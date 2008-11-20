@@ -9,12 +9,12 @@
 
 #include "pvfs2-types.h"
 
-#define PINT_HINT_TRANSFER 0x01
-
 #define PVFS_HINT_REQUEST_ID_NAME "pvfs.hint.request_id"
 #define PVFS_HINT_CLIENT_ID_NAME  "pvfs.hint.client_id"
 #define PVFS_HINT_HANDLE_NAME     "pvfs.hint.handle"
 #define PVFS_HINT_OP_ID_NAME      "pvfs.hint.op_id"
+#define PVFS_HINT_RANK_NAME       "pvfs.hint.rank"
+#define PVFS_HINT_SERVER_ID_NAME  "pvfs.hint.server_id"
 
 typedef struct PVFS_hint_s *PVFS_hint;
 

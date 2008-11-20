@@ -53,6 +53,7 @@ int main(int argc, char **argv)
     int server_count;
     PVFS_BMI_addr_t *addr_array = NULL;
     struct handlelist *hl_all, *hl_unrefd, *hl_notree;
+    struct PVFS_mgmt_setparam_value param_value;
 
     fsck_opts = parse_args(argc, argv);
     if (!fsck_opts)
@@ -125,15 +126,17 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = PVFS_SERVER_ADMIN_MODE;
     /* put the servers into administrative mode */
     ret = PVFS_mgmt_setparam_list(cur_fs,
 				  &creds,
 				  PVFS_SERV_PARAM_MODE,
-				  (uint64_t)PVFS_SERVER_ADMIN_MODE,
+				  &param_value,
 				  addr_array,
-				  NULL,
 				  server_count,
-				  NULL /* detailed errors */);
+				  NULL, /* detailed errors */
+                                  NULL);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
@@ -180,15 +183,17 @@ int main(int argc, char **argv)
 
     handlelist_finalize(&hl_all);
 
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+
     /* drop out of admin mode now that we've traversed the dir tree */
     PVFS_mgmt_setparam_list(cur_fs,
 			    &creds,
 			    PVFS_SERV_PARAM_MODE,
-			    (uint64_t) PVFS_SERVER_NORMAL_MODE,
+			    &param_value,
 			    addr_array,
-			    NULL,
 			    server_count,
-			    NULL);
+			    NULL, NULL);
     in_admin_mode = 0;
 
     /* third pass moves salvagable objects into lost+found:
@@ -215,15 +220,18 @@ int main(int argc, char **argv)
 
  exit_now:
     if (in_admin_mode) {
+
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+
 	/* get us out of admin mode */
 	PVFS_mgmt_setparam_list(cur_fs,
 				&creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t) PVFS_SERVER_NORMAL_MODE,
+                                &param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
     }
     
     PVFS_sys_finalize();
@@ -248,20 +256,22 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     PVFS_ds_position *position_array;
     struct PVFS_mgmt_server_stat *stat_array;
     struct handlelist *hl;
+    struct PVFS_mgmt_setparam_value param_value;
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
 	malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
     if (stat_array == NULL)
     {
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 	PVFS_mgmt_setparam_list(cur_fs,
 				creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t)PVFS_SERVER_NORMAL_MODE,
+				&param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
 	return NULL;
     }
 
@@ -270,18 +280,21 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 				stat_array,
 				addr_array,
 				server_count,
-				NULL /* details */);
+				NULL /* details */
+                , NULL);
     if (ret != 0)
     {
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	PVFS_mgmt_setparam_list(cur_fs,
 				creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t)PVFS_SERVER_NORMAL_MODE,
+                                &param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
 	return NULL;
     }
 
@@ -357,18 +370,21 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 					     addr_array,
 					     server_count,
                                              0,
-					     NULL /* details */);
+					     NULL /* details */,
+                                             NULL /* hints */);
 	if (ret < 0)
 	{
+            param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+            param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+
 	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
 	    PVFS_mgmt_setparam_list(cur_fs,
 				    creds,
 				    PVFS_SERV_PARAM_MODE,
-				    (uint64_t)PVFS_SERVER_NORMAL_MODE,
+                                    &param_value,
 				    addr_array,
-				    NULL,
 				    server_count,
-				    NULL);
+				    NULL, NULL);
 	    return NULL;
 	}
 
@@ -438,17 +454,20 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 					     addr_array,
 					     server_count,
                                              PVFS_MGMT_RESERVED,
-					     NULL /* details */);
+					     NULL /* details */,
+                                             NULL /* hints */);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
+            param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+            param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 	    PVFS_mgmt_setparam_list(cur_fs,
 				    creds,
 				    PVFS_SERV_PARAM_MODE,
-				    (uint64_t)PVFS_SERVER_NORMAL_MODE,
+				    &param_value,
 				    addr_array,
-				    NULL,
 				    server_count,
+				    NULL,
 				    NULL);
 	    return NULL;
 	}
@@ -514,7 +533,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			  "/",
 			  creds,
 			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     assert(ret == 0);
 
     pref = lookup_resp.ref;
@@ -522,7 +541,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
 		     creds,
-		     &getattr_resp);
+		     &getattr_resp, NULL);
 
     assert(getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY);
 
@@ -557,7 +576,7 @@ int match_dirdata(struct handlelist *hl,
 
     ret = PVFS_mgmt_get_dirdata_handle(dir_ref,
 				       &dirdata_handle,
-				       creds);
+				       creds, NULL);
     if (ret != 0)
     {
         PVFS_perror("match_dirdata", ret);
@@ -601,7 +620,7 @@ int descend(PVFS_fs_id cur_fs,
                          (!token ? PVFS_READDIR_START : token),
                          count,
                          creds,
-                         &readdir_resp);
+                         &readdir_resp, NULL);
 
         for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
         {
@@ -640,7 +659,7 @@ int descend(PVFS_fs_id cur_fs,
             ret = PVFS_sys_getattr(entry_ref,
                                    PVFS_ATTR_SYS_ALL_NOHINT,
                                    creds,
-                                   &getattr_resp);
+                                   &getattr_resp, NULL);
             if (ret != 0) {
                 ret = remove_directory_entry(dir_ref,
                                              entry_ref,
@@ -777,7 +796,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
     {
 	assert(0);
     }
-    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count);
+    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count, NULL);
     if (ret != 0)
     {
 	/* what does this mean? */
@@ -870,7 +889,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
-			       &getattr_resp);
+			       &getattr_resp, NULL);
 	if (ret) {
 	    /* remove anything we can't get attributes on */
 	    ret = remove_object(handle_ref,
@@ -951,7 +970,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
-			       &getattr_resp);
+			       &getattr_resp, NULL);
 	if (ret) {
 	    printf("warning: problem calling getattr on %llu; assuming datafile for now.\n",
 		   llu(handle));
@@ -1062,7 +1081,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 	ret = PVFS_sys_getattr(handle_ref,
 			       PVFS_ATTR_SYS_ALL_NOHINT,
 			       creds,
-			       &getattr_resp);
+			       &getattr_resp, NULL);
 	if (ret) {
 	    printf("warning: problem calling getattr on %llu\n",
 		   llu(handle));
@@ -1098,7 +1117,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 			  "/lost+found",
 			  creds,
 			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret == 0) {
 	laf_ref = lookup_resp.ref;
 	return 0;
@@ -1114,7 +1133,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 			  "/",
 			  creds,
 			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     assert(ret == 0);
 
     root_ref = lookup_resp.ref;
@@ -1127,7 +1146,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 			     root_ref,
 			     attr,
 			     creds,
-			     &mkdir_resp);
+			     &mkdir_resp, NULL);
 	if (ret == 0) {
 	    laf_ref = mkdir_resp.ref;
 	}
@@ -1156,7 +1175,7 @@ int create_dirent(PVFS_object_ref dir_ref,
 	ret = PVFS_mgmt_create_dirent(dir_ref,
 				      name,
 				      handle,
-				      creds);
+				      creds, NULL);
 	if (ret != 0) {
 	    PVFS_perror("PVFS_mgmt_create_dirent", ret);
 	}
@@ -1184,7 +1203,7 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_dirent(dir_ref,
 				      name,
-				      creds);
+				      creds, NULL);
 	if (ret != 0) {
 	    PVFS_perror("PVFS_mgmt_remove_dirent", ret);
 	}
@@ -1209,7 +1228,7 @@ int remove_object(PVFS_object_ref obj_ref,
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_object(obj_ref,
-				      creds);
+				      creds, NULL);
 	if (ret != 0) {
 	    PVFS_perror("PVFS_mgmt_remove_object", ret);
 	}
@@ -1638,4 +1657,3 @@ static char *get_type_str(int type)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-

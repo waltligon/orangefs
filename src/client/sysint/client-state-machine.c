@@ -25,10 +25,16 @@
 #include "id-generator.h"
 #include "ncache.h"
 #include "acache.h"
+#include "pint-event.h"
+#include "pint-hint.h"
 
 #define MAX_RETURNED_JOBS   256
 
 job_context_id pint_client_sm_context = -1;
+
+extern int pint_client_pid;
+
+extern PINT_event_id PINT_client_sys_event_id;
 
 /*
   used for locally storing completed operations from test() call so
@@ -297,9 +303,12 @@ int client_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
+
+    PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
@@ -357,6 +366,15 @@ PVFS_error PINT_client_state_machine_post(
     int pvfs_sys_op __attribute__((unused)) = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PVFS_hint_add_internal(&sm_p->hints, PINT_HINT_OP_ID, sizeof(pvfs_sys_op), &pvfs_sys_op);
+
+    PINT_EVENT_START(PINT_client_sys_event_id, pint_client_pid, NULL, &sm_p->event_id,
+                     PINT_HINT_GET_CLIENT_ID(sm_p->hints),
+                     PINT_HINT_GET_RANK(sm_p->hints),
+                     PINT_HINT_GET_REQUEST_ID(sm_p->hints),
+                     PINT_HINT_GET_HANDLE(sm_p->hints),
+                     pvfs_sys_op);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_client_state_machine_post smcb %p, op: %s\n",
                  smcb, PINT_client_get_name_str(smcb->op));
@@ -392,6 +410,8 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_TERMINATE);
 
+        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+
         *op_id = -1;
 
         /* free the smcb */
@@ -403,6 +423,7 @@ PVFS_error PINT_client_state_machine_post(
                     PINT_client_get_name_str(pvfs_sys_op),
                     llu((op_id ? *op_id : -1)),
                     js.error_code);
+
     }
     else
     {

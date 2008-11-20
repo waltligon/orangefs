@@ -125,7 +125,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -169,7 +169,7 @@ static int rmdirent_remove_directory_entry(
         &s_op->key, 
         &s_op->val,
         flags,
-        NULL, smcb, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     /* 
      * Removing an entry causes an update of directory timestamps
@@ -219,7 +219,7 @@ static PINT_sm_action rmdirent_update_directory_attr(
         s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
         ds_attr, 
         TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

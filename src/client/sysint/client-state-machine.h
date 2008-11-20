@@ -28,6 +28,8 @@
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
 #include "state-machine.h"
+#include "pvfs2-hint.h"
+#include "pint-event.h"
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
@@ -299,10 +301,9 @@ struct PINT_client_mgmt_setparam_list_sm
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
-    int64_t value;
+    struct PVFS_mgmt_setparam_value *value;
     PVFS_id_gen_t *addr_array;
     int count;
-    uint64_t *old_value_array;
     int *root_check_status_array;
     PVFS_error_details *details;
 };
@@ -500,6 +501,8 @@ typedef struct PINT_client_sm
     PVFS_sys_op_id sys_op_id;
     void *user_ptr;
 
+    PINT_event_id event_id;
+
     /* stores the final operation error code on operation exit */
     PVFS_error error_code;
 
@@ -514,6 +517,8 @@ typedef struct PINT_client_sm
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
+
+    PVFS_hint hints;
 
     PINT_sm_msgarray_op msgarray_op;
 

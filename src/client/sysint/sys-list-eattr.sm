@@ -57,6 +57,7 @@ PVFS_error PVFS_isys_listeattr(
         const PVFS_credentials *credentials,
         PVFS_sysresp_listeattr *resp_p,
         PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
@@ -91,6 +92,7 @@ PVFS_error PVFS_isys_listeattr(
     sm_p->u.listeattr.pos_token = token;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
@@ -101,7 +103,8 @@ PVFS_error PVFS_sys_listeattr(
         PVFS_ds_position token,
         int32_t nkey,
         const PVFS_credentials *credentials,
-        PVFS_sysresp_listeattr *resp_p)
+        PVFS_sysresp_listeattr *resp_p,
+        PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -109,7 +112,7 @@ PVFS_error PVFS_sys_listeattr(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_listeattr entered\n");
 
     ret = PVFS_isys_listeattr(ref, token, nkey, credentials,
-            resp_p, &op_id, NULL);
+            resp_p, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -160,7 +163,9 @@ static PINT_sm_action list_eattr_setup_msgpair(
             sm_p->object_ref.handle,
             sm_p->u.listeattr.pos_token,
             sm_p->u.listeattr.nkey,
-            sm_p->u.listeattr.size_array);
+            sm_p->u.listeattr.size_array,
+            sm_p->hints
+            );
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

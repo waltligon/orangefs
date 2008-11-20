@@ -1124,7 +1124,7 @@ static int translate_dspace_attr_0_0_1(
                 coll_id, &extent_array, &new_handle,
                 tmp_attr->type, NULL,
                 (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-                NULL, trove_context, &op_id);
+                NULL, trove_context, &op_id, NULL);
 
             while (ret == 0)
             {
@@ -1168,7 +1168,7 @@ static int translate_dspace_attr_0_0_1(
                                        TROVE_SYNC,
                                        NULL,
                                        trove_context,
-                                       &op_id);
+                                       &op_id, NULL);
             while (ret == 0)
             {
                 ret = trove_dspace_test( 
@@ -1452,7 +1452,7 @@ static int translate_keyval_db_0_0_1(
             state = 0;
             ret = trove_keyval_write(
                 coll_id, handle, &t_key, &t_val, trove_flags, 0, NULL,
-                trove_context, &op_id);
+                trove_context, &op_id, NULL);
 
             while (ret == 0)
             {   

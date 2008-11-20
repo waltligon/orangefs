@@ -221,7 +221,7 @@ int fp_bmi_cache_initialize(int flowproto_id)
     ret = PINT_thread_mgr_bmi_start();
     if(ret < 0)
 	return(ret);
-    PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
+    PINT_thread_mgr_bmi_getcontext((PVFS_context_id *)&global_bmi_context);
 
     return(0);
 }
@@ -869,7 +869,8 @@ static void cache_write_callback_fn(void *user_ptr,
 		q_item->cache_req.buffer_type,
         	q_item->parent->tag,
         	&q_item->bmi_callback,
-        	global_bmi_context);
+        	global_bmi_context,
+		q_item->parent->hints);
 
 	/* TODO: error handling */
 	assert(ret >= 0);
@@ -940,7 +941,8 @@ static void cache_read_callback_fn(void *user_ptr,
 		q_item->cache_req.buffer_type,
 		q_item->parent->tag,
 		&q_item->bmi_callback,
-		global_bmi_context);
+		global_bmi_context,
+		(bmi_hint)q_item->parent->hints);
 		
 	/* TODO: error handling */
 	assert(ret >= 0);

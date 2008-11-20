@@ -160,7 +160,8 @@ static PINT_sm_action small_io_start_job(
            0,
            js_p,
            &tmp_id,
-           server_job_context);
+           server_job_context,
+           s_op->req->hints);
         if(ret < 0)
         {
             gossip_err("small_io: Failed to post trove bstream write\n");
@@ -194,7 +195,8 @@ static PINT_sm_action small_io_start_job(
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context,
+            s_op->req->hints);
         if(ret < 0)
         {
             gossip_err("small-io: Failed to post trove bstream read\n");

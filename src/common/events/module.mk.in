@@ -1,0 +1,19 @@
+
+
+ifneq (,$(BUILD_TAU))
+
+DIR := src/common/events
+files := pvfs_tau_api.c fmt_fsm.c
+
+src := $(patsubst %,$(DIR)/%,$(files))
+
+LIBSRC += $(src)
+SERVERSRC += $(src)
+LIBBMISRC += $(src)
+
+ifneq (,@TAU_INCS@)
+MODCFLAGS_$(DIR)/fmt_fsm.c := -x c++ @TAU_INCS@
+MODCFLAGS_$(DIR)/pvfs_tau_api.c := -x c++ @TAU_INCS@
+endif
+
+endif # BUILD_TAU

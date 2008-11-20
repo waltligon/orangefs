@@ -370,6 +370,20 @@ exit:
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
                             enum dbpf_op_state state)
 {
+    if(qop_p->event_type != trove_dbpf_read_event_id &&
+       qop_p->event_type != trove_dbpf_write_event_id)
+    {
+        if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id,
+                           *qop_p->op.u.d_create.out_handle_p);
+        }
+        else
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id);
+        }
+    }
+
     DBPF_COMPLETION_START(qop_p, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);

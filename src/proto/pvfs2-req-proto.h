@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
+#include "pint-hint.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -179,12 +180,14 @@ endecode_fields_5_struct(
                                  __fsid,                                   \
                                  __attr,                                   \
                                  __num_dfiles_req,                         \
-                                 __layout)                                 \
+                                 __layout,                                 \
+                                 __hints)                                  \
 do {                                                                       \
     int mask;                                                              \
     memset(&(__req), 0, sizeof(__req));                                    \
     (__req).op = PVFS_SERV_CREATE;                                         \
     (__req).credentials = (__creds);                                       \
+    (__req).hints = (__hints);                                             \
     (__req).u.create.fs_id = (__fsid);                                     \
     (__req).u.create.num_dfiles_req = (__num_dfiles_req);                  \
     (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
@@ -244,11 +247,13 @@ endecode_fields_5_struct(
                                  __fsid,               \
                                  __objtype,            \
                                  __objcount,           \
-                                 __ext_array)          \
+                                 __ext_array,          \
+                                 __hints)              \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_BATCH_CREATE;               \
     (__req).credentials = (__creds);                   \
+    (__req).hints = (__hints);                         \
     (__req).u.batch_create.fs_id = (__fsid);           \
     (__req).u.batch_create.object_type = (__objtype);        \
     (__req).u.batch_create.object_count = (__objcount);      \
@@ -287,10 +292,12 @@ endecode_fields_2_struct(
 #define PINT_SERVREQ_REMOVE_FILL(__req,   \
                                  __creds, \
                                  __fsid,  \
-                                 __handle)\
+                                 __handle,\
+                                 __hints) \
 do {                                      \
     memset(&(__req), 0, sizeof(__req));   \
     (__req).op = PVFS_SERV_REMOVE;        \
+    (__req).hints = (__hints);            \
     (__req).credentials = (__creds);      \
     (__req).u.remove.fs_id = (__fsid);    \
     (__req).u.remove.handle = (__handle); \
@@ -340,10 +347,12 @@ endecode_fields_2_struct(
 #define PINT_SERVREQ_MGMT_REMOVE_OBJECT_FILL(__req,   \
                                              __creds, \
                                              __fsid,  \
-                                             __handle)\
+                                             __handle,\
+                                             __hints) \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op = PVFS_SERV_MGMT_REMOVE_OBJECT;        \
+    (__req).hints = (__hints);                        \
     (__req).credentials = (__creds);                  \
     (__req).u.mgmt_remove_object.fs_id = (__fsid);    \
     (__req).u.mgmt_remove_object.handle = (__handle); \
@@ -371,10 +380,12 @@ endecode_fields_4_struct(
                                              __creds, \
                                              __fsid,  \
                                              __handle,\
-                                             __entry) \
+                                             __entry, \
+                                             __hints) \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op = PVFS_SERV_MGMT_REMOVE_DIRENT;        \
+    (__req).hints = (__hints);                        \
     (__req).credentials = (__creds);                  \
     (__req).u.mgmt_remove_dirent.fs_id = (__fsid);    \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
@@ -396,11 +407,13 @@ endecode_fields_2_struct(
 #define PINT_SERVREQ_MGMT_GET_DIRDATA_HANDLE_FILL(__req,   \
                                                   __creds, \
                                                   __fsid,  \
-                                                  __handle)\
+                                                  __handle,\
+                                                  __hints) \
 do {                                                       \
     memset(&(__req), 0, sizeof(__req));                    \
     (__req).op = PVFS_SERV_MGMT_GET_DIRDATA_HANDLE;        \
     (__req).credentials = (__creds);                       \
+    (__req).hints = (__hints);                             \
     (__req).u.mgmt_get_dirdata_handle.fs_id = (__fsid);    \
     (__req).u.mgmt_get_dirdata_handle.handle = (__handle); \
 } while (0)
@@ -430,11 +443,13 @@ endecode_fields_3_struct(
 #define PINT_SERVREQ_FLUSH_FILL(__req,   \
                                 __creds, \
                                 __fsid,  \
-                                __handle)\
+                                __handle,\
+                                __hints )\
 do {                                     \
     memset(&(__req), 0, sizeof(__req));  \
     (__req).op = PVFS_SERV_FLUSH;        \
     (__req).credentials = (__creds);     \
+    (__req).hints = (__hints);           \
     (__req).u.flush.fs_id = (__fsid);    \
     (__req).u.flush.handle = (__handle); \
 } while (0)
@@ -458,11 +473,13 @@ endecode_fields_3_struct(
                                   __creds, \
                                   __fsid,  \
                                   __handle,\
-                                  __amask) \
+                                  __amask, \
+                                  __hints) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
     (__req).op = PVFS_SERV_GETATTR;        \
     (__req).credentials = (__creds);       \
+    (__req).hints = (__hints);             \
     (__req).u.getattr.fs_id = (__fsid);    \
     (__req).u.getattr.handle = (__handle); \
     (__req).u.getattr.attrmask = (__amask);\
@@ -545,11 +562,13 @@ endecode_fields_4_struct(
                                   __handle,      \
                                   __objtype,     \
                                   __attr,        \
-                                  __extra_amask) \
+                                  __extra_amask, \
+                                  __hints)       \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_SETATTR;              \
     (__req).credentials = (__creds);             \
+    (__req).hints = (__hints);                   \
     (__req).u.setattr.fs_id = (__fsid);          \
     (__req).u.setattr.handle = (__handle);       \
     (__attr).objtype = (__objtype);              \
@@ -583,11 +602,13 @@ endecode_fields_5_struct(
                                       __path,          \
                                       __fsid,          \
                                       __handle,        \
-                                      __amask)         \
+                                      __amask,         \
+                                      __hints)         \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_LOOKUP_PATH;                \
     (__req).credentials = (__creds);                   \
+    (__req).hints = (__hints);                         \
     (__req).u.lookup_path.path = (__path);             \
     (__req).u.lookup_path.fs_id = (__fsid);            \
     (__req).u.lookup_path.handle = (__handle);\
@@ -645,11 +666,13 @@ endecode_fields_4_struct(
                                 __creds,               \
                                 __fs_id,               \
                                 __ext_array,           \
-                                __attr)                \
+                                __attr,                \
+                                __hints)               \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_MKDIR;                      \
     (__req).credentials = (__creds);                   \
+    (__req).hints = (__hints);                         \
     (__req).u.mkdir.fs_id = __fs_id;                   \
     (__req).u.mkdir.handle_extent_array.extent_count = \
         (__ext_array).extent_count;                    \
@@ -692,15 +715,17 @@ endecode_fields_4_struct(
                                    __name,          \
                                    __new_handle,    \
                                    __handle,        \
-                                   __fs_id)         \
+                                   __fs_id,         \
+                                   __hints)         \
 do {                                                \
     memset(&(__req), 0, sizeof(__req));             \
     (__req).op = PVFS_SERV_CRDIRENT;                \
     (__req).credentials = (__creds);                \
+    (__req).hints = (__hints);                      \
     (__req).u.crdirent.name = (__name);             \
     (__req).u.crdirent.new_handle = (__new_handle); \
     (__req).u.crdirent.handle =                     \
-       (__handle);                           \
+       (__handle);                                  \
     (__req).u.crdirent.fs_id = (__fs_id);           \
 } while (0)
 
@@ -725,11 +750,13 @@ endecode_fields_3_struct(
                                    __creds,       \
                                    __fsid,        \
                                    __handle,      \
-                                   __entry)       \
+                                   __entry,       \
+                                   __hints)       \
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_RMDIRENT;              \
     (__req).credentials = (__creds);              \
+    (__req).hints = (__hints);                    \
     (__req).u.rmdirent.fs_id = (__fsid);          \
     (__req).u.rmdirent.handle = (__handle);       \
     (__req).u.rmdirent.entry = (__entry);         \
@@ -767,11 +794,13 @@ endecode_fields_4_struct(
                                    __fsid,         \
                                    __handle,       \
                                    __new_dirent,   \
-                                   __entry)        \
+                                   __entry,        \
+                                   __hints)        \
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_CHDIRENT;               \
     (__req).credentials = (__creds);               \
+    (__req).hints = (__hints);                     \
     (__req).u.chdirent.fs_id = (__fsid);           \
     (__req).u.chdirent.handle =                    \
         (__handle);                                \
@@ -810,11 +839,13 @@ endecode_fields_4_struct(
                                   __fsid,             \
                                   __handle,           \
                                   __token,            \
-                                  __dirent_count)     \
+                                  __dirent_count,     \
+                                  __hints)            \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op = PVFS_SERV_READDIR;                   \
     (__req).credentials = (__creds);                  \
+    (__req).hints = (__hints);                        \
     (__req).u.readdir.fs_id = (__fsid);               \
     (__req).u.readdir.handle = (__handle);            \
     (__req).u.readdir.token = (__token);              \
@@ -842,10 +873,11 @@ endecode_fields_3a_struct(
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */
 
-#define PINT_SERVREQ_GETCONFIG_FILL(__req, __creds)\
+#define PINT_SERVREQ_GETCONFIG_FILL(__req, __creds, __hints)\
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_GETCONFIG;              \
+    (__req).hints = (__hints);                     \
     (__req).credentials = (__creds);               \
 } while (0);
 
@@ -884,11 +916,13 @@ endecode_fields_5_struct(
                                 __creds,   \
                                 __fsid,    \
                                 __size,    \
-                                __handle)  \
+                                __handle,  \
+                                __hints)   \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
     (__req).op = PVFS_SERV_TRUNCATE;       \
     (__req).credentials = (__creds);       \
+    (__req).hints = (__hints);             \
     (__req).u.truncate.fs_id = (__fsid);   \
     (__req).u.truncate.size = (__size);    \
     (__req).u.truncate.handle = (__handle);\
@@ -905,11 +939,12 @@ endecode_fields_1_struct(
     PVFS_servreq_statfs,
     PVFS_fs_id, fs_id)
 
-#define PINT_SERVREQ_STATFS_FILL(__req, __creds, __fsid)\
+#define PINT_SERVREQ_STATFS_FILL(__req, __creds, __fsid,__hints)\
 do {                                                    \
     memset(&(__req), 0, sizeof(__req));                 \
     (__req).op = PVFS_SERV_STATFS;                      \
     (__req).credentials = (__creds);                    \
+    (__req).hints = (__hints);                          \
     (__req).u.statfs.fs_id = (__fsid);                  \
 } while (0)
 
@@ -992,11 +1027,13 @@ struct PVFS_servreq_io
                              __io_dist,               \
                              __file_req,              \
                              __file_req_off,          \
-                             __aggregate_size)        \
+                             __aggregate_size,        \
+                             __hints)                 \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op                 = PVFS_SERV_IO;        \
     (__req).credentials        = (__creds);           \
+    (__req).hints              = (__hints);           \
     (__req).u.io.fs_id         = (__fsid);            \
     (__req).u.io.handle        = (__handle);          \
     (__req).u.io.io_type       = (__io_type);         \
@@ -1007,7 +1044,7 @@ do {                                                  \
     (__req).u.io.file_req        = (__file_req);      \
     (__req).u.io.file_req_offset = (__file_req_off);  \
     (__req).u.io.aggregate_size  = (__aggregate_size);\
-} while (0)                             
+} while (0)
 
 struct PVFS_servresp_io
 {
@@ -1118,11 +1155,13 @@ struct PVFS_servreq_small_io
                                    __filereq,                            \
                                    __filereq_offset,                     \
                                    __segments,                           \
-                                   __memreq_size)                        \
+                                   __memreq_size,                        \
+                                   __hints )                             \
 do {                                                                     \
     int _sio_i;                                                          \
     (__req).op                                = PVFS_SERV_SMALL_IO;      \
     (__req).credentials                       = (__creds);               \
+    (__req).hints                             = (__hints);               \
     (__req).u.small_io.fs_id                  = (__fsid);                \
     (__req).u.small_io.handle                 = (__handle);              \
     (__req).u.small_io.io_type                = (__io_type);             \
@@ -1211,11 +1250,13 @@ endecode_fields_3a_struct(
                                   __fsid,  \
                                   __amask, \
                                   __nhandles, \
-                                  __handle_array) \
+                                  __handle_array, \
+                                  __hints) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
     (__req).op = PVFS_SERV_LISTATTR;        \
     (__req).credentials = (__creds);       \
+    (__req).hints = (__hints);             \
     (__req).u.listattr.fs_id = (__fsid);    \
     (__req).u.listattr.attrmask = (__amask);\
     (__req).u.listattr.nhandles = (__nhandles);    \
@@ -1245,46 +1286,42 @@ struct PVFS_servreq_mgmt_setparam
 {
     PVFS_fs_id fs_id;             /* file system */
     enum PVFS_server_param param; /* parameter to set */
-    uint64_t value;               /* parameter value */
+    struct PVFS_mgmt_setparam_value value;
 };
 endecode_fields_3_struct(
     PVFS_servreq_mgmt_setparam,
     PVFS_fs_id, fs_id,
     enum, param,
-    uint64_t, value)
+    PVFS_mgmt_setparam_value, value)
 
-#define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,  \
-                                        __creds,\
-                                        __fsid, \
-                                        __param,\
-                                        __value)\
-do {                                            \
-    memset(&(__req), 0, sizeof(__req));         \
-    (__req).op = PVFS_SERV_MGMT_SETPARAM;       \
-    (__req).credentials = (__creds);            \
-    (__req).u.mgmt_setparam.fs_id = (__fsid);   \
-    (__req).u.mgmt_setparam.param = (__param);  \
-    (__req).u.mgmt_setparam.value = (__value);  \
+#define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,                   \
+                                        __creds,                 \
+                                        __fsid,                  \
+                                        __param,                 \
+                                        __value,                 \
+                                        __hints)                 \
+do {                                                             \
+    memset(&(__req), 0, sizeof(__req));                          \
+    (__req).op = PVFS_SERV_MGMT_SETPARAM;                        \
+    (__req).credentials = (__creds);                             \
+    (__req).hints = (__hints);                                   \
+    (__req).u.mgmt_setparam.fs_id = (__fsid);                    \
+    (__req).u.mgmt_setparam.param = (__param);                   \
+    (__req).u.mgmt_setparam.value.type = (__value)->type;        \
+    (__req).u.mgmt_setparam.value.u.value = (__value)->u.value;  \
 } while (0)
-
-struct PVFS_servresp_mgmt_setparam
-{
-    uint64_t old_value;
-};
-endecode_fields_1_struct(
-    PVFS_servresp_mgmt_setparam,
-    uint64_t, old_value)
 
 /* mgmt_noop ********************************************************/
 /* - does nothing except contact a server to see if it is responding
  * to requests
  */
 
-#define PINT_SERVREQ_MGMT_NOOP_FILL(__req, __creds)\
+#define PINT_SERVREQ_MGMT_NOOP_FILL(__req, __creds, __hints)\
 do {                                               \
     memset(&(__req), 0, sizeof(__req));            \
     (__req).op = PVFS_SERV_MGMT_NOOP;              \
     (__req).credentials = (__creds);               \
+    (__req).hints = (__hints);                     \
 } while (0)
 
 
@@ -1304,11 +1341,13 @@ endecode_fields_2_struct(
 #define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,    \
                                         __creds,  \
                                         __next_id,\
-                                        __count)  \
+                                        __count,  \
+                                        __hints)  \
 do {                                              \
     memset(&(__req), 0, sizeof(__req));           \
     (__req).op = PVFS_SERV_MGMT_PERF_MON;         \
     (__req).credentials = (__creds);              \
+    (__req).hints = (__hints);                    \
     (__req).u.mgmt_perf_mon.next_id = (__next_id);\
     (__req).u.mgmt_perf_mon.count = (__count);    \
 } while (0)
@@ -1356,11 +1395,13 @@ endecode_fields_4_struct(
                                         __fs_id,                   \
                                         __handle_count,            \
                                         __position,                \
-                                        __flags)                   \
+                                        __flags,                   \
+                                        __hints)                   \
 do {                                                               \
     memset(&(__req), 0, sizeof(__req));                            \
     (__req).op = PVFS_SERV_MGMT_ITERATE_HANDLES;                   \
     (__req).credentials = (__creds);                               \
+    (__req).hints = (__hints);                                     \
     (__req).u.mgmt_iterate_handles.fs_id = (__fs_id);              \
     (__req).u.mgmt_iterate_handles.handle_count = (__handle_count);\
     (__req).u.mgmt_iterate_handles.position = (__position),        \
@@ -1403,11 +1444,13 @@ endecode_fields_1a_struct(
                                         __creds,                    \
                                         __fs_id,                    \
                                         __handle_array,             \
-                                        __handle_count)             \
+                                        __handle_count,             \
+                                        __hints)                    \
 do {                                                                \
     memset(&(__req), 0, sizeof(__req));                             \
     (__req).op = PVFS_SERV_MGMT_DSPACE_INFO_LIST;                   \
     (__req).credentials = (__creds);                                \
+    (__req).hints = (__hints);                                      \
     (__req).u.mgmt_dspace_info_list.fs_id = (__fs_id);              \
     (__req).u.mgmt_dspace_info_list.handle_array = (__handle_array);\
     (__req).u.mgmt_dspace_info_list.handle_count = (__handle_count);\
@@ -1438,11 +1481,12 @@ endecode_fields_1_struct(
     PVFS_servreq_mgmt_event_mon,
     uint32_t, event_count)
 
-#define PINT_SERVREQ_MGMT_EVENT_MON_FILL(__req, __creds, __event_count)\
+#define PINT_SERVREQ_MGMT_EVENT_MON_FILL(__req, __creds, __event_count, __hints)\
 do {                                                                   \
     memset(&(__req), 0, sizeof(__req));                                \
     (__req).op = PVFS_SERV_MGMT_EVENT_MON;                             \
     (__req).credentials = (__creds);                                   \
+    (__req).hints = (__hints);                                         \
     (__req).u.mgmt_event_mon.event_count = (__event_count);            \
 } while (0)
 
@@ -1487,14 +1531,16 @@ endecode_fields_2aa_struct(
                                   __handle,\
                                   __nkey,\
                                   __key_array, \
-                                  __size_array) \
+                                  __size_array,\
+                                  __hints) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
-    (__req).op = PVFS_SERV_GETEATTR;        \
+    (__req).op = PVFS_SERV_GETEATTR;       \
     (__req).credentials = (__creds);       \
-    (__req).u.geteattr.fs_id = (__fsid);    \
-    (__req).u.geteattr.handle = (__handle); \
-    (__req).u.geteattr.nkey = (__nkey); \
+    (__req).hints = (__hints);             \
+    (__req).u.geteattr.fs_id = (__fsid);   \
+    (__req).u.geteattr.handle = (__handle);\
+    (__req).u.geteattr.nkey = (__nkey);    \
     (__req).u.geteattr.key = (__key_array);\
     (__req).u.geteattr.valsz = (__size_array);\
 } while (0)
@@ -1547,11 +1593,13 @@ endecode_fields_4aa_struct(
                                   __flags,       \
                                   __nkey,        \
                                   __key_array,   \
-                                  __val_array)   \
+                                  __val_array,   \
+                                  __hints)       \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
     (__req).op = PVFS_SERV_SETEATTR;        \
-    (__req).credentials = (__creds);             \
+    (__req).credentials = (__creds);        \
+    (__req).hints = (__hints);              \
     (__req).u.seteattr.fs_id = (__fsid);    \
     (__req).u.seteattr.handle = (__handle); \
     (__req).u.seteattr.flags = (__flags);   \
@@ -1581,11 +1629,13 @@ endecode_fields_3_struct(
                                   __creds, \
                                   __fsid,  \
                                   __handle,\
-                                  __key) \
+                                  __key,   \
+                                  __hints) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
     (__req).op = PVFS_SERV_DELEATTR;        \
     (__req).credentials = (__creds);       \
+    (__req).hints = (__hints);             \
     (__req).u.deleattr.fs_id = (__fsid);    \
     (__req).u.deleattr.handle = (__handle); \
     (__req).u.deleattr.key.buffer_sz = (__key).buffer_sz;\
@@ -1620,11 +1670,13 @@ endecode_fields_4a_struct(
                                   __handle,           \
                                   __token,            \
                                   __nkey,             \
-                                  __size_array)       \
+                                  __size_array,       \
+                                  __hints)            \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op = PVFS_SERV_LISTEATTR;                 \
     (__req).credentials = (__creds);                  \
+    (__req).hints = (__hints);                        \
     (__req).u.listeattr.fs_id = (__fsid);             \
     (__req).u.listeattr.handle = (__handle);          \
     (__req).u.listeattr.token = (__token);            \
@@ -1655,6 +1707,8 @@ struct PVFS_server_req
 {
     enum PVFS_server_op op;
     PVFS_credentials credentials;
+    PVFS_hint hints;
+
     union
     {
         struct PVFS_servreq_create create;
@@ -1700,12 +1754,14 @@ encode_PVFS_server_req(char **pptr, const struct PVFS_server_req *x) {
 #endif
     *pptr += 4;
     encode_PVFS_credentials(pptr, &x->credentials);
+    encode_PINT_hint(pptr, x->hints);
 }
 static inline void
 decode_PVFS_server_req(char **pptr, struct PVFS_server_req *x) {
     decode_enum(pptr, &x->op);
     *pptr += 4;
     decode_PVFS_credentials(pptr, &x->credentials);
+    decode_PINT_hint(pptr, &x->hints);
 }
 #endif
 
@@ -1730,7 +1786,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_io io;
         struct PVFS_servresp_write_completion write_completion;
         struct PVFS_servresp_statfs statfs;
-        struct PVFS_servresp_mgmt_setparam mgmt_setparam;
         struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
         struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;
         struct PVFS_servresp_mgmt_dspace_info_list mgmt_dspace_info_list;

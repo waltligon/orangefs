@@ -33,8 +33,8 @@ static char s_client_core_path[PATH_MAX];
 
 #define MAX_DEV_INIT_FAILURES 10
 
-#define DEFAULT_ACACHE_TIMEOUT_STR "100"
-#define DEFAULT_NCACHE_TIMEOUT_STR "100"
+#define DEFAULT_ACACHE_TIMEOUT_STR "5"
+#define DEFAULT_NCACHE_TIMEOUT_STR "5"
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
@@ -62,6 +62,7 @@ typedef struct
     char *dev_buffer_count;
     char *dev_buffer_size;
     char *logtype;
+    char *events;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -411,6 +412,12 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->dev_buffer_size;
                 arg_index+=2;
             }
+            if(opts->events)
+            {
+                arg_list[arg_index] = "--events";
+                arg_list[arg_index+1] = opts->events;
+                arg_index+=2;
+            }
 
             if(opts->verbose)
             {
@@ -461,6 +468,7 @@ static void print_help(char *progname)
            "PATH\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
+    printf("--events=EVENTS               enable tracing of certain EVENTS\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -491,6 +499,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
@@ -599,6 +608,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->gossip_mask = optarg;
                     break;
                 }
+                else if (strcmp("events", cur_option) == 0)
+                {
+                    opts->events = optarg;
+                }
+
                 break;
             case 'h':
           do_help:

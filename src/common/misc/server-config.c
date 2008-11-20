@@ -67,6 +67,7 @@ static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_logtype);
 static DOTCONF_CB(get_event_logging_list);
+static DOTCONF_CB(get_event_tracing);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(check_this_server);
@@ -144,7 +145,8 @@ static char *get_handle_range_str(
     int meta_handle_range);
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
-    char *alias);
+    char *alias,
+    int *index);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
     PINT_llist *list,
     char *alias);
@@ -528,6 +530,9 @@ static const configoption_t options[] =
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,"none,"},
+
+    {"EnableTracing",ARG_STR, get_event_tracing,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,"no"},
 
     /* At startup each pvfs server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
@@ -1001,7 +1006,7 @@ int PINT_parse_config(
     {
         struct host_alias_s *halias;
         halias = find_host_alias_ptr_by_alias(
-                                config_s, server_alias_name);
+                                config_s, server_alias_name, &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
             gossip_err("Configuration file error. "
@@ -1582,6 +1587,26 @@ DOTCONF_CB(get_event_logging_list)
         len += strlen(cmd->data.list[i]);
     }
     config_s->event_logging = strdup(buf);
+    return NULL;
+}
+
+DOTCONF_CB(get_event_tracing)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if(!strcmp(cmd->data.str, "yes"))
+    {
+	config_s->enable_events = 1;
+    }
+    else
+    {
+	config_s->enable_events = 0;
+    }
     return NULL;
 }
 
@@ -2489,12 +2514,12 @@ DOTCONF_CB(get_range_list)
                     is_new_handle_mapping = 1;
                     handle_mapping->alias_mapping =
                         find_host_alias_ptr_by_alias(
-                            config_s, cmd->data.list[i-1]);
+                            config_s, cmd->data.list[i-1], NULL);
                 }
 
                 assert(handle_mapping->alias_mapping ==
                        find_host_alias_ptr_by_alias(
-                           config_s, cmd->data.list[i-1]));
+                           config_s, cmd->data.list[i-1], NULL));
 
                 if (!handle_mapping->handle_range &&
                     !handle_mapping->handle_extent_array.extent_array)
@@ -3237,17 +3262,20 @@ static void copy_filesystem(
 
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
-    char *alias)
+    char *alias,
+    int *index)
 {
     PINT_llist *cur = NULL;
     struct host_alias_s *ret = NULL;
     struct host_alias_s *cur_alias = NULL;
+    int ind = 0;
 
     if (config_s && alias)
     {
         cur = config_s->host_aliases;
         while(cur)
         {
+            ind++;
             cur_alias = PINT_llist_head(cur);
             if (!cur_alias)
             {
@@ -3264,6 +3292,7 @@ static host_alias_s *find_host_alias_ptr_by_alias(
             cur = PINT_llist_next(cur);
         }
     }
+    if(index) *index = ind - 1;
     return ret;
 }
 

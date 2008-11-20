@@ -143,6 +143,7 @@ void *dbpf_thread_function(void *ptr)
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
 
+    PINT_event_thread_start("TROVE-DBPF");
     while(dbpf_thread_running)
     {
         /* check if we any have ops to service in our work queue */
@@ -197,6 +198,7 @@ void *dbpf_thread_function(void *ptr)
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
+    PINT_event_thread_stop();
 #endif
     return ptr;
 }

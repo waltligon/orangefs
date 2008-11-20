@@ -208,7 +208,8 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
-            attr->u.meta.dfile_array[i]);
+            attr->u.meta.dfile_array[i],
+            sm_p->hints);
 
 	msg_p->fs_id = sm_p->object_ref.fs_id;
 	msg_p->handle = attr->u.meta.dfile_array[i];
@@ -247,7 +248,8 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle);
+        sm_p->object_ref.handle,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

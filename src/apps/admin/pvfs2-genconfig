@@ -31,6 +31,7 @@ my $opt_trovesync = '1';
 my $opt_trovemethod = '';
 my $opt_quiet = '';
 my $opt_logging = '';
+my $opt_tracing = '';
 my $opt_logstamp = '';
 my $opt_server_job_timeout = '';
 my $opt_client_job_timeout = '';
@@ -185,11 +186,12 @@ sub parse_hostlist
 sub emit_defaults
 {
     my ($target, $num_unexp, $bmi_module, $logfile,
-        $logging, $logstamp, $server_job_timeout, $client_job_timeout) = @_;
+        $logging, $tracing, $logstamp, $server_job_timeout, $client_job_timeout) = @_;
 
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
     print $target "\tEventLogging $logging\n";
+    print $target "\tEnableTracing $tracing\n";
     print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
@@ -520,6 +522,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --portal      <NUM>               Portals index for
                                        listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
+     --tracing                         Enable event tracing in the server
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
      --storage <STRING>                path to pvfs storage directory.
@@ -665,6 +668,17 @@ sub get_logging
         $logging = "none";
     }
     return $logging;
+}
+
+sub get_tracing
+{
+    my $tracing;
+    if ($opt_tracing) {
+        $tracing = "yes";
+    } else {
+        $tracing = "no";
+    }
+    return $tracing;
 }
 
 sub get_logstamp
@@ -1357,6 +1371,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'metaservers=s' => \$opt_metaservers,
     'logfile=s'     => \$opt_logfile,
     'logging=s'     => \$opt_logging,
+    'tracing'       => \$opt_tracing,
     'logstamp=s'    => \$opt_logstamp,
     'first-handle=i' => \$opt_first_handle,
     'last-handle=i' => \$opt_last_handle,
@@ -1542,6 +1557,7 @@ if (!$opt_quiet) {
 
 
 my $logging = get_logging();
+my $tracing = get_tracing();
 my $logstamp = get_logstamp();
 my $first_handle = get_first_handle();
 my $last_handle = get_last_handle();
@@ -1566,7 +1582,7 @@ if (!$opt_quiet) {
 }
 
 emit_defaults($output_target, $num_unexp_reqs,
-    $bmi_module, $default_logfile, $logging, 
+    $bmi_module, $default_logfile, $logging, $tracing,
     $logstamp, $server_job_timeout, $client_job_timeout);
 if ($opt_security == 1) 
 {

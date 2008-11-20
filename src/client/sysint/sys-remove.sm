@@ -154,6 +154,7 @@ PVFS_error PVFS_isys_remove(
     PVFS_object_ref parent_ref, 
     const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -186,6 +187,8 @@ PVFS_error PVFS_isys_remove(
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %llu,%d\n",
@@ -206,7 +209,8 @@ PVFS_error PVFS_isys_remove(
 PVFS_error PVFS_sys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
-    const PVFS_credentials *credentials)
+    const PVFS_credentials *credentials,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -214,7 +218,7 @@ PVFS_error PVFS_sys_remove(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
 
     ret = PVFS_isys_remove(object_name, parent_ref,
-                           credentials, &op_id, NULL);
+                           credentials, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_remove call", ret);
@@ -269,7 +273,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->u.remove.object_name);
+        sm_p->u.remove.object_name,
+        sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
                  "under %llu,%d\n", sm_p->u.remove.object_name,
@@ -317,7 +322,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id);
+        sm_p->parent_ref.fs_id,
+        sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%llu,%d) "
                  "under %llu,%d\n", sm_p->u.remove.object_name,

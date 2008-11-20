@@ -55,6 +55,12 @@ int service_operation(
 {
     sigset_t orig_sigset; 
     int ret = 0;
+    op->upcall.pid = current->pid;
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    op->upcall.tgid = -1;
+#else
+    op->upcall.tgid = current->tgid;
+#endif
 
 retry_servicing:
     op->downcall.status = 0;

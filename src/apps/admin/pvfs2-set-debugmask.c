@@ -42,6 +42,7 @@ int main(int argc, char **argv)
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credentials creds;
+    struct PVFS_mgmt_setparam_value param_value;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -76,18 +77,22 @@ int main(int argc, char **argv)
         printf("Setting debugmask on server %s\n",
                user_opts->single_server);
 
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = (uint64_t)user_opts->debug_mask;
         ret = PVFS_mgmt_setparam_single(
             cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            user_opts->debug_mask, user_opts->single_server,
+            &param_value, user_opts->single_server,
             NULL, NULL);
     }
     else
     {
         printf("Setting debugmask on all servers\n");
 
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = user_opts->debug_mask;
         ret = PVFS_mgmt_setparam_all(
             cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
-            user_opts->debug_mask, NULL, NULL);
+            &param_value, NULL, NULL);
     }
 
     if (ret)

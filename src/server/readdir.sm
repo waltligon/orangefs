@@ -124,7 +124,7 @@ static PINT_sm_action readdir_read_dirdata_handle(
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p, &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -204,8 +204,8 @@ static PINT_sm_action readdir_iterate_on_entries(
         s_op->req->u.readdir.token, s_op->key_a, s_op->val_a,
         s_op->req->u.readdir.dirent_count, 
         0, 
-        NULL, smcb, 0, js_p, 
-        &j_id, server_job_context);
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

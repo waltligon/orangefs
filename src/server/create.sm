@@ -170,7 +170,7 @@ static int create_metafile(
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return(ret);
 }
@@ -380,7 +380,8 @@ static int create_local_datafiles(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context,
+        s_op->req->hints);
 
     return(ret);
 }
@@ -408,7 +409,8 @@ static PINT_sm_action request_datafiles(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context,
+        s_op->req->hints);
     return ret;
 }
 
@@ -435,7 +437,8 @@ static PINT_sm_action remove_metafile_object(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context,
+        s_op->req->hints);
     return ret;
 }
 
@@ -468,7 +471,8 @@ static PINT_sm_action remove_local_datafile_handles(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context,
+        s_op->req->hints);
 
     return ret;
 }
@@ -511,7 +515,8 @@ static PINT_sm_action replace_remote_datafile_handles(
             0,
             js_p,
             &j_id,
-            server_job_context);
+            server_job_context,
+            s_op->req->hints);
 
         s_op->u.create.handle_index++;
         return(ret);
@@ -542,7 +547,8 @@ static PINT_sm_action remove_keyvals(
         s_op->req->u.create.fs_id,
         s_op->resp.u.create.metafile_handle,
         s_op->key_a, s_op->val_a, s_op->error_a,
-        2, TROVE_SYNC, NULL, smcb, 0, js_p, &j_id, server_job_context);
+        2, TROVE_SYNC, NULL, smcb, 0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
 
     return ret;
 }
@@ -685,7 +691,8 @@ static PINT_sm_action write_keyvals(
         s_op->resp.u.create.metafile_handle,
         s_op->key_a, s_op->val_a,
         keyval_count, TROVE_SYNC, NULL, smcb,
-        0, js_p, &j_id, server_job_context);
+        0, js_p, &j_id, server_job_context,
+        s_op->req->hints);
     return ret;
 }
 
@@ -743,7 +750,8 @@ static PINT_sm_action setattr_setobj_attribs(
          s_op->req->u.create.fs_id, s_op->resp.u.create.metafile_handle,
          ds_attr,
          TROVE_SYNC,
-         smcb, 0, js_p, &j_id, server_job_context);
+         smcb, 0, js_p, &j_id, server_job_context,
+         s_op->req->hints);
 
      return ret;
 }

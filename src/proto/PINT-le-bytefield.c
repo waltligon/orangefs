@@ -24,6 +24,7 @@
 #include "src/io/description/pint-request.h"  /* for PINT_Request */
 #include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
 #include "pvfs2-internal.h"
+#include "pint-hint.h"
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
@@ -57,6 +58,7 @@ static void lebf_initialize(void)
     PINT_Request tmp_req;
     char *tmp_name = strdup("foo");
     const int init_big_size = 1024 * 1024;
+    int i;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_initialize\n");
 
@@ -79,6 +81,14 @@ static void lebf_initialize(void)
     memset(&tmp_req, 0, sizeof(tmp_req));
 
     initializing_sizes = 1;
+
+    /* set number of hints in request to the max */
+    for(i = 0; i < PVFS_HINT_MAX; ++i)
+    {
+        char name[PVFS_HINT_MAX_NAME_LENGTH] = {0};
+        char val[PVFS_HINT_MAX_LENGTH] = {0};
+        PVFS_hint_add(&req.hints, name, PVFS_HINT_MAX_LENGTH, val);
+    }
 
     for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
 	req.op = resp.op = op_type;
@@ -270,6 +280,7 @@ static void lebf_initialize(void)
     }
 
     /* clean up stuff just used for initialization */
+    PVFS_hint_free(req.hints);
     free(tmp_dist.dist_name);
     free(tmp_name);
     initializing_sizes = 0;
@@ -488,7 +499,6 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MKDIR, mkdir);
         CASE(PVFS_SERV_READDIR, readdir);
         CASE(PVFS_SERV_STATFS, statfs);
-        CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
         CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
         CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
         CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
@@ -511,6 +521,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_MGMT_SETPARAM:
             /* nothing else */
             break;
 
@@ -682,7 +693,6 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_STATFS, statfs);
-	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
 	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
@@ -705,6 +715,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_MGMT_SETPARAM:
 	    /* nothing else */
 	    break;
 

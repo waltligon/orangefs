@@ -143,6 +143,8 @@ struct flow_descriptor
     PINT_Request_state *file_req_state;
     PINT_Request_state *mem_req_state;
     PINT_Request_result result;
+
+    PVFS_hint hints;
 };
 typedef struct flow_descriptor flow_descriptor;
 

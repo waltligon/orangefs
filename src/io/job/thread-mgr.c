@@ -16,6 +16,9 @@
 #include "trove.h"
 #include "pvfs2-internal.h"
 
+#include "pint-event.h"
+#include <stdio.h>
+
 #define THREAD_MGR_TEST_COUNT 5
 #define THREAD_MGR_TEST_TIMEOUT 10
 static int thread_mgr_test_timeout = THREAD_MGR_TEST_TIMEOUT;
@@ -84,6 +87,7 @@ static void *trove_thread_function(void *ptr)
     int timeout = thread_mgr_test_timeout;
 
 #ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_start("TROVE");
     while (trove_thread_running)
 #endif
     {
@@ -143,9 +147,11 @@ static void *trove_thread_function(void *ptr)
                              stat_trove_error_code_array[i]);
 	}
     }
+#ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_stop();
+#endif
     return (NULL);
 }
-
 
 /* bmi_thread_function()
  *
@@ -161,6 +167,7 @@ static void *bmi_thread_function(void *ptr)
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
 
 #ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_start("BMI");
     while (bmi_thread_running)
 #endif
     {
@@ -180,6 +187,7 @@ static void *bmi_thread_function(void *ptr)
 #ifdef __PVFS2_JOB_THREADED__
                 continue;
 #endif
+
                 return NULL;
 	    }
 
@@ -255,6 +263,7 @@ static void *bmi_thread_function(void *ptr)
             gossip_err("bmi_thread_function thread terminating\n");
             break;
 #endif
+
             return NULL;
 	}
 
@@ -280,6 +289,9 @@ static void *bmi_thread_function(void *ptr)
 	}
     }
 
+#ifdef __PVFS2_JOB_THREADED__
+    PINT_event_thread_stop();
+#endif
     return (NULL);
 }
 

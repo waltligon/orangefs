@@ -18,6 +18,7 @@ extern "C" {
 #include "pvfs2-internal.h"
 #include "dbpf-keyval-pcache.h"
 #include "dbpf-open-cache.h"
+#include "pint-event.h"
 
 /* For unknown Berkeley DB errors, we return some large value
  */
@@ -66,14 +67,6 @@ extern "C" {
 
 #define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
 ((__handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
-
-#define DBPF_EVENT_START(__op, __id)                                     \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
- PVFS_EVENT_FLAG_START)
-
-#define DBPF_EVENT_END(__op, __id)                                       \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
- PVFS_EVENT_FLAG_END)
 
 #define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)          \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
@@ -156,6 +149,19 @@ extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
+
+extern PINT_event_group trove_dbpf_event_group;
+
+extern PINT_event_type trove_dbpf_read_event_id;
+extern PINT_event_type trove_dbpf_write_event_id;
+extern PINT_event_type trove_dbpf_keyval_write_event_id;
+extern PINT_event_type trove_dbpf_keyval_read_event_id;
+extern PINT_event_type trove_dbpf_dspace_create_event_id;
+extern PINT_event_type trove_dbpf_dspace_create_list_event_id;
+extern PINT_event_type trove_dbpf_dspace_getattr_event_id;
+extern PINT_event_type trove_dbpf_dspace_setattr_event_id;
+
+extern int dbpf_pid;
 
 struct dbpf_aio_ops
 {
@@ -424,20 +430,21 @@ struct dbpf_bstream_rw_list_op
 
 inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                 TROVE_handle handle,
-                                char **mem_offset_array, 
+                                char **mem_offset_array,
                                 TROVE_size *mem_size_array,
                                 int mem_count,
                                 TROVE_offset *stream_offset_array,
                                 TROVE_size *stream_size_array,
                                 int stream_count,
                                 TROVE_size *out_size_p,
-                                TROVE_ds_flags flags, 
+                                TROVE_ds_flags flags,
                                 TROVE_vtag_s *vtag,
                                 void *user_ptr,
                                 TROVE_context_id context_id,
                                 TROVE_op_id *out_op_id_p,
                                 int opcode,
-                                struct dbpf_aio_ops * aio_ops);
+                                struct dbpf_aio_ops * aio_ops,
+                                PVFS_hint  hints);
 
 struct dbpf_keyval_get_handle_info_op
 {
@@ -534,6 +541,7 @@ struct dbpf_op
     void *user_ptr;
     TROVE_ds_flags flags;
     TROVE_context_id context_id;
+    PVFS_hint  hints;
     union
     {
         /* all the op types go in here; structs are all
@@ -734,10 +742,11 @@ int dbpf_bstream_read_at(TROVE_coll_id coll_id,
                          TROVE_size *inout_size_p,
                          TROVE_offset offset,
                          TROVE_ds_flags flags,
-                         TROVE_vtag_s *vtag, 
+                         TROVE_vtag_s *vtag,
                          void *user_ptr,
                          TROVE_context_id context_id,
-                         TROVE_op_id *out_op_id_p);
+                         TROVE_op_id *out_op_id_p,
+                         PVFS_hint  hints);
 
 int dbpf_bstream_write_at(TROVE_coll_id coll_id,
                           TROVE_handle handle,
@@ -748,14 +757,16 @@ int dbpf_bstream_write_at(TROVE_coll_id coll_id,
                           TROVE_vtag_s *vtag,
                           void *user_ptr,
                           TROVE_context_id context_id,
-                          TROVE_op_id *out_op_id_p);
+                          TROVE_op_id *out_op_id_p,
+                          PVFS_hint  hints);
 
 int dbpf_bstream_flush(TROVE_coll_id coll_id,
                        TROVE_handle handle,
                        TROVE_ds_flags flags,
                        void *user_ptr,
                        TROVE_context_id context_id,
-                       TROVE_op_id *out_op_id_p);
+                       TROVE_op_id *out_op_id_p,
+                       PVFS_hint hints);
 
 int dbpf_bstream_resize(TROVE_coll_id coll_id,
                         TROVE_handle handle,
@@ -764,7 +775,8 @@ int dbpf_bstream_resize(TROVE_coll_id coll_id,
                         TROVE_vtag_s *vtag,
                         void *user_ptr,
                         TROVE_context_id context_id,
-                        TROVE_op_id *out_op_id_p);
+                        TROVE_op_id *out_op_id_p,
+                        PVFS_hint  hints);
 
 int dbpf_bstream_validate(TROVE_coll_id coll_id,
                           TROVE_handle handle,
@@ -772,7 +784,8 @@ int dbpf_bstream_validate(TROVE_coll_id coll_id,
                           TROVE_vtag_s *vtag,
                           void *user_ptr,
                           TROVE_context_id context_id,
-                          TROVE_op_id *out_op_id_p);
+                          TROVE_op_id *out_op_id_p,
+                          PVFS_hint  hints);
 
 #if defined(__cplusplus)
 }

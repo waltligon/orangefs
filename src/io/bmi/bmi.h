@@ -49,7 +49,8 @@ int BMI_post_send(bmi_op_id_t * id,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id);
+		  bmi_context_id context_id,
+                  bmi_hint hints);
 
 int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    BMI_addr_t dest,
@@ -58,7 +59,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
 			    void *user_ptr,
-			    bmi_context_id context_id);
+			    bmi_context_id context_id,
+                            bmi_hint hints);
 
 int BMI_post_recv(bmi_op_id_t * id,
 		  BMI_addr_t src,
@@ -68,7 +70,8 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id);
+		  bmi_context_id context_id,
+                  bmi_hint hints);
 
 int BMI_test(bmi_op_id_t id,
 	     int *outcount,
@@ -143,7 +146,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id);
+		       bmi_context_id context_id,
+                       bmi_hint hints);
 
 int BMI_post_recv_list(bmi_op_id_t * id,
 		       BMI_addr_t src,
@@ -157,7 +161,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id);
+		       bmi_context_id context_id,
+                       bmi_hint hints);
 
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 BMI_addr_t dest,
@@ -169,7 +174,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 bmi_context_id context_id);
+				 bmi_context_id context_id,
+                                 bmi_hint hints);
 
 int BMI_cancel(bmi_op_id_t id, 
 	       bmi_context_id context_id);

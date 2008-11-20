@@ -59,6 +59,9 @@ typedef struct
     /* the operation return code after being services */
     TROVE_ds_state state;
 
+    PINT_event_type event_type;
+    PINT_event_id event_id;
+
     PINT_op_id mgr_op_id;
     struct qlist_head link;
 } dbpf_queued_op_t;

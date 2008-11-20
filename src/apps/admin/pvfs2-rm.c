@@ -100,7 +100,7 @@ int main(int argc, char **argv)
 
             memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
             rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
-                                 &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                 &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
             if (rc)
             {
                 PVFS_perror("PVFS_sys_lookup", rc);
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
 
             memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
             rc = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_TYPE,
-                                   &credentials, &resp_getattr);
+                                   &credentials, &resp_getattr, NULL);
             if (rc)
             {
                 PVFS_perror("PVFS_sys_getattr", rc);
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
-                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (rc)
         {
             PVFS_perror("PVFS_sys_lookup", rc);
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
         }
 
         parent_ref = resp_lookup.ref;
-        rc = PVFS_sys_remove(filename, parent_ref, &credentials);
+        rc = PVFS_sys_remove(filename, parent_ref, &credentials, NULL);
         if (rc)
         {
             fprintf(stderr, "Error: An error occurred while "

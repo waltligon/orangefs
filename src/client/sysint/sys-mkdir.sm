@@ -159,6 +159,7 @@ PVFS_error PVFS_isys_mkdir(
     const PVFS_credentials *credentials,
     PVFS_sysresp_mkdir *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -206,6 +207,8 @@ PVFS_error PVFS_isys_mkdir(
     sm_p->u.mkdir.mkdir_resp = resp;
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->object_ref = parent_ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
                  "under parent handle %llu on fs %d\n", object_name,
@@ -222,7 +225,8 @@ PVFS_error PVFS_sys_mkdir(
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     const PVFS_credentials *credentials,
-    PVFS_sysresp_mkdir *resp)
+    PVFS_sysresp_mkdir *resp,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -230,7 +234,7 @@ PVFS_error PVFS_sys_mkdir(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
 
     ret = PVFS_isys_mkdir(object_name, parent_ref, attr,
-                          credentials, resp, &op_id, NULL);
+                          credentials, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
@@ -367,7 +371,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
-        sm_p->u.mkdir.sys_attr);
+        sm_p->u.mkdir.sys_attr,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
@@ -416,7 +421,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
+        sm_p->object_ref.fs_id,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -480,7 +486,8 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        sm_p->u.mkdir.metafile_handle);
+        sm_p->u.mkdir.metafile_handle,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.mkdir.metafile_handle;
@@ -701,7 +708,8 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
             0,
             eattr_count,
             sm_p->u.mkdir.key_array,
-            sm_p->u.mkdir.val_array);
+            sm_p->u.mkdir.val_array,
+            sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.mkdir.metafile_handle;

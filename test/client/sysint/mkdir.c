@@ -80,7 +80,7 @@ int main(int argc,char **argv)
 	time(NULL);
 
     ret = PVFS_sys_mkdir(entry_name, parent_refn, attr, 
-                         &credentials, &resp_mkdir);
+                         &credentials, &resp_mkdir, NULL);
     if (ret < 0)
     {
         printf("mkdir failed\n");

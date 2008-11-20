@@ -102,6 +102,7 @@ PVFS_error PVFS_isys_readdir(
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -140,6 +141,9 @@ PVFS_error PVFS_isys_readdir(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+
     /* point the sm dirent array and outcount to the readdir response field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
     sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
@@ -168,7 +172,8 @@ PVFS_error PVFS_sys_readdir(
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
-    PVFS_sysresp_readdir *resp)
+    PVFS_sysresp_readdir *resp,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -176,7 +181,7 @@ PVFS_error PVFS_sys_readdir(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
 
     ret = PVFS_isys_readdir(ref, token, pvfs_dirent_incount,
-                            credentials, resp, &op_id, NULL);
+                            credentials, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_readdir call", ret);
@@ -249,8 +254,9 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        sm_p->readdir.pos_token,
-        sm_p->readdir.dirent_limit);
+        sm_p->u.readdir.pos_token,
+        sm_p->u.readdir.dirent_limit,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

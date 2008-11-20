@@ -69,6 +69,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     PVFS_handle entry_handle,
     PVFS_credentials *credentials,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -102,6 +103,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_create_dirent.entry = entry;
     sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to create dirent %s under %llu,%d\n",
@@ -118,7 +120,8 @@ PVFS_error PVFS_mgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
-    PVFS_credentials *credentials)
+    PVFS_credentials *credentials,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -127,7 +130,7 @@ PVFS_error PVFS_mgmt_create_dirent(
                  "PVFS_mgmt_create_dirent entered\n");
 
     ret = PVFS_imgmt_create_dirent(
-        parent_ref, entry, entry_handle, credentials, &op_id, NULL);
+        parent_ref, entry, entry_handle, credentials, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_create_dirent call", ret);
@@ -183,7 +186,8 @@ static int mgmt_create_dirent_setup_msgpair(
         sm_p->u.mgmt_create_dirent.entry,
         sm_p->u.mgmt_create_dirent.entry_handle,
         sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id);
+        sm_p->parent_ref.fs_id,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;

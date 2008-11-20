@@ -235,6 +235,8 @@ typedef struct
     int32_t type;
     int32_t __pad1;
     PVFS_credentials credentials;
+    int pid;
+    int tgid;
     /* currently trailer is used only by readx/writex (iox) */
     PVFS_size  trailer_size;
     PVFS2_ALIGN_VAR(char *, trailer_buf);

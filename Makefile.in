@@ -79,6 +79,7 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_SERVER = @BUILD_SERVER@
+BUILD_TAU = @BUILD_TAU@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -136,7 +137,8 @@ INCLUDES := \
     src/common/quicklist \
     src/common/id-generator \
     src/common/gossip \
-    src/common/gen-locks
+    src/common/gen-locks \
+    src/common/events
 else
 INCLUDES := \
     src/client/sysint \
@@ -146,6 +148,7 @@ INCLUDES := \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
+    src/common/events \
     src/io/trove \
     src/io/bmi \
     src/io/description \
@@ -774,6 +777,31 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  CCPIC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
+# c++ rule for building server objects
+%-server.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects for threaded library
+%-threaded.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects for threaded library
+%-threaded.po: %.cpp
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects 
+%.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects 
+%.po: %.cpp
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
 # bison and yacc
 %.c: %.y
 	$(Q) "  BISON		$@"
@@ -869,7 +897,7 @@ clean::
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES)\
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma
+		src/apps/karma/karma 
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
 endif
@@ -1040,8 +1068,6 @@ endif
 
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
-	# for compatibility in case anyone really wants "lsplus"
-	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)

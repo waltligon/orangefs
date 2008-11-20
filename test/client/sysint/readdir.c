@@ -56,7 +56,7 @@ int main(int argc,char **argv)
     name = starting_point;
     PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
         PVFS_perror_gossip("Lookup failed", ret);
@@ -77,7 +77,7 @@ int main(int argc,char **argv)
         memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS_READDIR_START :
                                              token), pvfs_dirent_incount, 
-                               &credentials, &resp_readdir);
+                               &credentials, &resp_readdir, NULL);
         if (ret < 0)
         {
             PVFS_perror_gossip("readdir failed", ret);

@@ -35,7 +35,6 @@ extern struct PINT_server_req_params pvfs2_perf_update_params;
 extern struct PINT_server_req_params pvfs2_job_timer_params;
 extern struct PINT_server_req_params pvfs2_proto_error_params;
 extern struct PINT_server_req_params pvfs2_perf_mon_params;
-extern struct PINT_server_req_params pvfs2_event_mon_params;
 extern struct PINT_server_req_params pvfs2_iterate_handles_params;
 extern struct PINT_server_req_params pvfs2_get_eattr_params;
 extern struct PINT_server_req_params pvfs2_get_eattr_list_params;
@@ -75,7 +74,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 20 */ {PVFS_SERV_MGMT_PERF_MON, &pvfs2_perf_mon_params},
     /* 21 */ {PVFS_SERV_MGMT_ITERATE_HANDLES, &pvfs2_iterate_handles_params},
     /* 22 */ {PVFS_SERV_MGMT_DSPACE_INFO_LIST, NULL},
-    /* 23 */ {PVFS_SERV_MGMT_EVENT_MON, &pvfs2_event_mon_params},
+    /* 23 */ {PVFS_SERV_MGMT_EVENT_MON, NULL},
     /* 24 */ {PVFS_SERV_MGMT_REMOVE_OBJECT, &pvfs2_mgmt_remove_object_params},
     /* 25 */ {PVFS_SERV_MGMT_REMOVE_DIRENT, &pvfs2_mgmt_remove_dirent_params},
     /* 26 */ {PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, &pvfs2_mgmt_get_dirdata_handle_params},

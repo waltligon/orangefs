@@ -111,6 +111,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array;
+    struct PVFS_mgmt_setparam_value param_value;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -166,26 +167,31 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    param_value.type = PVFS_SERV_PARAM_MODE;
+    param_value.u.value = PVFS_SERVER_ADMIN_MODE;
+
     /* put the servers into administrative mode */
     ret = PVFS_mgmt_setparam_list(cur_fs,
-				  &creds,
-				  PVFS_SERV_PARAM_MODE,
-				  (uint64_t)PVFS_SERVER_ADMIN_MODE,
-				  addr_array,
-				  NULL,
-				  server_count,
-				  NULL /* detailed errors */);
+                                  &creds,
+                                  PVFS_SERV_PARAM_MODE,
+                                  &param_value,
+                                  addr_array,
+                                  server_count,
+                                  NULL, /* detailed errors */
+                                  NULL);
     if (ret != 0)
     {
+        param_value.type = PVFS_SERV_PARAM_MODE;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
 	PVFS_mgmt_setparam_list(cur_fs,
 				&creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t)PVFS_SERVER_NORMAL_MODE,
+				&param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
 	return(-1);
     }
 
@@ -213,15 +219,16 @@ int main(int argc, char **argv)
 
     handlelist_finalize();
 
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = PVFS_SERVER_NORMAL_MODE;
     PVFS_mgmt_setparam_list(
 	cur_fs,
 	&creds,
 	PVFS_SERV_PARAM_MODE,
-	(uint64_t)PVFS_SERVER_NORMAL_MODE,
+	&param_value,
 	addr_array,
-	NULL,
 	server_count,
-	NULL);
+	NULL, NULL);
 
     PVFS_sys_finalize();
 
@@ -241,20 +248,22 @@ int build_handlelist(PVFS_fs_id cur_fs,
     unsigned long *total_count_array;
     PVFS_ds_position *position_array;
     struct PVFS_mgmt_server_stat *stat_array;
+    struct PVFS_mgmt_setparam_value param_value;
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
 	malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
     if (stat_array == NULL)
     {
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 	PVFS_mgmt_setparam_list(cur_fs,
 				creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t)PVFS_SERVER_NORMAL_MODE,
+				&param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
 	return -1;
     }
 
@@ -263,18 +272,20 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				stat_array,
 				addr_array,
 				server_count,
-				NULL /* details */);
+				NULL /* details */
+                , NULL);
     if (ret != 0)
     {
-	PVFS_perror("PVFS_mgmt_statfs_list", ret);
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+        PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	PVFS_mgmt_setparam_list(cur_fs,
 				creds,
 				PVFS_SERV_PARAM_MODE,
-				(uint64_t)PVFS_SERVER_NORMAL_MODE,
+                                &param_value,
 				addr_array,
-				NULL,
 				server_count,
-				NULL);
+				NULL, NULL);
 	return -1;
     }
 
@@ -349,18 +360,20 @@ int build_handlelist(PVFS_fs_id cur_fs,
 					     addr_array,
 					     server_count,
                                              0,
-					     NULL /* details */);
+					     NULL /* details */,
+                                             NULL /* hints */);
 	if (ret < 0)
 	{
-	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
+            param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
+            param_value.u.value = PVFS_SERVER_NORMAL_MODE;
+            PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
 	    PVFS_mgmt_setparam_list(cur_fs,
 				    creds,
 				    PVFS_SERV_PARAM_MODE,
-				    (uint64_t)PVFS_SERVER_NORMAL_MODE,
+				    &param_value,
 				    addr_array,
-				    NULL,
 				    server_count,
-				    NULL);
+				    NULL, NULL);
 	    return -1;
 	}
 
@@ -435,14 +448,14 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_object_ref pref;
 
     PVFS_sys_lookup(cur_fs, "/", creds,
-                    &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                    &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     /* lookup_resp.pinode_refn.handle gets root handle */
     pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL_NOHINT,
 		     creds,
-		     &getattr_resp);
+		     &getattr_resp, NULL);
 
     if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -491,7 +504,7 @@ int descend(PVFS_fs_id cur_fs,
                          (!token ? PVFS_READDIR_START : token),
                          count,
                          creds,
-                         &readdir_resp);
+                         &readdir_resp, NULL);
 
         for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
         {
@@ -508,7 +521,7 @@ int descend(PVFS_fs_id cur_fs,
             if ((ret = PVFS_sys_getattr(entry_ref,
                              PVFS_ATTR_SYS_ALL_NOHINT,
                              creds,
-                             &getattr_resp)) != 0)
+                             &getattr_resp, NULL)) != 0)
             {
                 printf("Could not get attributes of handle %llu [%d]\n",
                         llu(cur_handle), ret);
@@ -586,7 +599,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
         printf("invalid value of number of datafiles = %d\n", df_count);
 	assert(0);
     }
-    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count);
+    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count, NULL);
     if (ret != 0)
     {
 	assert(0);
@@ -639,7 +652,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
                          PVFS_ATTR_SYS_ALL,
-                         creds, &getattr_resp);
+                         creds, &getattr_resp, NULL);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;

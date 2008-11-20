@@ -14,6 +14,20 @@
 #include <pthread.h>
 #include <signal.h>
 #include <getopt.h>
+#include <net/if.h>
+#include <netinet/in.h>
+
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
+
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
@@ -35,6 +49,7 @@
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
 #include "pvfs2-encode-stubs.h"
+#include "pint-event.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -104,6 +119,7 @@ typedef struct
     int dev_buffer_count_set;
     unsigned int dev_buffer_size;
     int dev_buffer_size_set;
+    char *events;
 } options_t;
 
 /*
@@ -129,7 +145,8 @@ typedef struct
 
     job_status_s jstat;
     struct PINT_dev_unexp_info info;
-
+    PVFS_hint hints;
+    
     /* iox requests may post multiple operations at one shot */
     int num_ops, num_incomplete_ops;
     PVFS_sys_op_id op_id;
@@ -197,6 +214,7 @@ static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 static struct PINT_perf_counter* acache_pc = NULL;
 static struct PINT_perf_counter* static_acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
+/* static char hostname[100]; */
 
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
@@ -217,12 +235,14 @@ static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
     char *entry_name,
     PVFS_credentials *credentials,
-    int follow_link);
+    int follow_link,
+    PVFS_hint hints);
 
 static int write_device_response(
     void *buffer_list,
@@ -519,6 +539,7 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
 static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -527,6 +548,8 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.lookup.parent_refn.handle));
 
+    /* get rank from pid */
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_ref_lookup(
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         vfs_request->in_upcall.req.lookup.d_name,
@@ -534,7 +557,8 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.lookup,
         vfs_request->in_upcall.req.lookup.sym_follow,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -550,7 +574,8 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 static PVFS_error post_create_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a create request for %s (fsid %d | parent %llu)\n",
@@ -558,13 +583,15 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.create.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.create.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_create(
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn,
         vfs_request->in_upcall.req.create.attributes,
         &vfs_request->in_upcall.credentials, NULL, NULL,
         &vfs_request->response.create,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -576,6 +603,7 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
 static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -585,6 +613,7 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
         llu(vfs_request->in_upcall.req.sym.parent_refn.handle),
         vfs_request->in_upcall.req.sym.target);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_symlink(
         vfs_request->in_upcall.req.sym.entry_name,
         vfs_request->in_upcall.req.sym.parent_refn,
@@ -592,8 +621,9 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.sym.attributes,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.symlink,
-        &vfs_request->op_id, (void *)vfs_request);
-
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting symlink create failed", ret);
@@ -604,19 +634,22 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a getattr request for fsid %d | handle %llu\n",
         vfs_request->in_upcall.req.getattr.refn.fs_id,
         llu(vfs_request->in_upcall.req.getattr.refn.handle));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_getattr(
         vfs_request->in_upcall.req.getattr.refn,
         vfs_request->in_upcall.req.getattr.mask,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.getattr,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -628,6 +661,7 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -636,11 +670,13 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
         llu(vfs_request->in_upcall.req.setattr.refn.handle),
         vfs_request->in_upcall.req.setattr.attributes.mask);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_setattr(
         vfs_request->in_upcall.req.setattr.refn,
         vfs_request->in_upcall.req.setattr.attributes,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -652,7 +688,8 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a remove request for %s under fsid %d and "
@@ -660,11 +697,13 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.remove.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_remove(
         vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -676,6 +715,7 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -684,13 +724,15 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.mkdir.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_mkdir(
         vfs_request->in_upcall.req.mkdir.d_name,
         vfs_request->in_upcall.req.mkdir.parent_refn,
         vfs_request->in_upcall.req.mkdir.attributes,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.mkdir,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -702,6 +744,7 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
                  "for %llu,%d (token %llu)\n",
@@ -709,13 +752,15 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.req.readdir.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdir.token));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_readdir(
         vfs_request->in_upcall.req.readdir.refn,
         vfs_request->in_upcall.req.readdir.token,
         vfs_request->in_upcall.req.readdir.max_dirent_count,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.readdir,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -726,6 +771,7 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 
 static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
 {
+    PVFS_hint hints;
     PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
@@ -734,6 +780,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.req.readdirplus.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdirplus.token));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_readdirplus(
         vfs_request->in_upcall.req.readdirplus.refn,
         vfs_request->in_upcall.req.readdirplus.token,
@@ -741,7 +788,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, (void *)vfs_request, hints);
 
     if (ret < 0)
     {
@@ -753,6 +800,7 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
 static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -765,13 +813,15 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.rename.new_parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.rename.new_parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_rename(
         vfs_request->in_upcall.req.rename.d_old_name,
         vfs_request->in_upcall.req.rename.old_parent_refn,
         vfs_request->in_upcall.req.rename.d_new_name,
         vfs_request->in_upcall.req.rename.new_parent_refn,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -783,7 +833,8 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %llu under "
         "fsid %d to be size %lld\n",
@@ -791,11 +842,13 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.truncate.refn.fs_id,
         lld(vfs_request->in_upcall.req.truncate.size));
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_truncate(
         vfs_request->in_upcall.req.truncate.refn,
         vfs_request->in_upcall.req.truncate.size,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -807,7 +860,8 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a getxattr request for fsid %d | handle %llu\n",
@@ -847,6 +901,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     vfs_request->response.geteattr.val_array[0].buffer_sz = 
         PVFS_REQ_LIMIT_VAL_LEN;
 
+    fill_hints(&hints, vfs_request);
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
         vfs_request->in_upcall.req.getxattr.refn,
@@ -855,7 +910,9 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         &vfs_request->key,
         &vfs_request->response.geteattr,
         &vfs_request->op_id, 
+        hints, 
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -867,6 +924,7 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -886,6 +944,7 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
     vfs_request->val.buffer_sz = 
         vfs_request->in_upcall.req.setxattr.keyval.val_sz;
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_seteattr_list(
         vfs_request->in_upcall.req.setxattr.refn,
         &vfs_request->in_upcall.credentials,
@@ -894,7 +953,9 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
         &vfs_request->val,
         vfs_request->in_upcall.req.setxattr.flags,
         &vfs_request->op_id, 
+        hints, 
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -906,6 +967,7 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -920,12 +982,15 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_DEBUG,
         "removexattr key %s\n", (char *) vfs_request->key.buffer);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_deleattr(
         vfs_request->in_upcall.req.setxattr.refn,
         &vfs_request->in_upcall.credentials,
         &vfs_request->key,
         &vfs_request->op_id, 
+        hints,
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -938,7 +1003,8 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
     int i = 0, j = 0;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a listxattr request for fsid %d | handle %llu\n",
@@ -980,6 +1046,8 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
         free(vfs_request->response.listeattr.key_array);
         return -PVFS_ENOMEM;
     }
+
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_listeattr(
         vfs_request->in_upcall.req.listxattr.refn,
         vfs_request->in_upcall.req.listxattr.token,
@@ -987,8 +1055,10 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.listeattr,
         &vfs_request->op_id, 
+        hints,
         (void *)vfs_request);
-
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting listxattr failed", ret);
@@ -1421,16 +1491,19 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_statfs(
         vfs_request->in_upcall.req.statfs.fs_id,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.statfs,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
@@ -1551,7 +1624,8 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 static PVFS_error post_io_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
 #ifdef USE_MMAP_RA_CACHE
     int val = 0, amt_returned = 0;
     void *buf = NULL;
@@ -1665,6 +1739,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         PVFS_BYTE, &vfs_request->file_req);
     assert(ret == 0);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req,
         vfs_request->in_upcall.req.io.offset, 
@@ -1672,7 +1747,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
 
     if (ret < 0)
     {
@@ -1715,6 +1790,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     int32_t i, num_ops_posted, iox_count, iox_index;
     int32_t *mem_sizes = NULL;
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+
     struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
 
     if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
@@ -1841,6 +1918,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             gossip_err("post_iox_request: request_hindexed failed\n");
             break;
         }
+
+        fill_hints(&hints, vfs_request);
         /* post the I/O */
         ret = PVFS_isys_io(
             vfs_request->in_upcall.req.iox.refn, vfs_request->file_req_a[i],
@@ -1850,6 +1929,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             &vfs_request->response.iox[i],
             vfs_request->in_upcall.req.iox.io_type,
             &vfs_request->op_ids[i],
+            hints,
             (void *)vfs_request);
 
         if (ret < 0)
@@ -1943,17 +2023,20 @@ static PVFS_error service_operation_cancellation(
 static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %llu,%d\n",
         llu(vfs_request->in_upcall.req.fsync.refn.handle),
         vfs_request->in_upcall.req.fsync.refn.fs_id);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_flush(
         vfs_request->in_upcall.req.fsync.refn,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
-
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting flush failed", ret);
@@ -1965,15 +2048,15 @@ static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
     char *entry_name,
     PVFS_credentials *credentials,
-    int follow_link)
+    int follow_link,
+    PVFS_hint hints)
 {
     PVFS_error ret = 0;
     PVFS_sysresp_lookup lookup_response;
     PVFS_object_ref refn = { PVFS_HANDLE_NULL, PVFS_FS_ID_NULL };
-
     ret = PVFS_sys_ref_lookup(
         parent.fs_id, entry_name, parent, credentials,
-        &lookup_response, follow_link);
+        &lookup_response, follow_link, hints);
 
     if (ret)
     {
@@ -2228,11 +2311,14 @@ static inline void package_downcall_members(
                 */
                 if (*error_code == -PVFS_EEXIST)
                 {
+                    PVFS_hint hints;
+                    fill_hints(&hints, vfs_request);
                     vfs_request->out_downcall.resp.create.refn =
                         perform_lookup_on_create_error(
                             vfs_request->in_upcall.req.create.parent_refn,
                             vfs_request->in_upcall.req.create.d_name,
-                            &vfs_request->in_upcall.credentials, 1);
+                            &vfs_request->in_upcall.credentials, 1, hints);
+                    vfs_request->hints = hints;
 
                     if (vfs_request->out_downcall.resp.create.refn.handle ==
                         PVFS_HANDLE_NULL)
@@ -2686,6 +2772,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     PINT_dev_release_unexpected(&vfs_request->info);
     PINT_sys_release(vfs_request->op_id);
 
+    PVFS_hint_free(vfs_request->hints);
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
 
@@ -3313,6 +3400,11 @@ int main(int argc, char **argv)
     }
     set_device_parameters(&s_opts);
 
+    if(s_opts.events)
+    {
+        PINT_event_enable(s_opts.events);
+    }
+
     /* start performance counters for acache */
     acache_pc = PINT_perf_initialize(acache_keys);
     if(!acache_pc)
@@ -3538,8 +3630,10 @@ static void print_help(char *progname)
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--logstamp=none|usec|datetime overrides the default log message's time stamp\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
+    printf("--create-request-id           create a id which is transfered to the server\n");
     printf("--desc-count=VALUE            overrides the default # of kernel buffer descriptors\n");
     printf("--desc-size=VALUE             overrides the default size of each kernel buffer descriptor\n");
+    printf("--events=EVENT_LIST           specify the events to enable\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -3566,6 +3660,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"logtype",1,0,0},
         {"logstamp",1,0,0},
         {"child",0,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
@@ -3743,6 +3838,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("child", cur_option) == 0)
                 {
                     opts->child = 1;
+                }
+                else if (strcmp("events", cur_option) == 0)
+                {
+                    opts->events = optarg;
                 }
                 break;
             case 'h':
@@ -4047,6 +4146,51 @@ static void set_device_parameters(options_t *s_opts)
     s_desc_params[BM_READDIR].dev_buffer_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     s_desc_params[BM_READDIR].dev_buffer_size  = PVFS2_READDIR_DEFAULT_DESC_SIZE;
     return;
+}
+
+static int get_mac(void);
+
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+{
+    int32_t mac;
+
+    *hints = NULL;
+    if(!s_opts.events) return;
+
+    mac = get_mac();
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);
+    PVFS_hint_add(hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(mac), &mac);
+}
+
+static int get_mac(void)
+{
+    int sock;
+    struct ifreq iface;
+    int mac;
+
+    strcpy(iface.ifr_name,"eth0");
+
+    if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+    else
+    {
+        if((ioctl(sock, SIOCGIFHWADDR, &iface)) < 0)
+        {
+            perror("ioctl SIOCGIFHWADDR");
+            return -1;
+        }
+        else
+        {
+            mac = iface.ifr_hwaddr.sa_data[0] & 0xff;
+            mac |= (iface.ifr_hwaddr.sa_data[1] & 0xff) << 8;
+            mac |= (iface.ifr_hwaddr.sa_data[2] & 0xff) << 8;
+            mac |= (iface.ifr_hwaddr.sa_data[3] & 0xff) << 8;
+            return mac;
+        }
+    }
 }
 
 /*

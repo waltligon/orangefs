@@ -69,6 +69,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
     char *entry,
     PVFS_credentials *credentials,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -100,6 +101,7 @@ PVFS_error PVFS_imgmt_remove_dirent(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_remove_dirent.entry = entry;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to remove dirent %s under %llu,%d\n",
@@ -115,7 +117,8 @@ PVFS_error PVFS_imgmt_remove_dirent(
 PVFS_error PVFS_mgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
-    PVFS_credentials *credentials)
+    PVFS_credentials *credentials,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -124,7 +127,7 @@ PVFS_error PVFS_mgmt_remove_dirent(
                  "PVFS_mgmt_remove_dirent entered\n");
 
     ret = PVFS_imgmt_remove_dirent(
-        parent_ref, entry, credentials, &op_id, NULL);
+        parent_ref, entry, credentials, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_remove_dirent call", ret);
@@ -172,7 +175,8 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->u.mgmt_remove_dirent.entry);
+        sm_p->u.mgmt_remove_dirent.entry,
+        sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing MGMT_REMOVE_DIRENT %s "
                  "under %llu,%d\n", sm_p->u.mgmt_remove_dirent.entry,

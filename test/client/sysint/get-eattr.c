@@ -118,7 +118,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
                           &credentials, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
       PVFS_perror("PVFS_sys_lookup", ret);
@@ -157,7 +157,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
                             parent_ref, &credentials, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
   if (ret != 0)
   {
     fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
@@ -167,7 +167,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
   /* get extended attribute */
   resp_geteattr.val_array = val_p;
   ret = PVFS_sys_geteattr_list(resp_lookup.ref,
-          &credentials, nkey, key_p, &resp_geteattr);
+          &credentials, nkey, key_p, &resp_geteattr, NULL);
   if (ret < 0)
   {
       PVFS_perror("PVFS_sys_geteattr failed with errcode", ret);

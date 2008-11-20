@@ -114,6 +114,7 @@ PVFS_error PVFS_isys_readdirplus(
     uint32_t attrmask,
     PVFS_sysresp_readdirplus *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -151,6 +152,7 @@ PVFS_error PVFS_isys_readdirplus(
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
     /* point the sm dirent array and outcount to the readdirplus response field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
     sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
@@ -191,7 +193,8 @@ PVFS_error PVFS_sys_readdirplus(
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,
-    PVFS_sysresp_readdirplus *resp)
+    PVFS_sysresp_readdirplus *resp,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -199,7 +202,7 @@ PVFS_error PVFS_sys_readdirplus(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdirplus entered\n");
 
     ret = PVFS_isys_readdirplus(ref, token, pvfs_dirent_incount,
-                            credentials, attrmask, resp, &op_id, NULL);
+                            credentials, attrmask, resp, &op_id, NULL, hints);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_readdirplus call", ret);
@@ -510,7 +513,8 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
             sm_p->object_ref.fs_id,
             sm_p->u.readdirplus.attrmask,
             sm_p->u.readdirplus.handle_count[i],
-            sm_p->u.readdirplus.handles[i]);
+            sm_p->u.readdirplus.handles[i],
+            sm_p->hints);
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
@@ -730,7 +734,8 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
             sm_p->object_ref.fs_id,
             PVFS_ATTR_DATA_SIZE,
             sm_p->u.readdirplus.handle_count[i],
-            sm_p->u.readdirplus.handles[i]);
+            sm_p->u.readdirplus.handles[i],
+            sm_p->hints);
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;

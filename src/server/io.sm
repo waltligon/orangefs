@@ -117,7 +117,8 @@ static int io_send_ack(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,
         s_op->tag, s_op->encoded.buffer_type, 0, smcb, 0, js_p,
-        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout);
+        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout,
+        s_op->req->hints);
 
     return err;
 }
@@ -155,6 +156,8 @@ static PINT_sm_action io_start_flow(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    s_op->u.io.flow_d->hints = s_op->req->hints;
 
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
@@ -233,7 +236,8 @@ static PINT_sm_action io_start_flow(
     }
 
     err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
-                   server_job_context, user_opts->server_job_flow_timeout);
+                   server_job_context, user_opts->server_job_flow_timeout
+                   , s_op->req->hints);
 
     return err;
 }
@@ -374,7 +378,8 @@ static PINT_sm_action io_send_completion_ack(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
-        server_job_context, user_opts->server_job_bmi_timeout);
+        server_job_context, user_opts->server_job_bmi_timeout,
+        s_op->req->hints);
 
     return err;
 }

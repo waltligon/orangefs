@@ -91,7 +91,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
 {
     char *buffer = (char *) malloc(4096);
     int ret;
-    
+
     if (obj->fs_type == UNIX_FILE)
     {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
@@ -113,8 +113,8 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
         key.buffer_sz = strlen(DIST_KEY) + 1;
         val.buffer = buffer;
         val.buffer_sz = 4096;
-        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref,
+                creds, &key, &val, NULL)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -137,7 +137,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
     char *buffer = (char *) malloc(4096);
     int ret, num_dfiles, count;
     PVFS_fs_id fsid;
-    
+
     if (obj->fs_type == UNIX_FILE)
     {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
@@ -159,8 +159,8 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         key.buffer_sz = strlen(DFILE_KEY) + 1;
         val.buffer = buffer;
         val.buffer_sz = 4096;
-        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
-                creds, &key, &val)) < 0)
+        if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref,
+                creds, &key, &val, NULL)) < 0)
         {
             PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
@@ -169,7 +169,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         fsid = obj->u.pvfs2.fs_id;
     }
     /*
-     * At this point, we know all the dfile handles 
+     * At this point, we know all the dfile handles
      */
     num_dfiles = (ret / sizeof(PVFS_handle));
     count = num_dfiles < *nservers ? num_dfiles : *nservers;
@@ -212,6 +212,7 @@ int main(int argc, char ** argv)
     PVFS_credentials credentials;
     char *servers[256];
     PVFS_handle handles[256];
+    char metadataserver[256];
     int i, nservers = 256;
 
     memset(&dist, 0, sizeof(dist));
@@ -258,10 +259,21 @@ int main(int argc, char ** argv)
     printf("dist_name = %s\n", dist->dist_name);
     printf("dist_params:\n%s\n", dist->methods->params_string(dist->params));
     PINT_dist_free(dist);
+
+
+    ret = PINT_cached_config_get_server_name(metadataserver, 256,
+        src.u.pvfs2.ref.handle, src.u.pvfs2.ref.fs_id);
+    if( ret != 0)
+    {
+        fprintf(stderr, "Error, could not get metadataserver name\n");
+        return (-1);
+    }
+    printf("Metadataserver: %s\n", metadataserver);
+
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
-        printf("Server %d - %s, handle: %llu (%08llx.bstream)\n", i, servers[i],
+        printf("Datafile %d - %s, handle: %llu (%08llx.bstream)\n", i, servers[i],
             llu(handles[i]), llu(handles[i]));
         free(servers[i]);
     }
@@ -380,18 +392,18 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
             perror("fstatfs:");
             fprintf(stderr, "could not fstatfs %s\n", obj->u.ufs.path);
         }
-        memcpy(&obj->u.ufs.fs_id, &PINT_statfs_fsid(&statfsbuf), 
+        memcpy(&obj->u.ufs.fs_id, &PINT_statfs_fsid(&statfsbuf),
                sizeof(PINT_statfs_fsid(&statfsbuf)));
         return 0;
     }
     else
     {
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, 
+        ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id,
                               (char *) obj->u.pvfs2.pvfs2_path,
-                              credentials, 
+                              credentials,
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -402,7 +414,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               credentials, &resp_getattr);
+                               credentials, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",

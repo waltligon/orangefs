@@ -55,6 +55,7 @@ PVFS_error PVFS_isys_deleattr(
         const PVFS_credentials *credentials,
         PVFS_ds_keyval *key_p,
         PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
@@ -86,7 +87,8 @@ PVFS_error PVFS_isys_deleattr(
     sm_p->u.deleattr.key_p = key_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
-
+    PVFS_hint_copy(hints, &sm_p->hints);
+    
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
 }
@@ -94,7 +96,8 @@ PVFS_error PVFS_isys_deleattr(
 PVFS_error PVFS_sys_deleattr(
         PVFS_object_ref ref,
         const PVFS_credentials *credentials,
-        PVFS_ds_keyval *key_p)
+        PVFS_ds_keyval *key_p, 
+        PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -102,7 +105,7 @@ PVFS_error PVFS_sys_deleattr(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_deleattr entered\n");
 
     ret = PVFS_isys_deleattr(ref, credentials,
-            key_p, &op_id, NULL);
+            key_p, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -141,7 +144,9 @@ static PINT_sm_action del_eattr_setup_msgpair(
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            (*sm_p->u.deleattr.key_p));
+            (*sm_p->u.deleattr.key_p),
+            sm_p->hints
+            );
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

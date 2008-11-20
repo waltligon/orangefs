@@ -612,7 +612,8 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id)
+		  bmi_context_id context_id,
+                  bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -634,7 +635,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_recv(
         id, tmp_ref->method_addr, buffer, expected_size, actual_size,
-        buffer_type, tag, user_ptr, context_id);
+        buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -650,7 +651,8 @@ int BMI_post_send(bmi_op_id_t * id,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id)
+		  bmi_context_id context_id,
+                  bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -672,7 +674,7 @@ int BMI_post_send(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_send(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
-        user_ptr, context_id);
+        user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -688,7 +690,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
 			    void *user_ptr,
-			    bmi_context_id context_id)
+			    bmi_context_id context_id,
+                            bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -710,7 +713,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_sendunexpected(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
-        user_ptr, context_id);
+        user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -1162,6 +1165,9 @@ void *BMI_memalloc(BMI_addr_t addr,
 {
     void *new_buffer = NULL;
     ref_st_p tmp_ref = NULL;
+
+    return PINT_mem_aligned_alloc(size, 4096);
+/*    return(malloc(size)); */
 
     /* find a reference that matches this address */
     gen_mutex_lock(&ref_mutex);
@@ -1660,7 +1666,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id)
+		       bmi_context_id context_id,
+                       bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1696,7 +1703,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_send_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
-            context_id);
+            context_id, (PVFS_hint)hints);
 
 	return (ret);
     }
@@ -1727,7 +1734,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id)
+		       bmi_context_id context_id,
+                       bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1763,7 +1771,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_recv_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_expected_size, total_actual_size,
-            buffer_type, tag, user_ptr, context_id);
+            buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
 
 	return (ret);
     }
@@ -1792,7 +1800,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 bmi_context_id context_id)
+				 bmi_context_id context_id,
+                                 bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1829,7 +1838,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_sendunexpected_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
-            context_id);
+            context_id, (PVFS_hint)hints);
 
 	return (ret);
     }

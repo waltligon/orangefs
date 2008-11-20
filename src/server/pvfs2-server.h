@@ -31,6 +31,7 @@
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
 #include "state-machine.h"
+#include "pint-event.h"
 
 extern job_context_id server_job_context;
 
@@ -404,6 +405,8 @@ typedef struct PINT_server_op
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
     int op_cancelled; /* indicates unexp message was cancelled */
     enum PVFS_server_op op;  /* type of operation that we are servicing */
+
+    PINT_event_id event_id;
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 

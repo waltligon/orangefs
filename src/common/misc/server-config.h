@@ -138,6 +138,7 @@ typedef struct distribution_configuration_s
 typedef struct server_configuration_s
 {
     char *host_id;
+    int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
     char *storage_path;
@@ -159,6 +160,7 @@ typedef struct server_configuration_s
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
     char *event_logging;
+    int enable_events;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
 

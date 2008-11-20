@@ -23,17 +23,8 @@
 #include "trove.h"
 #include "gossip.h"
 #include "id-generator.h"
-#include "pint-event.h"
 #include "job-time-mgr.h"
 #include "pvfs2-internal.h"
-
-#define JOB_EVENT_START(__op, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
- PVFS_EVENT_FLAG_START)
-
-#define JOB_EVENT_END(__op, __size, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, __size, __id, \
- PVFS_EVENT_FLAG_END)
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -178,7 +169,7 @@ int job_initialize(int flags)
         teardown_queues();
         return (-ret);
     }
-    ret = PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
+    ret = PINT_thread_mgr_bmi_getcontext((PVFS_context_id *)&global_bmi_context);
     /* this should never fail if the thread startup succeeded */
     assert(ret == 0);
 
@@ -371,7 +362,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
                  job_status_s * out_status_p,
                  job_id_t * id,
                  job_context_id context_id,
-                 int timeout_sec)
+                 int timeout_sec,
+                 PVFS_hint hints)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -398,20 +390,22 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
+
+    jd->hints = hints;
 
     /* post appropriate type of send */
     if (!send_unexpected)
     {
         ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
-                            buffer_type, tag, user_ptr_internal, 
-                            global_bmi_context);
+                            buffer_type, tag, user_ptr_internal,
+                            global_bmi_context, jd->hints);
     }
     else
     {
         ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
                                       buffer, size, buffer_type, tag,
-                                      user_ptr_internal, global_bmi_context);
+                                      user_ptr_internal, global_bmi_context,
+                                      jd->hints);
     }
 
     if (ret < 0)
@@ -419,7 +413,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -431,18 +424,16 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, size, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     bmi_pending_count++;
-    jd->event_type = PVFS_EVENT_BMI_SEND;
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -468,7 +459,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
                       job_status_s * out_status_p,
                       job_id_t * id,
                       job_context_id context_id,
-                      int timeout_sec)
+                      int timeout_sec,
+                      PVFS_hint hints)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -495,7 +487,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
+
+    jd->hints = hints;
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -503,7 +496,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         ret = BMI_post_send_list(&(jd->u.bmi.id), addr,
                                  (const void **) buffer_list, size_list,
                                  list_count, total_size, buffer_type,
-                                 tag, user_ptr_internal, global_bmi_context);
+                                 tag, user_ptr_internal, global_bmi_context, hints);
     }
     else
     {
@@ -511,7 +504,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
                                            (const void **) buffer_list,
                                            size_list, list_count,
                                            total_size, buffer_type, tag,
-                                           user_ptr_internal, global_bmi_context);
+                                           user_ptr_internal, global_bmi_context, hints);
     }
 
     if (ret < 0)
@@ -519,7 +512,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -531,18 +523,16 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = total_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     bmi_pending_count++;
-    jd->event_type = PVFS_EVENT_BMI_SEND;
     return(job_time_mgr_add(jd, timeout_sec));
 }
 
@@ -563,7 +553,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
                  job_status_s * out_status_p,
                  job_id_t * id,
                  job_context_id context_id,
-                 int timeout_sec)
+                 int timeout_sec,
+                 PVFS_hint hints)
 {
     /* post a bmi recv.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -582,24 +573,25 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
+
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
-                        &(jd->u.bmi.actual_size), buffer_type, tag, 
-                        user_ptr_internal, 
-                        global_bmi_context);
+                        &(jd->u.bmi.actual_size), buffer_type, tag,
+                        user_ptr_internal,
+                        global_bmi_context,
+                        hints);
     if (ret < 0)
     {
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -611,19 +603,16 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     bmi_pending_count++;
-    jd->event_type = PVFS_EVENT_BMI_RECV;
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -648,7 +637,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
                       job_status_s * out_status_p,
                       job_id_t * id,
                       job_context_id context_id,
-                      int timeout_sec)
+                      int timeout_sec,
+                      PVFS_hint hints)
 {
 
     /* post a bmi recv.  If it completes (or fails) immediately, then
@@ -669,25 +659,24 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
                              size_list, list_count, total_expected_size,
                              &(jd->u.bmi.actual_size), buffer_type, tag,
-                             user_ptr_internal, global_bmi_context);
+                             user_ptr_internal, global_bmi_context, hints);
 
     if (ret < 0)
     {
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -699,19 +688,16 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     bmi_pending_count++;
-    jd->event_type = PVFS_EVENT_BMI_RECV;
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -1289,7 +1275,8 @@ int job_flow(flow_descriptor * flow_d,
              job_status_s * out_status_p,
              job_id_t * id,
              job_context_id context_id,
-             int timeout_sec)
+             int timeout_sec,
+             PVFS_hint hints)
 {
     struct job_desc *jd = NULL;
     int ret = -1;
@@ -1301,6 +1288,8 @@ int job_flow(flow_descriptor * flow_d,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
+    flow_d->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
     jd->context_id = context_id;
@@ -1308,15 +1297,12 @@ int job_flow(flow_descriptor * flow_d,
     flow_d->user_ptr = jd;
     flow_d->callback = flow_callback;
 
-    JOB_EVENT_START(PVFS_EVENT_FLOW, jd->job_id);
-
     /* post the flow */
     ret = PINT_flow_post(flow_d);
     if (ret < 0)
     {
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_FLOW, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -1327,7 +1313,6 @@ int job_flow(flow_descriptor * flow_d,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = flow_d->total_transferred;
-        JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transferred, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -1336,7 +1321,6 @@ int job_flow(flow_descriptor * flow_d,
     /* queue up the job desc. for later completion */
     *id = jd->job_id;
     flow_pending_count++;
-    jd->event_type = PVFS_EVENT_FLOW;
     gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (post time): %d\n",
             flow_pending_count);
 
@@ -1381,7 +1365,7 @@ int job_flow_cancel(job_id_t id, job_context_id context_id)
 
 /* job_trove_bstream_write_at()
  *
- * storage byte stream write 
+ * storage byte stream write
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -1397,7 +1381,8 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
                                job_aint status_user_tag,
                                job_status_s * out_status_p,
                                job_id_t * id,
-                               job_context_id context_id)
+                               job_context_id context_id,
+                               PVFS_hint hints)
 {
     /* post a trove write.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1416,6 +1401,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
@@ -1424,14 +1410,13 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_AT, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
                                  &jd->u.trove.actual_size, offset, flags,
-                                 jd->u.trove.vtag, user_ptr_internal, 
-                                    global_trove_context,
-                                 &(jd->u.trove.id));
+                                 jd->u.trove.vtag, user_ptr_internal,
+                                 global_trove_context,
+                                 &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1440,7 +1425,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1455,8 +1439,6 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1467,27 +1449,27 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_WRITE_AT;
 
     return (0);
 }
 
 int job_trove_bstream_write_list(TROVE_coll_id coll_id,
                                  TROVE_handle handle,
-                                 char **mem_offset_array, 
+                                 char **mem_offset_array,
                                  TROVE_size *mem_size_array,
                                  int mem_count,
-                                 TROVE_offset *stream_offset_array, 
+                                 TROVE_offset *stream_offset_array,
                                  TROVE_size *stream_size_array,
                                  int stream_count,
                                  TROVE_size *out_size_p,
-                                 TROVE_ds_flags flags, 
+                                 TROVE_ds_flags flags,
                                  TROVE_vtag_s *vtag,
                                  void * user_ptr,
                                  job_aint status_user_tag,
                                  job_status_s *out_status_p,
                                  job_id_t *id,
-                                 job_context_id context_id)
+                                 job_context_id context_id,
+                                 PVFS_hint hints)
 {
     /* post a trove write.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1507,16 +1489,16 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
         return 1;
     }
     jd->job_user_ptr = user_ptr;
+    jd->hints = hints;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_bstream_write_list(coll_id, handle, 
+    ret = trove_bstream_write_list(coll_id, handle,
                                    mem_offset_array, mem_size_array,
                                    mem_count,
                                    stream_offset_array, stream_size_array,
@@ -1526,7 +1508,7 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
                                    vtag,
                                    user_ptr_internal,
                                    global_trove_context,
-                                   &(jd->u.trove.id));
+                                   &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1535,7 +1517,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1550,8 +1531,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1562,7 +1541,6 @@ int job_trove_bstream_write_list(TROVE_coll_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_WRITE_LIST;
 
     return (0);
 } 
@@ -1586,7 +1564,8 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
                               job_aint status_user_tag,
                               job_status_s * out_status_p,
                               job_id_t * id,
-                              job_context_id context_id)
+                              job_context_id context_id,
+                              PVFS_hint hints)
 {
     /* post a trove read.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1605,6 +1584,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
@@ -1613,14 +1593,13 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_READ_AT, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
                                 &jd->u.trove.actual_size, offset, flags,
                                 jd->u.trove.vtag, user_ptr_internal,
                                 global_trove_context,
-                                &(jd->u.trove.id));
+                                &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1629,7 +1608,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1644,8 +1622,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1656,7 +1632,6 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_READ_AT;
 
     return (0);
 }
@@ -1676,7 +1651,8 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
                                 job_aint status_user_tag,
                                 job_status_s * out_status_p,
                                 job_id_t * id,
-                                job_context_id context_id)
+                                job_context_id context_id,
+                                PVFS_hint hints)
 {
     /* post a trove read.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1695,6 +1671,7 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -1702,10 +1679,9 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_READ_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_bstream_read_list(coll_id, handle, 
+    ret = trove_bstream_read_list(coll_id, handle,
                                   mem_offset_array, mem_size_array,
                                   mem_count,
                                   stream_offset_array, stream_size_array,
@@ -1713,7 +1689,7 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
                                   out_size_p, flags,
                                   jd->u.trove.vtag, user_ptr_internal,
                                   global_trove_context,
-                                  &(jd->u.trove.id));
+                                  &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1722,7 +1698,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1737,8 +1712,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, out_status_p->actual_size, 
-            jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1749,7 +1722,6 @@ int job_trove_bstream_read_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_READ_LIST;
 
     return (0);
 }
@@ -1768,8 +1740,9 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
-                            
+                            job_context_id context_id,
+                            PVFS_hint hints)
+
 {
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -1790,11 +1763,10 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_FLUSH, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
-                              global_trove_context, &(jd->u.trove.id));
+                              global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1803,7 +1775,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1815,7 +1786,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1825,7 +1795,6 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_BSTREAM_FLUSH;
 
     return (0);
 }
@@ -1847,11 +1816,12 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
                           job_aint status_user_tag,
                           job_status_s * out_status_p,
                           job_id_t * id,
-                          job_context_id context_id)
+                          job_context_id context_id,
+                          PVFS_hint hints)
 {
     /* post a trove keyval read.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -1866,6 +1836,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -1873,12 +1844,11 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
-                            jd->u.trove.vtag, user_ptr_internal, 
-                            global_trove_context, &(jd->u.trove.id));
+                            jd->u.trove.vtag, user_ptr_internal,
+                            global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1887,7 +1857,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1901,7 +1870,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1912,7 +1880,6 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_READ;
 
     return (0);
 }
@@ -1936,11 +1903,12 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
                                job_aint status_user_tag,
                                job_status_s * out_status_p,
                                job_id_t * id,
-                               job_context_id context_id)
+                               job_context_id context_id,
+                               PVFS_hint hints)
 {
     /* post a trove keyval read.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -1955,6 +1923,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -1962,13 +1931,12 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_read_list(coll_id, handle, key_array, val_array, 
-                                 err_array, count, flags, jd->u.trove.vtag, 
+    ret = trove_keyval_read_list(coll_id, handle, key_array, val_array,
+                                 err_array, count, flags, jd->u.trove.vtag,
                                  user_ptr_internal,
-                                 global_trove_context, &(jd->u.trove.id));
+                                 global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -1977,7 +1945,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1991,7 +1958,6 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2002,14 +1968,13 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_READ_LIST;
 
     return (0);
 }
 
 /* job_trove_keyval_write()
  *
- * storage key/value write 
+ * storage key/value write
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2024,11 +1989,12 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
                            job_aint status_user_tag,
                            job_status_s * out_status_p,
                            job_id_t * id,
-                           job_context_id context_id)
+                           job_context_id context_id,
+                           PVFS_hint hints)
 {
     /* post a trove keyval write.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2043,6 +2009,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -2050,13 +2017,12 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
-                             jd->u.trove.vtag, user_ptr_internal, 
+                             jd->u.trove.vtag, user_ptr_internal,
                              global_trove_context,
-                             &(jd->u.trove.id));
+                             &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2065,7 +2031,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2079,7 +2044,6 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2090,14 +2054,13 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_WRITE;
 
     return (0);
 }
 
 /* job_trove_keyval_write_list()
  *
- * storage key/value list write 
+ * storage key/value list write
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2113,11 +2076,12 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
                            job_aint status_user_tag,
                            job_status_s * out_status_p,
                            job_id_t * id,
-                           job_context_id context_id)
+                           job_context_id context_id,
+                           PVFS_hint hints)
 {
     /* post a trove keyval write.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2132,6 +2096,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -2139,16 +2104,15 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     gossip_debug(GOSSIP_JOB_DEBUG, "job_trove_keyval_write_list() posting trove_keyval_write_list()\n");
     ret = trove_keyval_write_list(coll_id, handle,
                              key_array, val_array,
                              count, flags,
-                             jd->u.trove.vtag, user_ptr_internal, 
+                             jd->u.trove.vtag, user_ptr_internal,
                              global_trove_context,
-                             &(jd->u.trove.id));
+                             &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2157,7 +2121,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2171,7 +2134,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2182,7 +2144,6 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST;
 
     return (0);
 }
@@ -2199,7 +2160,8 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
                                   job_aint status_user_tag,
                                   job_status_s * out_status_p,
                                   job_id_t * id,
-                                  job_context_id context_id)
+                                  job_context_id context_id,
+                                  PVFS_hint hints)
 {
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2221,7 +2183,6 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_REMOVE_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove_list(coll_id, handle,
@@ -2229,7 +2190,8 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
                              count, flags,
                              jd->u.trove.vtag, user_ptr_internal, 
                              global_trove_context,
-                             &(jd->u.trove.id));
+                             &(jd->u.trove.id),
+                             hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2238,7 +2200,6 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2252,7 +2213,6 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2263,7 +2223,6 @@ int job_trove_keyval_remove_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST;
 
     return (0);
 }
@@ -2283,7 +2242,8 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
                            job_aint status_user_tag,
                            job_status_s * out_status_p,
                            job_id_t * id,
-                           job_context_id context_id)
+                           job_context_id context_id,
+                           PVFS_hint hints)
 {
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2304,11 +2264,10 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_FLUSH, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_flush(coll_id, handle, flags, user_ptr_internal,
-                             global_trove_context, &(jd->u.trove.id));
+                             global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2317,7 +2276,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2330,7 +2288,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2341,7 +2298,6 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_FLUSH;
 
     return (0);
 }
@@ -2354,7 +2310,8 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
                                      job_aint status_user_tag,
                                      job_status_s * out_status_p,
                                      job_id_t * id,
-                                     job_context_id context_id)
+                                     job_context_id context_id,
+                                     PVFS_hint hints)
 {
     /* post a trove operation keyval get handle info.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2375,22 +2332,24 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_get_handle_info(
         coll_id,
         handle,
-        flags, 
+        flags,
         info,
-        user_ptr_internal, 
-        global_trove_context, &(jd->u.trove.id));
+        user_ptr_internal,
+        global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2399,7 +2358,6 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2412,18 +2370,16 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_GET_HANDLE_INFO;
 
     return (0);
 }
@@ -2431,7 +2387,7 @@ int job_trove_keyval_get_handle_info(PVFS_fs_id coll_id,
 
 /* job_trove_dspace_getattr()
  *
- * read generic dspace attributes 
+ * read generic dspace attributes
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2443,7 +2399,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s *out_status_p,
                              job_id_t *id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a trove operation dspace get attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2470,13 +2427,14 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
                                handle, out_ds_attr_ptr, 0 /* flags */ ,
-                               user_ptr_internal, 
-                               global_trove_context, &(jd->u.trove.id));
+                               user_ptr_internal,
+                               global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2485,7 +2443,6 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2498,18 +2455,16 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_GETATTR;
 
     return (0);
 }
@@ -2530,7 +2485,8 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s *out_status_p,
                              job_id_t *id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a trove operation dspace get attr list.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2551,13 +2507,15 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr_list(coll_id,
@@ -2565,8 +2523,8 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
                                handle_array, out_ds_attr_ptr,
                                out_error_array,
                                0 /* flags */ ,
-                               user_ptr_internal, 
-                               global_trove_context, &(jd->u.trove.id));
+                               user_ptr_internal,
+                               global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2575,7 +2533,6 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2588,25 +2545,23 @@ int job_trove_dspace_getattr_list(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_GETATTR_LIST;
 
     return (0);
 }
 
 /* job_trove_dspace_setattr()
  *
- * write generic dspace attributes 
+ * write generic dspace attributes
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2619,7 +2574,8 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s * out_status_p,
                              job_id_t * id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a trove operation dspace set attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2646,13 +2602,12 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_SETATTR, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p,
                                flags,
-                               user_ptr_internal, global_trove_context, 
-                               &(jd->u.trove.id));
+                               user_ptr_internal, global_trove_context,
+                               &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2661,7 +2616,6 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2674,25 +2628,23 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_SETATTR;
 
     return (0);
 }
 
 /* job_trove_bstream_resize()
  *
- * resize (truncate or preallocate) a storage byte stream 
+ * resize (truncate or preallocate) a storage byte stream
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2706,7 +2658,8 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s * out_status_p,
                              job_id_t * id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a resize trove operation.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -2733,13 +2686,12 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_RESIZE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_resize(coll_id, handle, &size,
                                flags,
-                               vtag, user_ptr_internal, global_trove_context, 
-                               &(jd->u.trove.id));
+                               vtag, user_ptr_internal, global_trove_context,
+                               &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2748,7 +2700,6 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2761,25 +2712,23 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
     }
 
     /* if we fall to this point, the job did not immediately complete and
-     * we must queue up to test it later 
+     * we must queue up to test it later
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_BSTREAM_RESIZE;
 
     return (0);
 }
 
 /* job_trove_bstream_validate()
  *
- * check consistency of a bytestream for a given vtag 
+ * check consistency of a bytestream for a given vtag
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2791,7 +2740,8 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
                                job_aint status_user_tag,
                                job_status_s * out_status_p,
                                job_id_t * id,
-                               job_context_id context_id)
+                               job_context_id context_id,
+                               PVFS_hint hints)
 {
     gossip_lerr("Error: unimplemented.\n");
     out_status_p->error_code = -PVFS_ENOSYS;
@@ -2800,7 +2750,7 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
 
 /* job_trove_keyval_remove()
  *
- * remove a key/value entry 
+ * remove a key/value entry
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2815,11 +2765,12 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
+                            job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a trove keyval remove.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2834,6 +2785,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
@@ -2841,12 +2793,11 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_REMOVE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, val_p, flags,
-                              jd->u.trove.vtag, user_ptr_internal, 
-                              global_trove_context, &(jd->u.trove.id));
+                              jd->u.trove.vtag, user_ptr_internal,
+                              global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2855,7 +2806,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2869,7 +2819,6 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2880,14 +2829,13 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_REMOVE;
 
     return (0);
 }
 
 /* job_trove_keyval_validate()
  *
- * check consistency of a key/value pair for a given vtag 
+ * check consistency of a key/value pair for a given vtag
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2899,7 +2847,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
                               job_aint status_user_tag,
                               job_status_s * out_status_p,
                               job_id_t * id,
-                              job_context_id context_id)
+                              job_context_id context_id,
+                              PVFS_hint hints)
 {
     gossip_lerr("Error: unimplemented.\n");
     out_status_p->error_code = -PVFS_ENOSYS;
@@ -2908,7 +2857,7 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
 
 /* job_trove_keyval_iterate()
  *
- * iterate through all of the key/value pairs for a data space 
+ * iterate through all of the key/value pairs for a data space
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -2925,11 +2874,12 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s * out_status_p,
                              job_id_t * id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a trove keyval iterate.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -2944,6 +2894,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->u.trove.position = position;
@@ -2953,14 +2904,13 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
                                &(jd->u.trove.position), key_array, val_array,
                                &(jd->u.trove.count), flags, jd->u.trove.vtag,
-                               user_ptr_internal, 
-                               global_trove_context, &(jd->u.trove.id));
+                               user_ptr_internal,
+                               global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -2969,7 +2919,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2985,7 +2934,6 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
         out_status_p->vtag = jd->u.trove.vtag;
         out_status_p->position = jd->u.trove.position;
         out_status_p->count = jd->u.trove.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2996,14 +2944,13 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE;
 
     return (0);
 }
 
 /* job_trove_keyval_iterate_keys()
  *
- * iterate through all of the keys for a data space 
+ * iterate through all of the keys for a data space
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -3019,11 +2966,12 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
                              job_aint status_user_tag,
                              job_status_s * out_status_p,
                              job_id_t * id,
-                             job_context_id context_id)
+                             job_context_id context_id,
+                             PVFS_hint hints)
 {
     /* post a trove keyval iterate_keys.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -3038,6 +2986,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->u.trove.position = position;
@@ -3047,14 +2996,13 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(coll_id, handle,
-                               &(jd->u.trove.position), key_array, 
+                               &(jd->u.trove.position), key_array,
                                &(jd->u.trove.count), flags, jd->u.trove.vtag,
-                               user_ptr_internal, 
-                               global_trove_context, &(jd->u.trove.id));
+                               user_ptr_internal,
+                               global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3063,7 +3011,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3079,7 +3026,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
         out_status_p->vtag = jd->u.trove.vtag;
         out_status_p->position = jd->u.trove.position;
         out_status_p->count = jd->u.trove.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3090,7 +3036,6 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS;
 
     return (0);
 }
@@ -3114,8 +3059,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     job_context_id context_id)
 {
     /* post a trove keyval iterate_handles.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -3139,13 +3084,12 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
                                &(jd->u.trove.position), handle_array,
                                &(jd->u.trove.count), flags, jd->u.trove.vtag,
-                               user_ptr_internal, 
+                               user_ptr_internal,
                                global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -3155,7 +3099,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3171,7 +3114,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
         out_status_p->vtag = jd->u.trove.vtag;
         out_status_p->position = jd->u.trove.position;
         out_status_p->count = jd->u.trove.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3182,7 +3124,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES;
 
     return (0);
 }
@@ -3190,7 +3131,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 /* job_trove_dspace_create()
  *
- * create a new data space object 
+ * create a new data space object
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -3204,7 +3145,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
+                            job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a dspace create.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -3223,6 +3165,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = PVFS_HANDLE_NULL;
     jd->context_id = context_id;
@@ -3230,7 +3173,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
@@ -3238,8 +3182,8 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
                               &(jd->u.trove.handle),
                               type,
                               hint, flags,
-                              user_ptr_internal, 
-                              global_trove_context, &(jd->u.trove.id));
+                              user_ptr_internal,
+                              global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3248,7 +3192,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3262,7 +3205,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->handle = jd->u.trove.handle;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3273,7 +3215,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_CREATE;
 
     return (0);
 }
@@ -3296,7 +3237,8 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
+                            job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a dspace create list.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -3322,7 +3264,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create_list(coll_id,
@@ -3332,7 +3273,8 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
                               type,
                               hint, flags,
                               user_ptr_internal, 
-                              global_trove_context, &(jd->u.trove.id));
+                              global_trove_context, &(jd->u.trove.id),
+                              hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3341,7 +3283,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3354,7 +3295,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3365,7 +3305,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_CREATE;
 
     return (0);
 }
@@ -3386,7 +3325,8 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
 			    job_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
-			    job_context_id context_id)
+			    job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a dspace remove_list.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -3411,7 +3351,6 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_REMOVE, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove_list(coll_id,
@@ -3420,7 +3359,8 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
                               count,
                               flags,
                               user_ptr_internal, 
-                              global_trove_context, &(jd->u.trove.id));
+                              global_trove_context, &(jd->u.trove.id),
+                              hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3429,7 +3369,6 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3442,7 +3381,6 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3453,7 +3391,6 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_REMOVE;
 
     return (0);
 }
@@ -3462,7 +3399,7 @@ int job_trove_dspace_remove_list(PVFS_fs_id coll_id,
 
 /* job_trove_dspace_remove()
  *
- * remove an entire data space object (byte stream and key/value) 
+ * remove an entire data space object (byte stream and key/value)
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -3474,7 +3411,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
+                            job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a dspace remove.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -3499,13 +3437,14 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_REMOVE, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
                               handle, flags,
-                              user_ptr_internal, 
-                              global_trove_context, &(jd->u.trove.id));
+                              user_ptr_internal,
+                              global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3514,7 +3453,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -3527,7 +3465,6 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3538,14 +3475,13 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_REMOVE;
 
     return (0);
 }
 
 /* job_trove_dspace_verify()
  *
- * verify that a given dataspace exists and discover its type 
+ * verify that a given dataspace exists and discover its type
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -3557,7 +3493,8 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
                             job_aint status_user_tag,
                             job_status_s * out_status_p,
                             job_id_t * id,
-                            job_context_id context_id)
+                            job_context_id context_id,
+                            PVFS_hint hints)
 {
     /* post a dspace verify.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -3582,13 +3519,14 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_VERIFY, jd->job_id);
+
+
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
-                              handle, &jd->u.trove.type, 
+                              handle, &jd->u.trove.type,
                               flags,
-                              user_ptr_internal, global_trove_context, &(jd->u.trove.id));
+                              user_ptr_internal, global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -3597,7 +3535,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* the trove_method will determine what value is returned in immediate
@@ -3612,7 +3549,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3623,7 +3559,6 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_DSPACE_VERIFY;
 
     return (0);
 }
@@ -3703,7 +3638,7 @@ int job_trove_fs_create(char *collname,
     user_ptr_internal = &jd->trove_callback;
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_collection_create(collname, new_coll_id, user_ptr_internal, 
+    ret = trove_collection_create(collname, new_coll_id, user_ptr_internal,
         &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -3741,7 +3676,7 @@ int job_trove_fs_create(char *collname,
 
 /* job_trove_fs_remove()
  *
- * remove an existing file system 
+ * remove an existing file system
  *
  * returns 0 on success, 1 on immediate completion, and -errno on
  * failure
@@ -3799,7 +3734,7 @@ int job_trove_fs_lookup(char *collname,
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_collection_lookup(
         TROVE_METHOD_DBPF,
-        collname, &(jd->u.trove.fsid), 
+        collname, &(jd->u.trove.fsid),
         user_ptr_internal, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -3849,11 +3784,12 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
                           job_aint status_user_tag,
                           job_status_s * out_status_p,
                           job_id_t * id,
-                          job_context_id context_id)
+                          job_context_id context_id,
+                          PVFS_hint hints)
 {
     /* post a trove collection set eattr.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -3868,6 +3804,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
+    jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
@@ -3928,11 +3865,12 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
                           job_aint status_user_tag,
                           job_status_s * out_status_p,
                           job_id_t * id,
-                          job_context_id context_id)
+                          job_context_id context_id,
+                          PVFS_hint hints)
 {
     /* post a trove collection get eattr.  If it completes (or fails)
-     * immediately, then return and fill in the status structure.  
-     * If it needs to be tested for completion later, then queue 
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -4022,7 +3960,7 @@ int job_null(
     jd->u.null_info.error_code = error_code;
 
     gen_mutex_lock(&completion_mutex);
-    job_desc_q_add(completion_queue_array[jd->context_id], 
+    job_desc_q_add(completion_queue_array[jd->context_id],
         jd);
     /* set completed flag while holding queue lock */
     jd->completed_flag = 1;
@@ -4039,7 +3977,7 @@ int job_null(
 /* job_test()
  *
  * check for completion of a particular job, don't return until
- * either job completes or timeout expires 
+ * either job completes or timeout expires
  *
  * returns 0 if nothing done, 1 if something done, -errno on failure
  */
@@ -4067,7 +4005,7 @@ int job_test(job_id_t id,
 /* job_testsome()
  *
  * check for completion of a set of jobs, don't return until
- * either all jobs complete or timeout expires 
+ * either all jobs complete or timeout expires
  *
  * returns 0 on success, -errno on failure
  */
@@ -4124,7 +4062,7 @@ int job_testsome(job_id_t * id_array,
 
         if(timeout_ms > 0)
         {
-            pthread_ret = pthread_cond_timedwait(&completion_cond, 
+            pthread_ret = pthread_cond_timedwait(&completion_cond,
                 &completion_mutex,
                 &pthread_timeout);
         }
@@ -4149,7 +4087,7 @@ int job_testsome(job_id_t * id_array,
             EINVAL) && pthread_ret != ETIMEDOUT)
         {
             /* pthread_cond_wait() gave a weird return code; pass along to
-             * caller 
+             * caller
              */
             ret = pthread_ret;
         }
@@ -4163,7 +4101,7 @@ int job_testsome(job_id_t * id_array,
 /* job_testsome()
  *
  * check for completion of a set of jobs, don't return until
- * either all jobs complete or timeout expires 
+ * either all jobs complete or timeout expires
  *
  * returns 0 if nothing done, 1 if something done, -errno on failure
  */
@@ -4270,7 +4208,7 @@ int job_testsome(job_id_t * id_array,
             time_exhaust_flag = 1;
         }
         else if(timeout_ms < 0)
-        {   
+        {
             time_exhaust_flag = 0;
         }
         else
@@ -4363,7 +4301,7 @@ int job_testcontext(job_id_t * out_id_array_p,
 
         if(timeout_ms > 0)
         {
-            pthread_ret = pthread_cond_timedwait(&completion_cond, 
+            pthread_ret = pthread_cond_timedwait(&completion_cond,
                 &completion_mutex,
                 &pthread_timeout);
         }
@@ -4388,7 +4326,7 @@ int job_testcontext(job_id_t * out_id_array_p,
             EINVAL) && pthread_ret != ETIMEDOUT)
         {
             /* pthread_cond_wait() gave a weird return code; pass along to
-             * caller 
+             * caller
              */
             ret = pthread_ret;
         }
@@ -4508,7 +4446,7 @@ int job_testcontext(job_id_t * out_id_array_p,
             time_exhaust_flag = 1;
         }
         else if(timeout_ms < 0)
-        {   
+        {
             time_exhaust_flag = 0;
         }
         else
@@ -4906,7 +4844,8 @@ static void precreate_pool_fill_thread_mgr_callback(
                             NULL, 
                             &jd->trove_callback, 
                             global_trove_context,
-                            &tmp_id);
+                            &tmp_id,
+                            jd->hints);
     
     trove_pending_count++;
 
@@ -4971,7 +4910,7 @@ static void trove_thread_mgr_callback(
     {
         /* set job descriptor fields and put into completion queue */
         tmp_desc->u.trove.state = error_code;
-        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                        tmp_desc);
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
@@ -4994,7 +4933,7 @@ static void trove_thread_mgr_callback(
  * no return value
  */
 static void bmi_thread_mgr_callback(
-    void* data, 
+    void* data,
     PVFS_size actual_size,
     PVFS_error error_code)
 {
@@ -5033,7 +4972,7 @@ static void bmi_thread_mgr_callback(
 
 /* bmi_thread_mgr_unexp_handler()
  *
- * callback function executed by the thread manager for BMI when an unexpected 
+ * callback function executed by the thread manager for BMI when an unexpected
  * BMI message arrives
  *
  * no return value
@@ -5041,7 +4980,7 @@ static void bmi_thread_mgr_callback(
 static void bmi_thread_mgr_unexp_handler(
     struct BMI_unexpected_info* unexp)
 {
-    struct job_desc* tmp_desc = NULL; 
+    struct job_desc* tmp_desc = NULL;
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -5068,7 +5007,7 @@ static void bmi_thread_mgr_unexp_handler(
         tmp_desc->completed_flag = 1;
         if (completion_queue_array[tmp_desc->context_id])
         {
-            job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+            job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                            tmp_desc);
         }
 
@@ -5086,14 +5025,14 @@ static void bmi_thread_mgr_unexp_handler(
 
 /* dev_thread_mgr_unexp_handler()
  *
- * callback function executed by the thread manager for dev when an unexpected 
+ * callback function executed by the thread manager for dev when an unexpected
  * device message arrives
  *
  * no return value
  */
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
 {
-    struct job_desc* tmp_desc = NULL; 
+    struct job_desc* tmp_desc = NULL;
 
     gen_mutex_lock(&dev_unexp_mutex);
     /* remove the operation from the pending dev_unexp queue */
@@ -5114,7 +5053,7 @@ static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
         tmp_desc->completed_flag = 1;
         if (completion_queue_array[tmp_desc->context_id])
         {
-            job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+            job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                            tmp_desc);
         }
 
@@ -5202,16 +5141,13 @@ static void fill_status(struct job_desc *jd,
         break;
     }
 
-    if(jd->event_type)
-        JOB_EVENT_END(jd->event_type, status->actual_size, jd->job_id);
-
     return;
 }
 
 /* do_one_test_cycle_req_sched()
  *
  * tests the request scheduler to see if anything has completed.
- * Does not block at all.  
+ * Does not block at all.
  *
  * returns 0 on success, -errno on failure
  */
@@ -5246,7 +5182,7 @@ static int do_one_test_cycle_req_sched(void)
         gen_mutex_lock(&completion_mutex);
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
-        job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+        job_desc_q_add(completion_queue_array[tmp_desc->context_id],
             tmp_desc);
         gen_mutex_unlock(&completion_mutex);
     }
@@ -5344,7 +5280,7 @@ static int completion_query_some(job_id_t * id_array,
     }
 
     /* we better not have lost any ops since the first loop through the job
-     * list 
+     * list
      */
     assert((*inout_count_p) == done_count);
 
@@ -5451,10 +5387,10 @@ static void do_one_work_cycle_all(int idle_time_ms)
          * don't have a single thing to do.  Sleep here to prevent busy
          * spins.
          */
-        struct timespec ts; 
-         ts.tv_sec = idle_time_ms/1000; 
-         ts.tv_nsec = (idle_time_ms%1000)*1000*1000; 
-         nanosleep(&ts, NULL); 
+        struct timespec ts;
+         ts.tv_sec = idle_time_ms/1000;
+         ts.tv_nsec = (idle_time_ms%1000)*1000*1000;
+         nanosleep(&ts, NULL);
     }
 
     gen_mutex_unlock(&work_cycle_mutex);
@@ -5470,7 +5406,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
  */
 static void flow_callback(flow_descriptor* flow_d)
 {
-    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr; 
+    struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr;
 
     gen_mutex_lock(&initialized_mutex);
     if(initialized == 0)
@@ -5483,7 +5419,7 @@ static void flow_callback(flow_descriptor* flow_d)
 
     /* set job descriptor fields and put into completion queue */
     gen_mutex_lock(&completion_mutex);
-    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                    tmp_desc);
     /* set completed flag while holding queue lock */
     tmp_desc->completed_flag = 1;
@@ -5577,7 +5513,8 @@ int job_precreate_pool_fill(
     job_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t * id,
-    job_context_id context_id)
+    job_context_id context_id,
+    PVFS_hint hints)
 {
     struct job_desc *jd = NULL;
 
@@ -5594,6 +5531,7 @@ int job_precreate_pool_fill(
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
+    jd->hints = hints;
     jd->trove_callback.fn = precreate_pool_fill_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     jd->u.precreate_pool.precreate_pool = precreate_pool;
@@ -5844,7 +5782,8 @@ int job_precreate_pool_get_handles(
     job_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t * id,
-    job_context_id context_id)
+    job_context_id context_id,
+    PVFS_hint hints)
 {
     struct job_desc *jd = NULL;
 
@@ -5862,6 +5801,7 @@ int job_precreate_pool_get_handles(
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->hints = hints;
     jd->status_user_tag = status_user_tag;
     jd->u.precreate_pool.precreate_handle_array = handle_array;
     jd->u.precreate_pool.precreate_handle_count = count;
@@ -6072,7 +6012,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             NULL, 
             &tmp_trove_array[i].trove_callback, 
             global_trove_context,
-            &tmp_id);
+            &tmp_id,
+            jd->hints);
         if(ret < 0)
         {
             precreate_pool_get_thread_mgr_callback_unlocked(
@@ -6110,7 +6051,8 @@ int job_precreate_pool_iterate_handles(
     job_aint status_user_tag,
     job_status_s* out_status_p,
     job_id_t* id,
-    job_context_id context_id)
+    job_context_id context_id,
+    PVFS_hint hints)
 {
     PVFS_ds_position local_position;
     PVFS_ds_position pool_index;
@@ -6205,6 +6147,7 @@ int job_precreate_pool_iterate_handles(
         jd->u.precreate_pool.key_array[i].buffer_sz = sizeof(handle_array[i]);
     }
     jd->job_user_ptr = user_ptr;
+    jd->hints = hints;
     jd->u.precreate_pool.position = local_position;
     jd->u.precreate_pool.count = count;
     jd->u.precreate_pool.precreate_handle_array = handle_array;
@@ -6214,7 +6157,6 @@ int job_precreate_pool_iterate_handles(
     jd->trove_callback.fn = precreate_pool_iterate_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(fsid, pool->pool_handle,
@@ -6222,7 +6164,7 @@ int job_precreate_pool_iterate_handles(
                                jd->u.precreate_pool.key_array, 
                                &(jd->u.precreate_pool.count), flags, NULL,
                                user_ptr_internal, 
-                               global_trove_context, &tmp_id);
+                               global_trove_context, &tmp_id, jd->hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -6231,7 +6173,6 @@ int job_precreate_pool_iterate_handles(
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
         free(jd->u.precreate_pool.key_array);
         dealloc_job_desc(jd);
         jd = NULL;
@@ -6249,7 +6190,6 @@ int job_precreate_pool_iterate_handles(
         out_status_p->position = pool_index << 32;
         out_status_p->position |= jd->u.precreate_pool.position;
         out_status_p->count = jd->u.precreate_pool.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS, 0, jd->job_id);
         free(jd->u.precreate_pool.key_array);
         dealloc_job_desc(jd);
         jd = NULL;
@@ -6262,7 +6202,6 @@ int job_precreate_pool_iterate_handles(
      */
     *id = jd->job_id;
     trove_pending_count++;
-    jd->event_type = PVFS_EVENT_TROVE_KEYVAL_ITERATE_KEYS;
     gen_mutex_unlock(&precreate_pool_mutex);
 
     return (0);

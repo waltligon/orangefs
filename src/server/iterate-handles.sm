@@ -106,7 +106,8 @@ static PINT_sm_action iterate_handles_do_work(
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context,
+            s_op->req->hints);
     }
     else if(s_op->req->u.mgmt_iterate_handles.flags == 0)
     {

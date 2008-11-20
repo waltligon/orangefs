@@ -163,10 +163,11 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                             TROVE_keyval_s *key_p,
                             TROVE_keyval_s *val_p,
                             TROVE_ds_flags flags,
-                            TROVE_vtag_s *vtag, 
+                            TROVE_vtag_s *vtag,
                             void *user_ptr,
                             TROVE_context_id context_id,
-                            TROVE_op_id *out_op_id_p)
+                            TROVE_op_id *out_op_id_p,
+                            PVFS_hint  hints)
 {
     int ret;
     dbpf_queued_op_t *q_op_p = NULL;
@@ -227,9 +228,25 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return ret;
     }
 
+    q_op_p->event_type = trove_dbpf_keyval_read_event_id;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_read: client_id: %d, reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_CLIENT_ID(hints),
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
+    PINT_EVENT_START(trove_dbpf_keyval_read_event_id,
+                     dbpf_pid, NULL, &q_op_p->event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     handle,
+                     PINT_HINT_GET_OP_ID(hints));
+
     /* initialize the op-specific members */
     op_p->u.k_read.key = key_p;
     op_p->u.k_read.val = val_p;
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -323,7 +340,8 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
                              TROVE_vtag_s *vtag,
                              void *user_ptr,
                              TROVE_context_id context_id,
-                             TROVE_op_id *out_op_id_p)
+                             TROVE_op_id *out_op_id_p,
+                             PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -353,9 +371,24 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
         return ret;
     }
 
+    q_op_p->event_type = trove_dbpf_keyval_write_event_id;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_write: reqid: %d, rank: %d\n",
+                 PINT_HINT_GET_REQUEST_ID(hints),
+                 PINT_HINT_GET_RANK(hints));
+
+    PINT_EVENT_START(trove_dbpf_keyval_write_event_id,
+                     dbpf_pid, NULL, &q_op_p->event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     handle,
+                     PINT_HINT_GET_OP_ID(hints));
+
    /* initialize the op-specific members */
     op_p->u.k_write.key = *key_p;
     op_p->u.k_write.val = *val_p;
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
@@ -533,7 +566,8 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
                               TROVE_vtag_s *vtag,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -564,6 +598,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     }
 
     /* initialize op-specific members */
+    op_p->hints = hints;
     op_p->u.k_remove.key = *key_p;
     if(val_p)
     {
@@ -626,7 +661,8 @@ static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
                                   TROVE_vtag_s *vtag,
                                   void *user_ptr,
                                   TROVE_context_id context_id,
-                                  TROVE_op_id *out_op_id_p)
+                                  TROVE_op_id *out_op_id_p,
+                                  PVFS_hint hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -751,7 +787,8 @@ static int dbpf_keyval_validate(TROVE_coll_id coll_id,
                                 TROVE_vtag_s *vtag,
                                 void* user_ptr,
                                 TROVE_context_id context_id,
-                                TROVE_op_id *out_op_id_p)
+                                TROVE_op_id *out_op_id_p,
+                                PVFS_hint  hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -766,7 +803,8 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
                                TROVE_vtag_s *vtag,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -801,6 +839,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     op_p->u.k_iterate.val_array = val_array;
     op_p->u.k_iterate.position_p = position_p;
     op_p->u.k_iterate.count_p = inout_count_p;
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -934,7 +973,8 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
                                     TROVE_vtag_s *vtag,
                                     void *user_ptr,
                                     TROVE_context_id context_id,
-                                    TROVE_op_id *out_op_id_p)
+                                    TROVE_op_id *out_op_id_p,
+                                    PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -968,6 +1008,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
     op_p->u.k_iterate_keys.key_array = key_array;
     op_p->u.k_iterate_keys.position_p = position_p;
     op_p->u.k_iterate_keys.count_p = inout_count_p;
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -1080,7 +1121,8 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                  TROVE_vtag_s *vtag,
                                  void *user_ptr,
                                  TROVE_context_id context_id,
-                                 TROVE_op_id *out_op_id_p)
+                                 TROVE_op_id *out_op_id_p,
+                                 PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -1115,6 +1157,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     op_p->u.k_read_list.val_array = val_array;
     op_p->u.k_read_list.err_array = err_array;
     op_p->u.k_read_list.count = count;
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -1184,7 +1227,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                                   TROVE_vtag_s *vtag,
                                   void *user_ptr,
                                   TROVE_context_id context_id,
-                                  TROVE_op_id *out_op_id_p)
+                                  TROVE_op_id *out_op_id_p,
+                                  PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -1218,6 +1262,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     op_p->u.k_write_list.key_array = key_array;
     op_p->u.k_write_list.val_array = val_array;
     op_p->u.k_write_list.count = count;
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
@@ -1391,7 +1436,8 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
                              TROVE_ds_flags flags,
                              void *user_ptr,
                              TROVE_context_id context_id,
-                             TROVE_op_id *out_op_id_p)
+                             TROVE_op_id *out_op_id_p,
+                             PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -1404,7 +1450,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-    
+
     ret = dbpf_op_init_queued_or_immediate(
         &op, &q_op_p,
         KEYVAL_FLUSH,
@@ -1420,6 +1466,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
     {
         return ret;
     }
+    op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
 }
@@ -1894,7 +1941,8 @@ static int dbpf_keyval_get_handle_info(
     TROVE_keyval_handle_info *info,
     void * user_ptr,
     TROVE_context_id context_id,
-    TROVE_op_id *out_op_id_p)
+    TROVE_op_id *out_op_id_p,
+    PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -1925,6 +1973,7 @@ static int dbpf_keyval_get_handle_info(
     }
 
     op_p->u.k_get_handle_info.info = info;
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);

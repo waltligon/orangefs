@@ -17,7 +17,6 @@
 #include "trove-types.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "thread-mgr.h"
-#include "pvfs2-event.h"
 
 /* describes BMI operations */
 struct bmi_desc
@@ -124,7 +123,7 @@ struct job_desc
     job_context_id context_id;  /* context */
     struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
     struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
-    enum PVFS_event_op event_type;
+    PVFS_hint hints;
 
     /* union of information for lower level interfaces */
     union
