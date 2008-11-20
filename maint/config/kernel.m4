@@ -919,6 +919,61 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        dnl 2.6.27 changed the constructor parameter signature of
+	dnl kmem_cache_create.  Check for this newer one-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror.  Note that the next configure test will
+        dnl determine if we have a two param constructor or not.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for one-param kmem_cache_create constructor)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(void *req)
+		{
+		}
+	], [
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM, 1, [Define if kernel kmem_cache_create constructor has newer-style one-parameter form]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+        dnl 2.6.27 changed the parameter signature of
+	dnl inode_operations->permission.  Check for this newer two-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror and -Wall.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror -Wall"
+	AC_MSG_CHECKING(for two param permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		#include <linux/fs.h>
+		#include <linux/namei.h>
+		int ctor(struct inode *i, int a)
+		{
+			return 0;
+		}
+		struct inode_operations iop = {
+			.permission = ctor,
+		};
+	], [
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+
         dnl 2.6.24 changed the constructor parameter signature of
 	dnl kmem_cache_create.  Check for this newer two-param style and
 	dnl if not, assume it is old.  Note we can get away with just
@@ -958,6 +1013,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
         AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -967,9 +1024,26 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		read_lock(&as.tree_lock);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
+	AC_DEFINE(HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a rw_lock_t member named tree_lock]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
+
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(if kernel address_space struct has a spinlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock_t member named tree_lock]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
 	AC_TRY_COMPILE([
@@ -1008,6 +1082,34 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_READ_INODE, 1, [Define if kernel super_operations contains read_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains drop_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.drop_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DROP_INODE, 1, [Define if kernel super_operations contains drop_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains put_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.put_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_PUT_INODE, 1, [Define if kernel super_operations contains put_inode field]),
 	AC_MSG_RESULT(no)
 	)
 
