@@ -1,6 +1,0 @@
-#!/bin/sh
-
-cp ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp ${PVFS2_MOUNTPOINT}
-cp ${PVFS2_MOUNTPOINT}/pvfs2-cp ${PVFS2_DEST}
-
-cmp ${PVFS2_DEST}/pvfs2-cp ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp
