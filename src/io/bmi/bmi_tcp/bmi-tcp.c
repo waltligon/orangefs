@@ -2736,6 +2736,7 @@ static int tcp_do_work(int max_idle_time)
     gen_mutex_lock(&interface_mutex);
     if (ret < 0)
     {
+        PVFS_perror_gossip("Error: socket collection:", ret);
         /* BMI_socket_collection_testglobal() returns BMI error code */
 	return (ret);
     }
@@ -2760,7 +2761,7 @@ static int tcp_do_work(int max_idle_time)
 	    ret = tcp_do_work_error(addr_array[i]);
 	    if (ret < 0)
 	    {
-		return (ret);
+                PVFS_perror_gossip("Warning: BMI error handling failure, continuing", ret);
 	    }
 	}
 	else
@@ -2770,8 +2771,8 @@ static int tcp_do_work(int max_idle_time)
 		ret = tcp_do_work_send(addr_array[i], &stall_flag);
 		if (ret < 0)
 		{
-		    return (ret);
-		}
+                    PVFS_perror_gossip("Warning: BMI send error, continuing", ret);
+                }
 		if(!stall_flag)
 		    busy_flag = 0;
 	    }
@@ -2780,7 +2781,7 @@ static int tcp_do_work(int max_idle_time)
 		ret = tcp_do_work_recv(addr_array[i], &stall_flag);
 		if (ret < 0)
 		{
-		    return (ret);
+                    PVFS_perror_gossip("Warning: BMI recv error, continuing", ret);
 		}
 		if(!stall_flag)
 		    busy_flag = 0;
@@ -3594,14 +3595,7 @@ static int tcp_accept_init(int *socket, char** peer)
     {
         /* Force closure of the connection */
         close(*socket);
-        errno = EACCES;
-        /* FIXME: 
-         * BIG KLUDGE
-         * if we return an error, pvfs2-server's bmi thread simply terminates. 
-         * hence I am returning 0 here. Need to ask Phil or RobR about this...
-         */
-        *socket = -1;
-        return 0;
+        return (bmi_tcp_errno_to_pvfs(-EACCES));
     }
 
 #endif
