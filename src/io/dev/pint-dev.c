@@ -20,6 +20,7 @@
 #include <sys/poll.h>
 #include <sys/uio.h>
 #include <assert.h>
+#include <sys/mman.h>
 
 #include "pint-mem.h"
 #include "pvfs2-types.h"
@@ -204,6 +205,17 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
             desc[i].ptr = NULL;
             break;
         }
+
+#ifdef REDHAT_RELEASE_9
+        /* fixes a corruption issue on linux 2.4 kernels where the buffers are
+         * not being pinned in memory properly 
+         */
+        if(mlock( (const char *) ptr, total_size) != 0)
+        { 
+           gossip_err("Error: FAILED to mlock shared buffer\n");
+           break;
+        }
+#endif
         desc[i].ptr  = ptr;
         desc[i].total_size = total_size;
         desc[i].size = params[i].dev_buffer_size;
@@ -260,6 +272,16 @@ void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
     {
         ptr = (void *) desc[i].ptr;
         assert(ptr);
+
+#ifdef REDHAT_RELEASE_9
+        /* fixes a corruption issue on linux 2.4 kernels where the buffers are
+         * not being pinned in memory properly
+         */
+        if(munlock( (const char *) ptr, desc[i].total_size) != 0)
+        { 
+           gossip_err("Error: FAILED to munlock shared buffer\n");
+        }
+#endif
 
         PINT_mem_aligned_free(ptr);
     }
