@@ -108,7 +108,7 @@ static void PINT_worker_destroy(PINT_manager_t manager,
 static int PINT_manager_find_worker(PINT_manager_t manager,
                                     PINT_service_callout callout,
                                     void *op_ptr,
-                                    PVFS_hint *hint,
+                                    PVFS_hint hint,
                                     PVFS_id_gen_t input_work_id,
                                     struct PINT_worker_s **result_worker,
                                     PINT_queue_id *queue_id);
@@ -133,7 +133,7 @@ inline static int PINT_op_entry_create(struct PINT_op_entry **op,
                                        void *user_ptr,
                                        PINT_service_callout callout,
                                        void *op_ptr,
-                                       PVFS_hint *hint,
+                                       PVFS_hint hint,
                                        PVFS_id_gen_t wq_id,
                                        PINT_context_id context_id);
 
@@ -551,7 +551,7 @@ int PINT_manager_id_post(PINT_manager_t manager,
                          PINT_op_id *id,
                          PINT_service_callout callout,
                          void *op_ptr,
-                         PVFS_hint *hint,
+                         PVFS_hint hint,
                          PVFS_id_gen_t queue_worker_id)
 {
     return PINT_manager_ctx_post(manager, manager->context, user_ptr,
@@ -589,7 +589,7 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
                           PINT_op_id *id,
                           PINT_service_callout callout,
                           void *op_ptr,
-                          PVFS_hint *hint,
+                          PVFS_hint hint,
                           PVFS_id_gen_t worker_id)
 {
     struct PINT_op_entry *op_entry;
@@ -671,7 +671,7 @@ inline static int PINT_op_entry_create(struct PINT_op_entry **op,
                                        void *user_ptr,
                                        PINT_service_callout callout,
                                        void *op_ptr,
-                                       PVFS_hint *hint,
+                                       PVFS_hint hint,
                                        PVFS_id_gen_t wq_id,
                                        PINT_context_id context_id)
 {
@@ -703,7 +703,7 @@ inline static int PINT_op_entry_create(struct PINT_op_entry **op,
 static int PINT_manager_find_worker(PINT_manager_t manager,
                                     PINT_service_callout callout,
                                     void *op_ptr,
-                                    PVFS_hint *hint,
+                                    PVFS_hint hint,
                                     PVFS_id_gen_t input_worker_id,
                                     struct PINT_worker_s **result_worker,
                                     PINT_queue_id *queue_id)
@@ -1320,7 +1320,7 @@ static void PINT_manager_op_start(PINT_manager_t manager, PINT_operation_t *op)
     qlist_for_each_entry(handler, &manager->event_handlers, link)
     {
         handler->callback(
-            PINT_OP_EVENT_START, handler->event_ptr, op->id, &op->hint);
+            PINT_OP_EVENT_START, handler->event_ptr, op->id, op->hint);
     }
 }
 
@@ -1331,7 +1331,7 @@ static void PINT_manager_op_end(PINT_manager_t manager, PINT_operation_t *op)
     qlist_for_each_entry(handler, &manager->event_handlers, link)
     {
         handler->callback(
-            PINT_OP_EVENT_END, handler->event_ptr, op->id, &op->hint);
+            PINT_OP_EVENT_END, handler->event_ptr, op->id, op->hint);
     }
 }
 
@@ -1385,7 +1385,7 @@ int PINT_manager_service_op(PINT_manager_t manager,
     PINT_manager_op_start(manager, op);
 
     /* service */
-    *error = op->operation(op->operation_ptr, &op->hint);
+    *error = op->operation(op->operation_ptr, op->hint);
 
     PINT_manager_op_end(manager, op);
 

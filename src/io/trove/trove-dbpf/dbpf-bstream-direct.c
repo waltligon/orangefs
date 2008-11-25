@@ -661,7 +661,7 @@ static size_t direct_read(int fd,
     return read_size;
 }
 
-static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint *hint)
+static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
 {
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref;
@@ -744,7 +744,7 @@ done:
     return ret;
 }
 
-static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint *hint)
+static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
 {
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref;

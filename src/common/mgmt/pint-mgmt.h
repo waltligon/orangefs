@@ -95,7 +95,7 @@ int PINT_manager_id_post(PINT_manager_t manager,
                          PINT_op_id *id,
                          PINT_service_callout callout,
                          void *op_ptr,
-                         PVFS_hint *hint,
+                         PVFS_hint hint,
                          PVFS_id_gen_t queue_worker_id);
 
 int PINT_manager_ctx_post(PINT_manager_t manager,
@@ -104,7 +104,7 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
                           PINT_op_id *id,
                           PINT_service_callout callout,
                           void *op_ptr,
-                          PVFS_hint *hint,
+                          PVFS_hint hint,
                           PVFS_id_gen_t queue_worker_id);
 
 int PINT_manager_cancel(PINT_manager_t manager,
@@ -114,7 +114,7 @@ int PINT_manager_cancel(PINT_manager_t manager,
 typedef int (*PINT_worker_mapping_callout) (PINT_manager_t manager,
                                             PINT_service_callout callout,
                                             void *op_ptr,
-                                            PVFS_hint *hint,
+                                            PVFS_hint hint,
                                             PVFS_id_gen_t *id);
 
 int PINT_manager_add_map(PINT_manager_t manager,
@@ -172,7 +172,7 @@ enum PINT_event_type
 };
 
 typedef void (*PINT_event_callback) (
-    enum PINT_event_type type, void *event_ptr, PINT_op_id id, PVFS_hint *hint);
+    enum PINT_event_type type, void *event_ptr, PINT_op_id id, PVFS_hint hint);
 
 void PINT_manager_event_handler_add(PINT_manager_t manager, 
                                     PINT_event_callback callback,

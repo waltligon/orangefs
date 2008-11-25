@@ -15,7 +15,7 @@ typedef PVFS_id_gen_t PINT_op_id;
  * a negative error value
  */
 typedef int (* PINT_service_callout)(
-    void *user_ptr, PVFS_hint *hints);
+    void *user_ptr, PVFS_hint hints);
 
 typedef struct
 {
