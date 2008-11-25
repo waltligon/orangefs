@@ -53,6 +53,7 @@
 # be overridden on the command line during make install
 DESTDIR =
 srcdir = @srcdir@
+builddir = @BUILD_ABSOLUTE_TOP@
 prefix = @prefix@
 datarootdir = @datarootdir@
 exec_prefix = @exec_prefix@
@@ -139,6 +140,8 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events
+GENINCLUDES := \
+	include
 else
 INCLUDES := \
     src/client/sysint \
@@ -157,6 +160,8 @@ INCLUDES := \
     src/io/dev \
     src/proto \
     src/common/mgmt
+GENINCLUDES := \
+	include
 endif
 
 #################################################################
@@ -207,6 +212,8 @@ CFLAGS += -I .
 CFLAGS += -I $(srcdir)
   # add selected include directories
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
+CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
+
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
@@ -1026,7 +1033,7 @@ install:: all
 else
 install:: all install_doc
 	install -d $(includedir)
-	install -m 644 $(srcdir)/include/pvfs2.h $(includedir)
+	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
@@ -1034,6 +1041,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-hint.h $(includedir)
 
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
