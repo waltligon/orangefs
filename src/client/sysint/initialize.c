@@ -93,11 +93,13 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
 
     ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
-    if (ret < 0)
+
+/*  ignore error *
+ *  if (ret < 0)
     {
         gossip_err("Error initializing event interface.\n");
         return (ret);
-    }
+    } */
 
 
     /**

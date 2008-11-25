@@ -270,7 +270,7 @@ static PINT_sm_action chdirent_update_directory_attr(
         ds_attr, 
         TROVE_SYNC |
         0,
-        s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

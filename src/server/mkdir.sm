@@ -123,7 +123,7 @@ static PINT_sm_action mkdir_create(
         s_op->u.mkdir.fs_id, &s_op->u.mkdir.handle_extent_array,
         PVFS_TYPE_DIRECTORY, NULL,
         TROVE_SYNC, 
-        s_op, 0, js_p, &i,
+        smcb, 0, js_p, &i,
         server_job_context, s_op->req->hints);
 
     return ret;
@@ -165,7 +165,7 @@ static PINT_sm_action mkdir_setattrib(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         ds_attr, 
         TROVE_SYNC,
-        s_op, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -196,7 +196,7 @@ static int mkdir_create_dirdata_dspace(
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
         TROVE_SYNC,
-        s_op, 0, js_p, &i,
+        smcb, 0, js_p, &i,
         server_job_context, s_op->req->hints);
 
     free(extent_array.extent_array);
