@@ -116,7 +116,7 @@ typedef struct
     char *server_alias;
 } options_t;
 
-static options_t s_server_options = { 0, 0, 1, NULL, NULL, 0};
+static options_t s_server_options = { 0, 0, 1, NULL, NULL};
 static char *fs_conf = NULL;
 
 /* each of the elements in this array consists of a string and its length.
