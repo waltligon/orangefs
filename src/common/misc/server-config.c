@@ -117,6 +117,9 @@ static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_ca_bundle);
 #endif
 static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(enter_mappings_context);
+static DOTCONF_CB(exit_mappings_context);
+static DOTCONF_CB(get_security_mapping);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -127,6 +130,7 @@ static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
+static void free_security_mapping(void *ptr);
 static void copy_filesystem(
     struct filesystem_configuration_s *dest_fs,
     struct filesystem_configuration_s *src_fs);
@@ -923,6 +927,12 @@ static const configoption_t options[] =
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS, "3600"},
 
+    {"<Mappings>", ARG_NONE, enter_mappings_context, NULL, CTX_GLOBAL, NULL},
+
+    {"</Mappings>", ARG_NONE, exit_mappings_context, NULL, CTX_MAPPINGS, NULL},
+
+    {"Mapping", ARG_STR, get_security_mapping, NULL, CTX_MAPPINGS, NULL},
+    
     LAST_OPTION
 };
 
@@ -2714,6 +2724,28 @@ DOTCONF_CB(get_security_timeout)
     return NULL;
 }
 
+DOTCONF_CB(enter_mappings_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_MAPPINGS;
+    return NULL;
+}
+
+DOTCONF_CB(exit_mappings_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_GLOBAL;
+    return NULL;
+}
+
+DOTCONF_CB(get_security_mapping)
+{
+    /* TODO: parse the mappings and stick them in the configuration struct */
+    return NULL;
+}
+
 /*
  * Function: PINT_config_release
  *
@@ -2833,6 +2865,12 @@ void PINT_config_release(struct server_configuration_s *config_s)
         free(config_s->cabundle_path);
         config_s->cabundle_path = NULL;
 #endif
+
+        if (config_s->security_mappings)
+        {
+            PINT_llist_free(config_s->security_mappings,free_security_mapping);
+            config_s->security_mappings = NULL;
+        }
 
     }
 }
@@ -3077,6 +3115,14 @@ static void free_filesystem(void *ptr)
         free(fs);
         fs = NULL;
     }
+}
+
+static void free_security_mapping(void *ptr)
+{
+    security_mapping_s *mapping = (security_mapping_s*)ptr;
+
+    free(mapping->pattern);
+    free(mapping->group_array);
 }
 
 static void copy_filesystem(

@@ -28,6 +28,7 @@ enum
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
+    CTX_MAPPINGS         = (1 << 12),
 };
 
 typedef struct phys_server_desc
@@ -132,6 +133,14 @@ typedef struct distribution_configuration_s
 
 } distribution_configuration;
 
+typedef struct security_mapping_s
+{
+    char *pattern;
+    PVFS_uid userid;
+    int num_groups;
+    PVFS_gid *group_array;
+} security_mapping_s;
+
 typedef struct server_configuration_s
 {
     char *host_id;
@@ -197,6 +206,7 @@ typedef struct server_configuration_s
 #endif
 
     int security_timeout;
+    PINT_llist *security_mappings;   /* ptrs are type security_mapping_s */
 
     void *private_data;
 } server_configuration_s;
