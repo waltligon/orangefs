@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "pvfs2.h"
 #include "gossip.h"
 #include "flow.h"
 #include "flowproto-support.h"
@@ -88,7 +89,7 @@ int main(
     }
 
     ret = BMI_post_sendunexpected(&op, server_addr, &mybuffer, 1,
-				  BMI_EXT_ALLOC, 0, NULL, context);
+				  BMI_EXT_ALLOC, 0, NULL, context, NULL);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_sendunexpected failure.\n");

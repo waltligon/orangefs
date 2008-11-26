@@ -124,7 +124,8 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
                               0 /* flags */,
                               NULL,
                               trove_context,
-                              &op_id);
+                              &op_id,
+                              NULL);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -139,7 +140,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
     ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
-                                 0, NULL, NULL, trove_context, &op_id);
+                                 0, NULL, NULL, trove_context, &op_id, NULL);
     while (ret == 0) ret = trove_dspace_test(
          coll_id, op_id, trove_context, &count, NULL, NULL, &state,
          TROVE_DEFAULT_TEST_TIMEOUT);
@@ -180,7 +181,8 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
                                    NULL, /* vtag */
                                    user_ptr_array,
                                    trove_context,
-                                   &op_id);
+                                   &op_id,
+                                   NULL);
         while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -194,7 +196,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	*context_p = trove_context;
 
     fprintf(stderr, "+++++++++++++++++++++++++++++++\n");
-    fprintf(stderr, "Trove init: coll_id=%d, handle=%lld, context=%d\n", coll_id, lld(parent_handle), trove_context);
+    fprintf(stderr, "Trove init: coll_id=%d, handle=%lld, context=%d\n", coll_id, lld(parent_handle), (int)trove_context);
 
 	free(mybuffer);
     return 0;

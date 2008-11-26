@@ -339,7 +339,8 @@ int stat_file(
                                   szPvfsPath, 
                                   &credentials, 
                                   &lk_response, 
-                                  PVFS2_LOOKUP_LINK_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW,
+                                  NULL);
         }
         else
         {
@@ -347,7 +348,8 @@ int stat_file(
                                   szPvfsPath, 
                                   &credentials, 
                                   &lk_response, 
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                                  NULL);
         }
    
         if(ret < 0)
@@ -362,7 +364,8 @@ int stat_file(
         ret = PVFS_sys_getattr(ref, 
                                PVFS_ATTR_SYS_ALL,
                                &credentials, 
-                               &getattr_response);
+                               &getattr_response,
+                               NULL);
 
         if(ret < 0)
         {                          
@@ -1001,7 +1004,8 @@ int pvfs2_open(
                               szPvfsPath, 
                               &credentials, 
                               &resp_lookup, 
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW,
+                              NULL);
     }
     else
     {
@@ -1009,7 +1013,8 @@ int pvfs2_open(
                               szPvfsPath, 
                               &credentials, 
                               &resp_lookup, 
-                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              PVFS2_LOOKUP_LINK_NO_FOLLOW,
+                              NULL);
     }
 
     if( (ret < 0) && 
@@ -1090,7 +1095,8 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
                           parentDirectory, 
                           (PVFS_credentials *) credentials, 
                           &resp_lookup, 
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW,
+                          NULL);
   
     if (ret < 0)
     {
@@ -1115,8 +1121,9 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
                           attr, 
                           (PVFS_credentials *) credentials,
                           NULL,           /* Accept default distribution for fs */
+                          &resp_create,
                           NULL,
-                          &resp_create);
+                          NULL);
 
     if (ret < 0)
     {
@@ -1174,7 +1181,8 @@ int lookup_parent(char             * filename,    /**< File Name */
                           szSegment, 
                           credentials, 
                           &resp_look, 
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW,
+                          NULL);
     if (ret < 0)
     {
         if(verbose)

@@ -89,7 +89,7 @@ int main(int argc, char **argv)
            str_buf, llu(parent_refn.handle));
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          &credentials, NULL, NULL, &resp_create);
+                          &credentials, NULL, &resp_create, NULL, NULL);
     if (ret < 0)
     {
         PVFS_perror("create failed with errcode", ret);
@@ -106,7 +106,7 @@ int main(int argc, char **argv)
 	 key.buffer_sz = strlen(key_s) + 1;
 	 val.buffer = val_s;
 	 val.buffer_sz = strlen(val_s) + 1;
-	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val, 0);
+	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val, 0, NULL);
     if (ret < 0)
     {
         PVFS_perror("seteattr failed with errcode", ret);
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
 	 printf("--geteattr--\n");
 	 val.buffer_sz = strlen(val_s) + 10;
 	 val.buffer = malloc(val.buffer_sz);
-	 ret = PVFS_sys_geteattr(resp_create.ref, &credentials, &key, &val);
+	 ret = PVFS_sys_geteattr(resp_create.ref, &credentials, &key, &val, NULL);
     if (ret < 0)
     {
         PVFS_perror("geteattr failed with errcode", ret);

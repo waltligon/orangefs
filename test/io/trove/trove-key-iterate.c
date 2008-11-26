@@ -80,7 +80,7 @@ static inline int file_lookup(
 	val.buffer_sz = sizeof(handle);
 	ret = trove_keyval_read(
             coll_id, parent_handle, &key, &val, 0,
-            NULL, NULL, context_id, &op_id);
+            NULL, NULL, context_id, &op_id, NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, context_id, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -94,7 +94,7 @@ static inline int file_lookup(
 	}
 
 	ret = trove_dspace_getattr(
-            coll_id, handle, &s_attr, 0, NULL, context_id, &op_id);
+            coll_id, handle, &s_attr, 0, NULL, context_id, &op_id, NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, context_id, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -171,7 +171,8 @@ int main(int argc, char **argv)
                                            NULL,
                                            NULL,
                                            trove_context,
-                                           &op_id);
+                                           &op_id,
+                                           NULL);
         if (it_ret == -1)
             return -1;
         while (it_ret == 0) it_ret = trove_dspace_test(

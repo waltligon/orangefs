@@ -116,7 +116,8 @@ int main(int argc, char **argv)
 			0,
 			&job_stat,
 			&foo_id,
-			context);
+			context,
+                        NULL);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_trove_dspace_create() failure.\n");

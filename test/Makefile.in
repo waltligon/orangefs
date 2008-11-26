@@ -84,7 +84,9 @@ INCLUDES := \
     ${pvfs2_srcdir}/src/proto \
     ${pvfs2_srcdir}/src/server \
     ${pvfs2_srcdir}/src/server/request-scheduler \
-	 ${pvfs2_srcdir}
+    ${pvfs2_srcdir} \
+    ${pvfs2_srcdir} \
+    ${pvfs2_builddir}/include
 
 #################################################################
 # Setup global flags

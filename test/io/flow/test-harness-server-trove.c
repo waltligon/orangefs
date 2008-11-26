@@ -170,7 +170,7 @@ int main(
 			      TROVE_TEST_FILE,
 			      NULL, 
 			      TROVE_FORCE_REQUESTED_HANDLE,
-			      NULL, trove_context, &op_id);
+			      NULL, trove_context, &op_id, NULL);
     while (ret == 0)
 	ret =
 	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
@@ -190,7 +190,7 @@ int main(
     val.buffer_sz = sizeof(file_handle);
     ret =
 	trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL,
-			   trove_context, &op_id);
+			   trove_context, &op_id, NULL);
     while (ret == 0)
 	ret =
 	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,

@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
     PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
-			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
+			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 	printf("IO-TEST: lookup failed; creating new file.\n");
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp, NULL);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      &credentials, NULL, NULL, &resp_cr);
+			      &credentials, NULL, &resp_cr, NULL, NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 &credentials, &resp_io);
+			 &credentials, &resp_io, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req,
-			&credentials, &resp_io);
+			&credentials, &resp_io, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_read failure", ret);
@@ -209,7 +209,7 @@ int main(int argc, char **argv)
 
     /* test out some of the mgmt functionality */
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
-			   &credentials, &resp_getattr);
+			   &credentials, &resp_getattr, NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_getattr", ret);
@@ -227,7 +227,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_mgmt_get_dfile_array(pinode_refn, &credentials,
-				    dfile_array, resp_getattr.attr.dfile_count);
+				    dfile_array, resp_getattr.attr.dfile_count, NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_dfile_array", ret);

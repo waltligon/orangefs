@@ -177,7 +177,8 @@ int main(int argc, char **argv)
 		0,
 		&job_stat,
 		&foo_id,
-		context);
+		context,
+                NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_dspace_create() failure.\n");
@@ -209,7 +210,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(root_handle);
 
 	ret = job_trove_fs_seteattr(coll_id, &key, &val, 0, NULL, 0,
-		&job_stat, &foo_id, context);
+		&job_stat, &foo_id, context, NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_fs_seteattr() failure.\n");
