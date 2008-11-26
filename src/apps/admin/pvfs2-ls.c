@@ -348,7 +348,6 @@ void print_entry(
     PVFS_object_ref ref;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
-    int client_id, req_id;
 
     if (!opts->list_long)
     {
@@ -406,7 +405,6 @@ int do_list(
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
-    uint32_t client_id, req_id;
 
     name = start;
 
