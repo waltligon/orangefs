@@ -931,7 +931,7 @@ static const configoption_t options[] =
 
     {"</Mappings>", ARG_NONE, exit_mappings_context, NULL, CTX_MAPPINGS, NULL},
 
-    {"Mapping", ARG_STR, get_security_mapping, NULL, CTX_MAPPINGS, NULL},
+    {"Mapping", ARG_RAW, get_security_mapping, NULL, CTX_MAPPINGS, NULL},
     
     LAST_OPTION
 };
@@ -2742,7 +2742,88 @@ DOTCONF_CB(exit_mappings_context)
 
 DOTCONF_CB(get_security_mapping)
 {
-    /* TODO: parse the mappings and stick them in the configuration struct */
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s*)cmd->context;
+    const char *line = cmd->data.str;
+    int len;
+    int account, keyword, pattern;
+    struct security_mapping_s *mapping;
+    int i;
+    
+    len = strlen(line);
+    mapping = malloc(sizeof(struct security_mapping_s));
+    if (!mapping)
+    {
+        return strerror(errno);
+    }
+    
+    for (account = 0; (account < len) && isspace(line[account]); account++);
+    for (i = account+1; (i < len) && !isspace(line[i]); i++);
+    if (i >= len)
+    {
+        free(mapping);
+        return "Unable to parse account field in mapping\n";
+    }
+    
+    mapping->account = malloc(i - account + 1);
+    if (!mapping->account)
+    {
+        free(mapping);
+        return strerror(errno);
+    }
+    strncpy(mapping->account, line + account, i - account);
+    
+    for (keyword = i; (keyword < len) && isspace(line[keyword]); keyword++);
+    for (i = keyword+1; (i < len) && !isspace(line[i]); i++);
+    if (i >= len)
+    {
+        free(mapping->account);
+        free(mapping);
+        return "Unable to parse keyword field in mapping\n";
+    }
+    
+    /* TODO: do something with the keyword */
+    
+    for (pattern = i; (pattern < len) && isspace(line[pattern]); pattern++);
+    if (pattern >= len)
+    {
+        free(mapping->account);
+        free(mapping);
+        return "Unable to parse pattern field in mapping\n";
+    }
+    
+    if (line[len-1] == '\n')
+    {
+        i = len - 1;
+    }
+    else
+    {
+        i = len;
+    }
+    
+    /* TODO: consider the effects of whitespace in regexps */
+    mapping->pattern = malloc(i - pattern + 1);
+    if (!mapping->pattern)
+    {
+        free(mapping->account);
+        free(mapping);
+        return strerror(errno);
+    }
+    strncpy(mapping->pattern, line + pattern, i - pattern);
+    
+    if (!config_s->security_mappings)
+    {
+        config_s->security_mappings = PINT_llist_new();
+        if (!config_s->security_mappings)
+        {
+            free(mapping->pattern);
+            free(mapping->account);
+            free(mapping);
+            return strerror(errno);
+        }
+    }
+    PINT_llist_add_to_tail(config_s->security_mappings, mapping);
+    
     return NULL;
 }
 
@@ -3121,8 +3202,12 @@ static void free_security_mapping(void *ptr)
 {
     security_mapping_s *mapping = (security_mapping_s*)ptr;
 
-    free(mapping->pattern);
-    free(mapping->group_array);
+    if (mapping)
+    {
+        free(mapping->account);
+        free(mapping->pattern);
+        free(mapping);
+    }
 }
 
 static void copy_filesystem(

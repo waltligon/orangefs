@@ -135,10 +135,8 @@ typedef struct distribution_configuration_s
 
 typedef struct security_mapping_s
 {
+    char *account;
     char *pattern;
-    PVFS_uid userid;
-    int num_groups;
-    PVFS_gid *group_array;
 } security_mapping_s;
 
 typedef struct server_configuration_s

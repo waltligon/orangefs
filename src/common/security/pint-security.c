@@ -749,7 +749,6 @@ static int load_ca_bundle(const char *path)
         ERR_error_string_n(ERR_get_error(), buf, 320);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error creating security store: "
                      "%s\n", buf);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "ok");
         return -1;
     }
 
@@ -759,8 +758,7 @@ static int load_ca_bundle(const char *path)
     if (!ret)
     {
         ERR_error_string_n(ERR_get_error(), buf, 320);
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading CA bundle file: "
-                     "%s\n", buf);
+        gossip_err("Error loading CA bundle file: %s\n", buf);
         X509_STORE_free(security_store);
         return -1;
     }
