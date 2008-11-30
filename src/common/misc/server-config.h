@@ -133,9 +133,18 @@ typedef struct distribution_configuration_s
 
 } distribution_configuration;
 
+enum security_keyword
+{
+    SECURITY_KEYWORD_EMAIL,
+    SECURITY_KEYWORD_EMAIL_REGEX,
+    SECURITY_KEYWORD_SUBJECT,
+    SECURITY_KEYWORD_SUBJECT_REGEX,
+};
+
 typedef struct security_mapping_s
 {
     char *account;
+    enum security_keyword keyword;
     char *pattern;
 } security_mapping_s;
 

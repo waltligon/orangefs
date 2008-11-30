@@ -2782,7 +2782,28 @@ DOTCONF_CB(get_security_mapping)
         return "Unable to parse keyword field in mapping\n";
     }
     
-    /* TODO: do something with the keyword */
+    if (!strncasecmp(line+keyword, "Email", i-keyword))
+    {
+        mapping->keyword = SECURITY_KEYWORD_EMAIL;
+    }
+    else if (!strncasecmp(line+keyword, "EmailRegex", i-keyword))
+    {
+        mapping->keyword = SECURITY_KEYWORD_EMAIL_REGEX;
+    }
+    else if (!strncasecmp(line+keyword, "Subject", i-keyword))
+    {
+        mapping->keyword = SECURITY_KEYWORD_SUBJECT;
+    }
+    else if (!strncasecmp(line+keyword, "SubjectRegex", i-keyword))
+    {
+        mapping->keyword = SECURITY_KEYWORD_SUBJECT_REGEX;
+    }
+    else
+    {
+        free(mapping->account);
+        free(mapping);
+        return "Invalid or unrecognized keyword field\n";
+    }
     
     for (pattern = i; (pattern < len) && isspace(line[pattern]); pattern++);
     if (pattern >= len)
