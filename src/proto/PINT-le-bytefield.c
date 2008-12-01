@@ -245,6 +245,14 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listattr;
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
+            case PVFS_SERV_GETCRED:
+                req.u.getcred.certificate = "";
+                req.u.getcred.sig_size = 0;
+                resp.u.getcred.credential.num_groups = 0;
+                resp.u.getcred.credential.issuer_id = "";
+                resp.u.getcred.credential.sig_size = 0;
+                reqsize = extra_size_PVFS_servreq_getcred;
+                respsize = extra_size_PVFS_servresp_getcred;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -403,6 +411,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+        CASE(PVFS_SERV_GETCRED, getcred);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -496,6 +505,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_GETCRED, getcred);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -599,6 +609,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_GETCRED, getcred);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -682,6 +693,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_GETCRED, getcred);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -809,6 +821,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.getattr.credential.signature);
                 break;
 
+            case PVFS_SERV_GETCRED:
+                decode_free(req->u.getcred.signature);
+                break;
+
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
 	    case PVFS_SERV_REMOVE:
@@ -918,6 +934,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_CREATE:
                     decode_free(resp->u.create.capability.handle_array);
                     decode_free(resp->u.create.capability.signature);
+                    break;
+                case PVFS_SERV_GETCRED:
+                    decode_free(resp->u.getcred.credential.group_array);
+                    decode_free(resp->u.getcred.credential.signature);
                     break;
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
