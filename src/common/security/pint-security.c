@@ -8,15 +8,19 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <regex.h>
 #include <errno.h>
 #include <assert.h>
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/stack.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 #include <openssl/x509_vfy.h>
 
 #include "pvfs2.h"
@@ -68,6 +72,7 @@ static int load_private_key(const char*);
 static int load_public_keys(const char*);
 static int load_ca_bundle(const char*);
 static int verify_callback(int, X509_STORE_CTX*);
+static const char *find_account(const char*, const STACK*);
 
 #endif /* SECURITY_ENCRYPTION_NONE */
 
@@ -449,6 +454,61 @@ int PINT_verify_certificate(const char *certstr,
     }
 
     return 0;
+}
+
+const char *PINT_lookup_account(const char *certstr)
+{
+    BIO *certbio;
+    X509 *cert;
+    X509_NAME *subject;
+    char *subjectstr;
+    STACK *emails;
+    const char *account;
+
+    if (!certstr)
+    {
+        return NULL;
+    }
+
+    certbio = BIO_new_mem_buf((char*)certstr, -1);
+    if (!certbio)
+    {
+        /* TODO: log error message */
+        return NULL;
+    }
+
+    cert = PEM_read_bio_X509(certbio, NULL, NULL, NULL);
+    BIO_vfree(certbio);
+    if (!cert)
+    {
+        /* TODO: log error message */
+        return NULL;
+    }
+
+    subject = X509_get_subject_name(cert);
+    if (!subject)
+    {
+        /* TODO: log error message */
+        X509_free(cert);
+        return NULL;
+    }
+
+    subjectstr = X509_NAME_oneline(subject, NULL, 0);
+    if (!subjectstr)
+    {
+        /* TODO: log error message */
+        X509_free(cert);
+        return NULL;
+    }
+
+    emails = X509_get1_email(cert);
+
+    account = find_account(subjectstr, emails);
+    CRYPTO_free(subjectstr);
+    X509_email_free(emails);
+    X509_free(cert);
+
+    return account;
 }
 
 /*  PINT_sign_capability
@@ -883,6 +943,94 @@ static int load_ca_bundle(const char *path)
 static int verify_callback(int ok, X509_STORE_CTX *ctx)
 {
     return ok;
+}
+
+/* TODO: consider logging matches for debugging configs */
+/* TODO: consider case-insensitve compare */
+static const char *find_account(const char *subject, const STACK *emails)
+{
+    const struct server_configuration_s *config;
+    PINT_llist_p mappings;
+    struct security_mapping_s *mapping;
+    regex_t regex;
+    const char *account = NULL;
+    int ret;
+
+    config = PINT_get_server_config();
+
+    mappings = config->security_mappings;
+    if (!mappings)
+    {
+        /* TODO: log error message */
+        return NULL;
+    }
+
+    /* exits after the first match */
+    for (mappings = mappings->next; mappings; mappings = mappings->next)
+    {
+        mapping = (struct security_mapping_s*)mappings->item;
+        if (mapping->keyword == SECURITY_KEYWORD_EMAIL)
+        {
+            ret = sk_find((STACK*)emails, mapping->pattern);
+            if (ret != -1)
+            {
+                account = mapping->account;
+            }
+        }
+        else if (mapping->keyword == SECURITY_KEYWORD_EMAIL_REGEX)
+        {
+            int i;
+
+            ret = regcomp(&regex, mapping->pattern, REG_EXTENDED|REG_NOSUB);
+            if (ret)
+            {
+                /* TODO: log error message */
+                continue;
+            }
+
+            for (i = 0; i < sk_num(emails); i++)
+            {
+                ret = regexec(&regex, sk_value(emails, i), 0, NULL, 0);
+                if (!ret)
+                {
+                    account = mapping->account;
+                    break;
+                }
+            }
+            
+            regfree(&regex);
+        }
+        else if (mapping->keyword == SECURITY_KEYWORD_SUBJECT)
+        {
+            if (!strcmp(subject, mapping->pattern))
+            {
+                account = mapping->account;
+            }
+        }
+        else if (mapping->keyword == SECURITY_KEYWORD_SUBJECT_REGEX)
+        {
+            ret = regcomp(&regex, mapping->pattern, REG_EXTENDED|REG_NOSUB);
+            if (ret)
+            {
+                /* TODO: log error message */
+                continue;
+            }
+            ret = regexec(&regex, subject, 0, NULL, 0);
+            regfree(&regex);
+            if (!ret)
+            {
+                account = mapping->account;
+            }
+        }
+
+        /* match found */
+        if (account)
+        {
+            break;
+        }
+    }
+
+    return account;
 }
 
 #else /* SECURITY_ENCRYPTION_NONE */

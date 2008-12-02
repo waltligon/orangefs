@@ -44,6 +44,8 @@ int PINT_security_finalize(void);
 
 int PINT_verify_certificate(const char *, const unsigned char *, unsigned int);
 
+const char *PINT_lookup_account(const char *);
+
 /* creates a signature from the remaining fields
  * any existing signature is overwritten
  */

@@ -1,5 +1,5 @@
 /* 
- * Copyright 2008 Clemson University
+ * Copyright 2008 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -94,16 +94,34 @@ static PINT_sm_action get_cred_setup(struct PINT_smcb *smcb,
 static PINT_sm_action get_cred_verify_cert(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
-    /* TODO: verify the certificate and signature */
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+
+    ret = PINT_verify_certificate(s_op->u.getcred.certificate,
+                                  s_op->u.getcred.signature,
+                                  s_op->u.getcred.sig_size);
+    
+    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
-    /* TODO: get the account name mapped to the certificate */
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    const char *account;
+
+    account = PINT_lookup_account(s_op->u.getcred.certificate);
+    if (!account)
+    {
+        /* TODO: log error message */
+        js_p->error_code = -PVFS_EACCES;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* TODO: look up user and group ids for the account */
     /* TODO: create a new credential and sign it */
+
     return SM_ACTION_COMPLETE;
 }
 
