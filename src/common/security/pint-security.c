@@ -13,6 +13,7 @@
 
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
@@ -338,6 +339,117 @@ int PINT_security_finalize(void)
 }
 
 #ifndef SECURITY_ENCRYPTION_NONE
+
+int PINT_verify_certificate(const char *certstr,
+                            const unsigned char *signature,
+                            unsigned int sig_size)
+{
+    BIO *certbio;
+    X509 *cert;
+    X509_STORE_CTX *store_ctx;
+    EVP_PKEY *pkey;
+    EVP_MD_CTX mdctx;
+    const EVP_MD *md;
+    int ret;
+
+    if (!certstr || !signature || (sig_size == 0))
+    {
+        return -PVFS_EINVAL;
+    }
+
+    /******* Part 1 - verify the certificate */
+
+    certbio = BIO_new_mem_buf((char*)certstr, -1);
+    if (!certbio)
+    {
+        /* TODO: log error message */
+        return -PVFS_EINVAL;
+    }
+
+    cert = PEM_read_bio_X509(certbio, NULL, NULL, NULL);
+    if (!cert)
+    {
+        /* TODO: log error message */
+        return -PVFS_EINVAL;
+    }
+    BIO_vfree(certbio);
+
+    store_ctx = X509_STORE_CTX_new();
+    if (!store_ctx)
+    {
+        /* TODO: log error message */
+        X509_free(cert);
+        return -PVFS_EINVAL;
+    }
+    /* XXX: previous versions did not return a value */
+    ret = X509_STORE_CTX_init(store_ctx, security_store, cert, NULL);
+    if (!ret)
+    {
+        /* TODO: log error message */
+        X509_STORE_CTX_free(store_ctx);
+        X509_free(cert);
+        return -PVFS_EINVAL;
+    }
+    /* TODO: set any verification options */
+
+    ret = X509_verify_cert(store_ctx);
+    X509_STORE_CTX_free(store_ctx);
+    if (ret <= 0)
+    {
+        /* TODO: log error message */
+        X509_free(cert);
+        return -PVFS_EPERM;
+    }
+
+    /* TODO: ensure ref counting keeps key from being freed with cert */
+    pkey = X509_get_pubkey(cert);
+    X509_free(cert);
+    if (!pkey)
+    {
+        /* TODO: log error message */
+        return -PVFS_EINVAL;
+    }
+
+    /******* Part 2 - verify the signature */
+
+    EVP_MD_CTX_init(&mdctx);
+
+#if defined(SECURITY_ENCRYPTION_RSA)
+    md = EVP_sha1();
+#elif defined(SECURITY_ENCRYPTION_DSA)
+    md = EVP_dss1();
+#else
+    md = NULL;
+#endif
+
+    ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
+    if (!ret)
+    {
+        /* TODO: log error message */
+        return -PVFS_EINVAL;
+    }
+   
+    ret = EVP_VerifyUpdate(&mdctx, certstr, strlen(certstr));
+    if (!ret)
+    {
+        /* TODO: log error message */
+        return -PVFS_EINVAL;
+    }
+
+    ret = EVP_VerifyFinal(&mdctx, signature, sig_size, pkey);
+    EVP_MD_CTX_cleanup(&mdctx);
+    EVP_PKEY_free(pkey);
+    if (ret == 0)
+    {
+        return -PVFS_EPERM;
+    }
+    else if (ret == -1)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    return 0;
+}
 
 /*  PINT_sign_capability
  *
@@ -753,6 +865,7 @@ static int load_ca_bundle(const char *path)
     }
 
     X509_STORE_set_verify_cb_func(security_store, verify_callback);
+    /* TODO: set any default verification options */
 
     ret = X509_STORE_load_locations(security_store, path, NULL);
     if (!ret)

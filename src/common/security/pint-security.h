@@ -42,6 +42,8 @@ int PINT_security_initialize(void);
  */
 int PINT_security_finalize(void);
 
+int PINT_verify_certificate(const char *, const unsigned char *, unsigned int);
+
 /* creates a signature from the remaining fields
  * any existing signature is overwritten
  */
