@@ -36,7 +36,11 @@ const PVFS_capability *PINT_null_capability(void);
 
 int PINT_capability_is_null(const PVFS_capability* cap);
 
+int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest);
+
 PVFS_credential *PINT_dup_credential(const PVFS_credential *cred);
+
+void PINT_cleanup_credential(PVFS_credential *cred);
 
 void PINT_release_credential(PVFS_credential *cred);
 

@@ -111,71 +111,91 @@ int PINT_capability_is_null(const PVFS_capability *cap)
     return (memcmp(cap, &null_capability, sizeof(PVFS_capability)) == 0);
 }
 
-void PINT_release_credential(PVFS_credential *cred)
+void PINT_cleanup_credential(PVFS_credential *cred)
 {
     if (cred)
     {
         free(cred->group_array);
         free(cred->issuer_id);
         free(cred->signature);
-        free(cred);
     }
+}
+
+void PINT_release_credential(PVFS_credential *cred)
+{
+    PINT_cleanup_credential(cred);
+    free(cred);
 }
 
 /* TODO: fix for the no security case. the previous assumption that
  * credentials are always signed will probably no longer hold.
  */
+int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
+{
+    if (!src || !dest || (src == dest))
+    {
+        return -PVFS_EINVAL;
+    }
+
+    memcpy(dest, src, sizeof(PVFS_credential));
+    dest->group_array = NULL;
+    dest->issuer_id = NULL;
+    dest->signature = NULL;
+
+    if (src->num_groups)
+    {
+        dest->group_array = calloc(src->num_groups, sizeof(PVFS_gid));
+        if (!dest->group_array)
+        {
+            return -PVFS_ENOMEM;
+        }
+        memcpy(dest->group_array, src->group_array,
+               src->num_groups * sizeof(PVFS_gid));
+    }
+
+    dest->issuer_id = strdup(src->issuer_id);
+    if (!dest->issuer_id)
+    {
+        free(dest->group_array);
+        return -PVFS_ENOMEM;
+    }
+
+    dest->signature = calloc(src->sig_size, 1);
+    if (!dest->signature)
+    {
+        free(dest->issuer_id);
+        free(dest->group_array);
+        return -PVFS_ENOMEM;
+    }
+    memcpy(dest->signature, src->signature, src->sig_size);
+
+    return 0;
+}
+
 PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
 {
-    PVFS_credential *ret = NULL;
+    PVFS_credential *newcred;
+    int ret;
 
     if (!cred)
     {
         return NULL;
     }
 
-    ret = (PVFS_credential*)calloc(1, sizeof(PVFS_credential));
-    if (!ret)
+    newcred = (PVFS_credential*)malloc(sizeof(PVFS_credential));
+    if (!newcred)
     {
         return NULL;
     }
 
-    memcpy(ret, cred, sizeof(PVFS_credential));
-    ret->group_array = NULL;
-    ret->issuer_id = NULL;
-    ret->signature = NULL;
-
-    if (cred->num_groups)
+    ret = PINT_copy_credential(cred, newcred);
+    if (ret < 0)
     {
-        ret->group_array = calloc(cred->num_groups, sizeof(PVFS_gid));
-        if (!ret->group_array)
-        {
-            free(ret);
-            return NULL;
-        }
-        memcpy(ret->group_array, cred->group_array, 
-               cred->num_groups * sizeof(PVFS_gid));
-    }
-
-    ret->issuer_id = strdup(cred->issuer_id);
-    if (!ret->issuer_id)
-    {
-        free(ret->group_array);
-        free(ret);
+        free(newcred);
         return NULL;
     }
 
-    ret->signature = (unsigned char*)calloc(cred->sig_size, 1);
-    if (!ret->signature)
-    {
-        free(ret->issuer_id);
-        free(ret->group_array);
-        free(ret);
-        return NULL;
-    }
-    memcpy(ret->signature, cred->signature, cred->sig_size);
-
-    return ret;
+    return newcred;
 }
 
 

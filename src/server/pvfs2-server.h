@@ -264,6 +264,14 @@ struct PINT_server_listattr_op
     int parallel_sms;
 };
 
+struct PINT_server_getcred_op
+{
+    char *certificate;
+    uint32_t sig_size;
+    PVFS_sig signature;
+    PVFS_credential credential;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -343,11 +351,12 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_getcred_op getcred;
     } u;
 
 } PINT_server_op;
 
-/* XXX: consider passing request only */
+/* TODO: consider passing request only */
 /* in that case we can move this whole block back to the file's top */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 

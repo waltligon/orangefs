@@ -1,0 +1,159 @@
+/* 
+ * Copyright 2008 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdlib.h>
+#include <string.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-util.h"
+#include "pvfs2-internal.h"
+#include "pint-util.h"
+#include "security-util.h"
+#include "pint-security.h"
+
+%%
+
+/* TODO: lots of work is done here. figure out a way to subdivide it */
+nested machine pvfs2_get_cred_work_sm
+{
+    state verify_cert
+    {
+        run get_cred_verify_cert;
+        success => make_cred;
+        default => return;
+    }
+
+    state make_cred
+    {
+        run get_cred_make_cred;
+        default => return;
+    }
+}
+
+machine pvfs2_get_cred_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup;
+        default => final_response;
+    }
+
+    state setup
+    {
+        run get_cred_setup;
+        default => work;
+    }
+
+    state work
+    {
+        jump pvfs2_get_cred_work_sm;
+        success => setup_response;
+        default => final_response;
+    }
+
+    state setup_response
+    {
+        run get_cred_setup_response;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run get_cred_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action get_cred_setup(struct PINT_smcb *smcb, 
+                                     job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    s_op->u.getcred.certificate = s_op->req->u.getcred.certificate;
+    s_op->u.getcred.sig_size = s_op->req->u.getcred.sig_size;
+    s_op->u.getcred.signature = s_op->req->u.getcred.signature;
+    memset(&s_op->u.getcred.credential, 0, sizeof(PVFS_credential));
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_cred_verify_cert(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    /* TODO: verify the certificate and signature */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
+{
+    /* TODO: get the account name mapped to the certificate */
+    /* TODO: look up user and group ids for the account */
+    /* TODO: create a new credential and sign it */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_cred_setup_response(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+
+    ret = PINT_copy_credential(&s_op->u.getcred.credential,
+                               &s_op->resp.u.getcred.credential);
+
+    js_p->error_code = ret;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_cred_cleanup(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_cleanup_credential(&s_op->u.getcred.credential);
+
+    return server_state_machine_complete(smcb);
+}
+
+static int perm_getcred(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
+struct PINT_server_req_params pvfs2_get_cred_params =
+{
+    .string_name = "getcred",
+    .perm = perm_getcred,
+    .access_type = PINT_server_req_readonly,
+    .state_machine = &pvfs2_get_cred_sm
+};
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
