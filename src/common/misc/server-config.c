@@ -2032,6 +2032,11 @@ DOTCONF_CB(get_trusted_network)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
+    if (cmd->arg_count == 0)
+    {
+      return NULL; 
+    }
+
     config_s->allowed_masks = (int *) calloc(cmd->arg_count, sizeof(int));
     if (config_s->allowed_masks == NULL)
     {
@@ -2057,6 +2062,7 @@ DOTCONF_CB(get_trusted_network)
         config_s->allowed_networks_count = 0;
         return("Parse error in netmask specification\n");
     }
+
     /* okay, we enable trusted network as well */
     config_s->network_enabled = 1;
     return NULL;
