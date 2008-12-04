@@ -218,6 +218,12 @@ struct PVFS_sysresp_listeattr_s
 };
 typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 
+struct PVFS_sysresp_getcred_s
+{
+    PVFS_credential credential;
+};
+typedef struct PVFS_sysresp_getcred_s PVFS_sysresp_getcred;
+
 
 /****************************************/
 /* system interface function prototypes */
@@ -596,6 +602,16 @@ PVFS_error PVFS_sys_listeattr(
     int32_t nkey,
     const PVFS_credential *credential,
     PVFS_sysresp_listeattr *resp);
+
+PVFS_error PVFS_isys_getcred(
+    const char *certificate,
+    PVFS_sysresp_getcred *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_getcred(
+    const char *certificate,
+    PVFS_sysresp_getcred *resp);
 
 PVFS_error PVFS_sys_set_info(
     enum PVFS_sys_setinfo_opt option,

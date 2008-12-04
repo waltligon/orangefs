@@ -50,7 +50,8 @@ CLIENT_SMCGEN := \
 	$(DIR)/mgmt-remove-object.c \
 	$(DIR)/mgmt-remove-dirent.c \
 	$(DIR)/mgmt-create-dirent.c \
-	$(DIR)/mgmt-get-dirdata-handle.c
+	$(DIR)/mgmt-get-dirdata-handle.c \
+        $(DIR)/sys-getcred.c
 
 # track generated .c files that need to be removed during dist clean, etc.
 SMCGEN += $(CLIENT_SMCGEN)

@@ -1,0 +1,116 @@
+/*
+ * Copyright 2008 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+/* TODO: include openssl stuff */
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+/* TODO: include security stuff */
+
+extern job_context_id pint_client_sm_context;
+
+%%
+
+machine pvfs2_client_getcred_sm
+{
+    /* TODO: replace with real states */
+    state entry
+    {
+        run getcred_entry;
+        default => terminate;
+    }
+}
+
+%%
+
+PVFS_error PVFS_isys_getcred(const char *certificate,
+                             PVFS_sysresp_getcred *resp_p,
+                             PVFS_sys_op_id *op_id,
+                             void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getcred entered\n");
+
+    if (!certificate || !resp_p)
+    {
+        gossip_err("invalid (NULL) argument\n");
+        return ret;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_SYS_GETCRED,
+                    sizeof(struct PINT_client_sm),
+                    client_op_state_get_machine,
+                    client_state_machine_terminate,
+                    pint_client_sm_context);
+    if (!smcb)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* TODO: continue filling out stuff */
+
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
+}
+
+PVFS_error PVFS_sys_getcred(const char *certificate,
+                            PVFS_sysresp_getcred *resp_p)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PVFS_error error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_getcred entered\n");
+
+    ret = PVFS_isys_getcred(certificate, resp_p, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_getcred call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "getcred", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/* TODO: replace with real states */
+static int getcred_entry(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
