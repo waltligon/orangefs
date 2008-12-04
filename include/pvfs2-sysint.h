@@ -604,13 +604,21 @@ PVFS_error PVFS_sys_listeattr(
     PVFS_sysresp_listeattr *resp);
 
 PVFS_error PVFS_isys_getcred(
+    PVFS_fs_id fs_id,
     const char *certificate,
+    const PVFS_sig signature,
+    uint32_t sig_size,
+    PVFS_BMI_addr_t addr,
     PVFS_sysresp_getcred *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
 PVFS_error PVFS_sys_getcred(
+    PVFS_fs_id fs_id,
     const char *certificate,
+    const PVFS_sig signature,
+    uint32_t sig_size,
+    PVFS_BMI_addr_t addr,
     PVFS_sysresp_getcred *resp);
 
 PVFS_error PVFS_sys_set_info(
