@@ -253,6 +253,7 @@ static void lebf_initialize(void)
                 resp.u.getcred.credential.sig_size = 0;
                 reqsize = extra_size_PVFS_servreq_getcred;
                 respsize = extra_size_PVFS_servresp_getcred;
+                break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;

@@ -8,8 +8,6 @@
 #include <string.h>
 #include <assert.h>
 
-/* TODO: include openssl stuff */
-
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -37,7 +35,7 @@ machine pvfs2_client_getcred_sm
     state xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup;
+        default => cleanup;
     }
 
     state cleanup
