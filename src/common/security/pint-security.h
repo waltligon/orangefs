@@ -81,6 +81,8 @@ int PINT_verify_credential (PVFS_credential *);
  */
 int PINT_init_capability(PVFS_capability *);
 
+int PINT_init_credential(PVFS_credential *);
+
 
 #endif
 

@@ -65,6 +65,8 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
 
 #ifndef SECURITY_ENCRYPTION_NONE
 
+static gen_mutex_t lookup_groups_mutex = GEN_MUTEX_INITIALIZER;
+
 /* the private key used for signing */
 static EVP_PKEY *security_privkey = NULL;
 /* the store context used to verify client certificates */
@@ -545,7 +547,6 @@ int PINT_lookup_userid(const char *account, PVFS_uid *userid)
     return 0;
 }
 
-/* TODO: make this function reentrant */
 int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
         uint32_t *num_groups)
 {
@@ -555,12 +556,15 @@ int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
     uint32_t ngroups;
     int i;
 
+    gen_mutex_lock(&lookup_groups_mutex);
+
     /* TODO: make the size a configurable constant */
     groups = (PVFS_gid*)calloc(32, sizeof(PVFS_gid));
     if (!groups)
     {
         *num_groups = 0;
         *group_array = NULL;
+        gen_mutex_unlock(&lookup_groups_mutex);
         return -PVFS_ENOMEM;
     }
 
@@ -570,6 +574,7 @@ int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
         free(groups);
         *num_groups = 0;
         *group_array = NULL;
+        gen_mutex_unlock(&lookup_groups_mutex);
         return -PVFS_EINVAL;
     }
 
@@ -594,6 +599,7 @@ int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
     *group_array = groups;
     *num_groups = ngroups;
 
+    gen_mutex_unlock(&lookup_groups_mutex);
     return 0;
 }
 
@@ -825,7 +831,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure.\n");
         EVP_MD_CTX_cleanup(&mdctx);
-        return 0;
+        return -1;
     }
     
     ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size,
@@ -1095,7 +1101,6 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 
 /* TODO: consider logging matches for debugging configs */
 /* TODO: consider case-insensitve compare */
-/* TODO: fix for when emails is NULL */
 static const char *find_account(const char *subject, const STACK *emails)
 {
     const struct server_configuration_s *config;
@@ -1263,6 +1268,31 @@ int PINT_init_capability(PVFS_capability *cap)
             ret = -PVFS_ENOMEM;
         }
 #endif /* SECURITY_ENCRYPTION_NONE */
+    }
+    else
+    {
+        ret = -PVFS_EINVAL;
+    }
+
+    return ret;
+}
+
+int PINT_init_credential(PVFS_credential *cred)
+{
+    int ret = 0;
+
+    if (cred)
+    {
+        memset(cred, 0, sizeof(PVFS_credential));
+
+#ifndef SECURITY_ENCRYPTION_NONE
+        cred->signature =
+            (unsigned char*)calloc(1, EVP_PKEY_size(security_privkey));
+        if (cred->signature == NULL)
+        {
+            ret = -PVFS_ENOMEM;
+        }
+#endif /* !SECURITY_ENCRYPTION_NONE */
     }
     else
     {

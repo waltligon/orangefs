@@ -88,13 +88,14 @@ static PINT_sm_action get_cred_setup(struct PINT_smcb *smcb,
                                      job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
 
     s_op->u.getcred.certificate = s_op->req->u.getcred.certificate;
     s_op->u.getcred.sig_size = s_op->req->u.getcred.sig_size;
     s_op->u.getcred.signature = s_op->req->u.getcred.signature;
-    memset(&s_op->u.getcred.credential, 0, sizeof(PVFS_credential));
+    ret = PINT_init_credential(&s_op->u.getcred.credential);
 
-    js_p->error_code = 0;
+    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 
