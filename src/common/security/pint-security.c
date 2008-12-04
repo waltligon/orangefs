@@ -361,6 +361,7 @@ int PINT_verify_certificate(const char *certstr,
     EVP_PKEY *pkey;
     EVP_MD_CTX mdctx;
     const EVP_MD *md;
+    unsigned long err;
     int ret;
 
     if (!certstr || !signature || (sig_size == 0))
@@ -373,14 +374,20 @@ int PINT_verify_certificate(const char *certstr,
     certbio = BIO_new_mem_buf((char*)certstr, -1);
     if (!certbio)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
 
     cert = PEM_read_bio_X509(certbio, NULL, NULL, NULL);
     if (!cert)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
     BIO_vfree(certbio);
@@ -388,15 +395,21 @@ int PINT_verify_certificate(const char *certstr,
     store_ctx = X509_STORE_CTX_new();
     if (!store_ctx)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         X509_free(cert);
-        return -PVFS_EINVAL;
+        return -PVFS_ENOMEM;
     }
     /* XXX: previous versions did not return a value */
     ret = X509_STORE_CTX_init(store_ctx, security_store, cert, NULL);
     if (!ret)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         X509_STORE_CTX_free(store_ctx);
         X509_free(cert);
         return -PVFS_EINVAL;
@@ -405,11 +418,18 @@ int PINT_verify_certificate(const char *certstr,
 
     ret = X509_verify_cert(store_ctx);
     X509_STORE_CTX_free(store_ctx);
-    if (ret <= 0)
+    if (ret == 0)
     {
-        /* TODO: log error message */
-        X509_free(cert);
         return -PVFS_EPERM;
+    }
+    else if (ret < 0)
+    {
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
+        X509_free(cert);
+        return -PVFS_EINVAL;
     }
 
     /* TODO: ensure ref counting keeps key from being freed with cert */
@@ -417,7 +437,10 @@ int PINT_verify_certificate(const char *certstr,
     X509_free(cert);
     if (!pkey)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
 
@@ -436,14 +459,20 @@ int PINT_verify_certificate(const char *certstr,
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
     if (!ret)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
    
     ret = EVP_VerifyUpdate(&mdctx, certstr, strlen(certstr));
     if (!ret)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
 
@@ -452,10 +481,16 @@ int PINT_verify_certificate(const char *certstr,
     EVP_PKEY_free(pkey);
     if (ret == 0)
     {
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+            "Certificate verification error: invalid client signature\n");
         return -PVFS_EPERM;
     }
     else if (ret == -1)
     {
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return -PVFS_EINVAL;
     }
 
@@ -1093,9 +1128,17 @@ static int load_ca_bundle(const char *path)
     return 0;
 }
 
-/* TODO: implement me */
 static int verify_callback(int ok, X509_STORE_CTX *ctx)
 {
+    if (!ok)
+    {
+        int err;
+        err = X509_STORE_CTX_get_error(ctx);
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "Certificate verification error: %s\n",
+                     X509_verify_cert_error_string(err));
+    }
+
     return ok;
 }
 

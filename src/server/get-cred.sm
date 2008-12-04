@@ -108,6 +108,11 @@ static PINT_sm_action get_cred_verify_cert(struct PINT_smcb *smcb,
     ret = PINT_verify_certificate(s_op->u.getcred.certificate,
                                   s_op->u.getcred.signature,
                                   s_op->u.getcred.sig_size);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "Certificate verification failed\n");
+    }
     
     js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
