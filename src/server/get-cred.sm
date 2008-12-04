@@ -155,8 +155,14 @@ static PINT_sm_action get_cred_sign_cred(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
 
-    /* TODO: sign the credential */
+    ret = PINT_sign_credential(&s_op->u.getcred.credential);
+    if (ret == -1)
+    {
+        /* TODO: log error message */
+        js_p->error_code = -PVFS_EINVAL;
+    }
 
     return SM_ACTION_COMPLETE;
 }

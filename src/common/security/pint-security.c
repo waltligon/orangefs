@@ -221,6 +221,7 @@ static int setup_threading(void)
  */
 static unsigned long id_function(void)
 {
+    /* TODO: find a more portable way to do this */
     return (unsigned long)gen_thread_self();
 }
 
@@ -444,7 +445,7 @@ int PINT_verify_certificate(const char *certstr,
         return -PVFS_EINVAL;
     }
 
-    ret = EVP_VerifyFinal(&mdctx, signature, sig_size, pkey);
+    ret = EVP_VerifyFinal(&mdctx, (unsigned char*)signature, sig_size, pkey);
     EVP_MD_CTX_cleanup(&mdctx);
     EVP_PKEY_free(pkey);
     if (ret == 0)
@@ -780,6 +781,66 @@ int PINT_verify_capability(PVFS_capability *data)
     return (ret == 1);
 }
 
+int PINT_sign_credential(PVFS_credential *cred)
+{
+    const struct server_configuration_s *conf;
+    EVP_MD_CTX mdctx;
+    char buf[256];
+    const EVP_MD *md;
+    int ret;
+    
+    assert(security_privkey);
+    
+    conf = PINT_get_server_config();
+    
+    cred->issuer_id = conf->server_alias;
+    
+    /* TODO: separate credential timeout */
+    cred->timeout = PINT_util_get_current_time() + conf->security_timeout;
+    
+#if defined(SECURITY_ENCRYPTION_RSA)
+    md = EVP_sha1();
+#elif defined(SECURITY_ENCRYPTION_DSA)
+    md = EVP_dss1();
+#endif
+
+    EVP_MD_CTX_init(&mdctx);
+    
+    ret = EVP_SignInit_ex(&mdctx, md, NULL);
+    ret &= EVP_SignUpdate(&mdctx, &cred->serial, sizeof(uint32_t));
+    ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
+    if (cred->num_groups)
+    {
+        ret &= EVP_SignUpdate(&mdctx, cred->group_array, 
+                              cred->num_groups * sizeof(PVFS_gid));
+    }
+    if (cred->issuer_id)
+    {
+        ret &= EVP_SignUpdate(&mdctx, cred->issuer_id, 
+                strlen(cred->issuer_id) * sizeof(char));
+    }
+    ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure.\n");
+        EVP_MD_CTX_cleanup(&mdctx);
+        return 0;
+    }
+    
+    ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size,
+                        security_privkey);
+    EVP_MD_CTX_cleanup(&mdctx);
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing credential: "
+                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+        return -1;
+    }
+    
+    return 0;
+}
+
 /*  PINT_verify_credential
  *
  *  Takes in a PVFS_credential structure and checks to see if the
@@ -839,10 +900,12 @@ int PINT_verify_credential(PVFS_credential *cred)
         ret &= EVP_VerifyUpdate(&mdctx, cred->group_array,
                                 cred->num_groups * sizeof(PVFS_gid));
     }
-    ret &= EVP_VerifyUpdate(&mdctx, cred->issuer_id,
-                            (strlen(cred->issuer_id) + 1) * sizeof(char));
+    if (cred->issuer_id)
+    {
+        ret &= EVP_VerifyUpdate(&mdctx, cred->issuer_id,
+                                strlen(cred->issuer_id) * sizeof(char));
+    }
     ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
-    ret &= EVP_VerifyUpdate(&mdctx, &cred->sig_size, sizeof(uint32_t));
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");

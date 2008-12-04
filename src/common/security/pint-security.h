@@ -61,6 +61,8 @@ int PINT_sign_capability(PVFS_capability *);
  */
 int PINT_verify_capability(PVFS_capability *);
 
+int PINT_sign_credential(PVFS_credential *);
+
 /* computes a signature from the fields and compares 
  * to the existing signature returns non-zero if equal
  * nothing changed in the structure
