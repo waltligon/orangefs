@@ -46,6 +46,10 @@ int PINT_verify_certificate(const char *, const unsigned char *, unsigned int);
 
 const char *PINT_lookup_account(const char *);
 
+int PINT_lookup_userid(const char *, PVFS_uid *);
+
+int PINT_lookup_groups(const char *, PVFS_gid **, uint32_t *);
+
 /* creates a signature from the remaining fields
  * any existing signature is overwritten
  */

@@ -9,6 +9,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <sys/types.h>
+#include <unistd.h>
+#include <pwd.h>
+#include <grp.h>
 #include <regex.h>
 #include <errno.h>
 #include <assert.h>
@@ -511,6 +514,88 @@ const char *PINT_lookup_account(const char *certstr)
     return account;
 }
 
+int PINT_lookup_userid(const char *account, PVFS_uid *userid)
+{
+    struct passwd pwbuf;
+    struct passwd *pwbufp;
+    char *buf;
+    long max;
+    int ret;
+
+    max = sysconf(_SC_GETPW_R_SIZE_MAX);
+    assert(max != -1);
+    buf = calloc(max, sizeof(char));
+    if (!buf)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    memset(&pwbuf, 0, sizeof(struct passwd));
+    ret = getpwnam_r(account, &pwbuf, buf, max, &pwbufp);
+    if ((pwbufp == NULL) || ret)
+    {
+        free(buf);
+        return -PVFS_EINVAL;
+    }
+
+    *userid = pwbuf.pw_uid;
+
+    free(buf);
+    return 0;
+}
+
+/* TODO: make this function reentrant */
+int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
+        uint32_t *num_groups)
+{
+    struct group *grent;
+    struct passwd *pwbuf;
+    PVFS_gid *groups;
+    uint32_t ngroups;
+    int i;
+
+    /* TODO: make the size a configurable constant */
+    groups = (PVFS_gid*)calloc(32, sizeof(PVFS_gid));
+    if (!groups)
+    {
+        *num_groups = 0;
+        *group_array = NULL;
+        return -PVFS_ENOMEM;
+    }
+
+    pwbuf = getpwnam(account);
+    if (pwbuf == NULL)
+    {
+        free(groups);
+        *num_groups = 0;
+        *group_array = NULL;
+        return -PVFS_EINVAL;
+    }
+
+    groups[0] = pwbuf->pw_gid;
+    ngroups = 1;
+
+    for (grent = getgrent(); grent && (ngroups < 32); grent = getgrent())
+    {
+        for (i = 0; grent->gr_mem[i]; i++)
+        {
+            /* XXX: should case matter? */
+            if (!strcasecmp(grent->gr_mem[i], account))
+            {
+                groups[ngroups] = grent->gr_gid;
+                ngroups++;
+                break;
+            }
+        }
+    }
+
+    endgrent();
+    *group_array = groups;
+    *num_groups = ngroups;
+
+    return 0;
+}
+
 /*  PINT_sign_capability
  *
  *  Takes in a PVFS_capability structure and creates a signature
@@ -947,6 +1032,7 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 
 /* TODO: consider logging matches for debugging configs */
 /* TODO: consider case-insensitve compare */
+/* TODO: fix for when emails is NULL */
 static const char *find_account(const char *subject, const STACK *emails)
 {
     const struct server_configuration_s *config;

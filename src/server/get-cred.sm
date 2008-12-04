@@ -30,6 +30,13 @@ nested machine pvfs2_get_cred_work_sm
     state make_cred
     {
         run get_cred_make_cred;
+        success => sign_cred;
+        default => return;
+    }
+
+    state sign_cred
+    {
+        run get_cred_sign_cred;
         default => return;
     }
 }
@@ -110,6 +117,7 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     const char *account;
+    int ret;
 
     account = PINT_lookup_account(s_op->u.getcred.certificate);
     if (!account)
@@ -119,8 +127,36 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* TODO: look up user and group ids for the account */
-    /* TODO: create a new credential and sign it */
+    ret = PINT_lookup_userid(account, &s_op->u.getcred.credential.userid);
+    if (ret < 0)
+    {
+        /* TODO: log error message */
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_lookup_groups(account,
+                             &s_op->u.getcred.credential.group_array,
+                             &s_op->u.getcred.credential.num_groups);
+    if (ret < 0)
+    {
+        /* TODO: log error message */
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* TODO: remove the serial field if it is never used */
+    s_op->u.getcred.credential.serial = 0;
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action get_cred_sign_cred(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* TODO: sign the credential */
 
     return SM_ACTION_COMPLETE;
 }
