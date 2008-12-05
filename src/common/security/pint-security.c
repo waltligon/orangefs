@@ -877,6 +877,7 @@ int PINT_sign_credential(PVFS_credential *cred)
         return -1;
     }
     
+    /* TODO: investigate why Valgrind chokes here */
     ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size,
                         security_privkey);
     EVP_MD_CTX_cleanup(&mdctx);

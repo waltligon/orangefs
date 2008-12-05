@@ -177,12 +177,9 @@ static PINT_sm_action get_cred_setup_response(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
 
-    ret = PINT_copy_credential(&s_op->u.getcred.credential,
-                               &s_op->resp.u.getcred.credential);
+    s_op->resp.u.getcred.credential = s_op->u.getcred.credential;
 
-    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 
