@@ -505,6 +505,7 @@ const char *PINT_lookup_account(const char *certstr)
     char *subjectstr;
     STACK *emails;
     const char *account;
+    unsigned long err;
 
     if (!certstr)
     {
@@ -514,7 +515,10 @@ const char *PINT_lookup_account(const char *certstr)
     certbio = BIO_new_mem_buf((char*)certstr, -1);
     if (!certbio)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return NULL;
     }
 
@@ -522,22 +526,26 @@ const char *PINT_lookup_account(const char *certstr)
     BIO_vfree(certbio);
     if (!cert)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         return NULL;
     }
 
     subject = X509_get_subject_name(cert);
     if (!subject)
     {
-        /* TODO: log error message */
-        X509_free(cert);
         return NULL;
     }
 
     subjectstr = X509_NAME_oneline(subject, NULL, 0);
     if (!subjectstr)
     {
-        /* TODO: log error message */
+        err = ERR_get_error();
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: %s\n",
+                     ERR_func_error_string(err),
+                     ERR_reason_error_string(err));
         X509_free(cert);
         return NULL;
     }
@@ -545,8 +553,8 @@ const char *PINT_lookup_account(const char *certstr)
     emails = X509_get1_email(cert);
 
     account = find_account(subjectstr, emails);
-    CRYPTO_free(subjectstr);
     X509_email_free(emails);
+    CRYPTO_free(subjectstr);
     X509_free(cert);
 
     return account;
@@ -1150,6 +1158,8 @@ static const char *find_account(const char *subject, const STACK *emails)
     PINT_llist_p mappings;
     struct security_mapping_s *mapping;
     regex_t regex;
+    char *errbuf;
+    int sz;
     const char *account = NULL;
     int ret;
 
@@ -1158,7 +1168,7 @@ static const char *find_account(const char *subject, const STACK *emails)
     mappings = config->security_mappings;
     if (!mappings)
     {
-        /* TODO: log error message */
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "No security mappings defined!\n");
         return NULL;
     }
 
@@ -1171,6 +1181,10 @@ static const char *find_account(const char *subject, const STACK *emails)
             ret = sk_find((STACK*)emails, mapping->pattern);
             if (ret != -1)
             {
+                gossip_debug(GOSSIP_SECURITY_DEBUG,
+                             "Matched email '%s' to account '%s'\n",
+                             sk_value(emails, ret),
+                             mapping->account);
                 account = mapping->account;
             }
         }
@@ -1181,7 +1195,16 @@ static const char *find_account(const char *subject, const STACK *emails)
             ret = regcomp(&regex, mapping->pattern, REG_EXTENDED|REG_NOSUB);
             if (ret)
             {
-                /* TODO: log error message */
+                sz = regerror(ret, &regex, NULL, 0);
+                errbuf = calloc(sz, sizeof(char));
+                if (errbuf)
+                {
+                    regerror(ret, &regex, errbuf, sz);
+                    gossip_err("Error compiling regular expression '%s': %s\n",
+                               mapping->pattern,
+                               errbuf);
+                    free(errbuf);
+                }
                 continue;
             }
 
@@ -1190,6 +1213,12 @@ static const char *find_account(const char *subject, const STACK *emails)
                 ret = regexec(&regex, sk_value(emails, i), 0, NULL, 0);
                 if (!ret)
                 {
+                    gossip_debug(GOSSIP_SECURITY_DEBUG,
+                                 "Matched pattern '%s' to email '%s' " 
+                                 "and account '%s'\n",
+                                 mapping->pattern,
+                                 sk_value(emails, i),
+                                 mapping->account);
                     account = mapping->account;
                     break;
                 }
@@ -1201,6 +1230,10 @@ static const char *find_account(const char *subject, const STACK *emails)
         {
             if (!strcmp(subject, mapping->pattern))
             {
+                gossip_debug(GOSSIP_SECURITY_DEBUG,
+                             "Matched subject '%s' to account '%s'\n",
+                             subject,
+                             mapping->account);
                 account = mapping->account;
             }
         }
@@ -1209,13 +1242,28 @@ static const char *find_account(const char *subject, const STACK *emails)
             ret = regcomp(&regex, mapping->pattern, REG_EXTENDED|REG_NOSUB);
             if (ret)
             {
-                /* TODO: log error message */
+                sz = regerror(ret, &regex, NULL, 0);
+                errbuf = calloc(sz, sizeof(char));
+                if (errbuf)
+                {
+                    regerror(ret, &regex, errbuf, sz);
+                    gossip_err("Error compiling regular expression '%s': %s\n",
+                               mapping->pattern,
+                               errbuf);
+                    free(errbuf);
+                }
                 continue;
             }
             ret = regexec(&regex, subject, 0, NULL, 0);
             regfree(&regex);
             if (!ret)
             {
+                gossip_debug(GOSSIP_SECURITY_DEBUG,
+                                 "Matched pattern '%s' to subject '%s' " 
+                                 "and account '%s'\n",
+                                 mapping->pattern,
+                                 subject,
+                                 mapping->account);
                 account = mapping->account;
             }
         }

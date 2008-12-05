@@ -128,7 +128,7 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
     account = PINT_lookup_account(s_op->u.getcred.certificate);
     if (!account)
     {
-        /* TODO: log error message */
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Account lookup failed\n");
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
     }
