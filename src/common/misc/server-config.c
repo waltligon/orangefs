@@ -2772,6 +2772,7 @@ DOTCONF_CB(get_security_mapping)
         return strerror(errno);
     }
     strncpy(mapping->account, line + account, i - account);
+    mapping->account[i-account] = '\0';
     
     for (keyword = i; (keyword < len) && isspace(line[keyword]); keyword++);
     for (i = keyword+1; (i < len) && !isspace(line[i]); i++);
@@ -2831,6 +2832,7 @@ DOTCONF_CB(get_security_mapping)
         return strerror(errno);
     }
     strncpy(mapping->pattern, line + pattern, i - pattern);
+    mapping->pattern[i-pattern] = '\0';
     
     if (!config_s->security_mappings)
     {
