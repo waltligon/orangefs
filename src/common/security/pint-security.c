@@ -842,7 +842,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     
     conf = PINT_get_server_config();
     
-    cred->issuer_id = conf->server_alias;
+    cred->issuer_id = strdup(conf->server_alias);
     
     /* TODO: separate credential timeout */
     cred->timeout = PINT_util_get_current_time() + conf->security_timeout;

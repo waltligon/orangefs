@@ -966,7 +966,7 @@ int PINT_parse_config(
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
-    config_s->server_alias = server_alias_name;
+    config_s->server_alias = strdup(server_alias_name);
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
