@@ -136,7 +136,7 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
     ret = PINT_lookup_userid(account, &s_op->u.getcred.credential.userid);
     if (ret < 0)
     {
-        /* TODO: log error message */
+        gossip_err("UID lookup failed\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -146,7 +146,7 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
                              &s_op->u.getcred.credential.num_groups);
     if (ret < 0)
     {
-        /* TODO: log error message */
+        gossip_err("Group lookup failed\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -166,7 +166,7 @@ static PINT_sm_action get_cred_sign_cred(struct PINT_smcb *smcb,
     ret = PINT_sign_credential(&s_op->u.getcred.credential);
     if (ret == -1)
     {
-        /* TODO: log error message */
+        gossip_err("Unable to sign credential\n");
         js_p->error_code = -PVFS_EINVAL;
     }
 

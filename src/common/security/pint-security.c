@@ -580,6 +580,9 @@ int PINT_lookup_userid(const char *account, PVFS_uid *userid)
     ret = getpwnam_r(account, &pwbuf, buf, max, &pwbufp);
     if ((pwbufp == NULL) || ret)
     {
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "User '%s' not found in password database\n",
+                     account);
         free(buf);
         return -PVFS_EINVAL;
     }
@@ -614,6 +617,9 @@ int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
     pwbuf = getpwnam(account);
     if (pwbuf == NULL)
     {
+        gossip_debug(GOSSIP_SECURITY_DEBUG,
+                     "User '%s' not found in password database\n",
+                     account);
         free(groups);
         *num_groups = 0;
         *group_array = NULL;
