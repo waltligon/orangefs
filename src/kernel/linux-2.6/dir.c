@@ -910,7 +910,6 @@ struct file_operations pvfs2_dir_operations =
     readdir : pvfs2_readdir,
     open : pvfs2_file_open,
     release : pvfs2_file_release,
-    llseek : pvfs2_dir_llseek
 #else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,

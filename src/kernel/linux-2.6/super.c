@@ -1434,9 +1434,6 @@ void pvfs2_kill_sb(
 
         /* free the pvfs2 superblock private data */
         kfree(PVFS2_SB(sb));
-#else
-        sb->u.generic_sbp = NULL;
-#endif
         {
             int count1, count2;
             count1 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_alloc_count));
@@ -1452,6 +1449,9 @@ void pvfs2_kill_sb(
                         count1, count2);
             }
         }
+#else
+        sb->u.generic_sbp = NULL;
+#endif
     }
     else
     {

@@ -295,6 +295,8 @@ static int postcopy_buffers(int buffer_index, struct rw_options *rw,
     return ret;
 }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
 /* Copy from page-cache to application address space 
  * @rw - operation context, contains information about the I/O operation
  *       and holds the pointers to the page-cache page array from which
@@ -419,6 +421,8 @@ static int copy_from_pagecache(struct rw_options *rw,
     kfree(copied_iovec);
     return 0;
 }
+
+#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
 
 /*
  * Post and wait for the I/O upcall to finish
@@ -701,11 +705,14 @@ static long bound_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ss
     return max_nr_iovecs;
 }
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
 #ifdef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
 #define pg_ref_count(pg) atomic_read(&(pg)->count)
 #else
 #define pg_ref_count(pg) atomic_read(&(pg)->_count)
 #endif
+
 /*
  * Cleaning up pages in the cache involves dropping the reference count
  * while cleaning up pages that were newly allocated involves unlocking
@@ -771,6 +778,7 @@ static int pvfs2_readpages_fill_cb(void *_data, struct page *page)
     rw->dest.pages.issue_pages[rw->dest.pages.nr_issue_pages++] = page;
     return 0;
 }
+
 
 #if defined(HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT)
 #define lock_mapping_tree(mapping) spin_lock(&mapping->page_lock)
@@ -1172,6 +1180,7 @@ cleanup:
     cleanup_cache_pages(rw.dest.pages.nr_pages, &rw, err);
     return err == 0 ? total_actual_io : err;
 }
+#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
 
 /*
  * Common entry point for read/write/readv/writev
@@ -1347,13 +1356,16 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
+#ifndef PVFS2_LINUX_KERNEL_2_4
         /* if a file is immutable, stage its I/O 
          * through the cache */
         if (IS_IMMUTABLE(rw->inode)) {
             /* Stage the I/O through the kernel's pagecache */
             ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
         }
-        else {
+        else 
+#endif /* PVFS2_LINUX_KERNEL_2_4 */
+        {
             /* push the I/O directly through to storage */
             ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
         }
