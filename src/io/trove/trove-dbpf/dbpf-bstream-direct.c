@@ -1116,15 +1116,19 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
     if(ret != 0)
     {
-        goto done;
+        dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
+        return ret;
     }
 
     ret = ftruncate(op_p->u.b_resize.open_ref.fd, op_p->u.b_resize.size);
     if(ret == -1)
     {
         ret = -trove_errno_to_trove_error(errno);
-        goto done;
+        dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
+        return ret;
     }
+
+    dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
 
     attr.u.datafile.b_size = op_p->u.b_resize.size;
 
@@ -1141,7 +1145,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     {
         dbpf_queued_op_free(q_op_p);
         ret = -TROVE_ENOMEM;
-        goto done;
+        return ret;
     }
     *op_p->u.d_setattr.attr_p = attr;
 
@@ -1150,8 +1154,6 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
      */
     ret = DBPF_OP_CONTINUE;
 
-done:
-    dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
     return ret;
 }
 
