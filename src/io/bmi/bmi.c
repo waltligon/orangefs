@@ -28,7 +28,6 @@
 #include "id-generator.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
-#include "pint-mem.h"
 
 /*
  * List of BMI addrs currently managed.
