@@ -29,7 +29,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
 
     if (IS_PVFS_NON_ERRNO_ERROR(-errnum))
     {
-        snprintf(buf, limit, PINT_non_errno_strerror_mapping[tmp]);
+        snprintf(buf, limit, "%s", PINT_non_errno_strerror_mapping[tmp]);
     }
     else
     {

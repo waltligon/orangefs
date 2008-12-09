@@ -142,7 +142,7 @@ static options_t *parse_args(int argc, char **argv)
 		break;
             case 'd':
           do_dirent:
-                snprintf(tmp_opts->dirent_name, PATH_MAX, optarg);
+                snprintf(tmp_opts->dirent_name, PATH_MAX, "%s", optarg);
                 break;
 	    case 'f':
           do_fsid:
