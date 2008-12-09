@@ -105,26 +105,26 @@ static inline gen_thread_t gen_thread_self(void)
 
 static inline int gen_cond_wait(gen_cond_t *cond, gen_mutex_t *mut)
 {
-    (void *)cond;
+    (void) cond;
     return 0;
 }
 
 static inline int gen_cond_timedwait(gen_cond_t *cond, gen_mutex_t *mut,
                                      const struct timespec *abstime)
 {
-    (void *)cond;
+    (void) cond;
     return 0;
 }
 
 static inline int gen_cond_signal(gen_cond_t *cond)
 {
-    (void *)cond;
+    (void) cond;
     return 0;
 }
 
 static inline int gen_cond_broadcast(gen_cond_t *cond)
 {
-    (void *)cond;
+    (void) cond;
     return 0;
 }
 
