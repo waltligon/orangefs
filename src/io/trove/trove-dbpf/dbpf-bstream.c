@@ -727,7 +727,8 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     enum dbpf_op_type tmp_type;
     PINT_event_type event_type;
-    int i, count_mem;
+    int i;
+    PVFS_size count_mem;
 #ifdef __PVFS2_TROVE_AIO_THREADED__
     struct dbpf_op *op_p = NULL;
     int aiocb_inuse_count = 0;
