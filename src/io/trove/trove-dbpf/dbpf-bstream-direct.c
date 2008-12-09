@@ -419,12 +419,12 @@ static size_t direct_write(int fd,
                  "buf_offset: %llu, "
                  "size: %zu, \n\t"
                  "write_offset: %llu, "
-                 "stream_size: %zu\n",
+                 "stream_size: %llu\n",
                  buf, 
                  llu(buf_offset), 
                  size,
                  llu(write_offset),
-                 stream_size);
+                 llu(stream_size));
 
     aligned_buf = PINT_mem_aligned_alloc(aligned_size, BLOCK_SIZE);
     if(!aligned_buf)
