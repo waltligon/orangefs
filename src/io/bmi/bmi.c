@@ -1166,9 +1166,6 @@ void *BMI_memalloc(BMI_addr_t addr,
     void *new_buffer = NULL;
     ref_st_p tmp_ref = NULL;
 
-    return PINT_mem_aligned_alloc(size, 4096);
-/*    return(malloc(size)); */
-
     /* find a reference that matches this address */
     gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, addr);
@@ -1223,9 +1220,6 @@ int BMI_unexpected_free(BMI_addr_t addr,
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
-
-    PINT_mem_aligned_free(buffer);
-    return(0);
 
     /* find a reference that matches this address */
     gen_mutex_lock(&ref_mutex);

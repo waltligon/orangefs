@@ -30,9 +30,6 @@
 
 #define MAX_REGIONS 64
 
-/* #define PAD_BUFFER */
-#define FLOW_ALIGNMENT_PADDING 4096
-
 #define FLOW_CLEANUP(__flow_data)                                     \
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
@@ -714,9 +711,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void *tmp_buffer;
     void *tmp_user_ptr;
     int sync_mode = 0;
-#ifdef PAD_BUFFER
-    int padding;
-#endif
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
@@ -1322,9 +1316,6 @@ static void trove_write_callback_fn(void *user_ptr,
     struct result_chain_entry *old_result_tmp;
     void *tmp_buffer;
     PVFS_size bytes_processed = 0;
-#ifdef PAD_BUFFER
-    int padding;
-#endif
 
     gossip_debug(
         GOSSIP_FLOW_PROTO_DEBUG,
