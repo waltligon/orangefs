@@ -25,7 +25,7 @@
 
 typedef int64_t bmi_size_t;         /**< Data region size */
 typedef int32_t bmi_msg_tag_t;      /**< User-specified message tag */
-typedef int32_t bmi_context_id;     /**< Context identifier */
+typedef int64_t bmi_context_id;     /**< Context identifier */
 typedef int64_t bmi_op_id_t;        /**< Reference to ongoing network op */
 typedef struct PVFS_hint_s *bmi_hint;
 
