@@ -220,8 +220,8 @@ int update_fs_conf(void)
         fprintf(stderr,"Error opening pipe. errno=%d",errno);
         exit(-1);
     }
-    fscanf(fptr, "%s", output);
-    if(!strncmp(output,"",PATH_MAX))
+    ret = fscanf(fptr, "%s", output);
+    if(ret != 1 || !strncmp(output,"",PATH_MAX))
     {
         printf("fsid [%" PRId32 "] not found in file\n",opts.old_fsid);
         return -1;
@@ -267,6 +267,7 @@ int get_old_fsid_from_conf(void)
     int i = 0;
     char buffer[512][512];
     int32_t read_fsid = 0;
+    int ret;
 
     memset(buffer, 0, sizeof(buffer));
     
@@ -280,8 +281,11 @@ int get_old_fsid_from_conf(void)
     /* Read in file */
     while(!feof(fptr))
     {
-        fscanf(fptr,"%s",buffer[i]);
-        i++;
+        ret = fscanf(fptr,"%s",buffer[i]);
+        if(ret == 1)
+        {
+            i++;
+        }
     }
     fclose(fptr);
 
@@ -350,8 +354,8 @@ int move_hex_dir(void)
         fprintf(stderr,"Error opening pipe. errno=%d",errno);
         exit(-1);
     }
-    fscanf(fptr, "%s", output);
-    if(strncmp(output,"",PATH_MAX))
+    ret = fscanf(fptr, "%s", output);
+    if(ret && strncmp(output,"",PATH_MAX))
     {
         printf("mv from [%s] to [%s] failed.\n", path, new_path);
         return -1;
