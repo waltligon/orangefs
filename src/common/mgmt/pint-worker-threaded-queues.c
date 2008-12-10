@@ -145,6 +145,10 @@ static int threaded_queues_queue_remove(struct PINT_manager_s *manager,
     w = &inst->threaded;
 
     gen_mutex_lock(&w->mutex);
+
+    queue = id_gen_fast_lookup(queue_id);
+    assert(queue);
+
     while(!qlist_exists(&w->queues, &queue->link))
     {
         /* assume that operations are being pulled off presently
