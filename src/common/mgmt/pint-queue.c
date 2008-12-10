@@ -496,8 +496,6 @@ int PINT_queue_timedwait(PINT_queue_id queue_id,
 
     gen_mutex_lock(&queue->mutex);
 
-    gossip_debug(GOSSIP_MGMT_DEBUG, "%s: queue count: %d\n",
-                 __func__, queue->count);
     if(queue->count > 0)
     {
         gen_mutex_unlock(&queue->mutex);
@@ -524,8 +522,6 @@ int PINT_queue_timedwait(PINT_queue_id queue_id,
          * and we should try again with an updated value for microsecs.
          */
     } while(queue->count == 0 && ret == 0);
-
-    gossip_debug(GOSSIP_MGMT_DEBUG, "%s: ret: %d\n", __func__, ret);
 
     gen_mutex_unlock(&queue->mutex);
     if(ret != 0)
