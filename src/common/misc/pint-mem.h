@@ -7,47 +7,9 @@
 #ifndef __PINT_MEM_H
 #define __PINT_MEM_H
 
-#define _XOPEN_SOURCE 600
+extern void* PINT_mem_aligned_alloc(size_t size, size_t alignment);
+extern void PINT_mem_aligned_free(void *ptr);
 
-#include <stdlib.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
-
-/* PINT_mem_aligned_alloc()
- *
- * allocates a memory region of the specified size and returns a 
- * pointer to the region.  The address of the memory will be evenly
- * divisible by alignment.
- *
- * returns pointer to memory on success, NULL on failure
- */
-static inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
-{
-    int ret;
-    void *ptr;
-
-    ret = posix_memalign(&ptr, alignment, size);
-    if(ret != 0)
-    {
-        errno = ret;
-        return NULL;
-    }
-    return ptr;
-}
-
-/* PINT_mem_aligned_free()
- *
- * frees memory region previously allocated with
- * PINT_mem_aligned_alloc()
- *
- * no return value
- */
-static inline void PINT_mem_aligned_free(void *ptr)
-{
-    free(ptr);
-    return;
-}
 #endif /* __PINT_MEM_H */
 
 /*
