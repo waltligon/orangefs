@@ -3364,9 +3364,12 @@ int main(int argc, char **argv)
     }
 
     /* get rid of stdout/stderr/stdin */
-    freopen("/dev/null", "r", stdin);
-    freopen("/dev/null", "w", stdout);
-    freopen("/dev/null", "w", stderr);
+    if(!freopen("/dev/null", "r", stdin))
+        gossip_err("Error: failed to reopen stdin.\n");
+    if(!freopen("/dev/null", "w", stdout))
+        gossip_err("Error: failed to reopen stdout.\n");
+    if(!freopen("/dev/null", "w", stderr))
+        gossip_err("Error: failed to reopen stderr.\n");
 
     start_time = time(NULL);
     local_time = localtime(&start_time);

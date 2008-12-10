@@ -200,9 +200,12 @@ static int monitor_pvfs2_client(options_t *opts)
             }
 
             /* get rid of stdout/stderr/stdin */
-            freopen("/dev/null", "r", stdin);
-            freopen("/dev/null", "w", stdout);
-            freopen("/dev/null", "w", stderr);
+            if(!freopen("/dev/null", "r", stdin))
+                gossip_err("Error: failed to reopen stdin.\n");
+            if(!freopen("/dev/null", "w", stdout))
+                gossip_err("Error: failed to reopen stdout.\n");
+            if(!freopen("/dev/null", "w", stderr))
+                gossip_err("Error: failed to reopen stderr.\n");
 
             wpid = waitpid(core_pid, &ret, 0);
             assert(wpid != -1);

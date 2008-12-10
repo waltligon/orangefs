@@ -492,9 +492,12 @@ static int server_initialize(
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
     {
-        assert(freopen("/dev/null", "r", stdin));
-        assert(freopen("/dev/null", "w", stdout));
-        assert(freopen("/dev/null", "w", stderr));
+        if(!freopen("/dev/null", "r", stdin))
+            gossip_err("Error: failed to reopen stdin.\n");
+        if(!freopen("/dev/null", "w", stdout))
+            gossip_err("Error: failed to reopen stdout.\n");
+        if(!freopen("/dev/null", "w", stderr))
+            gossip_err("Error: failed to reopen stderr.\n");
 
         if(!strcmp(server_config.logtype, "syslog"))
         {
