@@ -1178,7 +1178,7 @@ int PINT_manager_wait_context(PINT_manager_t manager,
                               PINT_context_id context,
                               int microsecs)
 {
-    int ret;
+    int ret = 0;
     struct PINT_worker_s *worker;
 
     /* can only wait on callback contexts. queue contexts require
@@ -1209,7 +1209,7 @@ int PINT_manager_wait_op(PINT_manager_t manager,
                          PINT_op_id op_id,
                          int microsecs)
 {
-    int ret;
+    int ret = 0;
     struct PINT_worker_s *worker;
     struct PINT_op_entry *entry;
     int msecs_remaining;
