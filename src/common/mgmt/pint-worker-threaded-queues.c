@@ -38,7 +38,8 @@ static int threaded_queues_init(struct PINT_manager_s *manager,
                                 PINT_worker_attr_t *attr)
 {
     struct PINT_worker_threaded_queues_s *w;
-    int ret, i;
+    int ret = 0;
+    int i;
 
     w = &inst->threaded;
 
