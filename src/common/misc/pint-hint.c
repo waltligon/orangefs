@@ -366,7 +366,7 @@ int PVFS_hint_import_env(PVFS_hint * out_hint)
         {
             gossip_err("Environment variable PVFS2_HINTS is "
                        "malformed starting with: %s\n",
-                       save_ptr);
+                       aktvar);
             free(env_copy);
             return 0;
         }
