@@ -334,7 +334,7 @@ int PVFS_hint_import_env(PVFS_hint * out_hint)
 {
     char * env;
     char * env_copy;
-    char * save_ptr;
+    char * save_ptr = NULL;
     char * aktvar;
     char name[PVFS_HINT_MAX_NAME_LENGTH];
     int len;
