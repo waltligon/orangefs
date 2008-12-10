@@ -434,10 +434,20 @@ static void write_pidfile(int fd)
     pid_t pid = getpid();
     char pid_str[16] = {0};
     int len;
+    int ret;
 
     snprintf(pid_str, 16, "%d\n", pid);
     len = strlen(pid_str);
-    write(fd, pid_str, len);
+    ret = write(fd, pid_str, len);
+    if(ret < len)
+    {
+        gossip_err("Error: failed to write pid file.\n");
+        close(fd);
+        remove_pidfile();
+        return;
+    }
+    close(fd);
+    return;
 }
 
 static void remove_pidfile(void)
@@ -482,9 +492,9 @@ static int server_initialize(
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
     {
-        freopen("/dev/null", "r", stdin);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
+        assert(freopen("/dev/null", "r", stdin));
+        assert(freopen("/dev/null", "w", stdout));
+        assert(freopen("/dev/null", "w", stderr));
 
         if(!strcmp(server_config.logtype, "syslog"))
         {
@@ -619,8 +629,8 @@ static int server_setup_process_environment(int background)
     }
     if (pid_fd >= 0)
     {
+        /* note: pid_fd closed by write_pidfile() */
         write_pidfile(pid_fd);
-        close(pid_fd);
         atexit(remove_pidfile);
     }
     server_controlling_pid = getpid();
