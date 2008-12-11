@@ -207,7 +207,7 @@ error_in_cleanup:
             gossip_debug(GOSSIP_TROVE_DEBUG, 
                 "aio updating size for handle %llu\n", llu(ref.handle));
 
-            /* if we updated the size, then convert cur_op into a setattr.
+            /* If we updated the size, then convert cur_op into a setattr.
              * Note that we are not actually going to perform a setattr.
              * We just want the coalescing path to treat it like a setattr
              * so that the size update is synced before we complete.

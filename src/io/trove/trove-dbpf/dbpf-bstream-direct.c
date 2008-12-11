@@ -858,7 +858,11 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
 
             dbpf_open_cache_put(&rw_op->open_ref);
 
-            /* We want to hit the coalesce path, so we queue up the setattr */
+            /* If we updated the size, then convert cur_op into a setattr.
+             * Note that we are not actually going to perform a setattr.
+             * We just want the coalescing path to treat it like a setattr
+             * so that the size update is synced before we complete.
+             */
             dbpf_queued_op_init(qop_p,
                                 DSPACE_SETATTR,
                                 ref.handle,
