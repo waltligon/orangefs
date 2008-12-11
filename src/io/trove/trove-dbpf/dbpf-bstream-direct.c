@@ -1158,7 +1158,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     return ret;
 }
 
-static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
+int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
                                       TROVE_handle handle,
                                       TROVE_size *inout_size_p,
                                       TROVE_ds_flags flags,

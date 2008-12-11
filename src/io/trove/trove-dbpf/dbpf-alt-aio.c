@@ -354,7 +354,7 @@ struct TROVE_bstream_ops alt_aio_bstream_ops =
 {
     dbpf_bstream_read_at,
     dbpf_bstream_write_at,
-    dbpf_bstream_resize,
+    dbpf_bstream_direct_resize,
     dbpf_bstream_validate,
     alt_aio_bstream_read_list,
     alt_aio_bstream_write_list,

@@ -60,7 +60,6 @@ static char *list_proc_state_strings[] __attribute__((unused)) = {
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
 #endif
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
-static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
@@ -591,94 +590,6 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
     dbpf_open_cache_put(&tmp_ref);
-    return 1;
-
-return_error:
-    if (got_fd)
-    {
-        dbpf_open_cache_put(&tmp_ref);
-    }
-    return ret;
-}
-
-int dbpf_bstream_resize(TROVE_coll_id coll_id,
-                        TROVE_handle handle,
-                        TROVE_size *inout_size_p,
-                        TROVE_ds_flags flags,
-                        TROVE_vtag_s *vtag,
-                        void *user_ptr,
-                        TROVE_context_id context_id,
-                        TROVE_op_id *out_op_id_p,
-                        PVFS_hint  hints)
-{
-    dbpf_queued_op_t *q_op_p = NULL;
-    struct dbpf_collection *coll_p = NULL;
-
-    coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL)
-    {
-        return -TROVE_EINVAL;
-    }
-
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
-    {
-        return -TROVE_ENOMEM;
-    }
-
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        BSTREAM_RESIZE,
-                        handle,
-                        coll_p,
-                        dbpf_bstream_resize_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
-    /* initialize the op-specific members */
-    q_op_p->op.u.b_resize.size = *inout_size_p;
-    q_op_p->op.hints = hints;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
-}
-
-static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
-{
-    int ret = -TROVE_EINVAL, got_fd = 0;
-    struct open_cache_ref tmp_ref;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
-
-    ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 
-        DBPF_FD_BUFFERED_WRITE, &tmp_ref);
-    if (ret < 0)
-    {
-        goto return_error;
-    }
-    got_fd = 1;
-
-    ret = DBPF_RESIZE(tmp_ref.fd, op_p->u.b_resize.size);
-    if (ret != 0)
-    {
-        ret = -trove_errno_to_trove_error(errno);
-        goto return_error;
-    }
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %llu [fd = %d] "
-                 "to %lld \n", llu(op_p->handle), tmp_ref.fd,
-                 lld(op_p->u.b_resize.size));
-
-    dbpf_open_cache_put(&tmp_ref);
-
-    /* adjust size in cached attribute element, if present */
-    gen_mutex_lock(&dbpf_attr_cache_mutex);
-    dbpf_attr_cache_ds_attr_update_cached_data_bsize(
-        ref,  op_p->u.b_resize.size);
-    gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
     return 1;
 
 return_error:
@@ -1423,7 +1334,7 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
 {
     dbpf_bstream_read_at,
     dbpf_bstream_write_at,
-    dbpf_bstream_resize,
+    dbpf_bstream_direct_resize,
     dbpf_bstream_validate,
     dbpf_bstream_read_list,
     dbpf_bstream_write_list,
