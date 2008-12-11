@@ -216,9 +216,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
         ret = dbpf_sync_db(dbp, sync_context_type, sync_context);
 
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]: moving op %p with handle: %llu "
+                     "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
                      "to completion queue\n",
-                     qop_p, llu(qop_p->op.handle));
+                     qop_p, llu(qop_p->op.handle), qop_p->op.type);
 
         if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
         {
@@ -252,9 +252,9 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p, int retcode, int * outcount)
             }
 
             gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                         "[SYNC_COALESCE]: moving op: %p with handle: %llu "
+                         "[SYNC_COALESCE]: moving op: %p, handle: %llu , type: %d "
                          "to completion queue\n",
-                         ready_op, llu(ready_op->op.handle));
+                         ready_op, llu(ready_op->op.handle), ready_op->op.type);
 
             dbpf_op_queue_remove(ready_op);
             DBPF_COMPLETION_ADD(ready_op, OP_COMPLETED);
