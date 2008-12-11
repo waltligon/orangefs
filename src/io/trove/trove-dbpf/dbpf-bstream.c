@@ -26,6 +26,7 @@
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
+#include "dbpf-sync.h"
 
 #include "dbpf-alt-aio.h"
 
@@ -37,6 +38,7 @@ extern int TROVE_max_concurrent_io;
 static int s_dbpf_ios_in_progress = 0;
 static dbpf_op_queue_p s_dbpf_io_ready_queue = NULL;
 static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t dbpf_update_size_lock = GEN_MUTEX_INITIALIZER;
 
 static struct dbpf_aio_ops aio_ops;
 
@@ -74,6 +76,11 @@ static void aio_progress_notification(union sigval sig)
     struct dbpf_op *op_p = NULL;
     int ret, i, aiocb_inuse_count, state = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
+    PVFS_size eor = -1;
+    int j;
+    TROVE_ds_attributes attr;
+    TROVE_object_ref ref;
+    int sync_required = 0;
 
     cur_op = (dbpf_queued_op_t *)sig.sival_ptr;
     assert(cur_op);
@@ -145,23 +152,89 @@ static void aio_progress_notification(union sigval sig)
         {
             DBPF_AIO_SYNC_IF_NECESSARY(
                 op_p, op_p->u.b_rw_list.fd, ret);
+
+            /* TODO: need similar logic for non-threaded aio case too */
+
+            /* calculate end of request */
+            for(j=0; j<op_p->u.b_rw_list.stream_array_count; j++)
+            {
+                if(eor < op_p->u.b_rw_list.stream_offset_array[j] + 
+                    op_p->u.b_rw_list.stream_size_array[j])
+                {
+                    eor = op_p->u.b_rw_list.stream_offset_array[j] + 
+                        op_p->u.b_rw_list.stream_size_array[j];
+                }
+            }
+
+            ref.fs_id = op_p->coll_p->coll_id;
+            ref.handle = op_p->handle;
+
+            gen_mutex_lock(&dbpf_update_size_lock);
+            ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
+            if(ret != 0)
+            {
+                gen_mutex_unlock(&dbpf_update_size_lock);
+                goto error_in_cleanup;
+            }
+
+            if(eor > attr.u.datafile.b_size)
+            {
+                /* set the size of the file */
+                attr.u.datafile.b_size = eor;
+                ret = dbpf_dspace_attr_set(op_p->coll_p, ref, &attr);
+                if(ret != 0)
+                {
+                    gen_mutex_unlock(&dbpf_update_size_lock);
+                    goto error_in_cleanup;
+                }
+                sync_required = 1;
+            }
+            gen_mutex_unlock(&dbpf_update_size_lock);
         }
+
+error_in_cleanup:
 
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
         
+	cur_op->state = ret;
+        /* this is a macro defined in dbpf-thread.h */
+
+        if(sync_required)
+        {
+            int outcount;
+
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                "aio updating size for handle %llu\n", llu(ref.handle));
+
+            /* if we updated the size, then convert cur_op into a setattr.
+             * Note that we are not actually going to perform a setattr.
+             * We just want the coalescing path to treat it like a setattr
+             * so that the size update is synced before we complete.
+             */
+            dbpf_queued_op_init(cur_op,
+                                DSPACE_SETATTR,
+                                ref.handle,
+                                cur_op->op.coll_p,
+                                dbpf_dspace_setattr_op_svc,
+                                cur_op->op.user_ptr,
+                                TROVE_SYNC,
+                                cur_op->op.context_id);
+            cur_op->op.state = OP_IN_SERVICE;
+            dbpf_sync_coalesce(cur_op, 0, &outcount);
+        }
+        else
+        {
+            dbpf_queued_op_complete(cur_op, OP_COMPLETED);
+        }
+
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
                      "(state is %s)\n", 
                      list_proc_state_strings[
                      op_p->u.b_rw_list.list_proc_state]);
 
-	cur_op->state = ret;
-        /* this is a macro defined in dbpf-thread.h */
-        dbpf_queued_op_complete(
-            cur_op,
-            ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
-
         start_delayed_ops_if_any(1);
+
     }
     else
     {
