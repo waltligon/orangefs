@@ -17,6 +17,7 @@ TROVE_method_callback global_trove_method_callback;
 static TROVE_method_id TROVE_default_method(TROVE_coll_id id);
 
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
+extern struct TROVE_mgmt_ops dbpf_mgmt_direct_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
@@ -32,7 +33,7 @@ struct TROVE_mgmt_ops *mgmt_method_table[] =
     &dbpf_mgmt_ops,
     &dbpf_mgmt_ops, /* alt-aio */
     &dbpf_mgmt_ops, /* null-aio */
-    &dbpf_mgmt_ops  /* direct-io */
+    &dbpf_mgmt_direct_ops  /* direct-io */
 
 };
 

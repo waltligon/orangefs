@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <glob.h>
 #include "trove.h"
+#include "pint-context.h"
+#include "pint-mgmt.h"
 
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -54,6 +56,11 @@ PINT_event_type trove_dbpf_dspace_setattr_event_id;
 
 int dbpf_pid;
 
+PINT_manager_t io_thread_mgr;
+PINT_worker_id io_worker_id;
+PINT_queue_id io_queue_id;
+static int directio_threads_started = 0;
+
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 extern int TROVE_db_cache_size_bytes;
@@ -62,6 +69,13 @@ extern int TROVE_shm_key_hint;
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
+static int start_directio_threads(void);
+
+static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors);
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
@@ -653,6 +667,92 @@ static int dbpf_initialize(char *stoname,
     dbpf_open_cache_initialize();
 
     return dbpf_thread_initialize();
+}
+
+static int start_directio_threads(void)
+{
+    int ret;
+    PINT_context_id io_ctx;
+    PINT_worker_attr_t io_worker_attrs;
+
+    if(directio_threads_started)
+    {
+        /* already running */
+        return(0);
+    }
+
+    ret = PINT_open_context(&io_ctx, PINT_dbpf_io_completion_callback);
+    if(ret < 0)
+    {
+        dbpf_finalize();
+        return ret;
+    }
+
+    ret = PINT_manager_init(&io_thread_mgr, io_ctx);
+    if(ret < 0)
+    {
+        PINT_close_context(io_ctx);
+        dbpf_finalize();
+        return ret;
+    }
+
+    io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
+    io_worker_attrs.u.threaded.thread_count = 30;
+    io_worker_attrs.u.threaded.ops_per_queue = 10;
+    io_worker_attrs.u.threaded.timeout = 1000;
+    ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
+    if(ret < 0)
+    {
+        PINT_manager_destroy(io_thread_mgr);
+        PINT_close_context(io_ctx);
+        dbpf_finalize();
+        return ret;
+    }
+
+    ret = PINT_queue_create(&io_queue_id, NULL);
+    if(ret < 0)
+    {
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+        dbpf_finalize();
+	return ret;
+    }
+
+    ret = PINT_manager_queue_add(io_thread_mgr, io_worker_id, io_queue_id);
+    if(ret < 0)
+    {
+	PINT_queue_destroy(io_queue_id);
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+        dbpf_finalize();
+	return ret;
+    }
+
+    directio_threads_started = 1;
+
+    return(0);
+}
+
+static int dbpf_direct_initialize(char *stoname, TROVE_ds_flags flags)
+{
+    int ret;
+
+    /* some parts of initialization are shared with other methods */
+    ret = dbpf_initialize(stoname, flags);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* fire up the IO threads for direct IO */
+    ret = start_directio_threads();
+    if(ret < 0)
+    {
+        dbpf_finalize();
+        return(ret);
+    }
+    
+    return(0);
 }
 
 int dbpf_finalize(void)
@@ -1395,6 +1495,30 @@ return_error:
     return ret;
 }
 
+int dbpf_direct_collection_lookup(char *collname,
+                           TROVE_coll_id *out_coll_id_p,
+                           void *user_ptr,
+                           TROVE_op_id *out_op_id_p)
+{
+    int ret;
+
+    /* most of this is shared with the other methods */
+    ret = dbpf_collection_lookup(collname, out_coll_id_p, 
+        user_ptr, out_op_id_p);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* start directio threads if they aren't already running */
+    ret = start_directio_threads();
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    return(0);
+}
 
 int dbpf_collection_lookup(char *collname,
                            TROVE_coll_id *out_coll_id_p,
@@ -1966,6 +2090,28 @@ static void dbpf_db_error_callback(
     gossip_err("%s: %s\n", errpfx, msg);
 }
 
+/* dbpf_mgmt_direct_ops
+ *
+ * Structure holding pointers to all the management operations
+ * functions for this storage interface implementation.
+ */
+struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
+{
+    dbpf_direct_initialize,
+    /* TODO: do we need a special finalize too? */
+    dbpf_finalize,
+    dbpf_storage_create,
+    dbpf_storage_remove,
+    dbpf_collection_create,
+    dbpf_collection_remove,
+    dbpf_direct_collection_lookup,
+    dbpf_collection_iterate,
+    dbpf_collection_setinfo,
+    dbpf_collection_getinfo,
+    dbpf_collection_seteattr,
+    dbpf_collection_geteattr
+};
+
 /* dbpf_mgmt_ops
  *
  * Structure holding pointers to all the management operations
@@ -2071,6 +2217,27 @@ static void unlink_db_cache_files(const char* path)
     free(db_region_file);
 
     return;
+}
+
+static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors)
+{
+    int i;
+    dbpf_queued_op_t *qop_p;
+
+    for(i = 0; i < count; ++i)
+    {
+        if(errors[i] == PINT_MGMT_OP_COMPLETED)
+        {
+            qop_p = (dbpf_queued_op_t *)(user_ptrs[i]);
+            dbpf_queued_op_complete(qop_p, OP_COMPLETED);
+        }
+    }
+
+    return 0;
 }
 
 /*
