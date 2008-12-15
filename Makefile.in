@@ -1042,6 +1042,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-hint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-compat.h $(includedir)
 
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
