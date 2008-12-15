@@ -37,8 +37,21 @@
    PVFS_sys_ref_lookup(fs_id,pathname,parent_ref,credentials,resp,\
          follow_link, PVFS_HINT_NULL)
 
-#define PVFS_sys_io(ref,req,req_ofs,buf,mem_req,creds,resp,type)\
-   PVFS_sys_io(ref,req,req_ofs,buf,mem_req,creds,resp,type,PVFS_HINT_NULL)
+#undef PVFS_sys_read
+#define PVFS_sys_read(ref,req,off,buf,mem_req,creds,resp) \
+   PVFS_sys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_READ,PVFS_HINT_NULL)
+
+#undef PVFS_sys_write
+#define PVFS_sys_write(ref,req,off,buf,mem_req,creds,resp) \
+   PVFS_sys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_WRITE,PVFS_HINT_NULL)
+
+#undef PVFS_isys_read
+#define PVFS_isys_read(ref,req,off,buf,mem_req,creds,resp,opid,ptr)\
+	PVFS_isys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_READ,opid,PVFS_HINT_NULL,ptr)
+
+#undef PVFS_isys_write
+#define PVFS_isys_write(ref,req,off,buf,mem_req,creds,resp,opid,ptr)\
+	PVFS_isys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_WRITE,opid,PVFS_HINT_NULL,ptr)
 
 #define PVFS_sys_remove(entry,ref,creds)\
    PVFS_sys_remove(entry,ref,creds,PVFS_HINT_NULL)
@@ -52,6 +65,11 @@
 #define PVFS_sys_truncate(ref,size,creds)\
    PVFS_sys_truncate(ref,size,creds,PVFS_HINT_NULL)
 
+#define PVFS_sys_getparent(ref,name,cred,resp) \
+	PVFS_sys_getparent(ref,name,cred,resp,PVFS_HINT_NULL)
+
+#define PVFS_sys_flush(ref,cred)\
+	PVFS_sys_flush(ref,cred,PVFS_HINT_NULL)
 #endif
 
 
