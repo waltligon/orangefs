@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     int tmp_server_index;
     PVFS_sys_layout layout;
 
-    layout.algorithm = PVFS_SYS_LAYOUT_DEFAULT;
+    layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
     layout.server_list.count = 0;
     layout.server_list.servers = NULL;
 
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
         char directory[PVFS_NAME_MAX];
         char filename[PVFS_SEGMENT_MAX];
 
-        layout.algorithm = PVFS_SYS_LAYOUT_DEFAULT;
+        layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
         layout.server_list.count = 0;
         if(layout.server_list.servers)
         {
