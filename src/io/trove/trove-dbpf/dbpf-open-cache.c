@@ -41,6 +41,7 @@ struct open_cache_entry
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     int fd;
+    enum open_cache_open_type type;
 
     struct qlist_head queue_link;
 };
@@ -83,6 +84,10 @@ static int open_fd(
     int *fd, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
+    enum open_cache_open_type type);
+
+static void close_fd(
+    int fd, 
     enum open_cache_open_type type);
 
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
@@ -196,8 +201,10 @@ int dbpf_open_cache_get(
 		gen_mutex_unlock(&cache_mutex);
 		return ret;
 	    }
+            tmp_entry->type = type;
 	}
         out_ref->fd = tmp_entry->fd;
+        out_ref->type = type;
 
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
@@ -244,7 +251,7 @@ int dbpf_open_cache_get(
 
 	if (tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->fd);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
     }
@@ -267,6 +274,8 @@ int dbpf_open_cache_get(
             gen_mutex_unlock(&cache_mutex);
             return ret;
         }
+        tmp_entry->type = type;
+        out_ref->type = type;
         out_ref->fd = tmp_entry->fd;
 
 	out_ref->internal = tmp_entry;
@@ -293,6 +302,7 @@ int dbpf_open_cache_get(
         gen_mutex_unlock(&cache_mutex);
         return ret;
     }
+    out_ref->type = type;
 
     out_ref->internal = NULL;
     gen_mutex_unlock(&cache_mutex);
@@ -341,7 +351,7 @@ void dbpf_open_cache_put(
 	/* this wasn't cached; go ahead and close up */
 	if(in_ref->fd > -1)
 	{
-	    DBPF_CLOSE(in_ref->fd);
+            close_fd(in_ref->fd, in_ref->type);
 	    in_ref->fd = -1;
 	}
     }
@@ -403,7 +413,7 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: unused entry.\n");
 	if (tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->fd);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
 	qlist_add(&tmp_entry->queue_link, &free_list);
@@ -482,7 +492,7 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
         entry = qlist_entry(list_entry, struct open_cache_entry, queue_link);
         if(entry->fd > -1)
         {
-	    DBPF_CLOSE(entry->fd);
+            close_fd(entry->fd, entry->type);
 	    entry->fd = -1;
 	}
         qlist_del(&entry->queue_link);
@@ -611,6 +621,14 @@ static void* unlink_bstream(void *context)
     return NULL;
 }
 
+static void close_fd(
+    int fd, 
+    enum open_cache_open_type type)
+{
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+        "dbpf_open_cache closing fd %d of type %d\n", fd, type);
+    DBPF_CLOSE(fd);
+}
 
 /*
  * Local variables:
