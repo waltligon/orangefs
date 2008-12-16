@@ -148,7 +148,7 @@ int dbpf_aligned_block_put(void *ptr);
 int dbpf_aligned_blocks_finalize(void);
 #endif
 
-static int dbpf_dspace_setattr_op_svc_free_wrapper(struct dbpf_op *op_p);
+static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p);
 
 /**
  * Perform an write in direct mode (no buffering).
@@ -1085,22 +1085,48 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     return DBPF_OP_CONTINUE;
 }
 
-/* dbpf_dspace_setattr_op_svc_free_wrapper()
+/* dbpf_dspace_setattr_op_svc_and_resize()
  *
- * Wrapper around the dbpf_dspace_setattr_op_svc() function.  This allows
- * internal callsers of setattr to have a hook to use for freeing an
- * internally allocated ds attributes structure.
+ * Wrapper around the dbpf_dspace_setattr_op_svc() function that also
+ * resizes underlying bstream file
  *
- * preserves return code ov dbpf_dspace_setattr_op_svc()
+ * preserves return code of dbpf_dspace_setattr_op_svc()
  */
-static int dbpf_dspace_setattr_op_svc_free_wrapper(struct dbpf_op *op_p)
+static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p)
 {
     int ret;
+    struct open_cache_ref open_ref;
+    TROVE_size tmp_size;
     
     ret = dbpf_dspace_setattr_op_svc(op_p);
+    tmp_size = op_p->u.d_setattr.attr_p->u.datafile.b_size;
+
     free(op_p->u.d_setattr.attr_p);
 
-    return(ret);
+    if(ret != DBPF_OP_COMPLETE)
+    {
+        return(ret);
+    }
+
+    /* truncate file after attributes are set */
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle,
+        DBPF_FD_DIRECT_WRITE,
+        &open_ref);
+    if(ret < 0)
+    {
+        return ret;
+    }
+
+    ret = DBPF_RESIZE(open_ref.fd, tmp_size);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    dbpf_open_cache_put(&open_ref);
+
+    return(DBPF_OP_COMPLETE);
 }
 
 static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
@@ -1117,19 +1143,8 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
     if(ret != 0)
     {
-        dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
         return ret;
     }
-
-    ret = ftruncate(op_p->u.b_resize.open_ref.fd, op_p->u.b_resize.size);
-    if(ret == -1)
-    {
-        ret = -trove_errno_to_trove_error(errno);
-        dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
-        return ret;
-    }
-
-    dbpf_open_cache_put(&op_p->u.b_resize.open_ref);
 
     attr.u.datafile.b_size = op_p->u.b_resize.size;
 
@@ -1137,7 +1152,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
                         DSPACE_SETATTR,
                         ref.handle,
                         op_p->coll_p,
-                        dbpf_dspace_setattr_op_svc_free_wrapper,
+                        dbpf_dspace_setattr_op_svc_and_resize,
                         q_op_p->op.user_ptr,
                         TROVE_SYNC,
                         q_op_p->op.context_id);
@@ -1170,7 +1185,6 @@ int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
-    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -1195,16 +1209,6 @@ int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
                         context_id);
 
     /* initialize the op-specific members */
-    ret = dbpf_open_cache_get(
-        coll_id, handle,
-        DBPF_FD_DIRECT_WRITE,
-        &q_op_p->op.u.b_resize.open_ref);
-    if(ret < 0)
-    {
-        dbpf_queued_op_free(q_op_p);
-        return ret;
-    }
-
     q_op_p->op.u.b_resize.size = *inout_size_p;
     q_op_p->op.u.b_resize.queued_op_ptr = q_op_p;
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);

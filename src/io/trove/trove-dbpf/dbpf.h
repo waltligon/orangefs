@@ -379,7 +379,6 @@ struct dbpf_bstream_resize_op
     TROVE_size size;
     /* vtag? */
     void *queued_op_ptr;
-    struct open_cache_ref open_ref;
 };
 
 /* Used to maintain state of partial processing of a listio operation
