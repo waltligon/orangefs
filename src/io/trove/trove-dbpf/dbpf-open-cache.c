@@ -88,9 +88,7 @@ static int open_fd(
 
 static void close_fd(
     int fd, 
-    enum open_cache_open_type type,
-    TROVE_handle handle,
-    TROVE_coll_id coll_id);
+    enum open_cache_open_type type);
 
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
@@ -207,8 +205,6 @@ int dbpf_open_cache_get(
 	}
         out_ref->fd = tmp_entry->fd;
         out_ref->type = type;
-        out_ref->handle = handle;
-        out_ref->coll_id = coll_id;
 
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
@@ -255,8 +251,7 @@ int dbpf_open_cache_get(
 
 	if (tmp_entry->fd > -1)
 	{
-            close_fd(tmp_entry->fd, tmp_entry->type, tmp_entry->handle,
-                tmp_entry->coll_id);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
     }
@@ -282,8 +277,6 @@ int dbpf_open_cache_get(
         tmp_entry->type = type;
         out_ref->type = type;
         out_ref->fd = tmp_entry->fd;
-        out_ref->handle = handle;
-        out_ref->coll_id = coll_id;
 
 	out_ref->internal = tmp_entry;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
@@ -310,8 +303,6 @@ int dbpf_open_cache_get(
         return ret;
     }
     out_ref->type = type;
-    out_ref->handle = handle;
-    out_ref->coll_id = coll_id;
 
     out_ref->internal = NULL;
     gen_mutex_unlock(&cache_mutex);
@@ -360,7 +351,7 @@ void dbpf_open_cache_put(
 	/* this wasn't cached; go ahead and close up */
 	if(in_ref->fd > -1)
 	{
-            close_fd(in_ref->fd, in_ref->type, in_ref->handle, in_ref->coll_id);
+            close_fd(in_ref->fd, in_ref->type);
 	    in_ref->fd = -1;
 	}
     }
@@ -422,8 +413,7 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: unused entry.\n");
 	if (tmp_entry->fd > -1)
 	{
-            close_fd(tmp_entry->fd, tmp_entry->type, tmp_entry->handle,
-                tmp_entry->coll_id);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
 	qlist_add(&tmp_entry->queue_link, &free_list);
@@ -502,7 +492,7 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
         entry = qlist_entry(list_entry, struct open_cache_entry, queue_link);
         if(entry->fd > -1)
         {
-            close_fd(entry->fd, entry->type, entry->handle, entry->coll_id);
+            close_fd(entry->fd, entry->type);
 	    entry->fd = -1;
 	}
         qlist_del(&entry->queue_link);
@@ -633,44 +623,8 @@ static void* unlink_bstream(void *context)
 
 static void close_fd(
     int fd, 
-    enum open_cache_open_type type,
-    TROVE_handle handle,
-    TROVE_coll_id coll_id)
+    enum open_cache_open_type type)
 {
-    TROVE_object_ref ref;
-    TROVE_ds_attributes attr;
-    struct dbpf_collection *coll_p = NULL;
-    int ret;
-
-    /* truncate O_DIRECT files at close time to keep size consistent */
-    if(type == DBPF_FD_DIRECT_READ || type == DBPF_FD_DIRECT_WRITE)
-    {
-        gossip_err("dbpf_open_cache truncating fd %d for handle %llu at close time.\n",
-            fd, llu(handle));
-        
-        coll_p = dbpf_collection_find_registered(coll_id);
-        if (coll_p == NULL)
-        {
-            return;
-        }
-
-        ref.handle = handle;
-        ref.fs_id = coll_id;
-
-        ret = dbpf_dspace_attr_get(coll_p, ref, &attr);
-        if(ret != 0)
-        {
-            return;
-        }
-
-        ret = DBPF_RESIZE(fd, attr.u.datafile.b_size);
-        if(ret < 0)
-        {
-            gossip_err("Error: failed to truncate fd %d for handle %llu at close time.\n",
-                fd, llu(handle));
-        }
-    }
-
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
         "dbpf_open_cache closing fd %d of type %d\n", fd, type);
     DBPF_CLOSE(fd);

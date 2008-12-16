@@ -24,8 +24,6 @@ struct open_cache_ref
 {
     int fd;
     enum open_cache_open_type type;
-    TROVE_handle handle;
-    TROVE_coll_id coll_id;
     void* internal; /* pointer to underlying data structure */
 };
 
