@@ -1,6 +1,6 @@
 #!/bin/bash
 
-LTPVER="20080630"
+LTPVER="20081130"
 THISDATE=`date +%F-%R`
 DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
 
@@ -28,8 +28,7 @@ fi
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
 for patch in \
-	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
-	${VFS_SCRIPTS}/ltp-20080630-hackbench-limits.patch ; do
+	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch ; do
 		patch -p1 < $patch
 done
 if [ "${?}" != 0 ]
