@@ -8,7 +8,10 @@
  */
 
 #include "mx.h"
+#include "pint-hint.h"
 #include "pint-event.h"
+#include "pvfs2-debug.h"
+
 
 static int      tmp_id  = 0;    /* temporary id until bmi_mx is init'ed */
 struct bmx_data *bmi_mx = NULL; /* global state for bmi_mx */
@@ -28,6 +31,13 @@ int     sendunex_finish;
 int     recvunex_start;
 int     recvunex_finish;
 #endif
+
+/* statics for event logging */
+static PINT_event_type bmi_mx_send_event_id;
+static PINT_event_type bmi_mx_recv_event_id;
+
+static PINT_event_group bmi_mx_event_group;
+static pid_t bmi_mx_pid;
 
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
@@ -1559,8 +1569,7 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
         int                      ret    = 0;
-        int32_t                  eid    = 0;
-        int                      len    = 0;
+        PINT_event_id            eid    = 0;
 
 #if BMX_LOGGING
         if (!is_unexpected) {
@@ -1572,12 +1581,11 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 
         PINT_EVENT_START(
             bmi_mx_send_event_id, bmi_mx_pid, NULL, &eid,
-            *(uint32_t *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_CLIENT_ID, &len),
-            *(uint32_t *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_REQUEST_ID, &len),
-            *(PVFS_handle *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_HANDLE, &len),
+            PINT_HINT_GET_CLIENT_ID(hints),
+            PINT_HINT_GET_REQUEST_ID(hints),
+            PINT_HINT_GET_RANK(hints),
+            PINT_HINT_GET_HANDLE(hints),
+            PINT_HINT_GET_OP_ID(hints),
             total_size);
 
         mxmap = remote_map->method_data;
@@ -1807,7 +1815,7 @@ bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         struct method_op        *mop    = NULL;
         struct bmx_method_addr  *mxmap  = NULL;
         struct bmx_peer         *peer   = NULL;
-        int                      eid    = 0;
+        PINT_event_id            eid    = 0;
 
 #if BMX_LOGGING
         MPE_Log_event(recv_start, (int) tag, NULL);
@@ -1815,12 +1823,11 @@ bmx_post_recv_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 
         PINT_EVENT_START(
             bmi_mx_recv_event_id, bmi_mx_pid, NULL, &eid,
-            *(uint32_t *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_CLIENT_ID, &len),
-            *(uint32_t *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_REQUEST_ID, &len),
-            *(PVFS_handle *)PINT_hint_get_value_by_type(
-                hints, PINT_HINT_HANDLE, &len),
+            PINT_HINT_GET_CLIENT_ID(hints),
+            PINT_HINT_GET_REQUEST_ID(hints),
+            PINT_HINT_GET_RANK(hints),
+            PINT_HINT_GET_HANDLE(hints),
+            PINT_HINT_GET_OP_ID(hints),
             tot_expected_len);
 
         mxmap = remote_map->method_data;
@@ -2621,7 +2628,7 @@ BMI_mx_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
                         PINT_EVENT_END(
                             (ctx->mxc_type == BMX_REQ_TX ?
                              bmi_mx_send_event_id : bmi_mx_recv_event_id),
-                            bmi_tcp_pid, NULL, ctx->mxc_mop->event_id,
+                            bmi_mx_pid, NULL, ctx->mxc_mop->event_id,
                             ctx->mxc_mop->op_id, *size);
 
                         *outcount = 1;
@@ -2752,7 +2759,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         PINT_EVENT_END(
                             (ctx->mxc_type == BMX_REQ_TX ?
                              bmi_mx_send_event_id : bmi_mx_recv_event_id),
-                            bmi_tcp_pid, NULL, ctx->mxc_mop->event_id,
+                            bmi_mx_pid, NULL, ctx->mxc_mop->event_id,
                             ctx->mxc_mop->op_id, status.xfer_length);
 
                         id_gen_fast_unregister(ctx->mxc_mop->op_id);
