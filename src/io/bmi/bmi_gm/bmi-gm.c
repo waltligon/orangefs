@@ -29,6 +29,7 @@
 #ifdef ENABLE_GM_REGCACHE
 #include "bmi-gm-regcache.h"
 #endif
+#include "pvfs2-debug.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
@@ -62,7 +63,8 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
-		     bmi_context_id context_id);
+		     bmi_context_id context_id,
+                     PVFS_hint hints);
 int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_method_addr_p dest,
     const void *const *buffer_list,
@@ -72,7 +74,8 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id);
+    bmi_context_id context_id,
+    PVFS_hint hints);
 int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_method_addr_p dest,
     const void *const *buffer_list,
@@ -82,7 +85,8 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id);
+    bmi_context_id context_id,
+    PVFS_hint hints);
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       bmi_method_addr_p dest,
 			       const void *buffer,
@@ -90,7 +94,8 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
-			       bmi_context_id context_id);
+			       bmi_context_id context_id,
+                               PVFS_hint hints);
 int BMI_gm_post_recv(bmi_op_id_t * id,
 		     bmi_method_addr_p src,
 		     void *buffer,
@@ -99,7 +104,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
-		     bmi_context_id context_id);
+		     bmi_context_id context_id,
+                     PVFS_hint hints);
 int BMI_gm_post_recv_list(bmi_op_id_t * id,
     bmi_method_addr_p src,
     void *const *buffer_list,
@@ -110,7 +116,8 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id);
+    bmi_context_id context_id,
+    PVFS_hint hints);
 int BMI_gm_test(bmi_op_id_t id,
 		int *outcount,
 		bmi_error_code_t * error_code,
@@ -905,7 +912,8 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
-		     bmi_context_id context_id)
+		     bmi_context_id context_id,
+                     PVFS_hint hints)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -998,7 +1006,8 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id)
+    bmi_context_id context_id,
+    PVFS_hint hints)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -1017,7 +1026,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_send(id, dest, buffer_list[0], size_list[0], 
-	    buffer_type, tag, user_ptr, context_id));
+	    buffer_type, tag, user_ptr, context_id, hints));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1101,7 +1110,8 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id)
+    bmi_context_id context_id,
+    PVFS_hint hints)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -1121,7 +1131,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_sendunexpected(id, dest, buffer_list[0], 
-	    size_list[0], buffer_type, tag, user_ptr, context_id));
+	    size_list[0], buffer_type, tag, user_ptr, context_id, hints));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1190,7 +1200,8 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
-			       bmi_context_id context_id)
+			       bmi_context_id context_id,
+                               PVFS_hint hints)
 {
     int buffer_status = GM_BUF_USER_ALLOC;
     void *new_buffer = NULL;
@@ -1263,7 +1274,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
-		     bmi_context_id context_id)
+		     bmi_context_id context_id,
+                     PVFS_hint hints)
 {
     method_op_p query_op = NULL;
     method_op_p new_method_op = NULL;
@@ -1435,7 +1447,8 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
-    bmi_context_id context_id)
+    bmi_context_id context_id,
+    PVFS_hint hints)
 {
     method_op_p query_op = NULL;
     method_op_p new_method_op = NULL;
@@ -1457,7 +1470,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_recv(id, src, buffer_list[0], size_list[0],
-	    total_actual_size, buffer_type, tag, user_ptr, context_id));
+	    total_actual_size, buffer_type, tag, user_ptr, context_id, hints));
     }
 
     /* what happens here ?
