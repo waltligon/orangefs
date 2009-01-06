@@ -331,6 +331,8 @@ static struct
 static struct tcp_allowed_connection_s *gtcp_allowed_connection = NULL;
 #endif
 
+static int check_unexpected = 1;
+
 /* op_list_array indices */
 enum
 {
@@ -909,6 +911,12 @@ int BMI_tcp_set_info(int option,
         break;
     }
 #endif
+    case BMI_TCP_CHECK_UNEXPECTED:
+    {
+        check_unexpected = *(int *)inout_parameter;
+        break;
+    }
+
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                       "TCP hint %d not implemented.\n", option);
@@ -1316,7 +1324,8 @@ int BMI_tcp_testcontext(int incount,
          * that the next testunexpected call can pick it up without
          * delay
          */
-        if(!op_list_empty(op_list_array[IND_COMPLETE_RECV_UNEXP]))
+        if(check_unexpected &&
+           !op_list_empty(op_list_array[IND_COMPLETE_RECV_UNEXP]))
         {
             gen_mutex_unlock(&interface_mutex);
             return(0);
