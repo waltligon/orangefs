@@ -54,14 +54,8 @@ nested machine pvfs2_tree_create_sm
 
     state tree_create_xfer_msgpair_array
     {
+/* TODO: This needs to turn into a pjmp */
         jump pvfs2_msgpairarray_sm;
-        success => tree_communicate_remote_cleanup;
-        default => final_response;
-    }
-
-    state tree_communicate_remote_cleanup
-    {
-        run tree_communicate_remote_cleanup;
         success => tree_create_local;
         default => final_response;
     }
@@ -99,31 +93,47 @@ static int tree_create_comp_fn(void *v_p,
                                     int index)
 {
     PINT_smcb *smcb = v_p;
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
+    struct PINT_server_op *s_op;
+    struct PINT_server_op *parent_s_op;
     int i;
-        
+    int error_code;
+    int task_id;
+
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_create_comp_fn[%d]\n",index);
     
     assert(resp_p->op == PVFS_SERV_TREE_CREATE);
+    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+    parent_s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(parent_s_op->req->op == PVFS_SERV_TREE_CREATE);
 
     if (resp_p->status != 0)
     {   
         PVFS_perror_gossip("Creation failure", resp_p->status);
-        return resp_p->status;
     }   
-    
-    /* stash the newly created data file handles */
-    for (i = 0; i < resp_p->u.tree_create.handle_count; i++)
+    else
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
-                     llu(resp_p->u.tree_create.handle_array[i]));
-        s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
-                     = resp_p->u.tree_create.handle_array[i];
+        /* stash the newly created data file handles */
+        for (i = 0; i < resp_p->u.tree_create.handle_count; i++)
+        {
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
+                         llu(resp_p->u.tree_create.handle_array[i]));
+            parent_s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
+                         = resp_p->u.tree_create.handle_array[i];
+        }
     }
 
-    return 0;
+    if (s_op->msgarray)
+    {
+        free(s_op->msgarray);
+    }
+    free(s_op);
+
+    return resp_p->status;
 }
+
+#define CHILD_INDEX (i-1)
 
 static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb, job_status_s *js_p,
     int num_data_files, PVFS_fs_id fs_id, enum PVFS_server_op operation,
@@ -141,8 +151,15 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     struct PVFS_server_req *req;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
+
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+
     for (i = 0; i < num_data_files; i++) {
-//        gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", i, extent_array[i].extent_count, extent_array[i].extent_array[0].first, extent_array[i].extent_array[0].last);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n",
+            i, extent_array[i].extent_count,
+            llu(extent_array[i].extent_array[0].first),
+            llu(extent_array[i].extent_array[0].last));
     }
 
     /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
@@ -159,7 +176,11 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         num_files_per_server = 1;
     }
 
-//    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n", num_data_files, num_partitions, num_files_per_server);
+/*
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n",
+        num_data_files, num_partitions, num_files_per_server);
+*/
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
@@ -195,46 +216,60 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             (child_s_op->msgarray_count * sizeof(PINT_sm_msgpair_state)));
         if (child_s_op->msgarray == NULL)
         {
-            gossip_err("create: failed to allocate msgarray\n");
+            gossip_err("tree_communicate: failed to allocate msgarray\n");
+            return -PVFS_ENOMEM;
+        }
+
+        /* Allocate memory for building extent arrays to send to each "child" server. */
+        child_s_op->u.tree_communicate.tmp_extent_array = (PVFS_handle_extent_array **) malloc(
+            (num_partitions * num_files_per_server * sizeof(PVFS_handle_extent_array)));
+        if (child_s_op->u.tree_communicate.tmp_extent_array == NULL)
+        {
+            gossip_err("tree_communicate: failed to allocate tmp_extent_array\n");
             return -PVFS_ENOMEM;
         }
 
         /* Fill in the msgarray. */
         for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
         {
-            PINT_sm_msgpair_state *msg_p = &child_s_op->msgarray[i-1];
-            PVFS_handle_extent_array *tmp_extent_array;
+            PINT_sm_msgpair_state *msg_p = &child_s_op->msgarray[CHILD_INDEX];
 
-            /* TODO: need to store this pointer in order to free the memory */
-            tmp_extent_array = (PVFS_handle_extent_array *)malloc(
-                num_files_per_server * sizeof(PVFS_handle_extent_array));
-            if (tmp_extent_array == NULL)
-            {
-                gossip_err("create: failed to allocate tmp_extent_array\n");
-                return -PVFS_ENOMEM;
-            }
-
+            gossip_debug(GOSSIP_SERVER_DEBUG, "Processing child_s_op->msgarray[%d]\n", CHILD_INDEX);
             switch (operation)
             {
                 case PVFS_SERV_TREE_CREATE:
                 {
                     for (j = 0; j < num_files_per_server &&
-                                (i-1)*num_files_per_server+j < num_data_files; j++)
+                                (CHILD_INDEX)*num_files_per_server+j < num_data_files; j++)
                     {
-                        tmp_extent_array[j].extent_count = extent_array[(i-1)*num_files_per_server+j+1].extent_count;
-                        tmp_extent_array[j].extent_array = 
-                            extent_array[(i-1)*num_files_per_server+j+1].extent_array;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: tmp_extent_array[%d].extent_count = %d, first = %llu, last = %llu\n", j, tmp_extent_array[j].extent_count, tmp_extent_array[j].extent_array[0].first, tmp_extent_array[j].extent_array[0].last);
+                        PVFS_handle_extent_array *tmp_extent_array =
+                            *(child_s_op->u.tree_communicate.tmp_extent_array) +
+                                CHILD_INDEX*num_partitions + j;
+
+                        gossip_debug(GOSSIP_SERVER_DEBUG, "    count = %d\n", extent_array[(CHILD_INDEX)*num_files_per_server+j+1].extent_count);
+                        gossip_debug(GOSSIP_SERVER_DEBUG, "    array : first = %llu, last = %llu\n",
+                            llu(extent_array[(CHILD_INDEX)*num_files_per_server+j+1].extent_array[0].first),
+                            llu(extent_array[(CHILD_INDEX)*num_files_per_server+j+1].extent_array[0].last));
+
+                        (*tmp_extent_array).extent_count = extent_array[(CHILD_INDEX)*num_files_per_server+j+1].extent_count;
+                        (*tmp_extent_array).extent_array = 
+                            extent_array[(CHILD_INDEX)*num_files_per_server+j+1].extent_array;
+                        gossip_debug(GOSSIP_SERVER_DEBUG,
+                            "tree_communicate_partition_handles: child_s_op->u.tree_communicate.tmp_extent_array[%d][%d].extent_count = %d, first = %llu, last = %llu\n",
+                             CHILD_INDEX, j,
+                             (*tmp_extent_array).extent_count,
+                             llu((*tmp_extent_array).extent_array[0].first),
+                             llu((*tmp_extent_array).extent_array[0].last));
                     }
                     PINT_SERVREQ_TREE_CREATE_FILL(
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
-                        (i-1)*num_files_per_server+1,
+                        (CHILD_INDEX)*num_files_per_server+1,
                         j,
-                        tmp_extent_array);
+                        *(child_s_op->u.tree_communicate.tmp_extent_array));
                     msg_p->fs_id = fs_id;
-                    msg_p->handle = tmp_extent_array[0].extent_array[0].first;
+                    msg_p->handle = child_s_op->u.tree_communicate.tmp_extent_array[0]->extent_array[0].first;
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                     msg_p->comp_fn = tree_create_comp_fn;
                     break;
@@ -267,6 +302,8 @@ static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_create entered\n");
 
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+
     s_op->resp.u.tree_create.caller_handle_index = s_op->req->u.tree_create.caller_handle_index;
     s_op->resp.u.tree_create.handle_count = s_op->req->u.tree_create.num_data_files;
 
@@ -288,19 +325,6 @@ static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action tree_communicate_remote_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int tmp_error_code;
-
-    if (s_op->msgarray)
-    {
-        free(s_op->msgarray);
-    }
-    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(smcb, s_op, &tmp_error_code);
-    return SM_ACTION_COMPLETE;
-}
-
 static PINT_sm_action tree_create_local(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -309,6 +333,8 @@ static PINT_sm_action tree_create_local(struct PINT_smcb *smcb, job_status_s *js
     struct PVFS_server_req *req;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_create_local entered\n");
+
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
 
     js_p->error_code = 0;
 
@@ -330,11 +356,18 @@ static PINT_sm_action tree_create_local(struct PINT_smcb *smcb, job_status_s *js
 static PINT_sm_action tree_create_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb, PINT_FRAME_PREVIOUS);
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int tmp_error_code;
+    struct PINT_server_op *parent_s_op;
+    struct PINT_server_op *s_op;
+    int error_code;
+    int task_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_create_resp entered\n");
+
+    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+
+    parent_s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(parent_s_op->req->op == PVFS_SERV_TREE_CREATE);
 
     if (js_p->error_code == 0)
     {
@@ -342,7 +375,7 @@ static PINT_sm_action tree_create_resp(
                      llu(s_op->resp.u.create.handle));
         parent_s_op->resp.u.tree_create.handle_array[0] = s_op->resp.u.create.handle;
     }
-    PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(smcb, s_op, &tmp_error_code);
+    free(s_op);
  
     return (SM_ACTION_COMPLETE);
 }

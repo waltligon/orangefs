@@ -57,6 +57,12 @@ enum PINT_state_code {
  */
 #define PINT_STATE_STACK_SIZE 8
 
+struct PINT_state_stack_s
+{
+    struct PINT_state_s *state;
+    int prev_base_frame;
+};
+
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -65,10 +71,11 @@ typedef struct PINT_smcb
     /* state machine execution variables */
     int stackptr;
     struct PINT_state_s *current_state;
-    struct PINT_state_s *state_stack[PINT_STATE_STACK_SIZE];
+    struct PINT_state_stack_s state_stack[PINT_STATE_STACK_SIZE];
 
-    struct qlist_head frames;
-    int frame_count;
+    struct qlist_head frames;  /* circular list of frames */
+    int base_frame;   /* index of current base frame */
+    int frame_count;  /* number of frames in list */
 
     /* usage specific routinet to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int);
@@ -84,6 +91,7 @@ typedef struct PINT_smcb
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
     void *user_ptr; /* external user pointer */
+    int immediate; /* specifies immediate completion of the state machine */
 } PINT_smcb;
 
 #define PINT_SET_OP_COMPLETE do{PINT_smcb_set_complete(smcb);} while (0)
@@ -160,11 +168,11 @@ int PINT_state_machine_complete(void *);
  * We assume the first 6 characters of every state machine name are "pvfs2_".
  */
 #define PINT_state_machine_current_machine_name(smcb) \
-    (((smcb)->current_state->parent_machine->name) + 6)
+    ((smcb)->current_state ? (((smcb)->current_state->parent_machine->name) + 6) : "UNKNOWN")
 
 /* This macro returns the current state invoked */
 #define PINT_state_machine_current_state_name(smcb) \
-    ((smcb)->current_state->state_name)
+    ((smcb)->current_state ? ((smcb)->current_state->state_name) : "UNKNOWN")
 
 /* Prototypes for functions defined in by state machine code */
 int PINT_state_machine_halt(void);
@@ -177,6 +185,7 @@ PINT_sm_action PINT_state_machine_continue(
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
+int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
 int PINT_smcb_complete(struct PINT_smcb *smcb);
@@ -194,9 +203,11 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *error_code,
                         int *remaining);
 
-/* These macros are used in calls to PINT_sm_fram() */
+/* This macro is used in calls to PINT_sm_fram() */
 #define PINT_FRAME_CURRENT 0
 #define PINT_FRAME_PREVIOUS 1
+//#define PINT_FRAME_CURRENT (((smcb)->frame_count-(smcb)->base_frame)-1)
+//#define PINT_FRAME_PREVIOUS (((smcb)->frame_count-(smcb)->base_frame)-2)
 
 struct PINT_state_machine_s pvfs2_void_sm;
 

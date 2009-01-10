@@ -373,6 +373,11 @@ struct PINT_server_listattr_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
+struct PINT_server_tree_communicate_op
+{
+    PVFS_handle_extent_array **tmp_extent_array;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -463,6 +468,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_tree_communicate_op tree_communicate;
     } u;
 
 } PINT_server_op;
@@ -500,14 +506,6 @@ typedef struct PINT_server_op
 #if 0
       __s_op->prelude_mask = PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL;
 #endif
-
-#define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __error_code) \
-    do { \
-      int task_id; \
-      PINT_sm_pop_frame(__smcb, &task_id, __error_code, NULL); \
-      free(__s_op); \
-      __s_op = NULL; \
-    } while (0)
 
 /* PINT_ACCESS_DEBUG()
  *
