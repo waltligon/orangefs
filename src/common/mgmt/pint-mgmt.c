@@ -882,7 +882,7 @@ int PINT_manager_test_context(PINT_manager_t manager,
     int count;
     struct PINT_worker_s *worker;
     struct timeval start, now;
-    int timeleft;
+    int timeleft = microsecs;
 
     gettimeofday(&start, NULL);
 
