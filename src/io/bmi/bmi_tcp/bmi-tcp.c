@@ -914,6 +914,7 @@ int BMI_tcp_set_info(int option,
     case BMI_TCP_CHECK_UNEXPECTED:
     {
         check_unexpected = *(int *)inout_parameter;
+        ret = 0;
         break;
     }
 
