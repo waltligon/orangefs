@@ -828,6 +828,38 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
+        /*
+           set storage hints if any.  if any of these fail, we
+           can't error out since they're just hints.  thus, we
+           complain in logging and continue.
+           */
+        ret = trove_collection_setinfo(
+            cur_fs->coll_id, 0,
+            TROVE_DIRECTIO_THREADS_NUM,
+            (void *)&cur_fs->directio_thread_num);
+        if (ret < 0)
+        {
+            gossip_err("Error setting directio threads num\n");
+        }
+
+        ret = trove_collection_setinfo(
+            cur_fs->coll_id, 0,
+            TROVE_DIRECTIO_OPS_PER_QUEUE,
+            (void *)&cur_fs->directio_ops_per_queue);
+        if (ret < 0)
+        {
+            gossip_err("Error setting directio ops per queue\n");
+        }
+
+        ret = trove_collection_setinfo(
+            cur_fs->coll_id, 0,
+            TROVE_DIRECTIO_TIMEOUT,
+            (void *)&cur_fs->directio_timeout);
+        if (ret < 0)
+        {
+            gossip_err("Error setting directio threads num\n");
+        }
+
         orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
             cur_fs->trove_method,

@@ -118,6 +118,10 @@ typedef struct filesystem_configuration_s
     PVFS_gid exp_anon_gid;
 
     int32_t small_file_size;
+
+    int32_t directio_thread_num;
+    int32_t directio_ops_per_queue;
+    int32_t directio_timeout;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s

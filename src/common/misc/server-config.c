@@ -115,6 +115,9 @@ static DOTCONF_CB(get_coalescing_high_watermark);
 static DOTCONF_CB(get_coalescing_low_watermark);
 static DOTCONF_CB(get_trove_method);
 static DOTCONF_CB(get_small_file_size);
+static DOTCONF_CB(directio_thread_num);
+static DOTCONF_CB(directio_ops_per_queue);
+static DOTCONF_CB(directio_timeout);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -927,6 +930,21 @@ static const configoption_t options[] =
 
     /* Specifies the size of the small file transition point */
     {"SmallFileSize", ARG_INT, get_small_file_size, NULL, CTX_FILESYSTEM, NULL},
+
+    /* Specifies the number of threads that should be started to service
+     * Direct I/O operations.  This defaults to 30.
+     */
+    {"DirectIOThreadNum", ARG_INT, directio_thread_num, NULL,
+        CTX_STORAGEHINTS, "30"},
+
+    /* Specifies the number of operations to service at once in Direct I/O mode.
+     */
+    {"DirectIOOpsPerQueue", ARG_INT, directio_ops_per_queue, NULL,
+        CTX_STORAGEHINTS, "10"},
+
+    /* Specifies the timeout in Direct I/O to wait before checking the next queue. */
+    {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
+        CTX_STORAGEHINTS, "1000"},
 
     LAST_OPTION
 };
@@ -2738,6 +2756,47 @@ DOTCONF_CB(get_small_file_size)
     return NULL;
 }
 
+DOTCONF_CB(directio_thread_num)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->directio_thread_num = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(directio_ops_per_queue)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->directio_ops_per_queue = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(directio_timeout)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    struct filesystem_configuration_s *fs_conf =
+        (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->directio_timeout = cmd->data.value;
+
+    return NULL;
+}
 
 /*
  * Function: PINT_config_release

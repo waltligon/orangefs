@@ -71,6 +71,10 @@ static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
 static int start_directio_threads(void);
 
+static int trove_directio_threads_num = 30;
+static int trove_directio_ops_per_queue = 10;
+static int trove_directio_timeout = 1000;
+
 static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      int count,
                                      PINT_op_id *op_ids,
@@ -362,7 +366,6 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
     struct dbpf_collection* coll;
     coll = dbpf_collection_find_registered(coll_id);
 
-    assert(coll);
 
     switch(option)
     {
@@ -423,6 +426,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             gossip_debug(GOSSIP_TROVE_DEBUG, 
                          "dbpf collection %d - Setting HIGH_WATERMARK to %d\n",
                          (int) coll_id, *(int *)parameter);
+            assert(coll);
             dbpf_queued_op_set_sync_high_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -430,6 +434,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             gossip_debug(GOSSIP_TROVE_DEBUG, 
                          "dbpf collection %d - Setting LOW_WATERMARK to %d\n",
                          (int) coll_id, *(int *)parameter);
+            assert(coll);
             dbpf_queued_op_set_sync_low_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -438,6 +443,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - %s sync mode\n",
                          (int) coll_id,
                          (*(int *)parameter) ? "Enabling" : "Disabling");
+            assert(coll);
             dbpf_queued_op_set_sync_mode(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -446,7 +452,20 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - %s immediate completion\n",
                          (int) coll_id,
                          (*(int *)parameter) ? "Enabling" : "Disabling");
+            assert(coll);
             coll->immediate_completion = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_THREADS_NUM:
+            trove_directio_threads_num = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_OPS_PER_QUEUE:
+            trove_directio_ops_per_queue = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_TIMEOUT:
+            trove_directio_timeout = *(int *)parameter;
             ret = 0;
             break;
     }
@@ -697,9 +716,9 @@ static int start_directio_threads(void)
     }
 
     io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
-    io_worker_attrs.u.threaded.thread_count = 30;
-    io_worker_attrs.u.threaded.ops_per_queue = 10;
-    io_worker_attrs.u.threaded.timeout = 1000;
+    io_worker_attrs.u.threaded.thread_count = trove_directio_threads_num;
+    io_worker_attrs.u.threaded.ops_per_queue = trove_directio_ops_per_queue;
+    io_worker_attrs.u.threaded.timeout = trove_directio_timeout;
     ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
     if(ret < 0)
     {
