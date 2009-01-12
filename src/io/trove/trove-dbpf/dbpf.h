@@ -649,6 +649,22 @@ do {                                                          \
     }                                                         \
 } while(0)
 
+#define DBPF_EVENT_START(__coll_p, __q_op_p, __event_type, __event_id, args...) \
+    if(__coll_p->immediate_completion)                                          \
+    {                                                                           \
+        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
+                         ## args);                                              \
+    }                                                                           \
+    else                                                                        \
+    {                                                                           \
+        __q_op_p->event_type = __event_type;                                    \
+        PINT_EVENT_START(__event_type, dbpf_pid, NULL, (__event_id),            \
+                         ## args);                                              \
+        *(__event_id) = __q_op_p->event_id;                                     \
+    }
+
+#define DBPF_EVENT_END(__event_type, __event_id) \
+    PINT_EVENT_END(__event_type, dbpf_pid, NULL, __event_id)
 
 extern struct dbpf_storage *my_storage_p;
 

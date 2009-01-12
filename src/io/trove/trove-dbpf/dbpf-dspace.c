@@ -123,6 +123,9 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_type event_type;
+    PINT_event_id event_id;
+
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -152,13 +155,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    q_op_p->event_type = trove_dbpf_dspace_create_event_id;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "create: reqid: %d, rank: %d\n",
-                 PINT_HINT_GET_REQUEST_ID(hints),
-                 PINT_HINT_GET_RANK(hints));
-
-    PINT_EVENT_START(q_op_p->event_type,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_dspace_create_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -187,7 +185,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
@@ -285,6 +284,8 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_type event_type;
+    PINT_event_id event_id;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -321,9 +322,8 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    q_op_p->event_type = trove_dbpf_dspace_create_list_event_id;
-    PINT_EVENT_START(q_op_p->event_type,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_dspace_create_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -355,7 +355,8 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
@@ -501,7 +502,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int remove_one_handle(
@@ -697,7 +698,7 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     op_p->u.d_iterate_handles.position_p = position_p;
     op_p->u.d_iterate_handles.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
@@ -1033,7 +1034,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     op_p->hints = hints;
     op_p->u.d_verify.type_p = type_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
@@ -1095,6 +1096,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     TROVE_object_ref ref = {handle, coll_id};
     int ret;
+    PINT_event_id event_id;
+    PINT_event_type event_type;
 
     /* fast path cache hit; skips queueing */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -1159,10 +1162,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
         return ret;
     }
 
-    q_op_p->event_type = trove_dbpf_dspace_getattr_event_id;
-
-    PINT_EVENT_START(q_op_p->event_type,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_dspace_getattr_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -1173,7 +1174,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     op_p->u.d_getattr.attr_p = ds_attr_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
@@ -1304,6 +1306,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_id event_id;
+    PINT_event_type event_type;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -1327,13 +1331,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
         return ret;
     }
 
-    q_op_p->event_type = trove_dbpf_dspace_setattr_event_id;
-    gossip_debug(GOSSIP_TROVE_DEBUG, "setattr: reqid: %d, rank: %d\n",
-                 PINT_HINT_GET_REQUEST_ID(hints),
-                 PINT_HINT_GET_RANK(hints));
-
-    PINT_EVENT_START(q_op_p->event_type,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_dspace_setattr_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -1347,7 +1346,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
@@ -1843,8 +1843,7 @@ static int dbpf_dspace_testcontext(
         if(cur_op->event_type == trove_dbpf_read_event_id ||
            cur_op->event_type == trove_dbpf_write_event_id)
         {
-            PINT_EVENT_END(
-                cur_op->event_type, dbpf_pid, NULL, cur_op->event_id);
+            DBPF_EVENT_END(cur_op->event_type, cur_op->event_id);
         }
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);

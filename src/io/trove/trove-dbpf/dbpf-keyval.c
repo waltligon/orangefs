@@ -176,6 +176,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {handle, coll_id};
+    PINT_event_id event_id;
+    PINT_event_type event_type;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Read "
                  "of %s\n", (char *)key_p->buffer);
@@ -228,15 +230,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return ret;
     }
 
-    q_op_p->event_type = trove_dbpf_keyval_read_event_id;
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_read: client_id: %d, reqid: %d, rank: %d\n",
-                 PINT_HINT_GET_CLIENT_ID(hints),
-                 PINT_HINT_GET_REQUEST_ID(hints),
-                 PINT_HINT_GET_RANK(hints));
-
-    PINT_EVENT_START(trove_dbpf_keyval_read_event_id,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_keyval_read_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -248,7 +243,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     op_p->u.k_read.val = val_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -348,6 +344,8 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_id event_id;
+    PINT_event_type event_type;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -371,14 +369,8 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
         return ret;
     }
 
-    q_op_p->event_type = trove_dbpf_keyval_write_event_id;
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "kv_write: reqid: %d, rank: %d\n",
-                 PINT_HINT_GET_REQUEST_ID(hints),
-                 PINT_HINT_GET_RANK(hints));
-
-    PINT_EVENT_START(trove_dbpf_keyval_write_event_id,
-                     dbpf_pid, NULL, &q_op_p->event_id,
+    event_type = trove_dbpf_keyval_write_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
@@ -393,7 +385,8 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -612,7 +605,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
@@ -701,7 +694,7 @@ static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
@@ -841,7 +834,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     op_p->u.k_iterate.count_p = inout_count_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 /* dbpf_keyval_iterate_op_svc()
@@ -1010,7 +1003,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
     op_p->u.k_iterate_keys.count_p = inout_count_p;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 /* dbpf_keyval_iterate_keys_op_svc()
@@ -1159,7 +1152,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     op_p->u.k_read_list.count = count;
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
@@ -1267,7 +1260,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1468,7 +1461,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
     }
     op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
@@ -1977,7 +1970,7 @@ static int dbpf_keyval_get_handle_info(
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
