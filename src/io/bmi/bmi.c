@@ -29,6 +29,9 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
 
+static int bmi_initialized_count = 0;
+static gen_mutex_t bmi_initialize_mutex = GEN_MUTEX_INITIALIZER;
+
 /*
  * List of BMI addrs currently managed.
  */
@@ -142,6 +145,17 @@ int BMI_initialize(const char *method_list,
     char *this_addr = NULL;
     char *proto = NULL;
     int addr_count = 0;
+
+    gen_mutex_lock(&bmi_initialize_mutex);
+    if(bmi_initialized_count > 0)
+    {
+        /* Already initialized! Just increment ref count and return. */
+	++bmi_initialized_count;
+	gen_mutex_unlock(&bmi_initialize_mutex);
+        return 0;
+    }
+    ++bmi_initialized_count;
+    gen_mutex_unlock(&bmi_initialize_mutex);
 
     global_flags = flags;
 
@@ -480,6 +494,15 @@ int BMI_initialize(const char *module_string,
 int BMI_finalize(void)
 {
     int i = -1;
+
+    gen_mutex_lock(&bmi_initialize_mutex);
+    --bmi_initialized_count;
+    if(bmi_initialized_count > 0)
+    {
+        gen_mutex_unlock(&bmi_initialize_mutex);
+        return 0;
+    }
+    gen_mutex_unlock(&bmi_initialize_mutex);
 
     gen_mutex_lock(&active_method_count_mutex);
     /* attempt to shut down active methods */
