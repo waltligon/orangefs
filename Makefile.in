@@ -920,7 +920,7 @@ clean::
 endif
 
 saveconfig::
-	cp $(srcdir)/config.status $(srcdir)/config.save
+	cp -p $(builddir)/config.status $(builddir)/config.save
 
 # builds a tarball of the source tree suitable for distribution
 dist: saveconfig $(SMCGEN) cleaner
@@ -929,7 +929,8 @@ dist: saveconfig $(SMCGEN) cleaner
 ifdef BUILD_BMI_ONLY
 # builds a tarball of the BMI source tree suitable for distribution
 bmidist: saveconfig cleaner
-	@sh $(srcdir)/maint/make-bmi-dist.sh $(srcdir) @PVFS2_VERSION@
+	@sh $(srcdir)/maint/make-bmi-dist.sh $(srcdir) $(builddir) @PVFS2_VERSION@
+	cp -u $(builddir)/config.save $(builddir)/config.status
 endif
 
 # some stuff that is cleaned in both distclean and dist targets

@@ -13,7 +13,7 @@ AC_DEFUN([AX_GM],
     dnl    --with-gm-libs=<dir>/lib  (or lib64 if that exists)
     gm_home=
     AC_ARG_WITH(gm,
-    [  --with-gm=<dir>     Location of the GM install (default no GM)],
+[  --with-gm=<dir>         Location of the GM install (default no GM)],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-gm requires the path to your GM tree.])
 	elif test "$withval" != no ; then
@@ -21,7 +21,8 @@ AC_DEFUN([AX_GM],
 	fi
     )
     AC_ARG_WITH(gm-includes,
-    [  --with-gm-includes=<dir>  Location of the GM includes],
+[  --with-gm-includes=<dir>
+                          Location of the GM includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-gm-includes requires path to GM headers.])
 	elif test "$withval" != no ; then
@@ -29,7 +30,7 @@ AC_DEFUN([AX_GM],
 	fi
     )
     AC_ARG_WITH(gm-libs,
-    [  --with-gm-libs=<dir>      Location of the GM libraries],
+[  --with-gm-libs=<dir>    Location of the GM libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-gm-libs requires path to GM libraries.])
 	elif test "$withval" != no ; then

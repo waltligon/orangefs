@@ -14,7 +14,8 @@ AC_DEFUN([AX_IB],
 	fi
     )
     AC_ARG_WITH(ib-includes,
-    [  --with-ib-includes=<dir>      Location of the IB includes],
+[  --with-ib-includes=<dir>
+                          Location of the IB includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-ib-includes requires path to IB headers.])
 	elif test "$withval" != no ; then
@@ -22,7 +23,7 @@ AC_DEFUN([AX_IB],
 	fi
     )
     AC_ARG_WITH(ib-libs,
-    [  --with-ib-libs=<dir>          Location of the IB libraries],
+[  --with-ib-libs=<dir>    Location of the IB libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-ib-libs requires path to IB libraries.])
 	elif test "$withval" != no ; then
@@ -80,7 +81,8 @@ AC_DEFUN([AX_IB],
 	fi
     )
     AC_ARG_WITH(openib-includes,
-    [  --with-openib-includes=<dir>  Location of the OpenIB includes],
+[  --with-openib-includes=<dir>
+                          Location of the OpenIB includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-openib-includes requires path to OpenIB headers.])
 	elif test "$withval" != no ; then
@@ -88,7 +90,8 @@ AC_DEFUN([AX_IB],
 	fi
     )
     AC_ARG_WITH(openib-libs,
-    [  --with-openib-libs=<dir>      Location of the OpenIB libraries],
+[  --with-openib-libs=<dir>
+                          Location of the OpenIB libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-openib-libs requires path to OpenIB libraries.])
 	elif test "$withval" != no ; then

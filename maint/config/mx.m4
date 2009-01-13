@@ -13,7 +13,7 @@ AC_DEFUN([AX_MX],
     dnl    --with-mx-libs=<dir>/lib  (or lib64 if that exists)
     mx_home=
     AC_ARG_WITH(mx,
-    [  --with-mx=<dir>     Location of the MX install (default no MX)],
+[  --with-mx=<dir>         Location of the MX install (default no MX)],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-mx requires the path to your MX tree.])
 	elif test "$withval" != no ; then
@@ -21,7 +21,8 @@ AC_DEFUN([AX_MX],
 	fi
     )
     AC_ARG_WITH(mx-includes,
-    [  --with-mx-includes=<dir>  Location of the MX includes],
+[  --with-mx-includes=<dir>
+                          Location of the MX includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-mx-includes requires path to MX headers.])
 	elif test "$withval" != no ; then
@@ -29,7 +30,7 @@ AC_DEFUN([AX_MX],
 	fi
     )
     AC_ARG_WITH(mx-libs,
-    [  --with-mx-libs=<dir>      Location of the MX libraries],
+[  --with-mx-libs=<dir>    Location of the MX libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-mx-libs requires path to MX libraries.])
 	elif test "$withval" != no ; then

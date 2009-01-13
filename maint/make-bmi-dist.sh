@@ -10,19 +10,19 @@
 echo "make-bmi-dist"
 if test -z $1; then
     echo "No source directory specified"
-    echo "Usage: make-bmi-dist.sh <src dir> <version string>"
+    echo "Usage: make-bmi-dist.sh <src dir> <builddir> <version string>"
     exit 1
 fi
 
-if test -z $2; then
+if test -z $3; then
     echo "No version string specified"
-    echo "Usage: make-bmi-dist.sh <src dir> <version string>"
+    echo "Usage: make-bmi-dist.sh <src dir> <builddir> <version string>"
     exit 1
 fi
 
-BUILDDIR=$(pwd)
+BUILDDIR=$2
 SRCDIR="$1"
-PVFS2_VERSION="$2"
+PVFS2_VERSION="$3"
 
 if test "x$SRCDIR" = "x."; then
     SRCIR=`pwd`
@@ -82,7 +82,7 @@ cp -f --no-dereference -R $SRCDIR/INSTALL $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/Makefile.in $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/README $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/README.name_change $TARGETDIR
-cp -f --no-dereference -R $SRCDIR/config.save $TARGETDIR
+cp -f --no-dereference -R $BUILDDIR/config.save $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/configure $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/configure.in $TARGETDIR
 cp -f --no-dereference -R $SRCDIR/module.mk.in $TARGETDIR
@@ -94,7 +94,7 @@ cp -f --no-dereference -R $SRCDIR/src/common/gen-locks $TARGETDIR/src/common/
 cp -f --no-dereference -R $SRCDIR/src/common/gossip $TARGETDIR/src/common/
 cp -f --no-dereference -R $SRCDIR/src/common/id-generator $TARGETDIR/src/common/
 cp -f --no-dereference -R $SRCDIR/src/common/llist $TARGETDIR/src/common/
-cp -f $SRCDIR/include/pvfs2.h $TARGETDIR/include/
+cp -f $SRCDIR/include/pvfs2.h.in $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-debug.h $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-encode-stubs.h $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-event.h $TARGETDIR/include/
@@ -103,6 +103,7 @@ cp -f $SRCDIR/include/pvfs2-request.h $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-sysint.h $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-util.h $TARGETDIR/include/
 cp -f $SRCDIR/include/pvfs2-types.h $TARGETDIR/include/
+cp -f $SRCDIR/include/pvfs2-hint.h $TARGETDIR/include/
 cp -f $SRCDIR/src/common/misc/str-utils.h $TARGETDIR/src/common/misc/
 cp -f $SRCDIR/src/common/misc/str-utils.c $TARGETDIR/src/common/misc/
 cp -f $SRCDIR/src/common/misc/pint-event.h $TARGETDIR/src/common/misc/
@@ -113,6 +114,9 @@ cp -f $SRCDIR/src/common/misc/module.mk.in $TARGETDIR/src/common/misc/
 cp -f --no-dereference -R $SRCDIR/src/common/quickhash $TARGETDIR/src/common/
 cp -f --no-dereference -R $SRCDIR/src/common/quicklist $TARGETDIR/src/common/
 cp -f --no-dereference -R $SRCDIR/src/common/statecomp $TARGETDIR/src/common/
+cp -f --no-dereference -R $SRCDIR/src/common/mgmt $TARGETDIR/src/common/
+cp -f --no-dereference -R $SRCDIR/src/common/misc $TARGETDIR/src/common/
+cp -f --no-dereference -R $SRCDIR/src/proto $TARGETDIR/src/
 
 cd $TARGETDIR
 
@@ -133,7 +137,6 @@ sed -i "/src\/io\/flow/d" configure.in
 sed -i "/src\/io\/buffer/d" configure.in
 sed -i "/src\/io\/job/d" configure.in
 sed -i "/src\/io\/dev/d" configure.in
-sed -i "/src\/proto\/module.mk/d" configure.in
 sed -i "/src\/server\/module.mk/d" configure.in
 sed -i "/src\/server\/request-scheduler/d" configure.in
 sed -i "/src\/client\/sysint/d" configure.in
@@ -145,6 +148,7 @@ sed -i "/doc\/design\/module.mk/d" configure.in
 sed -i "/doc\/random\/module.mk/d" configure.in
 sed -i "/examples\/pvfs2-server.rc/d" configure.in
 sed -i "/doc\/doxygen\/pvfs2-doxygen.conf/d" configure.in
+sed -i "/common\/events\/module.mk/d" configure.in
 
 # dump some special options into the top level module.mk.in
 echo "DIST_RELEASE = 1" >> module.mk.in

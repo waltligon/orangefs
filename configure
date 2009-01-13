@@ -1325,24 +1325,29 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-thread-safety Disables thread safety in the client library
-  --disable-server Disables building of PVFS2 server
-  --disable-karma-mem-usage-stats Disables memory usage stats in karma
-  --enable-bmi-only Build only the BMI library
+  --disable-server        Disables building of PVFS2 server
+  --disable-karma-mem-usage-stats
+                          Disables memory usage stats in karma
+  --enable-bmi-only       Build only the BMI library
   --disable-perf-counters Disables pvfs2-server performance counters
   --enable-mmap-racache   **EXPERIMENTAL** Enables mmap-readahead in kernel
                           interface
-  --enable-trusted-connections  **EXPERIMENTAL** Enable connects only
+  --enable-trusted-connections
+                          **EXPERIMENTAL** Enable connects only
                           from trusted hosts/ports
   --disable-karma         Disables optional gui.  (Enabled by default)
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
-  --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
-  --disable-aio-threaded-callbacks  **EXPERIMENTAL** Disable use of AIO
+  --enable-nptl-workaround
+                          Enable workaround for buggy NPTL/Pthread libraries
+  --disable-aio-threaded-callbacks
+                          **EXPERIMENTAL** Disable use of AIO
                           threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
-  --enable-kernel-sendfile   **EXPERIMENTAL** Forcibly enable kernel
-                          sendfile
-  --enable-threaded-kmod-helper  **EXPERIMENTAL** Use threads in the kernel
+  --enable-kernel-sendfile
+                          **EXPERIMENTAL** Forcibly enable kernel sendfile
+  --enable-threaded-kmod-helper
+                          **EXPERIMENTAL** Use threads in the kernel
                           helper application
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict compiler warnings
@@ -1351,7 +1356,8 @@ Optional Features:
                           (epoll is enabled by default, this option
 			  ensures no checking is done for x-compiling)
   --disable-epoll         Disable epoll, use poll instead
-  --disable-segv-backtrace Disables back traces in segfault signal handler
+  --disable-segv-backtrace
+                          Disables back traces in segfault signal handler
   --enable-shared         Build shared client library
   --enable-static-server  Builds the server static
 
@@ -1369,21 +1375,28 @@ Optional Packages:
   --with-valgrind=<path>  Use valgrind annotations for debugging.
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --without-bmi-tcp       Disable BMI TCP method
-  --with-gm=<dir>     Location of the GM install (default no GM)
-  --with-gm-includes=<dir>  Location of the GM includes
-  --with-gm-libs=<dir>      Location of the GM libraries
-  --with-mx=<dir>     Location of the MX install (default no MX)
-  --with-mx-includes=<dir>  Location of the MX includes
-  --with-mx-libs=<dir>      Location of the MX libraries
+  --with-gm=<dir>         Location of the GM install (default no GM)
+  --with-gm-includes=<dir>
+                          Location of the GM includes
+  --with-gm-libs=<dir>    Location of the GM libraries
+  --with-mx=<dir>         Location of the MX install (default no MX)
+  --with-mx-includes=<dir>
+                          Location of the MX includes
+  --with-mx-libs=<dir>    Location of the MX libraries
   --with-ib=<dir>         Location of the IB installation (default no IB)
-  --with-ib-includes=<dir>      Location of the IB includes
-  --with-ib-libs=<dir>          Location of the IB libraries
+  --with-ib-includes=<dir>
+                          Location of the IB includes
+  --with-ib-libs=<dir>    Location of the IB libraries
   --with-openib=<dir>     Location of the OpenIB install (default no OpenIB)
-  --with-openib-includes=<dir>  Location of the OpenIB includes
-  --with-openib-libs=<dir>      Location of the OpenIB libraries
+  --with-openib-includes=<dir>
+                          Location of the OpenIB includes
+  --with-openib-libs=<dir>
+                          Location of the OpenIB libraries
   --with-portals=<dir>   Location of the Portals install (default no Portals)
-  --with-portals-includes=<dir>  Extra CFLAGS to specify Portals includes
-  --with-portals-libs=<dir>      Extra LIBS to link Portals libraries
+  --with-portals-includes=<dir>
+                          Extra CFLAGS to specify Portals includes
+  --with-portals-libs=<dir>
+                          Extra LIBS to link Portals libraries
 
 Some influential environment variables:
   CC          C compiler command
@@ -19735,12 +19748,26 @@ fi
 chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
-{ echo "$as_me:$LINENO: result: " >&5
+if test "x$BUILD_BMI_ONLY" = "x1" ; then
+	{ echo "$as_me:$LINENO: result: " >&5
 echo "${ECHO_T}" >&6; }
-{ echo "$as_me:$LINENO: result: ***** Displaying PVFS2 Configuration Information *****" >&5
-echo "${ECHO_T}***** Displaying PVFS2 Configuration Information *****" >&6; }
-{ echo "$as_me:$LINENO: result: ------------------------------------------------------" >&5
+	{ echo "$as_me:$LINENO: result: ***** Displaying BMI configuration information *****" >&5
+echo "${ECHO_T}***** Displaying BMI configuration information *****" >&6; }
+	{ echo "$as_me:$LINENO: result: ----------------------------------------------------" >&5
+echo "${ECHO_T}----------------------------------------------------" >&6; }
+	PKGSTR="BMI"
+else
+	{ echo "$as_me:$LINENO: result: " >&5
+echo "${ECHO_T}" >&6; }
+	{ echo "$as_me:$LINENO: result: ***** Displaying PVFS Configuration Information *****" >&5
+echo "${ECHO_T}***** Displaying PVFS Configuration Information *****" >&6; }
+	{ echo "$as_me:$LINENO: result: ------------------------------------------------------" >&5
 echo "${ECHO_T}------------------------------------------------------" >&6; }
+	PKGSTR="PVFS2"
+fi
+
+# print PVFS configs (not used by BMI)
+if test "x$BUILD_BMI_ONLY" != "x1" ; then
 
 if test "x$BUILD_KARMA" = "x1" ; then
    { echo "$as_me:$LINENO: result: PVFS2 configured to build karma gui               : yes" >&5
@@ -19750,15 +19777,7 @@ else
 echo "${ECHO_T}PVFS2 configured to build karma gui               :  no" >&6; }
 fi
 
-if test "x$BUILD_EPOLL" = "x1" ; then
-   { echo "$as_me:$LINENO: result: PVFS2 configured to use epoll                     : yes" >&5
-echo "${ECHO_T}PVFS2 configured to use epoll                     : yes" >&6; }
-else
-   { echo "$as_me:$LINENO: result: PVFS2 configured to use epoll                     :  no" >&5
-echo "${ECHO_T}PVFS2 configured to use epoll                     :  no" >&6; }
-fi
-
-if test "x$ENABLE_COVERAGE" = "x1" ; then
+if test "x$ENABLE_COVERAGE" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 configured to perform coverage analysis     : yes" >&5
 echo "${ECHO_T}PVFS2 configured to perform coverage analysis     : yes" >&6; }
 else
@@ -19766,7 +19785,7 @@ else
 echo "${ECHO_T}PVFS2 configured to perform coverage analysis     :  no" >&6; }
 fi
 
-if test "x$MISC_TROVE_FLAGS" = "x" ; then
+if test "x$MISC_TROVE_FLAGS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 configured for aio threaded callbacks       :  no" >&5
 echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       :  no" >&6; }
 else
@@ -19774,7 +19793,7 @@ else
 echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       : yes" >&6; }
 fi
 
-if test "x$LINUX_KERNEL_SRC" = "x" ; then
+if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 configured for the 2.6.x kernel module      :  no" >&5
 echo "${ECHO_T}PVFS2 configured for the 2.6.x kernel module      :  no" >&6; }
 else
@@ -19782,7 +19801,7 @@ else
 echo "${ECHO_T}PVFS2 configured for the 2.6.x kernel module      : yes" >&6; }
 fi
 
-if test "x$LINUX24_KERNEL_SRC" = "x" ; then
+if test "x$LINUX24_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 configured for the 2.4.x kernel module      :  no" >&5
 echo "${ECHO_T}PVFS2 configured for the 2.4.x kernel module      :  no" >&6; }
 else
@@ -19790,7 +19809,7 @@ else
 echo "${ECHO_T}PVFS2 configured for the 2.4.x kernel module      : yes" >&6; }
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" ; then
+if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 configured for using the mmap-ra-cache      :  no" >&5
 echo "${ECHO_T}PVFS2 configured for using the mmap-ra-cache      :  no" >&6; }
 else
@@ -19798,23 +19817,7 @@ else
 echo "${ECHO_T}PVFS2 configured for using the mmap-ra-cache      : yes" >&6; }
 fi
 
-if test "x$TRUSTED_CONNECTIONS" = "x" ; then
-	{ echo "$as_me:$LINENO: result: PVFS2 configured for using trusted connections    :  no" >&5
-echo "${ECHO_T}PVFS2 configured for using trusted connections    :  no" >&6; }
-else
-	{ echo "$as_me:$LINENO: result: PVFS2 configured for using trusted connections    : yes" >&5
-echo "${ECHO_T}PVFS2 configured for using trusted connections    : yes" >&6; }
-fi
-
-if test "x$THREAD_LIB" = "x" ; then
-   { echo "$as_me:$LINENO: result: PVFS2 configured for a thread-safe client library :  no" >&5
-echo "${ECHO_T}PVFS2 configured for a thread-safe client library :  no" >&6; }
-else
-   { echo "$as_me:$LINENO: result: PVFS2 configured for a thread-safe client library : yes" >&5
-echo "${ECHO_T}PVFS2 configured for a thread-safe client library : yes" >&6; }
-fi
-
-if test "x$REDHAT_RELEASE" = "x"; then
+if test "x$REDHAT_RELEASE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 will use workaround for redhat 2.4 kernels  :  no" >&5
 echo "${ECHO_T}PVFS2 will use workaround for redhat 2.4 kernels  :  no" >&6; }
 else
@@ -19822,7 +19825,7 @@ else
 echo "${ECHO_T}PVFS2 will use workaround for redhat 2.4 kernels  : yes" >&6; }
 fi
 
-if test "x$NPTL_WORKAROUND" = "x"; then
+if test "x$NPTL_WORKAROUND" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 will use workaround for buggy NPTL          :  no" >&5
 echo "${ECHO_T}PVFS2 will use workaround for buggy NPTL          :  no" >&6; }
 else
@@ -19830,7 +19833,7 @@ else
 echo "${ECHO_T}PVFS2 will use workaround for buggy NPTL          : yes" >&6; }
 fi
 
-if test "x$BUILD_SERVER" = "x1"; then
+if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    { echo "$as_me:$LINENO: result: PVFS2 server will be built                        : yes" >&5
 echo "${ECHO_T}PVFS2 server will be built                        : yes" >&6; }
 else
@@ -19838,6 +19841,35 @@ else
 echo "${ECHO_T}PVFS2 server will be built                        :  no" >&6; }
 
 fi
+
+else
+
+# print BMI and PVFS configs
+if test "x$THREAD_LIB" = "x"; then
+   { echo "$as_me:$LINENO: result: $PKGSTR configured for a thread-safe client library :  no" >&5
+echo "${ECHO_T}$PKGSTR configured for a thread-safe client library :  no" >&6; }
+else
+   { echo "$as_me:$LINENO: result: $PKGSTR configured for a thread-safe client library : yes" >&5
+echo "${ECHO_T}$PKGSTR configured for a thread-safe client library : yes" >&6; }
+fi
+
+if test "x$BUILD_EPOLL" = "x1" ; then
+   { echo "$as_me:$LINENO: result: $PKGSTR configured to use epoll                     : yes" >&5
+echo "${ECHO_T}$PKGSTR configured to use epoll                     : yes" >&6; }
+else
+   { echo "$as_me:$LINENO: result: $PKGSTR configured to use epoll                     :  no" >&5
+echo "${ECHO_T}$PKGSTR configured to use epoll                     :  no" >&6; }
+fi
+
+if test "x$TRUSTED_CONNECTIONS" = "x" ; then
+	{ echo "$as_me:$LINENO: result: $PKGSTR configured for using trusted connections    :  no" >&5
+echo "${ECHO_T}$PKGSTR configured for using trusted connections    :  no" >&6; }
+else
+	{ echo "$as_me:$LINENO: result: $PKGSTR configured for using trusted connections    : yes" >&5
+echo "${ECHO_T}$PKGSTR configured for using trusted connections    : yes" >&6; }
+fi
+
+fi # end of BMI/PVFS config display
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    { echo "$as_me:$LINENO: result: WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION." >&5
@@ -19848,12 +19880,12 @@ fi
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
-	{ echo "$as_me:$LINENO: WARNING: You have selected to build PVFS to use a \"fast\" network
+	{ echo "$as_me:$LINENO: WARNING: You have selected to build $PKGSTR to use a \"fast\" network
 		    interface, but have not disabled TCP.  The way this is
 		    currently implemented will lead to rather slow response
 		    times on the fast interface.  Suggest you configure with
 		    \"--without-bmi-tcp\" for the best performance." >&5
-echo "$as_me: WARNING: You have selected to build PVFS to use a \"fast\" network
+echo "$as_me: WARNING: You have selected to build $PKGSTR to use a \"fast\" network
 		    interface, but have not disabled TCP.  The way this is
 		    currently implemented will lead to rather slow response
 		    times on the fast interface.  Suggest you configure with
@@ -19863,8 +19895,8 @@ fi
 
 { echo "$as_me:$LINENO: result: " >&5
 echo "${ECHO_T}" >&6; }
-{ echo "$as_me:$LINENO: result: PVFS2 version string: $PVFS2_VERSION" >&5
-echo "${ECHO_T}PVFS2 version string: $PVFS2_VERSION" >&6; }
+{ echo "$as_me:$LINENO: result: $PKGSTR version string: $PVFS2_VERSION" >&5
+echo "${ECHO_T}$PKGSTR version string: $PVFS2_VERSION" >&6; }
 
 { echo "$as_me:$LINENO: result: " >&5
 echo "${ECHO_T}" >&6; }

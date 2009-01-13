@@ -45,6 +45,7 @@ SERVERSRC += $(DIR)/server-config.c \
 LIBBMISRC += $(DIR)/str-utils.c \
 	  $(DIR)/pint-event.c \
 	  $(DIR)/errno-mapping.c \
+	  $(DIR)/pint-mem.c
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

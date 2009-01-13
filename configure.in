@@ -166,7 +166,7 @@ AC_SUBST(THREAD_LIB)
 
 dnl a mechanism to disable building the PVFS2 server
 AC_ARG_ENABLE(server,
-[  --disable-server Disables building of PVFS2 server],
+[  --disable-server        Disables building of PVFS2 server],
 [if test "x$enableval" = "xyes" ; then
     BUILD_SERVER=1
     NEED_BERKELEY_DB=yes
@@ -186,7 +186,8 @@ AC_ARG_WITH(openssl,
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
 AC_ARG_ENABLE(karma-mem-usage-stats,
-[  --disable-karma-mem-usage-stats Disables memory usage stats in karma],
+[  --disable-karma-mem-usage-stats
+                          Disables memory usage stats in karma],
 [if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__KARMA_DISABLE_MEM_USAGE__"
 fi]
@@ -194,7 +195,7 @@ fi]
 
 dnl build only the bmi library
 AC_ARG_ENABLE(bmi-only,
-[  --enable-bmi-only Build only the BMI library],
+[  --enable-bmi-only       Build only the BMI library],
 [if test "x$enableval" = "xyes" ; then
     BUILD_BMI_ONLY=1
 fi]
@@ -230,7 +231,8 @@ AC_SUBST(MMAP_RA_CACHE)
 
 dnl See if the --enable-trusted-connections  option was given to configure
 AC_ARG_ENABLE(trusted-connections,
-[  --enable-trusted-connections  **EXPERIMENTAL** Enable connects only 
+[  --enable-trusted-connections
+                          **EXPERIMENTAL** Enable connects only 
                           from trusted hosts/ports ],
 [if test "x$enableval" = "xyes"; then
 TRUSTED_CONNECTIONS="-DUSE_TRUSTED"
@@ -315,7 +317,8 @@ dnl what was the configure option set to?
 use_nptl_workaround=0
 
 AC_ARG_ENABLE([nptl-workaround],
-[  --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries], 
+[  --enable-nptl-workaround
+                          Enable workaround for buggy NPTL/Pthread libraries], 
     set_nptl_workaround=1
     if test "$enableval" = no ; then 
     	use_nptl_workaround=0
@@ -391,7 +394,8 @@ AC_SUBST(NPTL_WORKAROUND)
 
 use_aio_thcb=1
 AC_ARG_ENABLE([aio-threaded-callbacks],
-[  --disable-aio-threaded-callbacks  **EXPERIMENTAL** Disable use of AIO 
+[  --disable-aio-threaded-callbacks
+                          **EXPERIMENTAL** Disable use of AIO 
                           threaded callbacks],
     if test "$enableval" = no ; then use_aio_thcb=0 ; fi)
 
@@ -567,8 +571,8 @@ AC_ARG_ENABLE(kernel-aio,
   )
 
 AC_ARG_ENABLE(kernel-sendfile,
-  [  --enable-kernel-sendfile   **EXPERIMENTAL** Forcibly enable kernel 
-                          sendfile],
+  [  --enable-kernel-sendfile
+                          **EXPERIMENTAL** Forcibly enable kernel sendfile],
   [ enable_kernel_sendfile=$enableval ],
   [ enable_kernel_sendfile=no ]
   )
@@ -584,7 +588,8 @@ dnl Note that even without this option, pvfs2-client-core always requires
 dnl pthreads to run its remount thread.
 dnl
 AC_ARG_ENABLE([threaded-kmod-helper],
-[  --enable-threaded-kmod-helper  **EXPERIMENTAL** Use threads in the kernel 
+[  --enable-threaded-kmod-helper
+                          **EXPERIMENTAL** Use threads in the kernel 
                           helper application],
 [ if test "x$enableval" = "xyes" ; then
     THREADED_KMOD_HELPER=yes
@@ -687,7 +692,8 @@ AC_ARG_ENABLE(epoll,
 
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
-[  --disable-segv-backtrace Disables back traces in segfault signal handler],,
+[  --disable-segv-backtrace
+                          Disables back traces in segfault signal handler],,
     AC_MSG_CHECKING(if segv backtrace capable)
     AC_TRY_COMPILE([
 #include <execinfo.h>
@@ -1104,9 +1110,20 @@ doc/doxygen/pvfs2-doxygen.conf
 chmod +x $BUILD_ABSOLUTE_TOP/src/apps/admin/pvfs2-config
 
 # print a summary of the configuration information
-AC_MSG_RESULT()
-AC_MSG_RESULT([***** Displaying PVFS2 Configuration Information *****])
-AC_MSG_RESULT([------------------------------------------------------])
+if test "x$BUILD_BMI_ONLY" = "x1" ; then
+	AC_MSG_RESULT()
+	AC_MSG_RESULT([***** Displaying BMI configuration information *****])
+	AC_MSG_RESULT([----------------------------------------------------])
+	PKGSTR="BMI"
+else
+	AC_MSG_RESULT()
+	AC_MSG_RESULT([***** Displaying PVFS Configuration Information *****])
+	AC_MSG_RESULT([------------------------------------------------------])
+	PKGSTR="PVFS2"
+fi
+
+# print PVFS configs (not used by BMI)
+if test "x$BUILD_BMI_ONLY" != "x1" ; then
 
 if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
@@ -1114,72 +1131,77 @@ else
    AC_MSG_RESULT([PVFS2 configured to build karma gui               :  no])
 fi
 
-if test "x$BUILD_EPOLL" = "x1" ; then
-   AC_MSG_RESULT([PVFS2 configured to use epoll                     : yes])
-else
-   AC_MSG_RESULT([PVFS2 configured to use epoll                     :  no])
-fi
-
-if test "x$ENABLE_COVERAGE" = "x1" ; then
+if test "x$ENABLE_COVERAGE" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis     :  no])
 fi
 
-if test "x$MISC_TROVE_FLAGS" = "x" ; then
+if test "x$MISC_TROVE_FLAGS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
 fi
 
-if test "x$LINUX_KERNEL_SRC" = "x" ; then
+if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      : yes])
 fi
 
-if test "x$LINUX24_KERNEL_SRC" = "x" ; then
+if test "x$LINUX24_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module      : yes])
 fi
 
-if test "x$MMAP_RA_CACHE" = "x" ; then
+if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
 fi
 
-if test "x$TRUSTED_CONNECTIONS" = "x" ; then
-	AC_MSG_RESULT([PVFS2 configured for using trusted connections    :  no])
-else
-	AC_MSG_RESULT([PVFS2 configured for using trusted connections    : yes])
-fi
-
-if test "x$THREAD_LIB" = "x" ; then
-   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library :  no])
-else
-   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library : yes])
-fi
-
-if test "x$REDHAT_RELEASE" = "x"; then
+if test "x$REDHAT_RELEASE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : yes])
 fi
 
-if test "x$NPTL_WORKAROUND" = "x"; then
+if test "x$NPTL_WORKAROUND" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
-if test "x$BUILD_SERVER" = "x1"; then
+if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 server will be built                        : yes])
 else
    AC_MSG_RESULT([PVFS2 server will be built                        :  no])
 
 fi
+
+else
+
+# print BMI and PVFS configs
+if test "x$THREAD_LIB" = "x"; then
+   AC_MSG_RESULT([$PKGSTR configured for a thread-safe client library :  no])
+else
+   AC_MSG_RESULT([$PKGSTR configured for a thread-safe client library : yes])
+fi
+
+if test "x$BUILD_EPOLL" = "x1" ; then
+   AC_MSG_RESULT([$PKGSTR configured to use epoll                     : yes])
+else
+   AC_MSG_RESULT([$PKGSTR configured to use epoll                     :  no])
+fi
+
+if test "x$TRUSTED_CONNECTIONS" = "x" ; then
+	AC_MSG_RESULT([$PKGSTR configured for using trusted connections    :  no])
+else
+	AC_MSG_RESULT([$PKGSTR configured for using trusted connections    : yes])
+fi
+
+fi # end of BMI/PVFS config display
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
@@ -1197,7 +1219,7 @@ dnl
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
-	AC_MSG_WARN([You have selected to build PVFS to use a "fast" network
+	AC_MSG_WARN([You have selected to build $PKGSTR to use a "fast" network
 		    interface, but have not disabled TCP.  The way this is
 		    currently implemented will lead to rather slow response
 		    times on the fast interface.  Suggest you configure with
@@ -1206,6 +1228,6 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 fi
 
 AC_MSG_RESULT()
-AC_MSG_RESULT([PVFS2 version string: $PVFS2_VERSION])
+AC_MSG_RESULT([$PKGSTR version string: $PVFS2_VERSION])
 
 AC_MSG_RESULT()
