@@ -389,7 +389,7 @@ static int create_create_comp_fn(void *v_p,
     s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
 //    gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn: s_op->msgpair->req->op = %llu\n", llu(s_op->msgpair.req->op));
 //    assert(s_op->msgpair->req->op == PVFS_SERV_CREATE);
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p = PINT_sm_frame(smcb, -1);
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn: sm_p->sys_op_id = %llu\n", llu(sm_p->sys_op_id));
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
 

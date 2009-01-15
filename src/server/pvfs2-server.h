@@ -373,11 +373,6 @@ struct PINT_server_listattr_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
-struct PINT_server_tree_communicate_op
-{
-    PVFS_handle_extent_array **tmp_extent_array;
-};
-
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -468,7 +463,6 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
-        struct PINT_server_tree_communicate_op tree_communicate;
     } u;
 
 } PINT_server_op;
