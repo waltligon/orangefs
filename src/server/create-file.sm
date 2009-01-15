@@ -387,10 +387,7 @@ static int create_create_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_CREATE);
     s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn: s_op->msgpair->req->op = %llu\n", llu(s_op->msgpair.req->op));
-//    assert(s_op->msgpair->req->op == PVFS_SERV_CREATE);
     sm_p = PINT_sm_frame(smcb, -1);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn: sm_p->sys_op_id = %llu\n", llu(sm_p->sys_op_id));
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
 
     free(s_op);
@@ -739,8 +736,7 @@ static int create_setattr_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
     s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
-//    assert(s_op->msg_p->req->op == PVFS_SERV_SETATTR);
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p = PINT_sm_frame(smcb, -1);
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
 
     free(s_op);
@@ -771,9 +767,10 @@ static PINT_sm_action create_file_setattr_setup(
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setattr_setup entered\n");
 
+    /* Clean up stack from TREE_CREATE operation */
     s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     assert(s_op);
-    assert(s_op->req->op == PVFS_SERV_CREATE_FILE);
+    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(sm_p);
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
@@ -831,12 +828,12 @@ static PINT_sm_action create_file_setattr_setup(
         msg_p->comp_fn = create_setattr_comp_fn;
 
         ret = PINT_cached_config_map_to_server(&msg_p->svr_addr, 
-            sm_p->u.create_file.meta_handle_extent_array.extent_array[0].first, sm_p->object_ref.fs_id);
+            sm_p->u.create_file.metafile_handle, sm_p->object_ref.fs_id);
 
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
-            js_p->error_code = ret;
+            js_p->error_code = 0;
         }
     }
     return SM_ACTION_COMPLETE;

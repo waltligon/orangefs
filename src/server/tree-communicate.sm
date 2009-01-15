@@ -94,19 +94,14 @@ static int tree_create_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     struct PINT_server_op *s_op;
-    struct PINT_server_op *parent_s_op;
     int i;
-    int error_code;
-    int task_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_create_comp_fn[%d]\n",index);
     
     assert(resp_p->op == PVFS_SERV_TREE_CREATE);
-    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
-    parent_s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    assert(parent_s_op->req->op == PVFS_SERV_TREE_CREATE);
 
     if (resp_p->status != 0)
     {   
@@ -119,16 +114,10 @@ static int tree_create_comp_fn(void *v_p,
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, "Handle created remotely: %llu\n",
                          llu(resp_p->u.tree_create.handle_array[i]));
-            parent_s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
+            s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
                          = resp_p->u.tree_create.handle_array[i];
         }
     }
-
-    if (s_op->msgarray)
-    {
-        free(s_op->msgarray);
-    }
-    free(s_op);
 
     return resp_p->status;
 }
@@ -140,15 +129,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     PVFS_handle_extent_array *extent_array)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *child_s_op;
     int num_partitions, num_files_per_server;
     int i;
     PVFS_handle_extent_array *local_extent;
     char server_name[1024];
     struct server_configuration_s *server_config = get_server_config_struct();
     int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-    struct PVFS_server_req *req;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
 
@@ -205,15 +191,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                    sizeof(PVFS_handle_extent_array));
         }
 
-        /* Create a stack frame for the operation. */
-        PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, child_s_op, 0,
-            fs_id, js_p->error_code, msg_p, req);
 
         /* Allocate msgarray. */
-        child_s_op->msgarray_count = num_partitions;
-        child_s_op->msgarray = (PINT_sm_msgpair_state *)malloc(
-            (child_s_op->msgarray_count * sizeof(PINT_sm_msgpair_state)));
-        if (child_s_op->msgarray == NULL)
+        s_op->msgarray_count = num_partitions;
+        s_op->msgarray = (PINT_sm_msgpair_state *)malloc(
+            (s_op->msgarray_count * sizeof(PINT_sm_msgpair_state)));
+        if (s_op->msgarray == NULL)
         {
             gossip_err("tree_communicate: failed to allocate msgarray\n");
             return -PVFS_ENOMEM;
@@ -222,9 +205,19 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         /* Fill in the msgarray. */
         for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
         {
-            PINT_sm_msgpair_state *msg_p = &child_s_op->msgarray[CHILD_INDEX];
+            PINT_sm_msgpair_state *msg_p = &s_op->msgarray[CHILD_INDEX];
+
             int num_data_files_for_this_server = 
-                    num_data_files - CHILD_INDEX * num_files_per_server;
+//                    num_data_files - CHILD_INDEX * num_files_per_server;
+                num_files_per_server;
+
+            for (num_data_files_for_this_server = num_files_per_server;
+                 CHILD_INDEX*num_files_per_server + num_data_files_for_this_server >=
+                 num_data_files;
+                 num_data_files_for_this_server--)
+            {
+                /* Do nothing; */ ;
+            }
 
             gossip_debug(GOSSIP_SERVER_DEBUG, "Data for child %d\n", CHILD_INDEX);
             gossip_debug(GOSSIP_SERVER_DEBUG, "    count = %d\n",
@@ -247,9 +240,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                     msg_p->fs_id = fs_id;
                     msg_p->handle =
                         extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].first;
-                    gossip_debug(GOSSIP_SERVER_DEBUG,
-                        "tree_communicate_partition_handles: child_s_op->msgarray[%d]->handle = %llu\n",
-                        CHILD_INDEX, llu(msg_p->handle));
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                     msg_p->comp_fn = tree_create_comp_fn;
                     break;
