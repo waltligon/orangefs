@@ -16,7 +16,7 @@
 #include "pvfs2.h"
 #include "pvfs2-sysint.h"
 
-#if PVFS2_VERSION_MAJOR == 2 && PVFS2_VERSION_MINOR == 7 && PVFS2_VERSION_SUB >= 1
+#if PVFS2_VERSION_MAJOR == 2 && PVFS2_VERSION_MINOR > 7
 
 #define PVFS_sys_create(entry_name,ref,attr,credentials,dist,resp)\
    PVFS_sys_create(entry_name,ref,attr,credentials,dist,resp,\
