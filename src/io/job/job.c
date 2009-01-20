@@ -67,20 +67,28 @@ enum
 #define PRECREATE_POOL_MAX_KEYS 32
 
 #ifdef __PVFS2_TROVE_SUPPORT__
+
 static gen_mutex_t precreate_pool_mutex = GEN_MUTEX_INITIALIZER;
-static QLIST_HEAD(precreate_pool_list);
 static QLIST_HEAD(precreate_pool_check_level_list);
 static QLIST_HEAD(precreate_pool_get_handles_list);
-static struct qlist_head* precreate_pool_initial = NULL;
+static QLIST_HEAD(precreate_pool_fs_list);
 
 struct precreate_pool
 {
     struct qlist_head list_link;
     char* host;
-    PVFS_fs_id fsid;
     PVFS_handle pool_handle;
     uint32_t pool_count; 
 };
+
+struct fs_pool
+{
+    struct qlist_head list_link;
+    PVFS_fs_id fsid;
+    struct qlist_head precreate_pool_list;
+    struct qlist_head* precreate_pool_initial;
+};
+
 struct precreate_pool_get_trove
 {
     struct job_desc* jd; /* parent job descriptor */
@@ -140,6 +148,7 @@ static void precreate_pool_iterate_callback(
     void* data, 
     PVFS_error error_code);
 static void precreate_pool_get_handles_try_post(struct job_desc* jd);
+static struct fs_pool* find_fs(PVFS_fs_id fsid);
 #endif
 
 /********************************************************
@@ -4686,6 +4695,7 @@ static void precreate_pool_fill_thread_mgr_callback(
     QLIST_HEAD(tmp_list);
     job_id_t tmp_id;
     int extra_trove_flags = 0;
+    struct fs_pool* fs;
 
     assert(jd);
 
@@ -4734,12 +4744,14 @@ static void precreate_pool_fill_thread_mgr_callback(
 
         /* increment in-memory count for this pool */
         gen_mutex_lock(&precreate_pool_mutex);
-        qlist_for_each(iterator, &precreate_pool_list)
+        fs = find_fs(jd->u.precreate_pool.fsid);
+        assert(fs);
+
+        qlist_for_each(iterator, &fs->precreate_pool_list)
         {
             pool = qlist_entry(iterator, struct precreate_pool,
                 list_link);
-            if(pool->pool_handle == jd->u.precreate_pool.precreate_pool &&
-                pool->fsid == jd->u.precreate_pool.fsid)
+            if(pool->pool_handle == jd->u.precreate_pool.precreate_pool)
             {
                 pool->pool_count += jd->u.precreate_pool.posted_count;
                 gossip_debug(GOSSIP_JOB_DEBUG, 
@@ -5569,15 +5581,19 @@ int job_precreate_pool_lookup_server(
 {
     struct precreate_pool* pool;
     struct qlist_head* iterator;
+    struct fs_pool* fs;
 
     gen_mutex_lock(&precreate_pool_mutex);
 
+    fs = find_fs(fsid);
+    assert(fs);
+
     /* check pool list, go back to sleep if any are empty */
-    qlist_for_each(iterator, &precreate_pool_list)
+    qlist_for_each(iterator, &fs->precreate_pool_list)
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
-        if(!strcmp(pool->host, host) && fsid == pool->fsid)
+        if(!strcmp(pool->host, host))
         {
             *pool_handle = pool->pool_handle;
             gen_mutex_unlock(&precreate_pool_mutex);
@@ -5598,40 +5614,51 @@ void job_precreate_pool_set_index(
     int server_index)
 {
     struct qlist_head* iterator;
+    struct qlist_head* iterator2;
     int num_pools = 0;
     int pool_index = 0;
     int current_index = 0;
+    struct fs_pool* fs;
 
     gen_mutex_lock(&precreate_pool_mutex);
 
-    qlist_for_each(iterator, &precreate_pool_list)
+    qlist_for_each(iterator2, &precreate_pool_fs_list)
     {
-        num_pools++;
-    }
-    
-    if(num_pools == 0)
-    {
+        num_pools = 0;
         pool_index = 0;
-    }
-    else
-    {
-        pool_index = server_index % num_pools;
-    }
+        current_index = 0;
 
-    qlist_for_each(iterator, &precreate_pool_list)
-    {
-        if(current_index == pool_index)
+        fs = qlist_entry(iterator2, struct fs_pool, list_link);
+
+        qlist_for_each(iterator, &fs->precreate_pool_list)
         {
-            precreate_pool_initial = iterator;
-            break;
+            num_pools++;
         }
-        current_index++;
-    }
+        
+        if(num_pools == 0)
+        {
+            pool_index = 0;
+        }
+        else
+        {
+            pool_index = server_index % num_pools;
+        }
 
-    /* safety check, should not hit this case */
-    if(!precreate_pool_initial)
-    {
-        precreate_pool_initial = precreate_pool_list.next;
+        qlist_for_each(iterator, &fs->precreate_pool_list)
+        {
+            if(current_index == pool_index)
+            {
+                fs->precreate_pool_initial = iterator;
+                break;
+            }
+            current_index++;
+        }
+
+        /* safety check, should not hit this case */
+        if(!fs->precreate_pool_initial)
+        {
+            fs->precreate_pool_initial = fs->precreate_pool_list.next;
+        }
     }
 
     gen_mutex_unlock(&precreate_pool_mutex);
@@ -5646,6 +5673,7 @@ int job_precreate_pool_register_server(
     int count)
 {
     struct precreate_pool* tmp_pool;
+    struct fs_pool* fs;
 
     /* create a little struct to track the pool information for this peer
      * server 
@@ -5663,7 +5691,6 @@ int job_precreate_pool_register_server(
         return(-ENOMEM);
     }
 
-    tmp_pool->fsid = fsid;
     tmp_pool->pool_handle = pool_handle;
     tmp_pool->pool_count = count;
     gossip_debug(GOSSIP_JOB_DEBUG, 
@@ -5675,23 +5702,29 @@ int job_precreate_pool_register_server(
         "Initial pool count for host %s, fsid %d: %d\n", host, (int)fsid,
         count);
 
-    /* stash the info where we can search and find it later */
-    qlist_add(&tmp_pool->list_link, &precreate_pool_list);
-
-#if 0
-    /* here are the steps to tear down these data structures if needed */
-    struct qlist_head* iterator;
-    struct qlist_head* scratch;
-    struct precreate_pool* pool;
-
-    qlist_for_each_safe(iterator, scratch, &precreate_pool_list)
+    /* search through file systems to see if we have registered anything for
+     * this fsid yet 
+     */
+    fs = find_fs(fsid);
+    if(!fs)
     {
-        pool = qlist_entry(iterator, struct precreate_pool,
-            list_link);
-        free(pool->host);
-        free(pool);
+        /* allocate a new structure for this fsid */
+        fs = malloc(sizeof(*fs));
+        if(!fs)
+        {
+            free(tmp_pool->host);
+            free(tmp_pool);
+            return(-ENOMEM);
+        }
+        memset(fs, 0, sizeof(*fs));
+        fs->fsid = fsid;
+        fs->precreate_pool_initial = NULL;
+        INIT_QLIST_HEAD(&fs->precreate_pool_list);
+        qlist_add(&fs->list_link, &precreate_pool_fs_list);
     }
-#endif
+
+    /* stash the info where we can search and find it later */
+    qlist_add(&tmp_pool->list_link, &fs->precreate_pool_list);
 
     return(1);
 }
@@ -5715,14 +5748,18 @@ int job_precreate_pool_check_level(
     struct qlist_head* iterator;
     struct precreate_pool* pool;
     struct job_desc *jd = NULL;
+    struct fs_pool* fs;
 
     gen_mutex_lock(&precreate_pool_mutex);
-    qlist_for_each(iterator, &precreate_pool_list)
+
+    fs = find_fs(fsid);
+    assert(fs);
+
+    qlist_for_each(iterator, &fs->precreate_pool_list)
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
-        if(pool->pool_handle == precreate_pool &&
-            pool->fsid == fsid)
+        if(pool->pool_handle == precreate_pool)
         {
             if(pool->pool_count < low_threshold)
             {
@@ -5786,6 +5823,7 @@ int job_precreate_pool_get_handles(
     PVFS_hint hints)
 {
     struct job_desc *jd = NULL;
+    struct fs_pool* fs;
 
     if(count < 0)
     {
@@ -5810,11 +5848,13 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.servers = servers;
     jd->u.precreate_pool.trove_pending = 0;
     jd->u.precreate_pool.flags = flags;
-    jd->u.precreate_pool.current_pool = precreate_pool_initial;
 
     /* rotate to use a different starting server in the pool next time */
     gen_mutex_lock(&precreate_pool_mutex);
-    precreate_pool_initial = precreate_pool_initial->next;
+    fs = find_fs(fsid);
+    assert(fs);
+    jd->u.precreate_pool.current_pool = fs->precreate_pool_initial;
+    fs->precreate_pool_initial = fs->precreate_pool_initial->next;
     gen_mutex_unlock(&precreate_pool_mutex);
     
     precreate_pool_get_handles_try_post(jd);
@@ -5842,13 +5882,17 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     struct qlist_head* scratch;
     struct job_desc* jd_checker;
     int i;
+    struct fs_pool* fs;
 
     gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_get_handles_try_post\n");
 
     gen_mutex_lock(&precreate_pool_mutex);
 
+    fs = find_fs(jd->u.precreate_pool.fsid);
+    assert(fs);
+
     /* check pool list, go back to sleep if any are empty */
-    qlist_for_each(iterator, &precreate_pool_list)
+    qlist_for_each(iterator, &fs->precreate_pool_list)
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
@@ -5896,7 +5940,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
              * set current pool to appropriate entry for this server
              */
             jd->u.precreate_pool.current_pool = NULL; /* sentinal */
-            qlist_for_each(iterator, &precreate_pool_list)
+            qlist_for_each(iterator, &fs->precreate_pool_list)
             {
                 pool = qlist_entry(iterator, struct precreate_pool,
                     list_link);
@@ -5930,10 +5974,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         {
             /* caller wants whatever we hand out */
             if(jd->u.precreate_pool.current_pool == NULL ||
-                jd->u.precreate_pool.current_pool->next == &precreate_pool_list)
+                jd->u.precreate_pool.current_pool->next == &fs->precreate_pool_list)
             {
                 /* either we are just starting, or we have wrapped around */
-                jd->u.precreate_pool.current_pool = precreate_pool_list.next;
+                jd->u.precreate_pool.current_pool = fs->precreate_pool_list.next;
             }
             else
             {
@@ -6000,7 +6044,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 
         /* post trove operation to pull out a handle */
         ret = trove_keyval_iterate_keys(
-            tmp_trove_array[i].pool->fsid, 
+            fs->fsid, 
             tmp_trove_array[i].pool->pool_handle,
             &tmp_trove_array[i].pos,
             &tmp_trove_array[i].key,
@@ -6064,6 +6108,7 @@ int job_precreate_pool_iterate_handles(
     void* user_ptr_internal;
     TROVE_op_id tmp_id;
     int i;
+    struct fs_pool* fs;
 
     /* low order bits are the trove iterate position */
     local_position = position & 0xffffffff;
@@ -6089,7 +6134,10 @@ int job_precreate_pool_iterate_handles(
 
     gen_mutex_lock(&precreate_pool_mutex);
 
-    qlist_for_each(iterator, &precreate_pool_list)
+    fs = find_fs(fsid);
+    assert(fs);
+
+    qlist_for_each(iterator, &fs->precreate_pool_list)
     {
         if(tmp_index == pool_index)
         {
@@ -6207,6 +6255,21 @@ int job_precreate_pool_iterate_handles(
     return (0);
 }
 
+static struct fs_pool* find_fs(PVFS_fs_id fsid)
+{
+    struct fs_pool* fs;
+    struct qlist_head* iterator;
+
+    qlist_for_each(iterator, &precreate_pool_fs_list)
+    {
+        fs = qlist_entry(iterator, struct fs_pool, list_link);
+        if(fs->fsid == fsid)
+        {
+            return(fs);
+        }
+    }
+    return(NULL);
+}
 
 
 #endif /* __PVFS2_TROVE_SUPPORT__ */

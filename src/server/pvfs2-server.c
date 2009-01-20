@@ -2029,11 +2029,6 @@ static int precreate_pool_initialize(int server_index)
         }
 
         fs_count++;
-        if(fs_count > 1)
-        {
-            gossip_err("Error: precreation does not support multiple file systems yet.\n");
-            return(-1);
-        }
 
         /* am I a meta server in this file system? */
         ret = PINT_cached_config_check_type(
