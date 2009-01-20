@@ -423,6 +423,10 @@ PVFS_error PINT_client_state_machine_post(
     return js.error_code;
 }
 
+/*
+ * This is only called in PVFS_sys_finalize
+ * Use PINT_sys_release() to release a state machine
+ */
 PVFS_error PINT_client_state_machine_release(
     PINT_smcb * smcb)
 {
