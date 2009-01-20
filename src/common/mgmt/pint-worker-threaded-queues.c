@@ -128,8 +128,8 @@ static int threaded_queues_queue_add(struct PINT_manager_s *manager,
     PINT_queue_add_producer(queue_id, w);
     PINT_queue_add_consumer(queue_id, w);
 
-    /* send a signal to all threads waiting for a queue to be added */
-    gen_cond_broadcast(&w->cond);
+    /* send a signal to one thread waiting for a queue to be added */
+    gen_cond_signal(&w->cond);
     gen_mutex_unlock(&w->mutex);
 
     return 0;
@@ -386,7 +386,18 @@ static void *PINT_worker_queues_thread_function(void * ptr)
             gen_mutex_lock(&worker->mutex);
             qlist_del(&queue->link);
             qlist_add_tail(&queue->link, &worker->queues);
-            gen_cond_broadcast(&worker->cond);
+
+            /* Don't signal another thread unless there is actually more
+             * work left in this queue.  Note that it is safe to check the
+             * count here because new operations cannot be submitted to the
+             * queue while worker->mutex is held (see
+             * threaded_queues_post()).  PINT_queue_insert() will do its own
+             * signalling as needed later.
+             */
+            if(PINT_queue_count(queue->id) > 0)
+            {
+                gen_cond_signal(&worker->cond);
+            }
             gen_mutex_unlock(&worker->mutex);
 
             if(op_count > 0)
