@@ -130,6 +130,13 @@ machine pvfs2_create_file_work_sm
     state dspace_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
+        success => dspace_create_remote_cleanup;
+        default => cleanup_work;
+    }
+
+    state dspace_create_remote_cleanup
+    {
+        run create_file_dspace_remote_cleanup;
         success => datafiles_setup;
         default => cleanup_work;
     }
@@ -174,7 +181,7 @@ machine pvfs2_create_file_work_sm
     state setattr_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => crdirent_setup;
+        success => setattr_cleanup;
         default => cleanup_work;
     }
 
@@ -378,19 +385,17 @@ static int create_create_comp_fn(void *v_p,
                                  int index)
 {
     PINT_smcb *smcb = v_p;
-    struct PINT_server_op *s_op;
+//    struct PINT_server_op *s_op;
     PINT_client_sm *sm_p;
-    int task_id;
-    int error_code;
+//    int task_id;
+//    int error_code;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_create_comp_fn entered\n");
 
     assert(resp_p->op == PVFS_SERV_CREATE);
-    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+//    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     sm_p = PINT_sm_frame(smcb, -1);
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
-
-    free(s_op);
 
     if (resp_p->status != 0)
     {
@@ -618,6 +623,30 @@ static PINT_sm_action create_file_dspace_local_cleanup(
     return SM_ACTION_COMPLETE;
 }
 
+/* Copy results and clean up the stack from creating the meta file locally. */
+static PINT_sm_action create_file_dspace_remote_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p;
+    struct PINT_server_op *s_op;
+    int task_id;
+    int error_code;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_dspace_remote_cleanup entered\n");
+
+    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+//    assert(s_op->req->op == PVFS_SERV_CREATE);
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
+
+    free(s_op);
+    js_p->error_code = error_code;
+/* TODO: Why is this necessary? */
+    js_p->error_code = 0;
+ 
+    return SM_ACTION_COMPLETE;
+}
+
 /* Prepare to create datafiles. Populate extents array.
    Probably some (one) will be local and some will be remote. */
 static PINT_sm_action create_file_datafiles_setup(
@@ -728,18 +757,16 @@ static int create_setattr_comp_fn(void *v_p,
     PVFS_object_ref refn;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p;
-    PINT_server_op *s_op;
-    int task_id;
-    int error_code;
+//    PINT_server_op *s_op;
+//    int task_id;
+//    int error_code;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_setattr_comp_fn entered\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
-    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+//    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     sm_p = PINT_sm_frame(smcb, -1);
     assert(sm_p->sys_op_id == PVFS_SYS_CREATE_FILE);
-
-    free(s_op);
 
     refn.fs_id = sm_p->msgpair.fs_id;
     refn.handle = sm_p->msgpair.handle;
@@ -824,7 +851,8 @@ static PINT_sm_action create_file_setattr_setup(
     {
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->u.create_file.metafile_handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+//        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = create_setattr_comp_fn;
 
         ret = PINT_cached_config_map_to_server(&msg_p->svr_addr, 
@@ -850,7 +878,7 @@ static PINT_sm_action create_file_setattr_cleanup(
 
     s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
     assert(s_op);
-    assert(s_op->req->op == PVFS_SERV_SETATTR);
+//    assert(s_op->req->op == PVFS_SERV_SETATTR);
     free(s_op);
     js_p->error_code = error_code;
     js_p->error_code = 0;
