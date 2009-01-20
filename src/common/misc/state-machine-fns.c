@@ -1,3 +1,4 @@
+
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
@@ -524,6 +525,8 @@ int PINT_smcb_alloc(
     (*smcb)->op_get_state_machine = getmach;
     (*smcb)->terminate_fn = term_fn;
     (*smcb)->context = context_id;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "[SM smcb_alloc]: (%p)\n", smcb);
     /* if a getmach given, lookup state machine */
     if (getmach)
         return PINT_state_machine_locate(*smcb);
@@ -540,6 +543,8 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 {
     struct PINT_frame_s *frame_entry, *tmp;
     assert(smcb);
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+            "[SM smcb_free]: (%p)\n", smcb);
     qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link)
     {
         if (frame_entry->frame && frame_entry->task_id == 0)
@@ -575,6 +580,9 @@ static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
 
     smcb->stackptr--;
     smcb->base_frame = smcb->state_stack[smcb->stackptr].prev_base_frame;
+    
+    assert(0 <= smcb->base_frame && smcb->base_frame < smcb->frame_count);
+    
     return smcb->state_stack[smcb->stackptr].state;
 }
 
@@ -689,6 +697,16 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
     if(qlist_empty(&smcb->frames))
     {
         return NULL;
+    }
+    
+    /*
+     * The first frame is created when the smcb is allocated and should be
+     * removed when the smcb is released.  We should never pop it.
+     */
+    if(smcb->frame_count == 1)
+    {
+    	gossip_err("Tried to pop first frame from a SM (%p)\n", smcb);
+    	return NULL;
     }
 
     frame_entry = qlist_entry(smcb->frames.next, struct PINT_frame_s, link);
