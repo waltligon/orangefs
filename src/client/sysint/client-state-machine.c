@@ -138,16 +138,17 @@ static PVFS_error completion_list_retrieve_completed(
         if (i < limit)
         {
             sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-            op_id_array[i] = sm_p->sys_op_id;
-            error_code_array[i] = sm_p->error_code;
+            if (sm_p) {
+                op_id_array[i] = sm_p->sys_op_id;
+                error_code_array[i] = sm_p->error_code;
 
-            if (user_ptr_array)
-            {
-                user_ptr_array[i] = (void *)sm_p->user_ptr;
+                if (user_ptr_array)
+                {
+                    user_ptr_array[i] = (void *)sm_p->user_ptr;
+                }
+                PINT_sys_release(sm_p->sys_op_id);
             }
             s_completion_list[i] = NULL;
-
-            PINT_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -302,7 +303,8 @@ int client_state_machine_terminate(
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
-            (cancelled_io_jobs_are_pending(smcb))))
+            (cancelled_io_jobs_are_pending(smcb))) &&
+        !PINT_smcb_immediate_completion(smcb))
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "add smcb %p to completion list\n", smcb);
@@ -352,7 +354,7 @@ PVFS_error PINT_client_state_machine_post(
     PINT_sm_action sm_ret;
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
-    int pvfs_sys_op = PINT_smcb_op(smcb);
+    int pvfs_sys_op __attribute__((unused)) = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -762,7 +764,6 @@ PVFS_error PINT_client_wait_internal(
     {
         smcb = PINT_id_gen_safe_lookup(op_id);
         assert(smcb);
-        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         do
         {
@@ -774,6 +775,8 @@ PVFS_error PINT_client_wait_internal(
             ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!PINT_smcb_complete(smcb) && (ret == 0));
+
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
         if (ret)
         {
