@@ -83,10 +83,12 @@ typedef struct PINT_smcb
     int op; /* this field externally indicates type of state machine */
     PVFS_id_gen_t op_id; /* unique ID for this operation */
     struct PINT_smcb *parent_smcb; /* points to parent smcb or NULL */
+    int children_running; /* the number of child SMs running */
+    /* these fields indicate progress of the SM */
     int op_terminate; /* indicates SM is ready to terminate */
     int op_cancelled; /* indicates SM operation was cancelled */
-    int children_running; /* the number of child SMs running */
     int op_completed;  /* indicates SM operation was added to completion Q */
+    int op_released;  /* indicates removed from Q and released - should never be found set */
     /* add a lock here */
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);

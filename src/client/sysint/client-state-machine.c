@@ -1,5 +1,5 @@
-/* 
- * (C) 2003 Clemson University and The University of Chicago 
+/*
+ * (C) 2003 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -60,6 +60,10 @@ static PVFS_error add_sm_to_completion_list(PINT_smcb *smcb)
 {
     gen_mutex_lock(&s_completion_list_mutex);
     assert(s_completion_list_index < MAX_RETURNED_JOBS);
+    if (!smcb->op_terminate && !smcb->op_cancelled)
+    {
+    	gossip_err("Warning: Added smcb (%p) to completion list not op_terniate or op_cancelled\n", smcb);
+    }
     if (!smcb->op_completed)
     {
         smcb->op_completed = 1;
@@ -74,6 +78,10 @@ static PVFS_error add_sm_to_completion_list(PINT_smcb *smcb)
   already completed by a previous call to testsome().  in this case,
   if the sm was added to the completion list, it MUST be removed
   before returning from test()
+
+  WBL - this is called only by test() to remove a single specific item
+  from the completion list.  It does NOT call PINT_sys_release on that
+  item.  testsome() need not be involved at all.
 */
 static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
 {
@@ -105,6 +113,11 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
     return found;
 }
 
+/*
+ * This reoutine removes up to limit items from the completion list
+ * and calls PINT_sys_release on each item removed.  It is called only
+ * by testsome()
+ */
 static PVFS_error completion_list_retrieve_completed(
     PVFS_sys_op_id *op_id_array,
     void **user_ptr_array,
@@ -161,7 +174,7 @@ static PVFS_error completion_list_retrieve_completed(
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
            (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
-    
+
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
@@ -197,7 +210,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
     return (sm_p->u.io.total_cancellations_remaining != 0);
 }
 
-/* this array must be ordered to match the enum in client-state-machine.h */ 
+/* this array must be ordered to match the enum in client-state-machine.h */
 struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
 {
     {&pvfs2_client_remove_sm},
@@ -306,7 +319,7 @@ int client_state_machine_terminate(
             (cancelled_io_jobs_are_pending(smcb))) &&
         !PINT_smcb_immediate_completion(smcb))
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "add smcb %p to completion list\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
@@ -480,7 +493,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 
     /* if we fall to here, the I/O operation is still in flight */
     /* first, set a flag informing the sys_io state machine that the
-     * operation has been cancelled so it doesn't post any new jobs 
+     * operation has been cancelled so it doesn't post any new jobs
      */
     PINT_smcb_set_cancelled(smcb);
 
@@ -794,22 +807,33 @@ PVFS_error PINT_client_wait_internal(
  */
 void PINT_sys_release(PVFS_sys_op_id op_id)
 {
-    PINT_smcb *smcb; 
-    PINT_client_sm *sm_p; 
-    PVFS_credentials *cred_p; 
+    PINT_smcb *smcb;
+    PINT_client_sm *sm_p;
+    PVFS_credentials *cred_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
-    if (smcb == NULL) 
+    if (smcb == NULL)
     {
         return;
     }
+    if (smcb->op_released)
+    {
+    	/* this means SM was released more than once, which is bad */
+    	gossip_err("PINT_sys_release called on same smcb (%p) twice\n", smcb);
+    	return;
+    }
+    smcb->op_released = 1;
+    if (!smcb->op_terminate && !smcb->op_cancelled)
+    {
+    	gossip_err("Warning: PINT_sys_release called on smcb (%p) not op_terminate or op_cancelled\n", smcb);
+    }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if (sm_p == NULL) 
+    if (sm_p == NULL)
     {
         cred_p = NULL;
     }
-    else 
+    else
     {
         cred_p = sm_p->cred_p;
     }
