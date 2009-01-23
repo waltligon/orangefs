@@ -137,7 +137,7 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE_FILE,
+    PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE,
              sizeof(struct PINT_client_sm),
              client_op_state_get_machine,
              client_state_machine_terminate,
@@ -435,8 +435,6 @@ static PINT_sm_action create_file_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_ref metafile_ref;
-    PVFS_size tmp_size = 0;
-    int ret;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_file state: cleanup\n");
 
@@ -463,6 +461,7 @@ static PINT_sm_action create_file_cleanup(
                            (const PVFS_object_ref*) &metafile_ref, 
                            (const PVFS_object_ref*) &(sm_p->object_ref));
 
+#if 0
         /* we only insert a cache entry if the entire create succeeds,
          * i.e. crdirent succeeded.  set size to 0 */
         ret = PINT_acache_update(metafile_ref,
@@ -472,6 +471,7 @@ static PINT_sm_action create_file_cleanup(
         {
             js_p->error_code = ret;
         }
+#endif
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create_file.retry_count < sm_p->msgarray_params.retry_limit))
@@ -486,7 +486,9 @@ static PINT_sm_action create_file_cleanup(
         return SM_ACTION_COMPLETE;
     }
 
+#if 0
     PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
+#endif
 
     if (sm_p->u.create_file.dist)
     {
