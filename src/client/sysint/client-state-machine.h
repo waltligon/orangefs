@@ -83,21 +83,15 @@ struct PINT_client_create_file_sm
     PVFS_sys_attr sys_attr;                     /* client=>server input parameter */
     PVFS_object_attr attr;                      /* client=>server input parameter */
     int num_data_files;                         /* client=>server input parameter */
+    PVFS_handle_extent_array meta_handle_extent_array; /* client=>server input parameter */
 
     int retry_count;                            /* client-side work space */
     int stored_error_code;                      /* client-side work space */
     PINT_dist *dist;                            /* client-side work space */
-
-    PVFS_handle_extent_array meta_handle_extent_array; /* client=>server input parameter */
-    PVFS_handle_extent_array *io_handle_extent_array; /* server work space */
-
-    PVFS_sys_layout layout;                     /* client work space */
-    PVFS_handle metafile_handle;                /* client/server work space */
-    PVFS_handle *datafile_handles;
-    PVFS_BMI_addr_t *data_server_addrs;
+    PVFS_sys_layout layout;                     /* client-side work space */
+    PVFS_handle metafile_handle;                /* client-side work space */
     PVFS_object_attr cache_attr;
 
-    PVFS_object_attr saved_parent_attr;
 };
 
 struct PINT_client_create_sm

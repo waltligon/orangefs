@@ -26,7 +26,6 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-io.c \
 	$(DIR)/sys-small-io.c \
 	$(DIR)/sys-create.c \
-	$(DIR)/sys-create-file.c \
 	$(DIR)/sys-mkdir.c \
 	$(DIR)/sys-remove.c \
 	$(DIR)/sys-flush.c \

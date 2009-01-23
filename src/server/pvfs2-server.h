@@ -373,6 +373,16 @@ struct PINT_server_listattr_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
+struct PINT_create_file_op
+{
+    PVFS_sys_layout layout;
+    PINT_dist *dist;
+    PVFS_handle metafile_handle;
+    PVFS_handle *datafile_handles;
+    PVFS_BMI_addr_t *data_server_addrs;
+    PVFS_handle_extent_array *io_handle_extent_array;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -463,6 +473,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_create_file_op create_file;
     } u;
 
 } PINT_server_op;
@@ -536,7 +547,7 @@ extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_create_work_sm;
-extern struct PINT_state_machine_s pvfs2_tree_create_sm;
+extern struct PINT_state_machine_s pvfs2_tree_create_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

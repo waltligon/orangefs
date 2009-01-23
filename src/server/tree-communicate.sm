@@ -42,7 +42,28 @@ enum
 
 %%
 
-nested machine pvfs2_tree_create_sm
+machine pvfs2_tree_create_sm
+{
+    state do_work
+    {
+        jump pvfs2_tree_create_work_sm;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run tree_create_cleanup;
+        default => terminate;
+    }
+}
+
+nested machine pvfs2_tree_create_work_sm
 {
     state tree_create_setup
     {
@@ -76,14 +97,9 @@ nested machine pvfs2_tree_create_sm
     state setup_resp
     {
         run tree_create_resp;
-        default => final_response;
-    }
-
-    state final_response
-    {
-        jump pvfs2_final_response_sm;
         default => return;
     }
+
 }
 
 %%
@@ -355,10 +371,28 @@ static PINT_sm_action tree_create_resp(
                      llu(s_op->resp.u.create.handle));
         parent_s_op->resp.u.tree_create.handle_array[0] = s_op->resp.u.create.handle;
     }
+    if (s_op->msgarray) {
+        free(s_op->msgarray);
+    }
+    if (s_op->resp.u.tree_create.handle_array) {
+        free(s_op->resp.u.tree_create.handle_array);
+    }
     free(s_op);
  
     return (SM_ACTION_COMPLETE);
 }
+
+static int tree_create_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
+      return(server_state_machine_complete(smcb));
+    }
+    return SM_ACTION_TERMINATE;
+}
+ 
 
 static inline int PINT_get_object_ref_tree_create(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)

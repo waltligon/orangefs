@@ -44,7 +44,6 @@ static int create_file_comp_fn(
 static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
-/* this will be rewritten to just send create_file request */
 machine pvfs2_client_create_sm
 {
     state init
@@ -129,7 +128,7 @@ PVFS_error PVFS_isys_create(
          (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
     {
 		gossip_err("Error: invalid number of datafiles (%d) specified "
-                   "in PVFS_sys_create_file().\n", (int)attr.dfile_count);
+                   "in PVFS_sys_create().\n", (int)attr.dfile_count);
 		return ret;
     }
 
@@ -161,8 +160,6 @@ PVFS_error PVFS_isys_create(
 
     sm_p->u.create_file.retry_count = 0;
     sm_p->u.create_file.stored_error_code = 0;
-
-    sm_p->u.create_file.datafile_handles = NULL;
 
     /* copy layout to sm struct */
     if(layout)
@@ -276,7 +273,7 @@ PVFS_error PVFS_sys_create(
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create_file entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
     ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
                            dist, layout, resp, &op_id, NULL);
@@ -490,18 +487,6 @@ static PINT_sm_action create_file_cleanup(
     }
 
     PINT_free_object_attr(&sm_p->u.create_file.cache_attr);
-
-    if (sm_p->u.create_file.data_server_addrs)
-    {
-        free(sm_p->u.create_file.data_server_addrs);
-        sm_p->u.create_file.data_server_addrs = NULL;
-    }
-
-    if (sm_p->u.create_file.datafile_handles)
-    {
-        free(sm_p->u.create_file.datafile_handles);
-        sm_p->u.create_file.datafile_handles = NULL;
-    }
 
     if (sm_p->u.create_file.dist)
     {
