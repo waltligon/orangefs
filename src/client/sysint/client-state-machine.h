@@ -786,7 +786,6 @@ extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
-extern struct PINT_state_machine_s pvfs2_client_create_file_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;

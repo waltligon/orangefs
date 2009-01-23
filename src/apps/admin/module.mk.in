@@ -21,7 +21,6 @@ ADMINSRC := \
 	$(DIR)/pvfs2-fsck.c\
 	$(DIR)/pvfs2-validate.c\
 	$(DIR)/pvfs2-cp.c \
-	$(DIR)/pvfs2-cp2.c \
 	$(DIR)/pvfs2-viewdist.c \
 	$(DIR)/pvfs2-xattr.c \
 	$(DIR)/pvfs2-touch.c \

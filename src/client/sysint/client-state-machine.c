@@ -232,8 +232,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_small_io_sm},
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
-    {&pvfs2_client_readdirplus_sm},
-    {&pvfs2_client_create_file_sm}
+    {&pvfs2_client_readdirplus_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
