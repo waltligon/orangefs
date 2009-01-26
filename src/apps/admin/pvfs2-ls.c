@@ -29,7 +29,7 @@
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
-#define MAX_NUM_DIRENTS    512
+#define MAX_NUM_DIRENTS    113
 
 /*
   arbitrarily restrict the number of paths

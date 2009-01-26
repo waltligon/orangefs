@@ -14,6 +14,10 @@
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
 
+#ifndef max
+#define max(a,b) ((a) < (b) ? (b) : (a))
+#endif
+
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID   (1 << 0)
 #define PVFS_ATTR_COMMON_GID   (1 << 1)
@@ -263,12 +267,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 
-#ifndef max3
-#define max3(a, b, c) (a) < (b) ? (b) < (c) ? (c) : (b) : (a) < (c) ? (c) : (a)
-#endif
-
 #define extra_size_PVFS_object_attr \
-        max3(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink, extra_size_PVFS_object_attr_dir)
+        max(max(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink), extra_size_PVFS_object_attr_dir)
 
 #endif /* __PVFS2_ATTR_H */
 
