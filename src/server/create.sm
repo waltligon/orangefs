@@ -165,12 +165,13 @@ static int create_setup_resp(
 static int create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
+//    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
       return(server_state_machine_complete(smcb));
-    }
-    return SM_ACTION_TERMINATE;
+//    }
+        
+//    return SM_ACTION_TERMINATE;
 }
 
 #if 0

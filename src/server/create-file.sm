@@ -72,7 +72,7 @@ machine pvfs2_create_file_sm
     {
         jump pvfs2_get_attr_work_sm;
         success => getattr_cleanup_and_create_dspace_init;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state getattr_cleanup_and_create_dspace_init
@@ -80,35 +80,35 @@ machine pvfs2_create_file_sm
         run create_file_getattr_cleanup_and_create_dspace_init;
         LOCAL_OPERATION => do_dspace_create;
         REMOTE_OPERATION => dspace_xfer_msgpair_array;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state do_dspace_create
     {
         jump pvfs2_create_work_sm;
         success => dspace_create_local_cleanup;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state dspace_create_local_cleanup
     {
         run create_file_dspace_local_cleanup;
         success => datafiles_setup;
-        default => cleanup;
+        default => final_response;
     }
 
     state dspace_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
         success => dspace_create_remote_cleanup;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state dspace_create_remote_cleanup
     {
         run create_file_dspace_remote_cleanup;
         success => datafiles_setup;
-        default => cleanup;
+        default => final_response;
     }
 
     state datafiles_setup
@@ -117,14 +117,14 @@ machine pvfs2_create_file_sm
         success => datafiles_tree_create;
         LOCAL_OPERATION => datafiles_tree_create;
         REMOTE_OPERATION => datafiles_tree_create;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state datafiles_tree_create
     {
         jump pvfs2_tree_create_work_sm;
         success => setattr_setup;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state setattr_setup
@@ -132,7 +132,7 @@ machine pvfs2_create_file_sm
         run create_file_setattr_setup;
         LOCAL_OPERATION => do_setattr;
         REMOTE_OPERATION => setattr_xfer_msgpair_array;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state do_setattr
@@ -145,28 +145,28 @@ machine pvfs2_create_file_sm
     {
         run create_file_setattr_cleanup;
         success => crdirent_setup;
-        default => cleanup;
+        default => final_response;
     }
 
     state setattr_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
         success => setattr_cleanup;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state crdirent_setup
     {
         run create_file_crdirent_setup;
         success => do_crdirent;
-        default => cleanup;
+        default => final_response;
     }
 
     state do_crdirent
     {
         jump pvfs2_crdirent_work_sm;
         success => crdirent_cleanup;
-        default => cleanup;
+        default => cleanup_stack_after_error;
     }
 
     state crdirent_cleanup
@@ -178,6 +178,12 @@ machine pvfs2_create_file_sm
     state setup_resp
     {
         run create_file_resp;
+        default => final_response;
+    }
+
+    state cleanup_stack_after_error
+    {
+        run create_file_cleanup_stack_after_error;
         default => final_response;
     }
 
@@ -786,6 +792,28 @@ static PINT_sm_action create_file_resp(
     return (SM_ACTION_COMPLETE);
 }
 
+
+static PINT_sm_action create_file_cleanup_stack_after_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id;
+    int error_code;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_cleanup_stack_after_error entered\n");
+
+    assert(s_op);
+    /* Make sure there was an extra frame on the stack that needed popping. */
+    if (s_op->req && s_op->req->op == PVFS_SERV_CREATE_FILE) {
+        return (SM_ACTION_COMPLETE);
+    }
+
+    PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    free(s_op);
+    js_p->error_code = 0;
+ 
+    return SM_ACTION_COMPLETE;
+}
 
 static PINT_sm_action create_file_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)

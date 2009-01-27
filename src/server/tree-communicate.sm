@@ -70,7 +70,7 @@ nested machine pvfs2_tree_create_work_sm
         run tree_create_setup;
         REMOTE_OPERATION => tree_create_xfer_msgpair_array;
         LOCAL_OPERATION => tree_create_local;
-        default => final_response;
+        default => return;
     }
 
     state tree_create_xfer_msgpair_array
@@ -78,14 +78,14 @@ nested machine pvfs2_tree_create_work_sm
 /* TODO: This needs to turn into a pjmp */
         jump pvfs2_msgpairarray_sm;
         success => tree_create_local;
-        default => final_response;
+        default => return;
     }
 
     state tree_create_local
     {
         run tree_create_local;
         LOCAL_OPERATION => do_create;
-        default => final_response;
+        default => return;
     }
 
     state do_create
@@ -385,12 +385,12 @@ static PINT_sm_action tree_create_resp(
 static int tree_create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+//    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
+//    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
       return(server_state_machine_complete(smcb));
-    }
-    return SM_ACTION_TERMINATE;
+//    }
+//    return SM_ACTION_TERMINATE;
 }
  
 
