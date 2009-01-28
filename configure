@@ -12449,8 +12449,8 @@ fi
 
 
 BUILD_ABSOLUTE_TOP=`pwd`
-SRC_RELATIVE_TOP=$srcdir
-SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
+SRC_RELATIVE_TOP=`echo $0 | sed -e "s|configure$||"`
+SRC_ABSOLUTE_TOP=`cd $SRC_RELATIVE_TOP ; pwd`
 
 
 

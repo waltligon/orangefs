@@ -601,8 +601,8 @@ dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
 dnl relative location for soft links for out-of-tree builds.
 BUILD_ABSOLUTE_TOP=`pwd`
-SRC_RELATIVE_TOP=$srcdir
-SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
+SRC_RELATIVE_TOP=`echo $0 | sed -e "s|configure$||"`
+SRC_ABSOLUTE_TOP=`cd $SRC_RELATIVE_TOP ; pwd`
 
 AC_SUBST(LINUX_KERNEL_SRC)
 AC_SUBST(LINUX24_KERNEL_SRC)
