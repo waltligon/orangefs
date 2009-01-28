@@ -175,6 +175,7 @@ static int precreate_pool_count(
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
+
 struct server_configuration_s *PINT_get_server_config(void)
 {
     return &server_config;
@@ -1320,8 +1321,24 @@ static int server_shutdown(
 
     if (status & SERVER_TROVE_INIT)
     {
+        PINT_llist *cur;
+        struct filesystem_configuration_s *cur_fs;
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting storage "
                      "interface         [   ...   ]\n");
+
+        cur = server_config.file_systems;
+        while(cur)
+        {
+            cur_fs = PINT_llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+            trove_collection_clear(cur_fs->trove_method, cur_fs->coll_id);
+
+            cur = PINT_llist_next(cur);
+        }
+
         trove_finalize(server_config.trove_method);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
                      "interface         [ stopped ]\n");
@@ -1799,6 +1816,7 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
 
     if (new_op)
     {
+
         /* add to list of state machines started without a request */
         qlist_add_tail(&new_op->next, &noreq_sop_list);
 

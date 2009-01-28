@@ -713,6 +713,8 @@ int dbpf_collection_lookup(char *collname,
                            void *user_ptr,
                            TROVE_op_id *out_op_id_p);
 
+int dbpf_collection_clear(TROVE_coll_id coll_id);
+
 int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
                             TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,

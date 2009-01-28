@@ -265,6 +265,7 @@ void decode_PINT_hint(char **pptr, PINT_hint **hint)
             info->decode(pptr, value);
             len = (*pptr - start);
             PVFS_hint_add(&new_hint, info->name, len, value);
+            free(value);
         }
         else
         {
@@ -321,6 +322,11 @@ void PVFS_hint_free(PVFS_hint hint)
         act = act->next;
 
         free(old->value);
+
+        if(old->type == PINT_HINT_UNKNOWN)
+        {
+            free(old->type_string);
+        }
         free(old);
     }
 }

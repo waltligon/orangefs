@@ -195,6 +195,9 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
 static inline int qlist_exists(struct qlist_head *list, struct qlist_head *link)
 {
     struct qlist_head *pos;
+
+    if(qlist_empty(list)) return 0;
+
     qlist_for_each(pos, list)
     {
         if(pos == link)

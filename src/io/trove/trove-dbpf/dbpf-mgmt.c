@@ -59,6 +59,7 @@ int dbpf_pid;
 PINT_manager_t io_thread_mgr;
 PINT_worker_id io_worker_id;
 PINT_queue_id io_queue_id;
+PINT_context_id io_ctx;
 static int directio_threads_started = 0;
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
@@ -70,6 +71,7 @@ struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
 static int start_directio_threads(void);
+static int stop_directio_threads(void);
 
 static int trove_directio_threads_num = 30;
 static int trove_directio_ops_per_queue = 10;
@@ -691,7 +693,6 @@ static int dbpf_initialize(char *stoname,
 static int start_directio_threads(void)
 {
     int ret;
-    PINT_context_id io_ctx;
     PINT_worker_attr_t io_worker_attrs;
 
     if(directio_threads_started)
@@ -752,6 +753,20 @@ static int start_directio_threads(void)
     return(0);
 }
 
+static int stop_directio_threads(void)
+{
+    if(directio_threads_started != 1)
+    {
+        return 0;
+    }
+
+    PINT_manager_queue_remove(io_thread_mgr, io_queue_id);
+    PINT_queue_destroy(io_queue_id);
+    PINT_manager_destroy(io_thread_mgr);
+    PINT_close_context(io_ctx);
+    return 0;
+}
+
 static int dbpf_direct_initialize(char *stoname, TROVE_ds_flags flags)
 {
     int ret;
@@ -774,6 +789,13 @@ static int dbpf_direct_initialize(char *stoname, TROVE_ds_flags flags)
     return(0);
 }
 
+static int dbpf_direct_finalize(void)
+{
+    stop_directio_threads();
+    dbpf_finalize();
+    return 0;
+}
+
 int dbpf_finalize(void)
 {
     int ret = -TROVE_EINVAL;
@@ -783,8 +805,6 @@ int dbpf_finalize(void)
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
-    dbpf_collection_clear_registered();
 
     if (my_storage_p)
     {
@@ -1514,10 +1534,62 @@ return_error:
     return ret;
 }
 
-int dbpf_direct_collection_lookup(char *collname,
-                           TROVE_coll_id *out_coll_id_p,
-                           void *user_ptr,
-                           TROVE_op_id *out_op_id_p)
+static int dbpf_direct_collection_clear(TROVE_coll_id coll_id)
+{
+    stop_directio_threads();
+    return dbpf_collection_clear(coll_id);
+}
+
+int dbpf_collection_clear(TROVE_coll_id coll_id)
+{
+    int ret;
+    struct dbpf_collection *coll_p = dbpf_collection_find_registered(coll_id);
+
+    dbpf_collection_deregister(coll_p);
+
+    if ((ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->coll_attr_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->ds_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->keyval_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+    free(coll_p->name);
+    free(coll_p->path_name);
+    PINT_dbpf_keyval_pcache_finalize(coll_p->pcache);
+
+    free(coll_p);
+    return 0;
+}
+
+static int dbpf_direct_collection_lookup(char *collname,
+                                         TROVE_coll_id *out_coll_id_p,
+                                         void *user_ptr,
+                                         TROVE_op_id *out_op_id_p)
 {
     int ret;
 
@@ -2117,13 +2189,13 @@ static void dbpf_db_error_callback(
 struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
 {
     dbpf_direct_initialize,
-    /* TODO: do we need a special finalize too? */
-    dbpf_finalize,
+    dbpf_direct_finalize,
     dbpf_storage_create,
     dbpf_storage_remove,
     dbpf_collection_create,
     dbpf_collection_remove,
     dbpf_direct_collection_lookup,
+    dbpf_direct_collection_clear,
     dbpf_collection_iterate,
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
@@ -2145,6 +2217,7 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_create,
     dbpf_collection_remove,
     dbpf_collection_lookup,
+    dbpf_collection_clear,
     dbpf_collection_iterate,
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,

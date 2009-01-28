@@ -48,6 +48,7 @@ struct PINT_worker_threaded_queues_s
     gen_mutex_t mutex;
     gen_cond_t cond;
     struct PINT_manager_s *manager;
+    int remove_requested;
 };
 
 struct PINT_worker_impl PINT_worker_threaded_queues_impl;

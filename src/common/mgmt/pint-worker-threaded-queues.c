@@ -141,21 +141,27 @@ static int threaded_queues_queue_remove(struct PINT_manager_s *manager,
 {
     struct PINT_worker_threaded_queues_s *w;
     struct PINT_queue_s *queue;
+    struct timespec timeout;
 
     w = &inst->threaded;
 
     gen_mutex_lock(&w->mutex);
+    w->remove_requested = 1;
 
     queue = id_gen_fast_lookup(queue_id);
     assert(queue);
 
+    /* we wait for 1 second -- long enough for the queue to
+     * be added back to the unused list */
+    timeout.tv_nsec = 0;
     while(!qlist_exists(&w->queues, &queue->link))
     {
         /* assume that operations are being pulled off presently
          * and it just needs to be added back to the
          * list of queues, which we will wait for
          */
-        gen_cond_wait(&w->cond, &w->mutex);
+        timeout.tv_sec = time(NULL) + 1;
+        gen_cond_timedwait(&w->cond, &w->mutex, &timeout);
     }
 
     /* now we're ensured that its there, so pluck it off */
@@ -165,6 +171,8 @@ static int threaded_queues_queue_remove(struct PINT_manager_s *manager,
 
     memset(&queue->link, 0, sizeof(queue->link));
 
+    w->remove_requested = 0;
+    gen_cond_broadcast(&w->cond);
     gen_mutex_unlock(&w->mutex);
 
     return 0;
@@ -357,6 +365,17 @@ static void *PINT_worker_queues_thread_function(void * ptr)
         gen_mutex_unlock(&thread->mutex);
 
         gen_mutex_lock(&worker->mutex);
+
+        if(worker->remove_requested)
+        {
+            gen_cond_wait(&worker->cond, &worker->mutex);
+            gen_mutex_unlock(&worker->mutex);
+
+            /* lock the mutex again before checking the running field */
+            gen_mutex_lock(&thread->mutex);
+            continue;
+        }
+
         if(!qlist_empty(&worker->queues))
         {
             queue = qlist_entry(
@@ -479,10 +498,16 @@ static int PINT_worker_queue_thread_stop(
 {
     int ret;
     void *ptr;
+    struct PINT_worker_threaded_queues_s *w;
 
     gen_mutex_lock(&tentry->mutex);
+    w = tentry->worker;
     tentry->running = 0;
     gen_mutex_unlock(&tentry->mutex);
+
+    gen_mutex_lock(&w->mutex);
+    gen_cond_broadcast(&w->cond);
+    gen_mutex_unlock(&w->mutex);
 
     ret = pthread_join(tentry->thread_id, &ptr);
     if(ret < 0)

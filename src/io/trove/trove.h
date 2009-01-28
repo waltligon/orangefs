@@ -112,6 +112,10 @@ int trove_close_context(
     TROVE_coll_id coll_id,
     TROVE_context_id context_id);
 
+int trove_collection_clear(
+    TROVE_method_id method_id,
+    TROVE_coll_id coll_id);
+
 int trove_storage_create(
     TROVE_method_id method_id,
     char *stoname,

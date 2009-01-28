@@ -422,6 +422,8 @@ struct TROVE_mgmt_ops
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
 
+    int (*collection_clear)(TROVE_coll_id coll_id);
+
     int (*collection_iterate)(TROVE_ds_position *inout_position_p,
 			      TROVE_keyval_s *name_array,
 			      TROVE_coll_id *coll_id_array,

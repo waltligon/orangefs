@@ -106,7 +106,6 @@ int gen_posix_cond_destroy(pthread_cond_t *cond)
         return -EINVAL;
     }
     pthread_cond_destroy(cond);
-    free(cond);
     return 0;
 }
 
