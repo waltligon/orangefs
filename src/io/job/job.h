@@ -139,6 +139,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
                   enum job_flags flags,
                   job_context_id context_id);
 
+int job_bmi_unexp_cancel(job_id_t id);
+
 int job_bmi_cancel(job_id_t id,
                    job_context_id context_id);
 

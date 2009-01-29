@@ -798,6 +798,33 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     return (0);
 }
 
+int job_bmi_unexp_cancel(job_id_t id)
+{
+    struct job_desc *jd;
+
+    gen_mutex_lock(&bmi_unexp_mutex);
+    jd = id_gen_safe_lookup(id);
+    job_desc_q_remove(jd);
+    bmi_unexp_pending_count--;
+    gen_mutex_unlock(&bmi_unexp_mutex);
+
+    gen_mutex_lock(&completion_mutex);
+    /* set completed flag while holding queue lock */
+    jd->completed_flag = 1;
+    if (completion_queue_array[jd->context_id])
+    {
+        job_desc_q_add(completion_queue_array[jd->context_id], jd);
+    }
+
+#ifdef __PVFS2_JOB_THREADED__
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+#endif
+    gen_mutex_unlock(&completion_mutex);
+
+    return 0;
+}
+
 /* job_bmi_cancel()
  *
  * cancels a job handling a BMI message

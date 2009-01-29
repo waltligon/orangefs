@@ -1658,6 +1658,9 @@ static int server_purge_unexpected_recv_machines(void)
 
         /* mark the message for cancellation */
         s_op->op_cancelled = 1;
+
+        /* cancel the pending job_bmi_unexp operation */
+        job_bmi_unexp_cancel(s_op->unexp_id);
     }
     return 0;
 }

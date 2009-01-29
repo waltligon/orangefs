@@ -404,6 +404,8 @@ typedef struct PINT_server_op
 {
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
     int op_cancelled; /* indicates unexp message was cancelled */
+    job_id_t unexp_id;
+
     enum PVFS_server_op op;  /* type of operation that we are servicing */
 
     PINT_event_id event_id;

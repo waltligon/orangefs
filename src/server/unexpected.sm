@@ -40,7 +40,6 @@ static PINT_sm_action unexpected_post(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    job_id_t j_id;
     struct PINT_server_op *s_op =
             (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -53,7 +52,7 @@ static PINT_sm_action unexpected_post(
        unexpected message (it is an output parameter).
      */
     ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
-                        js_p, &j_id, JOB_NO_IMMED_COMPLETE,
+                        js_p, &s_op->unexp_id, JOB_NO_IMMED_COMPLETE,
                         server_job_context);
     if(ret == SM_ACTION_COMPLETE)
     {
@@ -80,7 +79,6 @@ static PINT_sm_action unexpected_map(
     /* If op was cancelled, kill the SM */
     if (s_op->op_cancelled)
     {
-        /* is there a reason to do any cleanup? */
         return SM_ACTION_TERMINATE;
     }
     /* Else move it to the inprogress_sop_list */

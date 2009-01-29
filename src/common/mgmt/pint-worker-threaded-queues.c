@@ -151,16 +151,16 @@ static int threaded_queues_queue_remove(struct PINT_manager_s *manager,
     queue = id_gen_fast_lookup(queue_id);
     assert(queue);
 
-    /* we wait for 1 second -- long enough for the queue to
+    /* we wait for 10 millisecs -- long enough for the queue to
      * be added back to the unused list */
-    timeout.tv_nsec = 0;
     while(!qlist_exists(&w->queues, &queue->link))
     {
         /* assume that operations are being pulled off presently
          * and it just needs to be added back to the
          * list of queues, which we will wait for
          */
-        timeout.tv_sec = time(NULL) + 1;
+        timeout.tv_sec = time(NULL);
+        timeout.tv_nsec = 1e6;
         gen_cond_timedwait(&w->cond, &w->mutex, &timeout);
     }
 
