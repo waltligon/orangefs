@@ -148,8 +148,6 @@ int dbpf_aligned_block_put(void *ptr);
 int dbpf_aligned_blocks_finalize(void);
 #endif
 
-static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p);
-
 /**
  * Perform an write in direct mode (no buffering).
  *
@@ -234,6 +232,7 @@ static size_t direct_locked_write(int fd,
     ret = fcntl(fd, F_SETLKW, &writelock);
     if(ret < 0 && errno == EINTR)
     {
+        gossip_err("%s: failed to lock flock before writing\n", __func__);
         return -trove_errno_to_trove_error(errno);
     }
     writelock.l_type = F_UNLCK;
@@ -244,6 +243,7 @@ static size_t direct_locked_write(int fd,
     ret = fcntl(fd, F_SETLK, &writelock);
     if (ret < 0)
     {
+        gossip_err("%s: failed to unlock flock after writing\n", __func__);
         return -trove_errno_to_trove_error (errno);
     }
 
@@ -502,7 +502,7 @@ static size_t direct_write(int fd,
 
     PINT_mem_aligned_free(aligned_buf);
 
-    return size;
+    return (ret < 0) ? ret : size;
 }
 
 /**
@@ -681,6 +681,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
+        gossip_err("%s: failed to get size in dspace attr: (error=%d)\n", __func__, ret);
         goto done;
     }
 
@@ -695,6 +696,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         NULL);
     if(ret != 0)
     {
+        gossip_err("%s: failed to get bstream extents from offset/sizes: (error=%d)\n", __func__, ret);
         goto done;
     }
 
@@ -715,6 +717,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         stream_extents);
     if(ret != 0)
     {
+        gossip_err("%s: failed to get bstream extents from offset/sizes: (error=%d)\n", __func__, ret);
         goto done;
     }
 
@@ -729,6 +732,7 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         if(ret < 0)
         {
             ret = -trove_errno_to_trove_error(-ret);
+            gossip_err("%s: direct_locked_read failed: (error=%d)\n", __func__, ret);
             goto done;
         }
     }
@@ -773,6 +777,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         NULL);
     if(ret != 0)
     {
+        gossip_err("%s: failed to count extents from stream offset/sizes: (error=%d)\n", __func__, ret);
         goto cache_put;
     }
 
@@ -794,12 +799,14 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         stream_extents);
     if(ret != 0)
     {
+        gossip_err("%s: failed to get stream extents from stream offset/sizes: (error=%d)\n", __func__, ret);
         goto cache_put;
     }
 
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
+        gossip_err("%s: failed to get dspace attr for bstream: (error=%d)\n", __func__, ret);
         goto cache_put;
     }
 
@@ -814,6 +821,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
                                   attr.u.datafile.b_size);
         if(ret < 0)
         {
+            gossip_err("%s: failed to perform direct locked write: (error=%d)\n", __func__, ret);
             goto cache_put;
         }
 
@@ -833,6 +841,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
         if(ret != 0)
         {
+            gossip_err("%s: failed to get size from dspace attr: (error=%d)\n", __func__, ret);
             gen_mutex_unlock(&dbpf_update_size_lock);
             goto cache_put;
         }
@@ -844,6 +853,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
             ret = dbpf_dspace_attr_set(qop_p->op.coll_p, ref, &attr);
             if(ret != 0)
             {
+                gossip_err("%s: failed to update size in dspace attr: (error=%d)\n", __func__, ret);
                 gen_mutex_unlock(&dbpf_update_size_lock);
                 goto cache_put;
             }
@@ -875,6 +885,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
             ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
             if(ret < 0)
             {
+                gossip_err("%s: failed to coalesce size update in dspace attr: (error=%d)\n", __func__, ret);
                 goto done;
             }
 
@@ -950,6 +961,7 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
+        gossip_err("%s: failed to find collection with fsid %d\n", __func__, coll_id);
         return -TROVE_EINVAL;
     }
 
@@ -1006,6 +1018,7 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
         dbpf_bstream_direct_read_op_svc, op, NULL, io_queue_id);
     if(ret < 0)
     {
+        gossip_err("%s: failed to post direct read op: (error=%d)\n", __func__, ret);
         return ret;
     }
 
@@ -1077,6 +1090,7 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
         return ret;
     }
 
+    gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: queuing direct write operation\n", __func__);
     PINT_manager_id_post(
         io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
         dbpf_bstream_direct_write_op_svc, op, NULL, io_queue_id);
@@ -1085,28 +1099,48 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
     return DBPF_OP_CONTINUE;
 }
 
-/* dbpf_dspace_setattr_op_svc_and_resize()
- *
- * Wrapper around the dbpf_dspace_setattr_op_svc() function that also
- * resizes underlying bstream file
- *
- * preserves return code of dbpf_dspace_setattr_op_svc()
- */
-static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p)
+static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
 {
     int ret;
+    TROVE_ds_attributes attr;
+    TROVE_object_ref ref;
+    dbpf_queued_op_t *q_op_p;
     struct open_cache_ref open_ref;
-    TROVE_size tmp_size;
-    
-    ret = dbpf_dspace_setattr_op_svc(op_p);
-    tmp_size = op_p->u.d_setattr.attr_p->u.datafile.b_size;
+    PVFS_size tmpsize;
 
-    free(op_p->u.d_setattr.attr_p);
+    q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
+    ref.fs_id = op_p->coll_p->coll_id;
+    ref.handle = op_p->handle;
 
-    if(ret != DBPF_OP_COMPLETE)
+    gen_mutex_lock(&dbpf_update_size_lock);
+    ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
+    if(ret != 0)
     {
-        return(ret);
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return ret;
     }
+
+    tmpsize = op_p->u.b_resize.size;
+    attr.u.datafile.b_size = tmpsize;
+
+    ret = dbpf_dspace_attr_set(op_p->coll_p, ref, &attr);
+    if(ret < 0)
+    {
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return ret;
+    }
+    gen_mutex_unlock(&dbpf_update_size_lock);
+
+    /* setup op for sync coalescing */
+    dbpf_queued_op_init(q_op_p,
+                        DSPACE_SETATTR,
+                        ref.handle,
+                        q_op_p->op.coll_p,
+                        dbpf_dspace_setattr_op_svc,
+                        q_op_p->op.user_ptr,
+                        TROVE_SYNC,
+                        q_op_p->op.context_id);
+    q_op_p->op.state = OP_IN_SERVICE;
 
     /* truncate file after attributes are set */
     ret = dbpf_open_cache_get(
@@ -1118,7 +1152,7 @@ static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p)
         return ret;
     }
 
-    ret = DBPF_RESIZE(open_ref.fd, tmp_size);
+    ret = DBPF_RESIZE(open_ref.fd, tmpsize);
     if(ret < 0)
     {
         return(ret);
@@ -1126,54 +1160,11 @@ static int dbpf_dspace_setattr_op_svc_and_resize(struct dbpf_op *op_p)
 
     dbpf_open_cache_put(&open_ref);
 
-    return(DBPF_OP_COMPLETE);
+    /* we continue here so that we know the operation gets synced from being coalesced */
+    return(DBPF_OP_CONTINUE);
 }
 
-static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
-{
-    int ret;
-    TROVE_ds_attributes attr;
-    TROVE_object_ref ref;
-    dbpf_queued_op_t *q_op_p;
-
-    q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
-    ref.fs_id = op_p->coll_p->coll_id;
-    ref.handle = op_p->handle;
-
-    ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
-    if(ret != 0)
-    {
-        return ret;
-    }
-
-    attr.u.datafile.b_size = op_p->u.b_resize.size;
-
-    dbpf_queued_op_init(q_op_p,
-                        DSPACE_SETATTR,
-                        ref.handle,
-                        op_p->coll_p,
-                        dbpf_dspace_setattr_op_svc_and_resize,
-                        q_op_p->op.user_ptr,
-                        TROVE_SYNC,
-                        q_op_p->op.context_id);
-    op_p->u.d_setattr.attr_p = malloc(sizeof(*op_p->u.d_setattr.attr_p));
-    if(!op_p->u.d_setattr.attr_p)
-    {
-        dbpf_queued_op_free(q_op_p);
-        ret = -TROVE_ENOMEM;
-        return ret;
-    }
-    *op_p->u.d_setattr.attr_p = attr;
-
-    /* we don't have to add the op back to the queue, the dbpf_thread does
-     * that for us when we return 0 instead of 1
-     */
-    ret = DBPF_OP_CONTINUE;
-
-    return ret;
-}
-
-int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
+static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
                                       TROVE_handle handle,
                                       TROVE_size *inout_size_p,
                                       TROVE_ds_flags flags,

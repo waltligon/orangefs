@@ -1330,11 +1330,119 @@ static struct dbpf_aio_ops aio_ops =
     aio_fsync
 };
 
+static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
+{
+    int ret;
+    TROVE_ds_attributes attr;
+    TROVE_object_ref ref;
+    dbpf_queued_op_t *q_op_p;
+    struct open_cache_ref open_ref;
+    PVFS_size tmpsize;
+
+    q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
+
+    ref.fs_id = op_p->coll_p->coll_id;
+    ref.handle = op_p->handle;
+
+    gen_mutex_lock(&dbpf_update_size_lock);
+    ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
+    if(ret != 0)
+    {
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return ret;
+    }
+
+    tmpsize = op_p->u.b_resize.size;
+    attr.u.datafile.b_size = tmpsize;
+
+    ret = dbpf_dspace_attr_set(op_p->coll_p, ref, &attr);
+    if(ret < 0)
+    {
+        gen_mutex_unlock(&dbpf_update_size_lock);
+        return ret;
+    }
+    gen_mutex_unlock(&dbpf_update_size_lock);
+
+    /* setup op for sync coalescing */
+    dbpf_queued_op_init(q_op_p,
+                        DSPACE_SETATTR,
+                        ref.handle,
+                        q_op_p->op.coll_p,
+                        dbpf_dspace_setattr_op_svc,
+                        q_op_p->op.user_ptr,
+                        TROVE_SYNC,
+                        q_op_p->op.context_id);
+    q_op_p->op.state = OP_IN_SERVICE;
+
+    /* truncate file after attributes are set */
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle,
+        DBPF_FD_BUFFERED_WRITE,
+        &open_ref);
+    if(ret < 0)
+    {
+        return ret;
+    }
+
+    ret = DBPF_RESIZE(open_ref.fd, tmpsize);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    dbpf_open_cache_put(&open_ref);
+
+    return DBPF_OP_COMPLETE;
+}
+
+int dbpf_bstream_resize(TROVE_coll_id coll_id,
+                        TROVE_handle handle,
+                        TROVE_size *inout_size_p,
+                        TROVE_ds_flags flags,
+                        TROVE_vtag_s *vtag,
+                        void *user_ptr,
+                        TROVE_context_id context_id,
+                        TROVE_op_id *out_op_id_p,
+                        PVFS_hint hints)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+                        BSTREAM_RESIZE,
+                        handle,
+                        coll_p,
+                        dbpf_bstream_resize_op_svc,
+                        user_ptr,
+                        flags,
+                        context_id);
+
+    /* initialize the op-specific members */
+    q_op_p->op.u.b_resize.size = *inout_size_p;
+    q_op_p->op.u.b_resize.queued_op_ptr = q_op_p;
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
 struct TROVE_bstream_ops dbpf_bstream_ops =
 {
     dbpf_bstream_read_at,
     dbpf_bstream_write_at,
-    dbpf_bstream_direct_resize,
+    dbpf_bstream_resize,
     dbpf_bstream_validate,
     dbpf_bstream_read_list,
     dbpf_bstream_write_list,

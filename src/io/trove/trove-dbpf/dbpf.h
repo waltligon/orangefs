@@ -785,7 +785,7 @@ int dbpf_bstream_flush(TROVE_coll_id coll_id,
                        TROVE_op_id *out_op_id_p,
                        PVFS_hint hints);
 
-int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
+int dbpf_bstream_resize(TROVE_coll_id coll_id,
                         TROVE_handle handle,
                         TROVE_size *inout_size_p,
                         TROVE_ds_flags flags,
