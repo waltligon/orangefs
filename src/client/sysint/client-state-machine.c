@@ -303,7 +303,9 @@ int client_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p __attribute__((__unused__));
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
