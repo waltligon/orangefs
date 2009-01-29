@@ -474,6 +474,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
         /* NOTE: set flow error class bit so that system interface understands
          * that this may be a retry-able error
          */
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(-(PVFS_ECANCEL|PVFS_ERROR_FLOW), NULL, flow_data);
         if(flow_data->parent->state == FLOW_COMPLETE)
         {
@@ -720,6 +721,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
@@ -769,6 +771,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
         if(ret < 0)
         {
+            gossip_err("%s: I/O error occurred\n", __func__);
             handle_io_error(ret, q_item, flow_data);
             return;
         }
@@ -882,6 +885,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
         if(ret < 0)
         {
+            gossip_err("%s: I/O error occurred\n", __func__);
             handle_io_error(ret, q_item, flow_data);
             return;
         }
@@ -924,6 +928,7 @@ static void trove_read_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
@@ -993,6 +998,7 @@ static void trove_read_callback_fn(void *user_ptr,
 
         if(ret < 0)
         {
+            gossip_err("%s: I/O error occurred\n", __func__);
             handle_io_error(ret, q_item, flow_data);
             return;
         }
@@ -1046,6 +1052,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         if(flow_data->parent->state == FLOW_COMPLETE)
             return(1);
@@ -1282,6 +1289,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 
         if(ret < 0)
         {
+            gossip_err("%s: I/O error occurred\n", __func__);
             handle_io_error(ret, q_item, flow_data);
             if(flow_data->parent->state == FLOW_COMPLETE)
                 return(1);
@@ -1326,6 +1334,7 @@ static void trove_write_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
@@ -1484,6 +1493,7 @@ static void trove_write_callback_fn(void *user_ptr,
 
         if(ret < 0)
         {
+            gossip_err("%s: I/O error occurred\n", __func__);
             handle_io_error(ret, q_item, flow_data);
             return;
         }
@@ -1611,6 +1621,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
@@ -1752,6 +1763,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 
     if(ret < 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(ret, q_item, flow_data);
         return;
     }
@@ -1796,6 +1808,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
@@ -1951,6 +1964,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 
     if(ret < 0)
     {
+        gossip_err("%s: I/O error occurred\n", __func__);
         handle_io_error(ret, q_item, flow_data);
         return;
     }
