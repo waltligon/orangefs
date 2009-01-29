@@ -7900,7 +7900,7 @@ echo "$as_me: error: --with-tau must be given a pathname" >&2;}
    { (exit 1); exit 1; }; }
     else
        TAU_INCS="-I$withval/include"
-       CFLAGS="$CFLAGS $TAU_INCS"
+       CFLAGS="$CFLAGS $TAU_INCS -D__PVFS2_ENABLE_EVENT__"
        LDFLAGS="$LDFLAGS -L$withval/$(uname -m)/lib"
        tau_mkfile=$withval/$(uname -m)/lib/Makefile.*-profile-trace
        if test ! -f $tau_mkfile; then

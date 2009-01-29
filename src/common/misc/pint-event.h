@@ -65,7 +65,7 @@ int PINT_event_log_event(PINT_event_type type,
                          int *thread_id,
                          ...);
 
-#ifndef __PVFS2_DISABLE_EVENT__
+#ifdef __PVFS2_ENABLE_EVENT__
 
 #define PINT_EVENT_START(ET, PID, TID, EID, args...)  \
    PINT_event_start_event(ET, PID, TID, EID, ## args)
@@ -78,7 +78,7 @@ int PINT_event_log_event(PINT_event_type type,
 
 #define PINT_EVENT_ENABLED 1
 
-#else /* __PVFS2_DISABLE_EVENT__ */
+#else /* __PVFS2_ENABLE_EVENT__ */
 
 #define PINT_EVENT_START(ET, PID, TID, EID, args...)  \
     do { } while(0)
@@ -91,7 +91,7 @@ int PINT_event_log_event(PINT_event_type type,
 
 #define PINT_EVENT_ENABLED  0
 
-#endif /* __PVFS2_DISABLE_EVENT__ */
+#endif /* __PVFS2_ENABLE_EVENT__ */
 #endif /* __PINT_EVENT_H */
 
 /*
