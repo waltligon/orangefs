@@ -171,6 +171,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     {
         num_partitions = MAX_PARTITIONS;
         num_files_per_server = (num_data_files - 1) / MAX_PARTITIONS;
+        if (num_partitions * num_files_per_server < num_data_files - 1) {
+            num_files_per_server++;
+        }
     }
     else
     {

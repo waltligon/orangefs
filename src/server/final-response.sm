@@ -32,29 +32,10 @@
 static void PINT_gossip_err_server_resp(
     struct PVFS_server_resp *resp);
 
-enum
-{
-    LOCAL_OPERATION = 2,
-    REMOTE_OPERATION = 3
-};
-
 %%
 
 nested machine pvfs2_final_response_sm
 {
-    state test_local
-    {
-        run final_response_test_local;
-        REMOTE_OPERATION => release;
-        LOCAL_OPERATION => return_local;
-    }
-
-    state return_local
-    {
-        run final_response_return_local;
-        default => return;
-    }
-
     state release
     {
         run final_response_release;
@@ -76,13 +57,19 @@ nested machine pvfs2_final_response_sm
 
 %%
 
-static PINT_sm_action final_response_test_local(
+/* final_response_release()
+ *
+ * releases the operation from the request scheduler
+ */
+static PINT_sm_action final_response_release(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t tmp_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(s_op %p) %s (FR sm) state: test_local: (error_code = %d)\n",
+                 "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op),
                  js_p->error_code);
 
@@ -95,37 +82,10 @@ static PINT_sm_action final_response_test_local(
      */
     s_op->resp.status = -PVFS_ERROR_CODE(-js_p->error_code);
 
-    if (s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
-        js_p->error_code = LOCAL_OPERATION;
-    }
-    else {
-        js_p->error_code = REMOTE_OPERATION;
-    }
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action final_response_return_local(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
-
-/* final_response_release()
- *
- * releases the operation from the request scheduler
- */
-static PINT_sm_action final_response_release(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -1;
-    job_id_t tmp_id;
-
-    js_p->error_code = s_op->resp.status;
     /* catch cases in which the operation has not been scheduled */
     if (!s_op->scheduled_id)
     {
+        js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 

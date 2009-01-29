@@ -49,7 +49,7 @@ nested machine pvfs2_crdirent_work_sm
     {
         jump pvfs2_prelude_sm;
         success => validate;
-        default => final_response;
+        default => return;
     }
 
     state validate
