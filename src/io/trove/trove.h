@@ -104,6 +104,8 @@ int trove_initialize(
 
 int trove_finalize(TROVE_method_id method_id);
 
+int trove_migrate(TROVE_method_id method_id, const char* stoname);
+
 int trove_open_context(
     TROVE_coll_id coll_id,
     TROVE_context_id *context_id);
