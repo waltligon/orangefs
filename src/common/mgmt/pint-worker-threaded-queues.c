@@ -446,8 +446,15 @@ static void *PINT_worker_queues_thread_function(void * ptr)
         else
         {
             /* no queues in the list, wait for addition */
-            ret = gen_cond_wait(&worker->cond, &worker->mutex);
-            if(ret != 0)
+
+            /* we set a timeout of 1 second, long enough to not peg the cpu, but
+             * short enough to check thread cancellation */
+            struct timespec empty_timeout;
+            empty_timeout.tv_sec = time(NULL) + 1;
+            empty_timeout.tv_nsec = 0;
+
+            ret = gen_cond_timedwait(&worker->cond, &worker->mutex, &empty_timeout);
+            if(ret != 0 && ret != ETIMEDOUT)
             {
                 gossip_lerr("gen_cond_timedwait failed with error: %s\n",
                             strerror(ret));
