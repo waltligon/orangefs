@@ -2322,16 +2322,11 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
 
     for(i = 0; i < count; ++i)
     {
-        qop_p = (dbpf_queued_op_t *)(user_ptrs[i]);
         if(errors[i] == PINT_MGMT_OP_COMPLETED)
         {
-            qop_p->state = OP_COMPLETED;
+            qop_p = (dbpf_queued_op_t *)(user_ptrs[i]);
+            dbpf_queued_op_complete(qop_p, OP_COMPLETED);
         }
-        else
-        {
-            qop_p->state = errors[i];
-        }
-        dbpf_queued_op_complete(qop_p, OP_COMPLETED);
     }
 
     return 0;

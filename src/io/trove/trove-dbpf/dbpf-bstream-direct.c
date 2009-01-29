@@ -1160,8 +1160,7 @@ static int dbpf_bstream_direct_resize_op_svc(struct dbpf_op *op_p)
 
     dbpf_open_cache_put(&open_ref);
 
-    /* we continue here so that we know the operation gets synced from being coalesced */
-    return(DBPF_OP_CONTINUE);
+    return DBPF_OP_COMPLETE;
 }
 
 static int dbpf_bstream_direct_resize(TROVE_coll_id coll_id,
