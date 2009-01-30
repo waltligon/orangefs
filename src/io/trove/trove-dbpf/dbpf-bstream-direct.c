@@ -1090,11 +1090,12 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
         return ret;
     }
 
+    *out_op_id_p = q_op_p->op.id;
+
     gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: queuing direct write operation\n", __func__);
     PINT_manager_id_post(
         io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
         dbpf_bstream_direct_write_op_svc, op, NULL, io_queue_id);
-    *out_op_id_p = q_op_p->op.id;
 
     return DBPF_OP_CONTINUE;
 }
