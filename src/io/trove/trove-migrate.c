@@ -261,6 +261,7 @@ int trove_migrate (TROVE_method_id method_id, const char* stoname)
     int               minor;
     int               incremental;
     int               i;
+    int               migrated;
 #ifdef DEBUG_MIGRATE_PERF
     double            s,e;
     s = wtime();
@@ -308,6 +309,7 @@ ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
                 goto complete;
             }
 
+            migrated = 0;
             for (migrate_p = &(migration_table[0]);
                  migrate_p->migrate != NULL;
                  migrate_p++)
@@ -333,27 +335,32 @@ ret=%d coll=%d stoname=%s major=%d minor=%d incremental=%d\n",
                                migrate_p->major,
                                migrate_p->minor,
                                migrate_p->incremental);
+                    migrated = 1;
                 }
             }
 
-            ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d", &major, &minor, &incremental);
-            if (ret !=3)
+            if (migrated)
             {
-                gossip_err("sscanf failed: ret=%d\n", ret);
-                goto complete;
-            }
+                ret = sscanf(TROVE_DBPF_VERSION_VALUE, "%d.%d.%d",
+                             &major, &minor, &incremental);
+                if (ret !=3)
+                {
+                    gossip_err("sscanf failed: ret=%d\n", ret);
+                    goto complete;
+                }
 
-            ret = trove_put_version (coll_id, major, minor, incremental);
-            if (ret < 0)
-            {
-                gossip_err("trove_put_version failed: ret=%d coll=%d \
+                ret = trove_put_version (coll_id, major, minor, incremental);
+                if (ret < 0)
+                {
+                    gossip_err("trove_put_version failed: ret=%d coll=%d \
 ver=%d.%d.%d\n",
-                           ret, coll_id, major, minor, incremental);
-                goto complete;
-            }
+                               ret, coll_id, major, minor, incremental);
+                    goto complete;
+                }
 
-            gossip_err("Trove Version Set: %d.%d.%d\n",
-                       major, minor, incremental);
+                gossip_err("Trove Version Set: %d.%d.%d\n",
+                           major, minor, incremental);
+            }
         }
     }
 
@@ -407,7 +414,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!handles)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(TROVE_handle)*base_count);
+                   errno, (int)(sizeof(TROVE_handle)*base_count));
         return -1;
     }
 
@@ -415,7 +422,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!attrs)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(TROVE_ds_attributes)*base_count);
+                   errno, (int)(sizeof(TROVE_ds_attributes)*base_count));
         return -1;
     }
 
@@ -423,7 +430,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!states)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(TROVE_ds_state)*base_count);
+                   errno, (int)(sizeof(TROVE_ds_state)*base_count));
         return -1;
     }
 
@@ -431,7 +438,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!completed_states)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(TROVE_ds_state)*base_count);
+                   errno, (int)(sizeof(TROVE_ds_state)*base_count));
         return -1;
     }
 
@@ -439,7 +446,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!completed_ids)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(TROVE_op_id)*base_count);
+                   errno, (int)(sizeof(TROVE_op_id)*base_count));
         return -1;
     }
 
@@ -447,7 +454,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     if (!user)
     {
         gossip_err("malloc failed: errno=%d size=%d\n",
-                   errno, sizeof(void*)*base_count);
+                   errno, (int)(sizeof(void*)*base_count));
         return -1;
     }
     for (i = 0; i < base_count; i++)
