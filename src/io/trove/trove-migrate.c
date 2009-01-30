@@ -406,7 +406,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     handles = malloc(sizeof(TROVE_handle)*base_count);
     if (!handles)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(TROVE_handle)*base_count);
         return -1;
     }
@@ -414,7 +414,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     attrs = malloc(sizeof(TROVE_ds_attributes_s)*base_count);
     if (!attrs)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(TROVE_ds_attributes)*base_count);
         return -1;
     }
@@ -422,7 +422,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     states = malloc(sizeof(TROVE_ds_state)*base_count);
     if (!states)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(TROVE_ds_state)*base_count);
         return -1;
     }
@@ -430,7 +430,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     completed_states = malloc(sizeof(TROVE_ds_state)*base_count);
     if (!completed_states)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(TROVE_ds_state)*base_count);
         return -1;
     }
@@ -438,7 +438,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     completed_ids = malloc(sizeof(TROVE_op_id)*base_count);
     if (!completed_ids)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(TROVE_op_id)*base_count);
         return -1;
     }
@@ -446,7 +446,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
     user = (void**) malloc(sizeof(void*)*base_count);
     if (!user)
     {
-        gossip_err("malloc failed: errno=%d size=%ld\n",
+        gossip_err("malloc failed: errno=%d size=%d\n",
                    errno, sizeof(void*)*base_count);
         return -1;
     }
@@ -528,8 +528,8 @@ ret=%d coll=%d handles=%p attrs=%p states=%p count=%d context=%lld op=%lld\n",
             {
                 ret = -1;
                 gossip_err("trove_dspace_getattr_list failure: \
-coll=%lld context=%lld handle=%llu state=%d\n",
-                           lld(coll_id), lld(context_id),
+coll=%d context=%lld handle=%llu state=%d\n",
+                           coll_id, lld(context_id),
                            llu(handles[i]), states[i]);
                 goto complete;
             }
@@ -595,8 +595,8 @@ ret=%d handle=%lld context=%lld op=%lld\n",
             if (ret < 0)
             {
                 gossip_err("trove_dspace_testcontext failed: ret=%d \
-coll=%lld ids=%p count=%d states=%p context=%lld\n",
-                           ret, lld(coll_id), completed_ids,
+coll=%d ids=%p count=%d states=%p context=%lld\n",
+                           ret, coll_id, completed_ids,
                            completed_count, completed_states,
                            lld(context_id));
                 goto complete;
@@ -609,8 +609,8 @@ coll=%lld ids=%p count=%d states=%p context=%lld\n",
                 if (completed_states[k] != 0)
                 {
                     gossip_err("trove_dspace_testcontext failure: \
-coll=%lld id=%lld state=%d\n",
-                               lld(coll_id), lld(completed_ids[k]),
+coll=%d id=%lld state=%d\n",
+                               coll_id, lld(completed_ids[k]),
                                completed_states[k]);
                     goto complete;
                 }
