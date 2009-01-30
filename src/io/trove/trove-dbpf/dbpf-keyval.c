@@ -176,7 +176,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {handle, coll_id};
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Read "
@@ -344,7 +344,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
     coll_p = dbpf_collection_find_registered(coll_id);

@@ -124,7 +124,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     int ret;
     PINT_event_type event_type;
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
 
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -285,7 +285,7 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     int ret;
     PINT_event_type event_type;
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -1096,7 +1096,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     TROVE_object_ref ref = {handle, coll_id};
     int ret;
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
     /* fast path cache hit; skips queueing */
@@ -1306,7 +1306,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
-    PINT_event_id event_id;
+    PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
     coll_p = dbpf_collection_find_registered(coll_id);

@@ -2402,7 +2402,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     bmi_size_t copy_size = 0;
     bmi_size_t total_copied = 0;
     int i;
-    PINT_event_id eid;
+    PINT_event_id eid = 0;
 
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
@@ -3698,7 +3698,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     struct op_list_search_key key;
     int list_index = 0;
     bmi_size_t cur_index_complete = 0;
-    PINT_event_id eid;
+    PINT_event_id eid = 0;
 
     if(PINT_EVENT_ENABLED)
     {
