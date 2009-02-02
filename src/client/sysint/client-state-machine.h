@@ -89,7 +89,6 @@ struct PINT_client_create_sm
     PVFS_handle *datafile_handles;
     int stuffed;
 
-    PVFS_object_attr cache_attr;
     PVFS_handle handles[2];
 };
 

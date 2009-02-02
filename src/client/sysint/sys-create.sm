@@ -565,10 +565,6 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.attr.u.meta.dfile_count =
             sm_p->u.create.datafile_count;
 
-        /* set to NULL so we don't free it later */
-        sm_p->u.create.datafile_handles = NULL;
-        sm_p->u.create.datafile_count = 0;
-
         if(sm_p->u.create.stuffed)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "created stuffed file\n");
@@ -617,8 +613,6 @@ static PINT_sm_action create_cleanup(
         js_p->error_code = CREATE_RETRY;
         return SM_ACTION_COMPLETE;
     }
-
-    PINT_free_object_attr(&sm_p->u.create.cache_attr);
 
     if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
