@@ -43,6 +43,7 @@ struct options
     int list_human_readable;
     int list_long;
     int list_verbose;
+    int list_recursive;
     int list_numeric_uid_gid;
     int list_directory;
     int list_no_group;
@@ -54,6 +55,13 @@ struct options
     char *start[MAX_NUM_PATHS];
     int num_starts;
 };
+
+struct subdir_list
+{
+    char *path;
+    struct subdir_list *next;
+};
+typedef struct subdir_list subdir;
 
 static char *process_name = NULL;
 static int do_timing = 0;
@@ -71,6 +79,7 @@ static void print_entry(
     struct options *opts);
 
 static int do_list(
+    char *full_path,
     char *start,
     int fs_id,
     struct options *opts);
@@ -412,6 +421,7 @@ static double Wtime(void)
 }
 
 int do_list(
+    char *full_path,
     char *start,
     int fs_id,
     struct options *opts)
@@ -429,11 +439,17 @@ int do_list(
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
+    subdir *current, *head = NULL, *tail = NULL;
 
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
     PVFS_util_gen_credentials(&credentials);
+
+    if (opts->list_recursive || opts->num_starts > 1)
+    {
+        printf("%s%s:\n",full_path,start);
+    }
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
@@ -542,6 +558,38 @@ int do_list(
                     &rdplus_response.attr_array[i],
                     rdplus_response.stat_err_array[i],
                     opts);
+
+            PVFS_sys_attr *attr = &rdplus_response.attr_array[i];
+            if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
+            {
+                int path_len = strlen(start) + strlen(cur_file) + 1;
+                current = (subdir *) malloc(sizeof(subdir));
+
+                /* Prevent duplicate slashes in path */
+                if(start[strlen(start)-1] == '/')
+                {
+                    current->path = (char *) malloc(path_len);
+                    snprintf(current->path,path_len,"%s%s",start,cur_file);
+                }
+                else
+                {
+                    current->path = (char *) malloc(path_len + 1);
+                    snprintf(current->path,path_len+1,"%s/%s",start,cur_file);
+                }
+
+                /* Update linked list of subdirectories to recurse */
+                current->next = NULL;
+                if(!head)
+                {
+                    head = current;
+                    tail = current;
+                }
+                else
+                {
+                    tail->next = current;
+                    tail = current;
+                }
+            }
         }
         token = rdplus_response.token;
 
@@ -583,6 +631,19 @@ int do_list(
         free(rdplus_response.attr_array);
         rdplus_response.attr_array = NULL;
     }
+
+    if (opts->list_recursive)
+    {
+        current = head;
+        while(current)
+        {
+            printf("\n");
+            do_list(full_path,current->path,fs_id,opts);
+            current = current->next;
+            free(head);
+            head = current;
+        }
+    }
     return 0;
 }
 
@@ -603,6 +664,7 @@ static struct options* parse_args(int argc, char* argv[])
         {"human-readable",0,0,0},
         {"si",0,0,0},
         {"version",0,0,0},
+        {"recursive",0,0,0},
         {"verbose",0,0,0},
         {"numeric-uid-gid",0,0,0},
         {"directory",0,0,0},
@@ -621,7 +683,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    while((ret = getopt_long(argc, argv, "hVndGoAaiglt",
+    while((ret = getopt_long(argc, argv, "hRVndGoAaiglt",
                              long_opts, &option_index)) != -1)
     {
 	switch(ret)
@@ -647,6 +709,10 @@ static struct options* parse_args(int argc, char* argv[])
                 {
                     printf("%s\n", PVFS2_VERSION);
                     exit(0);
+                }
+                else if (strcmp("recursive", cur_option) == 0)
+                {
+                    goto list_recursive;
                 }
                 else if (strcmp("verbose", cur_option) == 0)
                 {
@@ -685,6 +751,10 @@ static struct options* parse_args(int argc, char* argv[])
             case 'h':
           list_human_readable:
                 tmp_opts->list_human_readable = 1;
+                break;
+            case 'R':
+          list_recursive:
+                tmp_opts->list_recursive = 1;
                 break;
             case 'V':
           list_verbose:
@@ -776,6 +846,8 @@ static void usage(int argc, char** argv)
             "list group information\n");
     fprintf(stderr,"      --help                 display this help "
             "and exit\n");
+    fprintf(stderr,"  -R, --recursive            list subdirectories "
+            "recursively\n");
     fprintf(stderr,"  -V, --verbose              reports if the dir is "
             "changing during listing\n");
     fprintf(stderr,"      --version              output version "
@@ -868,12 +940,34 @@ int main(int argc, char **argv)
 
     for(i = 0; i < user_opts->num_starts; i++)
     {
-        if (user_opts->num_starts > 1)
+        char *substr = strstr(user_opts->start[i],pvfs_path[i]);
+        char *index = user_opts->start[i];
+        char *search = substr; 
+        int j = 0;
+
+        /* Keep the mount path info to mimic /bin/ls output */
+        if( strncmp(pvfs_path[i],"/",strlen(pvfs_path[i])) )
         {
-            printf("%s:\n", pvfs_path[i]);
+            /* Get last matching substring */
+            while (search) 
+            {
+                substr = search;
+                search = strstr(++search,pvfs_path[i]);
+            }
+        }
+        else /* Root directory case has nothing to match */
+        {
+            substr = &user_opts->start[i][strlen(user_opts->start[i])-1];
         }
 
-        do_list(pvfs_path[i], fs_id_array[i], user_opts);
+        while (index != substr)
+        {
+            index++;
+            j++;
+        }
+        user_opts->start[i][j] = '\0';
+
+        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts);
 
         if (user_opts->num_starts > 1)
         {
