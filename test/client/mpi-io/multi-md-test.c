@@ -649,7 +649,7 @@ void pvfs_rmtestdir(int rank, int* n_ops)
 
     *n_ops = 1;
 
-    ret = PVFS_sys_remove(test_dir, pvfs_basedir, &pvfs_creds);
+    ret = PVFS_sys_remove(test_dir, pvfs_basedir, &pvfs_creds, NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_remove");
@@ -674,7 +674,7 @@ void pvfs_mktestdir(int rank, int* n_ops)
     attr.perms = PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
-    ret = PVFS_sys_mkdir(test_dir, pvfs_basedir, attr, &pvfs_creds, &resp_mkdir);
+    ret = PVFS_sys_mkdir(test_dir, pvfs_basedir, attr, &pvfs_creds, &resp_mkdir, NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_mkdir");
@@ -719,7 +719,7 @@ void pvfs_write(int rank, int* n_ops)
     for(i=0; i<opt_nfiles; i++)
     {
         ret = PVFS_sys_write(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
-            &pvfs_creds, &resp_io);
+            &pvfs_creds, &resp_io, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_read");
@@ -747,7 +747,7 @@ void pvfs_read(int rank, int* n_ops)
     for(i=0; i<opt_nfiles; i++)
     {
         ret = PVFS_sys_read(pvfs_refs[i], file_req, 0, pvfs_buf, mem_req,
-            &pvfs_creds, &resp_io);
+            &pvfs_creds, &resp_io, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_read");
@@ -821,7 +821,7 @@ void pvfs_create(int rank, int* n_ops)
         sprintf(test_file, "%d", i);
 
         ret = PVFS_sys_create(test_file, pvfs_testdir, attr, &pvfs_creds,
-            NULL, NULL, &resp_create);
+            NULL, &resp_create, PVFS_SYS_LAYOUT_DEFAULT, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_create");
@@ -888,7 +888,7 @@ void pvfs_rm(int rank, int* n_ops)
     {
         sprintf(test_file, "%d", i);
 
-        ret = PVFS_sys_remove(test_file, pvfs_testdir, &pvfs_creds);
+        ret = PVFS_sys_remove(test_file, pvfs_testdir, &pvfs_creds, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_remove");
@@ -1000,7 +1000,7 @@ void pvfs_prep(int rank, int* n_ops)
     PVFS_util_gen_credentials(&pvfs_creds);
 
     ret = PVFS_sys_lookup(fs_id, pvfs_path, &pvfs_creds, &resp_lookup, 
-        PVFS2_LOOKUP_LINK_FOLLOW);
+        PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if(ret < 0)
     {
         handle_error(ret, "PVFS_sys_lookup");
@@ -1063,7 +1063,8 @@ void pvfs_readdirplus(int rank, int* n_ops)
         ret = PVFS_sys_readdirplus(pvfs_testdir, token, PVFS_DIRENT_COUNT,
             &pvfs_creds, 
             PVFS_ATTR_SYS_ALL_NOHINT,
-            &rdplus_response);
+            &rdplus_response,
+            NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_readdirplus");
@@ -1102,7 +1103,7 @@ void pvfs_readdir(int rank, int* n_ops)
     do
     {
         ret = PVFS_sys_readdir(pvfs_testdir, token, PVFS_DIRENT_COUNT,
-            &pvfs_creds, &rd_response);
+            &pvfs_creds, &rd_response, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_readdir");
@@ -1133,7 +1134,7 @@ void pvfs_readdir_and_stat(int rank, int* n_ops)
     do
     {
         ret = PVFS_sys_readdir(pvfs_testdir, token, PVFS_DIRENT_COUNT,
-            &pvfs_creds, &rd_response);
+            &pvfs_creds, &rd_response, NULL);
         if(ret < 0)
         {
             handle_error(ret, "PVFS_sys_readdir");
@@ -1144,7 +1145,7 @@ void pvfs_readdir_and_stat(int rank, int* n_ops)
             tmp_ref.handle = rd_response.dirent_array[i].handle;
             tmp_ref.fs_id = pvfs_testdir.fs_id;
             ret = PVFS_sys_getattr(tmp_ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                &pvfs_creds, &getattr_response);
+                &pvfs_creds, &getattr_response, NULL);
             if(ret < 0)
             {
                 handle_error(ret, "PVFS_sys_getattr");
