@@ -580,7 +580,6 @@ static PINT_sm_action create_cleanup(
         {
             sm_p->u.create.attr.u.meta.dist = sm_p->u.create.dist;
             sm_p->u.create.attr.u.meta.dist_size = PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
-            sm_p->u.create.dist = NULL;
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
         }
 
@@ -617,6 +616,11 @@ static PINT_sm_action create_cleanup(
     if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
         free(sm_p->u.create.layout.server_list.servers);
+    }
+
+    if(sm_p->u.create.dist)
+    {
+        PINT_dist_free(sm_p->u.create.dist);
     }
 
     if(sm_p->u.create.datafile_handles)
