@@ -640,6 +640,7 @@ int do_list(
             printf("\n");
             do_list(full_path,current->path,fs_id,opts);
             current = current->next;
+            free(head->path);
             free(head);
             head = current;
         }
