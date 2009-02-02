@@ -46,6 +46,8 @@ static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t test_mutex = GEN_MUTEX_INITIALIZER;
 
+static void PINT_sys_release_smcb(PINT_smcb *smcb);
+
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
 do { assert(pint_client_sm_context != -1); } while(0)
 
@@ -416,8 +418,8 @@ PVFS_error PINT_client_state_machine_post(
 
         *op_id = -1;
 
-        /* free the smcb */
-        PINT_smcb_free(smcb);
+        /* free the smcb and any other extra data allocated there */
+        PINT_sys_release_smcb(smcb);
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%llu) "
@@ -809,13 +811,12 @@ PVFS_error PINT_client_wait_internal(
     return ret;
 }
 
-/** Frees resources associated with state machine instance.
+/** Finds state machine referenced by op_id and releases resources
+ * associated with it
  */
 void PINT_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_smcb *smcb; 
-    PINT_client_sm *sm_p; 
-    PVFS_credentials *cred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
@@ -823,6 +824,20 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     {
         return;
     }
+    PINT_id_gen_safe_unregister(op_id);
+    PINT_sys_release_smcb(smcb);
+
+    return;
+}
+
+/** releases resources associated with an smcb.  Can be used both on
+ * immediate completion and asynchronous completion
+ */
+static void PINT_sys_release_smcb(PINT_smcb *smcb)
+{
+    PINT_client_sm *sm_p; 
+    PVFS_credentials *cred_p; 
+
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p == NULL) 
     {
@@ -832,7 +847,6 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     {
         cred_p = sm_p->cred_p;
     }
-    PINT_id_gen_safe_unregister(op_id);
 
     if (PINT_smcb_op(smcb) && cred_p)
     {
