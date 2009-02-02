@@ -888,6 +888,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_CREATE:
                     decode_free(resp->u.batch_create.handle_array);
                     break;
+                
+                case PVFS_SERV_CREATE:
+                    decode_free(resp->u.create.datafile_handles);
+                    break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
                     decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
@@ -937,7 +941,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         break;
                     }
                 case PVFS_SERV_GETCONFIG:
-                case PVFS_SERV_CREATE:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:
                 case PVFS_SERV_MGMT_REMOVE_DIRENT:
