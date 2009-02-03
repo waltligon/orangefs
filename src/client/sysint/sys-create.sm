@@ -616,16 +616,19 @@ static PINT_sm_action create_cleanup(
     if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LIST)
     {
         free(sm_p->u.create.layout.server_list.servers);
+        sm_p->u.create.layout.server_list.servers = NULL;
     }
 
     if(sm_p->u.create.dist)
     {
         PINT_dist_free(sm_p->u.create.dist);
+        sm_p->u.create.dist = NULL;
     }
 
     if(sm_p->u.create.datafile_handles)
     {
         free(sm_p->u.create.datafile_handles);
+        sm_p->u.create.datafile_handles = NULL;
     }
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
