@@ -1,16 +1,60 @@
 
-@article{Resilience08,
+@inproceedings{SmallFilesIPDPS09,
+ author = {Philip Carns and  Sam Lang and  Robert Ross Murali Vilayannur Julian Kunkel and  Thomas Ludwig},
+ title = {Small File Accesses in Parallel File Systems},
+ booktitle = {IPDPS},
+ year = {2009},
+ month = {March}
+}
+
+@inproceedings{PosixExtTReport,
+ author = {M. Vilayannur and  S. Lang and  R. Ross and  R. Klundt  and L. Ward},
+ title = {Extending the POSIX I/O Interface: A Parallel File System Perspective},
+ booktitle = {Technical Memorandum ANL/MCS-TM-302},
+ year = {2008},
+ month = {October},
+ url = {http://www.mcs.anl.gov/uploads/cels/papers/TM-302-FINAL.pdf}
+}
+
+@inproceedings{LogBasedWritesPDSI08,
+ title = {Fast Log-based Concurrent Writing of Checkpoints},
+ author = {Milo Polte and Jiri Simsa and Wittawat Tantisiriroj and Garth Gibson},
+ booktitle = {Third Petascale Data Storage Workshop, Supercomputing},
+ year = {2008},
+ month = {November},
+ url = {http://www.pdsi-scidac.org/events/PDSW08/resources/papers/polte.pdf}
+}
+
+@inproceedings{OSDPDSI08,
+ title = {Revisiting the Metadata Architecture of Parallel File Systems},
+ author = {N. Ali and  A. Devulapalli and  D. Dalessandro and  P. Wyckoff and P. Sadayappan},
+ booktitle = {Third Petascale Data Storage Workshop, Supercomputing},
+ year = {2008},
+ month = {November},
+ url = {http://www.cse.ohio-state.edu/~alin/papers/pdsw2008.pdf}
+}
+
+@inproceedings{OSDCluster08,
+ author = {N. Ali and  A. Devulapalli and  D. Dalessandro and  P. Wyckoff and  P. Sadayappan},
+ title = {An OSD-based Approach to Managing Directory Operations in Parallel File Systems},
+ booktitle = {IEEE International Conference on Cluster Computing},
+ year = {2008},
+ month = {September},
+ url = {http://www.cse.ohio-state.edu/~alin/papers/cluster2008.pdf}
+}
+
+@inproceedings{Resilience08,
  author = {Bradley W. Settlemyer and Walter B. Ligon III},
  title  = {A Technique for Lock-Less Mirroring in Parallel File Systems},
- journal = {The Workshop On Resiliency in High-Performance Computing at The Eighth IEEE International Symposium on Cluster Computing and the Grid},
+ booktitle = {The Workshop On Resiliency in High-Performance Computing at The Eighth IEEE International Symposium on Cluster Computing and the Grid},
  year = {2008},
  url = {http://www.parl.clemson.edu/~bradles/downloads/settlemyer-MirroringInPFS.pdf}
 }
 
-@article{ServerToServerSC08,
+@inproceedings{ServerToServerSC08,
  author = {Philip H. Carns and Bradley W. Settlemyer and Water B. Ligon, III},
  title = {Using Server to Server Communication in Parallel File Systems to Simplify Consistency and Improve Performance},
- journal = {The International Conference for High Performance Computing, Networking, Storage, and Analysis},
+ booktitle = {The International Conference for High Performance Computing, Networking, Storage, and Analysis},
  month = {November},
  year = {2008},
  url = {http://www.parl.clemson.edu/~bradles/downloads/settlemyer-PFSCollectiveIO.pdf}
@@ -18,30 +62,29 @@
 
 @article{BradThesis,
  author = {Bradley W. Settlemyer},
- title = {A Mechanism for Scalable Redundancy in Parallel File Systems}
+ title = {A Mechanism for Scalable Redundancy in Parallel File Systems},
  journal = {Clemson University Master's Thesis},
  month = {May},
  year = {2006}
 }
 
-@article{pNFSPDSW07,
+@inproceedings{pNFSPDSW07,
  author = {L. Chai and X. Ouyang and R. Noronha and D.K. Panda},
  title = {pNFS/PVFS2 over InfiniBand: Early Experiences},
- journal = {Petascale Data Storage Workshop},
+ booktitle = {Petascale Data Storage Workshop},
  year = {2007},
  month = {November},
  url = {http://nowlab.cse.ohio-state.edu/publications/conf-papers/2007/pdsi07.pdf}
 }
 
-Fast Log-based Concurrent Writing of Checkpoints
-Milo Polte, Jiri Simsa, Wittawat Tantisiriroj, Garth Gibson
-@article{LogBasedWritesPDSI08,
- title = {Fast Log-based Concurrent Writing of Checkpoints},
- author = {Milo Polte and Jiri Simsa and Wittawat Tantisiriroj and Garth Gibson},
- journal = {Third Petascale Data Storage Workshop, Supercomputing},
- year = {2008},
- month = {November},
- url = {http://www.pdsi-scidac.org/events/PDSW08/resources/papers/polte.pdf}
+@article{LinuxMag07,
+ AUTHOR = "Jeffrey Layton",
+ TITLE = "Parallel Platters: File Systems for HPC Clusters",
+ JOURNAL = "Linux Magazine",
+ MONTH = "November",
+ YEAR = "2007",
+ ANNOTE = "magazine",
+ URL = "http://www.linux-mag.com/id/4358"
 }
 
 @article{HPCForum07,
@@ -479,6 +522,16 @@ Milo Polte, Jiri Simsa, Wittawat Tantisiriroj, Garth Gibson
   year        = "2000",
   pages       = "317-327",
   note        = "Best Paper Award"
+}
+
+@article{LinuxMag02,
+ AUTHOR = {Forest Hoffman},
+ TITLE = {Scalable I/O on Clusters},
+ JOURNAL = {Linux Magazine},
+ month = {July},
+ year = {2002},
+ ANNOTE = "magazine",
+ URL = "http://www.linux-mag.com/id/1107"
 }
 
 @article{LinuxJournal00,
