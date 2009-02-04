@@ -36,6 +36,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
     int ret, i;
     pthread_t *tids;
     pthread_attr_t attr;
+    pthread_t master_tid;
 
     tids = (pthread_t *)malloc(sizeof(pthread_t) * nent);
     if(!tids)
@@ -95,7 +96,19 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
         }
 
         /* create thread to perform I/O and trigger callback */
-        ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
+        if(mode == LIO_NOWAIT && i == (nent - 1))
+        {
+            /* note: in this case don't store the master's tid in the array;
+             * some thread implementations may allow the the
+             * alt_lio_thread() to complete (and try to free the array)
+             * before pthread_create() finishes execution here.
+             */
+            ret = pthread_create(&master_tid, &attr, alt_lio_thread, tmp_item);
+        }
+        else
+        {
+            ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
+        }
         if(ret != 0)
         {
             int j = 0;
