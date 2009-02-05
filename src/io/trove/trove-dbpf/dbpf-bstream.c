@@ -211,6 +211,13 @@ error_in_cleanup:
              * We just want the coalescing path to treat it like a setattr
              * so that the size update is synced before we complete.
              */
+
+            /* We need to free the aiocb_array in this case, since the
+             * dbpf_queued_op_free function won't know to do that anymore
+             */
+            free(cur_op->op.u.b_rw_list.aiocb_array);
+            cur_op->op.u.b_rw_list.aiocb_array = NULL;
+
             dbpf_queued_op_init(cur_op,
                                 DSPACE_SETATTR,
                                 ref.handle,
