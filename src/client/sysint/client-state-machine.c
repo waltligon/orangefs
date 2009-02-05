@@ -305,7 +305,7 @@ int client_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
-    PINT_client_sm *sm_p __attribute__((__unused__));
+    PINT_client_sm *sm_p;
 
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -313,6 +313,8 @@ int client_state_machine_terminate(
                  "client_state_machine_terminate smcb %p\n",smcb);
 
     PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+
+    PVFS_hint_free(sm_p->hints);
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
@@ -367,7 +369,7 @@ PVFS_error PINT_client_state_machine_post(
     PINT_sm_action sm_ret;
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
-    int pvfs_sys_op __attribute__((unused)) = PINT_smcb_op(smcb);
+    int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PVFS_hint_add_internal(&sm_p->hints, PINT_HINT_OP_ID, sizeof(pvfs_sys_op), &pvfs_sys_op);

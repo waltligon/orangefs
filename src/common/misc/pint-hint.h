@@ -57,6 +57,12 @@ int PVFS_hint_add_internal(
     int length,
     void *value);
 
+int PVFS_hint_replace_internal(
+    PVFS_hint *hint,
+    enum PINT_hint_type type,
+    int length,
+    void *value);
+
 #define PINT_HINT_GET_REQUEST_ID(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_REQUEST_ID, NULL) ? \
     *(uint32_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_REQUEST_ID, NULL) : 0

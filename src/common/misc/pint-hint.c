@@ -31,6 +31,8 @@ struct PINT_hint_info
     int length;
 };
 
+static int PINT_hint_check(PVFS_hint *hints, enum PINT_hint_type type);
+
 static const struct PINT_hint_info hint_types[] = {
 
     {PINT_HINT_REQUEST_ID,
@@ -114,7 +116,18 @@ int PVFS_hint_add_internal(
     int length,
     void *value)
 {
+    int ret;
     const struct PINT_hint_info *info;
+
+    info = PINT_hint_get_info_by_type(type);
+    if(info)
+    {
+        ret = PINT_hint_check(hint, info->type);
+        if(ret == -PVFS_EEXIST)
+        {
+            return PVFS_hint_replace_internal(hint, type, length, value);
+        }
+    }
 
     PINT_hint * new_hint = malloc(sizeof(PINT_hint));
     if (!new_hint)
@@ -147,13 +160,75 @@ int PVFS_hint_add_internal(
     return 0;
 }
 
-int PVFS_hint_add(
+int PVFS_hint_replace(
     PVFS_hint *hint,
     const char *type,
     int length,
     void *value)
 {
     const struct PINT_hint_info *info;
+
+    info = PINT_hint_get_info_by_name(type);
+    if(info)
+    {
+        return PVFS_hint_replace_internal(hint, info->type, length, value);
+    }
+    return PVFS_hint_add(hint, type, length, value);
+}
+
+int PVFS_hint_replace_internal(
+    PVFS_hint *hint,
+    enum PINT_hint_type type,
+    int length,
+    void *value)
+{
+    PINT_hint *tmp;
+    const struct PINT_hint_info *info;
+
+    info = PINT_hint_get_info_by_type(type);
+    if(info)
+    {
+        tmp = *hint;
+        while(tmp)
+        {
+            if(tmp->type == info->type)
+            {
+                free(tmp->value);
+                tmp->length = length;
+                tmp->value = malloc(length);
+                if(!tmp->value)
+                {
+                    return -PVFS_ENOMEM;
+                }
+                memcpy(tmp->value, value, length);
+                return 0;
+            }
+
+            tmp = tmp->next;
+        }
+    }
+    return -PVFS_ENOENT;
+}
+
+int PVFS_hint_add(
+    PVFS_hint *hint,
+    const char *type,
+    int length,
+    void *value)
+{
+    int ret;
+    const struct PINT_hint_info *info;
+
+    info = PINT_hint_get_info_by_name(type);
+    if(info)
+    {
+        ret = PINT_hint_check(hint, info->type);
+        if(ret == -PVFS_EEXIST)
+        {
+            return ret;
+        }
+    }
+
     PINT_hint * new_hint = malloc(sizeof(PINT_hint));
     if (!new_hint)
     {
@@ -170,7 +245,6 @@ int PVFS_hint_add(
 
     memcpy(new_hint->value, value, length);
 
-    info = PINT_hint_get_info_by_name(type);
     if(info)
     {
         new_hint->type = info->type;
@@ -192,6 +266,32 @@ int PVFS_hint_add(
     new_hint->next = *hint;
     *hint = new_hint;
 
+    return 0;
+}
+
+int PVFS_hint_check(PVFS_hint *hints, const char *type)
+{
+    const struct PINT_hint_info *info;
+
+    info = PINT_hint_get_info_by_name(type);
+    return PINT_hint_check(hints, info->type);
+}
+
+static int PINT_hint_check(PVFS_hint *hints, enum PINT_hint_type type)
+{
+    PINT_hint *tmp;
+
+    if(!hints) return 0;
+
+    tmp = *hints;
+    while(tmp)
+    {
+        if(tmp->type == type)
+        {
+            return -PVFS_EEXIST;
+        }
+        tmp = tmp->next;
+    }
     return 0;
 }
 
