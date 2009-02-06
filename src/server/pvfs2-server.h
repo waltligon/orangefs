@@ -499,10 +499,24 @@ typedef struct PINT_server_op
       if (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
-      __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
+        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
       } \
       else { \
+        PINT_sm_msgpair_params *mpp = &__s_op->msgarray_params; \
         PINT_init_msgpair(__s_op, __msg_p); \
+        mpp->job_context = server_job_context; \
+        if (server_config) \
+        { \
+            mpp->job_timeout = server_config->client_job_bmi_timeout; \
+            mpp->retry_limit = server_config->client_retry_limit; \
+            mpp->retry_delay = server_config->client_retry_delay_ms; \
+        } \
+        else \
+        { \
+            mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT; \
+            mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT; \
+            mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT; \
+        } \
         __location = REMOTE_OPERATION; \
         __req = &__msg_p->req; \
       } \

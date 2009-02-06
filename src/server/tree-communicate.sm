@@ -146,7 +146,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int num_partitions, num_files_per_server;
-    int i;
+    int i, j, k;
     PVFS_handle_extent_array *local_extent;
     char server_name[1024];
     struct server_configuration_s *server_config = get_server_config_struct();
@@ -221,14 +221,28 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             return -PVFS_ENOMEM;
         }
 
+        {
+            PINT_sm_msgpair_params *mpp = &s_op->msgarray_params;
+            mpp->job_context = server_job_context;
+            if (server_config)
+            {
+                mpp->job_timeout = server_config->client_job_bmi_timeout;
+                mpp->retry_limit = server_config->client_retry_limit;
+                mpp->retry_delay = server_config->client_retry_delay_ms;
+            }
+            else
+            {
+                mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
+                mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
+                mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
+            }
+        }
+
         /* Fill in the msgarray. */
         for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
         {
             PINT_sm_msgpair_state *msg_p = &s_op->msgarray[CHILD_INDEX];
-
-            int num_data_files_for_this_server = 
-//                    num_data_files - CHILD_INDEX * num_files_per_server;
-                num_files_per_server;
+            int num_data_files_for_this_server;
 
             for (num_data_files_for_this_server = num_files_per_server;
                  CHILD_INDEX*num_files_per_server + num_data_files_for_this_server >=
@@ -239,11 +253,16 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             }
 
             gossip_debug(GOSSIP_SERVER_DEBUG, "Data for child %d\n", CHILD_INDEX);
-            gossip_debug(GOSSIP_SERVER_DEBUG, "    count = %d\n",
-                extent_array[CHILD_INDEX*num_files_per_server + 1].extent_count);
-            gossip_debug(GOSSIP_SERVER_DEBUG, "    array[0] : first = %llu, last = %llu\n",
-                llu(extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].first),
-                llu(extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].last));
+            for (j = 0; j < num_data_files_for_this_server; j++) {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "    count = %d\n",
+                    extent_array[CHILD_INDEX*num_files_per_server + j + 1].extent_count);
+                for (k = 0; k < extent_array[CHILD_INDEX*num_files_per_server + j + 1].extent_count; k++) {
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "    array[%d] : first = %llu, last = %llu\n",
+                        k,
+                        llu(extent_array[CHILD_INDEX*num_files_per_server + j + 1].extent_array[k].first),
+                        llu(extent_array[CHILD_INDEX*num_files_per_server + j + 1].extent_array[k].last));
+                }
+            }
 
             switch (operation)
             {
@@ -388,12 +407,7 @@ static PINT_sm_action tree_create_resp(
 static int tree_create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-//    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-//    if (! s_op->prelude_mask & PRELUDE_LOCAL_CALL) {
       return(server_state_machine_complete(smcb));
-//    }
-//    return SM_ACTION_TERMINATE;
 }
  
 
