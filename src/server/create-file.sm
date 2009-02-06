@@ -274,6 +274,7 @@ static PINT_sm_action create_file_getattr_cleanup_and_create_dspace_init(
     int ret = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct PVFS_server_req *req;
+    int tmp_num_data_files;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_getattr_cleanup_and_create_dspace_init entered\n");
 
@@ -321,10 +322,12 @@ static PINT_sm_action create_file_getattr_cleanup_and_create_dspace_init(
         if (num_dfiles_requested_override > 0)
         {
             /* Determine the number of dfiles */
+            tmp_num_data_files = s_op->req->u.create_file.num_data_files;
             PINT_cached_config_get_num_dfiles(s_op->req->u.create_file.fs_id,
                     s_op->u.create_file.dist,
                     num_dfiles_requested_override,
-                    &s_op->req->u.create_file.num_data_files);
+                    &tmp_num_data_files);
+            s_op->req->u.create_file.num_data_files = tmp_num_data_files;
         }
         gossip_debug(GOSSIP_SERVER_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
             s_op->req->u.create_file.num_data_files, num_dfiles_requested_override);
@@ -511,6 +514,7 @@ static PINT_sm_action create_file_datafiles_setup(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct PVFS_server_req *req;
+    int tmp_num_data_files;
     
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_datafiles_setup entered\n");
 
@@ -553,7 +557,7 @@ static PINT_sm_action create_file_datafiles_setup(
     }
 
     server_config = get_server_config_struct();
-
+    tmp_num_data_files = s_op->req->u.create_file.num_data_files;
     ret = PINT_cached_config_map_servers(
         server_config,
         s_op->req->u.create_file.fs_id,
