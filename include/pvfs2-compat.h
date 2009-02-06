@@ -70,6 +70,15 @@
 
 #define PVFS_sys_flush(ref,cred)\
 	PVFS_sys_flush(ref,cred,PVFS_HINT_NULL)
+
+#define PVFS_sys_symlink(tof,ref,from,attr,cred,resp) \
+        PVFS_sys_symlink(tof,ref,from,attr,cred,resp,PVFS_HINT_NULL)
+
+#define PVFS_sys_rename(from,fref,to,tref,cred) \
+        PVFS_sys_rename(from,fref,to,tref,cred,PVFS_HINT_NULL)
+
+#define PVFS_sys_statfs(fsid,creds,resp) \
+        PVFS_sys_statfs(fsid,creds,resp,PVFS_HINT_NULL)
 #endif
 
 

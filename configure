@@ -706,6 +706,9 @@ LINUX24_KERNEL_MINOR_VER
 BUILD_ABSOLUTE_TOP
 SRC_RELATIVE_TOP
 SRC_ABSOLUTE_TOP
+FUSE_LDFLAGS
+FUSE_CFLAGS
+BUILD_FUSE
 ENABLE_COVERAGE
 STRICT_CFLAGS
 QUIET_COMPILE
@@ -1350,6 +1353,7 @@ Optional Features:
                           **EXPERIMENTAL** Use threads in the kernel
                           helper application
   --enable-fast           Disable optional debugging, enable optimizations.
+  --enable-fuse           **EXPERIMENTAL** Enable FUSE component
   --enable-strict         Turn on strict compiler warnings
   --enable-verbose-build  Enables full output during build process
   --enable-epoll          Enable use of epoll for TCP/IP polling
@@ -12469,6 +12473,82 @@ fi
 fi
 
 
+test_for_fuse()
+{
+  # Extract the first word of "pkg-config", so it can be a program name with args.
+set dummy pkg-config; ac_word=$2
+{ echo "$as_me:$LINENO: checking for $ac_word" >&5
+echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
+if test "${ac_cv_prog_HAVE_PKGCONFIG+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test -n "$HAVE_PKGCONFIG"; then
+  ac_cv_prog_HAVE_PKGCONFIG="$HAVE_PKGCONFIG" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+    ac_cv_prog_HAVE_PKGCONFIG="yes"
+    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+IFS=$as_save_IFS
+
+  test -z "$ac_cv_prog_HAVE_PKGCONFIG" && ac_cv_prog_HAVE_PKGCONFIG="no"
+fi
+fi
+HAVE_PKGCONFIG=$ac_cv_prog_HAVE_PKGCONFIG
+if test -n "$HAVE_PKGCONFIG"; then
+  { echo "$as_me:$LINENO: result: $HAVE_PKGCONFIG" >&5
+echo "${ECHO_T}$HAVE_PKGCONFIG" >&6; }
+else
+  { echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+fi
+
+
+  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+    { echo "$as_me:$LINENO: checking for FUSE library" >&5
+echo $ECHO_N "checking for FUSE library... $ECHO_C" >&6; }
+    if `pkg-config --exists fuse` ; then
+       { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+       FUSE_LDFLAGS=`pkg-config --libs fuse`
+       FUSE_CFLAGS=`pkg-config --cflags fuse`
+
+
+
+       BUILD_FUSE="1"
+
+    else
+            { { echo "$as_me:$LINENO: error: FUSE: FUSE library not found. Check LD_LIBRARY_PATH." >&5
+echo "$as_me: error: FUSE: FUSE library not found. Check LD_LIBRARY_PATH." >&2;}
+   { (exit 1); exit 1; }; }
+    fi
+  else
+          { { echo "$as_me:$LINENO: error: FUSE: pkg-config not available. Please install pkg-config." >&5
+echo "$as_me: error: FUSE: pkg-config not available. Please install pkg-config." >&2;}
+   { (exit 1); exit 1; }; }
+  fi
+}
+
+# Check whether --enable-fuse was given.
+if test "${enable_fuse+set}" = set; then
+  enableval=$enable_fuse;
+if test "x$enableval" = "xyes" ; then
+   test_for_fuse
+   CFLAGS="$CFLAGS -D__PVFS2_ENABLE_FUSE__"
+fi
+
+fi
+
+
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
     CFLAGS="$CFLAGS -g -O2"
@@ -18477,7 +18557,7 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
-ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -19040,6 +19120,7 @@ do
     "src/apps/admin/pvfs2-config") CONFIG_FILES="$CONFIG_FILES src/apps/admin/pvfs2-config" ;;
     "src/apps/karma/module.mk") CONFIG_FILES="$CONFIG_FILES src/apps/karma/module.mk" ;;
     "src/apps/vis/module.mk") CONFIG_FILES="$CONFIG_FILES src/apps/vis/module.mk" ;;
+    "src/apps/fuse/module.mk") CONFIG_FILES="$CONFIG_FILES src/apps/fuse/module.mk" ;;
     "src/apps/kernel/linux/module.mk") CONFIG_FILES="$CONFIG_FILES src/apps/kernel/linux/module.mk" ;;
     "src/io/trove/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/trove/module.mk" ;;
     "src/io/trove/trove-handle-mgmt/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/trove/trove-handle-mgmt/module.mk" ;;
@@ -19236,10 +19317,10 @@ LINUX24_KERNEL_MINOR_VER!$LINUX24_KERNEL_MINOR_VER$ac_delim
 BUILD_ABSOLUTE_TOP!$BUILD_ABSOLUTE_TOP$ac_delim
 SRC_RELATIVE_TOP!$SRC_RELATIVE_TOP$ac_delim
 SRC_ABSOLUTE_TOP!$SRC_ABSOLUTE_TOP$ac_delim
+FUSE_LDFLAGS!$FUSE_LDFLAGS$ac_delim
+FUSE_CFLAGS!$FUSE_CFLAGS$ac_delim
+BUILD_FUSE!$BUILD_FUSE$ac_delim
 ENABLE_COVERAGE!$ENABLE_COVERAGE$ac_delim
-STRICT_CFLAGS!$STRICT_CFLAGS$ac_delim
-QUIET_COMPILE!$QUIET_COMPILE$ac_delim
-BUILD_EPOLL!$BUILD_EPOLL$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -19281,6 +19362,9 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+STRICT_CFLAGS!$STRICT_CFLAGS$ac_delim
+QUIET_COMPILE!$QUIET_COMPILE$ac_delim
+BUILD_EPOLL!$BUILD_EPOLL$ac_delim
 PVFS2_SEGV_BACKTRACE!$PVFS2_SEGV_BACKTRACE$ac_delim
 build_shared!$build_shared$ac_delim
 INTELC!$INTELC$ac_delim
@@ -19315,7 +19399,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 32; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 35; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
@@ -19791,6 +19875,14 @@ echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       :  no" >&6; }
 else
    { echo "$as_me:$LINENO: result: PVFS2 configured for aio threaded callbacks       : yes" >&5
 echo "${ECHO_T}PVFS2 configured for aio threaded callbacks       : yes" >&6; }
+fi
+
+if test "x$BUILD_FUSE" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   { echo "$as_me:$LINENO: result: PVFS2 configured to use FUSE                      : yes" >&5
+echo "${ECHO_T}PVFS2 configured to use FUSE                      : yes" >&6; }
+else
+   { echo "$as_me:$LINENO: result: PVFS2 configured to use FUSE                      :  no" >&5
+echo "${ECHO_T}PVFS2 configured to use FUSE                      :  no" >&6; }
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

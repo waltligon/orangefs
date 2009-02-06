@@ -79,6 +79,7 @@ BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 NEEDS_LIBRT = @NEEDS_LIBRT@
@@ -451,6 +452,8 @@ VISSRC :=
 VISMISCSRC :=
 # KARMASRC is source for the karma gui
 KARMASRC :=
+# FUSESRC is source for the FUSE interface daemon
+FUSESRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
 KERNAPPTHRSRC :=
@@ -595,6 +598,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
+# FUSEOBJS
+FUSEOBJS := $(patsubst %.c,%.o, $(filter %.c,$(FUSESRC)))
+FUSEDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FUSESRC)))
+
 # state machine generation tool, built for the build machine, not the
 # host machine, in the case of cross-compilation
 STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
@@ -621,7 +628,7 @@ else
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
     $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
-    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
+    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
 endif
 
 ####################################################################
@@ -631,7 +638,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE)
 endif
 
 # target for building admin tools
@@ -744,6 +751,11 @@ lib/libpvfs2-server.a: $(SERVEROBJS)
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(KARMAOBJS) $(LIBS) $(call modldflags,$<)
+
+# fule for building FUSE interface and its objects
+$(FUSE): $(FUSEOBJS) $(LIBRARIES)
+	$(Q) " LD 		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $(FUSEOBJS) $(LIBS) $(call modldflags,$<)
 
 # rule for building vis executables from object files
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
@@ -902,9 +914,11 @@ clean::
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES)\
+		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
+		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
+		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma 
+		src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
 endif
@@ -1086,6 +1100,10 @@ endif
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
+endif
+
+ifdef BUILD_FUSE
+	install -m 755 $(FUSE) $(prefix)/bin
 endif
 
 	install -d $(sbindir)

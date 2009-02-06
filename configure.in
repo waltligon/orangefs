@@ -620,6 +620,42 @@ if test "x$USR_CFLAGS_SET" = "xno"; then
 fi
 ])
 
+dnl
+dnl a function to check for FUSE
+dnl
+test_for_fuse()
+{
+  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
+    AC_MSG_CHECKING([for FUSE library])
+    if `pkg-config --exists fuse` ; then
+       AC_MSG_RESULT(yes)
+       FUSE_LDFLAGS=`pkg-config --libs fuse`
+       FUSE_CFLAGS=`pkg-config --cflags fuse`
+
+       AC_SUBST(FUSE_LDFLAGS)
+       AC_SUBST(FUSE_CFLAGS)
+       BUILD_FUSE="1"
+       AC_SUBST(BUILD_FUSE)
+    else
+            AC_MSG_ERROR([FUSE: FUSE library not found. Check LD_LIBRARY_PATH.])
+    fi
+  else
+          AC_MSG_ERROR(FUSE: pkg-config not available. Please install pkg-config.)
+  fi
+}
+
+dnl FUSE component
+AC_ARG_ENABLE(fuse,
+[  --enable-fuse           **EXPERIMENTAL** Enable FUSE component],
+[
+if test "x$enableval" = "xyes" ; then
+   test_for_fuse
+   CFLAGS="$CFLAGS -D__PVFS2_ENABLE_FUSE__"
+fi
+],
+)
+
 # default CFLAGS is -g -O2, unless user set CFLAGS or asked for --enable-fast
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
     CFLAGS="$CFLAGS -g -O2"
@@ -1063,6 +1099,7 @@ src/apps/admin/module.mk
 src/apps/admin/pvfs2-config
 src/apps/karma/module.mk
 src/apps/vis/module.mk
+src/apps/fuse/module.mk
 src/apps/kernel/linux/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
@@ -1141,6 +1178,12 @@ if test "x$MISC_TROVE_FLAGS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for aio threaded callbacks       : yes])
+fi
+
+if test "x$BUILD_FUSE" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured to use FUSE                      : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to use FUSE                      :  no])
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
