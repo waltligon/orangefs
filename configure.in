@@ -489,6 +489,8 @@ AC_ARG_WITH(tau,
 AC_SUBST(TAU_INCS)
 AC_SUBST(BUILD_TAU)
 
+BUILD_KERNEL=
+
 dnl
 dnl Enables the kernel module to build if the appropriate
 dnl linux-2.6.x path is specified
@@ -516,7 +518,12 @@ AC_ARG_WITH(kernel,
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
     LINUX_KERNEL_SRC="$withval"
-    , LINUX_KERNEL_SRC="")
+    , LINUX_KERNEL_SRC=""
+
+    BUILD_KERNEL=1
+)
+
+AC_SUBST(BUILD_KERNEL)
 
 dnl
 dnl Enables the kernel module to build if the appropriate

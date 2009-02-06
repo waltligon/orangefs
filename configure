@@ -699,6 +699,7 @@ NPTL_WORKAROUND
 MISC_TROVE_FLAGS
 TAU_INCS
 BUILD_TAU
+BUILD_KERNEL
 THREADED_KMOD_HELPER
 LINUX_KERNEL_SRC
 LINUX24_KERNEL_SRC
@@ -7928,6 +7929,8 @@ fi
 
 
 
+BUILD_KERNEL=
+
 
 # Check whether --with-kernel was given.
 if test "${with_kernel+set}" = set; then
@@ -7962,7 +7965,12 @@ echo "$as_me: error: The kernel source tree does not appear to be 2.6" >&2;}
 
 else
   LINUX_KERNEL_SRC=""
+
+    BUILD_KERNEL=1
+
 fi
+
+
 
 
 
@@ -19310,6 +19318,7 @@ NPTL_WORKAROUND!$NPTL_WORKAROUND$ac_delim
 MISC_TROVE_FLAGS!$MISC_TROVE_FLAGS$ac_delim
 TAU_INCS!$TAU_INCS$ac_delim
 BUILD_TAU!$BUILD_TAU$ac_delim
+BUILD_KERNEL!$BUILD_KERNEL$ac_delim
 THREADED_KMOD_HELPER!$THREADED_KMOD_HELPER$ac_delim
 LINUX_KERNEL_SRC!$LINUX_KERNEL_SRC$ac_delim
 LINUX24_KERNEL_SRC!$LINUX24_KERNEL_SRC$ac_delim
@@ -19320,7 +19329,6 @@ SRC_ABSOLUTE_TOP!$SRC_ABSOLUTE_TOP$ac_delim
 FUSE_LDFLAGS!$FUSE_LDFLAGS$ac_delim
 FUSE_CFLAGS!$FUSE_CFLAGS$ac_delim
 BUILD_FUSE!$BUILD_FUSE$ac_delim
-ENABLE_COVERAGE!$ENABLE_COVERAGE$ac_delim
 _ACEOF
 
   if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 97; then
@@ -19362,6 +19370,7 @@ _ACEOF
 ac_delim='%!_!# '
 for ac_last_try in false false false false false :; do
   cat >conf$$subs.sed <<_ACEOF
+ENABLE_COVERAGE!$ENABLE_COVERAGE$ac_delim
 STRICT_CFLAGS!$STRICT_CFLAGS$ac_delim
 QUIET_COMPILE!$QUIET_COMPILE$ac_delim
 BUILD_EPOLL!$BUILD_EPOLL$ac_delim
@@ -19399,7 +19408,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 35; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 36; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5
