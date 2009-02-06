@@ -220,6 +220,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             gossip_err("tree_communicate: failed to allocate msgarray\n");
             return -PVFS_ENOMEM;
         }
+        memset(s_op->msgarray, 0, s_op->msgarray_count * sizeof(PINT_sm_msgpair_state));
 
         {
             PINT_sm_msgpair_params *mpp = &s_op->msgarray_params;
@@ -335,6 +336,8 @@ static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->resp.u.tree_create.handle_array, 0,
+        s_op->req->u.tree_create.num_data_files * sizeof(PVFS_handle));
 
     tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_create.num_data_files,
         s_op->req->u.tree_create.fs_id, PVFS_SERV_TREE_CREATE,

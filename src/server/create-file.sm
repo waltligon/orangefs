@@ -542,6 +542,8 @@ static PINT_sm_action create_file_datafiles_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->u.create_file.io_handle_extent_array, 0,
+        s_op->req->u.create_file.num_data_files * sizeof(PVFS_handle_extent_array));
 
     /* allocate data server bmi address array */
     if (s_op->u.create_file.data_server_addrs == NULL)
@@ -555,6 +557,8 @@ static PINT_sm_action create_file_datafiles_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->u.create_file.data_server_addrs, 0,
+        s_op->req->u.create_file.num_data_files * sizeof(PVFS_BMI_addr_t));
 
     server_config = get_server_config_struct();
     tmp_num_data_files = s_op->req->u.create_file.num_data_files;
@@ -601,6 +605,9 @@ static PINT_sm_action create_file_datafiles_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(tree_create_s_op->resp.u.tree_create.handle_array, 0,
+        tree_create_s_op->req->u.tree_create.num_data_files *
+               sizeof(PVFS_handle));
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
