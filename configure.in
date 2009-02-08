@@ -518,12 +518,9 @@ AC_ARG_WITH(kernel,
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
     LINUX_KERNEL_SRC="$withval"
-    , LINUX_KERNEL_SRC=""
-
     BUILD_KERNEL=1
+    , LINUX_KERNEL_SRC=""
 )
-
-AC_SUBST(BUILD_KERNEL)
 
 dnl
 dnl Enables the kernel module to build if the appropriate
@@ -552,8 +549,10 @@ AC_ARG_WITH(kernel24,
        k24_minor_ver=$tmp_k24_minor_ver
     fi
     LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="`echo $k24_minor_ver| cut -d'.' -f 1`"
+    BUILD_KERNEL=1
     , LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER="")
 
+AC_SUBST(BUILD_KERNEL)
 
 dnl now that we have the path to kernel source we can feature-test kernels. 
 

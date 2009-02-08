@@ -7962,15 +7962,12 @@ echo "$as_me: error: The kernel source tree does not appear to be 2.6" >&2;}
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
     LINUX_KERNEL_SRC="$withval"
+    BUILD_KERNEL=1
 
 else
   LINUX_KERNEL_SRC=""
 
-    BUILD_KERNEL=1
-
 fi
-
-
 
 
 
@@ -8004,10 +8001,12 @@ echo "$as_me: error: The kernel source tree does not appear to be 2.4" >&2;}
        k24_minor_ver=$tmp_k24_minor_ver
     fi
     LINUX24_KERNEL_SRC="$withval" LINUX24_KERNEL_MINOR_VER="`echo $k24_minor_ver| cut -d'.' -f 1`"
+    BUILD_KERNEL=1
 
 else
   LINUX24_KERNEL_SRC="" LINUX24_KERNEL_MINOR_VER=""
 fi
+
 
 
 
