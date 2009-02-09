@@ -1146,7 +1146,7 @@ static PINT_sm_action io_datafile_complete_operations(
                  (js_p->error_code == -PVFS_EPROTO))
             {
                 /* if this is a an error that we can retry */
-                gossip_debug(GOSSIP_IO_DEBUG,
+                gossip_err(
                    "%s: flow failed, retrying from msgpair\n", __func__);
                 cur_ctx->msg_send_has_been_posted = 0;
                 cur_ctx->msg_recv_has_been_posted = 0;
@@ -1154,7 +1154,7 @@ static PINT_sm_action io_datafile_complete_operations(
             else
             {
                 /* do not retry on remaining error codes */
-                gossip_debug(GOSSIP_IO_DEBUG,
+                gossip_err(
                    "%s: flow failed, not retrying\n", __func__);
 
                 /* forcing the count high insures that the sm won't restart */
