@@ -222,7 +222,7 @@ static PINT_sm_action create_file_getattr_init(
 
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, getattr_s_op,
         s_op->req->u.create_file.parent_handle,
-        s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req);
+        s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req, 0);
     PINT_SERVREQ_GETATTR_FILL(*req,
                               s_op->credentials,
                               s_op->req->u.create_file.fs_id,
@@ -415,7 +415,7 @@ static PINT_sm_action create_file_getattr_cleanup_and_create_dspace_init(
 
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
             s_op->req->u.create_file.meta_handle_extent_array.extent_array[0].first,
-            s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req);
+            s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req, 0);
 
         PINT_SERVREQ_CREATE_FILL(
             *req,
@@ -586,7 +586,7 @@ static PINT_sm_action create_file_datafiles_setup(
     js_p->error_code = LOCAL_OPERATION;
     /* Create a server frame for processing the datafile creates. */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_create_s_op, 0, s_op->req->u.create_file.fs_id,
-        js_p->error_code, msg_p, req);
+        js_p->error_code, msg_p, req, 0);
     PINT_SERVREQ_TREE_CREATE_FILL(
         *req,
         s_op->credentials,
@@ -672,13 +672,17 @@ static PINT_sm_action create_file_setattr_setup(
            s_op->req->u.create_file.num_data_files * sizeof(PVFS_handle));
 
     /* Clean up memory allocated for the tree_create call. */
+    if (tree_create_s_op->resp.u.tree_create.handle_array)
+    {
+        free(tree_create_s_op->resp.u.tree_create.handle_array);
+    }
     free(tree_create_s_op);
     tree_create_s_op = NULL;
 
     /* Create a server frame for calling setattr. */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, setattr_s_op,
         s_op->u.create_file.metafile_handle, s_op->req->u.create_file.fs_id,
-        js_p->error_code, msg_p, req);
+        js_p->error_code, msg_p, req, 0);
     PINT_SERVREQ_SETATTR_FILL(
         *req,
         s_op->credentials,
@@ -753,7 +757,7 @@ static PINT_sm_action create_file_crdirent_setup(
 
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, crdirent_s_op,
         s_op->req->u.create_file.parent_handle,
-        s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req);
+        s_op->req->u.create_file.fs_id, js_p->error_code, msg_p, req, 0);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         *req,
@@ -845,6 +849,18 @@ static PINT_sm_action create_file_cleanup(
     {
         PINT_dist_free(s_op->u.create_file.dist);
         s_op->u.create_file.dist = NULL;
+    }
+
+    if (s_op->u.create_file.data_server_addrs)
+    {
+        free(s_op->u.create_file.data_server_addrs);
+        s_op->u.create_file.data_server_addrs = NULL;
+    }
+
+    if (s_op->u.create_file.io_handle_extent_array)
+    {
+        free(s_op->u.create_file.io_handle_extent_array);
+        s_op->u.create_file.io_handle_extent_array = NULL;
     }
 
 #if 0

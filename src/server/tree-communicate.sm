@@ -75,8 +75,17 @@ nested machine pvfs2_tree_create_work_sm
 
     state tree_create_xfer_msgpair_array
     {
-/* TODO: This needs to turn into a pjmp */
-        jump pvfs2_msgpairarray_sm;
+        pjmp tree_communicate_prepare_pjmp
+        {
+            REMOTE_OPERATION => pvfs2_msgpairarray_sm;
+        }
+        success => tree_create_cleanup_pjmp_stack;
+        default => return;
+    }
+
+    state tree_create_cleanup_pjmp_stack
+    {
+        run tree_communicate_cleanup_pjmp_stack;
         success => tree_create_local;
         default => return;
     }
@@ -116,8 +125,9 @@ static int tree_create_comp_fn(void *v_p,
                  "tree_create_comp_fn[%d]\n",index);
     
     assert(resp_p->op == PVFS_SERV_TREE_CREATE);
+//    s_op = PINT_sm_frame(smcb, -1);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+//    assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
 
     if (resp_p->status != 0)
     {   
@@ -188,6 +198,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
+        s_op->num_pjmp_frames = num_partitions;
 
         /* Arrange for the local extent to be first in the extent_array. */
         for (i = 0; i < num_data_files; i++)
@@ -211,38 +222,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         }
 
 
-        /* Allocate msgarray. */
-        s_op->msgarray_count = num_partitions;
-        s_op->msgarray = (PINT_sm_msgpair_state *)malloc(
-            (s_op->msgarray_count * sizeof(PINT_sm_msgpair_state)));
-        if (s_op->msgarray == NULL)
-        {
-            gossip_err("tree_communicate: failed to allocate msgarray\n");
-            return -PVFS_ENOMEM;
-        }
-        memset(s_op->msgarray, 0, s_op->msgarray_count * sizeof(PINT_sm_msgpair_state));
-
-        {
-            PINT_sm_msgpair_params *mpp = &s_op->msgarray_params;
-            mpp->job_context = server_job_context;
-            if (server_config)
-            {
-                mpp->job_timeout = server_config->client_job_bmi_timeout;
-                mpp->retry_limit = server_config->client_retry_limit;
-                mpp->retry_delay = server_config->client_retry_delay_ms;
-            }
-            else
-            {
-                mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
-                mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
-                mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
-            }
-        }
-
-        /* Fill in the msgarray. */
+        /* Prepare the stack for pjmp. */
         for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
         {
-            PINT_sm_msgpair_state *msg_p = &s_op->msgarray[CHILD_INDEX];
+            PINT_server_op *tree_communicate_s_op;
+            PINT_sm_msgpair_state *msg_p;
+            struct PVFS_server_req *req;
             int num_data_files_for_this_server;
 
             for (num_data_files_for_this_server = num_files_per_server;
@@ -265,10 +250,21 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 }
             }
 
+            PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
+                extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].first,
+                fs_id, js_p->error_code, msg_p, req, REMOTE_OPERATION);
+
             switch (operation)
             {
                 case PVFS_SERV_TREE_CREATE:
                 {
+                    tree_communicate_s_op->resp.u.tree_create.caller_handle_index =
+                        s_op->resp.u.tree_create.caller_handle_index;
+                    tree_communicate_s_op->resp.u.tree_create.handle_count =
+                        s_op->resp.u.tree_create.handle_count;
+                    tree_communicate_s_op->resp.u.tree_create.handle_array =
+                        s_op->resp.u.tree_create.handle_array;
+
                     PINT_SERVREQ_TREE_CREATE_FILL(
                         msg_p->req,
                         s_op->req->credentials,
@@ -308,11 +304,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i;
+//    int i;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_create_setup entered\n");
 
     assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
+/*
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_create_setup: num_data_files = %d\n", s_op->req->u.tree_create.num_data_files);
     for (i = 0; i < s_op->req->u.tree_create.num_data_files; i++) {
         gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -321,28 +318,52 @@ static PINT_sm_action tree_create_setup(struct PINT_smcb *smcb, job_status_s *js
             llu(s_op->req->u.tree_create.io_handle_extent_array[i].extent_array[0].first),
             llu(s_op->req->u.tree_create.io_handle_extent_array[i].extent_array[0].last));
     }
-
+*/
 
     s_op->resp.u.tree_create.caller_handle_index = s_op->req->u.tree_create.caller_handle_index;
     s_op->resp.u.tree_create.handle_count = s_op->req->u.tree_create.num_data_files;
 
-    /* allocate handle array */
-    s_op->resp.u.tree_create.handle_array = (PVFS_handle *)
-        malloc(s_op->req->u.tree_create.num_data_files *
-               sizeof(PVFS_handle));
     if (! s_op->resp.u.tree_create.handle_array)
     {
-        gossip_err("tree_create: failed to allocate handle_array\n");
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
+        /* allocate handle array */
+        s_op->resp.u.tree_create.handle_array = (PVFS_handle *)
+            malloc(s_op->req->u.tree_create.num_data_files *
+                   sizeof(PVFS_handle));
+        if (! s_op->resp.u.tree_create.handle_array)
+        {
+            gossip_err("tree_create: failed to allocate handle_array\n");
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(s_op->resp.u.tree_create.handle_array, 0,
+            s_op->req->u.tree_create.num_data_files * sizeof(PVFS_handle));
     }
-    memset(s_op->resp.u.tree_create.handle_array, 0,
-        s_op->req->u.tree_create.num_data_files * sizeof(PVFS_handle));
 
-    tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_create.num_data_files,
+    return(tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_create.num_data_files,
         s_op->req->u.tree_create.fs_id, PVFS_SERV_TREE_CREATE,
-        s_op->req->u.tree_create.io_handle_extent_array);
+        s_op->req->u.tree_create.io_handle_extent_array));
+}
 
+static PINT_sm_action tree_communicate_prepare_pjmp(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action tree_communicate_cleanup_pjmp_stack(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* get frame from bottom of stack */
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i, task_id, error_code;
+    PINT_server_op *old_frame;
+
+    /* for each state machine spawned, pop a frame */
+    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    {   
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        assert(task_id == REMOTE_OPERATION);
+        free(old_frame);
+    }
+ 
     return SM_ACTION_COMPLETE;
 }
 
@@ -362,7 +383,7 @@ static PINT_sm_action tree_create_local(struct PINT_smcb *smcb, job_status_s *js
     /* Create a stack frame for the local create. */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
         s_op->req->u.tree_create.io_handle_extent_array[0].extent_array[0].first,
-        s_op->req->u.tree_create.fs_id, js_p->error_code, msg_p, req);
+        s_op->req->u.tree_create.fs_id, js_p->error_code, msg_p, req, 0);
 
     PINT_SERVREQ_CREATE_FILL(
         *req,
@@ -410,7 +431,16 @@ static PINT_sm_action tree_create_resp(
 static int tree_create_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-      return(server_state_machine_complete(smcb));
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+            
+    gossip_debug(GOSSIP_SERVER_DEBUG, "tree_create_cleanup entered\n");
+ 
+    if (s_op->resp.u.tree_create.handle_array)
+    {
+        free(s_op->resp.u.tree_create.handle_array);
+        s_op->resp.u.tree_create.handle_array = NULL;
+    }
+    return(server_state_machine_complete(smcb));
 }
  
 

@@ -452,6 +452,8 @@ typedef struct PINT_server_op
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
 
+    int num_pjmp_frames;
+
     union
     {
 	/* request-specific scratch spaces for use during processing */
@@ -484,7 +486,7 @@ typedef struct PINT_server_op
     __msg_p->retry_flag = __retry_flag; \
     __msg_p->comp_fn = __comp_fn;
     
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __msg_p, __req) \
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __msg_p, __req, task_id) \
     do { \
       char server_name[1024]; \
       struct server_configuration_s *server_config = get_server_config_struct(); \
@@ -492,11 +494,11 @@ typedef struct PINT_server_op
       if(!__s_op) { return -PVFS_ENOMEM; } \
       memset(__s_op, 0, sizeof(struct PINT_server_op)); \
       __s_op->req = &__s_op->decoded.stub_dec.req; \
-      PINT_sm_push_frame(__smcb, 0, __s_op); \
+      PINT_sm_push_frame(__smcb, task_id, __s_op); \
       if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && __handle) { \
         PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
       } \
-      if (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name))) { \
+      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
         __location = LOCAL_OPERATION; \
         __req = __s_op->req; \
         __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
