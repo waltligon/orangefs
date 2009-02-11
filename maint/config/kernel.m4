@@ -1141,5 +1141,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        dnl newer 2.6 kernels (2.6.28) use d_obtain_alias instead of d_alloc_anon
+        AC_MSG_CHECKING(for d_alloc_anon)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/dcache.h>
+        ], [
+                struct inode *i;
+                d_alloc_anon(i);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_ALLOC_ANON, 1, [Define if dcache.h contains 
+                  d_alloc_annon]),
+        AC_MSG_RESULT(no)
+        )
+
 	CFLAGS=$oldcflags
+
 ])
