@@ -935,7 +935,7 @@ static const configoption_t options[] =
      * <a href="#StorageHints">StorageHints</a> context for that filesystem.
      */
     {"TroveMethod", ARG_STR, get_trove_method, NULL, 
-        CTX_DEFAULTS|CTX_STORAGEHINTS, "dbpf"},
+        CTX_DEFAULTS|CTX_STORAGEHINTS, "alt-aio"},
 
     /* Specifies the file system's key for use in HMAC-based digests of
      * client operations.
