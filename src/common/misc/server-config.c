@@ -919,6 +919,7 @@ static const configoption_t options[] =
      * be used to test the performance of the network without doing I/O to disk.
      * <li>dbpf.  Uses the system's Linux AIO implementation.  No longer
      * recommended in production environments.
+     * </ul>
      *
      * Note that this option can be specified in either the <a href="#Defaults">
      * Defaults</a> context of the main fs.conf, or in a filesystem specific 
