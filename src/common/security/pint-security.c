@@ -351,6 +351,13 @@ int PINT_security_finalize(void)
 
 #ifndef SECURITY_ENCRYPTION_NONE
 
+/* PINT_verify_certificate
+ * 
+ * Verifies an X.509 certificate against the local trust store.
+ *
+ * returns negative on error.
+ * returns 0 on success.
+ */
 int PINT_verify_certificate(const char *certstr,
                             const unsigned char *signature,
                             unsigned int sig_size)
@@ -497,6 +504,13 @@ int PINT_verify_certificate(const char *certstr,
     return 0;
 }
 
+/* PINT_lookup_account
+ *
+ * Finds the user account mapped to the given X.509 certificate.
+ *
+ * returns the account name on success.
+ * returns NULL if no mapping exists.
+ */
 const char *PINT_lookup_account(const char *certstr)
 {
     BIO *certbio;
@@ -560,6 +574,14 @@ const char *PINT_lookup_account(const char *certstr)
     return account;
 }
 
+/* PINT_lookup_userid
+ * 
+ * Searches for a userid that matches the given account in the system
+ * password database.
+ *
+ * returns negative on failure.
+ * returns zero on success.
+ */
 int PINT_lookup_userid(const char *account, PVFS_uid *userid)
 {
     struct passwd pwbuf;
@@ -593,6 +615,13 @@ int PINT_lookup_userid(const char *account, PVFS_uid *userid)
     return 0;
 }
 
+/* PINT_lookup_groups
+ *
+ * Searches the password database for every group of the specified account.
+ *
+ * returns negative on error.
+ * returns zero on success.
+ */
 int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
         uint32_t *num_groups)
 {
@@ -634,8 +663,7 @@ int PINT_lookup_groups(const char *account, PVFS_gid **group_array,
     {
         for (i = 0; grent->gr_mem[i]; i++)
         {
-            /* XXX: should case matter? */
-            if (!strcasecmp(grent->gr_mem[i], account))
+            if (!strcmp(grent->gr_mem[i], account))
             {
                 groups[ngroups] = grent->gr_gid;
                 ngroups++;
@@ -836,6 +864,13 @@ int PINT_verify_capability(PVFS_capability *data)
     return (ret == 1);
 }
 
+/* PINT_sign_credential
+ *
+ * Digitally signs a credential with the server private key.
+ *
+ * returns -1 on error.
+ * returns 0 on success.
+ */
 int PINT_sign_credential(PVFS_credential *cred)
 {
     const struct server_configuration_s *conf;
@@ -1157,6 +1192,11 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
     return ok;
 }
 
+/* find_account
+ *
+ * Internal function to find matches in the mappings configuration for the
+ * given subject strings and email addresses.
+ */
 /* TODO: consider logging matches for debugging configs */
 /* TODO: consider case-insensitve compare */
 static const char *find_account(const char *subject, const STACK *emails)
@@ -1375,6 +1415,13 @@ int PINT_init_capability(PVFS_capability *cap)
     return ret;
 }
 
+/* PINT_init_credential
+ *
+ * Initializes a credential and allocates memory for its internal members.
+ *
+ * returns negative on error.
+ * returns zero on success.
+ */
 int PINT_init_credential(PVFS_credential *cred)
 {
     int ret = 0;
