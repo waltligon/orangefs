@@ -565,7 +565,7 @@ static PINT_sm_action create_file_datafiles_setup(
     ret = PINT_cached_config_map_servers(
         server_config,
         s_op->req->u.create_file.fs_id,
-        &s_op->req->u.create_file.num_data_files,
+        &tmp_num_data_files,
         &s_op->u.create_file.layout,
         s_op->u.create_file.data_server_addrs,
         s_op->u.create_file.io_handle_extent_array);
