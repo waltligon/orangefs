@@ -24,6 +24,11 @@
 */
 #define BMI_TCP_ZERO_READ_LIMIT  10
 
+/* wait no more than 10 seconds for a partial BMI header to arrive on a
+ * socket once we have detected part of it.
+ */
+#define BMI_TCP_HEADER_WAIT_SECONDS 10
+
 /* peer name types */
 #define BMI_TCP_PEER_IP 1
 #define BMI_TCP_PEER_HOSTNAME 2
@@ -65,6 +70,8 @@ struct tcp_addr
     int sc_index;
     /* count of the number of sequential zero read operations */
     int zero_read_limit;
+    /* timer for how long we wait on incomplete headers to arrive */
+    int short_header_timer;
     /* flag used to determine if we can reconnect this address after failure */
     int dont_reconnect;
     char* peer;

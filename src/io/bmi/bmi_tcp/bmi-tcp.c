@@ -18,6 +18,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h>
 #include "pint-mem.h"
 
 #include "pvfs2-config.h"
@@ -2947,6 +2948,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     int tmp_errno;
     int tmp;
     bmi_size_t old_amt_complete = 0;
+    time_t current_time;
 
     *stall_flag = 1;
 
@@ -3041,7 +3043,21 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
 
     if (ret < TCP_ENC_HDR_SIZE)
     {
-	/* header not ready yet */
+        current_time = time(NULL);
+        if(!tcp_addr_data->short_header_timer)
+        {
+            tcp_addr_data->short_header_timer = current_time;
+        }
+        else if((current_time - tcp_addr_data->short_header_timer) > 
+            BMI_TCP_HEADER_WAIT_SECONDS)
+        {
+	    gossip_err("Error: incomplete BMI TCP header after %d seconds, closing connection.\n",
+                BMI_TCP_HEADER_WAIT_SECONDS);
+            tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EPIPE));
+            return (0);
+        }
+
+	/* header not ready yet, but we will keep hoping */
 	return (0);
     }
 
