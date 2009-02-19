@@ -181,9 +181,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int tmp_count;
     int i;
     int skip_flag;
-#ifndef __PVFS2_JOB_THREADED__
-    struct epoll_event event;
-#endif
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
@@ -191,90 +188,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     memset(status, 0, (sizeof(int) * incount));
 
     gen_mutex_lock(&scp->mutex);
-
-#ifndef __PVFS2_JOB_THREADED__
-    gen_mutex_lock(&scp->queue_mutex);
-
-    /* look for addresses slated for removal */
-    qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-        
-
-        /* take out of the epoll set */
-        if(tcp_addr_data->sc_index > -1)
-        {
-            memset(&event, 0, sizeof(event));
-            event.events = 0;
-            event.data.ptr = tcp_addr_data->map;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_DEL, tcp_addr_data->socket,
-                &event);
-
-            if(ret < 0 && errno != ENOENT)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-
-	    tcp_addr_data->sc_index = -1;
-	    tcp_addr_data->write_ref_count = 0;
-        }
-    }
-
-    /* look for addresses slated for addition */
-    qlist_for_each_safe(iterator, scratch, &scp->add_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-
-	if(tcp_addr_data->sc_index > -1)
-	{
-            memset(&event, 0, sizeof(event));
-	    /* update existing entry */
-            event.data.ptr = tcp_addr_data->map;
-            event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
-	    if(tcp_addr_data->write_ref_count > 0)
-                event.events |= EPOLLOUT;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_MOD, tcp_addr_data->socket,
-                            &event);
-
-            if(ret < 0 && errno != ENOENT)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-	}
-	else
-	{
-	    /* new entry */
-            tcp_addr_data->sc_index = 1;
-
-            memset(&event, 0, sizeof(event));
-            event.data.ptr = tcp_addr_data->map;
-            event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
-	    if(tcp_addr_data->write_ref_count > 0)
-                event.events |= EPOLLOUT;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_ADD, tcp_addr_data->socket,
-                &event);
-            if(ret < 0 && errno != EEXIST)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-	}
-    }
-    gen_mutex_unlock(&scp->queue_mutex);
-#endif
 
     /* actually do the epoll_wait() here */
     do

@@ -53,50 +53,9 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket);
 void BMI_socket_collection_queue(socket_collection_p scp,
 			   bmi_method_addr_p map, struct qlist_head* queue);
 
-#ifndef __PVFS2_JOB_THREADED__
 /* the bmi_tcp code may try to add a socket to the collection before
  * it is fully connected, just ignore in this case
  */
-#define BMI_socket_collection_add(s, m) \
-do { \
-    struct tcp_addr* tcp_data = (m)->method_data; \
-    if(tcp_data->socket > -1){ \
-	gen_mutex_lock(&((s)->queue_mutex)); \
-	BMI_socket_collection_queue(s, m, &((s)->add_queue)); \
-	gen_mutex_unlock(&((s)->queue_mutex)); \
-    } \
-} while(0)
-
-#define BMI_socket_collection_remove(s, m) \
-do { \
-    gen_mutex_lock(&((s)->queue_mutex)); \
-    BMI_socket_collection_queue(s, m, &((s)->remove_queue)); \
-    gen_mutex_unlock(&((s)->queue_mutex)); \
-} while(0)
-
-/* we _must_ have a valid socket at this point if we want to write data */
-#define BMI_socket_collection_add_write_bit(s, m) \
-do { \
-    struct tcp_addr* tcp_data = (m)->method_data; \
-    assert(tcp_data->socket > -1); \
-    gen_mutex_lock(&((s)->queue_mutex)); \
-    tcp_data->write_ref_count++; \
-    BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
-    gen_mutex_unlock(&((s)->queue_mutex)); \
-} while(0)
-
-#define BMI_socket_collection_remove_write_bit(s, m) \
-do { \
-    struct tcp_addr* tcp_data = (m)->method_data; \
-    gen_mutex_lock(&((s)->queue_mutex)); \
-    tcp_data->write_ref_count--; \
-    assert(tcp_data->write_ref_count > -1); \
-    BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
-    gen_mutex_unlock(&((s)->queue_mutex)); \
-} while(0)
-
-#else
-
 /* write a byte on the pipe_fd[1] so that poll breaks out in case it is idling */
 #define BMI_socket_collection_add(s, m) \
 do { \
@@ -143,9 +102,6 @@ do { \
     gen_mutex_unlock(&((s)->queue_mutex)); \
     write(s->pipe_fd[1], &c, 1);\
 } while(0)
-
-
-#endif
 
 void BMI_socket_collection_finalize(socket_collection_p scp);
 int BMI_socket_collection_testglobal(socket_collection_p scp,
