@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# try all of the normal pvfs2 command line utilites and make sure they work
+# for basic cases
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-touch $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-touch failure."
+    exit 1
+fi
+
+MYGROUP=`groups | cut -d ' ' -f 1`
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-chown $USER $MYGROUP $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-chown failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-chmod 777 $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-chmod failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-drop-caches -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-drop-caches failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fsck -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fsck failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-validate -m $PVFS2_MOUNTPOINT -c 
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-statfs failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fs-dump failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fs-dump failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-ls $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-ls failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-perror 0 
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-perror failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-stat $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-stat failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-viewdist -f $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-viewdist failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-xattr -s -k user.foo -v bar $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-xattr failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-rm $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-rm failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m $PVFS2_MOUNTPOINT "none"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-debugmask failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-mode -m $PVFS2_MOUNTPOINT "admin"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-mode failure." exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-mode -m $PVFS2_MOUNTPOINT "normal"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-mode failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-sync -m $PVFS2_MOUNTPOINT -D 0 -M 1
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-sync failure."
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-statfs -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-statfs failure."
+    exit 1
+fi
+
+
+
+
