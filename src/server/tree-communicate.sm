@@ -226,7 +226,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
         {
             PINT_server_op *tree_communicate_s_op;
-            PINT_sm_msgpair_state *msg_p;
+            PINT_sm_msgpair_state *msg_p = NULL;
             struct PVFS_server_req *req;
             int num_data_files_for_this_server;
 
