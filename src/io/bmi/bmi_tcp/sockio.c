@@ -220,34 +220,30 @@ int BMI_sockio_nbrecv(int s,
  */
 int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
-    int ret, comp = len;
-
+    int ret;
     assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
 
-    while (comp)
+  nbpeek_restart:
+    ret = recv(s, buf, len, (MSG_PEEK|DEFAULT_MSG_FLAGS));
+    if(ret == 0)
     {
-      nbpeek_restart:
-	ret = recv(s, buf, comp, (MSG_PEEK|DEFAULT_MSG_FLAGS));
-	if (!ret)	/* socket closed */
-	{
-	    errno = EPIPE;
-	    return (-1);
-	}
-	if (ret == -1 && errno == EWOULDBLOCK)
-	{
-	    return (len - comp);	/* return amount completed */
-	}
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbpeek_restart;
-	}
-	else if (ret == -1)
-	{
-	    return (-1);
-	}
-	comp -= ret;
+        errno = EPIPE;
+        return (-1);
     }
-    return (len - comp);
+    else if (ret == -1 && errno == EWOULDBLOCK)
+    {
+        return(0);
+    }
+    else if (ret == -1 && errno == EINTR)
+    {
+        goto nbpeek_restart;
+    }
+    else if (ret == -1)
+    {
+        return (-1);
+    }
+    
+    return(ret);
 }
 
 
