@@ -81,6 +81,7 @@ typedef struct {
     char *hostname;
     int port;
     ib_connection_t *c;
+    int reconnect_flag;
 } ib_method_addr_t;
 
 /*
