@@ -1528,9 +1528,9 @@ endecode_fields_2a_struct(
 
 struct PVFS_servreq_getcred
 {
-    char *certificate;
+    char *certificate; /* PEM encoded X.509 certificate */
     uint32_t sig_size;
-    PVFS_sig signature;
+    PVFS_sig signature; /* digital signature of certificate */
 };
 endecode_fields_1a_struct(
     PVFS_servreq_getcred,
