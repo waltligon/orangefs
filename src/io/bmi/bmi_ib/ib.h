@@ -11,6 +11,9 @@
 #include <src/io/bmi/bmi-types.h>
 #include <src/common/quicklist/quicklist.h>
 #include <src/common/gossip/gossip.h>
+#include <pvfs2-debug.h>
+#include <pvfs2-encode-stubs.h>
+#include <pvfs2-types.h>
 
 #ifdef __GNUC__
 /* confuses debugger */
