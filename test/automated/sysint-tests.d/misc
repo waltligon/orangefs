@@ -39,7 +39,7 @@ then
     exit 1
 fi
 
-${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-validate -m $PVFS2_MOUNTPOINT -c 
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-validate -d $PVFS2_MOUNTPOINT -c -f -s
 if [ "${?}" != 0 ]
 then
     echo "pvfs2-statfs failure."
