@@ -3061,6 +3061,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
 	return (0);
     }
 
+    tcp_addr_data->short_header_timer = 0;
     *stall_flag = 0;
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
     ret = BMI_sockio_nbrecv(tcp_addr_data->socket,
