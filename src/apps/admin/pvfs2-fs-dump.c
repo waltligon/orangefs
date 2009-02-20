@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    param_value.type = PVFS_SERV_PARAM_MODE;
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_ADMIN_MODE;
 
     /* put the servers into administrative mode */
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
                                   NULL);
     if (ret != 0)
     {
-        param_value.type = PVFS_SERV_PARAM_MODE;
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
         param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
