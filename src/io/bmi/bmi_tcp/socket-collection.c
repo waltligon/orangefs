@@ -55,7 +55,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     memset(tmp_scp, 0, sizeof(struct socket_collection));
 
-    gen_mutex_init(&tmp_scp->mutex);
     gen_mutex_init(&tmp_scp->queue_mutex);
 
     tmp_scp->pollfd_array = (struct
@@ -201,8 +200,6 @@ do_again:
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
-    gen_mutex_lock(&scp->mutex);
-
     gen_mutex_lock(&scp->queue_mutex);
 
     /* look for addresses slated for removal */
@@ -290,14 +287,12 @@ do_again:
 
     if(ret < 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
     /* nothing ready, just return */
     if(ret == 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(0);
     }
 
@@ -368,8 +363,6 @@ do_again:
 	    *outcount = (*outcount) + 1;
 	}
     }
-
-    gen_mutex_unlock(&scp->mutex);
 
     /* Under the following conditions (i.e. all of them must be true) we go back to redoing poll
      * a) There were no outstanding sockets/fds that had data

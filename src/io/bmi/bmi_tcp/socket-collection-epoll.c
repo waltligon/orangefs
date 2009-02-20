@@ -65,8 +65,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         return(NULL);
     }
 
-    gen_mutex_init(&tmp_scp->mutex);
-
     tmp_scp->server_socket = new_server_socket;
 
     if(new_server_socket > -1)
@@ -79,9 +77,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         if(ret < 0 && errno != EEXIST)
         {
             gossip_err("Error: epoll_ctl() failure: %s.\n", strerror(errno));
-#if 0
-            gen_mutex_destroy(&tmp_scp->mutex);
-#endif
             free(tmp_scp);
             return(NULL);
         }
@@ -100,9 +95,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
  */
 void BMI_socket_collection_finalize(socket_collection_p scp)
 {
-#if 0
-    gen_mutex_destroy(&scp->mutex);
-#endif
     free(scp);
     return;
 }
@@ -136,8 +128,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
-    gen_mutex_lock(&scp->mutex);
-
     /* actually do the epoll_wait() here */
     do
     {
@@ -153,14 +143,12 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     if(ret < 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(-old_errno);
     }
 
     /* nothing ready, just return */
     if(ret == 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(0);
     }
 
@@ -196,8 +184,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
         *outcount = (*outcount) + 1;
     }
-
-    gen_mutex_unlock(&scp->mutex);
 
     return (0);
 }

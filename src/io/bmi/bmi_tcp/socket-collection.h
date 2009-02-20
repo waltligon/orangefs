@@ -26,8 +26,6 @@
 
 struct socket_collection
 {
-    gen_mutex_t mutex;
-
     struct pollfd* pollfd_array;
     bmi_method_addr_p* addr_array;
     int array_max;

@@ -48,8 +48,11 @@
 #include "gen-locks.h"
 #include "pint-hint.h"
 #include "pint-event.h"
+#include "pint-util.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
+static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
+static int sc_test_busy = 0;
 
 /* function prototypes */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
@@ -1884,8 +1887,11 @@ void tcp_forget_addr(bmi_method_addr_p map,
 	/* perform a test to force the socket collection to act on the remove
 	 * request before continuing
 	 */
-	BMI_socket_collection_testglobal(tcp_socket_collection_p,
-	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0);
+        if(!sc_test_busy)
+        {
+            BMI_socket_collection_testglobal(tcp_socket_collection_p,
+                0, &tmp_outcount, &tmp_addr, &tmp_status, 0);
+        }
     }
 
     tcp_shutdown_addr(map);
@@ -2736,15 +2742,44 @@ static int tcp_do_work(int max_idle_time)
     int busy_flag = 1;
     struct timespec req;
     struct tcp_addr* tcp_addr_data = NULL;
+    struct timespec wait_time;
 
-    /* now we need to poll and see what to work on */
-    /* drop mutex while we make this call */
+    ret = 0;
+    while(sc_test_busy && ((ret == EINTR) || (ret == 0)))
+    {
+        if(max_idle_time == 0)
+        {
+            /* Someone else is busy polling sockets, but we don't want to idle.
+             * Return immediately.
+             */
+            return(0);
+        }
+        wait_time = PINT_util_get_abs_timespec(max_idle_time*1000);
+        ret = gen_cond_timedwait(&interface_cond, &interface_mutex, &wait_time);
+        if(ret == ETIMEDOUT)
+            max_idle_time = 0; /* don't bother sleeping again after this */
+    }
+
+    if(sc_test_busy)
+    {
+        /* ran out of time waiting on someone else, bail out */
+        return(0);
+    }
+
+    sc_test_busy = 1;
     gen_mutex_unlock(&interface_mutex);
+
+    /* our turn to look at the socket collection */
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
 				       addr_array, status_array,
 				       max_idle_time);
+
     gen_mutex_lock(&interface_mutex);
+    sc_test_busy = 0;
+    /* wake up anyone else who might have been waiting */
+    gen_cond_signal(&interface_cond);
+
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: socket collection:", ret);

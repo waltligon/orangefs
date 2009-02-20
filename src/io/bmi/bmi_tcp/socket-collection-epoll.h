@@ -30,8 +30,6 @@
 
 struct socket_collection
 {
-    gen_mutex_t mutex;
-
     int epfd;
     
     struct epoll_event event_array[BMI_EPOLL_MAX_PER_CYCLE];
