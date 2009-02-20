@@ -1885,7 +1885,7 @@ void tcp_forget_addr(bmi_method_addr_p map,
 	 * request before continuing
 	 */
 	BMI_socket_collection_testglobal(tcp_socket_collection_p,
-	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
+	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0);
     }
 
     tcp_shutdown_addr(map);
@@ -2743,7 +2743,7 @@ static int tcp_do_work(int max_idle_time)
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
 				       addr_array, status_array,
-				       max_idle_time, &interface_mutex);
+				       max_idle_time);
     gen_mutex_lock(&interface_mutex);
     if (ret < 0)
     {

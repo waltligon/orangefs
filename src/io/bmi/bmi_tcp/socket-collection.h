@@ -109,8 +109,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 bmi_method_addr_p * maps,
 				 int * status,
-				 int poll_timeout,
-				 gen_mutex_t* external_mutex);
+				 int poll_timeout);
 
 #endif /* __SOCKET_COLLECTION_H */
 

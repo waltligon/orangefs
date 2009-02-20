@@ -177,8 +177,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 bmi_method_addr_p * maps,
 				 int * status,
-				 int poll_timeout,
-				 gen_mutex_t* external_mutex)
+				 int poll_timeout)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
