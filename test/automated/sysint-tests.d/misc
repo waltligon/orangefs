@@ -25,11 +25,19 @@ then
     exit 1
 fi
 
-${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-drop-caches -m $PVFS2_MOUNTPOINT
+# look at the error message from this tool.  If we got an operation not
+# supported error, it just means that the server either doesn't support the
+# vm drop caches operation, or doesn't have permission.
+DC_OUT=`${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-drop-caches -m $PVFS2_MOUNTPOINT 2>&1` 
 if [ "${?}" != 0 ]
 then
-    echo "pvfs2-drop-caches failure." 1>&2
-    exit 1
+    TEST=`echo $DC_OUT | grep "not supported"`
+    if [ "${?}" != 0 ]
+    then 
+        echo $DC_OUT 1>&2
+        echo "pvfs2-drop-caches failure." 1>&2
+        exit 1
+    fi
 fi
 
 ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fsck -m $PVFS2_MOUNTPOINT
