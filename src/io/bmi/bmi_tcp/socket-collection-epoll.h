@@ -34,10 +34,6 @@ struct socket_collection
 
     int epfd;
     
-    gen_mutex_t queue_mutex;
-    struct qlist_head add_queue;
-    struct qlist_head remove_queue;
-
     struct epoll_event event_array[BMI_EPOLL_MAX_PER_CYCLE];
 
     int server_socket;
@@ -52,8 +48,6 @@ enum
 };
 
 socket_collection_p BMI_socket_collection_init(int new_server_socket);
-void BMI_socket_collection_queue(socket_collection_p scp,
-			   bmi_method_addr_p map, struct qlist_head* queue);
 
 /* the bmi_tcp code may try to add a socket to the collection before
  * it is fully connected, just ignore in this case
