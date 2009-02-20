@@ -54,6 +54,7 @@ typedef pthread_mutex_t gen_mutex_t;
 typedef pthread_t       gen_thread_t;
 typedef pthread_cond_t  gen_cond_t;
 #define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
+#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_posix_mutex_trylock(m)
@@ -75,6 +76,8 @@ typedef unsigned long gen_thread_t;
 typedef int gen_cond_t;
 
 #define GEN_MUTEX_INITIALIZER 0
+#define GEN_COND_INITIALIZER 0
+
 static inline int gen_mutex_lock(
     gen_mutex_t * mutex_p)
 {
