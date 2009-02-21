@@ -2744,28 +2744,29 @@ static int tcp_do_work(int max_idle_time)
     struct tcp_addr* tcp_addr_data = NULL;
     struct timespec wait_time;
 
-    ret = 0;
-    while(sc_test_busy && ((ret == EINTR) || (ret == 0)))
+    if(sc_test_busy)
     {
+        /* another thread is already polling or working on sockets */
         if(max_idle_time == 0)
         {
-            /* Someone else is busy polling sockets, but we don't want to idle.
-             * Return immediately.
+            /* we don't want to spend time waiting on it; return
+             * immediately.
              */
             return(0);
         }
-        wait_time = PINT_util_get_abs_timespec(max_idle_time*1000);
-        ret = gen_cond_timedwait(&interface_cond, &interface_mutex, &wait_time);
-        if(ret == ETIMEDOUT)
-            max_idle_time = 0; /* don't bother sleeping again after this */
-    }
 
-    if(sc_test_busy)
-    {
-        /* ran out of time waiting on someone else, bail out */
+        /* Sleep until working thread thread signals that it has finished
+         * its work and then return.  No need for this thread to poll;
+         * the other thread may have already finished what we wanted.
+         * This condition wait is used strictly as a best effort to
+         * prevent busy spin.  We'll sort out the results later.
+         */
+        wait_time = PINT_util_get_abs_timespec(max_idle_time*1000);
+        gen_cond_timedwait(&interface_cond, &interface_mutex, &wait_time);
         return(0);
     }
 
+    /* this thread has gained control of the polling.  */
     sc_test_busy = 1;
     gen_mutex_unlock(&interface_mutex);
 
@@ -2777,11 +2778,11 @@ static int tcp_do_work(int max_idle_time)
 
     gen_mutex_lock(&interface_mutex);
     sc_test_busy = 0;
-    /* wake up anyone else who might have been waiting */
-    gen_cond_signal(&interface_cond);
 
     if (ret < 0)
     {
+        /* wake up anyone else who might have been waiting */
+        gen_cond_broadcast(&interface_cond);
         PVFS_perror_gossip("Error: socket collection:", ret);
         /* BMI_socket_collection_testglobal() returns BMI error code */
 	return (ret);
@@ -2852,6 +2853,8 @@ static int tcp_do_work(int max_idle_time)
         gen_mutex_lock(&interface_mutex);
     }
 
+    /* wake up anyone else who might have been waiting */
+    gen_cond_broadcast(&interface_cond);
     return (0);
 }
 
