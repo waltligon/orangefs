@@ -15,10 +15,10 @@
 #include <assert.h>
 #include <sys/uio.h>
 #include <time.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <time.h>
 #include "pint-mem.h"
 
 #include "pvfs2-config.h"
@@ -48,7 +48,6 @@
 #include "gen-locks.h"
 #include "pint-hint.h"
 #include "pint-event.h"
-#include "pint-util.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
@@ -2743,6 +2742,7 @@ static int tcp_do_work(int max_idle_time)
     struct timespec req;
     struct tcp_addr* tcp_addr_data = NULL;
     struct timespec wait_time;
+    struct timeval start;
 
     if(sc_test_busy)
     {
@@ -2761,7 +2761,14 @@ static int tcp_do_work(int max_idle_time)
          * This condition wait is used strictly as a best effort to
          * prevent busy spin.  We'll sort out the results later.
          */
-        wait_time = PINT_util_get_abs_timespec(max_idle_time*1000);
+        gettimeofday(&start, NULL);
+        wait_time.tv_sec = start.tv_sec + max_idle_time / 1000;
+        wait_time.tv_nsec = (start.tv_usec + ((max_idle_time % 1000)*1000))*1000;
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
         gen_cond_timedwait(&interface_cond, &interface_mutex, &wait_time);
         return(0);
     }
