@@ -192,7 +192,7 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
          &pos->member != (head); 					\
          pos = n, n = qlist_entry(n->member.next, typeof(*n), member))
 
-static inline int qlist_exists(struct qlist_head *list, struct qlist_head *link)
+static inline int qlist_exists(struct qlist_head *list, struct qlist_head *qlink)
 {
     struct qlist_head *pos;
 
@@ -200,7 +200,7 @@ static inline int qlist_exists(struct qlist_head *list, struct qlist_head *link)
 
     qlist_for_each(pos, list)
     {
-        if(pos == link)
+        if(pos == qlink)
         {
             return 1;
         }
