@@ -129,6 +129,7 @@ sed -ie "s/chmod/dnl chmod/" configure.in
 sed -i "/src\/apps\/admin/d" configure.in
 sed -i "/src\/apps\/karma/d" configure.in
 sed -i "/src\/apps\/vis/d" configure.in
+sed -i "/src\/apps\/fuse/d" configure.in
 sed -i "/src\/apps\/kernel\/linux\/module.mk/d" configure.in
 sed -i "/src\/io\/trove/d" configure.in
 sed -i "/src\/common\/dotconf/d" configure.in
