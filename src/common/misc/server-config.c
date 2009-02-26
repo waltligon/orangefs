@@ -901,11 +901,25 @@ static const configoption_t options[] =
     {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
         CTX_STORAGEHINTS, "1"},
 
-    /* This option specifies the method used for trove.  Currently the
-     * dbpf method is the default.  Other methods include 'alt-aio'.
+    /* This option specifies the method used for trove.  The method specifies
+     * how both metadata and data are stored and managed by the PVFS servers.
+     * Currently the
+     * alt-aio method is the default.  Possible methods are:
+     * <ul>
+     * <li>alt-aio.  This uses a thread-based implementation of Asynchronous IO.
+     * <li>directio.  This uses a direct I/O implementation to perform I/O
+     * operations to datafiles.  This method may give significant performance
+     * improvement if PVFS servers are running over shared storage, especially
+     * for large I/O accesses.  For local storage, including RAID setups,
+     * the alt-aio method is recommended.
      *
-     * The null-aio method is an implementation that does no disk I/O at all
-     * and is only useful for development or debugging purposes.
+     * <li>null-aio.  This method is an implementation 
+     * that does no disk I/O at all
+     * and is only useful for development or debugging purposes.  It can
+     * be used to test the performance of the network without doing I/O to disk.
+     * <li>dbpf.  Uses the system's Linux AIO implementation.  No longer
+     * recommended in production environments.
+     * </ul>
      *
      * Note that this option can be specified in either the <a href="#Defaults">
      * Defaults</a> context of the main fs.conf, or in a filesystem specific 
@@ -921,7 +935,7 @@ static const configoption_t options[] =
      * <a href="#StorageHints">StorageHints</a> context for that filesystem.
      */
     {"TroveMethod", ARG_STR, get_trove_method, NULL, 
-        CTX_DEFAULTS|CTX_STORAGEHINTS, "dbpf"},
+        CTX_DEFAULTS|CTX_STORAGEHINTS, "alt-aio"},
 
     /* Specifies the file system's key for use in HMAC-based digests of
      * client operations.

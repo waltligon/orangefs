@@ -61,6 +61,9 @@
 /* Define if kernel super_operations contains drop_inode field */
 #undef HAVE_DROP_INODE
 
+/* Define if dcache.h contains d_alloc_annon */
+#undef HAVE_D_ALLOC_ANON
+
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
 

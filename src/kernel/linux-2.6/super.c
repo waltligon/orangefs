@@ -1062,6 +1062,8 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
                 refn.handle, refn.fs_id);
 
    inode = pvfs2_iget(sb, &refn);
+
+#ifdef HAVE_D_ALLOC_ANON
    if (inode == NULL)
    {
       return ERR_PTR(-ESTALE);
@@ -1071,12 +1073,19 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
       return (void *) inode;
    }
    dentry = d_alloc_anon(inode);
-
    if (dentry == NULL)
    {
       iput(inode);
       return ERR_PTR(-ENOMEM);
    }
+#else
+   dentry = d_obtain_alias(inode);
+   if(dentry == NULL)
+   {
+       return ERR_PTR(-ENOMEM);
+   }
+#endif
+
    dentry->d_op = &pvfs2_dentry_operations;
    return dentry;
 }

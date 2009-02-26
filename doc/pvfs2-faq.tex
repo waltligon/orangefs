@@ -1076,6 +1076,16 @@ maximum file and file system sizes for the local file system type that you are
 using for PVFS server storage and multiply these values by the number of
 servers you are using.
 
+\subsection{Mouning PVFS with the interrupt option}
+\label{sec:mountintr}
+The PVFS kernel module supports the {\tt intr} option provided by
+network file systems.  This allows applications to be sent kill signals
+when a filesystem is unresponsive (due to network failures, etc.).  The
+option can be specified at mount time:
+\begin{verbatim}
+mount -t pvfs2 -o intr tcp://hosta:3334/pvfs2-fs /pvfs-storage/
+\end{verbatim}
+
 %
 % MISSING FEATURES
 %
