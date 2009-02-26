@@ -633,6 +633,8 @@ static int getattr_object_getattr_comp_fn(
 	    return 0;
         case PVFS_TYPE_DIRDATA:
 	    return 0;
+        case PVFS_TYPE_INTERNAL:
+	    return 0;
         default:
             gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");

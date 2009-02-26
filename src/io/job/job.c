@@ -6162,7 +6162,17 @@ int job_precreate_pool_iterate_handles(
     gen_mutex_lock(&precreate_pool_mutex);
 
     fs = find_fs(fsid);
-    assert(fs);
+    if(!fs)
+    {
+        /* no precreate pools available for the requested fs; stop iteration
+         * right here
+         */
+        gen_mutex_unlock(&precreate_pool_mutex);
+        out_status_p->error_code = 0;
+        out_status_p->count = 0;
+        out_status_p->position = PVFS_ITERATE_END;
+        return(1);
+    }
 
     qlist_for_each(iterator, &fs->precreate_pool_list)
     {

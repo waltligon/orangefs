@@ -18,6 +18,7 @@ my $opt_protocol = '';
 my $opt_port = '';
 my $opt_board = '';
 my $opt_tcpport = '';
+my $opt_tcpbindspecific = '0';
 my $opt_gmport = '';
 my $opt_mxboard = '';
 my $opt_mxendpoint = '';
@@ -213,6 +214,11 @@ sub emit_defaults
     if(defined($default_logfile))
     {
         print $target "\tLogFile " . $default_logfile . "\n";
+    }
+
+    if($opt_tcpbindspecific)
+    {
+        print $target "\tTCPBindSpecific yes\n";
     }
 
     print $target "</Defaults>\n";
@@ -515,6 +521,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
   to run pvfs2-genconfig in interactive or non-interactive mode:
 
      --tcpport     <NUM>               TCP port to use (default: 3334)
+     --tcpbindspecific                 Bind TCP only to specific interfaces
      --gmport      <NUM>               GM port to use (default: 6)
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
@@ -1362,6 +1369,7 @@ my $show_specusage = '';
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
     'tcpport=i'     => \$opt_tcpport,
+    'tcpbindspecific'  => \$opt_tcpbindspecific,
     'gmport=i'      => \$opt_gmport,
     'mxboard=i'     => \$opt_mxboard,
     'mxendpoint=i'  => \$opt_mxendpoint,

@@ -65,11 +65,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         return(NULL);
     }
 
-    gen_mutex_init(&tmp_scp->mutex);
-    gen_mutex_init(&tmp_scp->queue_mutex);
-
-    INIT_QLIST_HEAD(&tmp_scp->remove_queue);
-    INIT_QLIST_HEAD(&tmp_scp->add_queue);
     tmp_scp->server_socket = new_server_socket;
 
     if(new_server_socket > -1)
@@ -82,10 +77,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         if(ret < 0 && errno != EEXIST)
         {
             gossip_err("Error: epoll_ctl() failure: %s.\n", strerror(errno));
-#if 0
-            gen_mutex_destroy(&tmp_scp->mutex);
-            gen_mutex_destroy(&tmp_scp->queue_mutex);
-#endif
             free(tmp_scp);
             return(NULL);
         }
@@ -93,48 +84,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     return (tmp_scp);
 }
-
-/* socket_collection_queue()
- * 
- * queues a tcp method_addr for addition or removal from the collection.
- *
- * returns 0 on success, -errno on failure.
- */
-void BMI_socket_collection_queue(socket_collection_p scp,
-			   bmi_method_addr_p map, struct qlist_head* queue)
-{
-    struct qlist_head* iterator = NULL;
-    struct qlist_head* scratch = NULL;
-    struct tcp_addr* tcp_addr_data = NULL;
-
-    /* make sure that this address isn't already slated for addition/removal */
-    qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	if(tcp_addr_data->map == map)
-	{
-	    qlist_del(&tcp_addr_data->sc_link);
-	    break;
-	}
-    }
-    qlist_for_each_safe(iterator, scratch, &scp->add_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	if(tcp_addr_data->map == map)
-	{
-	    qlist_del(&tcp_addr_data->sc_link);
-	    break;
-	}
-    }
-
-    /* add it on to the appropriate queue */
-    tcp_addr_data = map->method_data;
-    /* add to head, we are likely to access it again soon */
-    qlist_add(&tcp_addr_data->sc_link, queue);
-
-    return;
-}
-
 
 /* socket_collection_finalize()
  *
@@ -146,10 +95,6 @@ void BMI_socket_collection_queue(socket_collection_p scp,
  */
 void BMI_socket_collection_finalize(socket_collection_p scp)
 {
-#if 0
-    gen_mutex_destroy(&scp->mutex);
-    gen_mutex_destroy(&scp->queue_mutex);
-#endif
     free(scp);
     return;
 }
@@ -170,111 +115,18 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 bmi_method_addr_p * maps,
 				 int * status,
-				 int poll_timeout,
-				 gen_mutex_t* external_mutex)
+				 int poll_timeout)
 {
-    struct qlist_head* iterator = NULL;
-    struct qlist_head* scratch = NULL;
     struct tcp_addr* tcp_addr_data = NULL;
     int ret = -1;
     int old_errno;
     int tmp_count;
     int i;
-    int skip_flag;
-#ifndef __PVFS2_JOB_THREADED__
-    struct epoll_event event;
-#endif
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
-
-    gen_mutex_lock(&scp->mutex);
-
-#ifndef __PVFS2_JOB_THREADED__
-    gen_mutex_lock(&scp->queue_mutex);
-
-    /* look for addresses slated for removal */
-    qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-        
-
-        /* take out of the epoll set */
-        if(tcp_addr_data->sc_index > -1)
-        {
-            memset(&event, 0, sizeof(event));
-            event.events = 0;
-            event.data.ptr = tcp_addr_data->map;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_DEL, tcp_addr_data->socket,
-                &event);
-
-            if(ret < 0 && errno != ENOENT)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-
-	    tcp_addr_data->sc_index = -1;
-	    tcp_addr_data->write_ref_count = 0;
-        }
-    }
-
-    /* look for addresses slated for addition */
-    qlist_for_each_safe(iterator, scratch, &scp->add_queue)
-    {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-
-	if(tcp_addr_data->sc_index > -1)
-	{
-            memset(&event, 0, sizeof(event));
-	    /* update existing entry */
-            event.data.ptr = tcp_addr_data->map;
-            event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
-	    if(tcp_addr_data->write_ref_count > 0)
-                event.events |= EPOLLOUT;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_MOD, tcp_addr_data->socket,
-                            &event);
-
-            if(ret < 0 && errno != ENOENT)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-	}
-	else
-	{
-	    /* new entry */
-            tcp_addr_data->sc_index = 1;
-
-            memset(&event, 0, sizeof(event));
-            event.data.ptr = tcp_addr_data->map;
-            event.events = (EPOLLIN|EPOLLERR|EPOLLHUP);
-	    if(tcp_addr_data->write_ref_count > 0)
-                event.events |= EPOLLOUT;
-
-            ret = epoll_ctl(scp->epfd, EPOLL_CTL_ADD, tcp_addr_data->socket,
-                &event);
-            if(ret < 0 && errno != EEXIST)
-            {
-                /* TODO: error handling */
-                gossip_lerr("Error: epoll_ctl() failure: %s\n",
-                    strerror(errno));
-                assert(0);
-            }
-	}
-    }
-    gen_mutex_unlock(&scp->queue_mutex);
-#endif
 
     /* actually do the epoll_wait() here */
     do
@@ -291,14 +143,12 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     if(ret < 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(-old_errno);
     }
 
     /* nothing ready, just return */
     if(ret == 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(0);
     }
 
@@ -307,22 +157,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     for(i=0; i<tmp_count; i++)
     {
         assert(scp->event_array[i].events);
-        skip_flag = 0;
-
-        /* make sure this addr hasn't been removed */
-        gen_mutex_lock(&scp->queue_mutex);
-        qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
-        {
-            tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-            if(tcp_addr_data->map == scp->event_array[i].data.ptr)
-            {
-                skip_flag = 1;
-                break;
-            }
-        }
-        gen_mutex_unlock(&scp->queue_mutex);
-        if(skip_flag)
-            continue;
 
         if(scp->event_array[i].events & ERRMASK)
             status[*outcount] |= SC_ERROR_BIT;
@@ -350,8 +184,6 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
         *outcount = (*outcount) + 1;
     }
-
-    gen_mutex_unlock(&scp->mutex);
 
     return (0);
 }

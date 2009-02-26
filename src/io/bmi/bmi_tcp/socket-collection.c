@@ -55,7 +55,6 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     memset(tmp_scp, 0, sizeof(struct socket_collection));
 
-    gen_mutex_init(&tmp_scp->mutex);
     gen_mutex_init(&tmp_scp->queue_mutex);
 
     tmp_scp->pollfd_array = (struct
@@ -177,8 +176,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 bmi_method_addr_p * maps,
 				 int * status,
-				 int poll_timeout,
-				 gen_mutex_t* external_mutex)
+				 int poll_timeout)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -201,8 +199,6 @@ do_again:
     *outcount = 0;
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
-
-    gen_mutex_lock(&scp->mutex);
 
     gen_mutex_lock(&scp->queue_mutex);
 
@@ -291,14 +287,12 @@ do_again:
 
     if(ret < 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
     /* nothing ready, just return */
     if(ret == 0)
     {
-	gen_mutex_unlock(&scp->mutex);
 	return(0);
     }
 
@@ -369,8 +363,6 @@ do_again:
 	    *outcount = (*outcount) + 1;
 	}
     }
-
-    gen_mutex_unlock(&scp->mutex);
 
     /* Under the following conditions (i.e. all of them must be true) we go back to redoing poll
      * a) There were no outstanding sockets/fds that had data

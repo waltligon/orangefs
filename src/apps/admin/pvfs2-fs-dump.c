@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    param_value.type = PVFS_SERV_PARAM_MODE;
+    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_ADMIN_MODE;
 
     /* put the servers into administrative mode */
@@ -181,7 +181,7 @@ int main(int argc, char **argv)
                                   NULL);
     if (ret != 0)
     {
-        param_value.type = PVFS_SERV_PARAM_MODE;
+        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
         param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 
 	PVFS_perror("PVFS_mgmt_setparam_list", ret);
@@ -646,6 +646,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
     {
         PVFS_sysresp_getattr getattr_resp;
         PVFS_object_ref entry_ref;
+        char* fmt_string;
 
         entry_ref.handle = handle;
         entry_ref.fs_id  = cur_fs;
@@ -656,7 +657,8 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;
-            if (dot_fmt)
+            if (dot_fmt && getattr_resp.attr.objtype != PVFS_TYPE_INTERNAL &&
+                getattr_resp.attr.objtype != PVFS_TYPE_DATAFILE)
             {
                 printf("\tH%llu [shape=record, color=red, label = \"{(unknown) "
                        "| %llu (%d)}\"];\n",
@@ -664,9 +666,16 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
                        llu(handle),
                        server_idx);
             }
-            else
+            else if(!dot_fmt)
             {
-                printf("\t%s: %llu\n",
+                if(getattr_resp.attr.objtype == PVFS_TYPE_INTERNAL)
+                    fmt_string = "\t%s: %llu (server internal use)\n";
+                else if(getattr_resp.attr.objtype == PVFS_TYPE_DATAFILE)
+                    fmt_string = "\t%s: %llu (datafile, probably preallocated)\n";
+                else
+                    fmt_string = "\t%s: %llu (unknown)\n";
+
+                printf(fmt_string,
                        PVFS_mgmt_map_addr(cur_fs,
                                           creds,
                                           addr_array[server_idx],

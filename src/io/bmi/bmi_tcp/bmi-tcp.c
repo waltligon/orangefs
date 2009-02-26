@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <sys/uio.h>
 #include <time.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -49,6 +50,8 @@
 #include "pint-event.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
+static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
+static int sc_test_busy = 0;
 
 /* function prototypes */
 int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
@@ -1883,8 +1886,11 @@ void tcp_forget_addr(bmi_method_addr_p map,
 	/* perform a test to force the socket collection to act on the remove
 	 * request before continuing
 	 */
-	BMI_socket_collection_testglobal(tcp_socket_collection_p,
-	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
+        if(!sc_test_busy)
+        {
+            BMI_socket_collection_testglobal(tcp_socket_collection_p,
+                0, &tmp_outcount, &tmp_addr, &tmp_status, 0);
+        }
     }
 
     tcp_shutdown_addr(map);
@@ -2735,17 +2741,55 @@ static int tcp_do_work(int max_idle_time)
     int busy_flag = 1;
     struct timespec req;
     struct tcp_addr* tcp_addr_data = NULL;
+    struct timespec wait_time;
+    struct timeval start;
 
-    /* now we need to poll and see what to work on */
-    /* drop mutex while we make this call */
+    if(sc_test_busy)
+    {
+        /* another thread is already polling or working on sockets */
+        if(max_idle_time == 0)
+        {
+            /* we don't want to spend time waiting on it; return
+             * immediately.
+             */
+            return(0);
+        }
+
+        /* Sleep until working thread thread signals that it has finished
+         * its work and then return.  No need for this thread to poll;
+         * the other thread may have already finished what we wanted.
+         * This condition wait is used strictly as a best effort to
+         * prevent busy spin.  We'll sort out the results later.
+         */
+        gettimeofday(&start, NULL);
+        wait_time.tv_sec = start.tv_sec + max_idle_time / 1000;
+        wait_time.tv_nsec = (start.tv_usec + ((max_idle_time % 1000)*1000))*1000;
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
+        gen_cond_timedwait(&interface_cond, &interface_mutex, &wait_time);
+        return(0);
+    }
+
+    /* this thread has gained control of the polling.  */
+    sc_test_busy = 1;
     gen_mutex_unlock(&interface_mutex);
+
+    /* our turn to look at the socket collection */
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
 				       addr_array, status_array,
-				       max_idle_time, &interface_mutex);
+				       max_idle_time);
+
     gen_mutex_lock(&interface_mutex);
+    sc_test_busy = 0;
+
     if (ret < 0)
     {
+        /* wake up anyone else who might have been waiting */
+        gen_cond_broadcast(&interface_cond);
         PVFS_perror_gossip("Error: socket collection:", ret);
         /* BMI_socket_collection_testglobal() returns BMI error code */
 	return (ret);
@@ -2816,6 +2860,8 @@ static int tcp_do_work(int max_idle_time)
         gen_mutex_lock(&interface_mutex);
     }
 
+    /* wake up anyone else who might have been waiting */
+    gen_cond_broadcast(&interface_cond);
     return (0);
 }
 
@@ -2947,6 +2993,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     int tmp_errno;
     int tmp;
     bmi_size_t old_amt_complete = 0;
+    time_t current_time;
 
     *stall_flag = 1;
 
@@ -3041,10 +3088,25 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
 
     if (ret < TCP_ENC_HDR_SIZE)
     {
-	/* header not ready yet */
+        current_time = time(NULL);
+        if(!tcp_addr_data->short_header_timer)
+        {
+            tcp_addr_data->short_header_timer = current_time;
+        }
+        else if((current_time - tcp_addr_data->short_header_timer) > 
+            BMI_TCP_HEADER_WAIT_SECONDS)
+        {
+	    gossip_err("Error: incomplete BMI TCP header after %d seconds, closing connection.\n",
+                BMI_TCP_HEADER_WAIT_SECONDS);
+            tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EPIPE));
+            return (0);
+        }
+
+	/* header not ready yet, but we will keep hoping */
 	return (0);
     }
 
+    tcp_addr_data->short_header_timer = 0;
     *stall_flag = 0;
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Reading header for new op.\n");
     ret = BMI_sockio_nbrecv(tcp_addr_data->socket,

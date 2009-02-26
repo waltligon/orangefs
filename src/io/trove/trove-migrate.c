@@ -545,6 +545,7 @@ coll=%d context=%lld handle=%llu state=%d\n",
             {
                 struct stat  stat_data;
                 char         filename[PATH_MAX];
+                TROVE_size   b_size;
 
                 DBPF_GET_BSTREAM_FILENAME(filename,
                                           PATH_MAX,
@@ -552,17 +553,28 @@ coll=%d context=%lld handle=%llu state=%d\n",
                                           coll_id,
                                           llu(handles[i]));
                 ret = stat(filename, &stat_data);
-                if (ret != 0)
+                if ((ret != 0) && (errno == ENOENT))
+                {
+                    /* The bstream does not exist, assume this is due
+                     *  to lazy creation.
+                     */
+                    b_size = 0;
+                }
+                else if (ret != 0)
                 {
                     gossip_err("stat failed: ret=%d errno=%d fname=%s\n",
                                ret, errno, filename);
                     goto complete;
                 }
+                else
+                {
+                    b_size = (TROVE_size) stat_data.st_size;
+                }
 
                 /*
                  * Set bstream size
                  */
-                attrs[i].u.datafile.b_size = (TROVE_size) stat_data.st_size;
+                attrs[i].u.datafile.b_size = b_size;
 
                 ret = trove_dspace_setattr(coll_id,
                                            handles[i],

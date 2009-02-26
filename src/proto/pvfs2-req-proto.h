@@ -1307,8 +1307,10 @@ do {                                                             \
     (__req).hints = (__hints);                                   \
     (__req).u.mgmt_setparam.fs_id = (__fsid);                    \
     (__req).u.mgmt_setparam.param = (__param);                   \
-    (__req).u.mgmt_setparam.value.type = (__value)->type;        \
-    (__req).u.mgmt_setparam.value.u.value = (__value)->u.value;  \
+    if(__value){                                                 \
+        (__req).u.mgmt_setparam.value.type = (__value)->type;    \
+        (__req).u.mgmt_setparam.value.u.value = (__value)->u.value; \
+    } \
 } while (0)
 
 /* mgmt_noop ********************************************************/
