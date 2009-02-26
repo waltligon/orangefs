@@ -934,16 +934,13 @@ clean::
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4 clean
 endif
 
-saveconfig::
-	cp -p $(builddir)/config.status $(builddir)/config.save
-
 # builds a tarball of the source tree suitable for distribution
-dist: saveconfig $(SMCGEN) cleaner
+dist: $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 ifdef BUILD_BMI_ONLY
 # builds a tarball of the BMI source tree suitable for distribution
-bmidist: saveconfig cleaner
+bmidist: cleaner
 	@sh $(srcdir)/maint/make-bmi-dist.sh $(srcdir) $(builddir) @PVFS2_VERSION@
 	cp -u $(builddir)/config.save $(builddir)/config.status
 endif
@@ -960,6 +957,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	cp -p config.status config.save
 	rm -f config.log config.status config.cache 
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
