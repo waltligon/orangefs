@@ -942,7 +942,7 @@ ifdef BUILD_BMI_ONLY
 # builds a tarball of the BMI source tree suitable for distribution
 bmidist: cleaner
 	@sh $(srcdir)/maint/make-bmi-dist.sh $(srcdir) $(builddir) @PVFS2_VERSION@
-	cp -u $(builddir)/config.save $(builddir)/config.status
+	if test -f $(builddir)/config.save; then  cp -u $(builddir)/config.save $(builddir)/config.status; fi
 endif
 
 # some stuff that is cleaned in both distclean and dist targets
@@ -957,7 +957,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
-	cp -p config.status config.save
+	if test -f config.status; then cp -p config.status config.save; fi
 	rm -f config.log config.status config.cache 
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
