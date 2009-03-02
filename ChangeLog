@@ -2,6 +2,16 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.8.1
+=============
+
+* Fixes for trove migration with pre-existing
+  storage that contains empty files
+* Bug fixes to build of Infiniband BMI module
+* Build fixes for using --enable-shared
+* Update to heartbeat example
+* Fixes to tcp BMI for multiple threads calling testcontext
+
 pvfs-2.8.0
 =============
 
