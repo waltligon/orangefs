@@ -1092,7 +1092,7 @@ endif
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
 	# for compatibility in case anyone really wants "lsplus"
-	ln -s $(bindir)/pvfs2-ls $(bindir)/pvfs2-lsplus
+	ln -s pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
