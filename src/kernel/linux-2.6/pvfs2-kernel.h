@@ -740,6 +740,9 @@ struct super_block *pvfs2_get_sb(
 #endif
 #endif
 
+void pvfs2_read_inode(
+    struct inode *inode);
+
 void pvfs2_kill_sb(struct super_block *sb);
 int pvfs2_remount(
     struct super_block *sb,

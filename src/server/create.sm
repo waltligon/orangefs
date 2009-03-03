@@ -1,4 +1,4 @@
-/* 
+/*
  * (C) 2001 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
@@ -52,6 +52,21 @@ nested machine pvfs2_create_work_sm
     }
 
     state setup_resp
+    {
+        run create_setup_resp;
+        default => return;
+    }
+}
+
+nested machine pvfs2_create_work_2_sm
+{
+    state create_2
+    {
+        run create_create;
+        default => setup_resp_2;
+    }
+
+    state setup_resp_2
     {
         run create_setup_resp;
         default => return;

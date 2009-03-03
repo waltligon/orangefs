@@ -836,6 +836,7 @@ static PINT_sm_action create_file_cleanup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "create_file_cleanup entered\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "s_op->req->op = %d\n", s_op->req->op);
 
     assert(s_op->req->op == PVFS_SERV_CREATE_FILE);
 

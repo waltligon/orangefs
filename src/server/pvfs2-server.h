@@ -563,6 +563,7 @@ extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_crdirent_work_sm;
 extern struct PINT_state_machine_s pvfs2_create_sm;
 extern struct PINT_state_machine_s pvfs2_create_work_sm;
+extern struct PINT_state_machine_s pvfs2_create_work_2_sm;
 extern struct PINT_state_machine_s pvfs2_tree_create_work_sm;
 
 /* Exported Prototypes */
