@@ -1059,20 +1059,20 @@ int PINT_parse_config(
 
 #ifndef SECURITY_ENCRYPTION_NONE
 
-    if (!config_s->keystore_path)
+    if (server_alias_name && !config_s->keystore_path)
     {
         gossip_err("Configuration file error. No keystore path specified.\n");
         return 1;
     }
 
-    if (!config_s->serverkey_path)
+    if (server_alias_name && !config_s->serverkey_path)
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
         return 1;
     }
 
-    if (!config_s->cabundle_path)
+    if (server_alias_name && !config_s->cabundle_path)
     {
         gossip_err("Configuration file error. No CA bundle path specified.\n");
         return 1;
