@@ -77,7 +77,7 @@ static PINT_sm_action proto_error_init(
 			    js_p,
 			    &tmp_id,
 			    server_job_context,
-			    user_opts->server_job_bmi_timeout, s_op->req->hints);
+			    user_opts->server_job_bmi_timeout, NULL);
 
     return ret;
 }
