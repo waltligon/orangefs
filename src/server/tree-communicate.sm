@@ -129,7 +129,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     struct PINT_server_op *tree_communicate_s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *create_s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int num_partitions, num_files_per_server;
-    int i, j, k;
+    int i;
     PVFS_handle_extent_array *local_extent;
     char server_name[1024];
     struct server_configuration_s *server_config = get_server_config_struct();
@@ -140,16 +140,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
 
     assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
-
-/*
-    for (i = 0; i < num_data_files; i++) {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-            "tree_communicate_partition_handles: extent_array[%d].extent_count = %d, first = %llu, last = %llu\n",
-            i, extent_array[i].extent_count,
-            llu(extent_array[i].extent_array[0].first),
-            llu(extent_array[i].extent_array[0].last));
-    }
-*/
 
     /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
        fewer) then go ahead and send to each remaining server individually. */
@@ -194,7 +184,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                    sizeof(PVFS_handle_extent_array));
             memcpy(&extent_array[i],
                    &extent_array[0], sizeof(PVFS_handle_extent_array));
-            memcpy(&extent_array[i], &local_extent,
+            memcpy(&extent_array[0], &local_extent,
                    sizeof(PVFS_handle_extent_array));
         }
 
