@@ -138,7 +138,7 @@ typedef struct
     char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
 } pvfs2_fs_umount_request_t;
 
-typedef struct 
+typedef struct
 {
     PVFS_object_ref refn;
     int32_t key_sz;
@@ -154,7 +154,7 @@ typedef struct
     int32_t   __pad1;
 } pvfs2_setxattr_request_t;
 
-typedef struct 
+typedef struct
 {
     PVFS_object_ref refn;
     int32_t  requested_count;
@@ -162,7 +162,7 @@ typedef struct
     PVFS_ds_position token;
 } pvfs2_listxattr_request_t;
 
-typedef struct 
+typedef struct
 {
     PVFS_object_ref refn;
     int32_t key_sz;
@@ -181,13 +181,13 @@ typedef struct
 } pvfs2_fsync_request_t;
 
 enum pvfs2_param_request_type
-{   
+{
     PVFS2_PARAM_REQUEST_SET = 1,
     PVFS2_PARAM_REQUEST_GET = 2
-};  
-    
+};
+
 enum pvfs2_param_request_op
-{   
+{
     PVFS2_PARAM_REQUEST_OP_ACACHE_TIMEOUT_MSECS = 1,
     PVFS2_PARAM_REQUEST_OP_ACACHE_HARD_LIMIT = 2,
     PVFS2_PARAM_REQUEST_OP_ACACHE_SOFT_LIMIT = 3,
@@ -203,8 +203,8 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT = 13,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT = 14,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE = 15,
-};  
-    
+};
+
 typedef struct
 {
     enum pvfs2_param_request_type type;
@@ -234,7 +234,7 @@ typedef struct
 {
     int32_t type;
     int32_t __pad1;
-    PVFS_credentials credentials;
+    PVFS_credential * credentials;
     /* currently trailer is used only by readx/writex (iox) */
     PVFS_size  trailer_size;
     PVFS2_ALIGN_VAR(char *, trailer_buf);

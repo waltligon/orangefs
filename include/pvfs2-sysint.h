@@ -172,7 +172,7 @@ struct PVFS_sysresp_readdirplus_s
     PVFS_dirent   *dirent_array;
     uint32_t        pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
     uint64_t       directory_version;
-    PVFS_error    *stat_err_array; 
+    PVFS_error    *stat_err_array;
     PVFS_sys_attr *attr_array;
 };
 typedef struct PVFS_sysresp_readdirplus_s PVFS_sysresp_readdirplus;

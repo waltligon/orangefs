@@ -105,7 +105,7 @@ typedef struct PINT_sm_getattr_state
      * PVFS_ATTR_SYS_*
      */
     uint32_t req_attrmask;
-    
+
     /*
       Either from the acache or full getattr op, this is the resuling
       attribute that can be used by calling state machines
@@ -118,7 +118,7 @@ typedef struct PINT_sm_getattr_state
     PVFS_size size;
 
     int flags;
-    
+
 } PINT_sm_getattr_state;
 
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
@@ -288,7 +288,7 @@ struct PINT_client_readdirplus_sm
     int attrmask;                       /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
     /* scratch variables */
-    int nhandles;  
+    int nhandles;
     int svr_count;
     PVFS_size        **size_array;
     PVFS_object_attr *obj_attr_array;
@@ -342,7 +342,7 @@ struct PINT_client_rename_sm
     PVFS_handle old_dirent_handle;
 };
 
-struct PINT_client_mgmt_setparam_list_sm 
+struct PINT_client_mgmt_setparam_list_sm
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
@@ -358,7 +358,7 @@ struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_server_stat *stat_array;
-    int count; 
+    int count;
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
     PVFS_sysresp_statfs* resp; /* ignored by mgmt functions */
@@ -369,8 +369,8 @@ struct PINT_client_mgmt_perf_mon_list_sm
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_perf_stat **perf_matrix;
     uint64_t *end_time_ms_array;
-    int server_count; 
-    int history_count; 
+    int server_count;
+    int history_count;
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
     PVFS_error_details *details;
@@ -380,8 +380,8 @@ struct PINT_client_mgmt_event_mon_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_event **event_matrix;
-    int server_count; 
-    int event_count; 
+    int server_count;
+    int event_count;
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
 };
@@ -389,7 +389,7 @@ struct PINT_client_mgmt_event_mon_list_sm
 struct PINT_client_mgmt_iterate_handles_list_sm
 {
     PVFS_fs_id fs_id;
-    int server_count; 
+    int server_count;
     PVFS_id_gen_t *addr_array;
     PVFS_handle **handle_matrix;
     int *handle_count_array;
@@ -484,7 +484,7 @@ struct PINT_sysdev_unexp_sm
     struct PINT_dev_unexp_info *info;
 };
 
-typedef struct 
+typedef struct
 {
     PVFS_dirent **dirent_array;
     uint32_t      *dirent_outcount;
@@ -723,7 +723,7 @@ struct PINT_client_op_entry_s
 {
     struct PINT_state_machine_s * sm;
 };
-                                                                    
+
 extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
 extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 
