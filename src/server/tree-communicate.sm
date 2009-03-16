@@ -162,31 +162,46 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n",
         num_data_files, num_partitions, num_files_per_server);
 
+    /* Arrange for the local extent to be first in the extent_array. */
+    for (i = 0; i < num_data_files; i++)
+    {
+        PINT_cached_config_get_server_name(server_name, 1024,
+            extent_array[i].extent_array[0].first, fs_id);
+        if (! strcmp(server_config->host_id, server_name)) /* this one is local */
+        {
+            break; /* Found the local one at extent_array[i] */
+        }
+    }
+    if (i > 0 && i < num_data_files)
+    {
+        /* Swap the zero'th extent and the i'th extent */
+        memcpy(&local_extent, &extent_array[i],
+               sizeof(PVFS_handle_extent_array));
+        memcpy(&extent_array[i],
+               &extent_array[0], sizeof(PVFS_handle_extent_array));
+        memcpy(&extent_array[0], &local_extent,
+               sizeof(PVFS_handle_extent_array));
+    }
+
+    /* Create a stack frame for the local operation. */
+/* TODO: make this general-case with a case statement. */
+    s_op->num_pjmp_frames++;
+    js_p->error_code = LOCAL_OPERATION;
+    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
+        extent_array[0].extent_array[0].first,
+        fs_id, js_p->error_code, msg_p, req, LOCAL_OPERATION);
+
+    PINT_SERVREQ_CREATE_FILL(
+        *req,
+        s_op->req->credentials,
+        fs_id,
+        PVFS_TYPE_DATAFILE,
+        extent_array[0]);
+
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
         js_p->error_code = REMOTE_OPERATION;
         s_op->num_pjmp_frames++;
-
-        /* Arrange for the local extent to be first in the extent_array. */
-        for (i = 0; i < num_data_files; i++)
-        {
-            PINT_cached_config_get_server_name(server_name, 1024,
-                extent_array[i].extent_array[0].first, fs_id);
-            if (! strcmp(server_config->host_id, server_name)) /* this one is local */
-            {
-                break; /* Found the local one at extent_array[i] */
-            }
-        }
-        if (i > 0 && i < num_data_files)
-        {
-            /* Swap the zero'th extent and the i'th extent */
-            memcpy(&local_extent, &extent_array[i],
-                   sizeof(PVFS_handle_extent_array));
-            memcpy(&extent_array[i],
-                   &extent_array[0], sizeof(PVFS_handle_extent_array));
-            memcpy(&extent_array[0], &local_extent,
-                   sizeof(PVFS_handle_extent_array));
-        }
 
         /* Prepare the stack for pjmp. */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
@@ -271,22 +286,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             }
         }
     }
-
-    /* Create a stack frame for the local create. */
-    s_op->num_pjmp_frames++;
-    js_p->error_code = LOCAL_OPERATION;
-    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
-//        s_op->req->u.tree_create.io_handle_extent_array[0].extent_array[0].first,
-        extent_array[0].extent_array[0].first,
-        fs_id, js_p->error_code, msg_p, req, LOCAL_OPERATION);
-
-    PINT_SERVREQ_CREATE_FILL(
-        *req,
-        s_op->req->credentials,
-        fs_id,
-        PVFS_TYPE_DATAFILE,
-        extent_array[0]);
-//        s_op->req->u.tree_create.io_handle_extent_array[0]);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
