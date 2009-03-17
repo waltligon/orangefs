@@ -530,7 +530,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     TROVE_handle dummy_handle;
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
-    void *tmp_ptr;
+    void *tmp_ptr = NULL;
     void *tmp_handle;
     void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
