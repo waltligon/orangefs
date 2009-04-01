@@ -1157,9 +1157,21 @@ static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry, struct 
     return d_splice_alias(inode, dentry);
 }
 
+#ifdef HAVE_CURRENT_FSUID 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
+    sys_attr.owner = current_fsuid();             \
+    sys_attr.group = current_fsgid();             \
+    sys_attr.size = 0;                            \
+    sys_attr.perms = PVFS_util_translate_mode(mode,0); \
+    sys_attr.objtype = type;                      \
+    sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
+} while(0)
+#else
+#define fill_default_sys_attrs(sys_attr,type,mode)\
+do                                                \
+{ \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
@@ -1167,6 +1179,7 @@ do                                                \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
+#endif /* HAVE_CURRENT_FSUID */
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 

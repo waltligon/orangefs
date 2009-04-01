@@ -556,8 +556,13 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
+#ifdef HAVE_CURRENT_FSUID
+        inode->i_uid = current_fsuid();
+        inode->i_gid = current_fsgid();
+#else
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
+#endif
         inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
         inode->i_size = PAGE_CACHE_SIZE;
 #ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE
