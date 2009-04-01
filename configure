@@ -8046,7 +8046,7 @@ if test -n "$lk_src" ; then
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
 
                 	if test -n "${ARCH}" ; then
-		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include"
+		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
 	fi
 
 	{ echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
