@@ -154,7 +154,9 @@ static int server_setup_process_environment(int background);
 static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int sig);
+static void reload_config(void);
 static void server_sig_handler(int sig);
+static void hup_sighandler(int sig, siginfo_t *info, void *secret);
 static int server_parse_cmd_line_args(int argc, char **argv);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
@@ -355,25 +357,32 @@ int main(int argc, char **argv)
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
-        /* IF a signal was received and we have drained all the state machines
-         * that were in progress, then we initiate shutdown of the server
-         */
         if (signal_recvd_flag != 0)
         {
-            /*
-             * If we received a signal, then find out if we can exit now
-             * by checking if all s_ops (for expected messages) have either 
-             * finished or timed out,
-             */
-            if (qlist_empty(&inprogress_sop_list))
+            /* If the signal is a SIGHUP, catch and reload configuration */
+            if (signal_recvd_flag == SIGHUP)
             {
-                ret = 0;
-                siglevel = signal_recvd_flag;
-                goto server_shutdown;
+                reload_config();
+                signal_recvd_flag = 0; /* Reset the flag */
             }
-            /* not completed. continue... */
+            else
+            {
+                /*
+                 * If we received a signal and we have drained all the state
+                 * machines that were in progress, we initiate a shutdown of
+                 * the server. Find out if we can exit now * by checking if
+                 * all s_ops (for expected messages) have either finished or
+                 * timed out,
+                 */
+                if (qlist_empty(&inprogress_sop_list))
+                {
+                    ret = 0;
+                    siglevel = signal_recvd_flag;
+                    goto server_shutdown;
+                }
+                /* not completed. continue... */
+            }
         }
-
         ret = job_testcontext(server_job_id_array,
                               &comp_ct,
                               server_completed_job_p_array,
@@ -1143,6 +1152,10 @@ static int server_setup_signal_handlers(void)
 {
     struct sigaction new_action;
     struct sigaction ign_action;
+    struct sigaction hup_action;
+    hup_action.sa_sigaction = (void *)hup_sighandler;
+    sigemptyset (&hup_action.sa_mask);
+    hup_action.sa_flags = SA_RESTART | SA_SIGINFO;
 #ifdef __PVFS2_SEGV_BACKTRACE__
     struct sigaction segv_action;
 
@@ -1163,7 +1176,7 @@ static int server_setup_signal_handlers(void)
     /* catch these */
     sigaction (SIGILL, &new_action, NULL);
     sigaction (SIGTERM, &new_action, NULL);
-    sigaction (SIGHUP, &new_action, NULL);
+    sigaction (SIGHUP, &hup_action, NULL);
     sigaction (SIGINT, &new_action, NULL);
     sigaction (SIGQUIT, &new_action, NULL);
 #ifdef __PVFS2_SEGV_BACKTRACE__
@@ -1229,6 +1242,190 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     return;
 }
 #endif
+
+/* hup_signalhandler()
+ *
+ * Reload mutable configuration values. If there are errors, leave server in
+ * a running state.
+ *
+ * NOTE: this _only_ reloads configuration values related to squashing,
+ * readonly, and trusted settings.  It does not allow reloading of arbitrary
+ * configuration file settings.
+ *
+ * no return value
+ */
+static void hup_sighandler(int sig, siginfo_t *info, void *secret)
+{
+    uint64_t debug_mask;
+    int debug_on;
+
+    /* Let's make sure this message is printed out */
+    gossip_get_debug_mask(&debug_on, &debug_mask); /* Need to set back later */
+    gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG); /* Make sure debug set */
+    gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 received server: signal %d\n", sig);
+    gossip_set_debug_mask(debug_on, debug_mask); /* Set to original values */
+
+    /* Set the flag so the next server loop picks it up and reloads config */
+    signal_recvd_flag = sig;
+}
+
+static void reload_config(void)
+{
+    struct server_configuration_s sighup_server_config;
+    PINT_llist *orig_filesystems = NULL;
+    PINT_llist *hup_filesystems  = NULL;
+    struct filesystem_configuration_s *orig_fs;
+    struct filesystem_configuration_s *hup_fs;
+    int tmp_value = 0;
+    char **tmp_ptr = NULL;
+    int *tmp_int_ptr = NULL;
+
+    /* We received a SIGHUP. Update configuration in place */
+    if (PINT_parse_config(&sighup_server_config, fs_conf, s_server_options.server_alias) < 0)
+    {
+        gossip_err("Error: Please check your config files.\n");
+        gossip_err("Error: SIGHUP unable to update configuration.\n");
+        PINT_config_release(&sighup_server_config); /* Free memory */
+    }
+    else /* Successful load of config */
+    {
+        orig_filesystems = server_config.file_systems;
+        /* Loop and update all stored file systems */
+        while(orig_filesystems)
+        {
+            int found_matching_config = 0;
+
+            orig_fs = PINT_llist_head(orig_filesystems);
+            if(!orig_fs)
+            {
+               break;
+            }
+            hup_filesystems = sighup_server_config.file_systems;
+
+            /* Find the matching fs from sighup */
+            while(hup_filesystems)
+            {
+                hup_fs = PINT_llist_head(hup_filesystems);
+                if ( !hup_fs )
+                {
+                    break;
+                }
+                if( hup_fs->coll_id == orig_fs->coll_id )
+                {
+                    found_matching_config = 1;
+                    break;
+                }
+                hup_filesystems = PINT_llist_head(hup_filesystems);
+            }
+            if(!found_matching_config)
+            {
+                gossip_err("Error: SIGHUP unable to update configuration"
+                           "Matching configuration not found.\n");
+                break;
+            }
+            /* Update root squashing. Prelude is only place to accesses
+             * these values, so no need to lock around them. Swap the
+             * needed pointers so that server config gets new values,
+             * and the old values get freed up
+            */
+            orig_fs->exp_flags = hup_fs->exp_flags;
+
+            tmp_value = orig_fs->root_squash_count;
+            orig_fs->root_squash_count = hup_fs->root_squash_count;
+            hup_fs->root_squash_count = tmp_value;
+
+            tmp_ptr = orig_fs->root_squash_hosts;
+            orig_fs->root_squash_hosts = hup_fs->root_squash_hosts;
+            hup_fs->root_squash_hosts = tmp_ptr;
+
+            tmp_int_ptr = orig_fs->root_squash_netmasks;
+            orig_fs->root_squash_netmasks = hup_fs->root_squash_netmasks;
+            hup_fs->root_squash_netmasks = tmp_int_ptr;
+
+            tmp_value = orig_fs->root_squash_exceptions_count;
+            orig_fs->root_squash_exceptions_count = hup_fs->root_squash_exceptions_count;
+            hup_fs->root_squash_exceptions_count = tmp_value;
+
+            tmp_ptr = orig_fs->root_squash_exceptions_hosts;
+            orig_fs->root_squash_exceptions_hosts = hup_fs->root_squash_exceptions_hosts;
+            hup_fs->root_squash_exceptions_hosts = tmp_ptr;
+
+            tmp_int_ptr = orig_fs->root_squash_exceptions_netmasks;
+            orig_fs->root_squash_exceptions_netmasks = hup_fs->root_squash_exceptions_netmasks;
+            hup_fs->root_squash_exceptions_netmasks = tmp_int_ptr;
+
+            /* Update all squashing. Prelude is only place to accesses
+             * these values, so no need to lock around them. Swap
+             * pointers so that server config gets new values, and
+             * the old values get freed up
+             */
+            tmp_value = orig_fs->all_squash_count;
+            orig_fs->all_squash_count = hup_fs->all_squash_count;
+            hup_fs->all_squash_count = tmp_value;
+
+            tmp_ptr = orig_fs->all_squash_hosts;
+            orig_fs->all_squash_hosts = hup_fs->all_squash_hosts;
+            hup_fs->all_squash_hosts = tmp_ptr;
+
+            tmp_int_ptr = orig_fs->all_squash_netmasks;
+            orig_fs->all_squash_netmasks = hup_fs->all_squash_netmasks;
+            hup_fs->all_squash_netmasks = tmp_int_ptr;
+
+            /* Update read only. Prelude is only place to accesses
+             * these values, so no need to lock around them. Swap
+             * pointers so that server config gets new values, and
+             * the old values get freed up
+             */
+            tmp_value = orig_fs->ro_count;
+            orig_fs->ro_count = hup_fs->ro_count;
+            hup_fs->ro_count = tmp_value;
+
+            tmp_ptr = orig_fs->ro_hosts;
+            orig_fs->ro_hosts = hup_fs->ro_hosts;
+            hup_fs->ro_hosts = tmp_ptr;
+
+            tmp_int_ptr = orig_fs->ro_netmasks;
+           orig_fs->ro_netmasks = hup_fs->ro_netmasks;
+            hup_fs->ro_netmasks = tmp_int_ptr;
+
+            orig_fs->exp_anon_uid = hup_fs->exp_anon_uid;
+            orig_fs->exp_anon_gid = hup_fs->exp_anon_gid;
+
+            orig_filesystems = PINT_llist_next(orig_filesystems);
+        }
+#ifdef USE_TRUSTED
+        server_config.ports_enabled = sighup_server_config.ports_enabled;
+        server_config.allowed_ports[0] = sighup_server_config.allowed_ports[0];
+        server_config.allowed_ports[1] = sighup_server_config.allowed_ports[1];
+        server_config.network_enabled = sighup_server_config.network_enabled;
+
+        tmp_value = server_config.allowed_networks_count;
+        server_config.allowed_networks_count = sighup_server_config.allowed_networks_count;
+        sighup_server_config.allowed_networks_count = tmp_value;
+
+        tmp_ptr = server_config.allowed_networks;
+        server_config.allowed_networks = sighup_server_config.allowed_networks;
+        sighup_server_config.allowed_networks = tmp_ptr;
+
+        tmp_int_ptr = server_config.allowed_masks;
+        server_config.allowed_masks = sighup_server_config.allowed_masks;
+        sighup_server_config.allowed_masks = tmp_int_ptr;
+
+        /* security and security_dtor will be updated in a call
+         * to BMI_set_info. Need to save old values so they are
+         * deleted on cleanup
+         */
+        sighup_server_config.security = server_config.security;
+        sighup_server_config.security_dtor = server_config.security_dtor;
+
+        /* The set_info call grabs the interface_mutex, so we are
+         * basically using that to lock this resource
+         */
+        BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
+#endif
+        PINT_config_release(&sighup_server_config); /* Free memory */
+    }
+}
 
 static int server_shutdown(
     PINT_server_status_flag status,
@@ -1418,12 +1615,6 @@ static void server_sig_handler(int sig)
             gossip_err("\nPVFS2 server got signal %d "
                        "(server_status_flag: %d)\n",
                        sig, (int)server_status_flag);
-        }
-
-        if (sig == SIGHUP)
-        {
-            gossip_err("SIGHUP: pvfs2-server cannot restart; "
-                       "shutting down instead.\n");
         }
 
         /* ignore further invocations of this signal */
