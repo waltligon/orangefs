@@ -40,7 +40,8 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-eattr.c \
 	     $(DIR)/pint-mem.c \
-	     $(DIR)/pint-hint.c
+	     $(DIR)/pint-hint.c \
+	     $(DIR)/pint-segpool.c
 
 LIBBMISRC += $(DIR)/str-utils.c \
 	  $(DIR)/pint-event.c \
