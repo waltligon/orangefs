@@ -29,9 +29,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             -e s/sh.*/sh/`
             if test "x$SUBARCH" = "xi386"; then
                 ARCH=x86    
-            elif test "x$SUBARCH" = xx86_64"; then
+            elif test "x$SUBARCH" = "xx86_64"; then
                 ARCH=x86    
-            elif test "x$SUBARCH" = xsparc64"; then
+            elif test "x$SUBARCH" = "xsparc64"; then
                 ARCH=sparc    
             else
                 ARCH=$SUBARCH
