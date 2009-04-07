@@ -427,8 +427,6 @@ static PINT_sm_action remove_metafile_object(
         s_op->u.create.saved_error_code = js_p->error_code;
     }
 
-    free(s_op->resp.u.create.datafile_handles);
-
     ret = job_trove_dspace_remove(
         s_op->req->u.create.fs_id,
         s_op->resp.u.create.metafile_handle,

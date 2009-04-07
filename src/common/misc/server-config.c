@@ -3144,6 +3144,17 @@ static void free_filesystem(void *ptr)
             free(fs->ro_netmasks);
             fs->ro_netmasks = NULL;
         }
+        /* free all root_squash_exception_hosts specifications */
+        if (fs->root_squash_exceptions_hosts)
+        {
+            free_list_of_strings(fs->root_squash_exceptions_count, &fs->root_squash_exceptions_hosts);
+            fs->root_squash_exceptions_count = 0;
+        }
+        if (fs->root_squash_exceptions_netmasks)
+        {
+            free(fs->root_squash_exceptions_netmasks);
+            fs->root_squash_exceptions_netmasks = NULL;
+        }
         /* free all root_squash_hosts specifications */
         if (fs->root_squash_hosts)
         {
