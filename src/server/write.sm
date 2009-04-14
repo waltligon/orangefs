@@ -109,15 +109,16 @@ static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
     bytes = q_item->parent->buffer_size;
     PINT_segpool_take_segments(seg_handle, id, &bytes, &count, &offsets, &sizes);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: 3: count=%d, bytes=%d\n", __func__, count, bytes);
-    if(count == 0) {
-	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
-    }
     q_item->buffer_used = bytes;
     s_op->u.flow_write.offsets = offsets;
     s_op->u.flow_write.sizes = sizes;
     s_op->u.flow_write.segs = count;
 
+    if(count == 0) {
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+    }
+#if 0
     if(count == 0) {
 	if(flow_data->parent->total_transferred ==
 	   flow_data->total_bytes_processed &&
@@ -130,7 +131,7 @@ static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
-#if 0
+
     gossip_debug(GOSSIP_DIRECTIO_DEBUG,
 		 "offset %llu, buffer ptr: %p\n",
 		 llu(q_item->result_chain.result.offset_array[0]),
@@ -195,6 +196,10 @@ static PINT_sm_action trove_write_call(struct PINT_smcb *smcb, job_status_s *js_
     gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer[0]=%s\n", __func__,
 		 (char *)q_item->buffer);
 
+    if(s_op->u.flow_read.segs == 0 && q_item->buffer_used == 0) {
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+    }
 #if 0
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: result_tmp->buffer_offset=%x\n", 
 			__func__, result_tmp->buffer_offset);

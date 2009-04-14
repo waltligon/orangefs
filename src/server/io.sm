@@ -346,11 +346,11 @@ static PINT_sm_action start_pipeline_sm(
 	ret = PINT_segpool_init(s_op->u.io.flow_d->mem_req,
 				s_op->u.io.flow_d->file_req,
 				s_op->u.io.flow_d->file_data.fsize,
+				s_op->u.io.flow_d->file_req_offset,
 				s_op->u.io.flow_d->aggregate_size,
 				s_op->u.io.flow_d->file_data.server_nr,
 				s_op->u.io.flow_d->file_data.server_ct,
 				s_op->u.io.flow_d->file_data.dist, /* dist */
-				s_op->u.io.flow_d->file_req_offset, /* sson */
 				PINT_SP_SERVER_READ,
 				&seg_handle);
 
@@ -384,12 +384,12 @@ static PINT_sm_action start_pipeline_sm(
 	PINT_dist_lookup(s_op->u.io.flow_d->file_data.dist);
 	ret = PINT_segpool_init(s_op->u.io.flow_d->mem_req,
 				 s_op->u.io.flow_d->file_req,
-				s_op->u.io.flow_d->file_data.fsize, /* FIXME?? */
+				s_op->u.io.flow_d->file_data.fsize,
+				s_op->u.io.flow_d->file_req_offset, /* sson */
 				s_op->u.io.flow_d->aggregate_size,
 				 s_op->u.io.flow_d->file_data.server_nr,
 				 s_op->u.io.flow_d->file_data.server_ct,
 				 s_op->u.io.flow_d->file_data.dist, /* dist */
-				s_op->u.io.flow_d->file_req_offset, /* sson */
 				 PINT_SP_SERVER_WRITE,
 				 &seg_handle);
 

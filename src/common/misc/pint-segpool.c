@@ -49,7 +49,8 @@ int PINT_segpool_init(
     PINT_REQUEST_STATE_SET_TARGET(handle->file_req_state, request_offset);
     if(aggregate_size > -1)
     {
-        PINT_REQUEST_STATE_SET_FINAL(handle->file_req_state, request_offset);
+        PINT_REQUEST_STATE_SET_FINAL(handle->file_req_state, 
+				     aggregate_size+request_offset);
     }
     else
     {
