@@ -79,6 +79,7 @@ enum PVFS_server_op
     PVFS_SERV_BATCH_REMOVE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
+    PVFS_SERV_READ_COMPLETION = 39, /* AS: for read_ex */
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -982,6 +983,9 @@ struct PVFS_servreq_io
     PVFS_offset file_req_offset;
     /* aggregate size of data to transfer */
     PVFS_size aggregate_size;
+    uint32_t op; /* AS: operator */
+    uint32_t datatype; /* AS */
+    PVFS_handle *dfile_array; /* AD */
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servreq_io(pptr,x) do { \
@@ -996,6 +1000,9 @@ struct PVFS_servreq_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint32_t(pptr, &(x)->op); /* AS */	  \
+    encode_uint32_t(pptr, &(x)->datatype); /* AS */	  \
+    encode_dfile_array(pptr, (x)); /* AS */	\
 } while (0)
 #define decode_PVFS_servreq_io(pptr,x) do { \
     decode_PVFS_handle(pptr, &(x)->handle); \
@@ -1010,10 +1017,14 @@ struct PVFS_servreq_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
+    decode_uint32_t(pptr, &(x)->op); /* AS */		  \
+    decode_uint32_t(pptr, &(x)->datatype); /* AS */	  \
+    decode_dfile_array(pptr, (x)); /* AS */	\
 } while (0)
 /* could be huge, limit to max ioreq size beyond struct itself */
 #define extra_size_PVFS_servreq_io roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES) \
-  + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request))
+    + roundup8(PVFS_REQ_LIMIT_PINT_REQUEST_NUM * sizeof(PINT_Request))	\
+    + roundup8(PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))/* AS */
 #endif
 
 #define PINT_SERVREQ_IO_FILL(__req,                   \
@@ -1028,6 +1039,9 @@ struct PVFS_servreq_io
                              __file_req,              \
                              __file_req_off,          \
                              __aggregate_size,        \
+			     __op, /* AS */          \
+			     __datatype, /* AS */   \
+			     __dfile_array, /* AS */\
                              __hints)                 \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
@@ -1044,6 +1058,9 @@ do {                                                  \
     (__req).u.io.file_req        = (__file_req);      \
     (__req).u.io.file_req_offset = (__file_req_off);  \
     (__req).u.io.aggregate_size  = (__aggregate_size);\
+    (__req).u.io.op            = (__op); /* AS */	     \
+    (__req).u.io.datatype      = (__datatype); /* AS */    \
+    (__req).u.io.dfile_array   = (__dfile_array); /* AS */ \
 } while (0)
 
 struct PVFS_servresp_io
@@ -1054,6 +1071,17 @@ endecode_fields_1_struct(
     PVFS_servresp_io,
     PVFS_size, bstream_size)
 
+/* AS: read operations require a second response to announce completion */
+/* in case user-defined op is specified */
+struct PVFS_servresp_read_completion
+{
+    PVFS_ds_keyval result; /* AS */
+    PVFS_size total_completed; /* amount of data transferred */
+}; /* AS */
+endecode_fields_2_struct(
+     PVFS_servresp_read_completion,
+     PVFS_ds_keyval, result,
+     PVFS_size, total_completed)
 /* write operations require a second response to announce completion */
 struct PVFS_servresp_write_completion
 {
@@ -1787,6 +1815,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_getconfig getconfig;
         struct PVFS_servresp_io io;
         struct PVFS_servresp_write_completion write_completion;
+	struct PVFS_servresp_read_completion read_completion; /* AS */
         struct PVFS_servresp_statfs statfs;
         struct PVFS_servresp_mgmt_perf_mon mgmt_perf_mon;
         struct PVFS_servresp_mgmt_iterate_handles mgmt_iterate_handles;

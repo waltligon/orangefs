@@ -161,6 +161,7 @@ typedef struct PINT_client_io_ctx
 
     PINT_sm_msgpair_state msg;
     PINT_client_sm_recv_state write_ack;
+    PINT_client_sm_recv_state read_ack; /* AS */
 
     /*
       all *_has_been_posted fields are used at io_analyze_results time
@@ -170,6 +171,7 @@ typedef struct PINT_client_io_ctx
     int msg_recv_has_been_posted;
     int flow_has_been_posted;
     int write_ack_has_been_posted;
+    int read_ack_has_been_posted; /* AS */
 
     /*
       all *_in_progress fields are used at cancellation time to
@@ -179,6 +181,7 @@ typedef struct PINT_client_io_ctx
     int msg_recv_in_progress;
     int flow_in_progress;
     int write_ack_in_progress;
+    int read_ack_in_progress; /* AS */
 
 } PINT_client_io_ctx;
 
@@ -190,6 +193,9 @@ struct PINT_client_io_sm
     PVFS_offset file_req_offset;
     void *buffer;
     PVFS_Request mem_req;
+    int op; /* AS */
+    int datatype; /* AS */
+    void *tmp_buffer; /* AS */
 
     /* output parameter */
     PVFS_sysresp_io *io_resp_p;
@@ -203,6 +209,7 @@ struct PINT_client_io_sm
     int msgpair_completion_count;
     int flow_completion_count;
     int write_ack_completion_count;
+    int read_ack_completion_count; /* AS */
 
     PINT_client_io_ctx *contexts;
     int context_count;

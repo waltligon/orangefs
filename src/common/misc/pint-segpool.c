@@ -5,6 +5,7 @@
 #include "gen-locks.h"
 #include "id-generator.h"
 #include <assert.h>
+#include "server-config.h"
 
 struct PINT_sp_segments
 {
@@ -57,7 +58,11 @@ int PINT_segpool_init(
                                      PINT_REQUEST_TOTAL_BYTES(mem_request));
     }
 
-    handle->mem_req_state = PINT_new_request_state(mem_request);
+    if(mem_request)
+	handle->mem_req_state = PINT_new_request_state(mem_request);
+    else
+	handle->mem_req_state = NULL;
+    
     handle->filedata.fsize = file_size;
     handle->filedata.dist = dist;
     handle->filedata.server_nr = server_number;
@@ -153,7 +158,9 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
     int ret;
 
     segments = id_gen_fast_lookup(id);
-
+#if (!TEST)
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 0: *bytes=%ld\n", __func__, *bytes);
+#endif
     result.bytemax = *bytes;
     result.segs = 0;
     result.bytes = 0;
@@ -169,7 +176,8 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
         gen_mutex_unlock(&h->mutex);
         return 0;
     }
-
+    
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 1: count=%d\n", __func__, segments->count);
     if(segments->count == 0)
     {
         /* first time we need to allocate offset and size arrays */
@@ -181,6 +189,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                    &h->filedata,
                                    &result,
                                    PINT_CKSIZE);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 1-0: ret=%d, result.bytes=%d, result.segs=%d\n", __func__, ret, result.bytes, result.segs);
         if(ret != 0)
         {
             goto done;
@@ -234,6 +243,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                &h->filedata,
                                &result,
                                type);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: ret=%d, result.bytes=%d, result.bytemax=%d\n", __func__, ret, result.bytes, result.bytemax);
     if(ret != 0)
     {
         goto done;
@@ -277,6 +287,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                    &h->filedata,
                                    &result,
                                    type);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 3: ret=%d\n", __func__, ret);
         if(ret != 0)
         {
             goto done;
@@ -284,7 +295,9 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
 
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 4: result.bytes=%d\n", __func__, result.bytes);
     *bytes = result.bytes;
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 5: *bytes=%d\n", __func__, *bytes);
     *count = result.segs;
     *offsets = result.offset_array;
     *sizes = result.size_array;
@@ -294,9 +307,14 @@ done:
     return ret;
 }
 
+int segpool_done(PINT_segpool_handle_t h)
+{
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: \n", __func__);
+    return ((h->file_req_state->type_offset >= h->file_req_state->final_offset) || (h->file_req_state->eof_flag));
+}
 
 #include "pint-dist-utils.h"
-
+#if TEST
 /**
  * Testing code for the above.  This tests:
  *
@@ -320,7 +338,7 @@ int main(int argc, char *argv[])
     PVFS_Request_vector(1000, 1024, 6, PVFS_DOUBLE, &mem_req);
     PVFS_Request_vector(2000, 512, 6, PVFS_DOUBLE, &file_req);
 
-    PINT_segpool_init(mem_req,
+    PINT_segpool_init(NULL,/*mem_req,*/
                       file_req,
                       1024*1024*8,
                       0,
@@ -343,6 +361,8 @@ int main(int argc, char *argv[])
     {
         PINT_segpool_take_segments(handle, id[0], &(bytes[0]), &(count[0]),
                                    &(offsets[0]), &(sizes[0]));
+	printf("count[0]=%d\n", count[0]);
+	printf("bytes[0]=%d\n", bytes[0]);
         if(count[0] == 0) break;
 
 
@@ -357,7 +377,7 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
+#endif
 /*
  * Local variables:
  *  mode: c

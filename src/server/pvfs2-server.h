@@ -32,6 +32,7 @@
 #include "pvfs2-req-proto.h"
 #include "state-machine.h"
 #include "pint-event.h"
+#include "pint-segpool.h"
 
 extern job_context_id server_job_context;
 
@@ -335,6 +336,32 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
+/* This is for flow state machine */
+/* not sure if this is the right place */
+struct PINT_server_flow_read_op
+{
+    struct fp_queue_item *q_item;
+    PINT_segpool_handle_t seg_handle;
+    PINT_segpool_unit_id id;
+    PVFS_offset *offsets;
+    PINT_Request_state *file_req_state;
+    PVFS_size *sizes;
+    int segs;
+    int parallel_sms;
+};
+ 
+struct PINT_server_flow_write_op
+{
+    struct fp_queue_item *q_item;
+    PINT_segpool_handle_t seg_handle;
+    PINT_segpool_unit_id id;
+    PVFS_offset *offsets;
+    PINT_Request_state *file_req_state;
+    PVFS_size *sizes;
+    int segs;
+    int parallel_sms;
+};
+
 struct PINT_server_small_io_op
 {
     PVFS_offset offsets[IO_MAX_REGIONS];
@@ -470,6 +497,8 @@ typedef struct PINT_server_op
 	struct PINT_server_rmdirent_op rmdirent;
 	struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
+	struct PINT_server_flow_read_op flow_read; /* for read sm */
+	struct PINT_server_flow_write_op flow_write; /* for write sm */
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
 	struct PINT_server_mkdir_op mkdir;

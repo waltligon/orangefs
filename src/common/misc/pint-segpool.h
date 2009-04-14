@@ -59,4 +59,6 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                PVFS_offset **offsets,
                                PVFS_size **sizes);
 
+int segpool_done(PINT_segpool_handle_t h);
+
 #endif

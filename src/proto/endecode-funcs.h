@@ -35,6 +35,19 @@
     *(pptr) += 8; \
 } while (0)
 
+/* AS: passing dfile_array */
+#define encode_dfile_array(pptr,x) do { int dfiles_i;	\
+    for (dfiles_i=0; dfiles_i<(x)->server_ct; dfiles_i++)		\
+      encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);		\
+} while (0)
+#define decode_dfile_array(pptr,x) do { int dfiles_i;	\
+    (x)->dfile_array = decode_malloc((x)->server_ct \
+				     * sizeof(*(x)->dfile_array));      \
+    for (dfiles_i=0; dfiles_i<(x)->server_ct; dfiles_i++)		       \
+      decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]);   \
+} while (0)
+/* AS */
+
 #define encode_int64_t(pptr,x) do { \
     *(int64_t*) *(pptr) = htobmi64(*(x)); \
     *(pptr) += 8; \

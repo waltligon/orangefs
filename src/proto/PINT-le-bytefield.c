@@ -207,6 +207,11 @@ static void lebf_initialize(void)
 		/* only a response, but nothing special there */
 		noreq = 1;
 		break;
+	case PVFS_SERV_READ_COMPLETION: /* AS: FIXME */
+	    /* only a response, but nothing special there */
+	    noreq = 1; /* AS: this is required; otherwise lebf_encode_req() will complain. */
+	    respsize = 40; /* AS: not sure this is correct value */
+	    break; /* AS */
 	    case PVFS_SERV_MGMT_PERF_MON:
 		resp.u.mgmt_perf_mon.perf_array_count = 0;
 		respsize = extra_size_PVFS_servresp_mgmt_perf_mon;
@@ -422,6 +427,7 @@ static int lebf_encode_req(
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
+    case PVFS_SERV_READ_COMPLETION: /* AS: for read_ex */
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -504,6 +510,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+	CASE(PVFS_SERV_READ_COMPLETION, read_completion); /* AS: for read_ex */
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
@@ -625,6 +632,7 @@ static int lebf_decode_req(
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
+    case PVFS_SERV_READ_COMPLETION: /* AS: for read_ex */
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
@@ -699,6 +707,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+	CASE(PVFS_SERV_READ_COMPLETION, read_completion); /* AS: for read_ex */
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
@@ -848,6 +857,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		break;
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
+	case PVFS_SERV_READ_COMPLETION: /* AS: for read_ex */
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
@@ -960,6 +970,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_MGMT_NOOP:
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
+	    case PVFS_SERV_READ_COMPLETION: /* AS: for read_ex */
                 case PVFS_SERV_PROTO_ERROR:
                 case PVFS_SERV_BATCH_REMOVE:
                     /* nothing to free */

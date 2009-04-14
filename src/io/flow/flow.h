@@ -111,6 +111,10 @@ struct flow_descriptor
     PINT_Request *file_req;
     PVFS_offset file_req_offset;
     PINT_Request *mem_req;
+    int op; /* AS */
+    int datatype; /* AS */
+    void *tmp_buffer; /* AS */
+    PVFS_handle *dfile_array; /* AS */
     /* NOTE: aggregate_size is _optional_; it can be used to limit the 
      * amount of data transferred through a flow in the absence of a 
      * memory datatype (most commonly done by the pvfs2-server)
