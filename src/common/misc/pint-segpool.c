@@ -28,6 +28,8 @@ int PINT_segpool_init(
     PVFS_Request mem_request,
     PVFS_Request file_request,
     PVFS_size file_size,
+    PVFS_offset request_offset,
+    PVFS_size aggregate_size,
     uint32_t server_number,
     uint32_t server_count,
     PINT_dist *dist,
@@ -43,6 +45,18 @@ int PINT_segpool_init(
     }
 
     handle->file_req_state = PINT_new_request_state(file_request);
+    PINT_REQUEST_STATE_SET_TARGET(handle->file_req_state, request_offset);
+    if(aggregate_size > -1)
+    {
+        PINT_REQUEST_STATE_SET_FINAL(handle->file_req_state, request_offset);
+    }
+    else
+    {
+        PINT_REQUEST_STATE_SET_FINAL(handle->file_req_state,
+                                     request_offset +
+                                     PINT_REQUEST_TOTAL_BYTES(mem_request));
+    }
+
     handle->mem_req_state = PINT_new_request_state(mem_request);
     handle->filedata.fsize = file_size;
     handle->filedata.dist = dist;
