@@ -323,6 +323,8 @@ int main(int argc, char *argv[])
     PINT_segpool_init(mem_req,
                       file_req,
                       1024*1024*8,
+                      0,
+                      1024*8,
                       1,
                       4,
                       dist,

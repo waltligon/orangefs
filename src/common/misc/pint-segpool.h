@@ -39,6 +39,8 @@ typedef PVFS_id_gen_t PINT_segpool_unit_id;
 int PINT_segpool_init(PVFS_Request mem_request,
                       PVFS_Request file_request,
                       PVFS_size file_size,
+                      PVFS_offset request_offset,
+                      PVFS_size aggregate_size,
                       uint32_t server_number,
                       uint32_t server_count,
                       PINT_dist *dist,
