@@ -50,6 +50,15 @@ int PINT_segpool_init(
     handle->filedata.server_ct = server_count;
     handle->type = type;
 
+    if(type == PINT_SP_SERVER_WRITE || type == PINT_SP_CLIENT_WRITE)
+    {
+        handle->filedata.extend_flag = 1;
+    }
+    else
+    {
+        handle->filedata.extend_flag = 0;
+    }
+
     INIT_QLIST_HEAD(&handle->segments_list);
 
     gen_mutex_init(&handle->mutex);
@@ -301,7 +310,7 @@ int main(int argc, char *argv[])
                       file_req,
                       1024*1024*8,
                       1,
-                      123,
+                      4,
                       dist,
                       PINT_SP_SERVER_READ,
                       &handle);
