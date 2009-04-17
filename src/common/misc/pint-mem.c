@@ -4,7 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+/* solaris complains about _XOPEN_SOURCE, and since O_DIRECT
+ * isn't supported on solaris anyway..
+ */
+#ifndef _SOLARIS
 #define _XOPEN_SOURCE 600
+#endif
+
 #include <errno.h>
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H

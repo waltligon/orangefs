@@ -57,7 +57,7 @@ encode_PVFS_Request_fields(
     char ** pptr,
     struct PINT_Request * rp)
 {
-    u_int32_t encti;
+    uint32_t encti;
     encode_PVFS_offset(pptr, &(rp)->offset);
     encode_int32_t(pptr, &(rp)->num_ereqs);
     encode_int32_t(pptr, &(rp)->num_blocks);
@@ -73,10 +73,10 @@ encode_PVFS_Request_fields(
     encode_skip4(pptr,);
 
     /* These pointers have been encoded already, just write as ints */
-    encti = (u_int32_t)(uintptr_t) (rp)->ereq;
+    encti = (uint32_t)(uintptr_t) (rp)->ereq;
     encode_uint32_t(pptr, &encti);
 
-    encti = (u_int32_t)(uintptr_t) (rp)->sreq;
+    encti = (uint32_t)(uintptr_t) (rp)->sreq;
     encode_uint32_t(pptr, &encti);
 
     return 0;
@@ -126,7 +126,7 @@ inline static
 int decode_PINT_Request(char ** pptr,
                         struct PINT_Request ** req)
 {
-    u_int32_t encti;
+    uint32_t encti;
     int i;
     int numreq;
     struct PINT_Request * rp;

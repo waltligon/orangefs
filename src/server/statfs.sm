@@ -15,7 +15,7 @@
 #include "trove-handle-mgmt.h"
 #include "pint-cached-config.h"
 
-#ifdef HAVE_SYSINFO
+#ifdef HAVE_SYSINFO_H
 #include <sys/sysinfo.h>
 #endif
 

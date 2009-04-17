@@ -27,11 +27,11 @@
 
 /* basic types */
 #define encode_uint64_t(pptr,x) do { \
-    *(u_int64_t*) *(pptr) = htobmi64(*(x)); \
+    *(uint64_t*) *(pptr) = htobmi64(*(x)); \
     *(pptr) += 8; \
 } while (0)
 #define decode_uint64_t(pptr,x) do { \
-    *(x) = bmitoh64(*(u_int64_t*) *(pptr)); \
+    *(x) = bmitoh64(*(uint64_t*) *(pptr)); \
     *(pptr) += 8; \
 } while (0)
 
@@ -45,11 +45,11 @@
 } while (0)
 
 #define encode_uint32_t(pptr,x) do { \
-    *(u_int32_t*) *(pptr) = htobmi32(*(x)); \
+    *(uint32_t*) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
 } while (0)
 #define decode_uint32_t(pptr,x) do { \
-    *(x) = bmitoh32(*(u_int32_t*) *(pptr)); \
+    *(x) = bmitoh32(*(uint32_t*) *(pptr)); \
     *(pptr) += 4; \
 } while (0)
 
@@ -85,31 +85,31 @@
  */
 #ifdef HAVE_VALGRIND_H
 #define encode_string(pptr,pbuf) do { \
-    u_int32_t len = 0; \
+    uint32_t len = 0; \
     if (*pbuf) \
 	len = strlen(*pbuf); \
-    *(u_int32_t *) *(pptr) = htobmi32(len); \
+    *(uint32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
 	memcpy(*(pptr)+4, *pbuf, len+1); \
 	int pad = roundup8(4 + len + 1) - (4 + len + 1); \
 	*(pptr) += roundup8(4 + len + 1); \
 	memset(*(pptr)-pad, 0, pad); \
     } else { \
-	*(u_int32_t *) *(pptr) = 0; \
+	*(uint32_t *) *(pptr) = 0; \
 	*(pptr) += 8; \
     } \
 } while (0)
 #else
 #define encode_string(pptr,pbuf) do { \
-    u_int32_t len = 0; \
+    uint32_t len = 0; \
     if (*pbuf) \
 	len = strlen(*pbuf); \
-    *(u_int32_t *) *(pptr) = htobmi32(len); \
+    *(uint32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
 	memcpy(*(pptr)+4, *pbuf, len+1); \
 	*(pptr) += roundup8(4 + len + 1); \
     } else { \
-	*(u_int32_t *) *(pptr) = 0; \
+	*(uint32_t *) *(pptr) = 0; \
 	*(pptr) += 8; \
     } \
 } while (0)
@@ -119,7 +119,7 @@
 #define encode_string_size_check(pbuf) (strlen(*pbuf) + 5)
 
 #define decode_string(pptr,pbuf) do { \
-    u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
+    uint32_t len = bmitoh32(*(uint32_t *) *(pptr)); \
     *pbuf = *(pptr) + 4; \
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
@@ -127,7 +127,7 @@
 /* odd variation, space exists in some structure, must copy-in string */
 #define encode_here_string(pptr,pbuf) encode_string(pptr,pbuf)
 #define decode_here_string(pptr,pbuf) do { \
-    u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
+    uint32_t len = bmitoh32(*(uint32_t *) *(pptr)); \
     memcpy(pbuf, *(pptr) + 4, len + 1); \
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
@@ -136,13 +136,13 @@
 /* keyvals; a lot like strings; decoding points existing character data */
 /* BTW we are skipping the read_sz field - keep that in mind */
 #define encode_PVFS_ds_keyval(pptr,pbuf) do { \
-    u_int32_t len = ((PVFS_ds_keyval *)pbuf)->buffer_sz; \
-    *(u_int32_t *) *(pptr) = htobmi32(len); \
+    uint32_t len = ((PVFS_ds_keyval *)pbuf)->buffer_sz; \
+    *(uint32_t *) *(pptr) = htobmi32(len); \
     memcpy(*(pptr)+4, ((PVFS_ds_keyval *)pbuf)->buffer, len); \
     *(pptr) += roundup8(4 + len); \
 } while (0)
 #define decode_PVFS_ds_keyval(pptr,pbuf) do { \
-    u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
+    uint32_t len = bmitoh32(*(uint32_t *) *(pptr)); \
     ((PVFS_ds_keyval *)pbuf)->buffer_sz = len; \
     ((PVFS_ds_keyval *)pbuf)->buffer = *(pptr) + 4; \
     *(pptr) += roundup8(4 + len); \

@@ -23,6 +23,10 @@
 
 #include <stdlib.h>
 
+#ifdef _SOLARIS
+#include <sys/int_types.h>
+#endif
+
 typedef int64_t bmi_size_t;         /**< Data region size */
 typedef int32_t bmi_msg_tag_t;      /**< User-specified message tag */
 typedef int64_t bmi_context_id;     /**< Context identifier */

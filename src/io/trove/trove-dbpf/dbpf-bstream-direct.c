@@ -179,7 +179,7 @@ static size_t direct_aligned_write(int fd,
 {
     int ret;
 
-#ifndef NDEBUG
+#if defined(HAVE_O_DIRECT) && !defined(NDEBUG)
     /* if debug is enabled, check that fd was opened with O_DIRECT */
 
     if(!(fcntl(fd, F_GETFL) & O_DIRECT))
@@ -544,7 +544,7 @@ static size_t direct_aligned_read(int fd,
         return 0;
     }
 
-#ifndef NDEBUG
+#if defined(HAVE_O_DIRECT) && !defined(NDEBUG)
     /* if debug is enabled, check that fd was opened with O_DIRECT */
 
     if(!(fcntl(fd, F_GETFL) & O_DIRECT))

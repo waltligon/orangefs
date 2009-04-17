@@ -601,7 +601,7 @@ static const configoption_t options[] =
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},
      
-     /* Specifies the timeout value in seconds for TROVE jobs on the server.
+     /* Specifies the timeout value in seconds for Flow jobs on the server.
       */
      {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "300"},

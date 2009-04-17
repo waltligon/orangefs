@@ -87,9 +87,16 @@ void PINT_time_diff(PINT_time_marker mark1,
 #ifdef HAVE_SYS_VFS_H
 
 #include <sys/vfs.h>
+
+#ifdef TARGET_OS_SOLARIS
+#include  <sys/statvfs.h>
+#define PINT_statfs_t struct statvfs
+#else
 #define PINT_statfs_t struct statfs
-#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
-#define PINT_statfs_fd_lookup(_fd, _statfs) fstatfs(_fd, (_statfs))
+#endif
+
+#define PINT_statfs_lookup(_path, _statfs) statvfs(_path, (_statfs))
+#define PINT_statfs_fd_lookup(_fd, _statfs) fstatvfs(_fd, (_statfs))
 #define PINT_statfs_bsize(_statfs) (_statfs)->f_bsize
 #define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
 #define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree

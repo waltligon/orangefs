@@ -722,6 +722,7 @@ DB_CFLAGS
 DB_LIB
 NEEDS_LIBRT
 TARGET_OS_DARWIN
+TARGET_OS_SOLARIS
 TARGET_OS_LINUX
 BUILD_BMI_TCP
 BUILD_GM
@@ -7225,6 +7226,123 @@ echo "${ECHO_T}no" >&6; }
 fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+{ echo "$as_me:$LINENO: checking for O_DIRECT flag to open" >&5
+echo $ECHO_N "checking for O_DIRECT flag to open... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+        #define _GNU_SOURCE
+        #include <sys/types.h>
+        #include <sys/stat.h>
+        #include <fcntl.h>
+
+int
+main ()
+{
+
+        open(NULL, O_DIRECT);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_O_DIRECT 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
+{ echo "$as_me:$LINENO: checking for Solaris directio system call" >&5
+echo $ECHO_N "checking for Solaris directio system call... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+        #include <sys/types.h>
+        #include <fcntl.h>
+
+int
+main ()
+{
+
+        directio(0, DIRECTIO_ON);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_DIRECTIO_SYSCALL 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 { echo "$as_me:$LINENO: checking whether byte ordering is bigendian" >&5
 echo $ECHO_N "checking whether byte ordering is bigendian... $ECHO_C" >&6; }
 if test "${ac_cv_c_bigendian+set}" = set; then
@@ -14792,6 +14910,17 @@ _ACEOF
     	TARGET_OS_DARWIN=1
 
     ;;
+    *solaris*)
+
+cat >>confdefs.h <<\_ACEOF
+#define TARGET_OS_DARWIN 1
+_ACEOF
+
+    	TARGET_OS_SOLARIS=1
+
+        CFLAGS+=-lnsl -lsocket
+        SERVER_CFLAGS+=-lnsl -lsocket
+    ;;
     *linux*)
 
 cat >>confdefs.h <<\_ACEOF
@@ -17134,13 +17263,74 @@ fi
 if test $ac_cv_header_sys_sysinfo_h = yes; then
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_SYSINFO 1
+#define HAVE_SYSINFO_H 1
 _ACEOF
 
 
 fi
 
 
+
+tmpcflags=$CFLAGS
+CFLAGS=-Werror-implicit-function-declaration
+{ echo "$as_me:$LINENO: checking for sysinfo()" >&5
+echo $ECHO_N "checking for sysinfo()... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	#include <sys/sysinfo.h>
+
+int
+main ()
+{
+
+        struct sysinfo info;
+        int ret;
+        ret = sysinfo(&info);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_SYSINFO 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+CFLAGS=$tmpcflags
 
 
 for ac_func in strnlen
@@ -18697,6 +18887,69 @@ fi
 
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+{ echo "$as_me:$LINENO: checking that pwd_p gets returned from getpwuid_r" >&5
+echo $ECHO_N "checking that pwd_p gets returned from getpwuid_r... $ECHO_C" >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	#include <sys/types.h>
+        #include <pwd.h>
+
+int
+main ()
+{
+
+        struct passwd *pwd_p;
+        uid_t uid;
+        struct passwd *pwdbuf;
+        char *buf;
+        size_t buflen;
+        pwd_p = getpwuid_r(uid, pwdbuf, buf, buflen);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  { echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6; }
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_GETPWUID_R_PASSWD_RETURN 1
+_ACEOF
+
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	{ echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6; }
+
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 for d in src/apps src/io src/common src/client src/kernel \
        doc src/apps/kernel test; do
        install -d $d;
@@ -19519,6 +19772,7 @@ DB_CFLAGS!$DB_CFLAGS$ac_delim
 DB_LIB!$DB_LIB$ac_delim
 NEEDS_LIBRT!$NEEDS_LIBRT$ac_delim
 TARGET_OS_DARWIN!$TARGET_OS_DARWIN$ac_delim
+TARGET_OS_SOLARIS!$TARGET_OS_SOLARIS$ac_delim
 TARGET_OS_LINUX!$TARGET_OS_LINUX$ac_delim
 BUILD_BMI_TCP!$BUILD_BMI_TCP$ac_delim
 BUILD_GM!$BUILD_GM$ac_delim
@@ -19545,7 +19799,7 @@ LIBOBJS!$LIBOBJS$ac_delim
 LTLIBOBJS!$LTLIBOBJS$ac_delim
 _ACEOF
 
-  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 36; then
+  if test `sed -n "s/.*$ac_delim\$/X/p" conf$$subs.sed | grep -c X` = 37; then
     break
   elif $ac_last_try; then
     { { echo "$as_me:$LINENO: error: could not make $CONFIG_STATUS" >&5

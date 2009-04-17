@@ -475,10 +475,17 @@ static int open_fd(
 
     if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
     {
+#ifdef HAVE_O_DIRECT
         flags |= O_DIRECT;
+#endif
     }
 
     *fd = DBPF_OPEN(filename, flags, mode);
+
+#ifdef HAVE_DIRECTIO_SYSCALL
+    directio(*fd, DIRECTIO_ON);
+#endif
+
     return ((*fd < 0) ? -trove_errno_to_trove_error(errno) : 0);
 }
 

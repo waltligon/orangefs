@@ -61,6 +61,9 @@
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
+/* Define if Solaris directio syscall exists */
+#undef HAVE_DIRECTIO_SYSCALL
+
 /* Define if kernel super_operations contains drop_inode field */
 #undef HAVE_DROP_INODE
 
@@ -121,6 +124,9 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
+
+/* Define if getpwuid_r returns the passwd struct pointer */
+#undef HAVE_GETPWUID_R_PASSWD_RETURN
 
 /* Define if struct super_operations in kernel has get_fs_key callback */
 #undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
@@ -260,6 +266,9 @@
 /* Define to 1 if you have the <openssl/evp.h> header file. */
 #undef HAVE_OPENSSL_EVP_H
 
+/* Define if O_DIRECT flag exists */
+#undef HAVE_O_DIRECT
+
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
 
@@ -357,8 +366,11 @@
 /* Define if struct xtvec is defined in the kernel */
 #undef HAVE_STRUCT_XTVEC
 
-/* Define if sysinfo.h is present */
+/* Define if sysinfo() exists */
 #undef HAVE_SYSINFO
+
+/* Define if sysinfo.h is present */
+#undef HAVE_SYSINFO_H
 
 /* Define to 1 if you have the <sys/epoll.h> header file. */
 #undef HAVE_SYS_EPOLL_H
@@ -451,7 +463,7 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
-/* Define if on darwin */
+/* Define if on solaris */
 #undef TARGET_OS_DARWIN
 
 /* Define if on linux */

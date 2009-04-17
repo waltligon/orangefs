@@ -1161,7 +1161,11 @@ static int server_setup_signal_handlers(void)
 
     segv_action.sa_sigaction = (void *)bt_sighandler;
     sigemptyset (&segv_action.sa_mask);
+#ifdef _SOLARIS
+    segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_RESETHAND;
+#else
     segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
+#endif
 #endif
 
     /* Set up the structure to specify the new action. */

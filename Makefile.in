@@ -86,6 +86,7 @@ BUILD_KERNEL = @BUILD_KERNEL@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
+TARGET_OS_SOLARIS = @TARGET_OS_SOLARIS@
 GNUC = @GNUC@
 INTELC = @INTELC@
 # configure default is silent, unless --enable-verbose-build in
@@ -187,6 +188,10 @@ DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
+ifdef TARGET_OS_SOLARIS
+    CFLAGS += -D_SOLARIS
+    LIBS += -lnsl -lsocket
+endif
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
@@ -311,7 +316,11 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread
+
+ifdef TARGET_OS_SOLARIS
+    SERVERLIBS += -lnsl -lsocket
+endif
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
