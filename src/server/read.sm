@@ -62,48 +62,19 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
-    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    struct result_chain_entry *result_tmp = &q_item->result_chain;
-    struct result_chain_entry *old_result_tmp;
     PINT_segpool_handle_t seg_handle = s_op->u.flow_read.seg_handle;
     PINT_segpool_unit_id id = s_op->u.flow_read.id;
-    void *tmp_buffer;
-    PVFS_size bytes_processed = 0;
-    int err = -PVFS_EIO;
     int ret;
-    struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_config;
     struct server_configuration_s *server_config;
     int count;
     PVFS_offset *offsets;
     PVFS_size *sizes;
     PVFS_size bytes;
-    int tmp_id;
-
+    job_id_t tmp_id;
+    
     q_item->buffer_used = 0;
-#if 0
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-		 "%s: error_code: %d, initial_call_flag: %d, flow: %p.\n", 
-		 __func__, error_code, initial_call_flag,
-        flow_data->parent);
 
-    if(error_code != 0 || flow_data->parent->error_code != 0)
-    {
-        gossip_err("%s: I/O error occurred\n", __func__);
-        handle_io_error(error_code, q_item, flow_data);
-        if(flow_data->parent->state == FLOW_COMPLETE)
-            return(1);
-        else
-            return(0);
-    }
-
-    /* if there are no more receives to post, just return */
-    if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
-    {
-	js_p->error_code = 0;
-        return SM_ACTION_COMPLETE;
-    }
-#endif
     if(!q_item->buffer) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: !q_item->buffer\n", __func__);
         /* if the q_item has not been used, allocate a buffer */
@@ -115,8 +86,9 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     
     bytes = q_item->parent->buffer_size;
-    PINT_segpool_take_segments(seg_handle, id, &bytes, &count, &offsets, &sizes);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: bytes=%d, count=%d\n", __func__,
+    PINT_segpool_take_segments(seg_handle, id, &bytes, &count, 
+			       &offsets, &sizes);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: bytes=%ld, count=%d\n", __func__,
 		 bytes, count);
     
     q_item->buffer_used = bytes;
@@ -126,76 +98,50 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if(count == 0) {
 	js_p->error_code = 0;
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: count==0?\n", __func__);
 	return SM_ACTION_COMPLETE;
     }
 
-#if 0
-    if(bytes == 0) {        
-	if(flow_data->parent->total_transferred ==
-	   flow_data->total_bytes_processed &&
-	   PINT_REQUEST_DONE(flow_data->parent->file_req_state)) {
-	    assert(q_item->parent->state != FLOW_COMPLETE);
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: FLOW_COMPLETE?\n", __func__);
-	    q_item->parent->state = FLOW_COMPLETE; /* bmi_recv_call */
-	}
+    fs_config = PINT_config_get_filesystems(&server_config);
+
+    ret = job_trove_bstream_read_list(
+				      q_item->parent->src.u.trove.coll_id,
+				      q_item->parent->src.u.trove.handle,
+				      &q_item->buffer,
+				      (PVFS_size *)&q_item->buffer_used,
+				      1,
+				      offsets,
+				      sizes,
+				      count,
+				      &q_item->out_size,
+				      fs_config->trove_sync_data,
+				      NULL,
+				      smcb,
+				      0,
+				      js_p,
+				      &tmp_id,
+				      server_job_context,
+				      q_item->parent->hints);
+
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: ret=%d\n", __func__, ret);
+    
+    if(ret < 0) {
+	gossip_err("%s: I/O error occurred\n", __func__);
+	/* FIXME */
+	//handle_io_error(ret, q_item, flow_data);
+	js_p->error_code = -PVFS_EIO;
+	return SM_ACTION_COMPLETE;
+    }
+
+    if(ret == 1) {
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
-#endif    
 
-    //do{
-        //assert(q_item->buffer_used);
-        //assert(result_tmp->result.bytes);
-        //result_tmp->q_item = q_item;
-        /* XXX: can someone confirm this avoids a segfault in the immediate
-         * completion case? */
-	//assert(result_tmp->result.bytes);
-
-	fs_config = PINT_config_get_filesystems(&server_config);
-
-        ret = job_trove_bstream_read_list(
-            q_item->parent->src.u.trove.coll_id,
-            q_item->parent->src.u.trove.handle,
-            //(char**)&result_tmp->buffer_offset,
-	    &q_item->buffer,
-	    &q_item->buffer_used,
-            1,
-	    offsets,
-	    sizes,
-	    count,
-            &q_item->out_size,
-	    fs_config->trove_sync_data,
-            NULL,
-	    smcb,
-	    0,
-	    js_p,
-	    &tmp_id,
-	    server_job_context,
-            q_item->parent->hints);
-
-        if(ret < 0)
-        {
-            gossip_err("%s: I/O error occurred\n", __func__);
-	    /* FIXME */
-            //handle_io_error(ret, q_item, flow_data);
-            if(flow_data->parent->state == FLOW_COMPLETE)
-                return (1);
-            else
-                return (0);
-        }
-
-        if(ret == 1)
-        {
-            /* immediate completion; trigger callback ourselves */
-	    js_p->error_code = 1;
-	    return SM_ACTION_COMPLETE;
-        }
-
-	if(ret == 0) {
-	    js_p->error_code = 0;
-	    return SM_ACTION_DEFERRED;
-	}
-	//} while(result_tmp);
+    if(ret == 0) {
+	js_p->error_code = 0;
+	return SM_ACTION_DEFERRED;
+    }
 
     return SM_ACTION_COMPLETE;
 }
@@ -205,53 +151,17 @@ static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
     struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    struct result_chain_entry *result_tmp = &q_item->result_chain;
-    struct result_chain_entry *old_result_tmp;
-    int err = -PVFS_EIO;
-    int done = 0;
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    PINT_segpool_handle_t h = s_op->u.flow_write.seg_handle;
-
-#if 0
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-		 "%s, error_code: %d, flow: %p.\n", __func__,
-		 error_code, flow_data->parent);
-
-    result_tmp->posted_id = 0;
-
-    if(error_code != 0 || flow_data->parent->error_code != 0)
-    {
-        gossip_err("%s: I/O error occurred\n", __func__);
-        handle_io_error(error_code, q_item, flow_data);
-        return;
-    }
-#endif
 
     if(s_op->u.flow_read.segs == 0 && q_item->buffer_used == 0) {
 	js_p->error_code = 0;
-	return SM_ACTION_COMPLETE;
-    }
-#if 0
-    if(q_item->parent->state == FLOW_COMPLETE) {
-	js_p->error_code = 0;
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: count==0?\n", __func__);
 	return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: result_tmp->result.bytes=%ld\n", 
-		 __func__, result_tmp->result.bytes);
-
-    result_tmp = &q_item->result_chain;
-    do{
-        old_result_tmp = result_tmp;
-        result_tmp = result_tmp->next;
-        if(old_result_tmp != &q_item->result_chain)
-            free(old_result_tmp);
-    } while(result_tmp);
-    q_item->result_chain.next = NULL;
-#endif
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer_used=%d\n", __func__,
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer_used=%ld\n", __func__,
 		 q_item->buffer_used);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer[0]=%s\n", __func__,
 		 (char *)q_item->buffer);
@@ -280,7 +190,7 @@ static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
 			       js_p,
 			       &tmp_id,
 			       server_job_context,
-			       user_opts->server_job_flow_timeout,
+			       user_opts->server_job_bmi_timeout,
 			       (bmi_hint)q_item->parent->hints);
 
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
@@ -317,29 +227,25 @@ static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
-    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
-    struct result_chain_entry *result_tmp = &q_item->result_chain;
-    struct result_chain_entry *old_result_tmp;
     PINT_segpool_handle_t h = s_op->u.flow_read.seg_handle;
     js_p->error_code = 0;
     
-    flow_data->total_bytes_processed += q_item->buffer_used;
     q_item->parent->total_transferred += q_item->buffer_used;
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_bytes_processed=%d\n", __func__,
-		 flow_data->total_bytes_processed);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__,
+		 q_item->parent->total_transferred);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: count=%d\n", __func__,
 		 s_op->u.flow_read.segs);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: handle=%d\n", __func__, h);
-    //if(!PINT_REQUEST_DONE(q_item->parent->file_req_state)) {
-    if(!segpool_done(h)) {
+    /* FIXME: */
+    /* unless the second condition is set, the server starts
+       a new read request to one already done, and falls into
+       infinite trove_read->bmi_send->check_done loop */
+    if(!segpool_done(h) && s_op->u.flow_read.segs != 0) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: read: LOOP\n", __func__);
 	js_p->error_code = LOOP;
     }
     else {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: read: DONE\n", __func__);
-	flow_data->parent->state = FLOW_COMPLETE;
-	FLOW_CLEANUP(flow_data);
     }
     
     return SM_ACTION_COMPLETE;
@@ -347,10 +253,17 @@ static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
 
 static int epilog(struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
     js_p->error_code = 0;
 
+    if(q_item->buffer) {
+	BMI_memfree(q_item->parent->src.u.bmi.address, 
+		    q_item->buffer, q_item->parent->buffer_size, BMI_SEND);
+    }
     gossip_debug(GOSSIP_IO_DEBUG, "%s: read: \n", __func__);
     return SM_ACTION_COMPLETE;
+    //return(server_state_machine_complete(smcb)); // why not this?
 }
 
 static void do_comp(struct fp_queue_item *q_item)

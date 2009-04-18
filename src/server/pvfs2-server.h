@@ -334,6 +334,10 @@ struct PINT_server_getconfig_op
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
+    //io_pipeline* iop; /* substitute for flow_d */
+    int parallel_write_sms;
+    int parallel_read_sms;
+    PINT_segpool_handle_t seg_handle;
 };
 
 /* This is for flow state machine */
@@ -341,6 +345,8 @@ struct PINT_server_io_op
 struct PINT_server_flow_read_op
 {
     struct fp_queue_item *q_item;
+    void *buffer; /* substitute for q_item */
+    PVFS_size buffer_used; /* substitute for q_item */
     PINT_segpool_handle_t seg_handle;
     PINT_segpool_unit_id id;
     PVFS_offset *offsets;
@@ -353,6 +359,8 @@ struct PINT_server_flow_read_op
 struct PINT_server_flow_write_op
 {
     struct fp_queue_item *q_item;
+    void *buffer; /* substitute for q_item */
+    PVFS_size buffer_used; /* substitute for q_item */
     PINT_segpool_handle_t seg_handle;
     PINT_segpool_unit_id id;
     PVFS_offset *offsets;

@@ -24,6 +24,8 @@
 extern struct PINT_state_machine_s pvfs2_read_sm;
 extern struct PINT_state_machine_s pvfs2_write_sm;
 
+#define NUM_OF_PARALLEL_RWS 8
+
 %%
 
 machine pvfs2_io_sm
@@ -156,7 +158,6 @@ static PINT_sm_action start_pipeline_sm(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    //int err = -PVFS_EIO;
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
     struct PINT_server_op *flow_read_op;
@@ -270,48 +271,6 @@ static PINT_sm_action start_pipeline_sm(
     flow_data->parent = s_op->u.io.flow_d;
 
     /* setup the request processing states */
-#if 0 //////////////////
-    s_op->u.io.flow_d->file_req_state = 
-	PINT_new_request_state(s_op->u.io.flow_d->file_req);
-    if (!s_op->u.io.flow_d->file_req_state)
-    {
-	js_p->error_code = -PVFS_ENOMEM;
-	return SM_ACTION_COMPLETE;
-    }
-
-    /* only setup a memory datatype state if caller provided a memory datatype */
-    if(s_op->u.io.flow_d->mem_req)
-    {
-	s_op->u.io.flow_d->mem_req_state = 
-	    PINT_new_request_state(s_op->u.io.flow_d->mem_req);
-	if (!s_op->u.io.flow_d->mem_req_state)
-	{
-	    js_p->error_code = -PVFS_ENOMEM;
-	    return SM_ACTION_COMPLETE;
-	}
-    }
-
-    /* if a file datatype offset was specified, go ahead and skip ahead 
-     * before doing anything else
-     */
-    if(s_op->u.io.flow_d->file_req_offset)
-        PINT_REQUEST_STATE_SET_TARGET(s_op->u.io.flow_d->file_req_state,
-            s_op->u.io.flow_d->file_req_offset);
-
-    
-    /* set boundaries on file datatype */
-    if(s_op->u.io.flow_d->aggregate_size > -1)
-    {
-        PINT_REQUEST_STATE_SET_FINAL(s_op->u.io.flow_d->file_req_state,
-            s_op->u.io.flow_d->aggregate_size+s_op->u.io.flow_d->file_req_offset);
-    }
-    else
-    {
-        PINT_REQUEST_STATE_SET_FINAL(s_op->u.io.flow_d->file_req_state,
-            s_op->u.io.flow_d->file_req_offset +
-            PINT_REQUEST_TOTAL_BYTES(s_op->u.io.flow_d->mem_req));
-    }
-#endif //////////////////////
     gossip_debug(GOSSIP_IO_DEBUG, "%s: aggregate_size=%ld\n", __func__,
 		 s_op->u.io.flow_d->aggregate_size);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: file_data.fsize=%ld\n", __func__,
@@ -354,16 +313,13 @@ static PINT_sm_action start_pipeline_sm(
 				PINT_SP_SERVER_READ,
 				&seg_handle);
 
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: PINT_segpool_init() called: ret=%d, seg_handle=%d\n", __func__, ret, seg_handle);
-	//for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
-	for(i=0; i<1; i++) {
+	s_op->u.io.seg_handle = seg_handle;
+	for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
 	    PINT_segpool_register(seg_handle, &id);
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: PINT_segpool_register() called: id=%d\n", __func__, id);
 	    flow_data->prealloc_array[i].result_chain.q_item =
 		&flow_data->prealloc_array[i];
 	    flow_read_op = malloc(sizeof(*flow_read_op));
 	    memset(flow_read_op, 0, sizeof(*flow_read_op));
-	    memcpy(flow_read_op, s_op, sizeof(*flow_read_op));
 	    flow_read_op->u.flow_read.q_item = &flow_data->prealloc_array[i];
 	    flow_read_op->u.flow_read.seg_handle = seg_handle;
 	    flow_read_op->u.flow_read.id = id;
@@ -372,7 +328,9 @@ static PINT_sm_action start_pipeline_sm(
 		js_p->error_code = -PVFS_ENOMEM;
 		return SM_ACTION_COMPLETE;
 	    }
-	    gossip_debug(GOSSIP_IO_DEBUG, "flow_read: ret=%d\n", ret);
+	    s_op->u.io.parallel_read_sms++;
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_read_sms=%d\n", 
+			 __func__, s_op->u.io.parallel_read_sms);
 	}
     }
     else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
@@ -393,19 +351,15 @@ static PINT_sm_action start_pipeline_sm(
 				 PINT_SP_SERVER_WRITE,
 				 &seg_handle);
 
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: PINT_segpool_init() called: ret=%d, seg_handle=%d\n", __func__, ret, seg_handle);
-	/* only post one outstanding recv at a time; easier to manage */
+	s_op->u.io.seg_handle = seg_handle;
 	/* FIXME: we will eventually want to post multiple of recvs */
-	//for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
-	for(i=0; i<1; i++) {
+	for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
 	    PINT_segpool_register(seg_handle, &id);
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: PINT_segpool_register() called: id=%d\n", __func__, id);
 	    flow_data->prealloc_array[i].result_chain.q_item = 
 		&flow_data->prealloc_array[i];
 	
 	    flow_write_op = malloc(sizeof(*flow_write_op));
 	    memset(flow_write_op, 0, sizeof(*flow_write_op));
-	    memcpy(flow_write_op, s_op, sizeof(*flow_write_op));
 	    flow_write_op->u.flow_write.q_item = &flow_data->prealloc_array[i];
 	    flow_write_op->u.flow_write.seg_handle = seg_handle;
 	    flow_write_op->u.flow_write.id = id;
@@ -414,6 +368,9 @@ static PINT_sm_action start_pipeline_sm(
 		js_p->error_code = -PVFS_ENOMEM;
 		return SM_ACTION_COMPLETE;
 	    }
+	    s_op->u.io.parallel_write_sms++;
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_write_sms=%d\n", 
+			 __func__, s_op->u.io.parallel_write_sms);
 	}
     }
 
@@ -479,6 +436,11 @@ static PINT_sm_action io_cleanup(
     if (s_op->u.io.flow_d)
     {
         PINT_flow_free(s_op->u.io.flow_d);
+    }
+
+    if (s_op->u.io.seg_handle) {
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: freeing seg_handle\n", __func__);
+	PINT_segpool_destroy(s_op->u.io.seg_handle);
     }
 
     /* let go of our encoded response buffer, if we appear to have
