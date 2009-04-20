@@ -1,81 +1,12 @@
-#include "src/io/flow/flowproto-support.h"
-#include "thread-mgr.h"
+#ifndef __RW_SM_H
+#define __RW_SM_H
 
-/* the following buffer settings are used by default if none are specified in
- * the flow descriptor
+/* the following buffer settings are used by default
  */
-#define BUFFERS_PER_FLOW 8
+#define BUFFERS_PER_PIPELINING 8
 #define BUFFER_SIZE (256*1024)
 
-#define MAX_REGIONS 64
-
-#define FLOW_CLEANUP(__flow_data)                                     \
-do {                                                                  \
-    struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",\
-                 __flow_d);                                           \
-    cleanup_buffers(__flow_data);                                     \
-    __flow_d = (__flow_data)->parent;                                 \
-    free(__flow_data);                                                \
-} while(0)
-
-
-struct result_chain_entry
-{
-    PVFS_id_gen_t posted_id;
-    char *buffer_offset;
-    PINT_Request_result result;
-    PVFS_size size_list[MAX_REGIONS];
-    PVFS_offset offset_list[MAX_REGIONS];
-    struct result_chain_entry *next;
-    struct fp_queue_item *q_item;
-    struct PINT_thread_mgr_trove_callback trove_callback;
-};
-
-/* fp_queue_item describes an individual buffer being used within the flow */
-struct fp_queue_item
-{
-    PVFS_id_gen_t posted_id;
-    int last;
-    int seq;
-    void *buffer;
-    PVFS_size buffer_used;
-    PVFS_size out_size;
-    struct result_chain_entry result_chain;
-    int result_chain_count;
-  //struct qlist_head list_link;
-    flow_descriptor *parent;
-    struct PINT_thread_mgr_bmi_callback bmi_callback;
-};
-
-/* fp_private_data is information specific to this flow protocol, stored
- * in flow descriptor but hidden from caller
- */
-struct fp_private_data
-{
-    flow_descriptor *parent;
-    struct fp_queue_item* prealloc_array;
-    struct qlist_head list_link;
-    PVFS_size total_bytes_processed;
-    int next_seq;
-    int next_seq_to_send;
-    int dest_pending;
-    int dest_last_posted;
-    int initial_posts;
-    void *tmp_buffer_list[MAX_REGIONS];
-    void *intermediate;
-    int cleanup_pending_count;
-    int req_proc_done;
-  
-  //struct qlist_head src_list;
-  //struct qlist_head dest_list;
-  //struct qlist_head empty_list;
-};
-#define PRIVATE_FLOW(target_flow)\
-    ((struct fp_private_data*)(target_flow->flow_protocol_data))
-
-static void cleanup_buffers(
-    struct fp_private_data *flow_data);
+enum {DO_READ=3, DO_WRITE, LOOP};
 
 #if 0
 
@@ -192,86 +123,5 @@ static void handle_io_error(
 
 #endif
 
-/* cleanup_buffers()
- *
- * releases any resources consumed during flow processing
- *
- * no return value
- */
-static void cleanup_buffers(struct fp_private_data *flow_data)
-{
-    int i;
-    struct result_chain_entry *result_tmp;
-    struct result_chain_entry *old_result_tmp;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: \n", __func__);
-    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
-    {
-        for(i=0; i<flow_data->parent->buffers_per_flow; i++)
-        {
-            if(flow_data->prealloc_array[i].buffer)
-            {
-	      BMI_memfree(flow_data->parent->src.u.bmi.address,
-			  flow_data->prealloc_array[i].buffer,
-			  flow_data->parent->buffer_size,
-			  BMI_RECV);
-            }
-            result_tmp = &(flow_data->prealloc_array[i].result_chain);
-            do{
-                old_result_tmp = result_tmp;
-                result_tmp = result_tmp->next;
-                if(old_result_tmp !=
-                    &(flow_data->prealloc_array[i].result_chain))
-                    free(old_result_tmp);
-            }while(result_tmp);
-            flow_data->prealloc_array[i].result_chain.next = NULL;
-        }
-    }
-    else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
-    {
-        for(i=0; i<flow_data->parent->buffers_per_flow; i++)
-        {
-            if(flow_data->prealloc_array[i].buffer)
-            {
-                BMI_memfree(flow_data->parent->dest.u.bmi.address,
-                    flow_data->prealloc_array[i].buffer,
-                    flow_data->parent->buffer_size,
-                    BMI_SEND);
-            }
-            result_tmp = &(flow_data->prealloc_array[i].result_chain);
-            do{
-                old_result_tmp = result_tmp;
-                result_tmp = result_tmp->next;
-                if(old_result_tmp !=
-                    &(flow_data->prealloc_array[i].result_chain))
-                    free(old_result_tmp);
-            }while(result_tmp);
-            flow_data->prealloc_array[i].result_chain.next = NULL;
-        }
-    }
-    else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
-    {
-        if(flow_data->intermediate)
-        {
-            BMI_memfree(flow_data->parent->dest.u.bmi.address,
-                flow_data->intermediate, flow_data->parent->buffer_size, BMI_SEND);
-        }
-    }
-    else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-        flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
-    {
-        if(flow_data->intermediate)
-        {
-            BMI_memfree(flow_data->parent->src.u.bmi.address,
-                flow_data->intermediate, flow_data->parent->buffer_size, BMI_RECV);
-        }
-    }
-
-    free(flow_data->prealloc_array);
-}
-
-
-enum {DO_READ=3, DO_WRITE, LOOP};
+#endif /* __RW_SM_H */

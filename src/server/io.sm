@@ -18,8 +18,8 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-internal.h"
-#include "rw-sm.h"
 #include "pint-segpool.h"
+#include "rw-sm.h"
 
 extern struct PINT_state_machine_s pvfs2_read_sm;
 extern struct PINT_state_machine_s pvfs2_write_sm;
@@ -52,7 +52,7 @@ machine pvfs2_io_sm
 
     state start_pipelining
     {
-	pjmp start_pipeline_sm
+	pjmp start_pipelining_sm
         {
             DO_READ => pvfs2_read_sm;
 	    DO_WRITE => pvfs2_write_sm;
@@ -137,7 +137,7 @@ static int io_send_ack(
 }
 
 /*
- * Function: start_pipeline_sm()
+ * Function: start_pipelining_sm()
  *
  * Params:   server_op *s_op, 
  *           job_status_s* js_p
@@ -150,106 +150,94 @@ static int io_send_ack(
  * Returns:  int
  *
  * Synopsis: this is the most important part of the state machine.
- *           we setup the flow descriptor and post it in order to 
- *           carry out the data transfer
+ *           we setup the multiple read/write state machines 
+ *           to carry out the data transfer
  *           
  */
-static PINT_sm_action start_pipeline_sm(
+static PINT_sm_action start_pipelining_sm(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
-    struct PINT_server_op *flow_read_op;
-    struct PINT_server_op *flow_write_op;
+    struct PINT_server_op *rwsm_op;
     int i, ret; 
-    struct fp_private_data *flow_data = NULL;
     PINT_segpool_handle_t seg_handle;
         
-    s_op->u.io.flow_d = PINT_flow_alloc();
-    
-    if (!s_op->u.io.flow_d)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    s_op->u.io.flow_d->hints = s_op->req->hints;
+    s_op->u.io.hints = s_op->req->hints;
+    s_op->u.io.total_transferred = 0;
 
     /* we still have the file size stored in the response structure 
      * that we sent in the previous state, other details come from
      * request
      */
-    s_op->u.io.flow_d->file_data.fsize = s_op->resp.u.io.bstream_size;
-    s_op->u.io.flow_d->file_data.dist = s_op->req->u.io.io_dist;
-    s_op->u.io.flow_d->file_data.server_nr = s_op->req->u.io.server_nr;
-    s_op->u.io.flow_d->file_data.server_ct = s_op->req->u.io.server_ct;
+    s_op->u.io.file_data.fsize = s_op->resp.u.io.bstream_size;
+    s_op->u.io.file_data.dist = s_op->req->u.io.io_dist;
+    s_op->u.io.file_data.server_nr = s_op->req->u.io.server_nr;
+    s_op->u.io.file_data.server_ct = s_op->req->u.io.server_ct;
 
     /* on writes, we allow the bstream to be extended at EOF */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
     {
         gossip_debug(GOSSIP_IO_DEBUG, "%s: issuing pipelining to "
                      "write data.\n", __func__);
-        s_op->u.io.flow_d->file_data.extend_flag = 1;
+        s_op->u.io.file_data.extend_flag = 1;
     }
     else
     {
         gossip_debug(GOSSIP_IO_DEBUG, "%s: issuing pipelining to "
                      "read data.\n", __func__);
-        s_op->u.io.flow_d->file_data.extend_flag = 0;
+        s_op->u.io.file_data.extend_flag = 0;
     }
 
-    s_op->u.io.flow_d->file_req = s_op->req->u.io.file_req;
-    s_op->u.io.flow_d->file_req_offset = s_op->req->u.io.file_req_offset;
-    s_op->u.io.flow_d->mem_req = NULL;
-    s_op->u.io.flow_d->aggregate_size = s_op->req->u.io.aggregate_size;
-    s_op->u.io.flow_d->tag = s_op->tag;
-    s_op->u.io.flow_d->user_ptr = NULL;
-    s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
-    s_op->u.io.flow_d->op = s_op->req->u.io.op; /* AS: operation */
-    s_op->u.io.flow_d->datatype = s_op->req->u.io.datatype; /* AS: dtype */
-    s_op->u.io.flow_d->dfile_array = s_op->req->u.io.dfile_array; /* AD: dfile_array */
+    s_op->u.io.file_req = s_op->req->u.io.file_req;
+    s_op->u.io.file_req_offset = s_op->req->u.io.file_req_offset;
+    s_op->u.io.mem_req = NULL;
+    s_op->u.io.aggregate_size = s_op->req->u.io.aggregate_size;
+    s_op->u.io.tag = s_op->tag;
+    s_op->u.io.user_ptr = NULL;
+    s_op->u.io.op = s_op->req->u.io.op; /* AS: operation */
+    s_op->u.io.datatype = s_op->req->u.io.datatype; /* AS: dtype */
+    s_op->u.io.dfile_array = s_op->req->u.io.dfile_array; /* AD: dfile_array */
     
     gossip_debug(GOSSIP_IO_DEBUG, "server_ct=%d\n", s_op->req->u.io.server_ct);
     for(i=0; i<s_op->req->u.io.server_ct; i++)
-	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%lu\n", i, s_op->u.io.flow_d->dfile_array[i]);
+	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%lu\n", i, 
+		     s_op->u.io.dfile_array[i]);
 
     fs_conf = PINT_config_find_fs_id(user_opts, s_op->req->u.io.fs_id);
     if(fs_conf)
     {
         /* pick up any buffer settings overrides from fs conf */
-        s_op->u.io.flow_d->buffer_size = fs_conf->fp_buffer_size;
-        s_op->u.io.flow_d->buffers_per_flow = fs_conf->fp_buffers_per_flow;
+        s_op->u.io.buffer_size = fs_conf->fp_buffer_size;
+        s_op->u.io.num_of_buffers = fs_conf->fp_buffers_per_flow;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
-        "server_nr: %d, server_ct: %d\n",
-        lld(s_op->u.io.flow_d->file_data.fsize),
-        (int)s_op->u.io.flow_d->file_data.server_nr,
-        (int)s_op->u.io.flow_d->file_data.server_ct);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: fsize: %lld, " 
+		 "server_nr: %d, server_ct: %d\n", __func__,
+        lld(s_op->u.io.file_data.fsize),
+        (int)s_op->u.io.file_data.server_nr,
+        (int)s_op->u.io.file_data.server_ct);
 
     gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %lld, "
         "aggregate_size: %lld, handle: %llu\n", 
-        lld(s_op->u.io.flow_d->file_req_offset),
-        lld(s_op->u.io.flow_d->aggregate_size),
+        lld(s_op->u.io.file_req_offset),
+        lld(s_op->u.io.aggregate_size),
         llu(s_op->req->u.io.handle));
 
+    /* FIXME: loop bodies are same, need to remove if_else??? */
     /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
     {
-        s_op->u.io.flow_d->src.endpoint_id = BMI_ENDPOINT;
-        s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
-        s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
-        s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
-        s_op->u.io.flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
+        s_op->u.io.address = s_op->addr;
+        s_op->u.io.handle = s_op->req->u.io.handle;
+        s_op->u.io.coll_id = s_op->req->u.io.fs_id;
     }
     else if (s_op->req->u.io.io_type == PVFS_IO_READ)
     {
-        s_op->u.io.flow_d->src.endpoint_id = TROVE_ENDPOINT;
-        s_op->u.io.flow_d->src.u.trove.handle = s_op->req->u.io.handle;
-        s_op->u.io.flow_d->src.u.trove.coll_id = s_op->req->u.io.fs_id;
-        s_op->u.io.flow_d->dest.endpoint_id = BMI_ENDPOINT;
-        s_op->u.io.flow_d->dest.u.bmi.address = s_op->addr;
+        s_op->u.io.handle = s_op->req->u.io.handle;
+        s_op->u.io.coll_id = s_op->req->u.io.fs_id;
+        s_op->u.io.address = s_op->addr;
     }
     else
     {
@@ -258,119 +246,55 @@ static PINT_sm_action start_pipeline_sm(
         return SM_ACTION_COMPLETE;
     }
 
-    flow_data = (struct fp_private_data*)malloc(sizeof(struct fp_private_data));
-    if(!flow_data) {
-	js_p->error_code = -PVFS_ENOMEM;
-	return SM_ACTION_COMPLETE;
-    }
-
-    memset(flow_data, 0, sizeof(struct fp_private_data));
-    
-    s_op->u.io.flow_d->flow_protocol_data = flow_data;
-    s_op->u.io.flow_d->state = FLOW_TRANSMITTING;
-    flow_data->parent = s_op->u.io.flow_d;
-
     /* setup the request processing states */
     gossip_debug(GOSSIP_IO_DEBUG, "%s: aggregate_size=%ld\n", __func__,
-		 s_op->u.io.flow_d->aggregate_size);
+		 s_op->u.io.aggregate_size);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: file_data.fsize=%ld\n", __func__,
-		 s_op->u.io.flow_d->file_data.fsize);
+		 s_op->u.io.file_data.fsize);
 
-    if(s_op->u.io.flow_d->buffer_size < 1)
-        s_op->u.io.flow_d->buffer_size = BUFFER_SIZE;
-    if(s_op->u.io.flow_d->buffers_per_flow < 1)
-        s_op->u.io.flow_d->buffers_per_flow = BUFFERS_PER_FLOW;
-        
-    flow_data->prealloc_array = (struct fp_queue_item*)
-        malloc(s_op->u.io.flow_d->buffers_per_flow*sizeof(struct fp_queue_item));
-    if(!flow_data->prealloc_array)
-    {
-        free(flow_data);
-        js_p->error_code = (-PVFS_ENOMEM);
-	return SM_ACTION_COMPLETE;
-    }
+    if(s_op->u.io.buffer_size < 1)
+        s_op->u.io.buffer_size = BUFFER_SIZE;
+    if(s_op->u.io.num_of_buffers < 1)
+        s_op->u.io.num_of_buffers = BUFFERS_PER_PIPELINING;
 
-    memset(flow_data->prealloc_array, 0,
-        s_op->u.io.flow_d->buffers_per_flow*sizeof(struct fp_queue_item));
-    for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++)
-    {
-        flow_data->prealloc_array[i].parent = s_op->u.io.flow_d;
-    }
+    PINT_segpool_unit_id id;
 
-    /* remaining setup depends on the endpoints we intend to use */
-    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
-	PINT_segpool_unit_id id;
+    PINT_dist_lookup(s_op->u.io.file_data.dist);
+    ret = PINT_segpool_init(s_op->u.io.mem_req,
+			    s_op->u.io.file_req,
+			    s_op->u.io.file_data.fsize,
+			    s_op->u.io.file_req_offset,
+			    s_op->u.io.aggregate_size,
+			    s_op->u.io.file_data.server_nr,
+			    s_op->u.io.file_data.server_ct,
+			    s_op->u.io.file_data.dist, /* dist */
+			    (s_op->req->u.io.io_type == PVFS_IO_READ ? 
+			     PINT_SP_SERVER_READ: PINT_SP_SERVER_WRITE),
+			    &seg_handle);
 
-	PINT_dist_lookup(s_op->u.io.flow_d->file_data.dist);
-	ret = PINT_segpool_init(s_op->u.io.flow_d->mem_req,
-				s_op->u.io.flow_d->file_req,
-				s_op->u.io.flow_d->file_data.fsize,
-				s_op->u.io.flow_d->file_req_offset,
-				s_op->u.io.flow_d->aggregate_size,
-				s_op->u.io.flow_d->file_data.server_nr,
-				s_op->u.io.flow_d->file_data.server_ct,
-				s_op->u.io.flow_d->file_data.dist, /* dist */
-				PINT_SP_SERVER_READ,
-				&seg_handle);
-
-	s_op->u.io.seg_handle = seg_handle;
-	for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
-	    PINT_segpool_register(seg_handle, &id);
-	    flow_data->prealloc_array[i].result_chain.q_item =
-		&flow_data->prealloc_array[i];
-	    flow_read_op = malloc(sizeof(*flow_read_op));
-	    memset(flow_read_op, 0, sizeof(*flow_read_op));
-	    flow_read_op->u.flow_read.q_item = &flow_data->prealloc_array[i];
-	    flow_read_op->u.flow_read.seg_handle = seg_handle;
-	    flow_read_op->u.flow_read.id = id;
-	    ret = PINT_sm_push_frame(smcb, DO_READ, flow_read_op);
-	    if(ret < 0) {
-		js_p->error_code = -PVFS_ENOMEM;
-		return SM_ACTION_COMPLETE;
-	    }
+    s_op->u.io.seg_handle = seg_handle;
+    for(i=0; i<s_op->u.io.num_of_buffers; i++) {
+	PINT_segpool_register(seg_handle, &id);
+	rwsm_op = malloc(sizeof(*rwsm_op));
+	memset(rwsm_op, 0, sizeof(*rwsm_op));
+	rwsm_op->u.rwsm.seg_handle = seg_handle;
+	rwsm_op->u.rwsm.id = id;
+	rwsm_op->u.rwsm.parent = s_op;
+	if(s_op->req->u.io.io_type == PVFS_IO_READ) {
+	    ret = PINT_sm_push_frame(smcb, DO_READ, rwsm_op);
 	    s_op->u.io.parallel_read_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_read_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_read_sms);
 	}
-    }
-    else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: IO_WRITE\n", __func__);
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: file_size=%ld\n", __func__,
-		     s_op->u.io.flow_d->aggregate_size);
-	PINT_segpool_unit_id id;
-
-	PINT_dist_lookup(s_op->u.io.flow_d->file_data.dist);
-	ret = PINT_segpool_init(s_op->u.io.flow_d->mem_req,
-				 s_op->u.io.flow_d->file_req,
-				s_op->u.io.flow_d->file_data.fsize,
-				s_op->u.io.flow_d->file_req_offset, /* sson */
-				s_op->u.io.flow_d->aggregate_size,
-				 s_op->u.io.flow_d->file_data.server_nr,
-				 s_op->u.io.flow_d->file_data.server_ct,
-				 s_op->u.io.flow_d->file_data.dist, /* dist */
-				 PINT_SP_SERVER_WRITE,
-				 &seg_handle);
-
-	s_op->u.io.seg_handle = seg_handle;
-	/* FIXME: we will eventually want to post multiple of recvs */
-	for(i=0; i<s_op->u.io.flow_d->buffers_per_flow; i++) {
-	    PINT_segpool_register(seg_handle, &id);
-	    flow_data->prealloc_array[i].result_chain.q_item = 
-		&flow_data->prealloc_array[i];
-	
-	    flow_write_op = malloc(sizeof(*flow_write_op));
-	    memset(flow_write_op, 0, sizeof(*flow_write_op));
-	    flow_write_op->u.flow_write.q_item = &flow_data->prealloc_array[i];
-	    flow_write_op->u.flow_write.seg_handle = seg_handle;
-	    flow_write_op->u.flow_write.id = id;
-	    ret = PINT_sm_push_frame(smcb, DO_WRITE, flow_write_op);
-	    if(ret < 0) {
-		js_p->error_code = -PVFS_ENOMEM;
-		return SM_ACTION_COMPLETE;
-	    }
+	else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
+	    ret = PINT_sm_push_frame(smcb, DO_WRITE, rwsm_op);
 	    s_op->u.io.parallel_write_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_write_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_write_sms);
+	}
+	if(ret < 0) {
+	    js_p->error_code = -PVFS_ENOMEM;
+	    return SM_ACTION_COMPLETE;
 	}
     }
 
@@ -433,11 +357,6 @@ static PINT_sm_action io_cleanup(
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
 
-    if (s_op->u.io.flow_d)
-    {
-        PINT_flow_free(s_op->u.io.flow_d);
-    }
-
     if (s_op->u.io.seg_handle) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: freeing seg_handle\n", __func__);
 	PINT_segpool_destroy(s_op->u.io.seg_handle);
@@ -460,7 +379,7 @@ static PINT_sm_action io_cleanup(
  * Params:   server_op *s_op, 
  *           job_status_s* js_p
  *
- * Pre:      flow is completed so that we can report its status
+ * Pre:      IO is completed so that we can report its status
  *
  * Post:     if this is a write, response has been sent to client
  *           if this is a read, do nothing
@@ -523,34 +442,34 @@ static PINT_sm_action io_send_completion_ack(
     s_op->resp.status = js_p->error_code;
     if(s_op->req->u.io.io_type == PVFS_IO_READ) { /* AS: read with op */
 	s_op->resp.u.read_completion.total_completed =
-	    s_op->u.io.flow_d->total_transferred;
-	gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%ld\n", s_op->u.io.flow_d->total_transferred); /* AS */
+	    s_op->u.io.total_transferred;
+	gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%ld\n", s_op->u.io.total_transferred); /* AS */
 	switch(s_op->req->u.io.datatype) {
 	case (int)0x4c000405: /* MPI_INT */
 	    {
 		int *tmp;
-		tmp = s_op->u.io.flow_d->tmp_buffer;
+		tmp = s_op->u.io.tmp_buffer;
 		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (INT) to send=%d, s_op->resp.u.read_completion.total_completed=%lu\n", *tmp, s_op->resp.u.read_completion.total_completed);
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(int);
-		s_op->resp.u.read_completion.result.buffer = s_op->u.io.flow_d->tmp_buffer;
+		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
 	    }
 	case (int)0x4c00080b:
 	    {
 		double *tmp;
-		tmp = s_op->u.io.flow_d->tmp_buffer;
+		tmp = s_op->u.io.tmp_buffer;
 		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (DOUBLE) to send=%lf, s_op->resp.u.read_completion.total_completed=%lu\n", *tmp, s_op->resp.u.read_completion.total_completed);
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(double);
-		s_op->resp.u.read_completion.result.buffer = s_op->u.io.flow_d->tmp_buffer;
+		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
 	    }
 	}
     }
     else /* AS */
 	s_op->resp.u.write_completion.total_completed = 
-	    s_op->u.io.flow_d->total_transferred; /* AS */
+	    s_op->u.io.total_transferred; /* AS */
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__, s_op->u.io.flow_d->total_transferred);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__, s_op->u.io.total_transferred);
     err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
         s_op->addr, s_op->decoded.enc_type);

@@ -21,7 +21,7 @@
 #include "rw-sm.h"
 #include "trove.h"
 
-static void do_comp(struct fp_queue_item *);
+static void do_comp(struct PINT_server_op *);
 
 %%
 
@@ -61,9 +61,8 @@ nested machine pvfs2_read_sm
 static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
-    PINT_segpool_handle_t seg_handle = s_op->u.flow_read.seg_handle;
-    PINT_segpool_unit_id id = s_op->u.flow_read.id;
+    PINT_segpool_handle_t seg_handle = s_op->u.rwsm.seg_handle;
+    PINT_segpool_unit_id id = s_op->u.rwsm.id;
     int ret;
     struct filesystem_configuration_s *fs_config;
     struct server_configuration_s *server_config;
@@ -72,29 +71,30 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_size *sizes;
     PVFS_size bytes;
     job_id_t tmp_id;
+    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
     
-    q_item->buffer_used = 0;
+    s_op->u.rwsm.buffer_used = 0;
 
-    if(!q_item->buffer) {
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: !q_item->buffer\n", __func__);
-        /* if the q_item has not been used, allocate a buffer */
-        q_item->buffer = BMI_memalloc(
-            q_item->parent->dest.u.bmi.address,
-            q_item->parent->buffer_size, BMI_SEND);
+    if(!s_op->u.rwsm.buffer) {
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: !buffer\n", __func__);
+        /* if the buffer has not been used, allocate a buffer */
+        s_op->u.rwsm.buffer = BMI_memalloc(
+	    parent_s_op->u.io.address,
+            parent_s_op->u.io.buffer_size, BMI_SEND);
         /* TODO: error handling */
-        assert(q_item->buffer);
+        assert(s_op->u.rwsm.buffer);
     }
     
-    bytes = q_item->parent->buffer_size;
+    bytes = parent_s_op->u.io.buffer_size;
     PINT_segpool_take_segments(seg_handle, id, &bytes, &count, 
 			       &offsets, &sizes);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: bytes=%ld, count=%d\n", __func__,
 		 bytes, count);
     
-    q_item->buffer_used = bytes;
-    s_op->u.flow_read.offsets = offsets;
-    s_op->u.flow_read.sizes = sizes;
-    s_op->u.flow_read.segs = count;
+    s_op->u.rwsm.buffer_used = bytes;
+    s_op->u.rwsm.offsets = offsets;
+    s_op->u.rwsm.sizes = sizes;
+    s_op->u.rwsm.segs = count;
 
     if(count == 0) {
 	js_p->error_code = 0;
@@ -105,15 +105,15 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
     fs_config = PINT_config_get_filesystems(&server_config);
 
     ret = job_trove_bstream_read_list(
-				      q_item->parent->src.u.trove.coll_id,
-				      q_item->parent->src.u.trove.handle,
-				      &q_item->buffer,
-				      (PVFS_size *)&q_item->buffer_used,
+				      parent_s_op->u.io.coll_id,
+				      parent_s_op->u.io.handle,
+				      &s_op->u.rwsm.buffer,
+				      (PVFS_size *)&s_op->u.rwsm.buffer_used,
 				      1,
 				      offsets,
 				      sizes,
 				      count,
-				      &q_item->out_size,
+				      &s_op->u.rwsm.out_size,
 				      fs_config->trove_sync_data,
 				      NULL,
 				      smcb,
@@ -121,7 +121,7 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
 				      js_p,
 				      &tmp_id,
 				      server_job_context,
-				      q_item->parent->hints);
+				      parent_s_op->u.io.hints);
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: ret=%d\n", __func__, ret);
     
@@ -149,40 +149,38 @@ static int trove_read_call(struct PINT_smcb *smcb, job_status_s *js_p)
 static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
-    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
 
-    if(s_op->u.flow_read.segs == 0 && q_item->buffer_used == 0) {
+    if(s_op->u.rwsm.segs == 0 && s_op->u.rwsm.buffer_used == 0) {
 	js_p->error_code = 0;
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: count==0?\n", __func__);
 	return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer_used=%ld\n", __func__,
-		 q_item->buffer_used);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: q_item->buffer[0]=%s\n", __func__,
-		 (char *)q_item->buffer);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer_used=%ld\n", __func__,
+		 s_op->u.rwsm.buffer_used);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer[0]=%s\n", __func__,
+		 (char *)s_op->u.rwsm.buffer);
     /***************************************************/
-    do_comp(q_item); 
+    do_comp(s_op); 
     /***************************************************/
 
-    /* while we hold dest lock, look for next seq no. to send */
     //do{
-	assert(q_item->buffer_used);
-	if(flow_data->parent->op != 0) { /* AS: when op is specified */
+	assert(s_op->u.rwsm.buffer_used);
+	if(parent_s_op->u.io.op != 0) { /* AS: when op is specified */
 	    //ret = 1; /* AS: skip sending if op is specified */ 
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parent->op != 0\n", __func__);
 	    js_p->error_code = 0;
 	    return SM_ACTION_COMPLETE;
 	} 
 	else 
-	    ret = job_bmi_send(q_item->parent->dest.u.bmi.address,
-			       q_item->buffer,
-			       q_item->buffer_used,
-			       q_item->parent->tag,
+	    ret = job_bmi_send(parent_s_op->u.io.address,
+			       s_op->u.rwsm.buffer,
+			       s_op->u.rwsm.buffer_used,
+			       parent_s_op->u.io.tag,
 			       BMI_PRE_ALLOC,
 			       0, /* send_unexpected */
 			       smcb, /* user_ptr */
@@ -191,14 +189,14 @@ static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
 			       &tmp_id,
 			       server_job_context,
 			       user_opts->server_job_bmi_timeout,
-			       (bmi_hint)q_item->parent->hints);
-
+			       (bmi_hint)parent_s_op->u.io.hints);
+#if 0
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
                 "%s: (post send time) ini posts: %d, pending: %d, last: %d\n",
                 __func__,
                 flow_data->initial_posts, flow_data->dest_pending,
                 flow_data->dest_last_posted);
-
+#endif
         if(ret < 0)
         {
             gossip_err("%s: I/O error occurred\n", __func__);
@@ -226,21 +224,21 @@ static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
 static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
-    PINT_segpool_handle_t h = s_op->u.flow_read.seg_handle;
+    PINT_segpool_handle_t h = s_op->u.rwsm.seg_handle;
     js_p->error_code = 0;
+    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
     
-    q_item->parent->total_transferred += q_item->buffer_used;
+    parent_s_op->u.io.total_transferred += s_op->u.rwsm.buffer_used;
     gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__,
-		 q_item->parent->total_transferred);
+		 parent_s_op->u.io.total_transferred);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: count=%d\n", __func__,
-		 s_op->u.flow_read.segs);
+		 s_op->u.rwsm.segs);
 
     /* FIXME: */
     /* unless the second condition is set, the server starts
        a new read request to one already done, and falls into
        infinite trove_read->bmi_send->check_done loop */
-    if(!segpool_done(h) && s_op->u.flow_read.segs != 0) {
+    if(!segpool_done(h) && s_op->u.rwsm.segs != 0) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: read: LOOP\n", __func__);
 	js_p->error_code = LOOP;
     }
@@ -254,47 +252,48 @@ static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
 static int epilog(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct fp_queue_item *q_item = s_op->u.flow_read.q_item;
     js_p->error_code = 0;
+    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
 
-    if(q_item->buffer) {
-	BMI_memfree(q_item->parent->src.u.bmi.address, 
-		    q_item->buffer, q_item->parent->buffer_size, BMI_SEND);
+    if(s_op->u.rwsm.buffer) {
+	BMI_memfree(parent_s_op->u.io.address, s_op->u.rwsm.buffer, 
+		    parent_s_op->u.io.buffer_size, BMI_SEND);
     }
+
     gossip_debug(GOSSIP_IO_DEBUG, "%s: read: \n", __func__);
     return SM_ACTION_COMPLETE;
-    //return(server_state_machine_complete(smcb)); // why not this?
 }
 
-static void do_comp(struct fp_queue_item *q_item)
+static void do_comp(struct PINT_server_op *s_op)
 {
-    struct fp_private_data *flow_data = PRIVATE_FLOW(q_item->parent);
+    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
 
-    if(q_item->buffer) {
+    if(s_op->u.rwsm.buffer) {
 	PVFS_size i;
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-		     "%s: q_item->buffer_used=%ld, op=0x%x, datatype=0x%x\n", 
-		     __func__, q_item->buffer_used, flow_data->parent->op, 
-		     flow_data->parent->datatype); /* AS */
+		     "%s: buffer_used=%ld, op=0x%x, datatype=0x%x\n", 
+		     __func__, s_op->u.rwsm.buffer_used, 
+		     parent_s_op->u.io.op, 
+		     parent_s_op->u.io.datatype); /* AS */
 
-	switch(flow_data->parent->datatype) {
+	switch(parent_s_op->u.io.datatype) {
 	case ((int)0x4c000405): /* MPI_INT */
 	    {
-		int *a = q_item->buffer;
+		int *a = s_op->u.rwsm.buffer;
 		int result;
-		PVFS_size count = (q_item->buffer_used)/((*PVFS_INT).ub);
+		PVFS_size count = (s_op->u.rwsm.buffer_used)/((*PVFS_INT).ub);
 		int *tmp;
 		
-		if (flow_data->parent->total_transferred == 0) {
-		     if (flow_data->parent->tmp_buffer == NULL)
-			 flow_data->parent->tmp_buffer = (void *)malloc(1*sizeof(int));
-		     memset(flow_data->parent->tmp_buffer, 0, sizeof(int));
+		if (parent_s_op->u.io.total_transferred == 0) {
+		    if (parent_s_op->u.io.tmp_buffer == NULL)
+			parent_s_op->u.io.tmp_buffer = (void *)malloc(1*sizeof(int));
+		    memset(parent_s_op->u.io.tmp_buffer, 0, sizeof(int));
 		}
-		tmp = flow_data->parent->tmp_buffer;
-		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "total_transferred=%ld, total_bytes_processed=%ld\n", flow_data->parent->total_transferred, flow_data->total_bytes_processed);
+		tmp = parent_s_op->u.io.tmp_buffer;
+		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "total_transferred=%ld\n", parent_s_op->u.io.total_transferred);
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "count=%ld, tmp=%d\n", count, *tmp);
 
-		switch(flow_data->parent->op) {
+		switch(parent_s_op->u.io.op) {
 		case 0x58000001: /* MAX */
 		    result = *a;
 		    for (i=1; i<count; i++ ) {
@@ -303,7 +302,7 @@ static void do_comp(struct fp_queue_item *q_item)
 			}
 		    }
 		    a[0] = result;
-		    if (flow_data->parent->total_transferred == 0 ||
+		    if (parent_s_op->u.io.total_transferred == 0 ||
 			result > *tmp)
 			*tmp = result;
 		    break;
@@ -315,7 +314,7 @@ static void do_comp(struct fp_queue_item *q_item)
 			}
 		    }
 		    a[0] = result;
-		    if (flow_data->parent->total_transferred == 0 ||
+		    if (parent_s_op->u.io.total_transferred == 0 ||
 			result < *tmp)
 			*tmp = result;
 		    break;
@@ -336,31 +335,30 @@ static void do_comp(struct fp_queue_item *q_item)
 		default:
 		    break;
 		}
-		q_item->buffer = (void *)a;
-		flow_data->parent->tmp_buffer = (void *)tmp;
+		s_op->u.rwsm.buffer = (void *)a;
+		parent_s_op->u.io.tmp_buffer = (void *)tmp;
 	    }
 	    break;
 
 	case ((int)0x4c00080b): /* MPI_DOUBLE */
 	    {
-		double *a = q_item->buffer;
+		double *a = s_op->u.rwsm.buffer;
 		double result;
-		PVFS_size count = (q_item->buffer_used)/((*PVFS_DOUBLE).ub);
+		PVFS_size count = (s_op->u.rwsm.buffer_used)/((*PVFS_DOUBLE).ub);
 		double *tmp;
 
-		if (flow_data->parent->total_transferred == 0) {
-		    if (flow_data->parent->tmp_buffer == NULL)
-			flow_data->parent->tmp_buffer = (void *)malloc(1*sizeof(double));
-		    memset(flow_data->parent->tmp_buffer, 0, sizeof(double));
+		if (parent_s_op->u.io.total_transferred == 0) {
+		    if (parent_s_op->u.io.tmp_buffer == NULL)
+			parent_s_op->u.io.tmp_buffer = (void *)malloc(1*sizeof(double));
+		    memset(parent_s_op->u.io.tmp_buffer, 0, sizeof(double));
 		}
-		tmp = flow_data->parent->tmp_buffer;
+		tmp = parent_s_op->u.io.tmp_buffer;
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
-			     "total_transferred=%ld, total_bytes_processed=%ld\n", 
-			     flow_data->parent->total_transferred, 
-			     flow_data->total_bytes_processed);
+			     "total_transferred=%ld\n",
+			     parent_s_op->u.io.total_transferred);
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "count=%ld, tmp=%lf\n", 
 			     count, *tmp);
-		switch(flow_data->parent->op) {
+		switch(parent_s_op->u.io.op) {
 		case 0x58000001: /* MAX */
 		    result = *a;
 		    for (i=1; i<count; i++ ) {
@@ -369,7 +367,7 @@ static void do_comp(struct fp_queue_item *q_item)
 			}
 		    }
 		    a[0] = result;
-		    if (flow_data->parent->total_transferred == 0 ||
+		    if (parent_s_op->u.io.total_transferred == 0 ||
 			result > *tmp)
 			*tmp = result;
 		    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "max=%lf\n", *tmp);
@@ -383,7 +381,7 @@ static void do_comp(struct fp_queue_item *q_item)
 		    }
 
 		    a[0] = result;
-		    if (flow_data->parent->total_transferred == 0 ||
+		    if (parent_s_op->u.io.total_transferred == 0 ||
 			result < *tmp)
 			*tmp = result;
 		    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "min=%lf\n", 
@@ -404,8 +402,8 @@ static void do_comp(struct fp_queue_item *q_item)
 		default:
 		    break;
 		} /* end inner switch */
-		q_item->buffer = (void *)a;
-		flow_data->parent->tmp_buffer = (void *)tmp;
+		s_op->u.rwsm.buffer = (void *)a;
+		parent_s_op->u.io.tmp_buffer = (void *)tmp;
 	    }
 	    
 	    break;
