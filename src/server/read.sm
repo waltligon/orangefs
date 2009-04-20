@@ -171,10 +171,10 @@ static int bmi_send_call(struct PINT_smcb *smcb, job_status_s *js_p)
     //do{
 	assert(s_op->u.rwsm.buffer_used);
 	if(parent_s_op->u.io.op != 0) { /* AS: when op is specified */
-	    //ret = 1; /* AS: skip sending if op is specified */ 
+	    ret = 1; /* AS: skip sending if op is specified */ 
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parent->op != 0\n", __func__);
-	    js_p->error_code = 0;
-	    return SM_ACTION_COMPLETE;
+	    //js_p->error_code = ret;
+	    //return SM_ACTION_COMPLETE;
 	} 
 	else 
 	    ret = job_bmi_send(parent_s_op->u.io.address,

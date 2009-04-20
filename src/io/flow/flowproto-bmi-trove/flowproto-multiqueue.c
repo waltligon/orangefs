@@ -1949,19 +1949,23 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     }
 
     assert(total_size);
-    ret = BMI_post_recv_list(&q_item->posted_id,
-        q_item->parent->src.u.bmi.address,
-        flow_data->tmp_buffer_list,
-        size_array,
-        segs,
-        total_size,
-        &tmp_actual_size,
-        buffer_type,
-        q_item->parent->tag,
-        &q_item->bmi_callback,
-        global_bmi_context,
-        (bmi_hint)q_item->parent->hints);
 
+    if(flow_data->parent->op != 0) 
+	ret = 1; /* AS: skp sending if op is specified */
+    else
+	ret = BMI_post_recv_list(&q_item->posted_id,
+				 q_item->parent->src.u.bmi.address,
+				 flow_data->tmp_buffer_list,
+				 size_array,
+				 segs,
+				 total_size,
+				 &tmp_actual_size,
+				 buffer_type,
+				 q_item->parent->tag,
+				 &q_item->bmi_callback,
+				 global_bmi_context,
+				 (bmi_hint)q_item->parent->hints);
+    
     if(ret < 0)
     {
         gossip_err("%s: I/O error occurred\n", __func__);
