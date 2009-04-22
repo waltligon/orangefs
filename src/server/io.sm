@@ -195,6 +195,7 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.mem_req = NULL;
     s_op->u.io.aggregate_size = s_op->req->u.io.aggregate_size;
     s_op->u.io.tag = s_op->tag;
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: tag=%d\n", __func__, s_op->tag);
     s_op->u.io.user_ptr = NULL;
     s_op->u.io.op = s_op->req->u.io.op; /* AS: operation */
     s_op->u.io.datatype = s_op->req->u.io.datatype; /* AS: dtype */
@@ -226,7 +227,6 @@ static PINT_sm_action start_pipelining_sm(
         llu(s_op->req->u.io.handle));
 
     /* FIXME: loop bodies are same, need to remove if_else??? */
-    /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
     {
         s_op->u.io.address = s_op->addr;
@@ -404,6 +404,7 @@ static PINT_sm_action io_send_completion_ack(
      */
     if (s_op->req->u.io.io_type == PVFS_IO_READ)
     {
+	/* normal READ (i.e., without op and datatype) */
 	if(s_op->req->u.io.op == 0) { /* AS */
             gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack()?\n");
             js_p->error_code = 0;

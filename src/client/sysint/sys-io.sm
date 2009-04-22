@@ -1090,9 +1090,9 @@ static PINT_sm_action io_datafile_post_msgpairs(
     /* if anything posted, just wait for that to complete, else
      * go sleep then try the remaining msgpairs again */
     if (sm_p->u.io.msgpair_completion_count
-     || sm_p->u.io.flow_completion_count
+	|| sm_p->u.io.flow_completion_count
 	|| sm_p->u.io.read_ack_completion_count /* AS */
-     || sm_p->u.io.write_ack_completion_count)
+	|| sm_p->u.io.write_ack_completion_count)
         return SM_ACTION_DEFERRED;  /* means go find another machine to run */
     else {
         js_p->error_code = IO_RETRY;
@@ -1223,6 +1223,11 @@ static PINT_sm_action io_datafile_complete_operations(
 			goto check_next_step;
 		    }
 	    } /* AS */
+#if 0
+	else if(sm_p->u.io.io_type == PVFS_IO_READ && sm_p->u.io.op == 0)
+	    /* FIXME: why calls io_post_flow instead of this??? */
+	    goto check_next_step; /* sson */
+#endif
         else if(sm_p->u.io.io_type == PVFS_IO_WRITE) /* AS */
         {
             /* we expect this write to _not_ succeed immediately, because we
@@ -1431,9 +1436,9 @@ static PINT_sm_action io_datafile_complete_operations(
      * to do.
      */
     if (sm_p->u.io.msgpair_completion_count
-     || sm_p->u.io.flow_completion_count
+	|| sm_p->u.io.flow_completion_count
 	|| sm_p->u.io.read_ack_completion_count /* AS */
-     || sm_p->u.io.write_ack_completion_count) {
+	|| sm_p->u.io.write_ack_completion_count) {
         if (PINT_smcb_cancelled(smcb))
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                          "%d flows and %d write acks pending\n",
@@ -1693,9 +1698,7 @@ static PINT_sm_action io_analyze_results(
      * of the datafiles (where the EOF occurs).
      */
     if(sm_p->u.io.total_size == PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req))
-    {
         sm_p->u.io.io_resp_p->total_completed = sm_p->u.io.total_size;
-    }
     else
     {
         PVFS_offset eor; /* end-of-request */

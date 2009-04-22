@@ -155,13 +155,12 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
 {
     struct PINT_sp_segments *segments;
     PINT_Request_result result;
+    PINT_Request_result result_tmp;
     int type;
     int ret;
 
     segments = id_gen_fast_lookup(id);
-#if (!TEST)
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 0: *bytes=%ld\n", __func__, *bytes);
-#endif
+
     result.bytemax = *bytes;
     result.segs = 0;
     result.bytes = 0;
@@ -244,7 +243,11 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                &h->filedata,
                                &result,
                                type);
+
     gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: ret=%d, result.bytes=%d, result.bytemax=%d\n", __func__, ret, result.bytes, result.bytemax);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: result.segmax=%d\n", __func__, result.segmax);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: result.bytemax=%d\n", __func__, result.bytemax);
+
     if(ret != 0)
     {
         goto done;
@@ -258,28 +261,55 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
         int prev_segment_count = result.segs;
         assert(result.segmax == result.segs);
 
-        result.bytemax = result.bytemax - result.bytes;
-        result.segmax = 1;
-        result.segs = 0;
-        result.bytes = 0;
+        result_tmp.bytemax = result.bytemax - result.bytes;
+        result_tmp.segmax = 1;
+        result_tmp.segs = 0;
+        result_tmp.bytes = 0;
         ret = PINT_process_request(h->file_req_state,
                                    h->mem_req_state,
                                    &h->filedata,
-                                   &result,
+                                   &result_tmp,
                                    PINT_CKSIZE);
-        if(ret != 0)
+
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.bytes=%d, result_tmp.bytemax=%d\n", __func__, ret, result_tmp.bytes, result_tmp.bytemax);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.segs=%d\n",
+		 __func__, ret, result_tmp.segs);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.segmax=%d\n", __func__, ret, result_tmp.segmax);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result.bytemax=%d\n", __func__, ret, result.bytemax);
+
+	if(ret != 0)
         {
             goto done;
         }
 
+    	/* FIXME: nothing to process, so copy prior values and return */
+	if(result_tmp.bytes == 0) {
+	    *bytes = result.bytes;
+	    *count = result.segs;
+	    *offsets = result.offset_array;
+	    *sizes = result.size_array;
+	    goto done;
+	}
+
+	/* At this point, we know that there's something to process.
+	   so we use result_tmp */
+	result = result_tmp; 
+
         segments->count += result.segs;
-        segments->offsets = realloc(
-            segments->offsets, sizeof(PVFS_offset)*segments->count);
-        segments->sizes = realloc(
-            segments->sizes, sizeof(PVFS_size)*segments->count);
-        result.offset_array = segments->offsets + prev_segment_count;
+
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: segments->count=%d\n", 
+		     __func__, segments->count);
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: result.segmax=%d\n", 
+		     __func__, result.segmax);
+
+	segments->offsets = realloc(segments->offsets, 
+				    sizeof(PVFS_offset)*segments->count);
+	segments->sizes = realloc(segments->sizes, 
+				      sizeof(PVFS_size)*segments->count);
+	result.offset_array = segments->offsets + prev_segment_count;
         result.size_array = segments->sizes + prev_segment_count;
         result.segmax = result.segs;
+	
         result.segs = 0;
         result.bytes = 0;
 
@@ -303,7 +333,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
     *offsets = result.offset_array;
     *sizes = result.size_array;
 
-done:
+ done:
     gen_mutex_unlock(&h->mutex);
     return ret;
 }
@@ -311,6 +341,12 @@ done:
 int segpool_done(PINT_segpool_handle_t h)
 {
     gossip_debug(GOSSIP_IO_DEBUG, "%s: \n", __func__);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: type_offset=%d\n", __func__, 
+		 h->file_req_state->type_offset);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: final_offset=%d\n", __func__, 
+		 h->file_req_state->final_offset);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: eof_flag=%d\n", __func__, 
+		 h->file_req_state->eof_flag);
     return ((h->file_req_state->type_offset >= h->file_req_state->final_offset) || (h->file_req_state->eof_flag));
 }
 
