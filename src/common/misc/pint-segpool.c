@@ -177,7 +177,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
         return 0;
     }
     
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 1: count=%d\n", __func__, segments->count);
+    //gossip_debug(GOSSIP_IO_DEBUG, "%s: 1: count=%d\n", __func__, segments->count);
     if(segments->count == 0)
     {
         /* first time we need to allocate offset and size arrays */
@@ -189,7 +189,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                    &h->filedata,
                                    &result,
                                    PINT_CKSIZE);
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: 1-0: ret=%d, result.bytes=%d, result.segs=%d\n", __func__, ret, result.bytes, result.segs);
+	//gossip_debug(GOSSIP_IO_DEBUG, "%s: 1-0: ret=%d, result.bytes=%d, result.segs=%d\n", __func__, ret, result.bytes, result.segs);
         if(ret != 0)
         {
             goto done;
@@ -244,9 +244,8 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                &result,
                                type);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: ret=%d, result.bytes=%d, result.bytemax=%d\n", __func__, ret, result.bytes, result.bytemax);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: result.segmax=%d\n", __func__, result.segmax);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: result.bytemax=%d\n", __func__, result.bytemax);
+    //gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: ret=%d, result.bytes=%d, result.bytemax=%d\n", __func__, ret, result.bytes, result.bytemax);
+    //gossip_debug(GOSSIP_IO_DEBUG, "%s: 2: result.segmax=%d\n", __func__, result.segmax);
 
     if(ret != 0)
     {
@@ -270,13 +269,13 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                    &h->filedata,
                                    &result_tmp,
                                    PINT_CKSIZE);
-
+#if 0
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.bytes=%d, result_tmp.bytemax=%d\n", __func__, ret, result_tmp.bytes, result_tmp.bytemax);
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.segs=%d\n",
 		 __func__, ret, result_tmp.segs);
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result_tmp.segmax=%d\n", __func__, ret, result_tmp.segmax);
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: 2-1: ret=%d, result.bytemax=%d\n", __func__, ret, result.bytemax);
-
+#endif
 	if(ret != 0)
         {
             goto done;
@@ -296,12 +295,12 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
 	result = result_tmp; 
 
         segments->count += result.segs;
-
+#if 0
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: segments->count=%d\n", 
 		     __func__, segments->count);
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: result.segmax=%d\n", 
 		     __func__, result.segmax);
-
+#endif
 	segments->offsets = realloc(segments->offsets, 
 				    sizeof(PVFS_offset)*segments->count);
 	segments->sizes = realloc(segments->sizes, 
@@ -318,7 +317,6 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
                                    &h->filedata,
                                    &result,
                                    type);
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: 3: ret=%d\n", __func__, ret);
         if(ret != 0)
         {
             goto done;
@@ -326,9 +324,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
 
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 4: result.bytes=%d\n", __func__, result.bytes);
     *bytes = result.bytes;
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: 5: *bytes=%d\n", __func__, *bytes);
     *count = result.segs;
     *offsets = result.offset_array;
     *sizes = result.size_array;
@@ -340,6 +336,7 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
 
 int segpool_done(PINT_segpool_handle_t h)
 {
+#if 0
     gossip_debug(GOSSIP_IO_DEBUG, "%s: \n", __func__);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: type_offset=%d\n", __func__, 
 		 h->file_req_state->type_offset);
@@ -347,6 +344,7 @@ int segpool_done(PINT_segpool_handle_t h)
 		 h->file_req_state->final_offset);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: eof_flag=%d\n", __func__, 
 		 h->file_req_state->eof_flag);
+#endif
     return ((h->file_req_state->type_offset >= h->file_req_state->final_offset) || (h->file_req_state->eof_flag));
 }
 

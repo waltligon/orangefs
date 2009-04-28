@@ -702,7 +702,6 @@ PVFS_size PINT_distribute(PVFS_offset offset,
         }
         else
         {
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: sz=%d\n", __func__, sz); // sson
             PINT_ADD_SEGMENT(result, poff, sz, mode);
         }
         /* this is used by client code */

@@ -18,7 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 #include "pvfs2-internal.h"
-#include "rw-sm.h"
+#include "pipeline.h"
 #include "trove.h"
 #include "pint-segpool.h"
 
@@ -60,8 +60,8 @@ nested machine pvfs2_write_sm
 static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_segpool_handle_t seg_handle = s_op->u.rwsm.seg_handle;
-    PINT_segpool_unit_id id = s_op->u.rwsm.id;
+    PINT_segpool_handle_t seg_handle = s_op->u.pipeline.seg_handle;
+    PINT_segpool_unit_id id = s_op->u.pipeline.id;
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
@@ -69,47 +69,37 @@ static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_offset *offsets;
     PVFS_size *sizes;
     PVFS_size bytes;
-    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
 
-    s_op->u.rwsm.buffer_used = 0;
-    
-    if(!s_op->u.rwsm.buffer){
-        /* if the buffer has not been used, allocate a buffer */
-        s_op->u.rwsm.buffer = BMI_memalloc(
-            parent_s_op->u.io.address,
-            parent_s_op->u.io.buffer_size, BMI_RECV);
-        /* TODO: error handling */
-        assert(s_op->u.rwsm.buffer);
-    }
+    s_op->u.pipeline.buffer_used = 0;
+    bytes = s_op->u.pipeline.buffer_size;
 
-    bytes = parent_s_op->u.io.buffer_size;
     PINT_segpool_take_segments(seg_handle, id, &bytes, &count, 
 			       &offsets, &sizes);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: 3: count=%d, bytes=%ld\n", 
 		 __func__, count, bytes);
-    s_op->u.rwsm.buffer_used = bytes;
-    s_op->u.rwsm.offsets = offsets;
-    s_op->u.rwsm.sizes = sizes;
-    s_op->u.rwsm.segs = count;
 
     if(count == 0) {
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
-    
-    /* TODO: what if we recv less than expected? */
-    ret = job_bmi_recv(parent_s_op->u.io.address,
-		       (char *)s_op->u.rwsm.buffer,
-		       parent_s_op->u.io.buffer_size,
-		       parent_s_op->u.io.tag,
+
+    s_op->u.pipeline.buffer_used = bytes;
+    s_op->u.pipeline.offsets = offsets;
+    s_op->u.pipeline.sizes = sizes;
+    s_op->u.pipeline.segs = count;
+
+    ret = job_bmi_recv(s_op->u.pipeline.address,
+		       (void *)s_op->u.pipeline.buffer,
+		       s_op->u.pipeline.buffer_size,
+		       s_op->u.pipeline.tag,
 		       BMI_PRE_ALLOC, 
 		       smcb, 
-		       0, /* unsigned long status_user_tag = 0 */
+		       1, /* unsigned long status_user_tag = 0 */
 		       js_p,
 		       &tmp_id,
 		       server_job_context,
 		       user_opts->server_job_flow_timeout,
-		       (bmi_hint)parent_s_op->u.io.hints);
+		       (bmi_hint)s_op->u.pipeline.hints);
     
     if(ret < 0) {
 	gossip_err("%s: I/O error occurred\n", __func__);
@@ -118,7 +108,7 @@ static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
 	js_p->error_code = -PVFS_EIO;
 	return SM_ACTION_COMPLETE;
     }
-
+    /* immediate return */
     if(ret == 1) {
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
@@ -128,7 +118,6 @@ static PINT_sm_action bmi_recv_call(struct PINT_smcb *smcb, job_status_s *js_p)
 	return SM_ACTION_DEFERRED;
     }
 
-    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
@@ -139,39 +128,62 @@ static PINT_sm_action trove_write_call(struct PINT_smcb *smcb, job_status_s *js_
     job_id_t tmp_id;
     struct filesystem_configuration_s *fs_config;
     struct server_configuration_s *server_config;
-    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer_used=%ld\n", __func__, 
-		 s_op->u.rwsm.buffer_used);
+		 s_op->u.pipeline.buffer_used);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: actual_size=%ld\n", __func__,
+		 js_p->actual_size);
+#if 0
     gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer[0]=%s\n", __func__,
-		 (char *)s_op->u.rwsm.buffer);
+		 (char *)s_op->u.pipeline.buffer);
+#endif
 
-    if(s_op->u.rwsm.segs == 0 && s_op->u.rwsm.buffer_used == 0) {
+    if(s_op->u.pipeline.buffer_used == 0) {
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
+
+    /* figure out if the fs config has trove data sync turned on or off
+     */
+    server_config = get_server_config_struct();
+    if(!server_config)
+    {
+        gossip_err("write_io: server config is NULL!\n");
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
     
-    fs_config = PINT_config_get_filesystems(&server_config);
+    fs_config = PINT_config_find_fs_id(
+        server_config, s_op->u.pipeline.coll_id);
+    if(!fs_config)
+    {
+        gossip_err("write_io: Failed to get filesystem "
+                   "config from fs_id of: %d\n",
+                   s_op->u.pipeline.coll_id);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
     
     ret = job_trove_bstream_write_list(
-				       parent_s_op->u.io.coll_id,
-				       parent_s_op->u.io.handle,
-				       (char**)&s_op->u.rwsm.buffer,
-				       (TROVE_size *)&s_op->u.rwsm.buffer_used,
+				       s_op->u.pipeline.coll_id,
+				       s_op->u.pipeline.handle,
+				       (char **)&s_op->u.pipeline.buffer,
+				       (TROVE_size *)&js_p->actual_size,
 				       1,
-				       s_op->u.rwsm.offsets,
-				       s_op->u.rwsm.sizes,
-				       s_op->u.rwsm.segs,
-				       &s_op->u.rwsm.out_size,
-				       fs_config->trove_sync_data,
+				       s_op->u.pipeline.offsets,
+				       s_op->u.pipeline.sizes,
+				       s_op->u.pipeline.segs,
+				       &s_op->u.pipeline.out_size,
+				       (fs_config->trove_sync_data ? TROVE_SYNC : 0),
 				       NULL,
 				       smcb,
 				       0,
 				       js_p,
 				       &tmp_id,
 				       server_job_context,
-				       parent_s_op->u.io.hints);
+				       s_op->u.pipeline.hints);
 
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: ret=%d\n", __func__, ret);
     if(ret < 0) {
 	gossip_err("%s: I/O error occurred\n", __func__);
 	//handle_io_error(ret, q_item, flow_data);
@@ -181,29 +193,33 @@ static PINT_sm_action trove_write_call(struct PINT_smcb *smcb, job_status_s *js_
     }
 
     if(ret == 1) {
-	/* immediate completion; trigger callback ourselves */
+	/* immediate completion */
 	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
 
-    /* FIXME: not sure if this is required */
     if(ret == 0) {
+	js_p->error_code = 0;
 	return SM_ACTION_DEFERRED;
     }
 
     return SM_ACTION_COMPLETE;
 }
 
-static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action check_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_segpool_handle_t h = s_op->u.rwsm.seg_handle;
+    PINT_segpool_handle_t h = s_op->u.pipeline.seg_handle;
     js_p->error_code = 0;
-    struct PINT_server_op *parent_s_op = s_op->u.rwsm.parent;
+    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
 
-    parent_s_op->u.io.total_transferred += s_op->u.rwsm.buffer_used;
+    parent_s_op->u.io.total_transferred += s_op->u.pipeline.out_size;
     gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__,
 		 parent_s_op->u.io.total_transferred);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer_used=%ld\n", __func__,
+		 s_op->u.pipeline.buffer_used);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: out_size=%ld\n", __func__,
+		 s_op->u.pipeline.out_size);
 
     if(!segpool_done(h)) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: write: LOOP\n", __func__);
@@ -212,16 +228,15 @@ static int check_done(struct PINT_smcb *smcb, job_status_s *js_p)
     else {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: write: DONE\n", __func__);
     }
-    
+
     return SM_ACTION_COMPLETE;
 }
 
-static int epilog(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action epilog(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     js_p->error_code = 0;
 
     return SM_ACTION_COMPLETE;
-    //return(server_state_machine_complete(smcb)); // why not this?
 }
 
 /*

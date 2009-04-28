@@ -1223,11 +1223,6 @@ static PINT_sm_action io_datafile_complete_operations(
 			goto check_next_step;
 		    }
 	    } /* AS */
-#if 0
-	else if(sm_p->u.io.io_type == PVFS_IO_READ && sm_p->u.io.op == 0)
-	    /* FIXME: why calls io_post_flow instead of this??? */
-	    goto check_next_step; /* sson */
-#endif
         else if(sm_p->u.io.io_type == PVFS_IO_WRITE) /* AS */
         {
             /* we expect this write to _not_ succeed immediately, because we

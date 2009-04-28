@@ -19,12 +19,12 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
-#include "rw-sm.h"
+#include "pipeline.h"
 
 extern struct PINT_state_machine_s pvfs2_read_sm;
 extern struct PINT_state_machine_s pvfs2_write_sm;
 
-#define NUM_OF_PARALLEL_RWS 8
+#define NUM_OF_PARALLEL_SMS 8
 
 %%
 
@@ -160,11 +160,11 @@ static PINT_sm_action start_pipelining_sm(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
-    struct PINT_server_op *rwsm_op;
+    struct PINT_server_op *pipeline_op;
     int i, ret; 
     PINT_segpool_handle_t seg_handle;
-        
-    s_op->u.io.hints = s_op->req->hints;
+
+    s_op->u.io.parallel_sms = 0;
     s_op->u.io.total_transferred = 0;
 
     /* we still have the file size stored in the response structure 
@@ -194,7 +194,6 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.file_req_offset = s_op->req->u.io.file_req_offset;
     s_op->u.io.mem_req = NULL;
     s_op->u.io.aggregate_size = s_op->req->u.io.aggregate_size;
-    s_op->u.io.tag = s_op->tag;
     gossip_debug(GOSSIP_IO_DEBUG, "%s: tag=%d\n", __func__, s_op->tag);
     s_op->u.io.user_ptr = NULL;
     s_op->u.io.op = s_op->req->u.io.op; /* AS: operation */
@@ -226,26 +225,6 @@ static PINT_sm_action start_pipelining_sm(
         lld(s_op->u.io.aggregate_size),
         llu(s_op->req->u.io.handle));
 
-    /* FIXME: loop bodies are same, need to remove if_else??? */
-    if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
-    {
-        s_op->u.io.address = s_op->addr;
-        s_op->u.io.handle = s_op->req->u.io.handle;
-        s_op->u.io.coll_id = s_op->req->u.io.fs_id;
-    }
-    else if (s_op->req->u.io.io_type == PVFS_IO_READ)
-    {
-        s_op->u.io.handle = s_op->req->u.io.handle;
-        s_op->u.io.coll_id = s_op->req->u.io.fs_id;
-        s_op->u.io.address = s_op->addr;
-    }
-    else
-    {
-        gossip_lerr("Server: IO SM: unknown IO type requested.\n");
-        js_p->error_code = -PVFS_EINVAL;
-        return SM_ACTION_COMPLETE;
-    }
-
     /* setup the request processing states */
     gossip_debug(GOSSIP_IO_DEBUG, "%s: aggregate_size=%ld\n", __func__,
 		 s_op->u.io.aggregate_size);
@@ -255,9 +234,9 @@ static PINT_sm_action start_pipelining_sm(
     if(s_op->u.io.buffer_size < 1)
         s_op->u.io.buffer_size = BUFFER_SIZE;
     if(s_op->u.io.num_of_buffers < 1)
-        s_op->u.io.num_of_buffers = BUFFERS_PER_PIPELINING;
+        s_op->u.io.num_of_buffers = NUM_OF_PARALLEL_SMS;
 
-    PINT_segpool_unit_id id;
+    PINT_segpool_unit_id id[s_op->u.io.num_of_buffers];
 
     PINT_dist_lookup(s_op->u.io.file_data.dist);
     ret = PINT_segpool_init(s_op->u.io.mem_req,
@@ -273,24 +252,53 @@ static PINT_sm_action start_pipelining_sm(
 			    &seg_handle);
 
     s_op->u.io.seg_handle = seg_handle;
+    gen_mutex_init(&s_op->u.io.mutex);
     for(i=0; i<s_op->u.io.num_of_buffers; i++) {
-	PINT_segpool_register(seg_handle, &id);
-	rwsm_op = malloc(sizeof(*rwsm_op));
-	memset(rwsm_op, 0, sizeof(*rwsm_op));
-	rwsm_op->u.rwsm.seg_handle = seg_handle;
-	rwsm_op->u.rwsm.id = id;
-	rwsm_op->u.rwsm.parent = s_op;
+	PINT_segpool_register(seg_handle, &id[i]);
+	pipeline_op = malloc(sizeof(*pipeline_op));
+	memset(pipeline_op, 0, sizeof(*pipeline_op));
+
+	pipeline_op->u.pipeline.address = s_op->addr;
+	pipeline_op->u.pipeline.handle = s_op->req->u.io.handle;
+        pipeline_op->u.pipeline.coll_id = s_op->req->u.io.fs_id;
+
+	pipeline_op->u.pipeline.seg_handle = seg_handle;
+	pipeline_op->u.pipeline.id = id[i];
+	pipeline_op->u.pipeline.parent = s_op;
+	pipeline_op->u.pipeline.hints = s_op->req->hints;
+	pipeline_op->u.pipeline.tag = s_op->tag;
+	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
 	if(s_op->req->u.io.io_type == PVFS_IO_READ) {
-	    ret = PINT_sm_push_frame(smcb, DO_READ, rwsm_op);
-	    s_op->u.io.parallel_read_sms++;
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_read_sms=%d\n", 
-			 __func__, s_op->u.io.parallel_read_sms);
+	    if(!pipeline_op->u.pipeline.buffer) {
+		/* if the buffer has not been used, allocate a buffer */
+		pipeline_op->u.pipeline.buffer = 
+		    BMI_memalloc(pipeline_op->u.pipeline.address,
+				 pipeline_op->u.pipeline.buffer_size, 
+				 BMI_SEND);
+		/* TODO: error handling */
+		assert(pipeline_op->u.pipeline.buffer);
+	    }
+
+	    ret = PINT_sm_push_frame(smcb, DO_READ, pipeline_op);
+	    s_op->u.io.parallel_sms++;
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
+			 __func__, s_op->u.io.parallel_sms);
 	}
 	else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
-	    ret = PINT_sm_push_frame(smcb, DO_WRITE, rwsm_op);
-	    s_op->u.io.parallel_write_sms++;
-	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_write_sms=%d\n", 
-			 __func__, s_op->u.io.parallel_write_sms);
+	    if(!pipeline_op->u.pipeline.buffer){
+		/* if the buffer has not been used, allocate a buffer */
+		pipeline_op->u.pipeline.buffer = 
+		    BMI_memalloc(pipeline_op->u.pipeline.address,
+				 pipeline_op->u.pipeline.buffer_size, 
+				 BMI_RECV);
+		/* TODO: error handling */
+		assert(pipeline_op->u.pipeline.buffer);
+	    }
+
+	    ret = PINT_sm_push_frame(smcb, DO_WRITE, pipeline_op);
+	    s_op->u.io.parallel_sms++;
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
+			 __func__, s_op->u.io.parallel_sms);
 	}
 	if(ret < 0) {
 	    js_p->error_code = -PVFS_ENOMEM;
@@ -353,6 +361,11 @@ static PINT_sm_action io_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
+    int i;
+    struct PINT_server_op *pipeline_op;
+    int task_id;
+    int remaining;
+    PVFS_error tmp_err;
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
@@ -362,6 +375,28 @@ static PINT_sm_action io_cleanup(
 	PINT_segpool_destroy(s_op->u.io.seg_handle);
     }
 
+    for(i=0; i<s_op->u.io.parallel_sms; i++)
+    {
+	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+            &remaining);
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+		     "io: nested sm returned error code: %d\n", tmp_err);
+	if(pipeline_op->u.pipeline.buffer) {
+	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
+		BMI_memfree(pipeline_op->u.pipeline.address, 
+			    pipeline_op->u.pipeline.buffer, 
+			    s_op->u.io.buffer_size, BMI_SEND);
+	    }
+	    else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
+		BMI_memfree(pipeline_op->u.pipeline.address, 
+			    pipeline_op->u.pipeline.buffer, 
+			    s_op->u.io.buffer_size, BMI_RECV);
+	    }
+	}
+	free(pipeline_op);
+    }
+
+    gen_mutex_destroy(&s_op->u.io.mutex);
     /* let go of our encoded response buffer, if we appear to have
      * made one
      */
@@ -398,7 +433,9 @@ static PINT_sm_action io_send_completion_ack(
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: s_op->u.io.parallel_sms=%d\n",
+		 __func__, s_op->u.io.parallel_sms);
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */
@@ -406,11 +443,11 @@ static PINT_sm_action io_send_completion_ack(
     {
 	/* normal READ (i.e., without op and datatype) */
 	if(s_op->req->u.io.op == 0) { /* AS */
-            gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack()?\n");
+            gossip_debug(GOSSIP_IO_DEBUG, "%s: normal READ\n", __func__);
             js_p->error_code = 0;
             return SM_ACTION_COMPLETE;
         }
-        gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), IO_READ with op\n");
+        gossip_debug(GOSSIP_IO_DEBUG, "%s: IO_READ with op\n", __func__);
     }
 
     /* release encoding of the first ack that we sent */
