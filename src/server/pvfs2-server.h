@@ -365,6 +365,8 @@ struct PINT_server_pipeline_op
     PVFS_handle handle;
     PVFS_BMI_addr_t address;
 
+    enum PVFS_io_type io_type;
+
     void *parent;
     char *buffer; 
     PVFS_size buffer_size;

@@ -5,7 +5,7 @@
  */
 #define BUFFER_SIZE (256*1024)
 
-enum {DO_READ=3, DO_WRITE, LOOP};
+enum {LOOP=3};
 
 #if 0
 

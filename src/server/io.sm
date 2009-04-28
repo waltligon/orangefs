@@ -19,12 +19,12 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
-#include "pipeline.h"
+//#include "pipeline.h"
 
-extern struct PINT_state_machine_s pvfs2_read_sm;
-extern struct PINT_state_machine_s pvfs2_write_sm;
+extern struct PINT_state_machine_s pvfs2_pipeline_sm;
 
-#define NUM_OF_PARALLEL_SMS 8
+#define NUM_OF_PARALLEL_SMS 4
+#define BUFFER_SIZE (256*1024)
 
 %%
 
@@ -54,8 +54,7 @@ machine pvfs2_io_sm
     {
 	pjmp start_pipelining_sm
         {
-            DO_READ => pvfs2_read_sm;
-	    DO_WRITE => pvfs2_write_sm;
+            success => pvfs2_pipeline_sm;
         }
         success => send_completion_ack;
         default => release;
@@ -268,6 +267,7 @@ static PINT_sm_action start_pipelining_sm(
 	pipeline_op->u.pipeline.hints = s_op->req->hints;
 	pipeline_op->u.pipeline.tag = s_op->tag;
 	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
+	pipeline_op->u.pipeline.io_type = s_op->req->u.io.io_type;
 	if(s_op->req->u.io.io_type == PVFS_IO_READ) {
 	    if(!pipeline_op->u.pipeline.buffer) {
 		/* if the buffer has not been used, allocate a buffer */
@@ -279,7 +279,7 @@ static PINT_sm_action start_pipelining_sm(
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
-	    ret = PINT_sm_push_frame(smcb, DO_READ, pipeline_op);
+	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
 	    s_op->u.io.parallel_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_sms);
@@ -295,7 +295,7 @@ static PINT_sm_action start_pipelining_sm(
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
-	    ret = PINT_sm_push_frame(smcb, DO_WRITE, pipeline_op);
+	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
 	    s_op->u.io.parallel_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_sms);
