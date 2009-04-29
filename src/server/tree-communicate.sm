@@ -114,12 +114,13 @@ static int tree_create_comp_fn(void *v_p,
             s_op->resp.u.tree_create.handle_array[resp_p->u.tree_create.caller_handle_index+i]
                          = resp_p->u.tree_create.handle_array[i];
         }
+        s_op->resp.u.tree_create.time += resp_p->u.tree_create.time;
     }
 
     return resp_p->status;
 }
 
-#define CHILD_INDEX (i-1)
+#define CHILD_INDEX (i-num_local_extents)
 
 static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb, job_status_s *js_p,
     int num_data_files, PVFS_fs_id fs_id, enum PVFS_server_op operation,
@@ -136,39 +137,22 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct PVFS_server_req *req;
+    int num_local_extents = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
 
     assert(s_op->req->op == PVFS_SERV_TREE_CREATE);
 
-    /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
-       fewer) then go ahead and send to each remaining server individually. */
-    if (num_data_files - 1 > MAX_PARTITIONS) /* "-1" because we are assuming
-                                                one of the handles is local. */
-    {
-        num_partitions = MAX_PARTITIONS;
-        num_files_per_server = (num_data_files - 1) / MAX_PARTITIONS;
-        if (num_partitions * num_files_per_server < num_data_files - 1) {
-            num_files_per_server++;
-        }
-    }
-    else
-    {
-	num_partitions = num_data_files - 1;
-        num_files_per_server = 1;
-    }
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-        "tree_communicate_partition_handles: num_data_files = %d, num_partitions = %d, num_files_per_server = %d\n",
-        num_data_files, num_partitions, num_files_per_server);
-
-    /* Arrange for the local extent to be first in the extent_array. */
+    /* Arrange for the local extent to be first in the extent_array, if one is local. */
     for (i = 0; i < num_data_files; i++)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles: extent = %llu\n",
+                     llu(extent_array[i].extent_array[0].first));
         PINT_cached_config_get_server_name(server_name, 1024,
             extent_array[i].extent_array[0].first, fs_id);
         if (! strcmp(server_config->host_id, server_name)) /* this one is local */
         {
+            num_local_extents++;
             break; /* Found the local one at extent_array[i] */
         }
     }
@@ -183,20 +167,42 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                sizeof(PVFS_handle_extent_array));
     }
 
-    /* Create a stack frame for the local operation. */
-/* TODO: make this general-case with a case statement. */
-    s_op->num_pjmp_frames++;
-    js_p->error_code = LOCAL_OPERATION;
-    PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
-        extent_array[0].extent_array[0].first,
-        fs_id, js_p->error_code, msg_p, req, LOCAL_OPERATION);
+    /* Decide how to divide the handles. If there are only a few (MAX_PARTITIONS or
+       fewer) then go ahead and send to each remaining server individually. */
+    if (num_data_files - num_local_extents > MAX_PARTITIONS)
+    {
+        num_partitions = MAX_PARTITIONS;
+        num_files_per_server = (num_data_files - num_local_extents) / MAX_PARTITIONS;
+        if (num_partitions * num_files_per_server < num_data_files - num_local_extents) {
+            num_files_per_server++;
+        }
+    }
+    else
+    {
+	num_partitions = num_data_files - num_local_extents;
+        num_files_per_server = 1;
+    }
 
-    PINT_SERVREQ_CREATE_FILL(
-        *req,
-        s_op->req->credentials,
-        fs_id,
-        PVFS_TYPE_DATAFILE,
-        extent_array[0]);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "tree_communicate_partition_handles: num_data_files = %d, num_local_extents = %d, num_partitions = %d, num_files_per_server = %d\n",
+        num_data_files, num_local_extents, num_partitions, num_files_per_server);
+
+    if (num_local_extents > 0) {
+      /* Create a stack frame for the local operation. */
+/* TODO: make this general-case with a case statement. */
+      s_op->num_pjmp_frames++;
+      js_p->error_code = LOCAL_OPERATION;
+      PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, create_s_op,
+          extent_array[0].extent_array[0].first,
+          fs_id, js_p->error_code, msg_p, req, LOCAL_OPERATION);
+
+      PINT_SERVREQ_CREATE_FILL(
+          *req,
+          s_op->req->credentials,
+          fs_id,
+          PVFS_TYPE_DATAFILE,
+          extent_array[0]);
+    }
 
     if (num_partitions > 0) {
         /* We need to send tree-based messages to other servers */
@@ -205,7 +211,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
         /* Prepare the stack for pjmp. */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
-           extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].first,
+           extent_array[num_local_extents].extent_array[0].first,
            fs_id, js_p->error_code, msg_p, req, REMOTE_OPERATION);
 
         tree_communicate_s_op->resp.u.tree_create.caller_handle_index =
@@ -226,13 +232,13 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         }
 
         /* Fill in the msgarray. */
-        for (i = 1 /* the zero'th extent is local */; i <= num_partitions; i++)
+        for (i = num_local_extents /* the zero'th extent may be local */; i < num_partitions + num_local_extents; i++)
         {
             PINT_sm_msgpair_state *msg_p;
             int num_data_files_for_this_server;
 
             for (num_data_files_for_this_server = num_files_per_server;
-                 CHILD_INDEX*num_files_per_server + num_data_files_for_this_server >=
+                 CHILD_INDEX*num_files_per_server + num_data_files_for_this_server >
                  num_data_files;
                  num_data_files_for_this_server--)
             {
@@ -263,12 +269,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
-                        (CHILD_INDEX)*num_files_per_server+1,
+                        CHILD_INDEX*num_files_per_server+num_local_extents,
                         num_data_files_for_this_server,
-                        &(extent_array[CHILD_INDEX*num_files_per_server + 1]));
+                        &(extent_array[CHILD_INDEX*num_files_per_server + num_local_extents]));
                     msg_p->fs_id = fs_id;
                     msg_p->handle =
-                        extent_array[CHILD_INDEX*num_files_per_server + 1].extent_array[0].first;
+                        extent_array[CHILD_INDEX*num_files_per_server + num_local_extents].extent_array[0].first;
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                     msg_p->comp_fn = tree_create_comp_fn;
                     break;
@@ -343,6 +349,7 @@ static PINT_sm_action tree_create_resp(struct PINT_smcb *smcb, job_status_s *js_
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (task_id == LOCAL_OPERATION) {
             s_op->resp.u.tree_create.handle_array[0] = old_frame->resp.u.create.handle;
+            s_op->resp.u.tree_create.time += old_frame->resp.u.create.time;
         }
         else {
             assert(task_id == REMOTE_OPERATION);
