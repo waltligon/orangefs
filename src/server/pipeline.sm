@@ -305,12 +305,11 @@ static PINT_sm_action check_done(struct PINT_smcb *smcb, job_status_s *js_p)
     js_p->error_code = 0;
     struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
 
+    /* FIMXE: do we really need this lock? */
     gen_mutex_lock(&parent_s_op->u.io.mutex);
-    if(s_op->u.pipeline.io_type == PVFS_IO_READ)
-	parent_s_op->u.io.total_transferred += js_p->actual_size;
-    else if(s_op->u.pipeline.io_type == PVFS_IO_WRITE)
-	parent_s_op->u.io.total_transferred += s_op->u.pipeline.out_size;
+    parent_s_op->u.io.total_transferred += js_p->actual_size;
     gen_mutex_unlock(&parent_s_op->u.io.mutex);
+    
     gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__,
 		 parent_s_op->u.io.total_transferred);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: count=%d\n", __func__,

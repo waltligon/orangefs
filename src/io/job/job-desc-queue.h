@@ -30,7 +30,7 @@ struct bmi_desc
 struct trove_desc
 {
     TROVE_op_id id;
-    PVFS_size actual_size;
+    PVFS_size *out_size_p;
     PVFS_vtag *vtag;
     PVFS_fs_id fsid;
     PVFS_error state;

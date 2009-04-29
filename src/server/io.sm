@@ -251,7 +251,7 @@ static PINT_sm_action start_pipelining_sm(
 			    &seg_handle);
 
     s_op->u.io.seg_handle = seg_handle;
-    gen_mutex_init(&s_op->u.io.mutex);
+    gen_mutex_init(&s_op->u.io.mutex); /* FIXME: */
     for(i=0; i<s_op->u.io.num_of_buffers; i++) {
 	PINT_segpool_register(seg_handle, &id[i]);
 	pipeline_op = malloc(sizeof(*pipeline_op));
@@ -396,7 +396,8 @@ static PINT_sm_action io_cleanup(
 	free(pipeline_op);
     }
 
-    gen_mutex_destroy(&s_op->u.io.mutex);
+    gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
+
     /* let go of our encoded response buffer, if we appear to have
      * made one
      */
