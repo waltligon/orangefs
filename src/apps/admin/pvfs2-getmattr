@@ -1,0 +1,105 @@
+#!/bin/csh -f
+unalias *
+
+#set echo
+#set verbose
+
+#echo $0
+
+#if no options entered, then display usage information
+if ( $#argv == 0 ) then
+   goto usage
+endif
+
+#get the path associated with this command
+set mybin = $0:h
+
+#make sure that pvfs-xattr exists
+if ( ! -e $mybin/pvfs2-xattr ) then
+   echo
+   echo "$mybin/pvfs2-xattr command not found."
+endif
+
+#initialize parms
+set init = "init"
+set myFile = $init
+set myCopiesParm = 0
+set myModeParm   = 0
+set myFileParm   = 0
+
+#parse the command line....
+set index = 1
+set i
+while ( $index <= $#argv )
+
+   switch({$argv[$index]})
+   case {-h} :
+       goto usage
+       breaksw
+   case {-c} :
+       set myCopiesParm = 1
+       @ index++
+       breaksw
+   case {-m} :
+       set myModeParm = 1
+       @ index++
+       breaksw
+   case {-f} :
+       if ( $index == $#argv ) then
+          echo
+          echo "Missing file parameter.  Recheck usage."
+          goto usage
+       else
+          @ i = $index + 1
+          set myFileParm = 1
+          set myFile = $argv[$i]
+          @ index += 2
+       endif
+       breaksw
+   default :
+       echo
+       echo "Missing or invalid parameters.  Recheck usage."
+       goto usage
+       breaksw
+   endsw
+end #while
+
+
+#NOTE:  When PVFS is NOT in kernel mode, we can't easily check for file
+#       existence.  So, we just check to see that SOMETHING was entered.
+#       pvfs-xattr will validate the filename.
+#Did the user enter a file name?
+if ( $myFile == $init ) then
+   echo
+   echo "File name is required. Recheck usage."
+   goto usage
+endif
+
+#issue commands
+if ( $myCopiesParm && $myModeParm ) then
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.mode   -t {$myFile}
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.copies -t {$myFile}
+else if ( $myCopiesParm ) then
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.copies -t {$myFile}
+else if ( $myModeParm ) then
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.mode   -t {$myFile}
+else
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.mode   -t {$myFile}
+   {$mybin}/pvfs2-xattr -k user.pvfs2.mirror.copies -t {$myFile}
+endif
+
+#leave script
+exit
+
+#display help and exit script
+usage:
+    echo
+    echo "pvfs2-getmattr [-c] [-m] [-h] -f file"
+    echo "  -c : Retrieve the number of mirror copies"
+    echo "  -m : Retrieve the mirroring mode"
+    echo "  -h : Display this message"
+    echo
+    echo "Retrieve copies and mode when none specified.  File " \
+         "is required."
+exit
+######## end of script file ##########
