@@ -10,6 +10,7 @@
 # docsclean      cleans up documentation files
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
+# usertools	 builds user tools
 # kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
@@ -119,7 +120,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck admintools kernapps
+.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools
 
 ################################################################
 # Find project subdirectories
@@ -434,6 +435,8 @@ ADMINSRC :=
 # ADMINSRC_SERVER special version of ADMINSRC for tools that need server 
 # library
 ADMINSRC_SERVER :=
+# usRSRC is source code for userland programs
+USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
@@ -548,6 +551,13 @@ ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
 ADMINTOOLS := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC)))
 # ADMINDEPENDS is a list of dependency files for admin programs
 ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
+#
+# USEROBJS is a list of user program objects
+USEROBJS := $(patsubst %.c,%.o, $(filter %.c,$(USERSRC)))
+# USERTOOLS is a list of user program executables 
+USERTOOLS := $(patsubst %.c,%, $(filter %.c, $(USERSRC)))
+# USERDEPENDS is a list of dependency files for user programs
+USERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(USERSRC)))
 
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
@@ -627,7 +637,7 @@ ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
-    $(MISCDEPENDS) \
+    $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
     $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
 endif
@@ -639,11 +649,14 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE)
 endif
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
+
+#target for building user tools
+usertools: $(USERTOOLS)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
@@ -849,6 +862,8 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
+$(USERTOOLS): %: %.o $(LIBRARIES)
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
@@ -912,6 +927,7 @@ clean::
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+                $(USERTOOLS) $(USEROBJS) \
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
@@ -1057,6 +1073,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-hint.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-compat.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-mirror.h $(includedir)
 
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
@@ -1091,12 +1108,15 @@ endif
 
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
+	install -m 755 $(USERTOOLS) $(bindir)
 	# for compatibility in case anyone really wants "lsplus"
 	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-getmattr $(bindir)
+	install -m 755 $(srcdir)/src/apps/admin/pvfs2-setmattr $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
 endif

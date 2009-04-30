@@ -79,6 +79,8 @@ enum PVFS_server_op
     PVFS_SERV_BATCH_REMOVE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
+    PVFS_SERV_MIRROR = 39,
+    PVFS_SERV_IMM_COPIES = 40,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -893,6 +895,116 @@ endecode_fields_3_struct(
     string, fs_config_buf)
 #define extra_size_PVFS_servresp_getconfig \
     (PVFS_REQ_LIMIT_CONFIG_FILE_BYTES)
+
+/* mirror ******************************************************/
+/* - copies a datahandle owned by the local server to a data-  */
+/*   handle on a remote server. There could be multiple desti- */
+/*   nation data handles. dst_count tells us how many there    */
+/*   are.                                                      */
+struct PVFS_servreq_mirror
+{
+    PVFS_handle src_handle;
+    PVFS_handle *dst_handle;
+    PVFS_fs_id  fs_id;
+    PINT_dist   *dist;
+    uint32_t    bsize;
+    uint32_t    src_server_nr;
+    uint32_t    *wcIndex;
+    uint32_t     dst_count;
+    enum PVFS_flowproto_type flow_type;
+    enum PVFS_encoding_type encoding;
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servreq_mirror(pptr,x) do {      \
+   encode_PVFS_handle(pptr,&(x)->src_handle);        \
+   encode_PVFS_fs_id(pptr,&(x)->fs_id);              \
+   encode_PINT_dist(pptr,&(x)->dist);                \
+   encode_uint32_t(pptr,&(x)->bsize);                \
+   encode_uint32_t(pptr,&(x)->src_server_nr);        \
+   encode_uint32_t(pptr,&(x)->dst_count);            \
+   encode_enum(pptr,&(x)->flow_type);                \
+   encode_enum(pptr,&(x)->encoding);                 \
+   int i;                                            \
+   for (i=0; i<(x)->dst_count; i++)                  \
+   {                                                 \
+       encode_PVFS_handle(pptr,&(x)->dst_handle[i]); \
+       encode_uint32_t(pptr,&(x)->wcIndex[i]);       \
+   }                                                 \
+} while (0)
+
+#define decode_PVFS_servreq_mirror(pptr,x) do {          \
+   decode_PVFS_handle(pptr,&(x)->src_handle);            \
+   decode_PVFS_fs_id(pptr,&(x)->fs_id);                  \
+   decode_PINT_dist(pptr,&(x)->dist);                    \
+   decode_uint32_t(pptr,&(x)->bsize);                    \
+   decode_uint32_t(pptr,&(x)->src_server_nr);            \
+   decode_uint32_t(pptr,&(x)->dst_count);                \
+   decode_enum(pptr,&(x)->flow_type);                    \
+   decode_enum(pptr,&(x)->encoding);                     \
+   (x)->dst_handle = decode_malloc((x)->dst_count *      \
+                                   sizeof(PVFS_handle)); \
+   (x)->wcIndex = decode_malloc((x)->dst_count *         \
+                               sizeof(uint32_t));        \
+   int i;                                                \
+   for (i=0; i<(x)->dst_count; i++)                      \
+   {                                                     \
+       decode_PVFS_handle(pptr,&(x)->dst_handle[i]);     \
+       decode_uint32_t(pptr,&(x)->wcIndex[i]);           \
+   }                                                     \
+} while (0)
+#endif
+
+#define extra_size_PVFS_servreq_mirror \
+   ( (sizeof(PVFS_handle) * PVFS_REQ_LIMIT_HANDLES_COUNT) + \
+     (sizeof(uint32_t) * PVFS_REQ_LIMIT_HANDLES_COUNT) )
+
+/*Response to mirror request.  Identifies the number of bytes written and the */
+/*status of that write for each source-destination handle pair. (Source is    */
+/*always the same for each pair.)                                             */
+struct PVFS_servresp_mirror
+{
+    PVFS_handle src_handle;
+    uint32_t src_server_nr;
+    uint32_t *bytes_written;
+    uint32_t *write_status_code;
+    uint32_t dst_count;
+};
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_servresp_mirror(pptr,x) do {         \
+   encode_PVFS_handle(pptr,&(x)->src_handle);            \
+   encode_uint32_t(pptr,&(x)->src_server_nr);            \
+   encode_uint32_t(pptr,&(x)->dst_count);                \
+   int i;                                                \
+   for (i=0; i<(x)->dst_count; i++)                      \
+   {                                                     \
+       encode_uint32_t(pptr,&(x)->bytes_written[i]);     \
+       encode_uint32_t(pptr,&(x)->write_status_code[i]); \
+   }                                                     \
+} while (0)
+
+#define decode_PVFS_servresp_mirror(pptr,x) do {            \
+  decode_PVFS_handle(pptr,&(x)->src_handle);                \
+  decode_uint32_t(pptr,&(x)->src_server_nr);                \
+  decode_uint32_t(pptr,&(x)->dst_count);                    \
+  (x)->bytes_written     = decode_malloc((x)->dst_count *   \
+                                         sizeof(uint32_t)); \
+  (x)->write_status_code = decode_malloc((x)->dst_count *   \
+                                         sizeof(uint32_t)); \
+  int i;                                                    \
+  for (i=0; i<(x)->dst_count; i++ )                         \
+  {                                                         \
+      decode_uint32_t(pptr,&(x)->bytes_written[i]);         \
+      decode_uint32_t(pptr,&(x)->write_status_code[i]);     \
+  }                                                         \
+} while (0)
+#endif
+
+#define extra_size_PVFS_servresp_mirror \
+  ( (sizeof(uint32_t) * PVFS_REQ_LIMIT_HANDLES_COUNT) + \
+    (sizeof(uint32_t) * PVFS_REQ_LIMIT_HANDLES_COUNT) )
+
 
 /* truncate ****************************************************/
 /* - resizes an existing datafile */
@@ -1713,6 +1825,7 @@ struct PVFS_server_req
 
     union
     {
+        struct PVFS_servreq_mirror mirror;
         struct PVFS_servreq_create create;
         struct PVFS_servreq_unstuff unstuff;
         struct PVFS_servreq_batch_create batch_create;
@@ -1775,6 +1888,7 @@ struct PVFS_server_resp
     PVFS_error status;
     union
     {
+        struct PVFS_servresp_mirror mirror;
         struct PVFS_servresp_create create;
         struct PVFS_servresp_unstuff unstuff;
         struct PVFS_servresp_batch_create batch_create;

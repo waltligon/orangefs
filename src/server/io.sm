@@ -92,6 +92,7 @@ machine pvfs2_io_sm
 static int io_send_ack(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_send_ack (io.sm)....\n");
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
@@ -103,6 +104,9 @@ static int io_send_ack(
      */
     s_op->resp.status = js_p->error_code;
     s_op->resp.u.io.bstream_size = s_op->ds_attr.u.datafile.b_size;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"/tbstream_size:%d\n"
+                                    ,(int)s_op->resp.u.io.bstream_size);
 
     err = PINT_encode(&s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
                       s_op->addr, s_op->decoded.enc_type);
@@ -199,6 +203,8 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->buffers_per_flow = fs_conf->fp_buffers_per_flow;
     }
 
+    gossip_err("SERVER: IO SM: s_op->tag:%d\n",s_op->tag);
+
     gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
         "server_nr: %d, server_ct: %d\n",
         lld(s_op->u.io.flow_d->file_data.fsize),
@@ -235,9 +241,14 @@ static PINT_sm_action io_start_flow(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
                    server_job_context, user_opts->server_job_flow_timeout
                    , s_op->req->hints);
+
+    gossip_debug(GOSSIP_IO_DEBUG,"\treturn code from job_flow "
+                                 "submission:%d\n"
+                                ,err);
 
     return err;
 }
@@ -338,7 +349,9 @@ static PINT_sm_action io_send_completion_ack(
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+    
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
+    
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */
@@ -374,12 +387,17 @@ static PINT_sm_action io_send_completion_ack(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG,"\ts_op->tag:%d\n",s_op->tag);
+
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
         server_job_context, user_opts->server_job_bmi_timeout,
         s_op->req->hints);
+
+    gossip_debug(GOSSIP_IO_DEBUG,"return code from sending ack:%d\n"
+                                ,err);
 
     return err;
 }

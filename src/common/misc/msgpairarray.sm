@@ -94,6 +94,10 @@ static PINT_sm_action msgpairarray_init(
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_init...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
+
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
                  "(%d msgpair(s))\n", smcb, mop->count);
 
@@ -244,6 +248,10 @@ static PINT_sm_action msgpairarray_post(
         }
 
         session_tag = PINT_util_get_next_tag();
+
+        /*store the session tag for this msgpair, so the msgpair completion */
+        /*function can pass it to the caller of msgpairarray.               */
+        msg_p->session_tag = session_tag;
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
                      "posting recv\n", __func__, smcb, i);
@@ -488,6 +496,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
                  "completion_fn\n", smcb);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_completion_fn..\n");
 
     for (i = 0; i < mop->count; i++)
     {
@@ -545,6 +554,7 @@ static PINT_sm_action msgpairarray_completion_fn(
          */
         if (msg_p->comp_fn != NULL)
         {
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
             /* If we call the completion function, store the result on
              * a per message pair basis.  Also store some non-zero
              * (failure) value in js_p->error_code if we see one.

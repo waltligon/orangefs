@@ -37,7 +37,9 @@
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
  */
+#ifndef PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT
 #define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
+#endif
 
 /* Default number of times to retry restartable client operations. */
 #define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT  (5)

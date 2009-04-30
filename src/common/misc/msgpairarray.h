@@ -49,6 +49,11 @@ typedef struct PINT_sm_msgpair_state_s
     /* server address */
     PVFS_BMI_addr_t svr_addr;
 
+    /*session identifier between send and rcvs*/
+    /*note:  server-side i/o machine uses the session_tag as the flow */
+    /*descriptor tag.                                                 */
+    bmi_msg_tag_t session_tag;
+
     /* req and encoded_req are used to send a request */
     struct PVFS_server_req req;
     struct PINT_encoded_msg encoded_req;

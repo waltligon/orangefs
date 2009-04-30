@@ -9,6 +9,8 @@ ifdef BUILD_SERVER
 		$(DIR)/setparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
+		$(DIR)/mirror.c \
+		$(DIR)/create-immutable-copies.c \
 		$(DIR)/batch-create.c \
 		$(DIR)/batch-remove.c \
 		$(DIR)/crdirent.c \

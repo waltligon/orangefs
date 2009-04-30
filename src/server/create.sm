@@ -148,6 +148,9 @@ static int setup_final_response(
 static int create_metafile(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+
+   gossip_err("Executing create_metafile.....\n");
+   
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
@@ -178,6 +181,8 @@ static int create_metafile(
 static int check_stuffed(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
+  gossip_err("Executing check_stuffed...\n");
+
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int server_type;
     server_configuration_s *config = get_server_config_struct();
@@ -196,6 +201,8 @@ static int check_stuffed(
     assert(config);
 
     layout = &s_op->req->u.create.layout;
+
+    gossip_err("layout algorithm is %d.\n",layout->algorithm);
 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)
     {
@@ -246,6 +253,8 @@ static int check_stuffed(
         }
 
         s_op->resp.u.create.stuffed = 1;
+     s_op->u.create.handle_array_local[0] = 100;
+  gossip_err("File will be stuffed.\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -382,6 +391,10 @@ static int create_local_datafiles(
         &tmp_id,
         server_job_context,
         s_op->req->hints);
+
+   gossip_err("Value of ret from job_trove_dspace_create_list is %d.\n",ret);
+   gossip_err("handle_array_local[0] is %llu.\n",llu(*(s_op->u.create.handle_array_local)));
+
 
     return(ret);
 }
@@ -638,7 +651,7 @@ static PINT_sm_action write_keyvals(
 
     s_op->val_a[0].buffer = s_op->resp.u.create.datafile_handles;
     s_op->val_a[0].buffer_sz =
-        s_op->resp.u.create.datafile_count * sizeof(PVFS_handle);
+         s_op->resp.u.create.datafile_count * sizeof(PVFS_handle);
 
     s_op->key_a[1].buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;

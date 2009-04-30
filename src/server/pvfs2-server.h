@@ -30,8 +30,10 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
+#include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+
 
 extern job_context_id server_job_context;
 
@@ -216,6 +218,151 @@ struct PINT_server_create_op
     PVFS_error saved_error_code;
     int handle_index;
 };
+
+/*MIRROR structures*/
+typedef struct 
+{
+   /* session identifier created in the PVFS_SERV_IO request.  also used as  */
+   /* the flow identifier.                                                   */
+   bmi_msg_tag_t session_tag;
+
+   /*destination server address*/
+   PVFS_BMI_addr_t svr_addr;
+
+   /*status from PVFS_SERV_IO*/
+   PVFS_error io_status;
+
+   /*variables used to setup write completion ack*/
+   void        *encoded_resp_p;
+   job_status_s recv_status;
+   job_id_t     recv_id;
+
+   /*variables used to setup flow between the src & dest datahandle*/
+   flow_descriptor *flow_desc;
+   job_status_s     flow_status;
+   job_id_t         flow_job_id;
+  
+} write_job_t;
+
+
+/*This structure is used during the processing of a "mirror" request.*/
+struct PINT_server_mirror_op
+{
+   /*keep up with the number of outstanding jobs*/
+   int job_count;
+
+   /*maximum response size for the write request*/
+   int max_resp_sz;
+
+   /*info about each job*/
+   write_job_t *jobs;
+};
+typedef struct PINT_server_mirror_op PINT_server_mirror_op;
+
+/* Source refers to the file being copied, and destination refers to the copy.*/
+struct PINT_server_create_copies_op
+{
+    /*mirroring mode. attribute key is user.pvfs2.mirror.mode*/
+    MIRROR_MODE mirror_mode;
+
+    /*buffer holding list of remote servers for all copies of the file*/
+    char **my_remote_servers;
+
+    /*saved error code*/
+    PVFS_error saved_error_code;
+
+    /*number of copies desired. value of user.pvfs2.mirror.copies attribute*/
+    uint32_t copies;
+
+    /*successful/failed writes array in order of source handles       */
+    /*0=>successful  !0 => failure (UINT64_HIGH)                      */
+    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]   */
+    PVFS_handle *writes_completed;
+
+    /*number of attempts at writing handles*/
+    int retry_count;
+
+    /*source server names in order of distribution*/
+    char **io_servers;                       
+
+    /*source remote server names in distribution*/
+    char **remote_io_servers;
+
+    /*source local server names in distribution*/;                
+    char **local_io_servers;
+
+    /*number of source server names in the distribution*/                     
+    int num_io_servers;
+
+    /*number of source remote server names in distribution*/                  
+    int remote_io_servers_count;             
+
+    /*number of source local server names in distribution*/
+    int local_io_servers_count;              
+
+    /*source datahandles in order of distribution*/
+    PVFS_handle *handle_array_base;
+
+    /*local source datahandles*/
+    PVFS_handle *handle_array_base_local;
+
+    /*destination datahandles in order of distribution*/          
+    PVFS_handle *handle_array_copies;        
+
+    /*local destination datahandles*/
+    PVFS_handle *handle_array_copies_local;  
+
+    /*remote destination datahandles*/
+    PVFS_handle *handle_array_copies_remote;
+
+    /*number of local source datahandles*/
+    int handle_array_base_local_count; 
+
+    /*number of local destination datahandles*/
+    int handle_array_copies_local_count;      
+
+    /*number of remote destination datahandles*/
+    int handle_array_copies_remote_count;     
+
+    /*number of source datahandles*/
+    uint32_t dfile_count;
+
+    /*source metadata handle*/                     
+    PVFS_handle metadata_handle; 
+
+    /*source file system*/
+    PVFS_fs_id fs_id; 
+
+    /*number of io servers defined in the current file system*/
+    int io_servers_count; 
+
+    /*size of the source distribution structure */
+    uint32_t dist_size;
+
+    /*distribution structure for basic_dist*/
+    PINT_dist *dist;
+
+    /*local source handles' attribute structure*/
+    /*populates bstream_array_base_local with byte stream size*/
+    PVFS_ds_attributes *ds_attr_a;
+
+    /*local source handles' byte stream size*/
+    /*index corresponds to handle_array_base*/
+    PVFS_size *bstream_array_base_local;
+};
+typedef struct PINT_server_create_copies_op PINT_server_create_copies_op;
+
+
+/*This macro is used to initialize a PINT_server_op structure when pjmp'ing */
+/*to pvfs2_create_immutable_copies_sm.                                      */
+#define PVFS_SERVOP_IMM_COPIES_FILL(__new_p,__cur_p)                           \
+do {                                                                           \
+   memcpy(__new_p,__cur_p,sizeof(struct PINT_server_op));                      \
+   (__new_p)->op = PVFS_SERV_IMM_COPIES;                                       \
+   memset(&((__new_p)->u.create_copies),0,sizeof((__new_p)->u.create_copies)); \
+}while(0)
+
+
 
 /* struct PINT_server_lookup_op
  *
@@ -480,6 +627,8 @@ typedef struct PINT_server_op
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;
+        struct PINT_server_create_copies_op create_copies;
+        struct PINT_server_mirror_op mirror;
     } u;
 
 } PINT_server_op;
@@ -502,6 +651,10 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
 
+/* server side state machines */
+extern struct PINT_state_machine_s pvfs2_mirror_sm;
+
+
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
@@ -511,6 +664,9 @@ extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
+extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
+extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
