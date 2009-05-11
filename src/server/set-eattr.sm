@@ -112,11 +112,18 @@ static int seteattr_verify_eattribs(
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     /* iterate through the keys that are being written */
+    int j = 0;
+    char *valBuf = NULL;
     for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
     {
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey:%s value:%d\n"
-                            ,(char *)s_op->req->u.seteattr.key[i].buffer
-                            ,*(int *)s_op->req->u.seteattr.val[i].buffer);
+        gossip_debug(GOSSIP_MIRROR_DEBUG
+                    ,"\tkey:%s\n"
+                    ,(char *)s_op->req->u.seteattr.key[i].buffer);
+        valBuf = (char *)s_op->req->u.seteattr.val[i].buffer;
+        for (j=0; j<s_op->req->u.seteattr.val[i].buffer_sz; j++)
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
+                                            ,j
+                                            ,(unsigned int)valBuf[j]);
         js_p->error_code = PINT_eattr_namespace_verify(
             &s_op->req->u.seteattr.key[i],
             &s_op->req->u.seteattr.val[i]);
@@ -318,10 +325,13 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
 
         immutable_is_on = hint.flags & PVFS_IMMUTABLE_FL;
 
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"My key is %s.  My key value is %llu\n"                                       "PVFS_IMMUTABLE_FL is %llu.\n",
-               (char *)k->buffer,
-               llu(hint.flags),
-               llu(PVFS_IMMUTABLE_FL) );
+        gossip_debug(GOSSIP_MIRROR_DEBUG
+                     ,"My key is %s.  My key value is %llu"
+                      "\n"
+                      "PVFS_IMMUTABLE_FL is %llu.\n"
+                     ,(char *)k->buffer
+                     ,llu(hint.flags)
+                     ,llu(PVFS_IMMUTABLE_FL) );
         gossip_debug(GOSSIP_MIRROR_DEBUG,"immutable_is_on is %llu.\n"
                                         ,llu(immutable_is_on));
         gossip_debug(GOSSIP_MIRROR_DEBUG,"IMMUTABLE is %s.\n",

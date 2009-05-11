@@ -235,7 +235,7 @@ int main(int argc, char **argv)
                 }
              }/*end switch*/
         } else {
-            printf("key:%s Value:%s\n",
+            printf("key : \"%s\" \tValue : \"%s\"\n",
                     (char *)user_opts->key[0].buffer,
                     (char *)user_opts->val[0].buffer);
         }
@@ -470,7 +470,7 @@ static struct options* parse_args(int argc, char* argv[])
                   break;
                 } else {
                   tmp_opts->val[0].buffer = strdup(optarg);
-                  tmp_opts->val[0].buffer_sz = strlen(tmp_opts->val[0].buffer) + 1;
+                  tmp_opts->val[0].buffer_sz = strlen(tmp_opts->val[0].buffer);
                   break;
                 }
 	    case('?'):

@@ -83,7 +83,7 @@ PVFS_error PVFS_isys_seteattr_list(
                                                   ,j
                                                   ,(unsigned int)valBuf[j]);
         }/*end for*/
-    } /*end block*/
+    } /*end if*/
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))

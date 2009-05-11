@@ -730,11 +730,6 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     ssize_t length = 0;
     int fsuid, fsgid;
 
-    gossip_lerr("Executing pvfs2_inode_getxattr....\n");
-    gossip_lerr("Function parms: prefix=%s \tname=%s \tbuffer size=%d\n"
-               ,prefix,name,(int)size);
-
-
     if (name == NULL || (size > 0 && buffer == NULL))
     {
         gossip_err("pvfs2_inode_getxattr: bogus NULL pointers\n");
@@ -790,7 +785,6 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         if (ret == 0)
         {
             length = new_op->downcall.resp.getxattr.val_sz;
-            gossip_lerr("Returned length => %d\n",(int)length);
             if (size == 0)
             {
                 ret = length;
@@ -807,8 +801,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     /* No size problems */
                     memset(buffer, 0, size);
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                           size);
-                    ret = size; 
+                           length);
+                    ret = length; 
                     gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: "
                         "inode %llu key %s key_sz %d, val_length %d\n", 
                         llu(get_handle_from_ino(inode)),
@@ -844,8 +838,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
-
-    gossip_lerr("Executing pvfs2_inode_setxattr.....\n");
+    int i;
+    char *valBuf;
 
     if (size < 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
     {
@@ -923,10 +917,13 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
         new_op->upcall.req.setxattr.keyval.val_sz = size;
 
-        //gossip_lerr("Upcall: value=%d \tsize=%d\n"
-        //           ,*(int *)new_op->upcall.req.setxattr.keyval.val
-        //           ,new_op->upcall.req.setxattr.keyval.val_sz);
-
+        gossip_debug(GOSSIP_XATTR_DEBUG,"Upcall: size=%d\n"
+                    ,new_op->upcall.req.setxattr.keyval.val_sz);
+        valBuf = (char *)new_op->upcall.req.setxattr.keyval.val;
+        for (i=0; i<new_op->upcall.req.setxattr.keyval.val_sz; i++)
+            gossip_debug(GOSSIP_XATTR_DEBUG,"\tval[%d]=%#x\n"
+                        ,i
+                        ,(unsigned int)valBuf[i]);
 
         gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, "
                 "key_sz %d value size %zd\n", 
