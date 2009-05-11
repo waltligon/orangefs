@@ -6,7 +6,7 @@
 /* NOTE: if you make any changes to the encoding definitions in this file, 
  * please update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
  */
-
+/* added a comment */
 /** \file
  *
  *  Definitions of types used throughout PVFS2.
