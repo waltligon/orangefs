@@ -471,6 +471,15 @@ static PINT_sm_action prelude_perm_check(
                      */
                     js_p->error_code = 0;
                 }
+                else if(s_op->attr.owner == translated_uid || translated_uid
+                    == 0)
+                {
+                    /* owner of file and root can always set attributes (see
+                     * iozone, which does a setattr as part of truncating a
+                     * file with permission mask set to 0
+                     */
+                    js_p->error_code = 0;
+                }
                 else
                 {
                     /* normal setattr requires write permissions on existing
