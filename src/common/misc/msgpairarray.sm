@@ -253,7 +253,7 @@ static PINT_sm_action msgpairarray_post(
                            msg_p->encoded_resp_p,
                            msg_p->max_resp_sz,
                            session_tag,
-                           BMI_PRE_ALLOC,
+			   BMI_PRE_ALLOC,
                            smcb,
                            i,
                            &msg_p->recv_status,

@@ -21,10 +21,9 @@
 #include "pint-segpool.h"
 //#include "pipeline.h"
 
-extern struct PINT_state_machine_s pvfs2_pipeline_sm;
-
-#define NUM_OF_PARALLEL_SMS 4
-#define BUFFER_SIZE (256*1024)
+#define NUM_OF_PARALLEL_SMS 8
+#define BUFFER_SIZE (256*1024) /* 256KB */
+//#define BUFFER_SIZE (64*1024) /* 64KB */
 
 %%
 
@@ -158,9 +157,9 @@ static PINT_sm_action start_pipelining_sm(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
-    struct filesystem_configuration_s *fs_conf;
+    struct filesystem_configuration_s *fs_config;
     struct PINT_server_op *pipeline_op;
-    int i, ret; 
+    int i, ret, dfile_index;
     PINT_segpool_handle_t seg_handle;
 
     s_op->u.io.parallel_sms = 0;
@@ -197,19 +196,26 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.user_ptr = NULL;
     s_op->u.io.op = s_op->req->u.io.op; /* AS: operation */
     s_op->u.io.datatype = s_op->req->u.io.datatype; /* AS: dtype */
-    s_op->u.io.dfile_array = s_op->req->u.io.dfile_array; /* AD: dfile_array */
+    s_op->u.io.dfile_array  = s_op->req->u.io.dfile_array; /* AD: dfile_array */
     
     gossip_debug(GOSSIP_IO_DEBUG, "server_ct=%d\n", s_op->req->u.io.server_ct);
-    for(i=0; i<s_op->req->u.io.server_ct; i++)
+    gossip_debug(GOSSIP_IO_DEBUG, "fs_id=%d\n", s_op->req->u.io.fs_id);
+    for(i=0; i<s_op->req->u.io.server_ct; i++) {
 	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%lu\n", i, 
 		     s_op->u.io.dfile_array[i]);
+	if(s_op->u.io.dfile_array[i] == s_op->req->u.io.handle) {
+	    dfile_index = i;
+	    gossip_debug(GOSSIP_IO_DEBUG, "dfile_index=%d\n", i);
+	}
+    }
 
-    fs_conf = PINT_config_find_fs_id(user_opts, s_op->req->u.io.fs_id);
-    if(fs_conf)
+    fs_config = PINT_config_find_fs_id(user_opts, s_op->req->u.io.fs_id);
+    if(fs_config)
     {
         /* pick up any buffer settings overrides from fs conf */
-        s_op->u.io.buffer_size = fs_conf->fp_buffer_size;
-        s_op->u.io.num_of_buffers = fs_conf->fp_buffers_per_flow;
+        s_op->u.io.buffer_size = fs_config->fp_buffer_size;
+        //s_op->u.io.num_of_buffers = fs_config->fp_buffers_per_flow;
+	s_op->u.io.num_of_buffers = NUM_OF_PARALLEL_SMS; /* FIXME */
     }
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: fsize: %lld, " 
@@ -235,6 +241,26 @@ static PINT_sm_action start_pipelining_sm(
     if(s_op->u.io.num_of_buffers < 1)
         s_op->u.io.num_of_buffers = NUM_OF_PARALLEL_SMS;
 
+#if 0
+    /* figure out if the fs config has trove data sync turned on or off
+	 */
+    server_config = get_server_config_struct();
+    if(!server_config) {
+	js_p->error_code = -PVFS_EINVAL;
+	return SM_ACTION_COMPLETE;
+    }
+    
+    fs_config = PINT_config_find_fs_id(server_config, 
+				       s_op->u.pipeline.fs_id);
+    if(!fs_config) {
+	gossip_err("%s: Failed to get filesystem "
+		   "config from fs_id of: %d\n", __func__,
+		   s_op->u.pipeline.fs_id);
+	js_p->error_code = -PVFS_EINVAL;
+	return SM_ACTION_COMPLETE;
+    }
+#endif
+
     PINT_segpool_unit_id id[s_op->u.io.num_of_buffers];
 
     PINT_dist_lookup(s_op->u.io.file_data.dist);
@@ -259,7 +285,7 @@ static PINT_sm_action start_pipelining_sm(
 
 	pipeline_op->u.pipeline.address = s_op->addr;
 	pipeline_op->u.pipeline.handle = s_op->req->u.io.handle;
-        pipeline_op->u.pipeline.coll_id = s_op->req->u.io.fs_id;
+        pipeline_op->u.pipeline.fs_id = s_op->req->u.io.fs_id;
 
 	pipeline_op->u.pipeline.seg_handle = seg_handle;
 	pipeline_op->u.pipeline.id = id[i];
@@ -268,6 +294,16 @@ static PINT_sm_action start_pipelining_sm(
 	pipeline_op->u.pipeline.tag = s_op->tag;
 	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
 	pipeline_op->u.pipeline.io_type = s_op->req->u.io.io_type;
+
+	pipeline_op->u.pipeline.dfile_index = dfile_index;
+	pipeline_op->u.pipeline.dfile_count = s_op->u.io.file_data.server_ct;
+	pipeline_op->u.pipeline.dist = s_op->u.io.file_data.dist;
+
+	/* figure out if the fs config has trove data sync turned on or off
+	 */
+	pipeline_op->u.pipeline.trove_sync_flag = 
+	    (fs_config->trove_sync_data ? TROVE_SYNC : 0);
+	
 	if(s_op->req->u.io.io_type == PVFS_IO_READ) {
 	    if(!pipeline_op->u.pipeline.buffer) {
 		/* if the buffer has not been used, allocate a buffer */

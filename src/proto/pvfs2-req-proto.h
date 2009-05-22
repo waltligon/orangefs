@@ -80,6 +80,7 @@ enum PVFS_server_op
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
     PVFS_SERV_READ_COMPLETION = 39, /* AS: for read_ex */
+    PVFS_SERV_S2S = 40, /* sson */
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1039,9 +1040,9 @@ struct PVFS_servreq_io
                              __file_req,              \
                              __file_req_off,          \
                              __aggregate_size,        \
-			     __op, /* AS */          \
-			     __datatype, /* AS */   \
-			     __dfile_array, /* AS */\
+			     __op, /* AS */           \
+			     __datatype, /* AS */     \
+			     __dfile_array, /* AS */  \
                              __hints)                 \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
@@ -1729,6 +1730,37 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+/* sson: s2s comm **************************************************/
+struct PVFS_servreq_s2s
+{
+    //PVFS_handle handle;     /* handle of file object */
+    PVFS_ds_keyval outbuffer;
+    //PVFS_size out_size;
+    PVFS_ds_keyval inbuffer;
+    //PVFS_size in_size;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_s2s,
+    PVFS_ds_keyval, outbuffer,
+    PVFS_ds_keyval, inbuffer);
+
+#define PINT_SERVREQ_S2S_FILL(__req,            \
+			      __outbuffer,		  \
+			      __inbuffer,		  \
+			      __outbuffer_sz,		  \
+			      __inbuffer_sz,\
+			      __hints)		      \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_S2S;                 \
+    (__req).hints = (__hints);                        \
+    (__req).u.s2s.outbuffer.buffer = (__outbuffer);             \
+    (__req).u.s2s.inbuffer.buffer = (__inbuffer);          \
+    (__req).u.s2s.outbuffer.buffer_sz = (__outbuffer_sz);		   \
+    (__req).u.s2s.inbuffer.buffer_sz = (__inbuffer_sz);              \
+} while (0);
+
+/* sson: end */
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1772,6 +1804,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+	struct PVFS_servreq_s2s s2s; /* sson */
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

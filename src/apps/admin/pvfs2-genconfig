@@ -68,6 +68,8 @@ my $IO_ENDPOINT   = 0x2;
 my $OUT = undef;
 my $term = undef;
 
+my $opt_stripe_size = 262144; # sson
+
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
 
@@ -359,6 +361,14 @@ sub emit_filesystem
     {
         print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
     }
+
+    ## sson 
+    print $target "\t<Distribution>\n";
+    print $target "\t\tName simple_stripe\n";
+    print $target "\t\tParam strip_size\n";
+    print $target "\t\tValue 262144\n";
+    print $target "\t</Distribution>\n";
+    ## sson
 
     print $target "</Filesystem>\n";
 }

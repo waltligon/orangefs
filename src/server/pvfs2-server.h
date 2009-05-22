@@ -361,9 +361,20 @@ struct PINT_server_io_op
 /* substibute for flow */
 struct PINT_server_pipeline_op
 {
-    PVFS_fs_id coll_id;
+    PVFS_fs_id fs_id;
     PVFS_handle handle;
     PVFS_BMI_addr_t address;
+
+    int dfile_index;
+    int dfile_count;
+    struct PINT_dist_s *dist;
+
+    PINT_Request *file_req;
+    PVFS_offset file_req_offset;
+    PINT_Request *mem_req;
+
+    char tmp_buf[128]; /* FIXME */
+    PVFS_size unaligned_size;
 
     enum PVFS_io_type io_type;
 
@@ -379,6 +390,9 @@ struct PINT_server_pipeline_op
     int segs;
     PVFS_hint hints;
     PVFS_msg_tag_t tag;
+    int trove_sync_flag;
+    int adjust_flag; /* FIXME */
+    PVFS_offset loff;
 };
  
 struct PINT_server_small_io_op
@@ -558,6 +572,7 @@ extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
+extern struct PINT_state_machine_s pvfs2_pipeline_sm; /* sson */
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
