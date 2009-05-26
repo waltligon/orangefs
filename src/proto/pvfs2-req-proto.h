@@ -81,6 +81,7 @@ enum PVFS_server_op
     PVFS_SERV_UNSTUFF = 38,
     PVFS_SERV_MIRROR = 39,
     PVFS_SERV_IMM_COPIES = 40,
+    PVFS_SERV_TREE_REMOVE = 41,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -392,6 +393,36 @@ do {                                                  \
     (__req).u.mgmt_remove_dirent.fs_id = (__fsid);    \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
     (__req).u.mgmt_remove_dirent.entry = (__entry);   \
+} while (0)
+
+struct PVFS_servreq_tree_remove
+{
+    PVFS_fs_id  fs_id;
+    uint32_t num_data_files;
+    PVFS_handle *handle_array;
+};
+endecode_fields_1a_struct(
+    PVFS_servreq_tree_remove,
+    PVFS_fs_id, fs_id,
+    uint32_t, num_data_files,
+    PVFS_handle, handle_array)
+#define extra_size_PVFS_servreq_tree_remove \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                                  \
+                                 __creds,                                \
+                                 __fsid,                                 \
+                                 __num_data_files,                       \
+                                 __handle_array,                         \
+                                 __hints)                                \
+do {                                                                     \
+    memset(&(__req), 0, sizeof(__req));                                  \
+    (__req).op = PVFS_SERV_TREE_REMOVE;                                  \
+    (__req).hints = (__hints);                                           \
+    (__req).credentials = (__creds);                                     \
+    (__req).u.tree_remove.fs_id = (__fsid);                              \
+    (__req).u.tree_remove.num_data_files = (__num_data_files);           \
+    (__req).u.tree_remove.handle_array = (__handle_array);               \
 } while (0)
 
 /* mgmt_get_dirdata_handle */
@@ -1857,6 +1888,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+        struct PVFS_servreq_tree_remove tree_remove;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

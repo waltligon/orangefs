@@ -170,12 +170,11 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i = 0;
-    int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
-   /* post all datafile remove requests and responses simultaneously.
-    *
+   /*
     * NOTE: it's easier to clean up from a metafile with no datafiles
     * than the other way around!  so we remove datafiles first.
     */
@@ -187,42 +186,31 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
-                                 attr->u.meta.dfile_count);
-    if(ret != 0)
-    {
-	js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
+    /* post a send/recv pair for the remove to the
+       first server in the list of datafiles */
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_TREE_REMOVE_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        attr->u.meta.dfile_count,
+        attr->u.meta.dfile_array,
+        sm_p->hints);
     
-    /* for each datafile, post a send/recv pair for the remove */
-    for (i = 0; i < attr->u.meta.dfile_count; i++)
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = attr->u.meta.dfile_array[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;     /* TODO: Do we want retry? */
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
     {
-	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray_op.msgarray[i];
-
-	gossip_debug(GOSSIP_CLIENT_DEBUG,
-		     "  datafile_remove: removing handle %llu\n",
-		     llu(attr->u.meta.dfile_array[i]));
-
-	PINT_SERVREQ_REMOVE_FILL(
-            msg_p->req,
-            *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
-            attr->u.meta.dfile_array[i],
-            sm_p->hints);
-
-	msg_p->fs_id = sm_p->object_ref.fs_id;
-	msg_p->handle = attr->u.meta.dfile_array[i];
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-	msg_p->comp_fn = NULL;
-    }
-
-    /* fill in address of each server to contact */
-    ret =  PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);
-    if (ret < 0)
-    {
-	gossip_err("Error: failed to resolve server addresses.\n");
-	js_p->error_code = ret;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);

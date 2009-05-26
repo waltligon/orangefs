@@ -206,6 +206,14 @@ typedef enum
     SERVER_PRECREATE_INIT  = (1 << 18),
 } PINT_server_status_flag;
 
+typedef enum
+{   
+    PRELUDE_SCHEDULER_DONE     = (1 << 0),
+    PRELUDE_GETATTR_DONE       = (1 << 1),
+    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
+    PRELUDE_LOCAL_CALL         = (1 << 3),
+} PINT_prelude_flag;
+
 struct PINT_server_create_op
 {
     const char **io_servers;
@@ -543,6 +551,15 @@ struct PINT_server_unstuff_op
     void* encoded_layout;
 };
 
+struct PINT_server_tree_remove_op
+{
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    int handle_index;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -598,8 +615,12 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
+
+    int num_pjmp_frames;
 
     union
     {
@@ -629,9 +650,34 @@ typedef struct PINT_server_op
         struct PINT_server_unstuff_op unstuff;
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
+        struct PINT_server_tree_remove_op tree_remove;
     } u;
 
 } PINT_server_op;
+
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __msg_p, __req, __task_id) \
+    do { \
+      char server_name[1024]; \
+      struct server_configuration_s *server_config = get_server_config_struct(); \
+      __s_op = malloc(sizeof(struct PINT_server_op)); \
+      if(!__s_op) { return -PVFS_ENOMEM; } \
+      memset(__s_op, 0, sizeof(struct PINT_server_op)); \
+      __s_op->req = &__s_op->decoded.stub_dec.req; \
+      PINT_sm_push_frame(__smcb, __task_id, __s_op); \
+      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && __handle) { \
+        PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
+      } \
+      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
+        __location = LOCAL_OPERATION; \
+        __req = __s_op->req; \
+        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
+      } \
+      else { \
+        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
+        PINT_serv_init_msgarray_params(__s_op, __fs_id); \
+      } \
+    } while (0)
+
 
 /* PINT_ACCESS_DEBUG()
  *
@@ -667,6 +713,7 @@ extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

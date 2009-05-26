@@ -109,6 +109,14 @@ static PINT_sm_action prelude_req_sched(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
+    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }   
+ 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase_frame:%d\tframe_count:%d\n"
                                     ,smcb->base_frame,smcb->frame_count);
@@ -138,6 +146,14 @@ static PINT_sm_action prelude_getattr_if_needed(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
+
+    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: getattr already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
@@ -371,6 +387,13 @@ static PINT_sm_action prelude_perm_check(
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     /* Set the target object attribute pointer.. used later by the acl check */
     s_op->target_object_attr = obj_attr;
+
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: perm check already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        return SM_ACTION_COMPLETE;
+    }
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
