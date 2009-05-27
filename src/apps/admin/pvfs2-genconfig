@@ -68,7 +68,7 @@ my $IO_ENDPOINT   = 0x2;
 my $OUT = undef;
 my $term = undef;
 
-my $opt_stripe_size = 262144; # sson
+my $opt_dist = '';
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
@@ -362,13 +362,15 @@ sub emit_filesystem
         print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
     }
 
-    ## sson 
-    print $target "\t<Distribution>\n";
-    print $target "\t\tName simple_stripe\n";
-    print $target "\t\tParam strip_size\n";
-    print $target "\t\tValue 262144\n";
-    print $target "\t</Distribution>\n";
-    ## sson
+    if($opt_dist)
+    {
+	my @opt_dist_list = split(/:/, $opt_dist);
+	print $target "\t<Distribution>\n";
+	print $target "\t\tName $opt_dist_list[0]\n"; # simple_stripe
+	print $target "\t\tParam $opt_dist_list[1]\n"; # strip_size
+	print $target "\t\tValue $opt_dist_list[2]\n"; # 262144 
+	print $target "\t</Distribution>\n";
+    }
 
     print $target "</Filesystem>\n";
 }
@@ -1411,7 +1413,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'metaspec=s'   => \$opt_metaspec, 
     'spec-usage!'  => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
-    '-'           => \$using_stdout)
+    '-'           => \$using_stdout,
+    'distribution=s' => \$opt_dist)
     or die "Could not parse arguments.  See -h for help.\n";
 
 if($opt_quiet)
