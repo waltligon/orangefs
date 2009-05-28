@@ -115,18 +115,27 @@ nested machine pvfs2_remove_work_sm
 
 }
 
-machine pvfs2_remove_sm
+nested machine pvfs2_remove_with_prelude_sm
 {
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => work;
-        default => final_response;
+        success => do_work;
+        default => return;
     }
 
-    state work
+    state do_work
     {
         jump pvfs2_remove_work_sm;
+        default => return;
+    }
+}
+
+machine pvfs2_remove_sm
+{
+    state work
+    {
+        jump pvfs2_remove_with_prelude_sm;
         default => final_response;
     }
 

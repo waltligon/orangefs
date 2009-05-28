@@ -134,6 +134,7 @@ static int setup_final_response(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
 
     /* retrieve original error code if present */
     if(s_op->u.create.saved_error_code)
@@ -141,6 +142,11 @@ static int setup_final_response(
         js_p->error_code = s_op->u.create.saved_error_code;
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Datafile handles created:\n");
+    for (i = 0; i < s_op->resp.u.create.datafile_count; i++) {
+      gossip_debug(GOSSIP_SERVER_DEBUG, "\t%llu\n",
+        llu(s_op->resp.u.create.datafile_handles[i]));
+    }
     /* otherwise propigate the js_p->error code */
     return(SM_ACTION_COMPLETE);
 }

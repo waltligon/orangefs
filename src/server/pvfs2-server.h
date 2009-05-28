@@ -655,7 +655,7 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __msg_p, __req, __task_id) \
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
     do { \
       char server_name[1024]; \
       struct server_configuration_s *server_config = get_server_config_struct(); \
@@ -708,6 +708,7 @@ extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
