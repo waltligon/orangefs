@@ -81,7 +81,7 @@ PVFS_error PVFS_isys_seteattr_list(
             for (j=0; j<val_array[i].buffer_sz; j++)
                 gossip_debug(GOSSIP_SETEATTR_DEBUG,"          val[%d]=%#x\n"
                                                   ,j
-                                                  ,(unsigned int)valb_bf[j]);
+                                                  ,(unsigned int)val_buf[j]);
         }/*end for*/
     } /*end block*/
 

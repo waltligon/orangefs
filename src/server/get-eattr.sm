@@ -48,6 +48,13 @@ machine pvfs2_get_eattr_sm
     state active_setup
     {
         run geteattr_active_setup;
+        success => active_reqsched;
+        default => final_response;
+    }
+
+    state active_reqsched
+    {
+        run geteattr_active_reqsched;
         success => next_active;
         default => final_response;
     }
@@ -55,10 +62,17 @@ machine pvfs2_get_eattr_sm
     state next_active
     {
         run geteattr_next_active;
-        ACTIVE_DONE => check_resp;
+        ACTIVE_DONE => active_release;
         ACTIVE_FETCH_AND_ADD => active_faa;
         ACTIVE_FETCH_AND_SUBTRACT => active_fas;
         ACTIVE_COMPARE_AND_SWAP => active_cas;
+        default => final_response;
+    }
+
+    state active_release
+    {
+        run geteattr_active_release;
+        success => check_resp;
         default => final_response;
     }
 
@@ -189,6 +203,32 @@ static PINT_sm_action geteattr_active_setup(
 
     s_op->u.eattr.active.index = 0;
     return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action geteattr_active_reqsched(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    return job_req_sched_post(s_op->op,
+                              s_op->req->u.geteattr.fs_id,
+                              s_op->req->u.geteattr.handle,
+                              PINT_SERVER_REQ_MODIFY,
+                              PINT_SERVER_REQ_SCHEDULE,
+                              smcb, 0, js_p,
+                              &(s_op->scheduled_id), server_job_context);
+}
+
+static PINT_sm_action geteattr_active_release(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t tmp_id;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    return job_req_sched_release(s_op->scheduled_id,
+                                 smcb, 0, js_p, &tmp_id, server_job_context);
 }
 
 #define FAA "active.faa("
