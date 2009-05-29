@@ -71,16 +71,19 @@ PVFS_error PVFS_isys_seteattr_list(
     if(gossip_debug_enabled(GOSSIP_SETEATTR_DEBUG))
     {
         int i = 0;
-        gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                     "Setting extended attributes:\n");
+        int j; char *val_buf = (char *)val_array[i].buffer;
+        gossip_debug(GOSSIP_SETEATTR_DEBUG,"Setting extended attributes:\n");
         for(; i < nkey; ++i)
         {
-            gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                         "eattr[%d]: key=%s val=%.*s\n",
-                         i, (char *)key_array[i].buffer,
-                         val_array[i].buffer_sz, (char *)val_array[i].buffer);
-        }
-    }
+            gossip_debug(GOSSIP_SETEATTR_DEBUG,"eattr[%d]: key=%s\n"
+                                              , i
+                                              ,(char *)key_array[i].buffer);
+            for (j=0; j<val_array[i].buffer_sz; j++)
+                gossip_debug(GOSSIP_SETEATTR_DEBUG,"          val[%d]=%#x\n"
+                                                  ,j
+                                                  ,(unsigned int)valb_bf[j]);
+        }/*end for*/
+    } /*end block*/
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
