@@ -34,7 +34,14 @@ const char *PINT_eattr_namespaces[] =
     "user.",
     "trusted.",
     "security.",
+    "active.",
     NULL
+};
+
+enum xattr_type
+{
+    XATTR_BYTES_VALUE = 1,
+    XATTR_INT_VALUE = 10
 };
 
 /* optional parameters, filled in by parse_args() */
@@ -44,6 +51,7 @@ struct options
     PVFS_ds_keyval val;
     char* srcfile;
     int get, text;
+    enum xattr_type type;
 };
 
 enum object_type { 
@@ -157,9 +165,17 @@ int main(int argc, char **argv)
             }
             printf("\n");
         } else {
-            printf("key:%s Value:\n%s\n",
-                    (char *)user_opts->key.buffer,
-                    (char *)user_opts->val.buffer);
+            printf("    Key: %s\n",
+                    (char *)user_opts->key.buffer);
+            if(user_opts->type == XATTR_INT_VALUE)
+            {
+                printf("    Value: %d\n", *(int *)user_opts->val.buffer);
+            }
+            else
+            {
+                printf("    Value: %s\n",
+                       (char *)user_opts->val.buffer);
+            }
         }
     }
   PVFS_sys_finalize();
@@ -272,7 +288,7 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "k:v:ts";
+    char flags[] = "k:v:its";
     int one_opt = 0;
 
     struct options* tmp_opts = NULL;
@@ -290,6 +306,7 @@ static struct options* parse_args(int argc, char* argv[])
     tmp_opts->srcfile = strdup(argv[argc-1]);
     tmp_opts->get = 1;
 
+    tmp_opts->type = XATTR_BYTES_VALUE;
     /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
@@ -308,12 +325,24 @@ static struct options* parse_args(int argc, char* argv[])
                 tmp_opts->val.buffer = strdup(optarg);
                 tmp_opts->val.buffer_sz = strlen(tmp_opts->val.buffer) + 1;
                 break;
+            case 'i':
+                tmp_opts->type = XATTR_INT_VALUE;
+                break;
 	    case('?'):
                 printf("?\n");
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
+    if(tmp_opts->type == XATTR_INT_VALUE && tmp_opts->val.buffer)
+    {
+        char *b = tmp_opts->val.buffer;
+        tmp_opts->val.buffer = malloc(sizeof(int));
+        *(int *)tmp_opts->val.buffer = atoi(b);
+        tmp_opts->val.buffer_sz = sizeof(int);
+        free(b);
+    }
+
     if (tmp_opts->get == 1)
     {
         tmp_opts->val.buffer = calloc(1, VALBUFSZ);

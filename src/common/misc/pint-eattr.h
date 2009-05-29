@@ -8,6 +8,8 @@
 
 #include "pvfs2-types.h"
 
+#define PINT_EATTR_ACTIVE 42
+
 /* Extended Attributes
  *
  * These functions provide checking of extended attributes formats

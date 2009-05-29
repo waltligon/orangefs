@@ -53,6 +53,7 @@ static struct PINT_eattr_check PINT_eattr_access[] =
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
     {"security.", 0, NULL},
+    {"active.", PINT_EATTR_ACTIVE, NULL},
     {NULL, -PVFS_ENOENT, NULL}
 };
 
@@ -82,6 +83,7 @@ static struct PINT_eattr_check PINT_eattr_namespaces[] =
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
     {"security.", 0, NULL},
+    {"active.", 0, NULL},
     {NULL, -PVFS_EOPNOTSUPP, NULL}
 };
 
@@ -107,6 +109,7 @@ static struct PINT_eattr_check PINT_eattr_list[] =
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
     {"security.", 0, NULL},
+    {"active.", 0, NULL},
     {NULL, 0, PINT_eattr_add_pvfs_prefix}
 };
 

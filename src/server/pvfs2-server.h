@@ -382,10 +382,25 @@ struct PINT_server_listattr_op
     int parallel_sms;
 };
 
+struct PINT_server_eattr_active_op
+{
+    int index;
+    PVFS_ds_keyval xattr_key;
+    PVFS_ds_keyval xattr_value;
+    struct 
+    {
+        int add;
+        int subtract;
+        int compare;
+        int swap;
+    } value;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
     void *buffer;
+    struct PINT_server_eattr_active_op active;
 };
 
 struct PINT_server_unstuff_op

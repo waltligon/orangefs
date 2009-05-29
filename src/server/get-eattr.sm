@@ -25,20 +25,88 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
+enum
+{
+    ACTIVE_DONE = 4,
+    ACTIVE_FETCH_AND_ADD,
+    ACTIVE_FETCH_AND_SUBTRACT,
+    ACTIVE_COMPARE_AND_SWAP
+};
+
 %%
 
 machine pvfs2_get_eattr_sm
 {
-    state prelude
+    state setup
     {
-        jump pvfs2_prelude_sm;
-        success => setup_resp;
+        run geteattr_setup;
+        PINT_EATTR_ACTIVE => active_setup;
+        success => prelude;
         default => final_response;
     }
 
-    state setup_resp
+    state active_setup
     {
-        run geteattr_setup_resp;
+        run geteattr_active_setup;
+        success => next_active;
+        default => final_response;
+    }
+
+    state next_active
+    {
+        run geteattr_next_active;
+        ACTIVE_DONE => check_resp;
+        ACTIVE_FETCH_AND_ADD => active_faa;
+        ACTIVE_FETCH_AND_SUBTRACT => active_fas;
+        ACTIVE_COMPARE_AND_SWAP => active_cas;
+        default => final_response;
+    }
+
+    state active_faa
+    {
+        run geteattr_active_fetch;
+        success => active_add;
+        default => final_response;
+    }
+
+    state active_add
+    {
+        run geteattr_active_add;
+        success => next_active;
+        default => final_response;
+    }
+
+    state active_fas
+    {
+        run geteattr_active_fetch;
+        success => active_subtract;
+        default => final_response;
+    }
+
+    state active_subtract
+    {
+        run geteattr_active_subtract;
+        success => next_active;
+        default => final_response;
+    }
+
+    state active_cas
+    {
+        run geteattr_active_fetch;
+        success => active_compare_and_swap;
+        default => final_response;
+    }
+
+    state active_compare_and_swap
+    {
+        run geteattr_active_compare_and_swap;
+        success => next_active;
+        default => final_response;
+    }
+
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
         success => read_eattrib;
         default => final_response;
     }
@@ -71,10 +139,393 @@ machine pvfs2_get_eattr_sm
 %%
 
 /*
- * geteattr_setup_resp()
+ * geteattr_active_setup()
+ * Handle active attributes
+ */
+static PINT_sm_action geteattr_active_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i, tsz;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    /* TODO: check perms! */
+
+    s_op->resp.u.geteattr.val =
+        malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.geteattr.val)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.geteattr.err =
+        malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_error));
+    if (!s_op->resp.u.geteattr.err)
+    {
+        free(s_op->resp.u.geteattr.val);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
+    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    {
+        s_op->resp.u.geteattr.val[i].buffer = malloc(
+            s_op->req->u.geteattr.valsz[i]);
+        if (!s_op->resp.u.geteattr.val[i].buffer)
+        {
+            for(--i; i >= 0; --i)
+            {
+                free(s_op->resp.u.geteattr.val[i].buffer);
+            }
+            s_op->resp.u.geteattr.nkey = 0;
+            free (s_op->resp.u.geteattr.val);
+            free (s_op->resp.u.geteattr.err);
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        s_op->resp.u.geteattr.val[i].buffer_sz = s_op->req->u.geteattr.valsz[i];
+        s_op->resp.u.geteattr.err[i] = 0;
+    }
+
+    s_op->u.eattr.active.index = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+#define FAA "active.faa("
+#define FAS "active.fas("
+#define CAS "active.cas("
+
+static PINT_sm_action geteattr_next_active(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    char *key, *c, *xattr_key, *l, *valstr;
+    int len, xattr_keylen, valstr_len;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    if(s_op->u.eattr.active.index == s_op->req->u.geteattr.nkey)
+    {
+        js_p->error_code = ACTIVE_DONE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    key = s_op->req->u.geteattr.key[s_op->u.eattr.active.index].buffer;
+    len = s_op->req->u.geteattr.key[s_op->u.eattr.active.index].buffer_sz;
+
+    if(!strncmp(key, FAA, strlen(FAA)))
+    {
+        key += strlen(FAA);
+        len -= strlen(FAA);
+        key[len] = '\0';
+        c = index(key, ',');
+        xattr_keylen = c - key;
+        len -= xattr_keylen;
+        xattr_key = malloc(xattr_keylen + 1);
+        if(!xattr_key)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        strncpy(xattr_key, key, xattr_keylen);
+        xattr_key[xattr_keylen] = '\0';
+        xattr_keylen++;
+
+        l = rindex(xattr_key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            xattr_keylen--;
+            l = rindex(xattr_key, ' ');
+        }
+        key = c+1;
+        l = index(key, ' ');
+        while(l)
+        {
+            key++;
+            len--;
+            l = index(l+1, ' ');
+        }
+        key[len] = '\0';
+        c = index(key, ')');
+        l = rindex(key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            c--;
+            l = rindex(key, ' ');
+        }
+        valstr_len = c - key;
+        valstr = malloc(valstr_len + 1);
+        if(!valstr)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        strncpy(valstr, key, valstr_len);
+        valstr[valstr_len] = '\0';
+        sscanf(valstr, "%d", &s_op->u.eattr.active.value.add);
+        js_p->error_code = ACTIVE_FETCH_AND_ADD;
+    }
+    else if(!strncmp(key, FAS, strlen(FAS)))
+    {
+        key += strlen(FAS);
+        len -= strlen(FAS);
+        c = index(key, ',');
+        xattr_keylen = c - key;
+        len -= xattr_keylen;
+        xattr_key = malloc(xattr_keylen + 1);
+        if(!xattr_key)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        strncpy(xattr_key, key, xattr_keylen);
+        xattr_key[xattr_keylen] = '\0';
+        xattr_keylen++;
+
+        l = rindex(xattr_key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            xattr_keylen--;
+            l = rindex(xattr_key, ' ');
+        }
+        key = c+1;
+        l = index(key, ' ');
+        while(l)
+        {
+            key++;
+            len--;
+            l = index(l+1, ' ');
+        }
+        c = index(key, ')');
+        l = rindex(key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            c--;
+            l = rindex(key, ' ');
+        }
+        valstr_len = c - key;
+        valstr = malloc(valstr_len + 1);
+        if(!valstr)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        strncpy(valstr, key, valstr_len);
+        valstr[valstr_len] = '\0';
+        sscanf(valstr, "%d", &s_op->u.eattr.active.value.subtract);
+
+        js_p->error_code = ACTIVE_FETCH_AND_SUBTRACT;
+    }
+    else if(!strncmp(key, CAS, strlen(CAS)))
+    {
+        key += strlen(CAS);
+        len -= strlen(CAS);
+        c = index(key, ',');
+        xattr_keylen = c - key;
+        len -= xattr_keylen;
+        xattr_key = malloc(xattr_keylen + 1);
+        if(!xattr_key)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        strncpy(xattr_key, key, xattr_keylen);
+        xattr_key[xattr_keylen] = '\0';
+        xattr_keylen++;
+
+        l = rindex(xattr_key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            xattr_keylen--;
+            l = rindex(xattr_key, ' ');
+        }
+        key = c+1;
+        l = index(key, ' ');
+        while(l)
+        {
+            key++;
+            len--;
+            l = index(l+1, ' ');
+        }
+
+        c = index(key, ',');
+        len -= (int)(c - key);
+
+        l = rindex(c, ' ');
+        while(l)
+        {
+            *l = '\0';
+            l = rindex(c, ' ');
+        }
+        sscanf(key, "%d", &s_op->u.eattr.active.value.compare);
+
+        key = c+1;
+        l = index(key, ' ');
+        while(l)
+        {
+            key++;
+            len--;
+            l = index(l+1, ' ');
+        }
+
+        c = index(key, ')');
+        l = rindex(key, ' ');
+        while(l)
+        {
+            *l = '\0';
+            c--;
+            l = rindex(key, ' ');
+        }
+        valstr_len = c - key;
+        sscanf(key, "%d", &s_op->u.eattr.active.value.swap);
+        js_p->error_code = ACTIVE_COMPARE_AND_SWAP;
+    }
+
+    s_op->u.eattr.active.xattr_key.buffer = xattr_key;
+    s_op->u.eattr.active.xattr_key.buffer_sz = xattr_keylen;
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action geteattr_active_fetch(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t jid;
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read(
+        s_op->req->u.geteattr.fs_id,
+        s_op->req->u.geteattr.handle,
+        &s_op->u.eattr.active.xattr_key,
+        &s_op->resp.u.geteattr.val[s_op->u.eattr.active.index],
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &jid,
+        server_job_context,
+        s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action geteattr_active_add(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+    int value;
+    job_id_t jid;
+
+    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
+
+    s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
+    s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
+    *(int *)(s_op->u.eattr.active.xattr_value.buffer) = value + s_op->u.eattr.active.value.add;
+
+    s_op->u.eattr.active.index++;
+    ret = job_trove_keyval_write(
+        s_op->req->u.geteattr.fs_id,
+        s_op->req->u.geteattr.handle,
+        &s_op->u.eattr.active.xattr_key,
+        &s_op->u.eattr.active.xattr_value,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &jid,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
+}
+
+
+static PINT_sm_action geteattr_active_subtract(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int value, ret;
+    job_id_t jid;
+    js_p->error_code = 0;
+
+    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
+
+    s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
+    s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
+    *(int *)(s_op->u.eattr.active.xattr_value.buffer) = value - s_op->u.eattr.active.value.subtract;
+
+    s_op->u.eattr.active.index++;
+    ret = job_trove_keyval_write(
+        s_op->req->u.geteattr.fs_id,
+        s_op->req->u.geteattr.handle,
+        &s_op->u.eattr.active.xattr_key,
+        &s_op->u.eattr.active.xattr_value,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &jid,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
+}
+
+static PINT_sm_action geteattr_active_compare_and_swap(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int value;
+    int ret;
+    job_id_t jid;
+    js_p->error_code = 0;
+
+    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
+    assert(s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].read_sz == sizeof(int));
+
+    s_op->u.eattr.active.index++;
+    if(s_op->u.eattr.active.value.compare != value)
+    {
+        /* comparison failed */
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
+        s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
+        *(int *)(s_op->u.eattr.active.xattr_value.buffer) = s_op->u.eattr.active.value.swap;
+
+        /* comparison succeeded!  swap! */
+        ret = job_trove_keyval_write(
+            s_op->req->u.geteattr.fs_id,
+            s_op->req->u.geteattr.handle,
+            &s_op->u.eattr.active.xattr_key,
+            &s_op->u.eattr.active.xattr_value,
+            0,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &jid,
+            server_job_context,
+            s_op->req->hints);
+        return ret;
+    }
+}
+
+/*
+ * geteattr_setup()
  * Set up the response - allocate needed resources
  */
-static PINT_sm_action geteattr_setup_resp(
+static PINT_sm_action geteattr_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -97,7 +548,6 @@ static PINT_sm_action geteattr_setup_resp(
         if(js_p->error_code != 0)
         {
             /* not prefixed: treat this as if the key does not exist */
-            js_p->error_code = -PVFS_ENOENT;
             return SM_ACTION_COMPLETE;
         }
     }
@@ -181,6 +631,12 @@ static PINT_sm_action geteattr_check_resp(
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int k;
+
+    if(js_p->error_code == ACTIVE_DONE)
+    {
+        js_p->error_code = 0;
+    }
+
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
     /* put the returned read buffer size in buffer_sz */
