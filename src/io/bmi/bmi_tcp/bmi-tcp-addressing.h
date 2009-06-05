@@ -76,6 +76,7 @@ struct tcp_addr
     int dont_reconnect;
     char* peer;
     int peer_type;
+    uint32_t addr_hash; /* hash of string identifier */
 };
 
 
