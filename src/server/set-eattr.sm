@@ -14,6 +14,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-eattr.h"
+#include "pvfs2-mirror.h"
 
 
 enum {
@@ -215,6 +216,7 @@ static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
     memset(new_op,0,sizeof(struct PINT_server_op));
 
     PVFS_SERVOP_IMM_COPIES_FILL(new_op,s_op);
+    new_op->u.create_copies.expected_mirror_mode = MIRROR_ON_IMMUTABLE;
 
     ret = PINT_sm_push_frame(smcb,CREATE_IMM_COPIES,new_op);
     if (ret != 0)
@@ -274,6 +276,9 @@ static PINT_sm_action inspect_imm_copies(struct PINT_smcb *smcb
     {
        gossip_err("File successfully mirrored.\n");
     }
+
+    /*free memory from popped stack frame*/
+    free(imm_op);
 
     return SM_ACTION_COMPLETE;
 }/*end action inspect_imm_copies*/
