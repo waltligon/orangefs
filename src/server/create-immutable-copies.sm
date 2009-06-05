@@ -35,7 +35,8 @@ enum {
    REPLACE_DONE,
    LOCAL_SRC,
    REMOTE_SRC,
-   RETRY
+   RETRY,
+   NOTHING_TO_DO
 };
 
 
@@ -45,6 +46,8 @@ enum {
 
 
 /*helper macros*/
+
+/*Sets up a two dimensional array from a one dimensional array*/
 #define ONE_DIM_TO_TWO_DIMS(in,out,rows,cols,type) \
   do {                                             \
      int i;                                        \
@@ -62,6 +65,8 @@ static int mirror_comp_fn(
 
 static PVFS_handle *reorganize_copy_handles(
            struct PINT_server_create_copies_op *imm_p);
+
+static int get_server_names(PINT_server_create_copies_op *imm_p);
 
 
 /*start of state machine*/
@@ -163,12 +168,6 @@ nested machine pvfs2_create_immutable_copies_sm
    state check_store_job
     {
         run check_store_job;
-        default => cleanup;
-    }
-
-   state check_read_job
-    {
-        run check_read_job;
         default => cleanup;
     }
 
@@ -407,44 +406,39 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
    char server_name[SERVER_NAME_MAX] = {0};
    server_configuration_s *config = get_server_config_struct();
    int ret = 0;
-   int i;
-   PVFS_BMI_addr_t io_server_addr[imm_p->io_servers_count];
-   int addr_count = imm_p->io_servers_count;
+   int i,j;
 
-   memset(io_server_addr,0,imm_p->io_servers_count * sizeof(PVFS_BMI_addr_t));
- 
-   /*check error codes from trove read_list call*/
-   js_p->error_code = 0;
+   /*check error codes from previous trove read-list call. */
    for (i=0; i<sm_p->keyval_count; i++)
    {
-      /*if the mirroring mode has no entry or the mode=NO_MIRRORING, then we  */
-      /*will abort this request.                                              */
+      /*if the mirroring mode has no entry, the mode=NO_MIRRORING, or the mode*/
+      /*is not the expected mode, then there is nothing to do.                */
       if (sm_p->key_a[i].buffer == mode_key)
       {
           if (PVFS_get_errno_mapping(sm_p->error_a[i]) == ENOENT)
           {
-                 gossip_lerr("Mirror mode is not found. Defaulting to "
-                             "MODE=NO_MIRRORING.\n");
-                 js_p->error_code = -PVFS_EPERM;
+                 js_p->error_code = NOTHING_TO_DO;
                  goto error_exit;
           }
           imm_p->mirror_mode = *(MIRROR_MODE *)sm_p->val_a[i].buffer;
-          if (imm_p->mirror_mode == NO_MIRRORING)
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tRetrieved mirroring mode is %d.\n"
+                                          ,imm_p->mirror_mode);
+          if (imm_p->mirror_mode == NO_MIRRORING ||
+              imm_p->mirror_mode != imm_p->expected_mirror_mode)
           {
-             gossip_lerr("Mirror mode is NO_MIRRORING.  Aborting request..\n");
-             js_p->error_code = -PVFS_EPERM;
+             js_p->error_code = NOTHING_TO_DO;
              goto error_exit;
           }
       } 
 
       /*if the user hasn't set the number of copies, this code will */
-      /*default the number of copies to 1.                          */
+      /*set a default (currently = 1).                              */
       if (sm_p->key_a[i].buffer == copy_count_key)
       { 
          if (PVFS_get_errno_mapping(sm_p->error_a[i]) == ENOENT)
          {
             gossip_lerr("User-defined number of copies not found. "
-                        "Setting number of copies to %d.\n"
+                        "Defaulting number of copies to %d.\n"
                        ,DEFAULT_COPIES);
             imm_p->copies = DEFAULT_COPIES;
             continue; 
@@ -469,47 +463,66 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
    /*copies on the same server.                                            */
    if (imm_p->io_servers_count == 1)
    {
-       //imm_p->copies = 0;
+       gossip_lerr("Mirroring operation is not permitted when only one "
+                   "I/O server is running.\n");
        js_p->error_code = -PVFS_EPERM;
        return SM_ACTION_COMPLETE;
    }
 
    /* We need at least (# of copies) + 1 I/O servers running in the system to */
-   /* prevent duplicate data on any one server, but we can't exceed the number*/
-   /* of I/O servers.  So, if the number of copies requested by the user is   */
-   /* >= the number of I/O servers in the system, then we must lower the num- */
-   /* ber of requested copies.  If, then, the number of copies requested is   */
-   /* >= the number of datahandles for this file, then the total number of    */
-   /* SERVERS needed to satisfy this request is (# of copies) + 1.  In this   */
-   /* case, some of the mirror datahandles will reside on servers NOT in      */
-   /* the original distribution.                                              */
+   /* prevent duplicate data on any one server, while not exceeding the number*/
+   /* of I/O servers in the system. If the number of copies requested by the  */
+   /* user is >= the number of I/O servers in the system, then we lower the   */
+   /* number of requested copies.  We then set the number of I/O servers      */
+   /* required to meet this request with the (new value of copies) + 1.       */
+   /* At this point, if the number of I/O servers required is less than the   */
+   /* number of servers in this file's distribution, then set the number of   */
+   /* required I/O servers to the same number of servers in this file's dis-  */
+   /* tribution.                                                              */
    if (imm_p->copies >= imm_p->io_servers_count)
        imm_p->copies = imm_p->io_servers_count - 1;
 
-   if (imm_p->copies >= imm_p->dfile_count)
-       imm_p->io_servers_count = imm_p->copies + 1;
+   imm_p->io_servers_required = imm_p->copies + 1;
 
-   //gossip_debug(GOSSIP_MIRROR_DEBUG,"\tSetting copies = 2 for testing..\n");
-   //imm_p->copies = 2;
+   if (imm_p->io_servers_required < imm_p->dfile_count)
+       imm_p->io_servers_required = imm_p->dfile_count;
 
-   /*Get a list of I/O servers.  This function returns the list in            */ 
-   /*PVFS_BMI_addr_t format.                                                  */
-   ret = PINT_cached_config_get_server_array( imm_p->fs_id
-                                             ,PINT_SERVER_TYPE_IO
-                                             ,io_server_addr
-                                             ,&addr_count);
-   if (ret)
+   /*allocate space for io_servers array.  this array will contain the server */
+   /*names which will be used as the valid destination remotes for the copies.*/
+   imm_p->io_servers = malloc( imm_p->io_servers_required * sizeof(char *) );
+   if ( !imm_p->io_servers )
    {
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
    }
+   memset(imm_p->io_servers,0,imm_p->io_servers_required * sizeof(char *));
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAllocated char *:\n");
+   for (i=0; i<imm_p->io_servers_required; i++)
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t  io_servers[%d] : %p "
+                                        "\t &io_servers[%d] : %p\n"
+                                       ,i,imm_p->io_servers[i]
+                                       ,i,&(imm_p->io_servers[i])); 
+   imm_p->num_io_servers = imm_p->io_servers_required;
+   for (i=0;i<imm_p->io_servers_required;i++)
+   {
+       imm_p->io_servers[i] = malloc( sizeof(server_name) );
+       if ( !imm_p->io_servers[i] )
+       {
+           js_p->error_code = -PVFS_ENOMEM;
+           goto error_exit;
+       }
+       memset(imm_p->io_servers[i],0,sizeof(server_name));
+   }
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAllocated server_name..\n");
+   for (i=0; i<imm_p->io_servers_required; i++)
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t  io_servers[%d] : %p "
+                                        "\t *io_servers[%d] : %s "
+                                        "\t &io_servers[%d] : %p\n"
+                                       ,i,imm_p->io_servers[i]
+                                       ,i,imm_p->io_servers[i]
+                                       ,i,&(imm_p->io_servers[i])); 
 
-   /*Take the I/O server list and get the server names for each address.      */
 
-
-
-   /*reminder: the # of original data handles may be less than the # of */
-   /*servers available.                                                 */
 
    /*allocate space for the local source handles*/
    imm_p->handle_array_base_local = 
@@ -529,78 +542,61 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
    /*combination of local and remote data handles used as destination handles */
    /*for the copies. The order of this array will mimmick the order of the    */
    /*original data file array.  Thus, handle_array_base[i]                    */
-   /*and handle_array_copies[i] will hold handles for the same server.        */
-   imm_p->handle_array_copies = malloc(imm_p->dfile_count * 
-                                       imm_p->copies      *
-                                       sizeof(PVFS_handle));
+   /*and handle_array_copies[i] will hold handles for the same server number. */
+   imm_p->handle_array_copies = malloc(imm_p->io_servers_required  
+                                       * imm_p->copies      
+                                       * sizeof(PVFS_handle));
    if ( !imm_p->handle_array_copies )
    {
        js_p->error_code = -PVFS_ENOMEM;
        goto error_exit;
    }
-   memset(imm_p->handle_array_copies,0,imm_p->dfile_count * 
-                                       imm_p->copies      *
-                                       sizeof(PVFS_handle));
-
-
-
-   /*allocate space for io_servers array.  this array contains the server    */
-   /*names for the original data handles in the order of their distribution. */
-   imm_p->io_servers = malloc( imm_p->dfile_count * sizeof(char *) );
-   if ( !imm_p->io_servers )
-   {
-       js_p->error_code = -PVFS_ENOMEM;
-       goto error_exit;
-   }
-   memset(imm_p->io_servers,0,imm_p->dfile_count * sizeof(char *));
-   imm_p->num_io_servers = imm_p->dfile_count;
-   for (i=0;i<imm_p->dfile_count;i++)
-   {
-       imm_p->io_servers[i] = malloc( sizeof(server_name) );
-       if ( !imm_p->io_servers[i] )
-       {
-           js_p->error_code = -PVFS_ENOMEM;
-           goto error_exit;
-       }
-       memset(imm_p->io_servers[i],0,sizeof(server_name));
-   }
-
-
+   memset(imm_p->handle_array_copies,0,imm_p->io_servers_required  
+                                       * imm_p->copies      
+                                       * sizeof(PVFS_handle));
 
    /*allocate space for the local_io_servers array.  this array contains the */
    /*server names for local data handles.                                    */
-   imm_p->local_io_servers = malloc( imm_p->dfile_count * sizeof(char *));
+   imm_p->local_io_servers = malloc(  imm_p->io_servers_required
+                                    * sizeof(char *));
    if ( !imm_p->local_io_servers )
    {
-       js_p->error_code = -PVFS_ENOMEM;
+       js_p->error_code = -PVFS_ENOMEM;  
        goto error_exit;
+
    }
-   memset(imm_p->local_io_servers,0,imm_p->dfile_count * sizeof(char *));
+   memset(imm_p->local_io_servers
+         ,0
+         ,imm_p->io_servers_required * sizeof(char *));
    imm_p->local_io_servers_count = 0;
 
 
 
    /*allocate space for the remote_io_servers array.  this array contains the */
    /*server names for remote data handles.                                    */
-   imm_p->remote_io_servers = malloc( imm_p->dfile_count * sizeof(char*));
+   imm_p->remote_io_servers = malloc(  imm_p->io_servers_required 
+                                     * sizeof(char*));
    if ( !imm_p->remote_io_servers )
    {
        js_p->error_code = -PVFS_ENOMEM;
        goto error_exit;
    }
-   memset(imm_p->remote_io_servers,0,imm_p->dfile_count * sizeof(char*));
+   memset(imm_p->remote_io_servers
+         ,0
+         ,imm_p->io_servers_required * sizeof(char*));
    imm_p->remote_io_servers_count = 0;
 
+   /*populate the io_servers array with server_names:                         */
+   /*Step 1:  Always start by using the server names associated with the      */
+   /*         original datahandles, keeping the order in tact.                */
+   /*Step 2:  If additional servers are needed, then tap into the list of     */
+   /*         servers running in the file system and grab those that are not  */
+   /*         currently in the io_servers list.                               */
 
-
-   /*determine how many remote and how many local data handles are needed.*/
-   /*populate the io_servers array with the name of the servers used to   */
-   /*store this file (in the order of original distribution).  populate   */
-   /*the local and remote io servers arrays.                              */
+   /*Step 1*/   
    for (i=0; i<imm_p->dfile_count; i++)
    {
-      memset(server_name,0,SERVER_NAME_MAX);
-      ret = PINT_cached_config_get_server_name( server_name, 
+      ret = PINT_cached_config_get_server_name( imm_p->io_servers[i], 
                                                 sizeof(server_name)-1,
                                                 imm_p->handle_array_base[i],
                                                 imm_p->fs_id );
@@ -609,54 +605,77 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
          js_p->error_code = ret;
          goto error_exit;
       }
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of server_name is %s.\n"
-                                       "\tfor handle %llu\n"
-                                      ,server_name
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of server_name is %s "
+                                       "for handle %llu\n"
+                                      ,imm_p->io_servers[i]
                                       ,llu(imm_p->handle_array_base[i]));
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tconfig->host_id is %s.\n"
-                                      ,config->host_id);
+   }/*end for*/
+
+   /*Step 2*/
+   if (imm_p->io_servers_required > imm_p->dfile_count)
+   {
+      ret = get_server_names(imm_p);
+      if (ret)
+      {
+          gossip_lerr("Unable to populate io_servers list.\n");
+          js_p->error_code = ret;
+          goto error_exit;
+      }
+   }
+
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tconfig->host_id is %s.\n"
+                                   ,config->host_id);
       
-      if (strcmp(server_name,config->host_id) == 0)
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\timm_p->io_servers_required : %d\n"
+                                   ,imm_p->io_servers_required);
+   for (i=0,j=0; i<imm_p->io_servers_required; i++)
+   {
+      char *server_name = imm_p->io_servers[i];
+      if (strncmp(server_name,config->host_id,SERVER_NAME_MAX-1) == 0)
       {/*local*/
+         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tprocessing local....\n");
          imm_p->local_io_servers[imm_p->handle_array_copies_local_count] =
-             malloc( sizeof(server_name) );
+             malloc( SERVER_NAME_MAX );
          if ( !imm_p->local_io_servers[imm_p->handle_array_copies_local_count] )
          {
               js_p->error_code = -PVFS_ENOMEM;
               goto error_exit;
          }
+         memset(imm_p->local_io_servers[imm_p->handle_array_copies_local_count]
+               ,0
+               ,SERVER_NAME_MAX);
          memcpy(imm_p->local_io_servers[imm_p->handle_array_copies_local_count],
-                &server_name,sizeof(server_name));
-         imm_p->handle_array_base_local[imm_p->handle_array_base_local_count] =
-                 imm_p->handle_array_base[i];
-
-         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal source handle(%d):%llu\n"
-         ,imm_p->handle_array_base_local_count
+                server_name,SERVER_NAME_MAX-1);
+         if ( i < imm_p->dfile_count )
+         {
+            imm_p->handle_array_base_local[imm_p->handle_array_base_local_count] 
+            =
+            imm_p->handle_array_base[i];
+            imm_p->handle_array_base_local_count++;
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal source handle(%d):%llu\n"
+              ,imm_p->handle_array_base_local_count
     ,llu(imm_p->handle_array_base_local[imm_p->handle_array_base_local_count]));
+         }
 
          imm_p->handle_array_copies_local_count++;
-         imm_p->handle_array_base_local_count++;
-
       } 
       else
       {/*remote*/
          imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count] =
-             malloc( sizeof(server_name) );
+             malloc( SERVER_NAME_MAX );
          if (!imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count])
          {
                js_p->error_code = -PVFS_ENOMEM;
                goto error_exit;
          }
-         memcpy(imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count],
-                &server_name, sizeof(server_name));
+        memset(imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count]
+              ,0
+              ,SERVER_NAME_MAX);
+        memcpy(imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count]
+              ,server_name,SERVER_NAME_MAX-1);
          imm_p->handle_array_copies_remote_count++;
-      }
-
-      memcpy(imm_p->io_servers[i],&server_name,sizeof(server_name));
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tio_servers[%d]: %s\n"
-                                      ,i
-                                      ,imm_p->io_servers[i]);
-
+      }/*end if*/
    }/*end for*/
 
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLocal: %d\tRemote: %d\n"
@@ -711,7 +730,6 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
          ,0
          ,imm_p->handle_array_copies_remote_count * 
           imm_p->copies * sizeof(PVFS_handle));
-
 
 error_exit:
    /*all other memory will be freed in the "cleanup" action.*/
@@ -828,7 +846,9 @@ static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb
          ,0
          ,imm_p->dfile_count * sizeof(PVFS_size));
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tpopulating bstream_array_base_local...\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG
+               ,"\tpopulating bstream_array_base_local...\n");
+
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_base_local_count:%d\n"
                                    ,imm_p->handle_array_base_local_count);
    /*populate bstream_array_base_local*/
@@ -842,7 +862,8 @@ static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb
                ,j,llu(imm_p->handle_array_base[j]) );
             if (imm_p->handle_array_base_local[i] == imm_p->handle_array_base[j])
             {
-              imm_p->bstream_array_base_local[j] = imm_p->ds_attr_a[i].u.datafile.b_size;
+              imm_p->bstream_array_base_local[j] = 
+              imm_p->ds_attr_a[i].u.datafile.b_size;
               gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle:%llu\tsize:%d\n"
                   ,llu(imm_p->handle_array_base_local[i])
                   ,(int)imm_p->bstream_array_base_local[j] );
@@ -890,7 +911,7 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
    gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n"
                                  ,sm_p->target_object_attr->u.meta.dfile_array);
 
-   /*find local IO extent array for this file system*/
+   /*find local IO extent array for this file system for metadata host*/
    ret = PINT_cached_config_get_server( imm_p->fs_id
                                        ,config->host_id
                                        ,PINT_SERVER_TYPE_IO
@@ -907,6 +928,9 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
                              ,i,llu(data_handle_ext_array.extent_array[i].first)
                             ,llu(data_handle_ext_array.extent_array[i].last)  );
    }
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of copies: %d \tlocation:%p\n"
+                                   ,imm_p->copies,&imm_p->copies);
 
 
    /*create local datahandles - will be used as destination handles for copies*/
@@ -957,10 +981,10 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb
    }
    memset(imm_p->my_remote_servers,0,sizeof(char *) * rows * cols);
 
-   /*setup my_remote_servers[copy,remote] = remote server name.  This will */
-   /*allow job_precreate_pool to return handle_array_copies_remote where   */
-   /*[copy,remote] = remote handle.  We end up with a list of remotes for  */
-   /*each copy in original distribution order.                             */
+   /*setup my_remote_servers[copy,remote#] = remote server name.  This will */
+   /*allow job_precreate_pool to return handle_array_copies_remote where    */
+   /*[copy,remote#] = remote handle.  We end up with a list of remotes for  */
+   /*each copy in original distribution order.                              */
    for (i=0; i<(rows*cols); i++)
    {
        imm_p->my_remote_servers[i] = imm_p->remote_io_servers[i%cols];
@@ -1011,11 +1035,19 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
                                     ,llu(imm_p->handle_array_copies_remote[i]));
    }
 
-
-   for (i=0,j=0,k=0; i<(imm_p->dfile_count*imm_p->copies); i++)
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLocal destination handles:\n");
+   cols = imm_p->handle_array_copies_local_count;
+   for (i=0; i<(rows*cols); i++)
    {
-      if ( strcmp(imm_p->io_servers[i%imm_p->num_io_servers]
-                 ,config->host_id) == 0 )
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tLocal handle(%d):%llu\n"
+                                    ,i
+                                    ,llu(imm_p->handle_array_copies_local[i]));
+   }
+
+   for (i=0,j=0,k=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
+   {
+      if ( strncmp(imm_p->io_servers[i%imm_p->io_servers_required]
+                 ,config->host_id,SERVER_NAME_MAX-1) == 0 )
       {/*local*/
           memcpy(&imm_p->handle_array_copies[i]
                 ,&imm_p->handle_array_copies_local[j],sizeof(PVFS_handle));
@@ -1029,12 +1061,12 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
       }       
    }/*end for*/
 
-   for (i=0; i<(imm_p->dfile_count*imm_p->copies); i++)
+   for (i=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies[%d]:  %llu.\n"
                                        ,i
                                        ,llu(imm_p->handle_array_copies[i]));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tnumber of io servers: %d\n"
-                                   ,imm_p->num_io_servers);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tnumber of io servers required: %d\n"
+                                   ,imm_p->io_servers_required);
 
    /*create and initialize the writes_completed array*/
    imm_p->writes_completed = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
@@ -1052,9 +1084,6 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
    /*the retry count is used to monitor how many times we retry a write. */
    /*this value is incremented in the check_for_retries state.           */
    imm_p->retry_count = 0;
-
-   //gossip_debug(GOSSIP_MIRROR_DEBUG,"\tSetting bogus error code ...\n");
-   //js_p->error_code = -PVFS_ENOMEM;
 
    return SM_ACTION_COMPLETE;
 }/*end action setup_datahandle_copies*/
@@ -1078,13 +1107,13 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
    memset(handle_array_copies,0,sizeof(PVFS_handle) * imm_p->copies);
    ONE_DIM_TO_TWO_DIMS(imm_p->handle_array_copies
                       ,handle_array_copies
-                      ,imm_p->copies,imm_p->dfile_count
+                      ,imm_p->copies,imm_p->io_servers_required
                       ,PVFS_handle);
 
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tone dim to two dims:\n");
    for (row=0; row<imm_p->copies; row++)
    {
-       for (cols=0; cols<imm_p->dfile_count; cols++)
+       for (cols=0; cols<imm_p->io_servers_required; cols++)
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle_array_copies[%d][%d] : "
                                          "%llu\n"
                                         ,row,cols
@@ -1093,16 +1122,16 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
 
    js_p->error_code = 0;
 
-   /*for each source handle[i], create a MIRROR request containing a set of   */ 
+   /*for each source handle[src], create a MIRROR request containing a set of */ 
    /*destination handles.                                                     */
    for (src=0; src<imm_p->dfile_count; src++)
    {
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tWorking on src #%d\n",src);
 
-       /* writes_completed indicates the status of each copy for each source. */
-       /* copies. 0 ==> completed, + ==> incomplete, UINT64_HIGH ==> initial  */
-       /* state. If incomplete, the value stored in the array is the desti-   */
-       /* nation handle.                                                      */
+       /* writes_completed indicates the status of each copy for each source: */
+       /* 0 ==> completed, + ==> incomplete, UINT64_HIGH ==> initial state.   */
+       /* If incomplete, the value stored in the array is the destination     */
+       /* handle.                                                             */
        for (row=src,cols=0; cols<imm_p->copies; cols++)
        {
            index = (imm_p->copies * row) + cols;
@@ -1143,6 +1172,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        }
        memset(req->u.mirror.dst_handle,0,sizeof(PVFS_handle) * imm_p->copies);
 
+       /*index into the writes_completed array for each destination handle*/
        req->u.mirror.wcIndex = malloc(sizeof(uint32_t) * imm_p->copies);
        if ( !req->u.mirror.wcIndex )
        {
@@ -1164,15 +1194,15 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        index = imm_p->copies*src; /*first copy for this source*/
        if (imm_p->writes_completed[index] == UINT64_HIGH)
        {
-          /*handle_array_copies[copy,handles] is accessed as a two-dimensional*/
+          /*handle_array_copies[copy,server#] is accessed as a two-dimensional*/
           /*array where a row represents a copy and columns represent the     */
           /*destination handles,in order of the original file distribution. We*/
           /*map the source handle[i], which is also in distribution order,    */
           /*to handle_arrray_copies[0,i+1],[1,i+2],..,[n-1,(i+y)-1], where n  */
           /*is the number of copies and y is the number of handles in one copy*/
-          for (wc=0,row=0,cols=(src+1)%imm_p->dfile_count;
+          for (wc=0,row=0,cols=(src+1)%imm_p->io_servers_required;
                row < imm_p->copies;
-               wc++,row++,cols=(cols+1)%imm_p->dfile_count)
+               wc++,row++,cols=(cols+1)%imm_p->io_servers_required)
           {
             req->u.mirror.dst_handle[row] = handle_array_copies[row][cols];
             req->u.mirror.wcIndex[row]     = index + wc;
@@ -1227,7 +1257,9 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op->req(%p)\n"
                                        ,mirror_op->req);
 
-       if ( strcmp(imm_p->io_servers[src],config->host_id) == 0 )
+       if ( strncmp(imm_p->io_servers[src]
+                   ,config->host_id
+                   ,SERVER_NAME_MAX-1) == 0 )
        {
 
            gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is local.\n");
@@ -1432,7 +1464,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
 
    /*if one of the writes failed, js_p->error_code will contain an error.*/
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_completed array[src,copy]:\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_completed array[src,server#]:\n");
    for (i=0; i<imm_p->dfile_count; i++)
    {
      for (j=0; j<imm_p->copies; j++)
@@ -1496,7 +1528,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
 
    js_p->error_code = 0;
 
-   /*put copy handles in distribution order*/
+   /*put copy handles in proper distribution order*/
    reorg_handles = reorganize_copy_handles(imm_p);
    if (!reorg_handles)
    {
@@ -1507,6 +1539,8 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
 
    /*setup key/val pairs*/
    sm_p->keyval_count = key_count;
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of copies:%d \tlocation:%p\n"
+                                   ,imm_p->copies,&imm_p->copies);
 
    sm_p->key_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
    sm_p->val_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
@@ -1529,7 +1563,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
    sm_p->val_a[i].buffer_sz = sizeof(PVFS_handle) * imm_p->dfile_count
                                                   * imm_p->copies; 
 
-   /*setup user.pvfs2.mirror.copy_count*/
+   /*setup user.pvfs2.mirror.copies*/
    i++; assert(i<key_count);
    sm_p->key_a[i].buffer = malloc(sizeof(copy_count_key));
    if (!sm_p->key_a[i].buffer)
@@ -1560,14 +1594,15 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
    memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed
                                ,sm_p->val_a[i].buffer_sz);
    
-
    /*verify inputs*/
    i=0; assert(i<key_count);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tVerify inputs BEFORE call to trove...\n");
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsize of buffer : %d\n"
+                                   ,sm_p->key_a[i].buffer_sz);
+   PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
    for (j=0; j<(imm_p->dfile_count*imm_p->copies); j++)
    {
-       PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n"
        ,j
        ,llu(myHandle[j]));
@@ -1575,13 +1610,14 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
 
    i++; assert(i<key_count);
    int *myCount = (int *)sm_p->val_a[i].buffer;
-   sm_p->val_a[i].buffer_sz = sizeof(*myCount);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s:%d \tpointer:%p \tbuffer size:%lu\n"
+   sm_p->val_a[i].buffer_sz = sizeof(int);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s:%d \tpointer:%p \tbuffer size:%d\n"
                                    ,(char *)sm_p->key_a[i].buffer
                                    ,*myCount,myCount
-                                   ,sizeof(*myCount));
+                                   ,sm_p->val_a[i].buffer_sz);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey count:%d\n"
                                    ,sm_p->keyval_count);
+
    i++; assert(i<key_count);
    PVFS_handle *myStatus = (PVFS_handle *)sm_p->val_a[i].buffer;
    for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
@@ -1605,6 +1641,10 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
                                      ,&job_id
                                      ,server_job_context
                                      ,NULL);
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of ret from call to trove : %d\n"
+                                   ,ret);
+
    i=0; assert(i<key_count);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tVerify inputs AFTER call to trove...\n");
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
@@ -1624,6 +1664,8 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
                                    ,sm_p->val_a[i].buffer);
 
 
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of ret from trove call : %d\n"
+                                   ,ret);
    return (ret);
 
 error_exit:
@@ -1653,9 +1695,8 @@ static PINT_sm_action check_store_job (struct PINT_smcb *smcb
                       "Executing check_store_job....\n");
    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int ret,i;
-   job_id_t job_id;
-   
+   int i;
+  
 
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d\n"
                                    ,js_p->error_code);
@@ -1668,143 +1709,21 @@ static PINT_sm_action check_store_job (struct PINT_smcb *smcb
       return SM_ACTION_COMPLETE;
    }
 
-   /*The rest of this was coded for debugging purposes.  So, we will bypass it*/
-   /*here.                                                                    */
-   js_p->error_code = 0;
-   return SM_ACTION_COMPLETE;
-
-/******************************************************************************/
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsetup job to read mirror information\n");
-
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tBEFORE memset...\n");
-   PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[0].buffer;
-   for (i=0; i<2; i++)
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n"
-                                      ,i,llu(myHandle[i]));
-   int *myCopies = (int *)sm_p->val_a[1].buffer;
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tCopies:%d \tpointer:%p\n"
-                                   ,*myCopies,myCopies);
-   for (i=0; i<2; i++)
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tsm_p->key_a[%d].buffer:%s\n"
-                                        "\t\t\t\tpointer:%p\n"
-                                       ,i,(char *)sm_p->key_a[i].buffer
-                                       ,sm_p->key_a[i].buffer);
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tsm_p->keyval_count:%d\n"
-                                   ,sm_p->keyval_count);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tsm_p->error_a pointer:%p\n"
-                                   ,sm_p->error_a);
-
-   if (sm_p->error_a)
-   {
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tfreeing sm_p->error_a\n");
-      free(sm_p->error_a);
-   }
-   sm_p->error_a = malloc(sizeof(*sm_p->error_a) * sm_p->keyval_count);
-   if (!sm_p->error_a)
-   {
-       js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
-   }
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tnew error_a pointer:%p "
-                                    "\tsize of error_a:%lu\n"
-                                   ,sm_p->error_a
-                                   ,sizeof(*sm_p->error_a) * sm_p->keyval_count);
-
-   memset(sm_p->error_a,0,sizeof(*sm_p->error_a) * sm_p->keyval_count);   
-    
-   memset(sm_p->val_a[0].buffer,0,sizeof(PVFS_handle) * imm_p->dfile_count);
-   memset(sm_p->val_a[1].buffer,0,sizeof(int));
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAFTER memset...\n");
-   for (i=0; i<2; i++)
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n"
-                                      ,i,llu(myHandle[i]));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tCopies:%d \tpointer:%p\n"
-                                   ,*myCopies,myCopies);
-   for (i=0; i<2; i++)
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tsm_p->key_a[%d].buffer:%s\n"
-                                        "\t\t\t\tpointer:%p\n"
-                                       ,i,(char *)sm_p->key_a[i].buffer
-                                       ,sm_p->key_a[i].buffer);
-   for (i=0; i<2; i++)
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tsm_p->error_a[%d]:%d\n"
-                                       ,i,sm_p->error_a[i]);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey count:%d\n"
-                                   ,sm_p->keyval_count);
-
-   ret = job_trove_keyval_read_list(imm_p->fs_id
-                                   ,imm_p->metadata_handle
-                                   ,sm_p->key_a
-                                   ,sm_p->val_a
-                                   ,sm_p->error_a
-                                   ,sm_p->keyval_count
-                                   ,TROVE_SYNC
-                                   ,NULL
-                                   ,smcb
-                                   ,0
-                                   ,js_p
-                                   ,&job_id
-                                   ,server_job_context
-                                   ,NULL );  
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Leaving check_store_job..\n");
-
-   return (ret);
-}/*end state check_store_job*/
-
-
-
-
-
-
-static PINT_sm_action check_read_job (struct PINT_smcb *smcb
-                                     ,job_status_s *js_p)
-{   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,
-                      "Executing check_read_job....\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int i;
-
-   if (js_p->error_code)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tRead failed...\n");
-       return SM_ACTION_COMPLETE;
-   }
-
+   /*release memory used in previous job call*/
    for (i=0; i<sm_p->keyval_count; i++)
    {
-       if (sm_p->error_a[i])
-       {
-           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tError found reading key:%s\n"
-                                           ,(char *)sm_p->key_a[i].buffer);
-           js_p->error_code = sm_p->error_a[i];
-           return SM_ACTION_COMPLETE;
-       }
+          free(sm_p->key_a[i].buffer);
+          free(sm_p->val_a[i].buffer);
    }
+   free(sm_p->key_a);
+   free(sm_p->val_a);
+   sm_p->key_a = sm_p->val_a = NULL;
+   sm_p->keyval_count = 0;
 
-   PVFS_handle *handles = (PVFS_handle *)sm_p->val_a[0].buffer;
-   int *count = (int *)sm_p->val_a[1].buffer;
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandles/copy:%d "
-                                    "\tcopies:%d \tpointer:%p\n"
-                                   ,imm_p->dfile_count
-                                   ,*count,count);
-   for (i=0; i < 2; i++)
-   {
-       PVFS_handle myHandle = handles[i];
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle(%d):%llu\n"
-                                       ,i,llu(myHandle));
-   }
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Leaving check_read_job..\n");
+   js_p->error_code = 0;
 
    return SM_ACTION_COMPLETE;
-}/*end state check_read_job*/
-
+}/*end state check_store_job*/
 
 
 
@@ -1918,6 +1837,9 @@ static PINT_sm_action cleanup (struct PINT_smcb *smcb, job_status_s *js_p)
    sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    imm_p = &(sm_p->u.create_copies);
 
+   if (js_p->error_code == NOTHING_TO_DO)
+       js_p->error_code = 0;
+
    if (imm_p->my_remote_servers)
        free(imm_p->my_remote_servers);
 
@@ -1955,7 +1877,7 @@ static PINT_sm_action cleanup (struct PINT_smcb *smcb, job_status_s *js_p)
 
    if (imm_p->io_servers)
    {
-      for (i=0;i<imm_p->dfile_count;i++)
+      for (i=0;i<imm_p->io_servers_required;i++)
           free(imm_p->io_servers[i]);
       free(imm_p->io_servers);
    }
@@ -2132,56 +2054,127 @@ static PVFS_handle *reorganize_copy_handles(
 {
    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing reorganize_copy_handles..\n");
 
-   uint64_t i,j,k,rows,cols;
+   uint64_t i,j,k,rows,in_cols,out_cols;
    PVFS_handle *copies_out = NULL;
    PVFS_handle *copies_in  = imm_p->handle_array_copies;
 
 
-   rows = imm_p->copies;
-   cols = imm_p->dfile_count;
+   rows     = imm_p->copies;
+   in_cols  = imm_p->io_servers_required;
+   out_cols = imm_p->dfile_count;
 
    /* allocate copies_out array */
-   copies_out = malloc(sizeof(PVFS_handle) * rows * cols);
+   copies_out = malloc(sizeof(PVFS_handle) * rows * out_cols);
    if (!copies_out)
    {
       gossip_lerr("Unable to allocate memeory.\n");
       return (NULL);
    }
-   memset(copies_out,0,sizeof(PVFS_handle) * rows * cols);
+   memset(copies_out,0,sizeof(PVFS_handle) * rows * out_cols);
 
-   for (i=0; i<(cols*rows); i++)
+   for (i=0; i<(in_cols*rows); i++)
    {
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies(%d):%llu\n"
                                        ,(int)i
                                        ,llu(copies_in[i]));
    }
 
-   /*this code copies copies_in[n] to copies_out[n+1] within the same row*/
+   /*this code copies copies_in[n+1] to copies_out[n] within the same row*/
    /*each row represents one copy of the logical file, i.e., each of its */
    /*datahandles.                                                        */
    for (i=0,k=1; i<rows; i++,k++)
    {
-       for (j=0; j<cols; j++)
+       for (j=0; j<out_cols; j++)
        {
-           copies_out[(i*cols)+j] = copies_in[(i*cols)+((j+k)%cols)];
+           copies_out[(i*out_cols)+j] = copies_in[(i*in_cols)+((j+k)%in_cols)];
        }
    }
    
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Reorg'd Handles Array:\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReorg'd Handles Array:\n");
    for (i=0; i<rows; i++)
    {
-       for (j=0; j<cols; j++)
+       for (j=0; j<out_cols; j++)
        {
-           gossip_debug(GOSSIP_MIRROR_DEBUG,"\t(%d,%d):%llu\n"
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t(%d,%d):%llu\n"
                                 ,(int)i,(int)j
-                                ,llu(copies_out[(i*cols)+j]));
+                                ,llu(copies_out[(i*out_cols)+j]));
        }
    }
 
    return(copies_out);
 }/*end function reorganize_copy_handles*/
 
+static int get_server_names(PINT_server_create_copies_op *imm_p)
+{
+  char **list=NULL;
+  int size=0
+     ,i,j,ret;
 
+  gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing get_server_names....\n");
+
+  gossip_debug(GOSSIP_MIRROR_DEBUG,    "\tio_servers(before):\n");
+  for (i=0; i<imm_p->io_servers_required; i++)
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\t              [%d]:%s"
+                                       "\tlength:%d\n"
+                                      ,i
+                                      ,imm_p->io_servers[i]
+                                      ,(int)strlen(imm_p->io_servers[i]));
+
+
+
+  /*Get access to server names list residing in the cache*/
+  ret = PINT_cached_config_server_names(&list,&size,imm_p->fs_id);
+  if (ret)
+  {
+      if (list)
+         free(list);
+      gossip_lerr("Unable to retrieve server name list from the cache.\n");
+      return(ret);
+  }
+
+  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReturned from PINT_cached_config...\n"
+                                   "\t\t\tValue of      size:%d\n"
+                                   "\t\t\tValue of   list[0]:%p\n"
+                                   "\t\t\tValue of *list[0] : %s\n"
+                                   "\t\t\tstrlen of  list[0]:%d\n"
+                                  ,size
+                                  ,list[0], list[0]
+                                  ,(int)strlen(list[0]));
+
+  /*Remove server names that are already being used in the io_servers list*/
+  for (i=0; i<size; i++)
+  {
+     for (j=0; j<imm_p->dfile_count; j++)
+     {
+        if (strncmp(list[i],imm_p->io_servers[j],strlen(list[i])) == 0)
+        {
+         list[i] = NULL;
+         break;
+        }
+     }/*end for*/
+  }/*end for*/
+
+  /*Add server names to io_servers list*/
+  for (i=0,j=imm_p->dfile_count; i<size && j<imm_p->io_servers_required; i++)
+  {
+     if (list[i])
+     {
+        strncpy(imm_p->io_servers[j],list[i],SERVER_NAME_MAX-1);
+        j++;
+     }
+  }/*end for*/
+
+  gossip_debug(GOSSIP_MIRROR_DEBUG,    "\tio_servers(after):\n");
+  for (i=0; i<imm_p->io_servers_required; i++)
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\t             [%d]:%s\n"
+                                      ,i
+                                      ,imm_p->io_servers[i]);
+
+  /*deallocate memory used for "list"*/
+  free(list);
+
+  return (0);
+}/*end function get_server_names*/
 
 /******************************************************************************/
 /* Right now, this state machine is not called as a standalone request. It is */
