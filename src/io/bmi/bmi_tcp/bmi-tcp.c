@@ -48,6 +48,7 @@
 #include "gen-locks.h"
 #include "pint-hint.h"
 #include "pint-event.h"
+#include "quickhash.h"
 
 #define BMI_TCP_S2S_MAGIC_NR 51904
 
@@ -290,6 +291,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
     char* enc_hdr, bmi_size_t* env_amt_complete);
 static uint32_t hashlittle( const void *key, size_t length, uint32_t initval);
+static int addr_hash_compare(void* key, struct qhash_head* link);
 
 #if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
 static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data);
@@ -410,6 +412,9 @@ static PINT_event_type bmi_tcp_recv_event_id;
 static PINT_event_group bmi_tcp_event_group;
 static pid_t bmi_tcp_pid;
 
+static struct qhash_table* addr_hash_table = NULL;
+#define ADDR_HASH_TABLE_SIZE 137
+
 /*************************************************************************
  * Visible Interface 
  */
@@ -519,6 +524,15 @@ int BMI_tcp_initialize(bmi_method_addr_p listen_addr,
 #endif
         "%d%d%d%llu%d%d",
         "%d", &bmi_tcp_recv_event_id);
+    
+    /* create a hash table to store method addresses based on addr hash */
+    addr_hash_table = qhash_init(addr_hash_compare, quickhash_null32_hash,
+        ADDR_HASH_TABLE_SIZE);
+    if(!addr_hash_table)
+    {
+        tmp_errno = bmi_tcp_errno_to_pvfs(-ENOMEM);
+        goto initialize_failure;
+    }
 
     gen_mutex_unlock(&interface_mutex);
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
@@ -605,53 +619,82 @@ bmi_method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
     bmi_method_addr_p new_addr = NULL;
     struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
+    uint32_t addr_hash;
+    struct qhash_head* tmp_link;
 
     tcp_string = string_key("tcp", id_string);
     if (!tcp_string)
     {
-	/* the string doesn't even have our info */
-	return (NULL);
+        /* the string doesn't even have our info */
+        return (NULL);
     }
 
     /* start breaking up the method information */
     /* for normal tcp, it is simply hostname:port */
     if ((delim = index(tcp_string, ':')) == NULL)
     {
-	gossip_lerr("Error: malformed tcp address.\n");
-	free(tcp_string);
-	return (NULL);
+        gossip_lerr("Error: malformed tcp address.\n");
+        free(tcp_string);
+        return (NULL);
     }
 
-    /* looks ok, so let's build the method addr structure */
-    new_addr = alloc_tcp_method_addr();
-    if (!new_addr)
+    addr_hash = hashlittle(id_string, strlen(id_string), 3334);
+    /* do we already have a connection established from this host? */
+    if(addr_hash_table && (tmp_link = qhash_search(addr_hash_table,
+        &addr_hash)))
     {
-	free(tcp_string);
-	return (NULL);
+        /* we have already received an inbound connection from the host that
+         * we are looking up.  Re-use the existing method addr rather than
+         * creating a new one 
+         */
+        tcp_addr_data = qlist_entry(tmp_link, struct
+            tcp_addr, hash_link);
+        new_addr = tcp_addr_data->parent;
+        if(tcp_addr_data->hostname)
+            free(tcp_addr_data->hostname);
+        tcp_addr_data->dont_reconnect = 0;
+        assert(new_addr->ref_count == 1);
+        new_addr->ref_count++;
     }
-    tcp_addr_data = new_addr->method_data;
+    else
+    {
+        /* looks ok, so let's build the method addr structure */
+        new_addr = alloc_tcp_method_addr();
+        if (!new_addr)
+        {
+            free(tcp_string);
+            return (NULL);
+        }
+        tcp_addr_data = new_addr->method_data;
+    }
 
     ret = sscanf((delim + 1), "%d", &(tcp_addr_data->port));
     if (ret != 1)
     {
-	gossip_lerr("Error: malformed tcp address.\n");
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
+        gossip_lerr("Error: malformed tcp address.\n");
+        dealloc_tcp_method_addr(new_addr);
+        free(tcp_string);
+        return (NULL);
     }
 
     hostname = (char *) malloc((delim - tcp_string + 1));
     if (!hostname)
     {
-	dealloc_tcp_method_addr(new_addr);
-	free(tcp_string);
-	return (NULL);
+        dealloc_tcp_method_addr(new_addr);
+        free(tcp_string);
+        return (NULL);
     }
     strncpy(hostname, tcp_string, (delim - tcp_string));
     hostname[delim - tcp_string] = '\0';
 
     tcp_addr_data->hostname = hostname;
-    tcp_addr_data->addr_hash = hashlittle(id_string, strlen(id_string), 3334);
+    tcp_addr_data->addr_hash = addr_hash; 
+    /* add entry to hash table so we can find it later */
+    if(addr_hash_table)
+    {
+        qhash_add(addr_hash_table, &tcp_addr_data->addr_hash,
+            &tcp_addr_data->hash_link);
+    }
     gossip_debug(GOSSIP_BMI_DEBUG_TCP,
         "Hashed BMI address %s to %u\n", id_string,
         tcp_addr_data->addr_hash);
@@ -1954,7 +1997,11 @@ void tcp_forget_addr(bmi_method_addr_p map,
     tcp_addr_data->addr_error = error_code;
     if (dealloc_flag)
     {
-	dealloc_tcp_method_addr(map);
+        map->ref_count--;
+        if(map->ref_count == 0)
+        {
+	    dealloc_tcp_method_addr(map);
+        }
     }
     else
     {
@@ -2000,6 +2047,11 @@ static void dealloc_tcp_method_addr(bmi_method_addr_p map)
     if (tcp_addr_data->peer)
         free(tcp_addr_data->peer);
 
+    if (tcp_addr_data->hash_link.next || tcp_addr_data->hash_link.prev)
+    {
+        qhash_del(&tcp_addr_data->hash_link);
+    }
+
     bmi_dealloc_method_addr(map);
 
     return;
@@ -2035,6 +2087,7 @@ bmi_method_addr_p alloc_tcp_method_addr(void)
     tcp_addr_data->port = -1;
     tcp_addr_data->map = my_method_addr;
     tcp_addr_data->sc_index = -1;
+    tcp_addr_data->parent = my_method_addr;
 
     return (my_method_addr);
 }
@@ -3200,6 +3253,37 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     gossip_debug(GOSSIP_BMI_DEBUG_TCP,
         "Received a message from hashed address %u\n",
         new_header.src_addr_hash);
+
+    if(tcp_addr_data->addr_hash == 0)
+    {
+        struct qhash_head* tmp_link;
+        struct tcp_addr* found_tcp_addr_data = NULL;
+        /* This is the first incoming message on a new socket.  Search to
+         * see if we can find an address that we already explicitly resolved
+         * to this host
+         */
+        tmp_link = qhash_search(addr_hash_table, &new_header.src_addr_hash);
+        if(tmp_link)
+        {
+            /* we found a match; this host has already been looked up
+             * locally
+             */
+            found_tcp_addr_data = qlist_entry(tmp_link, struct
+                tcp_addr, hash_link);
+            gossip_err("ERROR: NEED TO IMPLEMENT ADDR MERGE.\n");
+            /* TODO: pick up here */
+        }
+        else
+        {
+            /* No lookups on this host yet.  Add it to the hash so we can
+             * find it later.
+             */
+            tcp_addr_data->addr_hash = new_header.src_addr_hash;
+            /* add entry to hash table so we can find it later */
+            qhash_add(addr_hash_table, &tcp_addr_data->addr_hash,
+                &tcp_addr_data->hash_link);
+        }
+    }
 
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, "Received new message; mode: %d.\n",
 		  (int) new_header.mode);
@@ -4443,6 +4527,20 @@ static uint32_t hashlittle( const void *key, size_t length, uint32_t initval)
   return c;
 }
 
+static int addr_hash_compare(void* key, struct qhash_head* link)
+{
+    uint32_t *addr_hash = key;
+    struct tcp_addr *tcp_addr_data = NULL;
+
+    tcp_addr_data = qhash_entry(link, struct tcp_addr, hash_link);
+    assert(tcp_addr_data);
+
+    if(tcp_addr_data->addr_hash == *addr_hash)
+    {
+        return(1);
+    }
+    return(0);
+}
 
 /*
  * Local variables:

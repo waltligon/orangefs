@@ -11,8 +11,9 @@
 #ifndef __BMI_TCP_ADDRESSING_H
 #define __BMI_TCP_ADDRESSING_H
 
-#include "bmi-types.h"
 #include <netinet/in.h>
+#include "bmi-types.h"
+#include "quickhash.h"
 
 /*****************************************************************
  * Information specific to tcp/ip
@@ -77,6 +78,8 @@ struct tcp_addr
     char* peer;
     int peer_type;
     uint32_t addr_hash; /* hash of string identifier */
+    struct qhash_head hash_link;
+    bmi_method_addr_p parent;
 };
 
 

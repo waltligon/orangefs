@@ -43,6 +43,7 @@
 struct bmi_method_addr
 {
     int method_type;
+    int ref_count;
     void *method_data;		/* area to be used by specific methods */
     void *parent;               /* pointer back to generic BMI address info */  
 };
