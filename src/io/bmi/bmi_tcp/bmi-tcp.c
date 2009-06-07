@@ -1364,7 +1364,11 @@ int BMI_tcp_testunexpected(int incount,
 	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
     {
 	info[*outcount].error_code = query_op->error_code;
-	info[*outcount].addr = query_op->addr;
+        /* always show unexpected messages on primary address */
+        if(query_op->addr->primary)
+	    info[*outcount].addr = query_op->addr->primary;
+        else
+	    info[*outcount].addr = query_op->addr;
 	info[*outcount].buffer = query_op->buffer;
 	info[*outcount].size = query_op->actual_size;
 	info[*outcount].tag = query_op->msg_tag;
@@ -1978,6 +1982,8 @@ void tcp_forget_addr(bmi_method_addr_p map,
     int tmp_outcount;
     bmi_method_addr_p tmp_addr;
     int tmp_status;
+
+    gossip_err("TODO: need to handle primary/secondary case!\n");
 
     if (tcp_socket_collection_p)
     {
@@ -3250,6 +3256,8 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
     {
         struct qhash_head* tmp_link;
         struct tcp_addr* found_tcp_addr_data = NULL;
+        bmi_method_addr_p found_map = NULL;
+
         /* This is the first incoming message on a new socket.  Search to
          * see if we can find an address that we already explicitly resolved
          * to this host
@@ -3262,8 +3270,11 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
              */
             found_tcp_addr_data = qlist_entry(tmp_link, struct
                 tcp_addr, hash_link);
-            gossip_err("ERROR: NEED TO IMPLEMENT ADDR MERGE.\n");
-            /* TODO: pick up here */
+            found_map = found_tcp_addr_data->parent;
+
+            /* link the two addresses together */
+            found_map->secondary = map;
+            map->primary = found_map;
         }
         else
         {
