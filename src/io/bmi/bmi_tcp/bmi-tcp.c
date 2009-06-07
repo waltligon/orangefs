@@ -1983,8 +1983,6 @@ void tcp_forget_addr(bmi_method_addr_p map,
     bmi_method_addr_p tmp_addr;
     int tmp_status;
 
-    gossip_err("TODO: need to handle primary/secondary case!\n");
-
     if (tcp_socket_collection_p)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
@@ -2006,15 +2004,26 @@ void tcp_forget_addr(bmi_method_addr_p map,
         map->ref_count--;
         if(map->ref_count == 0)
         {
+            if(map->secondary)
+            {
+                dealloc_tcp_method_addr(map->secondary);
+            }
+            if(map->primary)
+            {
+                map->primary->secondary = NULL;
+            }
 	    dealloc_tcp_method_addr(map);
         }
     }
     else
     {
-        /* this will cause the bmi control layer to check to see if 
-         * this address can be completely forgotten
-         */
-        bmi_method_addr_forget_callback(bmi_addr);
+        if(!map->primary)
+        {
+            /* this will cause the bmi control layer to check to see if 
+             * this address can be completely forgotten
+             */
+            bmi_method_addr_forget_callback(bmi_addr);
+        }
     }
     return;
 };
