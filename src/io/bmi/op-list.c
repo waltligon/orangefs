@@ -242,20 +242,6 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
             /* swap address in the op to match addr we are using */
             my_op->addr = my_op->addr->secondary;
         }
-#if 0
-        else if(my_key->method_addr->primary && 
-            my_key->method_addr->primary == my_op->addr)
-        {
-            /* swap address in the op to match addr we are using */
-            my_op->addr = my_key->method_addr->primary;
-        }
-        else if(my_key->method_addr->secondary &&
-            my_key->method_addr->secondary == my_op->addr)
-        {
-            /* swap address in the op to match addr we are using */
-            my_op->addr = my_key->method_addr->secondary;
-        }
-#endif
         else
         {
             return(1);
