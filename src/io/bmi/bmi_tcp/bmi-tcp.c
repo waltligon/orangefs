@@ -3267,31 +3267,10 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
         struct tcp_addr* found_tcp_addr_data = NULL;
         bmi_method_addr_p found_map = NULL;
 
-        /* This is the first incoming message on a new socket.  Search to
-         * see if we can find an address that we already explicitly resolved
-         * to this host
-         */
-        tmp_link = qhash_search(addr_hash_table, &new_header.src_addr_hash);
-        if(tmp_link)
+        /* This is the first incoming message on a new socket */
+        if(new_header.src_addr_hash == 0)
         {
-            /* we found a match; this host has already been looked up
-             * locally
-             */
-            found_tcp_addr_data = qlist_entry(tmp_link, struct
-                tcp_addr, hash_link);
-            found_map = found_tcp_addr_data->parent;
-
-            /* link the two addresses together */
-            found_map->secondary = map;
-            map->primary = found_map;
-        }
-        else
-        {
-            /* No lookups on this host yet. */
-            tcp_addr_data->addr_hash = new_header.src_addr_hash;
-            /* add entry to hash table so we can find it later */
-            qhash_add(addr_hash_table, &tcp_addr_data->addr_hash,
-                &tcp_addr_data->hash_link);
+            /* client connection; there is no identifier in the header */
             /* register this address with the method control layer */
             tcp_addr_data->bmi_addr = bmi_method_addr_reg_callback(map);
             if (ret < 0)
@@ -3299,6 +3278,42 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
                 tcp_shutdown_addr(map);
                 dealloc_tcp_method_addr(map);
                 return (ret);
+            }
+        }
+        else
+        {
+            /* server connection; search to see if we can find an address 
+             * that we already explicitly resolved to this host 
+             */
+            tmp_link = qhash_search(addr_hash_table, &new_header.src_addr_hash);
+            if(tmp_link)
+            {
+                /* we found a match; this host has already been looked up
+                 * locally
+                 */
+                found_tcp_addr_data = qlist_entry(tmp_link, struct
+                    tcp_addr, hash_link);
+                found_map = found_tcp_addr_data->parent;
+
+                /* link the two addresses together */
+                found_map->secondary = map;
+                map->primary = found_map;
+            }
+            else
+            {
+                /* No lookups on this host yet. */
+                tcp_addr_data->addr_hash = new_header.src_addr_hash;
+                /* add entry to hash table so we can find it later */
+                qhash_add(addr_hash_table, &tcp_addr_data->addr_hash,
+                    &tcp_addr_data->hash_link);
+                /* register this address with the method control layer */
+                tcp_addr_data->bmi_addr = bmi_method_addr_reg_callback(map);
+                if (ret < 0)
+                {
+                    tcp_shutdown_addr(map);
+                    dealloc_tcp_method_addr(map);
+                    return (ret);
+                }
             }
         }
     }
