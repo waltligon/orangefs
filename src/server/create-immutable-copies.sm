@@ -2122,24 +2122,25 @@ static int get_server_names(PINT_server_create_copies_op *imm_p)
 
 
 
-  /*Get access to server names list residing in the cache*/
-  ret = PINT_cached_config_server_names(&list,&size,imm_p->fs_id);
+  /*Get access to the io server names residing in the cache*/
+  ret = PINT_cached_config_io_server_names(&list,&size,imm_p->fs_id);
   if (ret)
   {
       if (list)
          free(list);
-      gossip_lerr("Unable to retrieve server name list from the cache.\n");
+      gossip_lerr("Unable to retrieve IO server names from the cache.\n");
       return(ret);
   }
 
-  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReturned from PINT_cached_config...\n"
-                                   "\t\t\tValue of      size:%d\n"
-                                   "\t\t\tValue of   list[0]:%p\n"
-                                   "\t\t\tValue of *list[0] : %s\n"
-                                   "\t\t\tstrlen of  list[0]:%d\n"
-                                  ,size
-                                  ,list[0], list[0]
-                                  ,(int)strlen(list[0]));
+  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReturned from PINT_cached_config...\n");
+  for (i=0; i<size; i++)
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tValue of      size:%d\n"
+                                     "\t\t\t\tValue of   list[%d]:%p\n"
+                                     "\t\t\t\tValue of  *list[%d]:%s\n"
+                                     "\t\t\t\tstrlen of  list[%d]:%d\n\n"
+                                    ,size
+                                    ,i,list[i],i,list[i]
+                                    ,i,(int)strlen(list[i]));
 
   /*Remove server names that are already being used in the io_servers list*/
   for (i=0; i<size; i++)

@@ -1789,12 +1789,14 @@ static int load_handle_lookup_table(
 
 /* PINT_cached_config_server_names()
  *
- * Returns a list of pointers to the server names currently running in this file
- * system.
+ * Returns a list of pointers to the IO server names currently running in this   
+ * file system.
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_cached_config_server_names( char ***list, int *size, PVFS_fs_id fsid)
+int PINT_cached_config_io_server_names( char ***list
+                                      , int *size
+                                      , PVFS_fs_id fsid)
 {
     int i;
     struct qlist_head *hash_link = NULL;
@@ -1812,9 +1814,8 @@ int PINT_cached_config_server_names( char ***list, int *size, PVFS_fs_id fsid)
         hash_link, struct config_fs_cache_s, hash_link);
 
     assert(cur_config_cache);
-    assert(cur_config_cache->fs);
 
-    *size = cur_config_cache->handle_lookup_table_size;
+    *size = cur_config_cache->io_server_count;
 
     *list = malloc(sizeof(char *) * (*size));
 
@@ -1825,7 +1826,8 @@ int PINT_cached_config_server_names( char ***list, int *size, PVFS_fs_id fsid)
 
     for (i=0; i<(*size); i++)
     {
-        (*list)[i] = cur_config_cache->handle_lookup_table[i].server_name;
+        /*addr_string originates from the alias mapping->bmi_address*/
+        (*list)[i] = cur_config_cache->io_server_array[i].addr_string;
     }
 
    return(0);
