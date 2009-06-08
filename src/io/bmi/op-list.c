@@ -216,10 +216,6 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
 			   method_op_p my_op)
 {
 
-    if (my_key->method_addr_yes && (my_key->method_addr != my_op->addr))
-    {
-	return (1);
-    }
     if (my_key->msg_tag_yes && (my_key->msg_tag != my_op->msg_tag))
     {
 	return (1);
@@ -228,6 +224,30 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
     {
 	return (1);
     }
+    if (my_key->method_addr_yes)
+    {
+        if(my_key->method_addr == my_op->addr)
+        {
+            /* normal case */
+        }
+        else if(my_op->addr->primary && 
+            my_key->method_addr == my_op->addr->primary)
+        {
+            /* swap address in the op to match addr we are using */
+            my_op->addr = my_op->addr->primary;
+        }
+        else if(my_op->addr->secondary &&
+            my_key->method_addr == my_op->addr->secondary)
+        {
+            /* swap address in the op to match addr we are using */
+            my_op->addr = my_op->addr->secondary;
+        }
+        else
+        {
+            return(1);
+        }
+    }
+
     return (0);
 }
 

@@ -1056,6 +1056,8 @@ int PINT_cached_config_map_to_server(
         return(-PVFS_EINVAL);
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: server_name=%s\n", __func__,
+		 tmp_entry->server_name); /* sson */
     *server_addr = tmp_entry->server_addr;
     return(0);
 }

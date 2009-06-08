@@ -344,6 +344,7 @@ struct PINT_server_io_op
     int op;
     int datatype;
     void *tmp_buffer;
+    PVFS_size count; /* for MEAN operation */
     PVFS_handle *dfile_array;
 
     PVFS_size aggregate_size;
@@ -393,8 +394,58 @@ struct PINT_server_pipeline_op
     int trove_sync_flag;
     int adjust_flag; /* FIXME */
     PVFS_offset loff;
+
+    void *allreduce_buf; /* FIXME */
 };
  
+/* allreduce */
+struct PINT_server_allreduce_op
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_BMI_addr_t address;
+
+    int dfile_index;
+    int dfile_count;
+    struct PINT_dist_s *dist;
+
+    PINT_Request *file_req;
+    PVFS_offset file_req_offset;
+    PINT_Request *mem_req;
+
+    char tmp_buf[128]; /* FIXME */
+    PVFS_size unaligned_size;
+
+    enum PVFS_io_type io_type;
+
+    void *parent;
+    char *buffer; 
+    PVFS_size buffer_size;
+    PVFS_size buffer_used; 
+    PVFS_size out_size;
+    PINT_segpool_handle_t seg_handle;
+    PINT_segpool_unit_id id;
+    PVFS_offset *offsets;
+    PVFS_size *sizes;
+    int segs;
+    PVFS_hint hints;
+    PVFS_msg_tag_t tag;
+    int trove_sync_flag;
+    int adjust_flag; /* FIXME */
+    PVFS_offset loff;
+
+    PVFS_handle *dfile_array;
+    int myRank;
+    int allreduce_depth; /* FIXME */
+    int current_depth; /* FIXME */
+    void *allreduce_buf; /* FIXME */
+    void *allreduce_recv_buf; /* FIXME */
+    PVFS_size allreduce_buf_sz; /* FIXME */
+    int mask; /* FIXME */
+    int comm_type; /* FIXME */
+};
+ 
+
 struct PINT_server_small_io_op
 {
     PVFS_offset offsets[IO_MAX_REGIONS];
@@ -531,6 +582,7 @@ typedef struct PINT_server_op
 	struct PINT_server_io_op io;
         struct PINT_server_small_io_op small_io;
 	struct PINT_server_pipeline_op pipeline;
+	struct PINT_server_allreduce_op allreduce;
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
 	struct PINT_server_mkdir_op mkdir;
@@ -573,6 +625,7 @@ extern struct PINT_state_machine_s pvfs2_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_pipeline_sm; /* sson */
+extern struct PINT_state_machine_s pvfs2_allreduce_sm; /* sson */
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

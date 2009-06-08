@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <math.h> /* sson */
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -2476,6 +2477,8 @@ static inline int io_check_context_status(
         {
             struct PINT_decoded_msg decoded_resp;
             struct PVFS_server_resp *resp = NULL;
+	    int count; /* sson */
+
             /*
               size for writes are reported in the final ack, but we
               have to decode it first
@@ -2497,6 +2500,7 @@ static inline int io_check_context_status(
 			if (sm_p->u.io.tmp_buffer == NULL) {
 			    sm_p->u.io.tmp_buffer = (void *)malloc(sizeof(int)); /* AS */
 			    memset(sm_p->u.io.tmp_buffer, 0, sizeof(int));
+			    sm_p->u.io.count = 0;
 			}
 			int old, new, final;
 			memcpy(&old, sm_p->u.io.tmp_buffer, sizeof(int));
@@ -2519,6 +2523,16 @@ static inline int io_check_context_status(
 			    gossip_debug(GOSSIP_IO_DEBUG,
 					 "result(INT): old=%d, new=%d, final=%d\n", old, new, final); /* AS */
 			    break;
+			case 0x5800000e: /* MEAN */
+			    if(sm_p->u.io.count == 0)
+				final = new;
+			    else {
+				final = (old + new)/2;
+			    }
+			    sm_p->u.io.count++;
+			    gossip_debug(GOSSIP_IO_DEBUG,
+					 "result(INT): old=%d, new=%d, final=%d\n", old, new, final); /* AS */
+			    break;
 			default:
 			    break;
 			}
@@ -2532,6 +2546,7 @@ static inline int io_check_context_status(
 			if (sm_p->u.io.tmp_buffer == NULL) {
 			    sm_p->u.io.tmp_buffer = (void *)malloc(sizeof(double)); /* AS */
 			    memset(sm_p->u.io.tmp_buffer, 0, sizeof(double));
+			    sm_p->u.io.count = 0;
 			}
 			double old, new, final;
 			memcpy(&old, sm_p->u.io.tmp_buffer, sizeof(double)); /* old value */
@@ -2552,6 +2567,23 @@ static inline int io_check_context_status(
 			case 0x58000003: /* SUM */
 			    final = old + new;
 			    gossip_debug(GOSSIP_IO_DEBUG,
+					 "result(DOUBLE): old=%lf, new=%lf, final=%lf\n", old, new, final); /* AS */
+			    break;
+			case 0x5800000e: /* MEAN */
+			    if(sm_p->u.io.count == 0)
+				final = new;
+			    else {
+				double tmp_sum;
+				count = resp->u.read_completion.total_completed/8;
+				if(((resp->u.read_completion.total_completed)%8) != 0 && 
+				   (262144 - resp->u.read_completion.total_completed >= 8))
+				    count++;
+				tmp_sum = (old*sm_p->u.io.count);
+				tmp_sum += new*count;
+				final = (tmp_sum)/(count+sm_p->u.io.count);
+			    }
+			    sm_p->u.io.count += ceil((resp->u.read_completion.total_completed/8)-0.5);
+			    gossip_debug(GOSSIP_IO_DEBUG, 
 					 "result(DOUBLE): old=%lf, new=%lf, final=%lf\n", old, new, final); /* AS */
 			    break;
 			default:

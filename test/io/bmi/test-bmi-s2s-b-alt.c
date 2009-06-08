@@ -55,22 +55,6 @@ int main(
 	return (-1);
     }
 
-    /* sleep to let the other instance come up and connect first */
-    sleep(10);
-
-    /* test a few times to process any incoming connections */
-    {
-        bmi_op_id_t out_id_array[1];
-        int outcount;
-        bmi_error_code_t error_code_array[1];
-        bmi_size_t actual_size_array[1];
-        BMI_testcontext(1, out_id_array, &outcount, error_code_array,
-            actual_size_array, NULL, 10, context);
-        BMI_testcontext(1, out_id_array, &outcount, error_code_array,
-            actual_size_array, NULL, 10, context);
-        BMI_testcontext(1, out_id_array, &outcount, error_code_array,
-            actual_size_array, NULL, 10, context);
-    }
     /* get a bmi_addr for the server */
     ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3380");
     if (ret < 0)
@@ -79,6 +63,8 @@ int main(
 	perror("BMI_addr_lookup");
 	return (-1);
     }
+
+    sleep(5);
 
     /* send the initial request on its way */
     ret = BMI_post_send(&(client_ops[1]), server_addr, &out_buf,

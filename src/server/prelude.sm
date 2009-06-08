@@ -461,25 +461,33 @@ static PINT_sm_action prelude_perm_check(
 	    }
             else /* setattr, seteattr, seteattr_list */
             {
-                /*
-                  NOTE: on other file systems, setattr doesn't
-                  seem to require read permissions by the user, group
-                  OR other, so long as the user or group matches (or
-                  is root)
-                */
-                if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
-                     ((s_op->attr.owner == 0) ||
-                      (s_op->attr.owner == translated_uid))) ||
-                    (((s_op->attr.mask & PVFS_ATTR_COMMON_GID) &&
-                      ((s_op->attr.group == 0) ||
-                       (s_op->attr.group == translated_gid)))) ||
-                    (translated_uid == 0))
+                if(s_op->attr.perms == 0 && s_op->attr.objtype ==
+                    PVFS_TYPE_SYMLINK)
                 {
+                    /* if the object is of type symlink but has empty perms,
+                     * then it must be a newly created symlink object that
+                     * does not have its true attributes set yet.  Let this
+                     * operation through.
+                     */
+                    js_p->error_code = 0;
+                }
+                else if(s_op->attr.owner == translated_uid || translated_uid
+                    == 0)
+                {
+                    /* owner of file and root can always set attributes (see
+                     * iozone, which does a setattr as part of truncating a
+                     * file with permission mask set to 0
+                     */
                     js_p->error_code = 0;
                 }
                 else
                 {
-                    js_p->error_code = -PVFS_EACCES;
+                    /* normal setattr requires write permissions on existing
+                     * objects
+                     */
+                    js_p->error_code = PINT_check_mode(
+                        &(s_op->attr), translated_uid,
+                        translated_gid, PINT_ACCESS_WRITABLE);
                 }
             }
             break;

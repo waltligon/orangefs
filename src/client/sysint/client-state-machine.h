@@ -196,6 +196,7 @@ struct PINT_client_io_sm
     int op; /* AS */
     int datatype; /* AS */
     void *tmp_buffer; /* AS */
+    PVFS_size count; /* AS: for MEAN operation */
 
     /* output parameter */
     PVFS_sysresp_io *io_resp_p;
