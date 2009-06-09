@@ -1,0 +1,13 @@
+
+1. download the mpich2-1.1.tar.gz
+  $ wget http://www.mcs.anl.gov/research/projects/mpich2/downloads/tarballs/1.1/mpich2-1.1.tar.gz
+
+2. untar the file and patch
+  $ tar xvfz mpich2-1.1.tar.gz
+  $ cd mpich2-1.1
+  $ patch -p 5 < mpich2-1.1.diff
+
+3. configure and build
+  $ ./configure --with-pvfs2=<PVFS2 BUILD DIR> --enable-romio --with-file-system=nfs+ufs+pvfs2
+  $ make && make install
+ 

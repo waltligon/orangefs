@@ -2534,6 +2534,7 @@ static inline int io_check_context_status(
 					 "result(INT): old=%d, new=%d, final=%d\n", old, new, final); /* AS */
 			    break;
 			default:
+			    final = new;
 			    break;
 			}
 			
@@ -2587,6 +2588,7 @@ static inline int io_check_context_status(
 					 "result(DOUBLE): old=%lf, new=%lf, final=%lf\n", old, new, final); /* AS */
 			    break;
 			default:
+			    final = new;
 			    break;
 			}
 

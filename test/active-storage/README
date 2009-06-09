@@ -1,0 +1,4 @@
+
+$ make clean
+$ make
+$ mpiexec -n 1 simple1_unaligned

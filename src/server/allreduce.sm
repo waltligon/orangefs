@@ -63,7 +63,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     int myRank = s_op->u.allreduce.myRank, newRank;
     PVFS_handle new_rank_handle;
     PVFS_BMI_addr_t svr_addr;
-    float *tmp;
+    double *tmp;
     PVFS_msg_tag_t session_tag;
 
     js_p->error_code = 0;
@@ -89,7 +89,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%ld\n", svr_addr);
     ret = job_bmi_recv(svr_addr,
 		       (void*)s_op->u.allreduce.allreduce_recv_buf,
-		       10*sizeof(float),
+		       10*sizeof(double),
 		       session_tag,
 		       BMI_PRE_ALLOC,
 		       smcb,
@@ -115,7 +115,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
     ret = job_bmi_send(svr_addr,
 		       (void*)s_op->u.allreduce.allreduce_buf,
-		       10*sizeof(float),
+		       10*sizeof(double),
 		       session_tag,
 		       BMI_PRE_ALLOC,
 		       0, /* 1: send_unexpected */
@@ -133,9 +133,10 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    float *a = s_op->u.allreduce.allreduce_buf;
-    float *b = s_op->u.allreduce.allreduce_recv_buf;
-    float *tmp;
+    struct PINT_server_op *parent_s_op = s_op->u.allreduce.parent;
+    double *a = s_op->u.allreduce.allreduce_buf;
+    double *b = s_op->u.allreduce.allreduce_recv_buf;
+    double *tmp;
     s_op->u.allreduce.current_depth++;
     s_op->u.allreduce.mask = s_op->u.allreduce.mask << 1;
 
@@ -154,6 +155,7 @@ static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s 
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: reduced result=%lf\n", __func__,
 		 *tmp);
+    parent_s_op->u.pipeline.buffer = (void *)tmp;
     return SM_ACTION_COMPLETE;
 }
 
@@ -161,14 +163,6 @@ static PINT_sm_action epilog(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     js_p->error_code = 0;
-    float *tmp = s_op->u.allreduce.allreduce_recv_buf;
-
-    /* in case of RECV */
-    if(s_op->u.allreduce.comm_type == 10) 
-	gossip_debug(GOSSIP_IO_DEBUG, "received=%f, js_p->actual_size=%ld\n", 
-		     tmp[0], js_p->actual_size);
-    else if(s_op->u.allreduce.comm_type == 11) /* SEND */
-	gossip_debug(GOSSIP_IO_DEBUG, "send completed\n");
     
     return SM_ACTION_COMPLETE;
 }

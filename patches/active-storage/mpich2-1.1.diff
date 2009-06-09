@@ -1,0 +1,1556 @@
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/include/mpi.h.in mpich2-1.1/src/include/mpi.h.in
+--- /home/sson/test/mpich2-1.1.org/src/include/mpi.h.in	2009-02-06 15:22:45.000000000 -0600
++++ mpich2-1.1/src/include/mpi.h.in	2009-06-08 23:52:26.343124750 -0500
+@@ -127,6 +127,8 @@
+ #define MPI_MINLOC  (MPI_Op)(0x5800000b)
+ #define MPI_MAXLOC  (MPI_Op)(0x5800000c)
+ #define MPI_REPLACE (MPI_Op)(0x5800000d)
++#define MPI_MEAN    (MPI_Op)(0x5800000e) /* sson */
++#define MPI_KMEANS  (MPI_Op)(0x5800000f) /* sson */
+ 
+ /* Permanent key values */
+ /* C Versions (return pointer to value),
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c	2008-08-14 16:35:53.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.c	2009-06-09 00:20:08.870745483 -0500
+@@ -14,6 +14,7 @@
+     ADIOI_PVFS2_Open, /* Open */
+     ADIOI_SCALEABLE_OpenColl, /* OpenColl */
+     ADIOI_PVFS2_ReadContig, /* ReadContig */
++    ADIOI_PVFS2_ReadContig_ex, /* ReadContig extended */ /* sson */
+     ADIOI_PVFS2_WriteContig, /* WriteContig */
+     ADIOI_GEN_ReadStridedColl, /* ReadStridedColl */
+     ADIOI_GEN_WriteStridedColl, /* WriteStridedColl */
+@@ -21,6 +22,7 @@
+     ADIOI_PVFS2_Fcntl, /* Fcntl */
+     ADIOI_PVFS2_SetInfo, /* SetInfo */
+     ADIOI_PVFS2_ReadStrided, /* ReadStrided */
++    ADIOI_PVFS2_ReadStrided_ex, /* ReadStrided extended */ /* sson */
+     ADIOI_PVFS2_WriteStrided, /* WriteStrided */
+     ADIOI_PVFS2_Close, /* Close */
+     ADIOI_PVFS2_IReadContig, /* IreadContig */
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.h mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.h
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.h	2008-12-17 14:16:58.000000000 -0600
++++ mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2.h	2009-06-09 00:36:23.702620461 -0500
+@@ -23,6 +23,10 @@
+                       MPI_Datatype datatype, int file_ptr_type,
+                      ADIO_Offset offset, ADIO_Status *status, int
+ 		     *error_code);
++void ADIOI_PVFS2_ReadContig_ex(ADIO_File fd, void *buf, int count, 
++			       MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++                     ADIO_Offset offset, ADIO_Status *status, int
++			       *error_code); /* sson */
+ void ADIOI_PVFS2_WriteContig(ADIO_File fd, void *buf, int count, 
+                       MPI_Datatype datatype, int file_ptr_type,
+                       ADIO_Offset offset, ADIO_Status *status, int
+@@ -37,6 +41,10 @@
+ 		       MPI_Datatype datatype, int file_ptr_type,
+ 		       ADIO_Offset offset, ADIO_Status *status, int
+ 		       *error_code);
++void ADIOI_PVFS2_ReadStrided_ex(ADIO_File fd, void *buf, int count,
++				MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++		       ADIO_Offset offset, ADIO_Status *status, int
++				*error_code); /* sson */
+ void ADIOI_PVFS2_Flush(ADIO_File fd, int *error_code);
+ void ADIOI_PVFS2_Delete(char *filename, int *error_code);
+ void ADIOI_PVFS2_Resize(ADIO_File fd, ADIO_Offset size, int *error_code);
+@@ -63,4 +71,8 @@
+ 		       MPI_Datatype datatype, int file_ptr_type,
+ 		       ADIO_Offset offset, ADIO_Status *status, int
+ 		       *error_code);
++void ADIOI_PVFS2_OldReadStrided_ex(ADIO_File fd, void *buf, int count,
++				   MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++		       ADIO_Offset offset, ADIO_Status *status, int
++				   *error_code); /* sson */
+ #endif
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_io_dtype.c mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_io_dtype.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_io_dtype.c	2008-08-05 11:22:49.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_io_dtype.c	2009-06-09 00:59:43.282622782 -0500
+@@ -12,6 +12,8 @@
+ #include "ad_pvfs2_io.h"
+ #include "ad_pvfs2_common.h"
+ 
++#define DEBUG_DTYPE 1 /* sson */
++
+ int ADIOI_PVFS2_StridedDtypeIO(ADIO_File fd, void *buf, int count,
+ 			       MPI_Datatype datatype, int file_ptr_type,
+ 			       ADIO_Offset offset, ADIO_Status *status, int
+@@ -197,6 +199,192 @@
+     return ret;
+ }
+ 
++/* sson */
++int ADIOI_PVFS2_StridedDtypeIO_ex(ADIO_File fd, void *buf, int count,
++			       MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++			       ADIO_Offset offset, ADIO_Status *status, int
++			       *error_code,
++			       int rw_type)
++{
++    int filetype_size = -1, ret = -1, filetype_is_contig = -1;
++    int num_filetypes = 0, cur_flat_file_reg_off = 0;
++    PVFS_Request tmp_mem_req, mem_req, tmp_file_req, file_req;
++    PVFS_sysresp_io resp_io;
++    ADIO_Offset off = -1, bytes_into_filetype = 0;
++    MPI_Aint filetype_extent = -1;
++    int etype_size = -1, i = -1;
++    PVFS_size pvfs_disp = -1;
++    ADIOI_Flatlist_node *flat_file_p = ADIOI_Flatlist;
++
++    /* Use for offseting the PVFS2 filetype */
++    int pvfs_blk = 1;
++    ADIOI_PVFS2_fs *pvfs_fs;
++    static char myname[] = "ADIOI_PVFS2_STRIDED_DTYPE";
++
++    memset(&tmp_mem_req, 0, sizeof(PVFS_Request));
++    memset(&mem_req, 0, sizeof(PVFS_Request));
++    memset(&tmp_file_req, 0, sizeof(PVFS_Request));
++    memset(&file_req, 0, sizeof(PVFS_Request));
++
++    pvfs_fs = (ADIOI_PVFS2_fs*)fd->fs_ptr;
++
++    ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
++
++    /* changed below if error */
++    *error_code = MPI_SUCCESS;  
++
++    /* datatype is the memory type 
++     * fd->filetype is the file type */
++    MPI_Type_size(fd->filetype, &filetype_size);
++    if (filetype_size == 0) {
++        *error_code = MPI_SUCCESS;
++        return -1;
++    }
++    MPI_Type_extent(fd->filetype, &filetype_extent);
++    MPI_Type_size(fd->etype, &etype_size);
++    if (filetype_size == 0) {
++        *error_code = MPI_SUCCESS;
++        return -1;
++    }
++
++    /* offset is in units of etype relative to the filetype.  We
++     * convert this to off in terms of actual data bytes (the offset
++     * minus the number of bytes that are not used).  We are allowed
++     * to do this since PVFS2 handles offsets with respect to a
++     * file_req in bytes, otherwise we would have to convert into a
++     * pure byte offset as is done in other methods.  Explicit offset
++     * case is handled by using fd->disp and byte-converted off. */
++
++    pvfs_disp = fd->disp;
++    if (file_ptr_type == ADIO_INDIVIDUAL) 
++    {
++	if (filetype_is_contig) 
++	{
++	    off = fd->fp_ind - fd->disp;
++	}
++	else 
++	{
++	    int flag = 0;
++	    /* Should have already been flattened in ADIO_Open*/
++	    while (flat_file_p->type != fd->filetype) 
++	    {
++		flat_file_p = flat_file_p->next;
++	    }
++	    num_filetypes = -1;
++	    while (!flag) 
++	    {
++		num_filetypes++;
++		for (i = 0; i < flat_file_p->count; i++) 
++		{
++		    /* Start on a non zero-length region */
++		    if (flat_file_p->blocklens[i]) 
++		    {
++			if (fd->disp + flat_file_p->indices[i] +
++			    (num_filetypes * filetype_extent) +
++			    flat_file_p->blocklens[i] > fd->fp_ind &&
++			    fd->disp + flat_file_p->indices[i] <= 
++			    fd->fp_ind) 
++			{
++			    cur_flat_file_reg_off = fd->fp_ind -
++				(fd->disp + flat_file_p->indices[i] +
++				 (num_filetypes * filetype_extent));
++			    flag = 1;
++			    break;
++			}
++			else
++			    bytes_into_filetype += flat_file_p->blocklens[i];
++		    }
++		}
++	    }
++	    /* Impossible that we don't find it in this datatype */
++	    assert(i != flat_file_p->count);
++	    off = bytes_into_filetype + cur_flat_file_reg_off;
++	}
++    }
++    else /* ADIO_EXPLICIT */
++    { 
++	off = etype_size * offset;
++    }
++
++#ifdef DEBUG_DTYPE
++    fprintf(stderr, "ADIOI_PVFS2_StridedDtypeIO: (fd->fp_ind=%Ld,fd->disp=%Ld,"
++	    " offset=%Ld),(pvfs_disp=%Ld,off=%Ld)\n",
++	    fd->fp_ind, fd->disp, offset, pvfs_disp, off);
++#endif
++
++
++    /* Convert the MPI memory and file datatypes into
++     * PVFS2 datatypes */
++    ret = convert_mpi_pvfs2_dtype(&datatype, &tmp_mem_req);
++    if (ret < 0)
++    {
++	goto error_state;
++    }
++    ret = convert_mpi_pvfs2_dtype(&(fd->filetype), &tmp_file_req);
++    if (ret < 0)
++    {
++	goto error_state;
++    }
++
++    ret = PVFS_Request_contiguous(count, tmp_mem_req, &mem_req);
++    if (ret != 0) /* TODO: convert this to MPIO error handling */
++        fprintf(stderr, "ADIOI_PVFS2_stridedDtypeIO: error in final"
++		" CONTIG memory type\n");
++    PVFS_Request_free(&tmp_mem_req);    
++
++    /* pvfs_disp is used to offset the filetype */
++    ret = PVFS_Request_hindexed(1, &pvfs_blk, &pvfs_disp,
++                                tmp_file_req, &file_req);
++    if (ret != 0)
++        fprintf(stderr, "ADIOI_PVFS2_StridedDtypeIO: error in final"
++			" HINDEXED file type\n");
++    PVFS_Request_free(&tmp_file_req);
++
++    if (rw_type == READ)
++	ret = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, off, buf,
++			       mem_req, &(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io); /* sson */
++    else
++	ret = PVFS_sys_write(pvfs_fs->object_ref, file_req, off, buf,
++			     mem_req, &(pvfs_fs->credentials), &resp_io);
++
++    if (ret != 0) {
++	fprintf(stderr, "ADIOI_PVFS2_StridedDtypeIO: Warning - PVFS_sys_"
++		"read/write returned %d and completed %Ld bytes.\n", 
++		ret, resp_io.total_completed);
++        *error_code = MPIO_Err_create_code(MPI_SUCCESS,
++                                           MPIR_ERR_RECOVERABLE,
++                                           myname, __LINE__,
++                                           ADIOI_PVFS2_error_convert(ret),
++                                           "Error in PVFS_sys_io \n", 0);
++        goto error_state;
++    }
++
++    if (file_ptr_type == ADIO_INDIVIDUAL)
++    {
++        fd->fp_ind = off += resp_io.total_completed;
++    }
++    
++  error_state:
++    fd->fp_sys_posn = -1;   /* set it to null. */
++
++    PVFS_Request_free(&mem_req);
++    PVFS_Request_free(&file_req);    
++
++#ifdef DEBUG_DTYPE
++    fprintf(stderr, "ADIOI_PVFS2_StridedDtypeIO: "
++            "resp_io.total_completed=%Ld,ret=%d\n", 
++	    resp_io.total_completed, ret);
++#endif
++
++#ifdef HAVE_STATUS_SET_BYTES
++    MPIR_Status_set_bytes(status, datatype, (int)resp_io.total_completed);
++    /* This is a temporary way of filling in status. The right way is to
++     * keep track of how much data was actually acccessed by 
++     * ADIOI_BUFFERED operations */
++#endif
++    return ret;
++} /* sson */
++ 
+ /* convert_mpi_pvfs2_dtype - Convert a MPI datatype into
+  * a PVFS2 datatype so that we can natively use the PVFS2 
+  * datatypes in the PVFS2 I/O calls instead of converting 
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read.c mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read.c	2008-07-29 13:32:43.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read.c	2009-06-09 00:19:06.438620643 -0500
+@@ -92,6 +92,88 @@
+     return;
+ }
+ 
++/* sson */
++void ADIOI_PVFS2_ReadContig_ex(ADIO_File fd, void *buf, int count, 
++			       MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++			    ADIO_Offset offset, ADIO_Status *status,
++			    int *error_code)
++{
++    int ret, datatype_size, len;
++    PVFS_Request file_req, mem_req;
++    PVFS_sysresp_io resp_io;
++    ADIOI_PVFS2_fs *pvfs_fs;
++    static char myname[] = "ADIOI_PVFS2_READCONTIG_EX"; /* sson */
++
++    pvfs_fs = (ADIOI_PVFS2_fs*)fd->fs_ptr;
++
++    MPI_Type_size(datatype, &datatype_size);
++    len = datatype_size * count;
++
++    ret = PVFS_Request_contiguous(len, PVFS_BYTE, &mem_req);
++    /* --BEGIN ERROR HANDLING-- */
++    if (ret != 0) {
++	*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++					   MPIR_ERR_RECOVERABLE,
++					   myname, __LINE__,
++					   ADIOI_PVFS2_error_convert(ret),
++					   "Error in pvfs_request_contig (memory)", 0);
++	return;
++    }
++    /* --END ERROR HANDLING-- */
++
++    ret = PVFS_Request_contiguous(len, PVFS_BYTE, &file_req);
++    /* --BEGIN ERROR HANDLING-- */
++    if (ret != 0) {
++	*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++					   MPIR_ERR_RECOVERABLE,
++					   myname, __LINE__,
++					   ADIOI_PVFS2_error_convert(ret),
++					   "Error in pvfs_request_contig (file)", 0);
++	return;
++    }
++    /* --END ERROR HANDLING-- */
++
++    if (file_ptr_type == ADIO_INDIVIDUAL) {
++	/* copy individual file pointer into offset variable, continue */
++	offset = fd->fp_ind;
++    }
++
++#ifdef ADIOI_MPE_LOGGING
++    MPE_Log_event( ADIOI_MPE_read_a, 0, NULL );
++#endif
++    ret = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, offset, buf, 
++			   mem_req, &(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io); /* sson */
++#ifdef ADIOI_MPE_LOGGING
++    MPE_Log_event( ADIOI_MPE_read_b, 0, NULL );
++#endif
++    /* --BEGIN ERROR HANDLING-- */
++    if (ret != 0 ) {
++	*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++					   MPIR_ERR_RECOVERABLE,
++					   myname, __LINE__,
++					   ADIOI_PVFS2_error_convert(ret),
++					   "Error in PVFS_sys_read", 0);
++	goto fn_exit;
++    }
++    /* --END ERROR HANDLING-- */
++
++    if (file_ptr_type == ADIO_INDIVIDUAL) {
++	fd->fp_ind += (int) resp_io.total_completed;
++	/* TODO: WHY THE INT CAST? */
++    }
++    fd->fp_sys_posn = offset + (int)resp_io.total_completed;
++
++#ifdef HAVE_STATUS_SET_BYTES
++    MPIR_Status_set_bytes(status, datatype, (int)resp_io.total_completed);
++#endif
++
++    *error_code = MPI_SUCCESS;
++fn_exit:
++    PVFS_Request_free(&mem_req);
++    PVFS_Request_free(&file_req);
++    return;
++} /* sson */
++
+ static int ADIOI_PVFS2_ReadStridedListIO(ADIO_File fd, void *buf, int count,
+ 				  MPI_Datatype datatype, int file_ptr_type,
+ 				  ADIO_Offset offset, ADIO_Status *status,
+@@ -114,6 +196,18 @@
+ 				      READ);
+ }
+ 
++/* sson */
++static int ADIOI_PVFS2_ReadStridedDtypeIO_ex(ADIO_File fd, void *buf, int count,
++					     MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++				   ADIO_Offset offset, ADIO_Status *status, 
++				   int *error_code)
++{
++    return ADIOI_PVFS2_StridedDtypeIO_ex(fd, buf, count,
++					 datatype, op /* sson */, file_ptr_type,
++				      offset, status, error_code,
++				      READ);
++} /* sson */
++
+ void ADIOI_PVFS2_ReadStrided(ADIO_File fd, void *buf, int count,
+ 			     MPI_Datatype datatype, int file_ptr_type,
+ 			     ADIO_Offset offset, ADIO_Status *status, int
+@@ -162,6 +256,55 @@
+     return;
+ }
+ 
++/* sson */
++void ADIOI_PVFS2_ReadStrided_ex(ADIO_File fd, void *buf, int count,
++				MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++			     ADIO_Offset offset, ADIO_Status *status, int
++			     *error_code)
++{
++    /* four ways (to date) that we can carry out strided i/o accesses:
++     * - naive posix
++     * - 'true' Datatype (from avery)
++     * - new List I/O (from avery)
++     * - classic List I/O  (the one that's always been in ROMIO)
++     * I imagine we'll keep Datatype as an optional optimization, and afer a
++     * release or two promote it to the default 
++     */
++    int ret = -1;
++
++    if (fd->hints->fs_hints.pvfs2.posix_read == ADIOI_HINT_ENABLE) {
++	ADIOI_GEN_ReadStrided(fd, buf, count, datatype, 
++		file_ptr_type, offset, status, error_code);
++	return;
++    }
++    if (fd->hints->fs_hints.pvfs2.dtype_read == ADIOI_HINT_ENABLE) {
++        ret = ADIOI_PVFS2_ReadStridedDtypeIO_ex(fd, buf, count,
++						datatype, op /* sson */, file_ptr_type,
++                                             offset, status, error_code);
++
++        /* Fall back to list I/O if datatype I/O didn't work */
++        if (ret != 0)
++        {
++            fprintf(stderr,
++                    "Falling back to list I/O since datatype I/O failed\n");
++            ret = ADIOI_PVFS2_ReadStridedListIO(fd, buf, count,
++                                                datatype, file_ptr_type,
++                                                offset, status, error_code);
++        }
++        return;
++    }
++    if (fd->hints->fs_hints.pvfs2.listio_read == ADIOI_HINT_ENABLE) {
++	ret = ADIOI_PVFS2_ReadStridedListIO(fd, buf, count, datatype,
++		file_ptr_type, offset, status, error_code);
++	return;
++    }
++    /* Use classic list I/O if no hints given base case */
++
++    ADIOI_PVFS2_OldReadStrided_ex(fd, buf, count, datatype, op /* sson */,
++	    file_ptr_type, offset, status, error_code);
++    return;
++} /* sson */
++
+ 
+ /*
+  * vim: ts=8 sts=4 sw=4 noexpandtab 
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read_list_classic.c mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read_list_classic.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read_list_classic.c	2009-06-02 10:25:49.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/adio/ad_pvfs2/ad_pvfs2_read_list_classic.c	2009-06-09 00:58:51.230621684 -0500
+@@ -907,3 +907,900 @@
+     if (!buftype_is_contig) ADIOI_Delete_flattened(datatype);
+ }
+ 
++/* sson */
++void ADIOI_PVFS2_OldReadStrided_ex(ADIO_File fd, void *buf, int count,
++				   MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++			     ADIO_Offset offset, ADIO_Status *status, int
++			     *error_code)
++{
++    /* offset is in units of etype relative to the filetype. */
++    ADIOI_Flatlist_node *flat_buf, *flat_file;
++    int i, j, k,  brd_size, frd_size=0, st_index=0;
++    int bufsize, sum, n_etypes_in_filetype, size_in_filetype;
++    int n_filetypes, etype_in_filetype;
++    ADIO_Offset abs_off_in_filetype=0;
++    int filetype_size, etype_size, buftype_size;
++    MPI_Aint filetype_extent, buftype_extent; 
++    int buf_count, buftype_is_contig, filetype_is_contig;
++    ADIO_Offset off, disp, start_off, initial_off;
++    int flag, st_frd_size, st_n_filetypes;
++
++    int mem_list_count, file_list_count;
++    PVFS_size *mem_offsets;
++    int64_t *file_offsets;
++    int *mem_lengths;
++    int32_t *file_lengths;
++    int total_blks_to_read;
++
++    int max_mem_list, max_file_list;
++
++    int b_blks_read;
++    int f_data_read;
++    int size_read=0, n_read_lists, extra_blks;
++
++    int end_brd_size, end_frd_size;
++    int start_k, start_j, new_file_read, new_buffer_read;
++    int start_mem_offset;
++    PVFS_Request mem_req, file_req;
++    ADIOI_PVFS2_fs * pvfs_fs;
++    PVFS_sysresp_io resp_io;
++    int err_flag=0;
++    MPI_Offset total_bytes_read = 0;
++    static char myname[] = "ADIOI_PVFS2_ReadStrided";
++
++#define MAX_ARRAY_SIZE 64
++
++    *error_code = MPI_SUCCESS;  /* changed below if error */
++
++    ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
++    ADIOI_Datatype_iscontig(fd->filetype, &filetype_is_contig);
++
++    /* the HDF5 tests showed a bug in this list processing code (see many many
++     * lines down below).  We added a workaround, but common HDF5 file types
++     * are actually contiguous and do not need the expensive workarond */
++    if (!filetype_is_contig) {
++	flat_file = ADIOI_Flatlist;
++	while (flat_file->type != fd->filetype) flat_file = flat_file->next;
++	if (flat_file->count == 1 && !buftype_is_contig)
++	    filetype_is_contig = 1;
++    }
++
++    MPI_Type_size(fd->filetype, &filetype_size);
++    if ( ! filetype_size ) {
++	*error_code = MPI_SUCCESS; 
++	return;
++    }
++
++    MPI_Type_extent(fd->filetype, &filetype_extent);
++    MPI_Type_size(datatype, &buftype_size);
++    MPI_Type_extent(datatype, &buftype_extent);
++    etype_size = fd->etype_size;
++
++    bufsize = buftype_size * count;
++    
++    pvfs_fs = (ADIOI_PVFS2_fs*)fd->fs_ptr;
++
++    if (!buftype_is_contig && filetype_is_contig) {
++
++/* noncontiguous in memory, contiguous in file. */
++        int64_t file_offsets;
++	int32_t file_lengths;
++
++	ADIOI_Flatten_datatype(datatype);
++	flat_buf = ADIOI_Flatlist;
++	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
++
++	off = (file_ptr_type == ADIO_INDIVIDUAL) ? fd->fp_ind : 
++	    fd->disp + etype_size * offset;
++
++	file_list_count = 1;
++	file_offsets = off;
++	file_lengths = 0;
++	total_blks_to_read = count*flat_buf->count;
++	b_blks_read = 0;
++
++	/* allocate arrays according to max usage */
++	if (total_blks_to_read > MAX_ARRAY_SIZE)
++	    mem_list_count = MAX_ARRAY_SIZE;
++	else mem_list_count = total_blks_to_read;
++	mem_offsets = (PVFS_size*)ADIOI_Malloc(mem_list_count*sizeof(PVFS_size));
++	mem_lengths = (int*)ADIOI_Malloc(mem_list_count*sizeof(int));
++
++	/* TODO: CHECK RESULTS OF MEMORY ALLOCATION */
++
++	j = 0;
++	/* step through each block in memory, filling memory arrays */
++	while (b_blks_read < total_blks_to_read) {
++	    for (i=0; i<flat_buf->count; i++) {
++		mem_offsets[b_blks_read % MAX_ARRAY_SIZE] = 
++		    /* TODO: fix this compiler warning */
++		    ((PVFS_size)buf + j*buftype_extent + flat_buf->indices[i]);
++		mem_lengths[b_blks_read % MAX_ARRAY_SIZE] = 
++		    flat_buf->blocklens[i];
++		file_lengths += flat_buf->blocklens[i];
++		b_blks_read++;
++		if (!(b_blks_read % MAX_ARRAY_SIZE) ||
++		    (b_blks_read == total_blks_to_read)) {
++
++		    /* in the case of the last read list call,
++		       adjust mem_list_count */
++		    if (b_blks_read == total_blks_to_read) {
++		        mem_list_count = total_blks_to_read % MAX_ARRAY_SIZE;
++			/* in case last read list call fills max arrays */
++			if (!mem_list_count) mem_list_count = MAX_ARRAY_SIZE;
++		    }
++		    err_flag = PVFS_Request_hindexed(mem_list_count, 
++			    mem_lengths, mem_offsets, PVFS_BYTE, &mem_req);
++		    if (err_flag < 0) break;
++		    err_flag = PVFS_Request_contiguous(file_lengths, 
++			    PVFS_BYTE, &file_req);
++		    if (err_flag < 0) break;
++#ifdef ADIOI_MPE_LOGGING
++                    MPE_Log_event( ADIOI_MPE_read_a, 0, NULL );
++#endif
++		    err_flag = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, 
++			    file_offsets, PVFS_BOTTOM, mem_req, 
++						&(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io);
++#ifdef ADIOI_MPE_LOGGING
++                    MPE_Log_event( ADIOI_MPE_read_b, 0, NULL );
++#endif
++		    /* --BEGIN ERROR HANDLING-- */
++		    if (err_flag != 0) {
++			*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++							   MPIR_ERR_RECOVERABLE,
++							   myname, __LINE__,
++							   ADIOI_PVFS2_error_convert(err_flag),
++							   "Error in PVFS_sys_read_ex", 0);
++			goto error_state;
++		    }
++		    PVFS_Request_free(&mem_req);
++		    PVFS_Request_free(&file_req);
++		    total_bytes_read += resp_io.total_completed;
++		    /* --END ERROR HANDLING-- */
++		  
++		    /* in the case of error or the last read list call, 
++		     * leave here */
++		    if (err_flag || b_blks_read == total_blks_to_read) break;
++
++		    file_offsets += file_lengths;
++		    file_lengths = 0;
++		} 
++	    } /* for (i=0; i<flat_buf->count; i++) */
++	    j++;
++	} /* while (b_blks_read < total_blks_to_read) */
++	ADIOI_Free(mem_offsets);
++	ADIOI_Free(mem_lengths);
++
++        if (file_ptr_type == ADIO_INDIVIDUAL) 
++	    fd->fp_ind += total_bytes_read;
++
++	fd->fp_sys_posn = -1;  /* set it to null. */
++
++#ifdef HAVE_STATUS_SET_BYTES
++	MPIR_Status_set_bytes(status, datatype, bufsize);
++	/* This isa temporary way of filling in status.  The right way is to
++	   keep tracke of how much data was actually read adn placed in buf
++	   by ADIOI_BUFFERED_READ. */
++#endif
++	ADIOI_Delete_flattened(datatype);
++
++	return;
++    } /* if (!buftype_is_contig && filetype_is_contig) */
++
++    /* know file is noncontiguous from above */
++    /* noncontiguous in file */
++
++    /* filetype already flattened in ADIO_Open */
++    flat_file = ADIOI_Flatlist;
++    while (flat_file->type != fd->filetype) flat_file = flat_file->next;
++
++    disp = fd->disp;
++    initial_off = offset;
++
++
++    /* for each case - ADIO_Individual pointer or explicit, find the file
++       offset in bytes (offset), n_filetypes (how many filetypes into
++       file to start), frd_size (remaining amount of data in present
++       file block), and st_index (start point in terms of blocks in
++       starting filetype) */
++    if (file_ptr_type == ADIO_INDIVIDUAL) {
++        offset = fd->fp_ind; /* in bytes */
++	n_filetypes = -1;
++	flag = 0;
++	while (!flag) {
++	    n_filetypes++;
++	    for (i=0; i<flat_file->count; i++) {
++	        if (disp + flat_file->indices[i] + 
++		    ((ADIO_Offset) n_filetypes)*filetype_extent +
++		    flat_file->blocklens[i]  >= offset) {
++		    st_index = i;
++		    frd_size = (int) (disp + flat_file->indices[i] + 
++				    ((ADIO_Offset) n_filetypes)*filetype_extent
++				      + flat_file->blocklens[i] - offset);
++		    flag = 1;
++		    break;
++		}
++	    }
++	} /* while (!flag) */
++    } /* if (file_ptr_type == ADIO_INDIVIDUAL) */
++    else {
++        n_etypes_in_filetype = filetype_size/etype_size;
++	n_filetypes = (int) (offset / n_etypes_in_filetype);
++	etype_in_filetype = (int) (offset % n_etypes_in_filetype);
++	size_in_filetype = etype_in_filetype * etype_size;
++	
++	sum = 0;
++	for (i=0; i<flat_file->count; i++) {
++	    sum += flat_file->blocklens[i];
++	    if (sum > size_in_filetype) {
++	        st_index = i;
++		frd_size = sum - size_in_filetype;
++		abs_off_in_filetype = flat_file->indices[i] +
++		    size_in_filetype - (sum - flat_file->blocklens[i]);
++		break;
++	    }
++	}
++	
++	/* abs. offset in bytes in the file */
++	offset = disp + ((ADIO_Offset) n_filetypes)*filetype_extent + 
++	    abs_off_in_filetype;
++    } /* else [file_ptr_type != ADIO_INDIVIDUAL] */
++
++    start_off = offset;
++    st_frd_size = frd_size;
++    st_n_filetypes = n_filetypes;
++    
++    if (buftype_is_contig && !filetype_is_contig) {
++
++/* contiguous in memory, noncontiguous in file. should be the most
++   common case. */
++
++        int mem_lengths;
++	char *mem_offsets;
++	
++	i = 0;
++	j = st_index;
++	n_filetypes = st_n_filetypes;
++	
++	mem_list_count = 1;
++	
++	/* determine how many blocks in file to read */
++	f_data_read = ADIOI_MIN(st_frd_size, bufsize);
++	total_blks_to_read = 1;
++	if (j < (flat_file->count-1)) j++;
++	else {
++	    j = 0;
++	    n_filetypes++;
++	}
++	while (f_data_read < bufsize) {
++	    f_data_read += flat_file->blocklens[j];
++	    total_blks_to_read++;
++	    if (j<(flat_file->count-1)) j++;
++	    else j = 0;	
++	}
++      
++	j = st_index;
++	n_filetypes = st_n_filetypes;
++	n_read_lists = total_blks_to_read/MAX_ARRAY_SIZE;
++	extra_blks = total_blks_to_read%MAX_ARRAY_SIZE;
++	
++	mem_offsets = buf;
++	mem_lengths = 0;
++	
++	/* if at least one full readlist, allocate file arrays
++	   at max array size and don't free until very end */
++	if (n_read_lists) {
++	    file_offsets = (int64_t*)ADIOI_Malloc(MAX_ARRAY_SIZE*
++						  sizeof(int64_t));
++	    file_lengths = (int32_t*)ADIOI_Malloc(MAX_ARRAY_SIZE*
++						  sizeof(int32_t));
++	}
++	/* if there's no full readlist allocate file arrays according
++	   to needed size (extra_blks) */
++	else {
++	    file_offsets = (int64_t*)ADIOI_Malloc(extra_blks*
++						  sizeof(int64_t));
++	    file_lengths = (int32_t*)ADIOI_Malloc(extra_blks*
++						  sizeof(int32_t));
++	}
++	
++	/* for file arrays that are of MAX_ARRAY_SIZE, build arrays */
++	for (i=0; i<n_read_lists; i++) {
++	    file_list_count = MAX_ARRAY_SIZE;
++	    if(!i) {
++	        file_offsets[0] = offset;
++		file_lengths[0] = st_frd_size;
++		mem_lengths = st_frd_size;
++	    }
++	    for (k=0; k<MAX_ARRAY_SIZE; k++) {
++	        if (i || k) {
++		    file_offsets[k] = disp + 
++			((ADIO_Offset)n_filetypes)*filetype_extent
++		      + flat_file->indices[j];
++		    file_lengths[k] = flat_file->blocklens[j];
++		    mem_lengths += file_lengths[k];
++		}
++		if (j<(flat_file->count - 1)) j++;
++		else {
++		    j = 0;
++		    n_filetypes++;
++		}
++	    } /* for (k=0; k<MAX_ARRAY_SIZE; k++) */
++	    err_flag = PVFS_Request_contiguous(mem_lengths, 
++					       PVFS_BYTE, &mem_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_contiguous (memory)", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++
++	    err_flag = PVFS_Request_hindexed(file_list_count, file_lengths, 
++					     file_offsets, PVFS_BYTE,
++					     &file_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_hindexed (file)", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++
++	    /* PVFS_Request_hindexed already expresses the offsets into the
++	     * file, so we should not pass in an offset if we are using
++	     * hindexed for the file type */
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_a, 0, NULL );
++#endif
++	    err_flag = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, 0, 
++				     mem_offsets, mem_req,
++					&(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io);
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_b, 0, NULL );
++#endif
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_sys_read_ex", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDING-- */
++	    PVFS_Request_free(&mem_req);
++	    PVFS_Request_free(&file_req);
++
++	    total_bytes_read += resp_io.total_completed;
++
++	    mem_offsets += mem_lengths;
++	    mem_lengths = 0;
++	} /* for (i=0; i<n_read_lists; i++) */
++
++	/* for file arrays smaller than MAX_ARRAY_SIZE (last read_list call) */
++	if (extra_blks) {
++	    file_list_count = extra_blks;
++	    if(!i) {
++	        file_offsets[0] = offset;
++		file_lengths[0] = ADIOI_MIN(st_frd_size, bufsize);
++	    }
++	    for (k=0; k<extra_blks; k++) {
++	        if(i || k) {
++		    file_offsets[k] = disp + 
++			((ADIO_Offset)n_filetypes)*filetype_extent +
++			flat_file->indices[j];
++		    if (k == (extra_blks - 1)) {
++		        file_lengths[k] = bufsize - (int32_t) mem_lengths
++			  - (int32_t) mem_offsets + (int32_t)  buf;
++		    }
++		    else file_lengths[k] = flat_file->blocklens[j];
++		} /* if(i || k) */
++		mem_lengths += file_lengths[k];
++		if (j<(flat_file->count - 1)) j++;
++		else {
++		    j = 0;
++		    n_filetypes++;
++		}
++	    } /* for (k=0; k<extra_blks; k++) */
++	    err_flag = PVFS_Request_contiguous(mem_lengths,
++					       PVFS_BYTE, &mem_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_contiguous (memory)", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++
++	    err_flag = PVFS_Request_hindexed(file_list_count, file_lengths, 
++		    file_offsets, PVFS_BYTE, &file_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_hindexed (file)", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++
++	    /* as above, use 0 for 'offset' when using hindexed file type */
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_a, 0, NULL );
++#endif
++	    err_flag = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, 0, 
++					mem_offsets, mem_req, &(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io);
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_b, 0, NULL );
++#endif
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_sys_read_ex", 0);		
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++	    PVFS_Request_free(&mem_req);
++	    PVFS_Request_free(&file_req);
++	    total_bytes_read += resp_io.total_completed;
++	}
++    }
++    else {
++/* noncontiguous in memory as well as in file */
++      
++        ADIOI_Flatten_datatype(datatype);
++	flat_buf = ADIOI_Flatlist;
++	while (flat_buf->type != datatype) flat_buf = flat_buf->next;
++
++	size_read = 0;
++	n_filetypes = st_n_filetypes;
++	frd_size = st_frd_size;
++	brd_size = flat_buf->blocklens[0];
++	buf_count = 0;
++	start_mem_offset = 0;
++	start_k = k = 0;
++	start_j = st_index;
++	max_mem_list = 0;
++	max_file_list = 0;
++
++	/* run through and file max_file_list and max_mem_list so that you 
++	   can allocate the file and memory arrays less than MAX_ARRAY_SIZE
++	   if possible */
++
++	while (size_read < bufsize) {
++	    k = start_k;
++	    new_buffer_read = 0;
++	    mem_list_count = 0;
++	    while ((mem_list_count < MAX_ARRAY_SIZE) && 
++		   (new_buffer_read < bufsize-size_read)) {
++	        /* find mem_list_count and file_list_count such that both are
++		   less than MAX_ARRAY_SIZE, the sum of their lengths are
++		   equal, and the sum of all the data read and data to be
++		   read in the next immediate read list is less than
++		   bufsize */
++	        if(mem_list_count) {
++		    if((new_buffer_read + flat_buf->blocklens[k] + 
++			size_read) > bufsize) {
++		        end_brd_size = new_buffer_read + 
++			    flat_buf->blocklens[k] - (bufsize - size_read);
++			new_buffer_read = bufsize - size_read;
++		    }
++		    else {
++		        new_buffer_read += flat_buf->blocklens[k];
++			end_brd_size = flat_buf->blocklens[k];
++		    }
++		}
++		else {
++		    if (brd_size > (bufsize - size_read)) {
++		        new_buffer_read = bufsize - size_read;
++			brd_size = new_buffer_read;
++		    }
++		    else new_buffer_read = brd_size;
++		}
++		mem_list_count++;
++		k = (k + 1)%flat_buf->count;
++	     } /* while ((mem_list_count < MAX_ARRAY_SIZE) && 
++	       (new_buffer_read < bufsize-size_read)) */
++	    j = start_j;
++	    new_file_read = 0;
++	    file_list_count = 0;
++	    while ((file_list_count < MAX_ARRAY_SIZE) && 
++		   (new_file_read < new_buffer_read)) {
++	        if(file_list_count) {
++		    if((new_file_read + flat_file->blocklens[j]) > 
++		       new_buffer_read) {
++		        end_frd_size = new_buffer_read - new_file_read;
++			new_file_read = new_buffer_read;
++			j--;
++		    }
++		    else {
++		        new_file_read += flat_file->blocklens[j];
++			end_frd_size = flat_file->blocklens[j];
++		    }
++		}
++		else {
++		    if (frd_size > new_buffer_read) {
++		        new_file_read = new_buffer_read;
++			frd_size = new_file_read;
++		    }
++		    else new_file_read = frd_size;
++		}
++		file_list_count++;
++		if (j < (flat_file->count - 1)) j++;
++		else j = 0;
++		
++		k = start_k;
++		if ((new_file_read < new_buffer_read) && 
++		    (file_list_count == MAX_ARRAY_SIZE)) {
++		    new_buffer_read = 0;
++		    mem_list_count = 0;
++		    while (new_buffer_read < new_file_read) {
++		        if(mem_list_count) {
++			    if((new_buffer_read + flat_buf->blocklens[k]) >
++			       new_file_read) {
++			        end_brd_size = new_file_read - new_buffer_read;
++				new_buffer_read = new_file_read;
++				k--;
++			    }
++			    else {
++			        new_buffer_read += flat_buf->blocklens[k];
++				end_brd_size = flat_buf->blocklens[k];
++			    }
++			}
++			else {
++			    new_buffer_read = brd_size;
++			    if (brd_size > (bufsize - size_read)) {
++			        new_buffer_read = bufsize - size_read;
++				brd_size = new_buffer_read;
++			    }
++			}
++			mem_list_count++;
++			k = (k + 1)%flat_buf->count;
++		    } /* while (new_buffer_read < new_file_read) */
++		} /* if ((new_file_read < new_buffer_read) && (file_list_count
++		     == MAX_ARRAY_SIZE)) */
++	    } /* while ((mem_list_count < MAX_ARRAY_SIZE) && 
++		 (new_buffer_read < bufsize-size_read)) */
++
++	    /*  fakes filling the readlist arrays of lengths found above  */
++	    k = start_k;
++	    j = start_j;
++	    for (i=0; i<mem_list_count; i++) {	     
++		if(i) {
++		    if (i == (mem_list_count - 1)) {
++			if (flat_buf->blocklens[k] == end_brd_size)
++			    brd_size = flat_buf->blocklens[(k+1)%
++							  flat_buf->count];
++			else {
++			    brd_size = flat_buf->blocklens[k] - end_brd_size;
++			    k--;
++			    buf_count--;
++			}
++		    }
++		}
++		buf_count++;
++		k = (k + 1)%flat_buf->count;
++	    } /* for (i=0; i<mem_list_count; i++) */
++	    for (i=0; i<file_list_count; i++) {
++		if (i) {
++		    if (i == (file_list_count - 1)) {
++			if (flat_file->blocklens[j] == end_frd_size)
++			    frd_size = flat_file->blocklens[(j+1)%
++							  flat_file->count];   
++			else {
++			    frd_size = flat_file->blocklens[j] - end_frd_size;
++			    j--;
++			}
++		    }
++		}
++		if (j < flat_file->count - 1) j++;
++		else {
++		    j = 0;
++		    n_filetypes++;
++		}
++	    } /* for (i=0; i<file_list_count; i++) */
++	    size_read += new_buffer_read;
++	    start_k = k;
++	    start_j = j;
++	    if (max_mem_list < mem_list_count)
++	        max_mem_list = mem_list_count;
++	    if (max_file_list < file_list_count)
++	        max_file_list = file_list_count;
++	} /* while (size_read < bufsize) */
++
++	/* one last check before we actually carry out the operation:
++	 * this code has hard-to-fix bugs when a noncontiguous file type has
++	 * such large pieces that the sum of the lengths of the memory type is
++	 * not larger than one of those pieces (and vice versa for large memory
++	 * types and many pices of file types.  In these cases, give up and
++	 * fall back to naive reads and writes.  The testphdf5 test created a
++	 * type with two very large memory regions and 600 very small file
++	 * regions.  The same test also created a type with one very large file
++	 * region and many (700) very small memory regions.  both cases caused
++	 * problems for this code */
++
++	if ( ( (file_list_count == 1) && 
++		    (new_file_read < flat_file->blocklens[0] ) ) ||
++		((mem_list_count == 1) && 
++		    (new_buffer_read < flat_buf->blocklens[0]) ) ||
++		((file_list_count == MAX_ARRAY_SIZE) && 
++		    (new_file_read < flat_buf->blocklens[0]) ) ||
++		( (mem_list_count == MAX_ARRAY_SIZE) &&
++		    (new_buffer_read < flat_file->blocklens[0])) )
++	{
++
++	    ADIOI_Delete_flattened(datatype);
++	    ADIOI_GEN_ReadStrided_naive(fd, buf, count, datatype,
++		    file_ptr_type, initial_off, status, error_code);
++	    return;
++	}
++
++	mem_offsets = (PVFS_size*)ADIOI_Malloc(max_mem_list*sizeof(PVFS_size));
++	mem_lengths = (int *)ADIOI_Malloc(max_mem_list*sizeof(int));
++	file_offsets = (int64_t *)ADIOI_Malloc(max_file_list*sizeof(int64_t));
++	file_lengths = (int32_t *)ADIOI_Malloc(max_file_list*sizeof(int32_t));
++	    
++	size_read = 0;
++	n_filetypes = st_n_filetypes;
++	frd_size = st_frd_size;
++	brd_size = flat_buf->blocklens[0];
++	buf_count = 0;
++	start_mem_offset = 0;
++	start_k = k = 0;
++	start_j = st_index;
++
++	/*  this section calculates mem_list_count and file_list_count
++	    and also finds the possibly odd sized last array elements
++	    in new_frd_size and new_brd_size  */
++	
++	while (size_read < bufsize) {
++	    k = start_k;
++	    new_buffer_read = 0;
++	    mem_list_count = 0;
++	    while ((mem_list_count < MAX_ARRAY_SIZE) && 
++		   (new_buffer_read < bufsize-size_read)) {
++	        /* find mem_list_count and file_list_count such that both are
++		   less than MAX_ARRAY_SIZE, the sum of their lengths are
++		   equal, and the sum of all the data read and data to be
++		   read in the next immediate read list is less than
++		   bufsize */
++	        if(mem_list_count) {
++		    if((new_buffer_read + flat_buf->blocklens[k] + 
++			size_read) > bufsize) {
++		        end_brd_size = new_buffer_read + 
++			    flat_buf->blocklens[k] - (bufsize - size_read);
++			new_buffer_read = bufsize - size_read;
++		    }
++		    else {
++		        new_buffer_read += flat_buf->blocklens[k];
++			end_brd_size = flat_buf->blocklens[k];
++		    }
++		}
++		else {
++		    if (brd_size > (bufsize - size_read)) {
++		        new_buffer_read = bufsize - size_read;
++			brd_size = new_buffer_read;
++		    }
++		    else new_buffer_read = brd_size;
++		}
++		mem_list_count++;
++		k = (k + 1)%flat_buf->count;
++	     } /* while ((mem_list_count < MAX_ARRAY_SIZE) && 
++	       (new_buffer_read < bufsize-size_read)) */
++	    j = start_j;
++	    new_file_read = 0;
++	    file_list_count = 0;
++	    while ((file_list_count < MAX_ARRAY_SIZE) && 
++		   (new_file_read < new_buffer_read)) {
++	        if(file_list_count) {
++		    if((new_file_read + flat_file->blocklens[j]) > 
++		       new_buffer_read) {
++		        end_frd_size = new_buffer_read - new_file_read;
++			new_file_read = new_buffer_read;
++			j--;
++		    }
++		    else {
++		        new_file_read += flat_file->blocklens[j];
++			end_frd_size = flat_file->blocklens[j];
++		    }
++		}
++		else {
++		    if (frd_size > new_buffer_read) {
++		        new_file_read = new_buffer_read;
++			frd_size = new_file_read;
++		    }
++		    else new_file_read = frd_size;
++		}
++		file_list_count++;
++		if (j < (flat_file->count - 1)) j++;
++		else j = 0;
++		
++		k = start_k;
++		if ((new_file_read < new_buffer_read) && 
++		    (file_list_count == MAX_ARRAY_SIZE)) {
++		    new_buffer_read = 0;
++		    mem_list_count = 0;
++		    while (new_buffer_read < new_file_read) {
++		        if(mem_list_count) {
++			    if((new_buffer_read + flat_buf->blocklens[k]) >
++			       new_file_read) {
++			        end_brd_size = new_file_read - new_buffer_read;
++				new_buffer_read = new_file_read;
++				k--;
++			    }
++			    else {
++			        new_buffer_read += flat_buf->blocklens[k];
++				end_brd_size = flat_buf->blocklens[k];
++			    }
++			}
++			else {
++			    new_buffer_read = brd_size;
++			    if (brd_size > (bufsize - size_read)) {
++			        new_buffer_read = bufsize - size_read;
++				brd_size = new_buffer_read;
++			    }
++			}
++			mem_list_count++;
++			k = (k + 1)%flat_buf->count;
++		    } /* while (new_buffer_read < new_file_read) */
++		} /* if ((new_file_read < new_buffer_read) && (file_list_count
++		     == MAX_ARRAY_SIZE)) */
++	    } /* while ((mem_list_count < MAX_ARRAY_SIZE) && 
++		 (new_buffer_read < bufsize-size_read)) */
++
++	    /*  fills the allocated readlist arrays  */
++	    k = start_k;
++	    j = start_j;
++	    for (i=0; i<mem_list_count; i++) {	     
++	        mem_offsets[i] = ((PVFS_size)buf + buftype_extent*
++					 (buf_count/flat_buf->count) +
++					 (int)flat_buf->indices[k]);
++		if(!i) {
++		    mem_lengths[0] = brd_size;
++		    mem_offsets[0] += flat_buf->blocklens[k] - brd_size;
++		}
++		else {
++		    if (i == (mem_list_count - 1)) {
++		        mem_lengths[i] = end_brd_size;
++			if (flat_buf->blocklens[k] == end_brd_size)
++			    brd_size = flat_buf->blocklens[(k+1)%
++							  flat_buf->count];
++			else {
++			    brd_size = flat_buf->blocklens[k] - end_brd_size;
++			    k--;
++			    buf_count--;
++			}
++		    }
++		    else {
++		        mem_lengths[i] = flat_buf->blocklens[k];
++		    }
++		}
++		buf_count++;
++		k = (k + 1)%flat_buf->count;
++	    } /* for (i=0; i<mem_list_count; i++) */
++	    for (i=0; i<file_list_count; i++) {
++	        file_offsets[i] = disp + flat_file->indices[j] + 
++		    ((ADIO_Offset)n_filetypes) * filetype_extent;
++	        if (!i) {
++		    file_lengths[0] = frd_size;
++		    file_offsets[0] += flat_file->blocklens[j] - frd_size;
++		}
++		else {
++		    if (i == (file_list_count - 1)) {
++		        file_lengths[i] = end_frd_size;
++			if (flat_file->blocklens[j] == end_frd_size)
++			    frd_size = flat_file->blocklens[(j+1)%
++							  flat_file->count];   
++			else {
++			    frd_size = flat_file->blocklens[j] - end_frd_size;
++			    j--;
++			}
++		    }
++		    else file_lengths[i] = flat_file->blocklens[j];
++		}
++		if (j < flat_file->count - 1) j++;
++		else {
++		    j = 0;
++		    n_filetypes++;
++		}
++	    } /* for (i=0; i<file_list_count; i++) */
++	    err_flag = PVFS_Request_hindexed(mem_list_count, mem_lengths, 
++		    mem_offsets, PVFS_BYTE, &mem_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0 ) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_hindexed (memory)", 0);
++		goto error_state;
++	    }
++	    /* -- END ERROR HANDLING-- */
++	    err_flag = PVFS_Request_hindexed(file_list_count, file_lengths, 
++		    file_offsets, PVFS_BYTE, &file_req);
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_Request_hindexed (file)", 0);
++		goto error_state;
++	    }
++	    /* --END ERROR HANDLING-- */
++
++	    /* offset will be expressed in memory and file datatypes */
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_a, 0, NULL );
++#endif
++	    err_flag = PVFS_sys_read_ex(pvfs_fs->object_ref, file_req, 0, 
++					PVFS_BOTTOM, mem_req, &(pvfs_fs->credentials), datatype /* sson */, op /* sson */, &resp_io);
++#ifdef ADIOI_MPE_LOGGING
++            MPE_Log_event( ADIOI_MPE_read_b, 0, NULL );
++#endif
++	    /* --BEGIN ERROR HANDLING-- */
++	    if (err_flag != 0) {
++		*error_code = MPIO_Err_create_code(MPI_SUCCESS,
++						   MPIR_ERR_RECOVERABLE,
++						   myname, __LINE__,
++						   ADIOI_PVFS2_error_convert(err_flag),
++						   "Error in PVFS_sys_read_ex", 0);
++	    }
++	    /* --END ERROR HANDLING-- */
++	    PVFS_Request_free(&mem_req);
++	    PVFS_Request_free(&file_req);
++	    total_bytes_read += resp_io.total_completed;
++	    size_read += new_buffer_read;
++	    start_k = k;
++	    start_j = j;
++	} /* while (size_read < bufsize) */
++	ADIOI_Free(mem_offsets);
++	ADIOI_Free(mem_lengths);
++    }
++    /* Other ADIO routines will convert absolute bytes into counts of datatypes */
++    /* when incrementing fp_ind, need to also take into account the file type:
++     * consider an N-element 1-d subarray with a lb and ub: ( |---xxxxx-----|
++     * if we wrote N elements, offset needs to point at beginning of type, not
++     * at empty region at offset N+1) 
++     *
++     * As we discussed on mpich-discuss in may/june 2009, the code below might
++     * look wierd, but by putting fp_ind at the last byte written, the next
++     * time we run through the strided code we'll update the fp_ind to the
++     * right location. */
++    if (file_ptr_type == ADIO_INDIVIDUAL) {
++	fd->fp_ind = file_offsets[file_list_count-1]+
++	    file_lengths[file_list_count-1];
++    }
++    
++    ADIOI_Free(file_offsets);
++    ADIOI_Free(file_lengths);
++    
++    if (err_flag == 0) *error_code = MPI_SUCCESS;
++
++error_state:
++    fd->fp_sys_posn = -1;   /* set it to null. */
++
++#ifdef HAVE_STATUS_SET_BYTES
++    MPIR_Status_set_bytes(status, datatype, bufsize);
++    /* This is a temporary way of filling in status. The right way is to 
++       keep track of how much data was actually read and placed in buf 
++       by ADIOI_BUFFERED_READ. */
++#endif
++    
++    if (!buftype_is_contig) ADIOI_Delete_flattened(datatype);
++} /* sson */
++
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/include/adioi.h mpich2-1.1/src/mpi/romio/adio/include/adioi.h
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/adio/include/adioi.h	2009-05-09 11:18:02.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/adio/include/adioi.h	2009-06-09 00:33:52.874619978 -0500
+@@ -148,6 +148,9 @@
+     void (*ADIOI_xxx_ReadContig) (ADIO_File fd, void *buf, int count, 
+                    MPI_Datatype datatype, int file_ptr_type, 
+                    ADIO_Offset offset, ADIO_Status *status, int *error_code);
++    void (*ADIOI_xxx_ReadContig_ex) (ADIO_File fd, void *buf, int count, 
++				     MPI_Datatype datatype, MPI_Op /* sson */, int file_ptr_type, 
++				     ADIO_Offset offset, ADIO_Status *status, int *error_code); /* sson */
+     void (*ADIOI_xxx_WriteContig) (ADIO_File fd, void *buf, int count, 
+                    MPI_Datatype datatype, int file_ptr_type, 
+                    ADIO_Offset offset, ADIO_Status *status, int *error_code);  
+@@ -166,6 +169,9 @@
+     void (*ADIOI_xxx_ReadStrided) (ADIO_File fd, void *buf, int count,
+ 	       MPI_Datatype datatype, int file_ptr_type,
+ 	       ADIO_Offset offset, ADIO_Status *status, int *error_code);
++    void (*ADIOI_xxx_ReadStrided_ex) (ADIO_File fd, void *buf, int count,
++				      MPI_Datatype datatype, MPI_Op op /* sson */, int file_ptr_type,
++				      ADIO_Offset offset, ADIO_Status *status, int *error_code); /* sson */
+     void (*ADIOI_xxx_WriteStrided) (ADIO_File fd, void *buf, int count,
+ 	       MPI_Datatype datatype, int file_ptr_type,
+ 	       ADIO_Offset offset, ADIO_Status *status, int *error_code);
+@@ -229,6 +235,9 @@
+ #define ADIO_ReadContig(fd,buf,count,datatype,file_ptr_type,offset,status,error_code) \
+         (*(fd->fns->ADIOI_xxx_ReadContig))(fd,buf,count,datatype,file_ptr_type,offset,status,error_code)
+ 
++#define ADIO_ReadContig_ex(fd,buf,count,datatype,op,file_ptr_type,offset,status,error_code) \
++    (*(fd->fns->ADIOI_xxx_ReadContig_ex))(fd,buf,count,datatype,op,file_ptr_type,offset,status,error_code) /* sson*/
++
+ #define ADIO_WriteContig(fd,buf,count,datatype,file_ptr_type,offset,status,error_code) \
+         (*(fd->fns->ADIOI_xxx_WriteContig))(fd,buf,count,datatype,file_ptr_type,offset,status,error_code)
+ 
+@@ -266,6 +275,9 @@
+ #define ADIO_ReadStrided(fd,buf,count,datatype,file_ptr_type,offset,status,error_code) \
+         (*(fd->fns->ADIOI_xxx_ReadStrided))(fd,buf,count,datatype,file_ptr_type,offset,status,error_code)
+ 
++#define ADIO_ReadStrided_ex(fd,buf,count,datatype,op,file_ptr_type,offset,status,error_code) \
++    (*(fd->fns->ADIOI_xxx_ReadStrided_ex))(fd,buf,count,datatype,op,file_ptr_type,offset,status,error_code) /* sson */
++
+ #define ADIO_WriteStrided(fd,buf,count,datatype,file_ptr_type,offset,status,error_code) \
+         (*(fd->fns->ADIOI_xxx_WriteStrided))(fd,buf,count,datatype,file_ptr_type,offset,status,error_code)
+ 
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/mpi-io/read_at.c mpich2-1.1/src/mpi/romio/mpi-io/read_at.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/mpi-io/read_at.c	2007-11-02 17:50:19.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/mpi-io/read_at.c	2009-06-09 00:35:01.762620316 -0500
+@@ -61,3 +61,27 @@
+ 
+     return error_code;
+ }
++
++/* sson */
++int MPI_File_read_at_ex(MPI_File mpi_fh, MPI_Offset offset, void *buf,
++			int count, MPI_Datatype datatype, MPI_Op op /* sson */, MPI_Status *status)
++{
++    int error_code;
++    static char myname[] = "MPI_FILE_READ_AT";
++#ifdef MPI_hpux
++    int fl_xmpi;
++
++    HPMP_IO_START(fl_xmpi, BLKMPIFILEREADAT, TRDTBLOCK, mpi_fh, datatype,
++		  count);
++#endif /* MPI_hpux */
++
++    /* ADIOI_File_read() defined in mpi-io/read.c */
++    error_code = MPIOI_File_read_ex(mpi_fh, offset, ADIO_EXPLICIT_OFFSET, buf,
++				    count, datatype, op /* sson */, myname, status);
++
++#ifdef MPI_hpux
++    HPMP_IO_END(fl_xmpi, mpi_fh, datatype, count);
++#endif /* MPI_hpux */
++
++    return error_code;
++} /* sson */
+diff -uNr -X EXCL /home/sson/test/mpich2-1.1.org/src/mpi/romio/mpi-io/read.c mpich2-1.1/src/mpi/romio/mpi-io/read.c
+--- /home/sson/test/mpich2-1.1.org/src/mpi/romio/mpi-io/read.c	2008-09-22 12:36:01.000000000 -0500
++++ mpich2-1.1/src/mpi/romio/mpi-io/read.c	2009-06-09 00:34:32.263992581 -0500
+@@ -59,6 +59,27 @@
+     return error_code;
+ }
+ 
++int MPI_File_read_ex(MPI_File mpi_fh, void *buf, int count, 
++		     MPI_Datatype datatype, MPI_Op op /* sson */, MPI_Status *status)
++{
++    int error_code;
++    static char myname[] = "MPI_FILE_READ";
++#ifdef MPI_hpux
++    int fl_xmpi;
++
++    HPMP_IO_START(fl_xmpi, BLKMPIFILEREAD, TRDTBLOCK, mpi_fh, datatype, count);
++#endif /* MPI_hpux */
++
++    error_code = MPIOI_File_read_ex(mpi_fh, (MPI_Offset) 0, ADIO_INDIVIDUAL, buf,
++				 count, datatype, op /* sson */, myname, status);
++
++#ifdef MPI_hpux
++    HPMP_IO_END(fl_xmpi, mpi_fh, datatype, count);
++#endif /* MPI_hpux */
++
++    return error_code;
++} /* sson */
++
+ /* prevent multiple definitions of this routine */
+ #ifdef MPIO_BUILD_PROFILING
+ int MPIOI_File_read(MPI_File mpi_fh,
+@@ -163,3 +184,109 @@
+     return error_code;
+ }
+ #endif
++
++/* sson */
++#ifdef MPIO_BUILD_PROFILING
++int MPIOI_File_read_ex(MPI_File mpi_fh,
++		    MPI_Offset offset,
++		    int file_ptr_type,
++		    void *buf,
++		    int count,
++		    MPI_Datatype datatype,
++		       MPI_Op op, /* sson */
++		    char *myname,
++		    MPI_Status *status)
++{
++    int error_code, bufsize, buftype_is_contig, filetype_is_contig;
++    int datatype_size;
++    ADIO_File fh;
++    ADIO_Offset off;
++
++    MPIU_THREAD_CS_ENTER(ALLFUNC,);
++    MPIR_Nest_incr();
++
++    fh = MPIO_File_resolve(mpi_fh);
++
++    /* --BEGIN ERROR HANDLING-- */
++    MPIO_CHECK_FILE_HANDLE(fh, myname, error_code);
++    MPIO_CHECK_COUNT(fh, count, myname, error_code);
++    MPIO_CHECK_DATATYPE(fh, datatype, myname, error_code);
++
++    if (file_ptr_type == ADIO_EXPLICIT_OFFSET && offset < 0)
++    {
++	error_code = MPIO_Err_create_code(MPI_SUCCESS, MPIR_ERR_RECOVERABLE,
++					  myname, __LINE__, MPI_ERR_ARG,
++					  "**iobadoffset", 0);
++	error_code = MPIO_Err_return_file(fh, error_code);
++	goto fn_exit;
++    }
++    /* --END ERROR HANDLING-- */
++
++    MPI_Type_size(datatype, &datatype_size);
++
++    /* --BEGIN ERROR HANDLING-- */
++    MPIO_CHECK_COUNT_SIZE(fh, count, datatype_size, myname, error_code);
++    /* --END ERROR HANDLING-- */
++
++    if (count*datatype_size == 0)
++    {
++#ifdef HAVE_STATUS_SET_BYTES
++       MPIR_Status_set_bytes(status, datatype, 0);
++#endif
++	error_code = MPI_SUCCESS;
++	goto fn_exit;
++    }
++
++    /* --BEGIN ERROR HANDLING-- */
++    MPIO_CHECK_INTEGRAL_ETYPE(fh, count, datatype_size, myname, error_code);
++    MPIO_CHECK_READABLE(fh, myname, error_code);
++    MPIO_CHECK_NOT_SEQUENTIAL_MODE(fh, myname, error_code);
++    /* --END ERROR HANDLING-- */
++
++    ADIOI_Datatype_iscontig(datatype, &buftype_is_contig);
++    ADIOI_Datatype_iscontig(fh->filetype, &filetype_is_contig);
++
++    ADIOI_TEST_DEFERRED(fh, myname, &error_code);
++
++    if (buftype_is_contig && filetype_is_contig)
++    {
++    /* convert count and offset to bytes */
++	bufsize = datatype_size * count;
++	if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
++	    off = fh->disp + fh->etype_size * offset;
++	}
++	else /* ADIO_INDIVIDUAL */ {
++	    off = fh->fp_ind;
++	}
++
++        /* if atomic mode requested, lock (exclusive) the region, because
++           there could be a concurrent noncontiguous request.
++	 */
++        if ((fh->atomicity) && ADIO_Feature(fh, ADIO_LOCKS))
++            ADIOI_WRITE_LOCK(fh, off, SEEK_SET, bufsize);
++
++	ADIO_ReadContig_ex(fh, buf, count, datatype, op /* sson */, file_ptr_type,
++			   off, status, &error_code); /* sson */
++
++        if ((fh->atomicity) && ADIO_Feature(fh, ADIO_LOCKS))
++            ADIOI_UNLOCK(fh, off, SEEK_SET, bufsize);
++    }
++    else
++    {
++	ADIO_ReadStrided_ex(fh, buf, count, datatype, op /* sson */, file_ptr_type,
++			    offset, status, &error_code); /* sson */
++	/* For strided and atomic mode, locking is done in ADIO_ReadStrided */
++    }
++
++    /* --BEGIN ERROR HANDLING-- */
++    if (error_code != MPI_SUCCESS)
++	error_code = MPIO_Err_return_file(fh, error_code);
++    /* --END ERROR HANDLING-- */
++
++fn_exit:
++    MPIR_Nest_decr();
++    MPIU_THREAD_CS_EXIT(ALLFUNC,);
++
++    return error_code;
++} /* sson */
++#endif
