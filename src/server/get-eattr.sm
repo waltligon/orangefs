@@ -866,8 +866,11 @@ static PINT_sm_action geteattr_cleanup(
             {
                 free(s_op->resp.u.geteattr.val[i].buffer);
             }
-            free(s_op->u.eattr.active.actives);
         }
+    }
+    if(s_op->u.eattr.active.actives)
+    {
+        free(s_op->u.eattr.active.actives);
     }
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);

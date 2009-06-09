@@ -159,7 +159,9 @@ typedef struct
 #endif
     PVFS_Request file_req;
     PVFS_Request mem_req;
-    PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
+    PVFS_ds_keyval key;/* used only by seteattr */
+    int nkey;
+    PVFS_ds_keyval * keys;/* used only by geteattr */
     PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
     /* The next few fields are used only by readx, writex */
@@ -861,6 +863,8 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_hint hints;
+    int i;
+    char *b, *pb;
     
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -868,46 +872,75 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.getxattr.refn.fs_id,
         llu(vfs_request->in_upcall.req.getxattr.refn.handle));
 
-    /* We need to fill in the vfs_request->key field here */
-    vfs_request->key.buffer = vfs_request->in_upcall.req.getxattr.key;
-    vfs_request->key.buffer_sz = vfs_request->in_upcall.req.getxattr.key_sz;
-    gossip_debug( GOSSIP_CLIENTCORE_DEBUG, 
-            "getxattr key %s keysz %d\n", 
-            (char *) vfs_request->key.buffer, vfs_request->key.buffer_sz);
+    vfs_request->nkey = 1;
+    b = vfs_request->in_upcall.req.getxattr.key;
+    while((b = index(b, '\n')) != NULL)
+    {
+        ++b;
+        vfs_request->nkey++;
+    }
+    
+    vfs_request->keys = malloc(sizeof(PVFS_ds_keyval) * vfs_request->nkey);
+    if(vfs_request->nkey > 1)
+    {
+        pb = vfs_request->in_upcall.req.getxattr.key;
+        for(i = 0; i < vfs_request->nkey; ++i)
+        {
+            b = index(pb, '\n');
+            if(b) *b = '\0';
+
+            vfs_request->keys[i].buffer = pb;
+            vfs_request->keys[i].buffer_sz = strlen(pb) + 1;
+            pb = b + 1;
+        }
+    }
+    else
+    {
+
+        /* We need to fill in the vfs_request->key field here */
+        vfs_request->keys[0].buffer = vfs_request->in_upcall.req.getxattr.key;
+        vfs_request->keys[0].buffer_sz = vfs_request->in_upcall.req.getxattr.key_sz;
+        gossip_debug( GOSSIP_CLIENTCORE_DEBUG, 
+                      "getxattr key %s keysz %d\n", 
+                      (char *) vfs_request->keys[0].buffer, vfs_request->keys[0].buffer_sz);
+    }
 
     /* We also need to allocate memory for the vfs_request->response.geteattr */
 
     vfs_request->response.geteattr.val_array = 
-        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval));
+        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval) * vfs_request->nkey);
     if (vfs_request->response.geteattr.val_array == NULL)
     {
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.err_array = 
-        (PVFS_error *) malloc(sizeof(PVFS_error));
+        (PVFS_error *) malloc(sizeof(PVFS_error) * vfs_request->nkey);
     if(vfs_request->response.geteattr.err_array == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
         return -PVFS_ENOMEM;
     }
-    vfs_request->response.geteattr.val_array[0].buffer = 
-        (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
-    if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
+    for(i = 0; i < vfs_request->nkey; ++i)
     {
-        free(vfs_request->response.geteattr.val_array);
-        free(vfs_request->response.geteattr.err_array);
-        return -PVFS_ENOMEM;
+        vfs_request->response.geteattr.val_array[i].buffer = 
+            (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+        if (vfs_request->response.geteattr.val_array[i].buffer == NULL)
+        {
+            free(vfs_request->response.geteattr.val_array);
+            free(vfs_request->response.geteattr.err_array);
+            return -PVFS_ENOMEM;
+        }
+        vfs_request->response.geteattr.val_array[i].buffer_sz = 
+            PVFS_REQ_LIMIT_VAL_LEN;
     }
-    vfs_request->response.geteattr.val_array[0].buffer_sz = 
-        PVFS_REQ_LIMIT_VAL_LEN;
 
     fill_hints(&hints, vfs_request);
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
         vfs_request->in_upcall.req.getxattr.refn,
         &vfs_request->in_upcall.credentials,
-        1,
-        &vfs_request->key,
+        vfs_request->nkey,
+        vfs_request->keys,
         &vfs_request->response.geteattr,
         &vfs_request->op_id, 
         hints, 
@@ -2267,7 +2300,7 @@ err:
 static inline void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i;
     assert(vfs_request);
     assert(error_code);
 
@@ -2663,11 +2696,11 @@ static inline void package_downcall_members(
             if (*error_code == 0)
             {
                 int val_sz = 
-                    vfs_request->response.geteattr.val_array[0].read_sz;
+                    vfs_request->response.geteattr.val_array[vfs_request->nkey-1].read_sz;
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
                         "getxattr: val_sz %d, val %s\n",
                         val_sz, 
-                        (char *) vfs_request->response.geteattr.val_array[0].buffer);
+                        (char *) vfs_request->response.geteattr.val_array[vfs_request->nkey-1].buffer);
                 /* copy the requested key's value out to the downcall */
                 if (val_sz > PVFS_MAX_XATTR_VALUELEN)
                 {
@@ -2678,7 +2711,7 @@ static inline void package_downcall_members(
                 {
                     vfs_request->out_downcall.resp.getxattr.val_sz = val_sz;
                     memcpy(vfs_request->out_downcall.resp.getxattr.val,
-                            vfs_request->response.geteattr.val_array[0].buffer,
+                            vfs_request->response.geteattr.val_array[vfs_request->nkey-1].buffer,
                             val_sz);
                 }
             }
@@ -2686,12 +2719,16 @@ static inline void package_downcall_members(
                 PVFS_perror("getxattr: ", *error_code);
             }
             /* free up the memory allocate to response.geteattr */
-            free(vfs_request->response.geteattr.val_array[0].buffer);
-            vfs_request->response.geteattr.val_array[0].buffer = NULL;
+            for(i = 0; i < vfs_request->nkey; ++i)
+            {
+                free(vfs_request->response.geteattr.val_array[i].buffer);
+                vfs_request->response.geteattr.val_array[i].buffer = NULL;
+            }
             free(vfs_request->response.geteattr.val_array);
             vfs_request->response.geteattr.val_array = NULL;
             free(vfs_request->response.geteattr.err_array);
             vfs_request->response.geteattr.err_array = NULL;
+            free(vfs_request->keys);
             break;
         case PVFS2_VFS_OP_SETXATTR:
             break;
@@ -3286,12 +3323,6 @@ int main(int argc, char **argv)
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
 
-    signal(SIGHUP,  client_core_sig_handler);
-    signal(SIGINT,  client_core_sig_handler);
-    signal(SIGPIPE, client_core_sig_handler);
-    signal(SIGILL,  client_core_sig_handler);
-    signal(SIGTERM, client_core_sig_handler);
-
     /* we don't want to write a core file if we're running under
      * the client parent process, because the client-core process
      * could keep segfaulting, and the client would keep restarting it...
@@ -3299,6 +3330,12 @@ int main(int argc, char **argv)
     if(s_opts.child)
     {
         struct rlimit lim = {0,0};
+
+        signal(SIGHUP,  client_core_sig_handler);
+        signal(SIGINT,  client_core_sig_handler);
+        signal(SIGPIPE, client_core_sig_handler);
+        signal(SIGILL,  client_core_sig_handler);
+        signal(SIGTERM, client_core_sig_handler);
 
         /* set rlimit to prevent core files */
         ret = setrlimit(RLIMIT_CORE, &lim);
