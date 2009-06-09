@@ -278,6 +278,10 @@ static int get_eattr_comp_fn(
                     resp_p->u.geteattr.val[k].buffer_sz;
             sm_p->u.geteattr.resp_p->err_array[k] =
                     resp_p->u.geteattr.err[k];
+            if(resp_p->u.geteattr.err[k] != 0)
+            {
+                gossip_err("geteattr(%d) error = %d\n", k, resp_p->u.geteattr.err[k]);
+            }
             /* check for too big a return message */
             if(resp_p->u.geteattr.err[k] == 0)
             {

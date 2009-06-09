@@ -25,6 +25,9 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 
+#define INTQUEUE_MAXSIZE 2048
+#define STRQUEUE_MAXSIZE 8192
+
 enum
 {
     ACTIVE_DONE = 4,
@@ -62,60 +65,14 @@ machine pvfs2_get_eattr_sm
     state next_active
     {
         run geteattr_next_active;
-        ACTIVE_DONE => active_release;
-        ACTIVE_FETCH_AND_ADD => active_faa;
-        ACTIVE_FETCH_AND_SUBTRACT => active_fas;
-        ACTIVE_COMPARE_AND_SWAP => active_cas;
-        default => final_response;
+        ACTIVE_DONE => check_resp;
+        default => do_active_op;
     }
 
-    state active_release
+    state do_active_op
     {
-        run geteattr_active_release;
-        success => check_resp;
-        default => final_response;
-    }
-
-    state active_faa
-    {
-        run geteattr_active_fetch;
-        success => active_add;
-        default => final_response;
-    }
-
-    state active_add
-    {
-        run geteattr_active_add;
-        success => next_active;
-        default => final_response;
-    }
-
-    state active_fas
-    {
-        run geteattr_active_fetch;
-        success => active_subtract;
-        default => final_response;
-    }
-
-    state active_subtract
-    {
-        run geteattr_active_subtract;
-        success => next_active;
-        default => final_response;
-    }
-
-    state active_cas
-    {
-        run geteattr_active_fetch;
-        success => active_compare_and_swap;
-        default => final_response;
-    }
-
-    state active_compare_and_swap
-    {
-        run geteattr_active_compare_and_swap;
-        success => next_active;
-        default => final_response;
+        run geteattr_do_active_op;
+        default => next_active;
     }
 
     state prelude
@@ -152,6 +109,33 @@ machine pvfs2_get_eattr_sm
 
 %%
 
+#define INTOP      "active.int."
+#define INTQUEUEOP "active.intqueue."
+#define STRQUEUEOP "active.strqueue."
+
+#define INTOP_FAA "fetch_and_add("
+#define INTOP_CAS "compare_and_swap("
+#define INTOP_FAS "fetch_and_store("
+
+#define INTQUEUEOP_ENQUEUE "enqueue("
+#define INTQUEUEOP_DEQUEUE "dequeue("
+#define INTQUEUEOP_HEAD "head("
+#define INTQUEUEOP_TAIL "tail("
+
+#define STRQUEUEOP_ENQUEUE "enqueue("
+#define STRQUEUEOP_DEQUEUE "dequeue("
+#define STRQUEUEOP_HEAD "head("
+#define STRQUEUEOP_TAIL "tail("
+
+static int active_op(char *key, int len);
+static char * skip_ws(char * buf);
+static char * get_memrchr(char *buf, char c, int n);
+static int extract_int_with_next(char *buffer, int *value, char **next);
+static int extract_int(char *buffer, int *value);
+static int extract_string(char *buffer, char **value);
+static int extract_name(char *buf, int prefix, PVFS_ds_keyval *key, char **next);
+static int extract_active_op(char *buffer, int buffer_sz, struct active *a);
+
 /*
  * geteattr_active_setup()
  * Handle active attributes
@@ -159,11 +143,33 @@ machine pvfs2_get_eattr_sm
 static PINT_sm_action geteattr_active_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int i, tsz;
+    int i, ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     js_p->error_code = 0;
 
     /* TODO: check perms! */
+
+    s_op->u.eattr.active.actives = malloc(sizeof(struct active) *
+                                          s_op->req->u.geteattr.nkey);
+    if(!s_op->u.eattr.active.actives)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* convert active attributes to operation structures */
+    for(i = 0; i < s_op->req->u.geteattr.nkey; ++i)
+    {
+        ret = extract_active_op(
+            s_op->req->u.geteattr.key[i].buffer,
+            s_op->req->u.geteattr.key[i].buffer_sz,
+            &s_op->u.eattr.active.actives[i]);
+        if(ret != 0)
+        {
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+    }
 
     s_op->resp.u.geteattr.val =
         malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
@@ -180,27 +186,8 @@ static PINT_sm_action geteattr_active_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->resp.u.geteattr.err, 0, s_op->req->u.geteattr.nkey * sizeof(PVFS_error));
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
-    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
-    {
-        s_op->resp.u.geteattr.val[i].buffer = malloc(
-            s_op->req->u.geteattr.valsz[i]);
-        if (!s_op->resp.u.geteattr.val[i].buffer)
-        {
-            for(--i; i >= 0; --i)
-            {
-                free(s_op->resp.u.geteattr.val[i].buffer);
-            }
-            s_op->resp.u.geteattr.nkey = 0;
-            free (s_op->resp.u.geteattr.val);
-            free (s_op->resp.u.geteattr.err);
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        s_op->resp.u.geteattr.val[i].buffer_sz = s_op->req->u.geteattr.valsz[i];
-        s_op->resp.u.geteattr.err[i] = 0;
-    }
-
     s_op->u.eattr.active.index = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -220,28 +207,24 @@ static PINT_sm_action geteattr_active_reqsched(
                               &(s_op->scheduled_id), server_job_context);
 }
 
-static PINT_sm_action geteattr_active_release(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    job_id_t tmp_id;
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
-
-    return job_req_sched_release(s_op->scheduled_id,
-                                 smcb, 0, js_p, &tmp_id, server_job_context);
-}
-
-#define FAA "active.faa("
-#define FAS "active.fas("
-#define CAS "active.cas("
-
 static PINT_sm_action geteattr_next_active(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    char *key, *c, *xattr_key, *l, *valstr;
-    int len, xattr_keylen, valstr_len;
+    job_id_t jid;
+    int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
+    struct active *active;
+
+    if(js_p->error_code != 0 && s_op->u.eattr.active.index == 0)
+    {
+        s_op->resp.u.geteattr.err[s_op->u.eattr.active.index--] = js_p->error_code;
+        js_p->error_code = 0;
+    }
+    else if(js_p->error_code != 0)
+    {
+        js_p->error_code = ACTIVE_DONE;
+        return SM_ACTION_COMPLETE;
+    }
 
     if(s_op->u.eattr.active.index == s_op->req->u.geteattr.nkey)
     {
@@ -249,233 +232,39 @@ static PINT_sm_action geteattr_next_active(
         return SM_ACTION_COMPLETE;
     }
 
-    key = s_op->req->u.geteattr.key[s_op->u.eattr.active.index].buffer;
-    len = s_op->req->u.geteattr.key[s_op->u.eattr.active.index].buffer_sz;
-
-    if(!strncmp(key, FAA, strlen(FAA)))
+    active = &s_op->u.eattr.active.actives[s_op->u.eattr.active.index];
+    switch(active->type)
     {
-        key += strlen(FAA);
-        len -= strlen(FAA);
-        key[len] = '\0';
-        c = index(key, ',');
-        xattr_keylen = c - key;
-        len -= xattr_keylen;
-        xattr_key = malloc(xattr_keylen + 1);
-        if(!xattr_key)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        strncpy(xattr_key, key, xattr_keylen);
-        xattr_key[xattr_keylen] = '\0';
-        xattr_keylen++;
+        case ACTIVE_INT:
+            active->xattr_value.buffer = &active->u.aint.fetched;
+            active->xattr_value.buffer_sz = sizeof(active->u.aint.fetched);
+            break;
+        case ACTIVE_INTQUEUE:
+            active->xattr_value.buffer = malloc(sizeof(int) * INTQUEUE_MAXSIZE);
+            if(!active->xattr_value.buffer)
+            {
+                s_op->resp.u.geteattr.err[s_op->u.eattr.active.index] = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            active->xattr_value.buffer_sz = sizeof(int) * INTQUEUE_MAXSIZE;
+            break;
 
-        l = rindex(xattr_key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            xattr_keylen--;
-            l = rindex(xattr_key, ' ');
-        }
-        key = c+1;
-        l = index(key, ' ');
-        while(l)
-        {
-            key++;
-            len--;
-            l = index(l+1, ' ');
-        }
-        key[len] = '\0';
-        c = index(key, ')');
-        l = rindex(key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            c--;
-            l = rindex(key, ' ');
-        }
-        valstr_len = c - key;
-        valstr = malloc(valstr_len + 1);
-        if(!valstr)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        strncpy(valstr, key, valstr_len);
-        valstr[valstr_len] = '\0';
-        sscanf(valstr, "%d", &s_op->u.eattr.active.value.add);
-        js_p->error_code = ACTIVE_FETCH_AND_ADD;
-    }
-    else if(!strncmp(key, FAS, strlen(FAS)))
-    {
-        key += strlen(FAS);
-        len -= strlen(FAS);
-        c = index(key, ',');
-        xattr_keylen = c - key;
-        len -= xattr_keylen;
-        xattr_key = malloc(xattr_keylen + 1);
-        if(!xattr_key)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        strncpy(xattr_key, key, xattr_keylen);
-        xattr_key[xattr_keylen] = '\0';
-        xattr_keylen++;
-
-        l = rindex(xattr_key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            xattr_keylen--;
-            l = rindex(xattr_key, ' ');
-        }
-        key = c+1;
-        l = index(key, ' ');
-        while(l)
-        {
-            key++;
-            len--;
-            l = index(l+1, ' ');
-        }
-        c = index(key, ')');
-        l = rindex(key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            c--;
-            l = rindex(key, ' ');
-        }
-        valstr_len = c - key;
-        valstr = malloc(valstr_len + 1);
-        if(!valstr)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        strncpy(valstr, key, valstr_len);
-        valstr[valstr_len] = '\0';
-        sscanf(valstr, "%d", &s_op->u.eattr.active.value.subtract);
-
-        js_p->error_code = ACTIVE_FETCH_AND_SUBTRACT;
-    }
-    else if(!strncmp(key, CAS, strlen(CAS)))
-    {
-        key += strlen(CAS);
-        len -= strlen(CAS);
-        c = index(key, ',');
-        xattr_keylen = c - key;
-        len -= xattr_keylen;
-        xattr_key = malloc(xattr_keylen + 1);
-        if(!xattr_key)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        strncpy(xattr_key, key, xattr_keylen);
-        xattr_key[xattr_keylen] = '\0';
-        xattr_keylen++;
-
-        l = rindex(xattr_key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            xattr_keylen--;
-            l = rindex(xattr_key, ' ');
-        }
-        key = c+1;
-        l = index(key, ' ');
-        while(l)
-        {
-            key++;
-            len--;
-            l = index(l+1, ' ');
-        }
-
-        c = index(key, ',');
-        len -= (int)(c - key);
-
-        l = rindex(c, ' ');
-        while(l)
-        {
-            *l = '\0';
-            l = rindex(c, ' ');
-        }
-        sscanf(key, "%d", &s_op->u.eattr.active.value.compare);
-
-        key = c+1;
-        l = index(key, ' ');
-        while(l)
-        {
-            key++;
-            len--;
-            l = index(l+1, ' ');
-        }
-
-        c = index(key, ')');
-        l = rindex(key, ' ');
-        while(l)
-        {
-            *l = '\0';
-            c--;
-            l = rindex(key, ' ');
-        }
-        valstr_len = c - key;
-        sscanf(key, "%d", &s_op->u.eattr.active.value.swap);
-        js_p->error_code = ACTIVE_COMPARE_AND_SWAP;
+        case ACTIVE_STRQUEUE:
+            active->xattr_value.buffer = malloc(sizeof(int) * STRQUEUE_MAXSIZE);
+            if(!active->xattr_value.buffer)
+            {
+                s_op->resp.u.geteattr.err[s_op->u.eattr.active.index] = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            active->xattr_value.buffer_sz = sizeof(int) * STRQUEUE_MAXSIZE;
+            break;
     }
 
-    s_op->u.eattr.active.xattr_key.buffer = xattr_key;
-    s_op->u.eattr.active.xattr_key.buffer_sz = xattr_keylen;
-
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action geteattr_active_fetch(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    job_id_t jid;
-    int ret;
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
     ret = job_trove_keyval_read(
         s_op->req->u.geteattr.fs_id,
         s_op->req->u.geteattr.handle,
-        &s_op->u.eattr.active.xattr_key,
-        &s_op->resp.u.geteattr.val[s_op->u.eattr.active.index],
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &jid,
-        server_job_context,
-        s_op->req->hints);
-
-    return ret;
-}
-
-static PINT_sm_action geteattr_active_add(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    int ret;
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
-    int value;
-    job_id_t jid;
-
-    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
-
-    s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
-    s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
-    *(int *)(s_op->u.eattr.active.xattr_value.buffer) = value + s_op->u.eattr.active.value.add;
-
-    s_op->u.eattr.active.index++;
-    ret = job_trove_keyval_write(
-        s_op->req->u.geteattr.fs_id,
-        s_op->req->u.geteattr.handle,
-        &s_op->u.eattr.active.xattr_key,
-        &s_op->u.eattr.active.xattr_value,
+        &s_op->u.eattr.active.actives[s_op->u.eattr.active.index].xattr_key,
+        &s_op->u.eattr.active.actives[s_op->u.eattr.active.index].xattr_value,
         0,
         NULL,
         smcb,
@@ -487,79 +276,417 @@ static PINT_sm_action geteattr_active_add(
     return ret;
 }
 
-
-static PINT_sm_action geteattr_active_subtract(
+static PINT_sm_action geteattr_do_active_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int value, ret;
     job_id_t jid;
-    js_p->error_code = 0;
-
-    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
-
-    s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
-    s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
-    *(int *)(s_op->u.eattr.active.xattr_value.buffer) = value - s_op->u.eattr.active.value.subtract;
-
-    s_op->u.eattr.active.index++;
-    ret = job_trove_keyval_write(
-        s_op->req->u.geteattr.fs_id,
-        s_op->req->u.geteattr.handle,
-        &s_op->u.eattr.active.xattr_key,
-        &s_op->u.eattr.active.xattr_value,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &jid,
-        server_job_context,
-        s_op->req->hints);
-    return ret;
-}
-
-static PINT_sm_action geteattr_active_compare_and_swap(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
+    int ret, index;
+    int *intqueue;
+    int count, size;
+    char *strqueue, *idx;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int value;
-    int ret;
-    job_id_t jid;
-    js_p->error_code = 0;
+    struct active *active;
 
-    value = *(int *)s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].buffer;
-    assert(s_op->resp.u.geteattr.val[s_op->u.eattr.active.index].read_sz == sizeof(int));
-
-    s_op->u.eattr.active.index++;
-    if(s_op->u.eattr.active.value.compare != value)
+    index = s_op->u.eattr.active.index;
+    if(js_p->error_code != 0)
     {
-        /* comparison failed */
+        s_op->resp.u.geteattr.err[index] = js_p->error_code;
+        js_p->error_code = 0;
+        s_op->u.eattr.active.index++;
         return SM_ACTION_COMPLETE;
     }
-    else
-    {
-        s_op->u.eattr.active.xattr_value.buffer = malloc(sizeof(int));
-        s_op->u.eattr.active.xattr_value.buffer_sz = sizeof(int);
-        *(int *)(s_op->u.eattr.active.xattr_value.buffer) = s_op->u.eattr.active.value.swap;
+    s_op->u.eattr.active.index++;
+    active = &s_op->u.eattr.active.actives[index];
 
-        /* comparison succeeded!  swap! */
-        ret = job_trove_keyval_write(
-            s_op->req->u.geteattr.fs_id,
-            s_op->req->u.geteattr.handle,
-            &s_op->u.eattr.active.xattr_key,
-            &s_op->u.eattr.active.xattr_value,
-            0,
-            NULL,
-            smcb,
-            0,
-            js_p,
-            &jid,
-            server_job_context,
-            s_op->req->hints);
-        return ret;
+    switch(active->type)
+    {
+        case ACTIVE_INT:
+            s_op->resp.u.geteattr.val[index].buffer = &active->u.aint.fetched;
+            s_op->resp.u.geteattr.val[index].buffer_sz = sizeof(int);
+            s_op->resp.u.geteattr.val[index].read_sz = sizeof(int);
+            switch(active->u.aint.op)
+            {
+                case ACTIVE_INT_OP_FAA:
+                    active->u.aint.add += active->u.aint.fetched;
+                    active->xattr_value.buffer = &active->u.aint.add;
+                    goto keyval_write;
+                case ACTIVE_INT_OP_CAS:
+                    if(active->u.aint.fetched == active->u.aint.compare)
+                    {
+                        active->xattr_value.buffer = &active->u.aint.swap;
+                        goto keyval_write;
+                    }
+                    return SM_ACTION_COMPLETE;
+
+                case ACTIVE_INT_OP_FAS:
+                    active->xattr_value.buffer = &active->u.aint.store;
+                    goto keyval_write;
+            }
+            break;
+
+        case ACTIVE_INTQUEUE:
+            s_op->resp.u.geteattr.val[index].buffer = NULL;
+            s_op->resp.u.geteattr.val[index].buffer_sz = 0;
+            s_op->resp.u.geteattr.val[index].read_sz = 0;
+            switch(active->u.intqueue.op)
+            {
+                case ACTIVE_INTQUEUE_OP_ENQUEUE:
+                    intqueue = (int *)active->xattr_value.buffer;
+                    count = active->xattr_value.read_sz / sizeof(int);
+                    if(count + 1 > INTQUEUE_MAXSIZE)
+                    {
+                        js_p->error_code = 0;
+                        s_op->resp.u.geteattr.err[index] = -PVFS_EINVAL;
+                        return SM_ACTION_COMPLETE;
+                    }
+                    intqueue[count] = active->u.intqueue.queue;
+                    active->xattr_value.buffer_sz = sizeof(int) * (count + 1);
+                    goto keyval_write;
+
+                case ACTIVE_INTQUEUE_OP_DEQUEUE:
+                    intqueue = (int *)active->xattr_value.buffer;
+                    count = active->xattr_value.read_sz / sizeof(int);
+                    if(count == 0)
+                    {
+                        return SM_ACTION_COMPLETE;
+                    }
+                    active->xattr_value.buffer = memmove(
+                        active->xattr_value.buffer,
+                        ((char *)active->xattr_value.buffer) + sizeof(int),
+                        active->xattr_value.read_sz - sizeof(int));
+
+                    active->xattr_value.buffer_sz = sizeof(int) * (count - 1);
+                    goto keyval_write;
+
+                case ACTIVE_INTQUEUE_OP_HEAD:
+                    s_op->resp.u.geteattr.val[index].buffer = malloc(sizeof(int));
+                    s_op->resp.u.geteattr.val[index].buffer_sz = sizeof(int);
+                    s_op->resp.u.geteattr.val[index].read_sz = sizeof(int);
+                    memcpy(s_op->resp.u.geteattr.val[index].buffer,
+                           active->xattr_value.buffer,
+                           sizeof(int));
+                    return SM_ACTION_COMPLETE;
+
+                case ACTIVE_INTQUEUE_OP_TAIL:
+                    count = active->xattr_value.read_sz / sizeof(int);
+                    s_op->resp.u.geteattr.val[index].buffer = malloc(sizeof(int));
+                    s_op->resp.u.geteattr.val[index].buffer_sz = sizeof(int);
+                    s_op->resp.u.geteattr.val[index].read_sz = sizeof(int);
+                    
+                    memcpy(s_op->resp.u.geteattr.val[index].buffer,
+                           ((char *)active->xattr_value.buffer) + ((count - 1) * sizeof(int)),
+                           sizeof(int));
+                    return SM_ACTION_COMPLETE;
+            }
+            break;
+
+        case ACTIVE_STRQUEUE:
+            s_op->resp.u.geteattr.val[index].buffer = NULL;
+            s_op->resp.u.geteattr.val[index].buffer_sz = 0;
+            s_op->resp.u.geteattr.val[index].read_sz = 0;
+            switch(active->u.strqueue.op)
+            {
+                case ACTIVE_STRQUEUE_OP_ENQUEUE:
+                    strqueue = (char *)active->xattr_value.buffer;
+                    size = active->xattr_value.read_sz;
+                    if(size + strlen(active->u.strqueue.queue) > STRQUEUE_MAXSIZE)
+                    {
+                        s_op->resp.u.geteattr.err = -PVFS_EINVAL;
+                        return SM_ACTION_COMPLETE;
+                    }
+                    memcpy(strqueue + size,
+                           active->u.strqueue.queue,
+                           strlen(active->u.strqueue.queue) + 1);
+                    active->xattr_value.buffer_sz = size + strlen(active->u.strqueue.queue) + 1;
+                    goto keyval_write;
+
+                case ACTIVE_STRQUEUE_OP_DEQUEUE:
+                    strqueue = (char *)active->xattr_value.buffer;
+                    size = active->xattr_value.read_sz;
+                    idx = strqueue + strlen(strqueue) + 1;
+                    memmove(active->xattr_value.buffer, idx, size - (strlen(strqueue) + 1));
+                    active->xattr_value.buffer_sz = size - (strlen(strqueue) + 1);
+                    goto keyval_write;
+
+                case ACTIVE_STRQUEUE_OP_HEAD:
+
+                    s_op->resp.u.geteattr.val[index].buffer = (char *)active->xattr_value.buffer;
+                    s_op->resp.u.geteattr.val[index].buffer_sz = strlen(active->xattr_value.buffer) + 1;
+                    s_op->resp.u.geteattr.val[index].read_sz = strlen(active->xattr_value.buffer) + 1;
+                    return SM_ACTION_COMPLETE;
+
+                case ACTIVE_STRQUEUE_OP_TAIL:
+
+                    strqueue = (char *)active->xattr_value.buffer;
+                    strqueue = get_memrchr(strqueue, '\0', (active->xattr_value.read_sz-1));
+                    ++strqueue;
+
+                    s_op->resp.u.geteattr.val[index].buffer = (char *)strqueue;
+                    s_op->resp.u.geteattr.val[index].buffer_sz = strlen(strqueue) + 1;
+                    s_op->resp.u.geteattr.val[index].read_sz = strlen(strqueue) + 1;
+                    return SM_ACTION_COMPLETE;
+            }
+            break;
     }
+
+keyval_write:
+    ret = job_trove_keyval_write(
+        s_op->req->u.geteattr.fs_id,
+        s_op->req->u.geteattr.handle,
+        &active->xattr_key,
+        &active->xattr_value,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &jid,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
 }
+
+static int active_op(char *k, int len)
+{
+    if(strstr(k, INTOP_FAA))
+    {
+        return 1;
+    }
+    if(strstr(k, INTOP_CAS))
+    {
+        return 1;
+    }
+    if(strstr(k, INTOP_FAS))
+    {
+        return 1;
+    }
+
+    if(strstr(k, INTQUEUEOP_ENQUEUE))
+    {
+        return 1;
+    }
+
+    if(strstr(k, INTQUEUEOP_DEQUEUE))
+    {
+        return 1;
+    }
+
+    if(strstr(k, INTQUEUEOP_HEAD))
+    {
+        return 1;
+    }
+
+    if(strstr(k, INTQUEUEOP_TAIL))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static char * skip_ws(char * buf)
+{
+    while(*buf == ' ')
+    {
+        ++buf;
+    }
+    return buf;
+}
+    
+static char * get_memrchr(char *buf, char c, int n)
+{
+    int i = n-1;
+    while(buf[i] != c)
+    {
+        --i;
+    }
+    return &buf[i];
+}
+
+static int extract_int_with_next(char *buffer, int *value, char **next)
+{
+    int i;
+    char *index;
+    sscanf(buffer, "%d", &i);
+    index = strstr(buffer, ",");
+    if(!index)
+    {
+        return -1;
+    }
+    *index = '\0';
+    ++index;
+    *next = skip_ws(index);
+    *value = i;
+    return 0;
+}
+
+static int extract_int(char *buffer, int *value)
+{
+    int i, n;
+    n = sscanf(buffer, "%d", &i);
+    if(n != 1)
+    {
+        return -1;
+    }
+    *value = i;
+    return 0;
+}
+
+static int extract_string(char *buffer, char **value)
+{
+    char *index;
+    index = strstr(buffer, ")");
+    if(!index)
+    {
+        return -1;
+    }
+    *index = '\0';
+    *value = buffer;
+    return 0;
+}
+
+static int extract_string_with_next(char *buffer, char **value, char **next)
+{
+    char *index;
+    index = strstr(buffer, ",");
+    if(!index)
+    {
+        return -1;
+    }
+    *index = '\0';
+    index++;
+    *value = buffer;
+    *next = skip_ws(index);
+    return 0;
+}
+
+static int extract_name(char *buffer, int prefix, PVFS_ds_keyval *key, char **next)
+{
+    char *k;
+
+    k = strstr(buffer+prefix, ".");
+    *k = '\0';
+    *next = k+1;
+    key->buffer = buffer;
+    key->buffer_sz = strlen(buffer) + 1;
+
+    return 0;
+}
+
+static int extract_active_op(char *buffer, int buffer_sz, struct active *a)
+{
+    int ret;
+    char *f;
+
+    if(!strncmp(buffer, INTOP, strlen(INTOP)))
+    {
+        a->type = ACTIVE_INT;
+        ret = extract_name(buffer, strlen(INTOP), &a->xattr_key, &buffer);
+        if(ret != 0)
+        {
+            return ret;
+        }
+
+        f = strstr(buffer, INTOP_FAA);
+        if(f)
+        {
+            a->u.aint.op = ACTIVE_INT_OP_FAA;
+            ret = extract_int(buffer + strlen(INTOP_FAA), &a->u.aint.add);
+            if(ret != 0)
+            {
+                return ret;
+            }
+        }
+        f = strstr(buffer, INTOP_CAS);
+        if(f)
+        {
+            a->u.aint.op = ACTIVE_INT_OP_CAS;
+            ret = extract_int_with_next(buffer + strlen(INTOP_CAS), &a->u.aint.compare, &buffer);
+            if(ret != 0)
+            {
+                return ret;
+            }
+            ret = extract_int(buffer, &a->u.aint.swap);
+            if(ret != 0)
+            {
+                return ret;
+            }
+        }
+        f = strstr(buffer, INTOP_FAS);
+        if(f)
+        {
+            a->u.aint.op = ACTIVE_INT_OP_FAS;
+            ret = extract_int(buffer + strlen(INTOP_FAS), &a->u.aint.store);
+            if(ret != 0)
+            {
+                return ret;
+            }
+        }
+    }
+    else if(!strncmp(buffer, INTQUEUEOP, strlen(INTQUEUEOP)))
+    {
+        a->type = ACTIVE_INTQUEUE;
+        ret = extract_name(buffer, strlen(INTQUEUEOP), &a->xattr_key, &buffer);
+        if(ret != 0)
+        {
+            return ret;
+        }
+
+        if(!strncmp(buffer, INTQUEUEOP_ENQUEUE, strlen(INTQUEUEOP_ENQUEUE)))
+        {
+            a->u.intqueue.op = ACTIVE_INTQUEUE_OP_ENQUEUE;
+            ret = extract_int(buffer + strlen(INTQUEUEOP_ENQUEUE), &a->u.intqueue.queue);
+            if(ret != 0)
+            {
+                return ret;
+            }
+        }
+        else if(!strncmp(buffer, INTQUEUEOP_DEQUEUE, strlen(INTQUEUEOP_DEQUEUE)))
+        {
+            a->u.intqueue.op = ACTIVE_INTQUEUE_OP_DEQUEUE;
+        }
+        else if(!strncmp(buffer, INTQUEUEOP_HEAD, strlen(INTQUEUEOP_HEAD)))
+        {
+            a->u.intqueue.op = ACTIVE_INTQUEUE_OP_HEAD;
+        }
+        else if(!strncmp(buffer, INTQUEUEOP_TAIL, strlen(INTQUEUEOP_TAIL)))
+        {
+            a->u.intqueue.op = ACTIVE_INTQUEUE_OP_TAIL;
+        }
+    }
+    else if(!strncmp(buffer, STRQUEUEOP, strlen(STRQUEUEOP)))
+    {
+        a->type = ACTIVE_STRQUEUE;
+        ret = extract_name(buffer, strlen(STRQUEUEOP), &a->xattr_key, &buffer);
+        if(ret != 0)
+        {
+            return ret;
+        }
+        if(!strncmp(buffer, STRQUEUEOP_ENQUEUE, strlen(STRQUEUEOP_ENQUEUE)))
+        {
+            a->u.intqueue.op = ACTIVE_STRQUEUE_OP_ENQUEUE;
+            ret = extract_string(buffer + strlen(STRQUEUEOP_ENQUEUE), &a->u.strqueue.queue);
+            if(!ret)
+            {
+                return ret;
+            }
+        }
+        else if(!strncmp(buffer, STRQUEUEOP_DEQUEUE, strlen(STRQUEUEOP_DEQUEUE)))
+        {
+            a->u.intqueue.op = ACTIVE_STRQUEUE_OP_DEQUEUE;
+        }
+        else if(!strncmp(buffer, STRQUEUEOP_HEAD, strlen(STRQUEUEOP_HEAD)))
+        {
+            a->u.intqueue.op = ACTIVE_STRQUEUE_OP_HEAD;
+        }
+        else if(!strncmp(buffer, STRQUEUEOP_TAIL, strlen(STRQUEUEOP_TAIL)))
+        {
+            a->u.intqueue.op = ACTIVE_STRQUEUE_OP_TAIL;
+        }
+    }
+
+    return 0;
+};
 
 /*
  * geteattr_setup()
@@ -587,8 +714,18 @@ static PINT_sm_action geteattr_setup(
             NULL);
         if(js_p->error_code != 0)
         {
-            /* not prefixed: treat this as if the key does not exist */
-            return SM_ACTION_COMPLETE;
+            if(js_p->error_code == PINT_EATTR_ACTIVE)
+            {
+                if(active_op(s_op->req->u.geteattr.key[i].buffer, s_op->req->u.geteattr.key[i].buffer_sz))
+                {
+                    /* not prefixed: treat this as if the key does not exist */
+                    return SM_ACTION_COMPLETE;
+                }
+                else
+                {
+                    js_p->error_code = 0;
+                }
+            }
         }
     }
 
@@ -628,14 +765,14 @@ static PINT_sm_action geteattr_setup(
     }
 
     return SM_ACTION_COMPLETE;
-}
+};
 
 /*
  * geteattr_read_eattrib()
  * Here is where the eattrib get read.  Not much to this.
  */
 static PINT_sm_action geteattr_read_eattrib(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -721,7 +858,16 @@ static PINT_sm_action geteattr_cleanup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     for(; i < s_op->resp.u.geteattr.nkey; ++i)
     {
-        free(s_op->resp.u.geteattr.val[i].buffer);
+        if(s_op->u.eattr.active.actives)
+        {
+            if(s_op->u.eattr.active.actives[i].type == ACTIVE_INTQUEUE &&
+               (s_op->u.eattr.active.actives[i].u.intqueue.op == ACTIVE_INTQUEUE_OP_HEAD ||
+                s_op->u.eattr.active.actives[i].u.intqueue.op == ACTIVE_INTQUEUE_OP_TAIL))
+            {
+                free(s_op->resp.u.geteattr.val[i].buffer);
+            }
+            free(s_op->u.eattr.active.actives);
+        }
     }
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);

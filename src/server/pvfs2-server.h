@@ -382,18 +382,80 @@ struct PINT_server_listattr_op
     int parallel_sms;
 };
 
+enum active_int_optype
+{
+    ACTIVE_INT_OP_FAA,
+    ACTIVE_INT_OP_CAS,
+    ACTIVE_INT_OP_FAS
+};
+
+struct active_int
+{
+    enum active_int_optype op;
+    int fetched;
+    int add;
+    int compare;
+    int swap;
+    int store;
+};
+
+enum active_intqueue_op
+{
+    ACTIVE_INTQUEUE_OP_ENQUEUE,
+    ACTIVE_INTQUEUE_OP_DEQUEUE,
+    ACTIVE_INTQUEUE_OP_HEAD,
+    ACTIVE_INTQUEUE_OP_TAIL
+};
+
+struct active_intqueue
+{
+    enum active_intqueue_op op;
+    int queue;
+    int head;
+    int tail;
+};
+
+enum active_strqueue_op
+{
+    ACTIVE_STRQUEUE_OP_ENQUEUE,
+    ACTIVE_STRQUEUE_OP_DEQUEUE,
+    ACTIVE_STRQUEUE_OP_HEAD,
+    ACTIVE_STRQUEUE_OP_TAIL
+};
+
+struct active_strqueue
+{
+    enum active_strqueue_op op;
+    char *queue;
+    char *head;
+    char *tail;
+};
+
+enum active_type
+{
+    ACTIVE_INT,
+    ACTIVE_INTQUEUE,
+    ACTIVE_STRQUEUE
+};
+
+struct active
+{
+    enum active_type type;
+    union
+    {
+        struct active_int aint;
+        struct active_intqueue intqueue;
+        struct active_strqueue strqueue;
+    } u;
+
+    PVFS_ds_keyval xattr_key;
+    PVFS_ds_keyval xattr_value;
+};
+
 struct PINT_server_eattr_active_op
 {
     int index;
-    PVFS_ds_keyval xattr_key;
-    PVFS_ds_keyval xattr_value;
-    struct 
-    {
-        int add;
-        int subtract;
-        int compare;
-        int swap;
-    } value;
+    struct active *actives;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */
