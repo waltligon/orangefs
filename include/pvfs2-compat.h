@@ -41,6 +41,10 @@
 #define PVFS_sys_read(ref,req,off,buf,mem_req,creds,resp) \
    PVFS_sys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_READ,PVFS_HINT_NULL)
 
+#undef PVFS_sys_read_ex /* sson */
+#define PVFS_sys_read_ex(ref,req,off,buf,mem_req,creds,datatype,op,resp) \
+  PVFS_sys_io_ex(ref,req,off,buf,mem_req,creds,datatype,op,resp,PVFS_IO_READ,PVFS_HINT_NULL)
+
 #undef PVFS_sys_write
 #define PVFS_sys_write(ref,req,off,buf,mem_req,creds,resp) \
    PVFS_sys_io(ref,req,off,buf,mem_req,creds,resp,PVFS_IO_WRITE,PVFS_HINT_NULL)
