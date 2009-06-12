@@ -82,7 +82,7 @@ int main( int argc, char *argv[] )
   MPI_File_open( comm, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
 
   MPI_File_read_at_ex( fh, OFFSET, tmp, nitem, MPI_DOUBLE, MPI_SUM, &status );
-
+  
   printf ("sum=%lf (active storage)\n", tmp[0]); 
 
   MPI_File_close( &fh );
@@ -96,15 +96,14 @@ int main( int argc, char *argv[] )
 
   MPI_File_close( &fh );
 #endif
-
   MPI_File_open( comm, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
-
+  
   MPI_File_read_at_ex( fh, OFFSET, tmp, nitem, MPI_DOUBLE, MPI_KMEANS, &status );
 
   printf ("kmean=%lf\n", tmp[0]); 
-
+  
   MPI_File_close( &fh );
- 
+
   free( buf );
   free( tmp );
 

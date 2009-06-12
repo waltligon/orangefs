@@ -19,11 +19,9 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
-//#include "pipeline.h"
 
-#define NUM_OF_PARALLEL_SMS 8
+#define NUM_OF_PARALLEL_SMS 1
 #define BUFFER_SIZE (256*1024) /* 256KB */
-//#define BUFFER_SIZE (64*1024) /* 64KB */
 
 %%
 
@@ -432,6 +430,7 @@ static PINT_sm_action io_cleanup(
 	free(pipeline_op);
     }
 
+    free(s_op->u.io.tmp_buffer); /* FIXME */
     gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
 
     /* let go of our encoded response buffer, if we appear to have

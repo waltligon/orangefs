@@ -640,8 +640,7 @@ int BMI_post_recv(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
-    //gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS, /* sson */
-    gossip_debug(GOSSIP_IO_DEBUG,
+    gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
                  "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
                  (long)src, (long)buffer, (long)expected_size, (int)tag);
 
@@ -681,8 +680,7 @@ int BMI_post_send(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
-    //gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS, /* sson */
-    gossip_debug(GOSSIP_IO_DEBUG,
+    gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
                  "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
                  (long)dest, (long)buffer, (long)size, (int)tag);
 

@@ -1197,8 +1197,6 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     }
     gen_mutex_lock(&interface_mutex);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: src=0x%x\n", __func__, src); /* sson */
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: src->method_data=0x%x\n", __func__, src->method_data); /* sson */
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
                                 1, expected_size, actual_size,
                                 buffer_type, tag,
@@ -2546,7 +2544,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         expected_size);
 
     tcp_addr_data = src->method_data;
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: tcp_addr_data->socket=%d\n", __func__, tcp_addr_data->socket); /* sson */
+
     /* short out immediately if the address is bad and we have no way to
      * reconnect
      */

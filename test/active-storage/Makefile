@@ -1,6 +1,6 @@
 all: simple1_unaligned
 
-MPICC=/home/sson/as-branch/test/mpich2-1.1/bin/mpicc 
+MPICC=/home/sson/as-branch/mpich2-1.1/bin/mpicc 
 CFLAGS=-Wall
 
 simple.o: simple.c

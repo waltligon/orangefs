@@ -366,7 +366,7 @@ struct PINT_server_pipeline_op
     PVFS_handle handle;
     PVFS_BMI_addr_t address;
 
-    int dfile_index;
+    int dfile_index; /* can be used for Rank */
     int dfile_count;
     struct PINT_dist_s *dist;
 
@@ -392,59 +392,25 @@ struct PINT_server_pipeline_op
     PVFS_hint hints;
     PVFS_msg_tag_t tag;
     int trove_sync_flag;
-    int adjust_flag; /* FIXME */
     PVFS_offset loff;
-
-    void *allreduce_buf; /* FIXME */
+    int parallel_sms;
 };
  
 /* allreduce */
 struct PINT_server_allreduce_op
 {
+    int op;
     PVFS_fs_id fs_id;
-    PVFS_handle handle;
-    PVFS_BMI_addr_t address;
-
-    int dfile_index;
-    int dfile_count;
-    struct PINT_dist_s *dist;
-
-    PINT_Request *file_req;
-    PVFS_offset file_req_offset;
-    PINT_Request *mem_req;
-
-    char tmp_buf[128]; /* FIXME */
-    PVFS_size unaligned_size;
-
-    enum PVFS_io_type io_type;
-
-    void *parent;
-    char *buffer; 
-    PVFS_size buffer_size;
-    PVFS_size buffer_used; 
-    PVFS_size out_size;
-    PINT_segpool_handle_t seg_handle;
-    PINT_segpool_unit_id id;
-    PVFS_offset *offsets;
-    PVFS_size *sizes;
-    int segs;
     PVFS_hint hints;
-    PVFS_msg_tag_t tag;
-    int trove_sync_flag;
-    int adjust_flag; /* FIXME */
-    PVFS_offset loff;
-
     PVFS_handle *dfile_array;
     int myRank;
-    int allreduce_depth; /* FIXME */
-    int current_depth; /* FIXME */
-    void *allreduce_buf; /* FIXME */
-    void *allreduce_recv_buf; /* FIXME */
-    PVFS_size allreduce_buf_sz; /* FIXME */
-    int mask; /* FIXME */
-    int comm_type; /* FIXME */
+    int allreduce_depth;
+    int current_depth;
+    void *allreduce_buf;
+    void *allreduce_recv_buf;
+    PVFS_size allreduce_buf_sz;
+    int mask;
 };
- 
 
 struct PINT_server_small_io_op
 {
