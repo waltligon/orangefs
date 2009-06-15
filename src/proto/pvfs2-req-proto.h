@@ -80,7 +80,6 @@ enum PVFS_server_op
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
     PVFS_SERV_READ_COMPLETION = 39, /* AS: for read_ex */
-    PVFS_SERV_S2S = 40, /* sson */
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };

@@ -20,7 +20,7 @@
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
 
-#define NUM_OF_PARALLEL_SMS 1
+#define NUM_OF_PARALLEL_SMS 8
 #define BUFFER_SIZE (256*1024) /* 256KB */
 
 %%
@@ -409,6 +409,9 @@ static PINT_sm_action io_cleanup(
 	PINT_segpool_destroy(s_op->u.io.seg_handle);
     }
 
+    if(s_op->u.io.tmp_buffer)
+	free(s_op->u.io.tmp_buffer); /* FIXME */
+    
     for(i=0; i<s_op->u.io.parallel_sms; i++)
     {
 	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
@@ -430,7 +433,6 @@ static PINT_sm_action io_cleanup(
 	free(pipeline_op);
     }
 
-    free(s_op->u.io.tmp_buffer); /* FIXME */
     gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
 
     /* let go of our encoded response buffer, if we appear to have

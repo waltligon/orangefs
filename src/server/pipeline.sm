@@ -759,13 +759,16 @@ static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *j
     memset(allreduce_op, 0, sizeof(*allreduce_op));
     allreduce_op->u.allreduce.fs_id = s_op->u.pipeline.fs_id;
     allreduce_op->u.allreduce.myRank = s_op->u.pipeline.dfile_index;
-    allreduce_op->u.allreduce.allreduce_recv_buf = (void*)malloc(5*sizeof(double));
-    allreduce_op->u.allreduce.allreduce_depth = log2(s_op->u.pipeline.dfile_count);
-    gossip_debug(GOSSIP_IO_DEBUG, "allreduce_depth=%d\n", allreduce_op->u.allreduce.allreduce_depth);
+    allreduce_op->u.allreduce.recv_buf = (void*)malloc(5*sizeof(double));
+    memset(allreduce_op->u.allreduce.recv_buf, 0, 5*sizeof(double));
+    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count);
+    gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
+		 allreduce_op->u.allreduce.tree_depth);
     allreduce_op->u.allreduce.current_depth = 0;
     allreduce_op->u.allreduce.mask = 0x1;
     allreduce_op->u.allreduce.dfile_array = parent_s_op->u.io.dfile_array;
-    allreduce_op->u.allreduce.allreduce_buf = (void*)malloc(5*sizeof(double));
+    allreduce_op->u.allreduce.send_buf = (void*)malloc(5*sizeof(double));
+    memset(allreduce_op->u.allreduce.send_buf, 0, 5*sizeof(double));
 
     ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
     
@@ -785,10 +788,10 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
             &remaining);
     gossip_debug(GOSSIP_SERVER_DEBUG, 
 		 "pipeline: nested sm returned error code: %d\n", tmp_err);
-    memcpy(s_op->u.pipeline.buffer, allreduce_op->u.allreduce.allreduce_buf,
+    memcpy(s_op->u.pipeline.buffer, allreduce_op->u.allreduce.send_buf,
 	   5*sizeof(double));
-    free(allreduce_op->u.allreduce.allreduce_buf);
-    free(allreduce_op->u.allreduce.allreduce_recv_buf);
+    free(allreduce_op->u.allreduce.send_buf);
+    free(allreduce_op->u.allreduce.recv_buf);
     free(allreduce_op);
 
     js_p->error_code = 0;

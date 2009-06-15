@@ -127,7 +127,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                  machine_name,
                  state_name,
                  (int32_t)r->status_user_tag);
-     
+
     /* call state action function */
     retval = (smcb->current_state->action.func)(smcb,r);
     /* process return code */
@@ -156,6 +156,9 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                  r->error_code,
                  SM_ACTION_STRING(retval));
 
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+		 "retval=%d, current_state->flag=%d\n", retval,
+		 smcb->current_state->flag); /* sson */
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
         /* start child SMs */

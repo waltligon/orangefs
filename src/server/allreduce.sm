@@ -54,7 +54,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     int myRank = s_op->u.allreduce.myRank, newRank;
     PVFS_handle new_rank_handle;
     PVFS_BMI_addr_t svr_addr;
-    double *tmp = s_op->u.allreduce.allreduce_buf;
+    double *tmp = s_op->u.allreduce.send_buf;
     PVFS_msg_tag_t session_tag;
     double tmpRank;
 
@@ -62,7 +62,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_IO_DEBUG, "tmpRank=%lf\n", tmpRank);
     js_p->error_code = 0;
     tmp[0] = tmpRank;
-    s_op->u.allreduce.allreduce_buf = (void*)tmp;
+    s_op->u.allreduce.send_buf = (void*)tmp;
     
     newRank = myRank^(s_op->u.allreduce.mask);
     gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d\n", myRank, newRank);
@@ -83,7 +83,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     /* RECV */
     gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%ld\n", svr_addr);
     ret = job_bmi_recv(svr_addr,
-		       (void*)s_op->u.allreduce.allreduce_recv_buf,
+		       (void*)s_op->u.allreduce.recv_buf,
 		       5*sizeof(double),
 		       session_tag,
 		       BMI_PRE_ALLOC,
@@ -108,7 +108,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
     gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%ld: tmp=%f\n", svr_addr, *tmp);
     ret = job_bmi_send(svr_addr,
-		       (void*)s_op->u.allreduce.allreduce_buf,
+		       (void*)s_op->u.allreduce.send_buf,
 		       5*sizeof(double),
 		       session_tag,
 		       BMI_PRE_ALLOC,
@@ -137,8 +137,8 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    double *a = s_op->u.allreduce.allreduce_buf;
-    double *b = s_op->u.allreduce.allreduce_recv_buf;
+    double *a = s_op->u.allreduce.send_buf;
+    double *b = s_op->u.allreduce.recv_buf;
     double tmp;
     js_p->error_code = 0;
 
@@ -146,13 +146,13 @@ static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s 
     s_op->u.allreduce.mask = s_op->u.allreduce.mask << 1;
 
     a[0] = a[0] + b[0];
-    s_op->u.allreduce.allreduce_buf = (void*)a;
+    s_op->u.allreduce.send_buf = (void*)a;
 
     gossip_debug(GOSSIP_IO_DEBUG, "received=%lf\n", *b);
-    gossip_debug(GOSSIP_IO_DEBUG, "current_depth=%d, allreduce_depth=%d\n",
+    gossip_debug(GOSSIP_IO_DEBUG, "current_depth=%d, tree_depth=%d\n",
 		 s_op->u.allreduce.current_depth, 
-		 s_op->u.allreduce.allreduce_depth);
-    if(s_op->u.allreduce.current_depth < s_op->u.allreduce.allreduce_depth)
+		 s_op->u.allreduce.tree_depth);
+    if(s_op->u.allreduce.current_depth < s_op->u.allreduce.tree_depth)
 	js_p->error_code = CONTINUE_ALLREDUCE;
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: reduced result=%lf\n", __func__,

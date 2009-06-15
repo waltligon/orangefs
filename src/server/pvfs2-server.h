@@ -404,10 +404,10 @@ struct PINT_server_allreduce_op
     PVFS_hint hints;
     PVFS_handle *dfile_array;
     int myRank;
-    int allreduce_depth;
+    int tree_depth;
     int current_depth;
-    void *allreduce_buf;
-    void *allreduce_recv_buf;
+    void *send_buf;
+    void *recv_buf;
     PVFS_size allreduce_buf_sz;
     int mask;
 };
