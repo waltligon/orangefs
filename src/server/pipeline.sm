@@ -7,6 +7,7 @@
 /*
  *  PVFS2 server state machine for driving read/write I/O operations.
  */
+#define _ISOC99_SOURCE /* log2() */ 
 
 #include <string.h>
 #include <assert.h>
@@ -22,6 +23,8 @@
 #include "pint-request.h"
 #include "pvfs2-internal.h"
 #include "trove.h"
+#include "pint-util.h"
+#include "pint-cached-config.h"
 
 #define LOOP 101
 #define UNALIGNED 102
