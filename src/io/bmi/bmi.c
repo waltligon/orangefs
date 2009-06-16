@@ -648,7 +648,6 @@ int BMI_post_recv(bmi_op_id_t * id,
 
     gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, src);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: tmp_ref->method_addr=0x%x\n", __func__, tmp_ref->method_addr);
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
@@ -688,7 +687,6 @@ int BMI_post_send(bmi_op_id_t * id,
 
     gen_mutex_lock(&ref_mutex);
     tmp_ref = ref_list_search_addr(cur_ref_list, dest);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: tmp_ref->method_addr=0x%x\n", __func__, tmp_ref->method_addr);
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);

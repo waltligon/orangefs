@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h> /* sson */
 
 #include "gossip.h"
 #include "pvfs2-debug.h"
@@ -157,8 +158,10 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                  SM_ACTION_STRING(retval));
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-		 "retval=%d, current_state->flag=%d\n", retval,
-		 smcb->current_state->flag); /* sson */
+		 "retval=%d, current_state->flag=%d, children_running=%d\n", 
+		 retval,
+		 smcb->current_state->flag,
+		 smcb->children_running); /* sson */
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
         /* start child SMs */
@@ -168,6 +171,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
          * issues a job_null that will drive progress from here and we don't
          * want to cause a double transition.
          */
+	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "smcb=%p: children_started=%d\n", smcb, children_started);
         if (children_started > 0)
             retval = SM_ACTION_DEFERRED;
         else
@@ -627,6 +631,8 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "[SM frame get]: (%p) op-id: %d index: %d base-frm: %d\n",
             smcb, smcb->op, index, smcb->base_frame);
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+		 "children_running=%d\n", smcb->children_running); /* sson */
 
     if(qlist_empty(&smcb->frames))
     {
@@ -769,7 +775,9 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
 
     *children_started = 0;
 
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: called\n", __func__); /* sson */
     my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: my_frame=%p\n", __func__, my_frame); /* sson */
     /* Iterate once up front to determine how many children we are going to
      * run.  This has to be set before starting any children, otherwise if
      * the first one immediately completes it will mistakenly believe it is
@@ -777,6 +785,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      */
     qlist_for_each_entry(f, &smcb->frames, link)
     {
+	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "f->frame=%p\n", f->frame);
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)
         {

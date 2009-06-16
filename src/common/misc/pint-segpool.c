@@ -1,4 +1,4 @@
-
+#include <stdlib.h> /* sson */
 #include "quicklist.h"
 #include "pint-request.h"
 #include "pint-segpool.h"

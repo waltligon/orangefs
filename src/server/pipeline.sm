@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 #include <math.h> /* log2() */
 
 #include "server-config.h"
@@ -117,7 +118,9 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_size *sizes;
     PVFS_size bytes;
     job_id_t tmp_id;
-    
+
+    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
+    gossip_debug(GOSSIP_IO_DEBUG, "smcb=%p, smcb->parent_smcb=%p\n", smcb, smcb->parent_smcb);
     s_op->u.pipeline.buffer_used = 0;
     bytes = s_op->u.pipeline.buffer_size;
 
@@ -512,7 +515,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	switch(parent_s_op->u.io.datatype) {
 	case ((int)0x4c000405): /* MPI_INT */
 	    {
-		int *a = s_op->u.pipeline.buffer;
+		int *a = (int*)s_op->u.pipeline.buffer;
 		int result;
 		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_size)/((*PVFS_INT).ub);
 		int *tmp;
@@ -589,7 +592,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 			*tmp = (tmp_sum)/(parent_s_op->u.io.count+count);
 		    }
 		    parent_s_op->u.io.count += count;
-		    gossip_debug(GOSSIP_IO_DEBUG, "mean=%lf\n", *tmp);
+		    gossip_debug(GOSSIP_IO_DEBUG, "mean=%d\n", *tmp);
 		    break;
 		default:
 		    break;
@@ -601,7 +604,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 	case ((int)0x4c00080b): /* MPI_DOUBLE */
 	    {
-		double *a = s_op->u.pipeline.buffer;
+		double *a = (double*)s_op->u.pipeline.buffer;
 		double result;
 		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_size)/((*PVFS_DOUBLE).ub);
 		double *tmp;
@@ -696,7 +699,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		    result = result/count;
 		    a[0] = result;
 
-		    gossip_debug(GOSSIP_IO_DEBUG, "count=%d\n", parent_s_op->u.io.count);
+		    gossip_debug(GOSSIP_IO_DEBUG, "count=%ld\n", parent_s_op->u.io.count);
 
 		    if (parent_s_op->u.io.count == 0)
 			*tmp = result;
@@ -761,7 +764,7 @@ static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *j
     allreduce_op->u.allreduce.myRank = s_op->u.pipeline.dfile_index;
     allreduce_op->u.allreduce.recv_buf = (void*)malloc(5*sizeof(double));
     memset(allreduce_op->u.allreduce.recv_buf, 0, 5*sizeof(double));
-    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count);
+    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count); /* FIXME !!!! */
     gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
 		 allreduce_op->u.allreduce.tree_depth);
     allreduce_op->u.allreduce.current_depth = 0;

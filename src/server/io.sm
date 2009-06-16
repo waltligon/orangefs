@@ -10,6 +10,7 @@
 
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h> /* sson */
 
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -20,7 +21,7 @@
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
 
-#define NUM_OF_PARALLEL_SMS 8
+#define NUM_OF_PARALLEL_SMS 1
 #define BUFFER_SIZE (256*1024) /* 256KB */
 
 %%
@@ -313,7 +314,15 @@ static PINT_sm_action start_pipelining_sm(
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
+	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
+	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
+	    if(ret < 0) {
+		js_p->error_code = -PVFS_ENOMEM;
+		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
+			     llu(js_p->error_code));
+		return SM_ACTION_COMPLETE;
+	    }
 	    s_op->u.io.parallel_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_sms);
@@ -329,14 +338,18 @@ static PINT_sm_action start_pipelining_sm(
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
+	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
+	    if(ret < 0) {
+		js_p->error_code = -PVFS_ENOMEM;
+		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
+			     llu(js_p->error_code));
+		return SM_ACTION_COMPLETE;
+	    }
+	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    s_op->u.io.parallel_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_sms);
-	}
-	if(ret < 0) {
-	    js_p->error_code = -PVFS_ENOMEM;
-	    return SM_ACTION_COMPLETE;
 	}
     }
 
@@ -411,7 +424,7 @@ static PINT_sm_action io_cleanup(
 
     if(s_op->u.io.tmp_buffer)
 	free(s_op->u.io.tmp_buffer); /* FIXME */
-    
+
     for(i=0; i<s_op->u.io.parallel_sms; i++)
     {
 	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
