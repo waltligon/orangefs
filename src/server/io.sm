@@ -200,8 +200,8 @@ static PINT_sm_action start_pipelining_sm(
     gossip_debug(GOSSIP_IO_DEBUG, "server_ct=%d\n", s_op->req->u.io.server_ct);
     gossip_debug(GOSSIP_IO_DEBUG, "fs_id=%d\n", s_op->req->u.io.fs_id);
     for(i=0; i<s_op->req->u.io.server_ct; i++) {
-	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%lu\n", i, 
-		     s_op->u.io.dfile_array[i]);
+	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%llu\n", i, 
+		     llu(s_op->u.io.dfile_array[i]));
 	if(s_op->u.io.dfile_array[i] == s_op->req->u.io.handle) {
 	    dfile_index = i;
 	    gossip_debug(GOSSIP_IO_DEBUG, "dfile_index=%d\n", i);
@@ -230,10 +230,10 @@ static PINT_sm_action start_pipelining_sm(
         llu(s_op->req->u.io.handle));
 
     /* setup the request processing states */
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: aggregate_size=%ld\n", __func__,
-		 s_op->u.io.aggregate_size);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: file_data.fsize=%ld\n", __func__,
-		 s_op->u.io.file_data.fsize);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: aggregate_size=%lld\n", __func__,
+		 lld(s_op->u.io.aggregate_size));
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: file_data.fsize=%lld\n", __func__,
+		 lld(s_op->u.io.file_data.fsize));
 
     if(s_op->u.io.buffer_size < 1)
         s_op->u.io.buffer_size = BUFFER_SIZE;
@@ -320,7 +320,7 @@ static PINT_sm_action start_pipelining_sm(
 	    if(ret < 0) {
 		js_p->error_code = -PVFS_ENOMEM;
 		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
-			     llu(js_p->error_code));
+			     llu(s_op->req->u.io.handle));
 		return SM_ACTION_COMPLETE;
 	    }
 	    s_op->u.io.parallel_sms++;
@@ -343,7 +343,7 @@ static PINT_sm_action start_pipelining_sm(
 	    if(ret < 0) {
 		js_p->error_code = -PVFS_ENOMEM;
 		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
-			     llu(js_p->error_code));
+			     llu(s_op->req->u.io.handle));
 		return SM_ACTION_COMPLETE;
 	    }
 	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
@@ -532,13 +532,13 @@ static PINT_sm_action io_send_completion_ack(
     if(s_op->req->u.io.io_type == PVFS_IO_READ) { /* AS: read with op */
 	s_op->resp.u.read_completion.total_completed =
 	    s_op->u.io.total_transferred;
-	gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%ld\n", s_op->u.io.total_transferred); /* AS */
+	gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%lld\n", lld(s_op->u.io.total_transferred)); /* AS */
 	switch(s_op->req->u.io.datatype) {
 	case (int)0x4c000405: /* MPI_INT */
 	    {
 		int *tmp;
 		tmp = s_op->u.io.tmp_buffer;
-		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (INT) to send=%d, s_op->resp.u.read_completion.total_completed=%lu\n", *tmp, s_op->resp.u.read_completion.total_completed);
+		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (INT) to send=%d, s_op->resp.u.read_completion.total_completed=%lld\n", *tmp, lld(s_op->resp.u.read_completion.total_completed));
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(int);
 		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
@@ -547,7 +547,7 @@ static PINT_sm_action io_send_completion_ack(
 	    {
 		double *tmp;
 		tmp = s_op->u.io.tmp_buffer;
-		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (DOUBLE) to send=%lf, s_op->resp.u.read_completion.total_completed=%lu\n", *tmp, s_op->resp.u.read_completion.total_completed);
+		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (DOUBLE) to send=%lf, s_op->resp.u.read_completion.total_completed=%lld\n", *tmp, lld(s_op->resp.u.read_completion.total_completed));
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(double);
 		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
@@ -558,8 +558,8 @@ static PINT_sm_action io_send_completion_ack(
 	s_op->resp.u.write_completion.total_completed = 
 	    s_op->u.io.total_transferred; /* AS */
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%ld\n", __func__, s_op->u.io.total_transferred);
-    err = PINT_encode(
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%lld\n", __func__,
+    lld(s_op->u.io.total_transferred)); err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
         s_op->addr, s_op->decoded.enc_type);
 

@@ -67,7 +67,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     newRank = myRank^(s_op->u.allreduce.mask);
     gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d\n", myRank, newRank);
     new_rank_handle = s_op->u.allreduce.dfile_array[newRank];
-    gossip_debug(GOSSIP_IO_DEBUG, "new_rank_handle=%ld\n", new_rank_handle);
+    gossip_debug(GOSSIP_IO_DEBUG, "new_rank_handle=%llu\n", llu(new_rank_handle));
     ret = PINT_cached_config_map_to_server(&svr_addr,
 					   new_rank_handle,
 					   s_op->u.allreduce.fs_id);
@@ -81,7 +81,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     session_tag = 3333;
 
     /* RECV */
-    gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%ld\n", svr_addr);
+    gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%llu\n", llu(svr_addr));
     ret = job_bmi_recv(svr_addr,
 		       (void*)s_op->u.allreduce.recv_buf,
 		       5*sizeof(double),
@@ -106,7 +106,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 #endif
 
-    gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%ld: tmp=%f\n", svr_addr, *tmp);
+    gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%llu: tmp=%f\n", llu(svr_addr), *tmp);
     ret = job_bmi_send(svr_addr,
 		       (void*)s_op->u.allreduce.send_buf,
 		       5*sizeof(double),
