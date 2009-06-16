@@ -359,9 +359,18 @@ static PINT_sm_action geteattr_do_active_op(
                     goto keyval_write;
 
                 case ACTIVE_INTQUEUE_OP_HEAD:
-                    s_op->resp.u.geteattr.val[index].buffer = malloc(sizeof(int));
-                    s_op->resp.u.geteattr.val[index].buffer_sz = sizeof(int);
-                    s_op->resp.u.geteattr.val[index].read_sz = sizeof(int);
+                    if(active->xattr_value.read_sz > 0)
+                    {
+                        s_op->resp.u.geteattr.val[index].buffer = malloc(sizeof(int));
+                        s_op->resp.u.geteattr.val[index].buffer_sz = sizeof(int);
+                        s_op->resp.u.geteattr.val[index].read_sz = sizeof(int);
+                    }
+                    else
+                    {
+                        s_op->resp.u.geteattr.val[index].buffer = NULL;
+                        s_op->resp.u.geteattr.val[index].buffer_sz = 0;
+                        s_op->resp.u.geteattr.val[index].read_sz = 0;
+                    }
                     memcpy(s_op->resp.u.geteattr.val[index].buffer,
                            active->xattr_value.buffer,
                            sizeof(int));
