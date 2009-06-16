@@ -379,7 +379,6 @@ struct PINT_server_pipeline_op
 
     enum PVFS_io_type io_type;
 
-    void *parent;
     char *buffer; 
     PVFS_size buffer_size;
     PVFS_size buffer_used; 

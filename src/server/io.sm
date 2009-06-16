@@ -54,7 +54,13 @@ machine pvfs2_io_sm
         {
             success => pvfs2_pipeline_sm;
         }
-        success => send_completion_ack;
+        success => cleanup_pipeline;
+    }
+
+    state cleanup_pipeline
+    {
+	run cleanup_pipeline_sm;
+	success => send_completion_ack;
         default => release;
     }
 
@@ -288,7 +294,7 @@ static PINT_sm_action start_pipelining_sm(
 
 	pipeline_op->u.pipeline.seg_handle = seg_handle;
 	pipeline_op->u.pipeline.id = id[i];
-	pipeline_op->u.pipeline.parent = s_op;
+	//pipeline_op->u.pipeline.parent = s_op;
 	pipeline_op->u.pipeline.hints = s_op->req->hints;
 	pipeline_op->u.pipeline.tag = s_op->tag;
 	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
@@ -357,6 +363,42 @@ static PINT_sm_action start_pipelining_sm(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb, 
+					  job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i;
+    struct PINT_server_op *pipeline_op;
+    int task_id;
+    int remaining;
+    PVFS_error tmp_err;
+
+    for(i=0; i<s_op->u.io.parallel_sms; i++)
+    {
+	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+            &remaining);
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+		     "io: nested sm returned error code: %d\n", tmp_err);
+	if(pipeline_op->u.pipeline.buffer) {
+	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
+		BMI_memfree(pipeline_op->u.pipeline.address, 
+			    pipeline_op->u.pipeline.buffer, 
+			    s_op->u.io.buffer_size, BMI_SEND);
+	    }
+	    else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
+		BMI_memfree(pipeline_op->u.pipeline.address, 
+			    pipeline_op->u.pipeline.buffer, 
+			    s_op->u.io.buffer_size, BMI_RECV);
+	    }
+	}
+	free(pipeline_op);
+    }
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+					 
 /*
  * Function: io_release()
  *
@@ -408,11 +450,6 @@ static PINT_sm_action io_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
-    int i;
-    struct PINT_server_op *pipeline_op;
-    int task_id;
-    int remaining;
-    PVFS_error tmp_err;
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
@@ -421,31 +458,10 @@ static PINT_sm_action io_cleanup(
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: freeing seg_handle\n", __func__);
 	PINT_segpool_destroy(s_op->u.io.seg_handle);
     }
-
+#if 0
     if(s_op->u.io.tmp_buffer)
 	free(s_op->u.io.tmp_buffer); /* FIXME */
-
-    for(i=0; i<s_op->u.io.parallel_sms; i++)
-    {
-	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
-            &remaining);
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
-		     "io: nested sm returned error code: %d\n", tmp_err);
-	if(pipeline_op->u.pipeline.buffer) {
-	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
-		BMI_memfree(pipeline_op->u.pipeline.address, 
-			    pipeline_op->u.pipeline.buffer, 
-			    s_op->u.io.buffer_size, BMI_SEND);
-	    }
-	    else if(s_op->req->u.io.io_type == PVFS_IO_WRITE) {
-		BMI_memfree(pipeline_op->u.pipeline.address, 
-			    pipeline_op->u.pipeline.buffer, 
-			    s_op->u.io.buffer_size, BMI_RECV);
-	    }
-	}
-	free(pipeline_op);
-    }
-
+#endif
     gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
 
     /* let go of our encoded response buffer, if we appear to have

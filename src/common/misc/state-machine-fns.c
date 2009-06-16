@@ -308,6 +308,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         * onto a stack */
         while (smcb->current_state->flag == SM_JUMP)
         {
+	    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: SM_JUMP\n", __func__);
 	    PINT_push_state(smcb, smcb->current_state);
 	    smcb->current_state =
                     smcb->current_state->action.nested->first_state;
@@ -656,6 +657,8 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
             prev = prev->prev;
         }
         frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
+	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "returned frame=%p\n",
+		     frame_entry->frame); /* sson */
         return frame_entry->frame;
     }
 }

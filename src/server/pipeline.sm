@@ -123,7 +123,6 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
-    gossip_debug(GOSSIP_IO_DEBUG, "smcb=%p, smcb->parent_smcb=%p\n", smcb, smcb->parent_smcb);
     s_op->u.pipeline.buffer_used = 0;
     bytes = s_op->u.pipeline.buffer_size;
 
@@ -220,7 +219,7 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
 
     if(s_op->u.pipeline.segs == 0) {
 	js_p->error_code = 0;
@@ -309,7 +308,7 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     js_p->error_code = 0;
     PVFS_size file_req_offset = parent_s_op->u.io.file_req_offset;
     PINT_request_file_data fdata = parent_s_op->u.io.file_data;
@@ -365,7 +364,7 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
     int regions;
@@ -503,7 +502,7 @@ int find_nearest_cluster(int     numClusters, /* no. clusters */
 static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     js_p->error_code = 0;
 
     if(s_op->u.pipeline.buffer) {
@@ -753,7 +752,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     int ret, tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     PVFS_handle new_rank_handle;
@@ -807,7 +806,7 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = s_op->u.pipeline.parent;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     PINT_segpool_handle_t h = s_op->u.pipeline.seg_handle;
     js_p->error_code = 0;
 
