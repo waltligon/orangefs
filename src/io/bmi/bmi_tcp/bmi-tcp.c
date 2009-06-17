@@ -3940,7 +3940,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
     bmi_size_t cur_index_complete = 0;
     PINT_event_id eid = 0;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: tcp_addr_data->socket=%d\n", __func__, tcp_addr_data->socket); /* sson */
     if(PINT_EVENT_ENABLED)
     {
         int i = 0;

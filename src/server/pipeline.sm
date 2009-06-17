@@ -755,24 +755,35 @@ static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *j
     PVFS_BMI_addr_t svr_addr;
     struct PINT_server_op *allreduce_op;
     int i;
+    double tmpRank;
 
-    allreduce_op = malloc(sizeof(*allreduce_op));
-    memset(allreduce_op, 0, sizeof(*allreduce_op));
-    allreduce_op->u.allreduce.fs_id = s_op->u.pipeline.fs_id;
-    allreduce_op->u.allreduce.myRank = s_op->u.pipeline.dfile_index;
-    allreduce_op->u.allreduce.recv_buf = (void*)malloc(5*sizeof(double));
-    memset(allreduce_op->u.allreduce.recv_buf, 0, 5*sizeof(double));
-    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count);
-    gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
-		 allreduce_op->u.allreduce.tree_depth);
-    allreduce_op->u.allreduce.current_depth = 0;
-    allreduce_op->u.allreduce.mask = 0x1;
-    allreduce_op->u.allreduce.dfile_array = s_op->u.pipeline.dfile_array;
-    allreduce_op->u.allreduce.send_buf = (void*)malloc(5*sizeof(double));
-    memset(allreduce_op->u.allreduce.send_buf, 0, 5*sizeof(double));
+    for(i=0; i<2; i++) {
+	allreduce_op = malloc(sizeof(*allreduce_op));
+	memset(allreduce_op, 0, sizeof(*allreduce_op));
+	
+	if(i==0)
+	    allreduce_op->u.allreduce.type = 0; /* SEND */
+	else if(i==1)
+	    allreduce_op->u.allreduce.type = 1; /* RECV */
+	allreduce_op->u.allreduce.fs_id = s_op->u.pipeline.fs_id;
+	allreduce_op->u.allreduce.myRank = s_op->u.pipeline.dfile_index;
+	allreduce_op->u.allreduce.recv_buf = (void*)malloc(5*sizeof(double));
+	memset(allreduce_op->u.allreduce.recv_buf, 0, 5*sizeof(double));
+	allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count);
+	gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
+		     allreduce_op->u.allreduce.tree_depth);
+	allreduce_op->u.allreduce.current_depth = 0;
+	allreduce_op->u.allreduce.mask = 0x1;
+	allreduce_op->u.allreduce.dfile_array = s_op->u.pipeline.dfile_array;
+	allreduce_op->u.allreduce.send_buf = (void*)malloc(5*sizeof(double));
+	memset(allreduce_op->u.allreduce.send_buf, 0, 5*sizeof(double));
 
-    ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
-    
+	tmpRank = (double)(allreduce_op->u.allreduce.myRank);
+	gossip_debug(GOSSIP_IO_DEBUG, "tmpRank=%lf\n", tmpRank);
+	memcpy(allreduce_op->u.allreduce.send_buf, &tmpRank, sizeof(double));
+	
+	ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
+    }   
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

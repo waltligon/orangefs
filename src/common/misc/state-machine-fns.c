@@ -788,7 +788,6 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      */
     qlist_for_each_entry(f, &smcb->frames, link)
     {
-	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "f->frame=%p\n", f->frame);
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)
         {

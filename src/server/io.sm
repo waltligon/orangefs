@@ -559,6 +559,8 @@ static PINT_sm_action io_send_completion_ack(
 		tmp = s_op->u.io.tmp_buffer;
 		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (INT) to send=%d, s_op->resp.u.read_completion.total_completed=%lld\n", *tmp, lld(s_op->resp.u.read_completion.total_completed));
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(int);
+		s_op->resp.u.read_completion.result.buffer = malloc(sizeof(int));
+		memset(s_op->resp.u.read_completion.result.buffer, 0, sizeof(int));
 		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
 	    }
@@ -568,6 +570,8 @@ static PINT_sm_action io_send_completion_ack(
 		tmp = s_op->u.io.tmp_buffer;
 		gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (DOUBLE) to send=%lf, s_op->resp.u.read_completion.total_completed=%lld\n", *tmp, lld(s_op->resp.u.read_completion.total_completed));
 		s_op->resp.u.read_completion.result.buffer_sz = sizeof(double);
+		s_op->resp.u.read_completion.result.buffer = malloc(sizeof(double));
+		memset(s_op->resp.u.read_completion.result.buffer, 0, sizeof(double));
 		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
 	    }

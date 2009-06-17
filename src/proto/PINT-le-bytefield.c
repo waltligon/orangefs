@@ -210,7 +210,7 @@ static void lebf_initialize(void)
 	case PVFS_SERV_READ_COMPLETION: /* AS: FIXME */
 	    /* only a response, but nothing special there */
 	    noreq = 1; /* AS: this is required; otherwise lebf_encode_req() will complain. */
-	    respsize = 40; /* AS: not sure this is correct value */
+	    respsize = 8; /* AS: not sure this is correct value */
 	    break; /* AS */
 	    case PVFS_SERV_MGMT_PERF_MON:
 		resp.u.mgmt_perf_mon.perf_array_count = 0;

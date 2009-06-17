@@ -402,6 +402,7 @@ struct PINT_server_pipeline_op
 /* allreduce */
 struct PINT_server_allreduce_op
 {
+    int type; /* SEND (0) or RECV (1) */
     int op;
     PVFS_fs_id fs_id;
     PVFS_hint hints;

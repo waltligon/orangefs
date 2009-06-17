@@ -56,14 +56,9 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_BMI_addr_t svr_addr;
     double *tmp = s_op->u.allreduce.send_buf;
     PVFS_msg_tag_t session_tag;
-    double tmpRank;
 
-    tmpRank = (double)myRank;
-    gossip_debug(GOSSIP_IO_DEBUG, "tmpRank=%lf\n", tmpRank);
     js_p->error_code = 0;
-    tmp[0] = tmpRank;
-    s_op->u.allreduce.send_buf = (void*)tmp;
-    
+
     newRank = myRank^(s_op->u.allreduce.mask);
     gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d\n", myRank, newRank);
     new_rank_handle = s_op->u.allreduce.dfile_array[newRank];
@@ -81,56 +76,60 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     session_tag = 3333;
 
     /* RECV */
-    gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%llu\n", llu(svr_addr));
-    ret = job_bmi_recv(svr_addr,
-		       (void*)s_op->u.allreduce.recv_buf,
-		       5*sizeof(double),
-		       session_tag,
-		       BMI_PRE_ALLOC,
-		       smcb,
-		       0,
-		       js_p,
-		       &tmp_id,
-		       server_job_context,
-		       user_opts->server_job_bmi_timeout,
-		       (bmi_hint)s_op->u.allreduce.hints);
-#if 0
-    if(ret == 1) {
-	js_p->error_code = ret;
-	return SM_ACTION_COMPLETE;
+    if(s_op->u.allreduce.type == 1) {
+	gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%llu\n", llu(svr_addr));
+	ret = job_bmi_recv(svr_addr,
+			   (void*)s_op->u.allreduce.recv_buf,
+			   5*sizeof(double),
+			   session_tag,
+			   BMI_PRE_ALLOC,
+			   smcb,
+			   0,
+			   js_p,
+			   &tmp_id,
+			   server_job_context,
+			   user_opts->server_job_bmi_timeout,
+			   (bmi_hint)s_op->u.allreduce.hints);
+	
+	if(ret == 1) {
+	    js_p->error_code = ret;
+	    return SM_ACTION_COMPLETE;
+	}
+	
+	if(ret == 0) {
+	    js_p->error_code = ret;
+	    return SM_ACTION_DEFERRED;
+	}
     }
-    
-    if(ret == 0) {
-	js_p->error_code = ret;
-	return SM_ACTION_DEFERRED;
+    /* SEND */
+    else if(s_op->u.allreduce.type == 0) {
+	gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%llu: tmp=%f\n", 
+		     llu(svr_addr), *tmp);
+	ret = job_bmi_send(svr_addr,
+			   (void*)s_op->u.allreduce.send_buf,
+			   5*sizeof(double),
+			   session_tag,
+			   BMI_PRE_ALLOC,
+			   0, /* 1: send_unexpected */
+			   smcb,
+			   0,
+			   js_p,
+			   &tmp_id,
+			   server_job_context,
+			   user_opts->server_job_bmi_timeout,
+			   (bmi_hint)s_op->u.allreduce.hints);
+	
+	if(ret == 1) {
+	    js_p->error_code = ret;
+	    return SM_ACTION_COMPLETE;
+	}
+	
+	if(ret == 0) {
+	    js_p->error_code = ret;
+	    return SM_ACTION_DEFERRED;
+	}
     }
-#endif
-
-    gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%llu: tmp=%f\n", llu(svr_addr), *tmp);
-    ret = job_bmi_send(svr_addr,
-		       (void*)s_op->u.allreduce.send_buf,
-		       5*sizeof(double),
-		       session_tag,
-		       BMI_PRE_ALLOC,
-		       0, /* 1: send_unexpected */
-		       smcb,
-		       0,
-		       js_p,
-		       &tmp_id,
-		       server_job_context,
-		       user_opts->server_job_bmi_timeout,
-		       (bmi_hint)s_op->u.allreduce.hints);
-    
-    if(ret == 1) {
-	js_p->error_code = ret;
-	return SM_ACTION_COMPLETE;
-    }
-    
-    if(ret == 0) {
-	js_p->error_code = ret;
-	return SM_ACTION_DEFERRED;
-    }
-
+	
     return SM_ACTION_COMPLETE;
 }
 
