@@ -791,30 +791,24 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         {
             length = new_op->downcall.resp.getxattr.val_sz;
             gossip_lerr("Returned length => %d\n",(int)length);
-            if (size == 0)
+            ret = length;
+            /* check to see if val length is > provided buffer size */
+            if (length > size)
             {
-                ret = length;
+                ret = -ERANGE;
             }
             else
             {
-                /* check to see if val length is > provided buffer size */
-                if (length > size)
-                {
-                    ret = -ERANGE;
-                }
-                else
-                {
-                    /* No size problems */
-                    memset(buffer, 0, size);
-                    memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                           size);
-                    ret = size; 
-                    gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: "
-                        "inode %llu key %s key_sz %d, val_length %d\n", 
-                        llu(get_handle_from_ino(inode)),
-                        (char*)new_op->upcall.req.getxattr.key, 
-                        (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
-                }
+                /* No size problems */
+                memset(buffer, 0, length);
+                memcpy(buffer, new_op->downcall.resp.getxattr.val, 
+                       length);
+                ret = length; 
+                gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: "
+                             "inode %llu key %s key_sz %d, val_length %d\n", 
+                             llu(get_handle_from_ino(inode)),
+                             (char*)new_op->upcall.req.getxattr.key, 
+                             (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
             }
         }
         else if (ret == -ENOENT)

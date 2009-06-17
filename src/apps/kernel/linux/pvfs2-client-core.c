@@ -877,7 +877,8 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     while((b = index(b, '\n')) != NULL)
     {
         ++b;
-        vfs_request->nkey++;
+        if(*b != '\0')
+            vfs_request->nkey++;
     }
     
     vfs_request->keys = malloc(sizeof(PVFS_ds_keyval) * vfs_request->nkey);
