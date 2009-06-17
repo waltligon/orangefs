@@ -341,11 +341,8 @@ struct PINT_server_io_op
     
     void *user_ptr;
 
-    int op;
-    int datatype;
     void *tmp_buffer;
     PVFS_size count; /* for MEAN operation */
-    PVFS_handle *dfile_array;
 
     PVFS_size aggregate_size;
 
@@ -366,18 +363,25 @@ struct PINT_server_pipeline_op
     PVFS_handle handle;
     PVFS_BMI_addr_t address;
 
+    PVFS_handle *dfile_array;
     int dfile_index; /* can be used for Rank */
     int dfile_count;
     struct PINT_dist_s *dist;
+    PINT_request_file_data file_data;
 
     PINT_Request *file_req;
     PVFS_offset file_req_offset;
     PINT_Request *mem_req;
 
+    /* for strip alignment */
     char tmp_buf[128]; /* FIXME */
     PVFS_size unaligned_size;
 
     enum PVFS_io_type io_type;
+
+    /* AS: operator and data type */
+    int op;
+    int datatype;
 
     char *buffer; 
     PVFS_size buffer_size;

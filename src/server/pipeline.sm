@@ -30,7 +30,6 @@
 #define UNALIGNED 102
 #define DO_COMP 103
 #define DO_ALLREDUCE 104
-#define CONTINUE_ALLREDUCE 105
 
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -122,7 +121,8 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_size bytes;
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
+    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", 
+		 smcb->base_frame, smcb->frame_count);
     s_op->u.pipeline.buffer_used = 0;
     bytes = s_op->u.pipeline.buffer_size;
 
@@ -219,7 +219,6 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
 
     if(s_op->u.pipeline.segs == 0) {
 	js_p->error_code = 0;
@@ -239,7 +238,7 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     if(s_op->u.pipeline.io_type == PVFS_IO_READ) {
 	assert(s_op->u.pipeline.buffer_used);
 
-	if(parent_s_op->u.io.op != 0) { /* AS: when op is specified */
+	if(s_op->u.pipeline.op != 0) { /* AS: when op is specified */
 	    ret = DO_COMP; /* AS: skip sending if op is specified */ 
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parent->op != 0\n", __func__);
 	    js_p->error_code = ret;
@@ -308,10 +307,9 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     js_p->error_code = 0;
-    PVFS_size file_req_offset = parent_s_op->u.io.file_req_offset;
-    PINT_request_file_data fdata = parent_s_op->u.io.file_data;
+    PVFS_size file_req_offset = s_op->u.pipeline.file_req_offset;
+    PINT_request_file_data fdata = s_op->u.pipeline.file_data;
     PVFS_simple_stripe_params *dparam = 
 	(PVFS_simple_stripe_params*)fdata.dist->params;
     PVFS_size count;
@@ -322,7 +320,7 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.pipeline.loff = loff;
     gossip_debug(GOSSIP_IO_DEBUG, "loff=%lld, file_req_offset=%lld\n", lld(loff), lld(file_req_offset));
 
-    switch(parent_s_op->u.io.datatype) {
+    switch(s_op->u.pipeline.datatype) {
     case ((int)0x4c000405): /* MPI_INT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
 			    file_req_offset)/((*PVFS_INT).ub);
@@ -364,7 +362,6 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
     int regions;
@@ -387,7 +384,7 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* determine which server we need to talk to */
     next_server_index = (s_op->u.pipeline.dfile_index + 1)%(s_op->u.pipeline.dfile_count);
-    next_server_handle = parent_s_op->u.io.dfile_array[next_server_index];
+    next_server_handle = s_op->u.pipeline.dfile_array[next_server_index];
 
     /* build a request */
     ret = PVFS_Request_contiguous(s_op->u.pipeline.unaligned_size, 
@@ -510,11 +507,11 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
 		     "%s: buffer_used=%lld, op=0x%x, datatype=0x%x, actual_size=%lld\n", 
 		     __func__, lld(s_op->u.pipeline.buffer_used), 
-		     parent_s_op->u.io.op, 
-		     parent_s_op->u.io.datatype,
+		     s_op->u.pipeline.op, 
+		     s_op->u.pipeline.datatype,
 		     lld(js_p->actual_size)); /* AS */
 
-	switch(parent_s_op->u.io.datatype) {
+	switch(s_op->u.pipeline.datatype) {
 	case ((int)0x4c000405): /* MPI_INT */
 	    {
 		int *a = (int*)s_op->u.pipeline.buffer;
@@ -540,7 +537,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "total_transferred=%lld\n", lld(parent_s_op->u.io.total_transferred));
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "count=%lld, tmp=%d\n", lld(count), *tmp);
 
-		switch(parent_s_op->u.io.op) {
+		switch(s_op->u.pipeline.op) {
 		case 0x58000001: /* MAX */
 		    result = *a;
 		    for (i=1; i<count; i++ ) {
@@ -652,7 +649,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 			     lld(parent_s_op->u.io.total_transferred));
 		gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "count=%lld, tmp=%lf\n", 
 			     lld(count), *tmp);
-		switch(parent_s_op->u.io.op) {
+		switch(s_op->u.pipeline.op) {
 		case 0x58000001: /* MAX */
 		    result = *a;
 		    for (i=1; i<count; i++ ) {
@@ -752,7 +749,6 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     int ret, tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
     PVFS_handle new_rank_handle;
@@ -766,12 +762,12 @@ static PINT_sm_action setup_allreduce_sm(struct PINT_smcb *smcb, job_status_s *j
     allreduce_op->u.allreduce.myRank = s_op->u.pipeline.dfile_index;
     allreduce_op->u.allreduce.recv_buf = (void*)malloc(5*sizeof(double));
     memset(allreduce_op->u.allreduce.recv_buf, 0, 5*sizeof(double));
-    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count); /* FIXME !!!! */
+    allreduce_op->u.allreduce.tree_depth = log2(s_op->u.pipeline.dfile_count);
     gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
 		 allreduce_op->u.allreduce.tree_depth);
     allreduce_op->u.allreduce.current_depth = 0;
     allreduce_op->u.allreduce.mask = 0x1;
-    allreduce_op->u.allreduce.dfile_array = parent_s_op->u.io.dfile_array;
+    allreduce_op->u.allreduce.dfile_array = s_op->u.pipeline.dfile_array;
     allreduce_op->u.allreduce.send_buf = (void*)malloc(5*sizeof(double));
     memset(allreduce_op->u.allreduce.send_buf, 0, 5*sizeof(double));
 
@@ -823,16 +819,19 @@ static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *
 
     /* FIXME: */
     /* unless the second condition is set, the server starts
-       a new read request to one already done, and falls into
+       a new read request that is already done, and falls into
        infinite trove_read->bmi_send->check_done loop */
     if(!segpool_done(h) && s_op->u.pipeline.segs != 0) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: LOOP\n", __func__);
 	js_p->error_code = LOOP;
     }
     else {
-	if(parent_s_op->u.io.op == (0x5800000f)) { /* KMEANS */
-	    parent_s_op->u.io.tmp_buffer = (void *)s_op->u.pipeline.buffer;
+#if 0
+	if(s_op->u.pipeline.op == (0x5800000f)) { /* KMEANS */
+	    memcpy(parent_s_op->u.io.tmp_buffer, 
+		   s_op->u.pipeline.buffer, sizeof(double));
 	}
+#endif
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: DONE\n", __func__);
     }
     

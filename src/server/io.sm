@@ -199,16 +199,13 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.aggregate_size = s_op->req->u.io.aggregate_size;
     gossip_debug(GOSSIP_IO_DEBUG, "%s: tag=%d\n", __func__, s_op->tag);
     s_op->u.io.user_ptr = NULL;
-    s_op->u.io.op = s_op->req->u.io.op; /* AS: operation */
-    s_op->u.io.datatype = s_op->req->u.io.datatype; /* AS: dtype */
-    s_op->u.io.dfile_array  = s_op->req->u.io.dfile_array; /* AD: dfile_array */
     
     gossip_debug(GOSSIP_IO_DEBUG, "server_ct=%d\n", s_op->req->u.io.server_ct);
     gossip_debug(GOSSIP_IO_DEBUG, "fs_id=%d\n", s_op->req->u.io.fs_id);
     for(i=0; i<s_op->req->u.io.server_ct; i++) {
 	gossip_debug(GOSSIP_IO_DEBUG, "dfile_array[%d]=%llu\n", i, 
-		     llu(s_op->u.io.dfile_array[i]));
-	if(s_op->u.io.dfile_array[i] == s_op->req->u.io.handle) {
+		     llu(s_op->req->u.io.dfile_array[i]));
+	if(s_op->req->u.io.dfile_array[i] == s_op->req->u.io.handle) {
 	    dfile_index = i;
 	    gossip_debug(GOSSIP_IO_DEBUG, "dfile_index=%d\n", i);
 	}
@@ -259,7 +256,7 @@ static PINT_sm_action start_pipelining_sm(
 				       s_op->u.pipeline.fs_id);
     if(!fs_config) {
 	gossip_err("%s: Failed to get filesystem "
-		   "config from fs_id of: %d\n", __func__,
+d		   "config from fs_id of: %d\n", __func__,
 		   s_op->u.pipeline.fs_id);
 	js_p->error_code = -PVFS_EINVAL;
 	return SM_ACTION_COMPLETE;
@@ -288,13 +285,15 @@ static PINT_sm_action start_pipelining_sm(
 	pipeline_op = malloc(sizeof(*pipeline_op));
 	memset(pipeline_op, 0, sizeof(*pipeline_op));
 
+	pipeline_op->u.pipeline.op = s_op->req->u.io.op;
+	pipeline_op->u.pipeline.datatype = s_op->req->u.io.datatype;
+
 	pipeline_op->u.pipeline.address = s_op->addr;
 	pipeline_op->u.pipeline.handle = s_op->req->u.io.handle;
         pipeline_op->u.pipeline.fs_id = s_op->req->u.io.fs_id;
 
 	pipeline_op->u.pipeline.seg_handle = seg_handle;
 	pipeline_op->u.pipeline.id = id[i];
-	//pipeline_op->u.pipeline.parent = s_op;
 	pipeline_op->u.pipeline.hints = s_op->req->hints;
 	pipeline_op->u.pipeline.tag = s_op->tag;
 	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
@@ -303,6 +302,9 @@ static PINT_sm_action start_pipelining_sm(
 	pipeline_op->u.pipeline.dfile_index = dfile_index;
 	pipeline_op->u.pipeline.dfile_count = s_op->u.io.file_data.server_ct;
 	pipeline_op->u.pipeline.dist = s_op->u.io.file_data.dist;
+	pipeline_op->u.pipeline.dfile_array = s_op->req->u.io.dfile_array;
+	pipeline_op->u.pipeline.file_data = s_op->u.io.file_data;
+	pipeline_op->u.pipeline.file_req_offset = s_op->u.io.file_req_offset;
 
 	/* figure out if the fs config has trove data sync turned on or off
 	 */
@@ -381,6 +383,7 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
 		     "io: nested sm returned error code: %d\n", tmp_err);
 	if(pipeline_op->u.pipeline.buffer) {
 	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
+		memcpy(s_op->u.io.tmp_buffer, pipeline_op->u.pipeline.buffer, sizeof(double));
 		BMI_memfree(pipeline_op->u.pipeline.address, 
 			    pipeline_op->u.pipeline.buffer, 
 			    s_op->u.io.buffer_size, BMI_SEND);
@@ -574,12 +577,12 @@ static PINT_sm_action io_send_completion_ack(
 	s_op->resp.u.write_completion.total_completed = 
 	    s_op->u.io.total_transferred; /* AS */
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%lld\n", __func__,
-    lld(s_op->u.io.total_transferred)); err = PINT_encode(
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: total_transferred=%lld\n", 
+		 __func__, lld(s_op->u.io.total_transferred)); 
+    err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
         s_op->addr, s_op->decoded.enc_type);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: err=%d\n", __func__, err); // err = 0
     if (err < 0)
     {
         gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
@@ -596,7 +599,8 @@ static PINT_sm_action io_send_completion_ack(
 
     gossip_debug(GOSSIP_IO_DEBUG, "%s: err=%d\n", __func__, err); // err = 1
 
-    return err;
+    js_p->error_code = err;
+    return SM_ACTION_COMPLETE;
 }
 
 static enum PINT_server_req_access_type PINT_server_req_access_io(
