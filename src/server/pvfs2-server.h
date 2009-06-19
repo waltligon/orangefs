@@ -418,9 +418,10 @@ struct PINT_server_allreduce_op
 
 struct PINT_server_kmeans_op
 {
+    int loop;
     int numClusters;
     int numCoords;
-    int numObjs;
+    int numObjs; /* local number of objs */
     int totalNumObjs;
     int *newClusterSize;
     int *clusterSize;

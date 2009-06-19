@@ -798,16 +798,19 @@ static PINT_sm_action setup_kmeans_sm(struct PINT_smcb *smcb, job_status_s *js_p
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i, j;
     struct PINT_server_op *kmeans_op;
-    int numClusters = 2; /* FIXME */
-    int numCoords = 18; /* FIXME */
+    int numClusters = 2; /* FIXME: should come from client? */
+    int numCoords = 18; /* FIXME: should come from client? */
 
     kmeans_op = malloc(sizeof(*kmeans_op));
     memset(kmeans_op, 0, sizeof(*kmeans_op));
-	
+
+    kmeans_op->u.kmeans.totalNumObjs = 17695; /* FIXME: should be obtained from allreduce(numObjs, SUM) */
+    kmeans_op->u.kmeans.numObjs = s_op->u.pipeline.buffer_used/sizeof(float)/numCoords;
     kmeans_op->u.kmeans.clusters = (float **)malloc(numClusters*sizeof(float*));
     assert(kmeans_op->u.kmeans.clusters != NULL);
     kmeans_op->u.kmeans.clusters[0] = (float *)malloc(numClusters*numCoords*sizeof(float));
     assert(kmeans_op->u.kmeans.clusters[0] != NULL);
+    kmeans_op->u.kmeans.objects = (float **)s_op->u.pipeline.buffer;
 
     for(i=1; i<numClusters; i++)
 	kmeans_op->u.kmeans.clusters[i] = kmeans_op->u.kmeans.clusters[i-1] + numCoords;
@@ -835,7 +838,7 @@ static PINT_sm_action cleanup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js
     kmeans_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
             &remaining);
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-		 "pipeline: nested sm returned error code: %d\n", tmp_err);
+		 "pipeline: nested sm (kmeans) returned error code: %d\n", tmp_err);
     //memcpy(s_op->u.pipeline.buffer, kmeans_op->u.kmeans.send_buf, 5*sizeof(double));
     free(kmeans_op->u.kmeans.clusters);
     free(kmeans_op->u.kmeans.clusters[0]);
