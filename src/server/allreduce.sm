@@ -21,13 +21,13 @@
 #include "pint-cached-config.h"
 #include "trove.h"
 
-#define CONTINUE_ALLREDUCE 105
+#define CONTINUE_ALLREDUCE 201
 
 %%
 
 nested machine pvfs2_allreduce_sm
 {
-    state start_allreduce
+    state allreduce
     {
         run allreduce_fn;
         default => check_allreduce;
@@ -36,7 +36,7 @@ nested machine pvfs2_allreduce_sm
     state check_allreduce
     {
 	run check_allreduce_done;
-	CONTINUE_ALLREDUCE => start_allreduce;
+	CONTINUE_ALLREDUCE => allreduce;
 	default => return;
     }
 }

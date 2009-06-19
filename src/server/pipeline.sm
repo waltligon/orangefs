@@ -30,6 +30,7 @@
 #define UNALIGNED 102
 #define DO_COMP 103
 #define DO_ALLREDUCE 104
+#define DO_KMEANS 105
 
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -48,7 +49,7 @@ nested machine pvfs2_pipeline_sm
     {
         run dispatch_data;
 	DO_COMP => check_align;
-        success => check_pipeline;
+        default => check_pipeline;
     }
 
     state check_align
@@ -74,7 +75,26 @@ nested machine pvfs2_pipeline_sm
     {
 	run do_comp_fn;
 	DO_ALLREDUCE => setup_allreduce;
+	DO_KMEANS => do_kmeans;
 	success => check_pipeline;
+    }
+
+    state do_kmeans
+    {
+	jump pvfs2_kmeans_sm;
+	success => check_pipeline;
+    }
+
+    state setup_kmeans
+    {
+	run setup_kmeans_fn;
+	success => run_kmeans;
+    }
+
+    state run_kmeans
+    {
+	jump pvfs2_kmeans_sm;
+	success => cleanup_kmeans;
     }
 
     state setup_allreduce
@@ -89,6 +109,12 @@ nested machine pvfs2_pipeline_sm
     state cleanup_allreduce
     {
 	run cleanup_allreduce_fn;
+	success => check_pipeline;
+    }
+
+    state cleanup_kmeans
+    {
+	run cleanup_kmeans_fn;
 	success => check_pipeline;
     }
 
@@ -337,6 +363,24 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
 			 lld(s_op->u.pipeline.unaligned_size));
 	}
+	break;
+    case ((int)0x4c00040a): /* MPI_FLOAT */
+	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
+			    file_req_offset)/((*PVFS_FLOAT).ub);
+	gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
+	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
+	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+	
+	if (loff == strip_boundary && file_req_offset != 0) {
+	    s_op->u.pipeline.unaligned_size = file_req_offset;
+	}
+
+	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
+	    js_p->error_code = UNALIGNED;
+	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
+			 lld(s_op->u.pipeline.unaligned_size));
+	}
+	break;
     case ((int)0x4c00080b): /* MPI_DOUBLE */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
 			    file_req_offset)/((*PVFS_DOUBLE).ub);
@@ -353,6 +397,7 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
 			 lld(s_op->u.pipeline.unaligned_size));
 	}
+	break;
     }
 
     return SM_ACTION_COMPLETE;
@@ -456,6 +501,7 @@ static int s2s_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     return 0;
 }
 
+#if 0
 /* square of Euclid distance between two multi-dimensional points            */
 __inline static
 float euclid_dist_2(int    numdims,  /* no. dimensions */
@@ -495,6 +541,7 @@ int find_nearest_cluster(int     numClusters, /* no. clusters */
   }
   return(index);
 }
+#endif 
 
 static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -711,11 +758,11 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		    gossip_debug(GOSSIP_IO_DEBUG, "mean=%lf\n", result);
 		    break;
 		case (0x5800000f): /* KMEANS */ {
+#if 0
 		    int index, numObjs, j;
 		    int numClusters=2, numCoords=4;
 		    double delta;
 		    
-#if 0
 		    for(i=0; i<numObjs; i++) {
 			//result = a[i];
 			index = find_nearest_cluster(numClusters, numCoords, a[i], clusters);
@@ -743,6 +790,58 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	} /* end switch() */
     } /* end if() */
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action setup_kmeans_sm(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret, i, j;
+    struct PINT_server_op *kmeans_op;
+    int numClusters = 2; /* FIXME */
+    int numCoords = 18; /* FIXME */
+
+    kmeans_op = malloc(sizeof(*kmeans_op));
+    memset(kmeans_op, 0, sizeof(*kmeans_op));
+	
+    kmeans_op->u.kmeans.clusters = (float **)malloc(numClusters*sizeof(float*));
+    assert(kmeans_op->u.kmeans.clusters != NULL);
+    kmeans_op->u.kmeans.clusters[0] = (float *)malloc(numClusters*numCoords*sizeof(float));
+    assert(kmeans_op->u.kmeans.clusters[0] != NULL);
+
+    for(i=1; i<numClusters; i++)
+	kmeans_op->u.kmeans.clusters[i] = kmeans_op->u.kmeans.clusters[i-1] + numCoords;
+
+    if(s_op->u.pipeline.dfile_index == 0) {
+	for (i=0; i<numClusters; i++)
+            for (j=0; j<numCoords; j++)
+                kmeans_op->u.kmeans.clusters[i][j] = kmeans_op->u.kmeans.objects[i][j];
+    }
+
+    ret = PINT_sm_push_frame(smcb, 0, kmeans_op);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action cleanup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id;
+    int remaining;
+    PVFS_error tmp_err;
+    struct PINT_server_op *kmeans_op;
+
+    kmeans_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+            &remaining);
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+		 "pipeline: nested sm returned error code: %d\n", tmp_err);
+    //memcpy(s_op->u.pipeline.buffer, kmeans_op->u.kmeans.send_buf, 5*sizeof(double));
+    free(kmeans_op->u.kmeans.clusters);
+    free(kmeans_op->u.kmeans.clusters[0]);
+    free(kmeans_op);
+
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 

@@ -403,7 +403,7 @@ struct PINT_server_pipeline_op
 struct PINT_server_allreduce_op
 {
     int type; /* SEND (0) or RECV (1) */
-    int op;
+    int op; /* SUM, MAX, MIN */
     PVFS_fs_id fs_id;
     PVFS_hint hints;
     PVFS_handle *dfile_array;
@@ -414,6 +414,23 @@ struct PINT_server_allreduce_op
     void *recv_buf;
     PVFS_size allreduce_buf_sz;
     int mask;
+};
+
+struct PINT_server_kmeans_op
+{
+    int numClusters;
+    int numCoords;
+    int numObjs;
+    int totalNumObjs;
+    int *newClusterSize;
+    int *clusterSize;
+    float delta;
+    float delta_tmp;
+    float **newClusters;
+    int *membership; /* [numObjs] */
+    float **objects; /* [numObjs][numCoords] data objects */
+    float **clusters; /* [numClusters][numCoords] cluster center */
+    float threshold;
 };
 
 struct PINT_server_small_io_op
@@ -553,6 +570,7 @@ typedef struct PINT_server_op
         struct PINT_server_small_io_op small_io;
 	struct PINT_server_pipeline_op pipeline;
 	struct PINT_server_allreduce_op allreduce;
+	struct PINT_server_kmeans_op kmeans;
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
 	struct PINT_server_mkdir_op mkdir;
@@ -596,6 +614,7 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_pipeline_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_allreduce_sm; /* sson */
+extern struct PINT_state_machine_s pvfs2_kmeans_sm; /* sson */
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

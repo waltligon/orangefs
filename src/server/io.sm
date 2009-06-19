@@ -22,7 +22,8 @@
 #include "pint-segpool.h"
 
 #define NUM_OF_PARALLEL_SMS 1
-#define BUFFER_SIZE (256*1024) /* 256KB */
+//#define BUFFER_SIZE (256*1024) /* 256KB */
+#define BUFFER_SIZE (1024*1024) /* 1MB */
 
 %%
 
@@ -296,7 +297,7 @@ d		   "config from fs_id of: %d\n", __func__,
 	pipeline_op->u.pipeline.id = id[i];
 	pipeline_op->u.pipeline.hints = s_op->req->hints;
 	pipeline_op->u.pipeline.tag = s_op->tag;
-	pipeline_op->u.pipeline.buffer_size = BUFFER_SIZE;
+	pipeline_op->u.pipeline.buffer_size = s_op->u.io.buffer_size; // BUFFER_SIZE;
 	pipeline_op->u.pipeline.io_type = s_op->req->u.io.io_type;
 
 	pipeline_op->u.pipeline.dfile_index = dfile_index;
@@ -322,9 +323,8 @@ d		   "config from fs_id of: %d\n", __func__,
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
-	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
-	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
+
 	    if(ret < 0) {
 		js_p->error_code = -PVFS_ENOMEM;
 		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
@@ -346,15 +346,14 @@ d		   "config from fs_id of: %d\n", __func__,
 		assert(pipeline_op->u.pipeline.buffer);
 	    }
 
-	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    ret = PINT_sm_push_frame(smcb, 0, pipeline_op);
+
 	    if(ret < 0) {
 		js_p->error_code = -PVFS_ENOMEM;
 		gossip_debug(GOSSIP_IO_DEBUG, "io: failed to setup nested sm for handle: %llu\n", 
 			     llu(s_op->req->u.io.handle));
 		return SM_ACTION_COMPLETE;
 	    }
-	    gossip_debug(GOSSIP_IO_DEBUG, "smcb->base_frame=%d, frame_count=%d\n", smcb->base_frame, smcb->frame_count);
 	    s_op->u.io.parallel_sms++;
 	    gossip_debug(GOSSIP_IO_DEBUG, "%s: parallel_sms=%d\n", 
 			 __func__, s_op->u.io.parallel_sms);
@@ -383,7 +382,9 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
 		     "io: nested sm returned error code: %d\n", tmp_err);
 	if(pipeline_op->u.pipeline.buffer) {
 	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
-		memcpy(s_op->u.io.tmp_buffer, pipeline_op->u.pipeline.buffer, sizeof(double));
+		if(pipeline_op->u.pipeline.op != 0)
+		    memcpy(s_op->u.io.tmp_buffer, pipeline_op->u.pipeline.buffer, 
+			   sizeof(double)); /* FIXME */
 		BMI_memfree(pipeline_op->u.pipeline.address, 
 			    pipeline_op->u.pipeline.buffer, 
 			    s_op->u.io.buffer_size, BMI_SEND);

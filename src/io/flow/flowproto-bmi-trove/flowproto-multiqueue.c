@@ -26,7 +26,8 @@
  * the flow descriptor
  */
 #define BUFFERS_PER_FLOW 8
-#define BUFFER_SIZE (256*1024)
+//#define BUFFER_SIZE (256*1024)
+#define BUFFER_SIZE (1024*1024)
 
 #define MAX_REGIONS 64
 

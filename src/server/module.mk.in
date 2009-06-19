@@ -45,7 +45,8 @@ ifdef BUILD_SERVER
 		$(DIR)/precreate-pool-refiller.c \
 		$(DIR)/unstuff.c \
 		$(DIR)/pipeline.c \
-		$(DIR)/allreduce.c
+		$(DIR)/allreduce.c \
+		$(DIR)/kmeans.c 
 
 	# c files that should be added to server library
 	SERVERSRC += \

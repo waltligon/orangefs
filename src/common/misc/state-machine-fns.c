@@ -157,11 +157,6 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                  r->error_code,
                  SM_ACTION_STRING(retval));
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-		 "retval=%d, current_state->flag=%d, children_running=%d\n", 
-		 retval,
-		 smcb->current_state->flag,
-		 smcb->children_running); /* sson */
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
         /* start child SMs */
@@ -171,7 +166,6 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
          * issues a job_null that will drive progress from here and we don't
          * want to cause a double transition.
          */
-	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "smcb=%p: children_started=%d\n", smcb, children_started);
         if (children_started > 0)
             retval = SM_ACTION_DEFERRED;
         else
@@ -308,7 +302,6 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         * onto a stack */
         while (smcb->current_state->flag == SM_JUMP)
         {
-	    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: SM_JUMP\n", __func__);
 	    PINT_push_state(smcb, smcb->current_state);
 	    smcb->current_state =
                     smcb->current_state->action.nested->first_state;
@@ -632,8 +625,6 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
             "[SM frame get]: (%p) op-id: %d index: %d base-frm: %d\n",
             smcb, smcb->op, index, smcb->base_frame);
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-		 "children_running=%d\n", smcb->children_running); /* sson */
 
     if(qlist_empty(&smcb->frames))
     {
@@ -657,8 +648,7 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
             prev = prev->prev;
         }
         frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
-	gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "returned frame=%p\n",
-		     frame_entry->frame); /* sson */
+
         return frame_entry->frame;
     }
 }
@@ -778,9 +768,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
 
     *children_started = 0;
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: called\n", __func__); /* sson */
     my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "%s: my_frame=%p\n", __func__, my_frame); /* sson */
     /* Iterate once up front to determine how many children we are going to
      * run.  This has to be set before starting any children, otherwise if
      * the first one immediately completes it will mistakenly believe it is
