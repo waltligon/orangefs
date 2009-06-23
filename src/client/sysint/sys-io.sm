@@ -468,7 +468,9 @@ static PINT_sm_action io_unstuff_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
 
+/*
  gossip_err("Executing io_unstuff_setup_msgpair....\n");
+*/
 
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
@@ -794,7 +796,9 @@ static PINT_sm_action io_datafile_post_msgpairs(
 
         cur_ctx->session_tag = PINT_util_get_next_tag();
 
+/*
         gossip_err("CLIENT: SYS-IO SM: cur_ctx->session_tag:%d",cur_ctx->session_tag);
+*/
 
 
         cur_ctx->msg_recv_has_been_posted = 0;

@@ -203,7 +203,9 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->buffers_per_flow = fs_conf->fp_buffers_per_flow;
     }
 
+/*
     gossip_err("SERVER: IO SM: s_op->tag:%d\n",s_op->tag);
+*/
 
     gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
         "server_nr: %d, server_ct: %d\n",
