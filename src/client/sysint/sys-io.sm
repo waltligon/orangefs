@@ -39,7 +39,8 @@ enum
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
     IO_UNSTUFF,
-    IO_FATAL_ERROR
+    IO_FATAL_ERROR,
+    IO_MIRRORING
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -166,7 +167,7 @@ machine pvfs2_client_io_sm
     {   
         run io_inspect_attr;
         IO_UNSTUFF => unstuff_setup_msgpair;
-        success => io_datafile_setup_msgpairs; /*check for mirroring*/
+        success => io_mirroring; 
         default => io_cleanup;
     }
 
@@ -180,22 +181,25 @@ machine pvfs2_client_io_sm
     state unstuff_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => io_datafile_setup_msgpairs; /*check for mirroring*/
+        success => io_mirroring; 
         default => io_cleanup;
     }
 
-   /* state io_mirroring
-    * {
-    *    run io_mirroring;
-    *    IO_MIRRORING => mirror_xfer_msgpair;
-    *    success => io_datafile_setup_msgpairs;
-    *    default => io_cleanup;
-    * }
-   */
-
-    /*add a new state here that gets the data handles IF mirroring is turned on.
-     *the meta-hint value will tell us if mirroring is turned on for this file.
-    */
+    state io_mirroring
+    {
+        run io_mirroring;
+        IO_MIRRORING => io_get_mirrors;
+        success => io_datafile_setup_msgpairs;
+        default => io_cleanup;
+    }
+   
+    state io_get_mirrors
+    {
+       /* jump pvfs2_get_mirrors_sm;*/
+        run pvfs2_get_mirrors_sm;
+        success => io_datafile_setup_msgpairs;
+        default => io_cleanup;
+    }
 
     state io_datafile_setup_msgpairs
     {
@@ -207,27 +211,8 @@ machine pvfs2_client_io_sm
     }
 
 
-    /*Tear apart small_io....make one call to client_small_io_sm for each
-     *msgpair.  
-     *
-     *  state small_io
-     *  {
-     *    pjmp small_io;
-     *    { success => pvfs2_client_small_io_sm; }
-     *    default => check_small_io;
-     *  }
-     *  state check_small_io
-     *  {
-     *     run check_small_io;
-     *     IO_RETRY => retry_small_io;
-     *     success => io_analyze_results;
-     *     default => io_cleanup;
-     *  }
-     *  state retry_small_io
-     *  {
-     *     run retry_small_io;
-     *     default => small_io;
-     *  }
+    /*We will make changes to msgpairarray to handle mirrored copies of a 
+     *data handle.
     */
     state small_io
     {
@@ -248,6 +233,9 @@ machine pvfs2_client_io_sm
 
     state io_datafile_post_msgpairs_retry
     {
+      /*We will not up the retry count unless all the handles for a msgpair
+       *have been tried.
+      */
         run io_datafile_post_msgpairs_retry;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         default => io_datafile_post_msgpairs;
@@ -549,6 +537,40 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
+
+static PINT_sm_action pvfs2_get_mirrors_sm
+(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+   return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action io_mirroring(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_mirroring....\n");
+
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_getmir_state *getmir_p = &(sm_p->getmir);
+
+    js_p->error_code = 0;
+
+    /*If mirroring is not activated for the logical file, then bypass this
+     *step.
+    */
+    if (sm_p->getattr.attr.u.meta.hint.flags & PVFS_MIRROR_FL)
+        js_p->error_code = IO_MIRRORING;
+    else
+        return SM_ACTION_COMPLETE;
+
+    memset(getmir_p,0,sizeof(PINT_sm_getmir_state));
+
+    getmir_p->object_ref.handle = sm_p->object_ref.handle;
+    getmir_p->object_ref.fs_id  = sm_p->object_ref.fs_id;
+    
+
+    return SM_ACTION_COMPLETE;
+}/*end io_mirroring*/
+
 
 static PINT_sm_action io_datafile_setup_msgpairs(
         struct PINT_smcb *smcb, job_status_s *js_p)

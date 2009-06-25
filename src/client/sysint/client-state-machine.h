@@ -382,6 +382,17 @@ struct PINT_server_fetch_config_sm_state
     int32_t *fs_config_buf_size;
 };
 
+
+typedef struct PINT_sm_getmir_state
+{
+  PVFS_object_ref object_ref;
+
+  uint32_t copies;
+
+  PVFS_handle *handles;
+
+} PINT_sm_getmir_state;
+
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
 
@@ -515,6 +526,8 @@ typedef struct PINT_client_sm
     PINT_sm_getattr_state getattr;
     /* generic dirent array used by both readdir and readdirplus state machines */
     PINT_sm_readdir_state readdir;
+    /* generic getmir used to retrieve and hold handle copies. */
+    PINT_sm_getmir_state getmir;
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
@@ -525,6 +538,7 @@ typedef struct PINT_client_sm
 
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
+
 
     PVFS_credentials *cred_p;
     union

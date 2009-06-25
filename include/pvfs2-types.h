@@ -294,6 +294,7 @@ typedef enum
 #define PVFS_IMMUTABLE_FL FS_IMMUTABLE_FL
 #define PVFS_APPEND_FL    FS_APPEND_FL
 #define PVFS_NOATIME_FL   FS_NOATIME_FL
+#define PVFS_MIRROR_FL    0x81ULL
 
 #else
 
@@ -301,6 +302,7 @@ typedef enum
 #define PVFS_IMMUTABLE_FL 0x10ULL
 #define PVFS_APPEND_FL    0x20ULL
 #define PVFS_NOATIME_FL   0x80ULL
+#define PVFS_MIRROR_FL    0x81ULL
 
 #endif
 
