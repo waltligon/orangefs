@@ -56,12 +56,13 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_handle new_rank_handle;
     PVFS_BMI_addr_t svr_addr;
     double *tmp = s_op->u.allreduce.send_buf;
-    PVFS_msg_tag_t session_tag;
+    PVFS_msg_tag_t session_tag = ALLREDUCE_TAG;
 
     js_p->error_code = 0;
 
     newRank = myRank^(s_op->u.allreduce.mask);
-    gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d\n", myRank, newRank);
+    gossip_debug(GOSSIP_IO_DEBUG, "mask=%x, myRank=%d, newRank=%d\n", 
+		 s_op->u.allreduce.mask, myRank, newRank);
     new_rank_handle = s_op->u.allreduce.dfile_array[newRank];
     gossip_debug(GOSSIP_IO_DEBUG, "new_rank_handle=%llu\n", llu(new_rank_handle));
     ret = PINT_cached_config_map_to_server(&svr_addr,
@@ -73,8 +74,6 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	js_p->error_code = ret;
 	return SM_ACTION_COMPLETE;
     }
-
-    session_tag = ALLREDUCE_TAG;
 
     /* RECV */
     if(s_op->u.allreduce.type == 1) {
@@ -139,11 +138,10 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
     int i;
 
     s_op->u.allreduce.current_depth++;
-    s_op->u.allreduce.mask = s_op->u.allreduce.mask << 1;
+    s_op->u.allreduce.mask <<= 1;
 
     switch(s_op->u.allreduce.datatype) {
     case ((int)0x4c000405): /* MPI_INT */ 
@@ -172,9 +170,6 @@ static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s 
 	break;
     }
 
-#if 0
-    gossip_debug(GOSSIP_IO_DEBUG, "received=%lf\n", *b);
-#endif
     gossip_debug(GOSSIP_IO_DEBUG, "current_depth=%d, tree_depth=%d\n",
 		 s_op->u.allreduce.current_depth, 
 		 s_op->u.allreduce.tree_depth);

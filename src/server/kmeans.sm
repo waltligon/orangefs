@@ -368,7 +368,7 @@ static PINT_sm_action allreduce_3_setup_fn(struct PINT_smcb *smcb, job_status_s 
 	allreduce_op->u.allreduce.dfile_array = s_op->u.kmeans.dfile_array;
 	allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
 	memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
-	memcpy(allreduce_op->u.allreduce.send_buf, &s_op->u.kmeans.delta_tmp, allreduce_op->u.allreduce.buf_sz);
+	memcpy(allreduce_op->u.allreduce.send_buf, &s_op->u.kmeans.delta, allreduce_op->u.allreduce.buf_sz);
 
 	ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
     }   
@@ -418,13 +418,18 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 	    js_p->error_code = ALLREDUCE3;
 	    break;
 	case 2:
-	    memcpy(&s_op->u.kmeans.delta_tmp, 
-		   allreduce_op->u.allreduce.send_buf,
-		   allreduce_op->u.allreduce.buf_sz);
-	    s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
+	    if(i==1) { /* FIXME */
+		memcpy(&s_op->u.kmeans.delta_tmp, 
+		       allreduce_op->u.allreduce.send_buf,
+		       allreduce_op->u.allreduce.buf_sz);
+		s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
+		gossip_debug(GOSSIP_IO_DEBUG, "i=%d: delta=%f\n", i, s_op->u.kmeans.delta);
+	    }
 	    js_p->error_code = DONE_ALLREDUCES;
 	    break;
-	}
+	default:
+	    break;
+	} /* end switch() */
 
 	free(allreduce_op->u.allreduce.send_buf);
 	free(allreduce_op->u.allreduce.recv_buf);
@@ -441,8 +446,13 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
     s_op->u.kmeans.delta = (s_op->u.kmeans.delta_tmp)/(s_op->u.kmeans.totalNumObjs);
 
-    if(s_op->u.kmeans.delta > s_op->u.kmeans.threshold && s_op->u.kmeans.loop++ < 500)
+    if(s_op->u.kmeans.delta > s_op->u.kmeans.threshold && 
+       s_op->u.kmeans.loop++ < 500) {
 	js_p->error_code = CONTINUE_KMEANS;
+	s_op->u.kmeans.allreduce_step = 0;
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: loop=%d\n", __func__, 
+		     s_op->u.kmeans.loop);
+    }
     else
 	js_p->error_code = 0;
 
