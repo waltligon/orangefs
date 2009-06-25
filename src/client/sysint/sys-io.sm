@@ -38,7 +38,8 @@ enum
     IO_GET_DATAFILE_SIZE,
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
-    IO_UNSTUFF
+    IO_UNSTUFF,
+    IO_FATAL_ERROR
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -146,6 +147,7 @@ static void io_datafile_index_array_destroy(
 %%
 
 machine pvfs2_client_io_sm
+
 {
     state init
     {
@@ -154,17 +156,17 @@ machine pvfs2_client_io_sm
     }
 
     state io_getattr
-    {
+    {   /*Modify meta_hint to include miorring status*/
         jump pvfs2_client_getattr_sm;
         success => inspect_attr;
         default => io_cleanup;
     }
 
     state inspect_attr
-    {
+    {   
         run io_inspect_attr;
         IO_UNSTUFF => unstuff_setup_msgpair;
-        success => io_datafile_setup_msgpairs;
+        success => io_datafile_setup_msgpairs; /*check for mirroring*/
         default => io_cleanup;
     }
 
@@ -178,9 +180,22 @@ machine pvfs2_client_io_sm
     state unstuff_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => io_datafile_setup_msgpairs;
+        success => io_datafile_setup_msgpairs; /*check for mirroring*/
         default => io_cleanup;
     }
+
+   /* state io_mirroring
+    * {
+    *    run io_mirroring;
+    *    IO_MIRRORING => mirror_xfer_msgpair;
+    *    success => io_datafile_setup_msgpairs;
+    *    default => io_cleanup;
+    * }
+   */
+
+    /*add a new state here that gets the data handles IF mirroring is turned on.
+     *the meta-hint value will tell us if mirroring is turned on for this file.
+    */
 
     state io_datafile_setup_msgpairs
     {
@@ -191,6 +206,29 @@ machine pvfs2_client_io_sm
         default => io_cleanup;
     }
 
+
+    /*Tear apart small_io....make one call to client_small_io_sm for each
+     *msgpair.  
+     *
+     *  state small_io
+     *  {
+     *    pjmp small_io;
+     *    { success => pvfs2_client_small_io_sm; }
+     *    default => check_small_io;
+     *  }
+     *  state check_small_io
+     *  {
+     *     run check_small_io;
+     *     IO_RETRY => retry_small_io;
+     *     success => io_analyze_results;
+     *     default => io_cleanup;
+     *  }
+     *  state retry_small_io
+     *  {
+     *     run retry_small_io;
+     *     default => small_io;
+     *  }
+    */
     state small_io
     {
         jump pvfs2_client_small_io_sm;
@@ -199,9 +237,12 @@ machine pvfs2_client_io_sm
     }
 
     state io_datafile_post_msgpairs
-    {
+    { /*whenever a msgpair is retried, we will use the "next" data handle, if
+       *mirrored data handles are available.
+      */
         run io_datafile_post_msgpairs;
         IO_RETRY => io_datafile_post_msgpairs_retry;
+        IO_FATAL_ERROR => io_cleanup;
         default => io_datafile_complete_operations;
     }
 
@@ -536,6 +577,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     switch(attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
+
             assert(attr->mask & PVFS_ATTR_META_DFILES);
             assert(attr->mask & PVFS_ATTR_META_DIST);
             assert(attr->u.meta.dist_size > 0);
@@ -758,13 +800,19 @@ static PINT_sm_action io_datafile_post_msgpairs(
                 {
                     goto try_next_encoding;
                 }
-            }
+            }     
+            if (ret == 1)
+
             /*
               FIXME: make this a clean error transition by adjusting
               the completion count and/or (not) exiting
             */
+            /* If one of the msgpairs gets this type of error, then the entire
+             * request should be aborted. Becky Ligon.
+            */
             PVFS_perror_gossip("PINT_encode failed", ret);
-            js_p->error_code = ret;
+            sm_p->u.io.stored_error_code = ret;
+            js_p->error_code = IO_FATAL_ERROR;
             return SM_ACTION_COMPLETE;
         }
 
@@ -776,7 +824,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
         if (!msg->encoded_resp_p)
         {
             /* FIXME: see above FIXME */
-            js_p->error_code = -PVFS_ENOMEM;
+            sm_p->u.io.stored_error_code = -PVFS_ENOMEM;
+            js_p->error_code = IO_FATAL_ERROR;
             return SM_ACTION_COMPLETE;
         }
 
@@ -794,7 +843,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
 
         cur_ctx->session_tag = PINT_util_get_next_tag();
 
-        gossip_err("CLIENT: SYS-IO SM: cur_ctx->session_tag:%d",cur_ctx->session_tag);
+        gossip_err("CLIENT: SYS-IO SM: cur_ctx->session_tag:%d"
+                  ,cur_ctx->session_tag);
 
 
         cur_ctx->msg_recv_has_been_posted = 0;
@@ -905,7 +955,6 @@ static PINT_sm_action io_datafile_post_msgpairs(
             } else {
                 PVFS_perror_gossip("Send immediately failed, cancelling recv",
                     msg->recv_status.error_code);
-
                 msg->op_status = msg->send_status.error_code;
                 msg->send_id = 0;
 
@@ -935,7 +984,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
         return SM_ACTION_DEFERRED;  /* means go find another machine to run */
     else {
         js_p->error_code = IO_RETRY;
-        return SM_ACTION_COMPLETE;  /* means look at error_code and run my machine again */
+        return SM_ACTION_COMPLETE;  /* means look at error_code and run my */
+                                    /* machine again. */
     }
 }
 
@@ -951,8 +1001,10 @@ io_datafile_post_msgpairs_retry(
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
     if (sm_p->u.io.retry_count > sm_p->msgarray_op.params.retry_limit) {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
-          __func__, sm_p->u.io.retry_count, sm_p->msgarray_op.params.retry_delay);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n"
+                                        ,__func__
+                                        ,sm_p->u.io.retry_count
+                                        ,sm_p->msgarray_op.params.retry_delay);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return SM_ACTION_COMPLETE;
     }
@@ -1218,8 +1270,8 @@ static PINT_sm_action io_datafile_complete_operations(
   check_next_step:
 
     /*
-     * If something is pending, return SM_ACTION_DEFERRED to let SM find the next thing
-     * to do.
+     * If something is pending, return SM_ACTION_DEFERRED to let SM find the
+     * next thing to do.
      */
     if (sm_p->u.io.msgpair_completion_count
      || sm_p->u.io.flow_completion_count
@@ -1331,8 +1383,7 @@ static PINT_sm_action io_analyze_results(
                     (i + 1), sm_p->u.io.datafile_count,
                     lld(sm_p->u.io.total_size));
             }
-            gossip_debug(
-                GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
+            gossip_debug(GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
                 (i + 1), sm_p->u.io.datafile_count,
                 lld(sm_p->u.io.total_size));
         }
@@ -1702,6 +1753,12 @@ static PINT_sm_action io_cleanup(
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
     }
 
+    /*these errors occur only within THIS machine and indicate an error that
+     *occurred BEFORE starting msgpairs or small-io.
+    */
+    if (js_p->error_code == IO_FATAL_ERROR)
+        js_p->error_code = sm_p->u.io.stored_error_code;
+
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->error_code)
@@ -1762,7 +1819,8 @@ static inline int io_decode_ack_response(
         {
             PVFS_perror_gossip("io_process_context_recv (op_status)",
                                cur_ctx->msg.op_status);
-            gossip_err("server: %s\n", BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
+            gossip_err("server: %s\n"
+                      , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
             ret = cur_ctx->msg.op_status;
         }
 

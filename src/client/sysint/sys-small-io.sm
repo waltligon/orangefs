@@ -124,7 +124,7 @@ static PINT_sm_action small_io_setup_msgpairs(
                                          sm_p->u.io.file_req_offset + 
                                          result.bytemax);
 
-            file_data.server_nr = sm_p->u.io.datafile_index_array[i];
+/*change this*/ file_data.server_nr = sm_p->u.io.datafile_index_array[i]; 
 
             result.segs = 0;
             result.bytes = 0;
@@ -162,7 +162,7 @@ static PINT_sm_action small_io_setup_msgpairs(
             sm_p->object_ref.fs_id,
             datafile_handle,
             sm_p->u.io.io_type,
-            sm_p->u.io.datafile_index_array[i],
+            sm_p->u.io.datafile_index_array[i], /*change this*/
             attr->u.meta.dfile_count,
             attr->u.meta.dist,
             sm_p->u.io.file_req,
@@ -173,7 +173,7 @@ static PINT_sm_action small_io_setup_msgpairs(
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;  /*change this*/
         msg_p->comp_fn = small_io_completion_fn;
 
         ret = PINT_cached_config_map_to_server(
@@ -306,9 +306,25 @@ static int small_io_completion_fn(void * user_args,
             PINT_free_request_state(file_req_state);
             PINT_free_request_state(mem_req_state);
         }
+    } /*if PVFS_IO_READ*/
+
+    /* 
+    PINT_sm_msgarray_op *msgarray_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgpair);
+    for (i=0; i<sm_p->u.io.datafile_count; i++)
+    {
+        if (sm_p->u.io.datafile_index_array[i] == 
+            msg_p->req.u.small_io.server_nr)
+        {
+            sm_p->u.io.dfile_size_array[i] =
+            resp_p->u.small_io.bstream_size;
+            break;
+        }
     }
+    */
 
     sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;
+
     sm_p->u.io.total_size += resp_p->u.small_io.result_size;
  
     return 0;
