@@ -1,4 +1,4 @@
-all: simple1_unaligned
+all: simple1_unaligned test_kmeans
 
 MPICC=/home/sson/as-branch/mpich2-1.1/bin/mpicc 
 CFLAGS=-Wall -g
@@ -15,6 +15,10 @@ simple1_unaligned.o: simple1_unaligned.c
 	$(MPICC) -c simple1_unaligned.c
 simple1_unaligned: simple1_unaligned.o
 	$(MPICC) $(CFLAGS) -o simple1_unaligned simple1_unaligned.o -lm
+test_kmeans.o: test_kmeans.c
+	$(MPICC) -c test_kmeans.c
+test_kmeans: test_kmeans.o
+	$(MPICC) $(CFLAGS) -o test_kmeans test_kmeans.o -lm
 simple2.o: simple2.c
 	$(MPICC) -c simple2.c
 simple2: simple2.o
@@ -33,4 +37,4 @@ vector1: vector1.o
 	$(MPICC) $(CFLAGS) -o vector1 vector1.o
 
 clean:
-	rm -f *.o *~ simple simple1 simple2 simple3 vector vector1 simple1_unaligned
+	rm -f *.o *~ simple simple1 simple2 simple3 vector vector1 simple1_unaligned test_kmeans
