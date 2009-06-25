@@ -8,8 +8,11 @@
  *  PVFS2 server state machine for driving read I/O operations.
  */
 
+#define _ISOC99_SOURCE /* log2() */ 
+
 #include <string.h>
 #include <assert.h>
+#include <math.h>
 
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -22,47 +25,73 @@
 #include "trove.h"
 
 #define CONTINUE_KMEANS 301
+#define ALLREDUCE2 302
+#define ALLREDUCE3 303
+#define DONE_ALLREDUCES 304
 
 %%
 
 nested machine pvfs2_kmeans_sm
 {
-    state bcast_inititial_centers
+    state bcast_setup
     {
-	run bcast_initial_centers_fn;
-    default => local_comp;
+	run bcast_setup_fn;
+	success => bcast;
+    }
+
+    state bcast
+    {
+	jump pvfs2_bcast_sm;
+	success => cleanup_bcast;
+    }
+
+    state cleanup_bcast
+    {
+	run cleanup_bcast_fn;
+	success => local_comp;
     }
 
     state local_comp
     {
         run local_comp_fn;
-	success => allreduce_1;
+	success => allreduce_1_setup;
     }
 
-    state allreduce_1
+    state allreduce_1_setup 
     {
-	jump pvfs2_allreduce_sm;
-	success => allreduce_2;
+	pjmp allreduce_1_setup_fn
+	{
+	    success => pvfs2_allreduce_sm;
+	}
+	success => cleanup_allreduce;
+    }
+
+    state allreduce_2_setup
+    {
+	pjmp allreduce_2_setup_fn
+	{
+	    success => pvfs2_allreduce_sm;
+	}
+	success => cleanup_allreduce;
+    }
+
+    state allreduce_3_setup
+    {
+	pjmp allreduce_3_setup_fn
+	{
+	    success => pvfs2_allreduce_sm;
+	}
+	success => cleanup_allreduce;
+    }
+
+    state cleanup_allreduce
+    {
+	run cleanup_allreduce_fn;
+	ALLREDUCE2 => allreduce_2_setup;
+	ALLREDUCE3 => allreduce_3_setup;
+	DONE_ALLREDUCES => check_done;
     }
     
-    state allreduce_2
-    {
-	jump pvfs2_allreduce_sm;
-	success => avg_replace;
-    }
-
-    state avg_replace
-    {
-	run avg_replace_fn;
-	success => allreduce_3;
-    }
-
-    state allreduce_3
-    {
-	jump pvfs2_allreduce_sm;
-	success => check_done;
-    }
-
     state check_done
     {
 	run check_done_fn;
@@ -115,98 +144,91 @@ int find_nearest_cluster(int     numClusters, /* no. clusters */
 
 /*
  */
-static PINT_sm_action bcast_initial_centers_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action bcast_setup_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0); /* pipeline.sm */
-    int ret, i, tmp_id;
-    int myRank = parent_s_op->u.pipeline.dfile_index, newRank, rootRank;
-    PVFS_handle new_rank_handle;
-    PVFS_BMI_addr_t svr_addr;
-    PVFS_msg_tag_t session_tag = 5555;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    int ret, i;
+    //int myRank = s_op->u.kmeans.myRank;
+    struct PINT_server_op *bcast_op;
 
     js_p->error_code = 0;
 
-    if(myRank == 0) {
-	for(i=1; i < parent_s_op->u.pipeline.dfile_count; i++) {
-	    gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d\n", 
-			 myRank, i);
-	    new_rank_handle = parent_s_op->u.pipeline.dfile_array[i];
-	    gossip_debug(GOSSIP_IO_DEBUG, "new_rank_handle=%llu\n", 
-			 llu(new_rank_handle));
-	    ret = PINT_cached_config_map_to_server(&svr_addr,
-						   new_rank_handle,
-						   parent_s_op->u.pipeline.fs_id);
+    /* membership: the cluster id for each data object */
+    s_op->u.kmeans.membership = (int*) malloc(s_op->u.kmeans.numObjs * sizeof(int));
+    assert(s_op->u.kmeans.membership != NULL);
 
-	    if(ret < 0) {
-		gossip_err("Failed to map meta server address\n");
-		js_p->error_code = ret;
-		return SM_ACTION_COMPLETE;
-	    }
+    /* initialize membership[] */
+    for (i=0; i<s_op->u.kmeans.numObjs; i++) 
+	s_op->u.kmeans.membership[i] = -1;
 
-	    ret = job_bmi_send(svr_addr,
-			       (void*)s_op->u.kmeans.clusters,
-			       18*sizeof(float),
-			       session_tag,
-			       BMI_PRE_ALLOC,
-			       0, /* 1: send_unexpected */
-			       smcb,
-			       0,
-			       js_p,
-			       &tmp_id,
-			       server_job_context,
-			       user_opts->server_job_bmi_timeout,
-			       (PVFS_hint)parent_s_op->u.pipeline.hints);
-	    
-	    if(ret == 1) {
-		js_p->error_code = ret;
-		return SM_ACTION_COMPLETE;
-	    }
-	    
-	    if(ret == 0) {
-		js_p->error_code = ret;
-		return SM_ACTION_DEFERRED;
-	    }
-	} /* end for() */
+    /* need to initialize newClusterSize and newClusters[0] to all 0 */
+    s_op->u.kmeans.newClusterSize = (int*) calloc(s_op->u.kmeans.numClusters, sizeof(int));
+    assert(s_op->u.kmeans.newClusterSize != NULL);
+    s_op->u.kmeans.clusterSize = (int*) calloc(s_op->u.kmeans.numClusters, sizeof(int));
+    assert(s_op->u.kmeans.clusterSize != NULL);
+    
+    s_op->u.kmeans.newClusters = (float**) malloc(s_op->u.kmeans.numClusters * sizeof(float*));
+    assert(s_op->u.kmeans.newClusters != NULL);
+    s_op->u.kmeans.newClusters[0] = (float*)  calloc(s_op->u.kmeans.numClusters * s_op->u.kmeans.numCoords, sizeof(float));
+    assert(s_op->u.kmeans.newClusters[0] != NULL);
+    for (i=1; i<s_op->u.kmeans.numClusters; i++)
+	s_op->u.kmeans.newClusters[i] = s_op->u.kmeans.newClusters[i-1] + s_op->u.kmeans.numCoords;
+
+    /* setup bcast */
+    bcast_op = malloc(sizeof(*bcast_op));
+    memset(bcast_op, 0, sizeof(*bcast_op));
+
+    bcast_op->u.bcast.fs_id = s_op->u.kmeans.fs_id;
+    bcast_op->u.bcast.myRank = s_op->u.kmeans.myRank;
+    bcast_op->u.bcast.buf_sz = s_op->u.kmeans.numClusters*s_op->u.kmeans.numCoords*sizeof(float);
+    bcast_op->u.bcast.recv_buf = (void*)malloc(bcast_op->u.bcast.buf_sz);
+    memset(bcast_op->u.bcast.recv_buf, 0, bcast_op->u.bcast.buf_sz);
+    bcast_op->u.bcast.datatype = (int)0x4c00040a; //MPI_FLOAT;
+    bcast_op->u.bcast.dfile_array = s_op->u.kmeans.dfile_array;
+    bcast_op->u.bcast.dfile_count = s_op->u.kmeans.dfile_count;
+    bcast_op->u.bcast.tree_depth = log2(s_op->u.kmeans.dfile_count);
+    bcast_op->u.bcast.current_depth = bcast_op->u.bcast.tree_depth;
+    bcast_op->u.bcast.mask = 0x1;
+    bcast_op->u.bcast.send_buf = (void*)malloc(bcast_op->u.bcast.buf_sz);
+    memset(bcast_op->u.bcast.send_buf, 0, bcast_op->u.bcast.buf_sz);
+    memcpy(bcast_op->u.bcast.send_buf, s_op->u.kmeans.clusters[0], 
+	   bcast_op->u.bcast.buf_sz);
+    
+    ret = PINT_sm_push_frame(smcb, 0, bcast_op);
+    
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id, remaining;
+    int i, j;
+    PVFS_error tmp_err;
+    struct PINT_server_op *bcast_op;
+    js_p->error_code = 0;
+
+    bcast_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+				 &remaining);
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+		 "kmeans: nested sm (bcast) returned error code: %d, remaining=%d\n", tmp_err, remaining);
+    
+    if(s_op->u.kmeans.myRank != 0) {
+	memcpy(s_op->u.kmeans.clusters[0], 
+	       bcast_op->u.bcast.recv_buf,
+	       bcast_op->u.bcast.buf_sz);
     }
-    else /* all other nodes */ {
-	/* RECV from rootRank */
-	new_rank_handle = parent_s_op->u.pipeline.dfile_array[0];
-	ret = PINT_cached_config_map_to_server(&svr_addr,
-					       new_rank_handle,
-					       parent_s_op->u.pipeline.fs_id);
+    
+    /* debug print */
+    for(i=0; i<s_op->u.kmeans.numClusters; i++)
+	for(j=0; j<s_op->u.kmeans.numCoords; j++)
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: clusters[%d][%d]=%lf\n", 
+			 __func__, i, j, s_op->u.kmeans.clusters[i][j]);
 
-	if(ret < 0) {
-	    gossip_err("Failed to map meta server address\n");
-	    js_p->error_code = ret;
-	    return SM_ACTION_COMPLETE;
-	}
-	
-	gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%llu\n", llu(svr_addr));
-	ret = job_bmi_recv(svr_addr,
-			   (void*)s_op->u.kmeans.clusters,
-			   18*sizeof(float),
-			   session_tag,
-			   BMI_PRE_ALLOC,
-			   smcb,
-			   0,
-			   js_p,
-			   &tmp_id,
-			   server_job_context,
-			   user_opts->server_job_bmi_timeout,
-			   (PVFS_hint)parent_s_op->u.pipeline.hints);
-	
-	if(ret == 1) {
-	    js_p->error_code = ret;
-	    return SM_ACTION_COMPLETE;
-	}
-	
-	if(ret == 0) {
-	    js_p->error_code = ret;
-	    return SM_ACTION_DEFERRED;
-	}
-    }
+    free(bcast_op->u.bcast.send_buf);
+    free(bcast_op->u.bcast.recv_buf);
+    free(bcast_op);
 	
     return SM_ACTION_COMPLETE;
 }
@@ -243,23 +265,173 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action avg_replace_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action allreduce_1_setup_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, j;
+    struct PINT_server_op *allreduce_op;
+    int ret, i;
 
-    /* average the sum and replace old cluster centers with newClusters */
-    for (i=0; i<s_op->u.kmeans.numClusters; i++) {
-	for (j=0; j<s_op->u.kmeans.numCoords; j++) {
-	    if (s_op->u.kmeans.clusterSize[i] > 1)
-		s_op->u.kmeans.clusters[i][j] /= 
-		    s_op->u.kmeans.clusterSize[i];
-	    s_op->u.kmeans.newClusters[i][j] = 0.0;   /* set back to 0 */
-	}
-	s_op->u.kmeans.newClusterSize[i] = 0;   /* set back to 0 */
-    }
+    for(i=0; i<2; i++) {
+	allreduce_op = malloc(sizeof(*allreduce_op));
+	memset(allreduce_op, 0, sizeof(*allreduce_op));
+	
+	if(i==0)
+	    allreduce_op->u.allreduce.type = 0; /* SEND */
+	else if(i==1)
+	    allreduce_op->u.allreduce.type = 1; /* RECV */
+	allreduce_op->u.allreduce.fs_id = s_op->u.kmeans.fs_id;
+	allreduce_op->u.allreduce.myRank = s_op->u.kmeans.myRank;
+	allreduce_op->u.allreduce.buf_sz = s_op->u.kmeans.numClusters*s_op->u.kmeans.numCoords*sizeof(float);
+	allreduce_op->u.allreduce.recv_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.recv_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	allreduce_op->u.allreduce.tree_depth = log2(s_op->u.kmeans.dfile_count);
+	gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
+		     allreduce_op->u.allreduce.tree_depth);
+	allreduce_op->u.allreduce.op = 0; /* FIXME: SUM */
+	allreduce_op->u.allreduce.datatype = (int)0x4c00040a; //MPI_FLOAT;
+	allreduce_op->u.allreduce.current_depth = 0;
+	allreduce_op->u.allreduce.mask = 0x1;
+	allreduce_op->u.allreduce.dfile_array = s_op->u.kmeans.dfile_array;
+	allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	memcpy(allreduce_op->u.allreduce.send_buf, s_op->u.kmeans.clusters[0], allreduce_op->u.allreduce.buf_sz);
 
+	ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
+    }   
     js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action allreduce_2_setup_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *allreduce_op;
+    int ret, i;
+
+    for(i=0; i<2; i++) {
+	allreduce_op = malloc(sizeof(*allreduce_op));
+	memset(allreduce_op, 0, sizeof(*allreduce_op));
+	
+	if(i==0)
+	    allreduce_op->u.allreduce.type = 0; /* SEND */
+	else if(i==1)
+	    allreduce_op->u.allreduce.type = 1; /* RECV */
+	allreduce_op->u.allreduce.fs_id = s_op->u.kmeans.fs_id;
+	allreduce_op->u.allreduce.myRank = s_op->u.kmeans.myRank;
+	allreduce_op->u.allreduce.buf_sz = s_op->u.kmeans.numClusters*sizeof(int);
+	allreduce_op->u.allreduce.recv_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.recv_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	allreduce_op->u.allreduce.tree_depth = log2(s_op->u.kmeans.dfile_count);
+	gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
+		     allreduce_op->u.allreduce.tree_depth);
+	allreduce_op->u.allreduce.op = 0; /* FIXME: SUM */
+	allreduce_op->u.allreduce.datatype = (int)0x4c000405; //MPI_INT;
+	allreduce_op->u.allreduce.current_depth = 0;
+	allreduce_op->u.allreduce.mask = 0x1;
+	allreduce_op->u.allreduce.dfile_array = s_op->u.kmeans.dfile_array;
+	allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	memcpy(allreduce_op->u.allreduce.send_buf, s_op->u.kmeans.newClusterSize, allreduce_op->u.allreduce.buf_sz);
+
+	ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
+    }   
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action allreduce_3_setup_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *allreduce_op;
+    int ret, i;
+
+    for(i=0; i<2; i++) {
+	allreduce_op = malloc(sizeof(*allreduce_op));
+	memset(allreduce_op, 0, sizeof(*allreduce_op));
+	
+	if(i==0)
+	    allreduce_op->u.allreduce.type = 0; /* SEND */
+	else if(i==1)
+	    allreduce_op->u.allreduce.type = 1; /* RECV */
+	allreduce_op->u.allreduce.fs_id = s_op->u.kmeans.fs_id;
+	allreduce_op->u.allreduce.myRank = s_op->u.kmeans.myRank;
+	allreduce_op->u.allreduce.buf_sz = 1*sizeof(float);
+	allreduce_op->u.allreduce.recv_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.recv_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	allreduce_op->u.allreduce.tree_depth = log2(s_op->u.kmeans.dfile_count);
+	gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
+		     allreduce_op->u.allreduce.tree_depth);
+	allreduce_op->u.allreduce.op = 0; /* FIXME: SUM */
+	allreduce_op->u.allreduce.datatype = (int)0x4c00040a; //MPI_FLOAT;
+	allreduce_op->u.allreduce.current_depth = 0;
+	allreduce_op->u.allreduce.mask = 0x1;
+	allreduce_op->u.allreduce.dfile_array = s_op->u.kmeans.dfile_array;
+	allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
+	memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
+	memcpy(allreduce_op->u.allreduce.send_buf, &s_op->u.kmeans.delta_tmp, allreduce_op->u.allreduce.buf_sz);
+
+	ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
+    }   
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int task_id;
+    int remaining;
+    PVFS_error tmp_err;
+    struct PINT_server_op *allreduce_op;
+    int i, j;
+    js_p->error_code = 0;
+
+    for(i=0; i<2; i++) {
+	allreduce_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+					 &remaining);
+	gossip_debug(GOSSIP_SERVER_DEBUG, 
+		     "kmeans: nested sm (allreduce) returned error code: %d\n", tmp_err);
+	switch(s_op->u.kmeans.allreduce_step) {
+	case 0:
+	    memcpy(s_op->u.kmeans.clusters[0], 
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	    js_p->error_code = ALLREDUCE2;
+	    break;
+	case 1:
+	    memcpy(s_op->u.kmeans.clusterSize, /* [numClusters] */
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	    
+	    /* average the sum and replace old cluster 
+	       centers with newClusters */
+	    for (i=0; i<s_op->u.kmeans.numClusters; i++) {
+		for (j=0; j<s_op->u.kmeans.numCoords; j++) {
+		    if (s_op->u.kmeans.clusterSize[i] > 1)
+			s_op->u.kmeans.clusters[i][j] /= 
+			    s_op->u.kmeans.clusterSize[i];
+		    s_op->u.kmeans.newClusters[i][j] = 0.0;   /* set back to 0 */
+		}
+		s_op->u.kmeans.newClusterSize[i] = 0;   /* set back to 0 */
+	    }
+	    
+	    js_p->error_code = ALLREDUCE3;
+	    break;
+	case 2:
+	    memcpy(&s_op->u.kmeans.delta_tmp, 
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	    s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
+	    js_p->error_code = DONE_ALLREDUCES;
+	    break;
+	}
+
+	free(allreduce_op->u.allreduce.send_buf);
+	free(allreduce_op->u.allreduce.recv_buf);
+	free(allreduce_op);
+    }
+    s_op->u.kmeans.allreduce_step++;
+	
     return SM_ACTION_COMPLETE;
 }
 

@@ -368,22 +368,22 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
 					  job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i;
     struct PINT_server_op *pipeline_op;
-    int task_id;
-    int remaining;
+    int i, task_id, remaining;
     PVFS_error tmp_err;
 
     for(i=0; i<s_op->u.io.parallel_sms; i++)
     {
 	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
-            &remaining);
+					&remaining);
         gossip_debug(GOSSIP_SERVER_DEBUG, 
 		     "io: nested sm returned error code: %d\n", tmp_err);
 	if(pipeline_op->u.pipeline.buffer) {
 	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
-		if(pipeline_op->u.pipeline.op != 0)
-		    memcpy(s_op->u.io.tmp_buffer, pipeline_op->u.pipeline.buffer, 
+		if(pipeline_op->u.pipeline.op != 0 && 
+		   pipeline_op->u.pipeline.op != (0x5800000f))
+		    memcpy(s_op->u.io.tmp_buffer, 
+			   pipeline_op->u.pipeline.buffer, 
 			   sizeof(double)); /* FIXME */
 		BMI_memfree(pipeline_op->u.pipeline.address, 
 			    pipeline_op->u.pipeline.buffer, 
@@ -462,10 +462,10 @@ static PINT_sm_action io_cleanup(
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: freeing seg_handle\n", __func__);
 	PINT_segpool_destroy(s_op->u.io.seg_handle);
     }
-#if 0
-    if(s_op->u.io.tmp_buffer)
+
+    if(s_op->u.io.tmp_buffer && s_op->req->u.io.op != 0)
 	free(s_op->u.io.tmp_buffer); /* FIXME */
-#endif
+
     gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
 
     /* let go of our encoded response buffer, if we appear to have

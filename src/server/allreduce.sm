@@ -22,6 +22,7 @@
 #include "trove.h"
 
 #define CONTINUE_ALLREDUCE 201
+#define ALLREDUCE_TAG 3333
 
 %%
 
@@ -73,14 +74,14 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	return SM_ACTION_COMPLETE;
     }
 
-    session_tag = 3333;
+    session_tag = ALLREDUCE_TAG;
 
     /* RECV */
     if(s_op->u.allreduce.type == 1) {
 	gossip_debug(GOSSIP_IO_DEBUG, "RECV from addr=%llu\n", llu(svr_addr));
 	ret = job_bmi_recv(svr_addr,
 			   (void*)s_op->u.allreduce.recv_buf,
-			   5*sizeof(double),
+			   s_op->u.allreduce.buf_sz,
 			   session_tag,
 			   BMI_PRE_ALLOC,
 			   smcb,
@@ -103,11 +104,13 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     /* SEND */
     else if(s_op->u.allreduce.type == 0) {
+#if 0
 	gossip_debug(GOSSIP_IO_DEBUG, "SEND to addr=%llu: tmp=%f\n", 
 		     llu(svr_addr), *tmp);
+#endif
 	ret = job_bmi_send(svr_addr,
 			   (void*)s_op->u.allreduce.send_buf,
-			   5*sizeof(double),
+			   s_op->u.allreduce.buf_sz,
 			   session_tag,
 			   BMI_PRE_ALLOC,
 			   0, /* 1: send_unexpected */
@@ -136,16 +139,42 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    double *a = s_op->u.allreduce.send_buf;
-    double *b = s_op->u.allreduce.recv_buf;
+    struct PINT_server_op *parent_s_op = PINT_sm_frame(smcb->parent_smcb, 0);
+    int i;
 
     s_op->u.allreduce.current_depth++;
     s_op->u.allreduce.mask = s_op->u.allreduce.mask << 1;
 
-    a[0] = a[0] + b[0];
-    memcpy(s_op->u.allreduce.send_buf, (void*)a, sizeof(double));
+    switch(s_op->u.allreduce.datatype) {
+    case ((int)0x4c000405): /* MPI_INT */ 
+	{
+	    int *a = s_op->u.allreduce.send_buf;
+	    int *b = s_op->u.allreduce.recv_buf;
+	    
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: SUM on INT\n", __func__);
+	    for(i=0; i<(s_op->u.allreduce.buf_sz)/sizeof(int); i++)
+		a[i] = a[i] + b[i];
+	    memcpy(s_op->u.allreduce.send_buf, (void*)a, sizeof(int));
+	}
+	break;
+    case ((int)0x4c00040a): /* MPI_FLOAT */ 
+	{
+	    float *a = s_op->u.allreduce.send_buf;
+	    float *b = s_op->u.allreduce.recv_buf;
+	    
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: SUM on FLOAT\n", __func__);
+	    for(i=0; i<(s_op->u.allreduce.buf_sz)/sizeof(float); i++)
+		a[i] = a[i] + b[i];
+	    memcpy(s_op->u.allreduce.send_buf, (void*)a, sizeof(float));
+	}
+	break;
+    default:
+	break;
+    }
 
+#if 0
     gossip_debug(GOSSIP_IO_DEBUG, "received=%lf\n", *b);
+#endif
     gossip_debug(GOSSIP_IO_DEBUG, "current_depth=%d, tree_depth=%d\n",
 		 s_op->u.allreduce.current_depth, 
 		 s_op->u.allreduce.tree_depth);
@@ -153,9 +182,6 @@ static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s 
 	js_p->error_code = CONTINUE_ALLREDUCE;
     else
 	js_p->error_code = 0;
-
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: reduced result=%lf\n", 
-		 __func__, *a);
 
     return SM_ACTION_COMPLETE;
 }

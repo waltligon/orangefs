@@ -46,6 +46,7 @@ ifdef BUILD_SERVER
 		$(DIR)/unstuff.c \
 		$(DIR)/pipeline.c \
 		$(DIR)/allreduce.c \
+		$(DIR)/bcast.c \
 		$(DIR)/kmeans.c 
 
 	# c files that should be added to server library

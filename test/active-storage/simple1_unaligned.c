@@ -4,6 +4,7 @@
 #include <string.h>
 #include <memory.h>
 #include <time.h>
+#include <assert.h>
 
 #define OFFSET 0
 
@@ -18,6 +19,7 @@ int main( int argc, char *argv[] )
   MPI_Comm comm;
   MPI_Status status;
   char infile[80] = "pvfs2:/mnt/pvfs2/test1_unaligned";
+  char infile1[80] = "pvfs2:/mnt/pvfs2/edge17695.bin";
   //int nitem = 2*1024; /* 2048*8byes = 16KB, will go through flow */
   //int nitem = 64*1024*8; /* 4MB */
   //int nitem = 8192; /* 64 KB */
@@ -26,6 +28,12 @@ int main( int argc, char *argv[] )
   //int nitem = (32768)*3; /* 3 stripes if strip size is 256KB */
   //int nitem = (32768-5)*4; /* 4 stripes if strip size is 256KB */
   //int nitem = (32768-5)*6; /* 6 stripes if strip size is 256KB */
+
+  /* for KMEANS */
+  int *numObjs;
+  int *numCoords;
+  float **objects;
+  int err;
 
   MPI_Init( &argc, &argv );
  
@@ -79,7 +87,16 @@ int main( int argc, char *argv[] )
 
   MPI_File_close(&fh);
 #endif
-  MPI_File_open( comm, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+  err = MPI_File_open( comm, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+
+  if (err != MPI_SUCCESS) {
+    char errstr[MPI_MAX_ERROR_STRING];
+    int  errlen;
+    MPI_Error_string(err, errstr, &errlen);
+    printf("Error at opening file %s (%s)\n", infile1, errstr);
+    MPI_Finalize();
+    exit(1);
+  }
 
   MPI_File_read_at_ex( fh, OFFSET, tmp, nitem, MPI_DOUBLE, MPI_SUM, &status );
   
@@ -96,9 +113,33 @@ int main( int argc, char *argv[] )
 
   MPI_File_close( &fh );
 #endif
-  MPI_File_open( comm, infile, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+
+  err = MPI_File_open( comm, infile1, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh );
+
+  if (err != MPI_SUCCESS) {
+    char errstr[MPI_MAX_ERROR_STRING];
+    int  errlen;
+    MPI_Error_string(err, errstr, &errlen);
+    printf("Error at opening file %s (%s)\n", infile1, errstr);
+    MPI_Finalize();
+    exit(1);
+  }
+
+  /* read numObjs & numCoords from the 1st 2 integers */
+  MPI_File_read(fh, numObjs, 1, MPI_INT, &status);
+  printf("numObjs=%d\n", *numObjs);
+  MPI_File_read(fh, numCoords, 1, MPI_INT, &status);
+  printf("numCoords=%d\n", *numCoords);
   
-  MPI_File_read_at_ex( fh, OFFSET, tmp, nitem, MPI_DOUBLE, MPI_KMEANS, &status );
+  objects    = (float**)malloc((*numObjs) * sizeof(float*));
+  assert(objects != NULL);
+  objects[0] = (float*) malloc((*numObjs)*(*numCoords) * sizeof(float));
+  assert(objects[0] != NULL);
+  for (i=1; i<(*numObjs); i++)
+    objects[i] = objects[i-1] + (*numCoords);
+  
+  MPI_File_read_ex(fh, objects[0], (*numObjs)*(*numCoords),
+		   MPI_FLOAT, MPI_KMEANS, &status);
 
   printf ("kmean=%lf\n", tmp[0]); 
   
@@ -106,6 +147,9 @@ int main( int argc, char *argv[] )
 
   free( buf );
   free( tmp );
+
+  free(objects[0]);
+  free(objects);
 
   MPI_Finalize();
   return errs;

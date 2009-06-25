@@ -404,6 +404,7 @@ struct PINT_server_allreduce_op
 {
     int type; /* SEND (0) or RECV (1) */
     int op; /* SUM, MAX, MIN */
+    int datatype; /* MPI_INT, MPI_FLOAT, MPI_DOUBLE */
     PVFS_fs_id fs_id;
     PVFS_hint hints;
     PVFS_handle *dfile_array;
@@ -412,12 +413,36 @@ struct PINT_server_allreduce_op
     int current_depth;
     void *send_buf;
     void *recv_buf;
-    PVFS_size allreduce_buf_sz;
+    PVFS_size buf_sz;
     int mask;
 };
 
+/* allreduce */
+struct PINT_server_bcast_op
+{
+    int type; /* SEND (0) or RECV (1) */
+    int datatype; /* MPI_INT, MPI_FLOAT, MPI_DOUBLE */
+    PVFS_fs_id fs_id;
+    PVFS_hint hints;
+    PVFS_handle *dfile_array;
+    int dfile_count;
+    int myRank;
+    int tree_depth;
+    int current_depth;
+    void *send_buf;
+    void *recv_buf;
+    PVFS_size buf_sz;
+    int mask;
+};
+
+
 struct PINT_server_kmeans_op
 {
+    int myRank;
+    PVFS_handle *dfile_array;
+    int dfile_count;
+    PVFS_fs_id fs_id;
+
     int loop;
     int numClusters;
     int numCoords;
@@ -432,6 +457,7 @@ struct PINT_server_kmeans_op
     float **objects; /* [numObjs][numCoords] data objects */
     float **clusters; /* [numClusters][numCoords] cluster center */
     float threshold;
+    int allreduce_step;
 };
 
 struct PINT_server_small_io_op
@@ -571,6 +597,7 @@ typedef struct PINT_server_op
         struct PINT_server_small_io_op small_io;
 	struct PINT_server_pipeline_op pipeline;
 	struct PINT_server_allreduce_op allreduce;
+	struct PINT_server_bcast_op bcast;
 	struct PINT_server_kmeans_op kmeans;
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
@@ -615,6 +642,7 @@ extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_pipeline_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_allreduce_sm; /* sson */
+extern struct PINT_state_machine_s pvfs2_bcast_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_kmeans_sm; /* sson */
 
 /* Exported Prototypes */
