@@ -259,11 +259,20 @@ struct PINT_server_mirror_op
 };
 typedef struct PINT_server_mirror_op PINT_server_mirror_op;
 
-/* Source refers to the file being copied, and destination refers to the copy.*/
+/* Source refers to the handle being copied, and destination refers to        */
+/* its copy.                                                                  */
 struct PINT_server_create_copies_op
 {
+    /*number of I/O servers required to meet the mirroring request.           */
+    uint32_t io_servers_required;
+
     /*mirroring mode. attribute key is user.pvfs2.mirror.mode*/
     MIRROR_MODE mirror_mode;
+
+    /*the expected mirroring mode tells us how to edit the retrieved mirroring*/
+    /*mode.  Example: if mirroring was called when immutable was set, then    */
+    /*the expected mirroring mode would be MIRROR_ON_IMMUTABLE.               */
+    MIRROR_MODE expected_mirror_mode;
 
     /*buffer holding list of remote servers for all copies of the file*/
     char **my_remote_servers;
@@ -274,15 +283,15 @@ struct PINT_server_create_copies_op
     /*number of copies desired. value of user.pvfs2.mirror.copies attribute*/
     uint32_t copies;
 
-    /*successful/failed writes array in order of source handles       */
-    /*0=>successful  !0 => failure (UINT64_HIGH)                      */
-    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]   */
+    /*successful/failed writes array in order of source handles         */
+    /*0=>successful  !UINT64_HIGH=>failure   UINT64_HIGH=>initial state */
+    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]     */
     PVFS_handle *writes_completed;
 
     /*number of attempts at writing handles*/
     int retry_count;
 
-    /*source server names in order of distribution*/
+    /*list of server names that will be used as destination servers*/
     char **io_servers;                       
 
     /*source remote server names in distribution*/

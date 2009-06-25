@@ -687,32 +687,6 @@ int pvfs2_flush_inode(struct inode *inode)
 /* directory entry key */
 #define DIRENT_KEY  "system.pvfs2." DIRECTORY_ENTRY_KEYSTR
 
-/* Extended attributes helper functions */
-static char *xattr_non_zero_terminated[] = {
-    DFILE_KEY,
-    DIST_KEY,
-    ROOT_KEY,
-};
-
-/* Extended attributes helper functions */
-
-/*
- * this function returns 
- * 0 if the val corresponding to name is known to be not terminated with an explicit \0
- * 1 if the val corresponding to name is known to be \0 terminated
- */
-static int xattr_zero_terminated(const char *name)
-{
-    int i;
-    static int xattr_count = sizeof(xattr_non_zero_terminated)/sizeof(char *);
-    for (i = 0;i < xattr_count; i++)
-    {
-        if (strcmp(name, xattr_non_zero_terminated[i]) == 0)
-            return 0;
-    }
-    return 1;
-}
-
 static char *xattr_resvd_keys[] = {
     DFILE_KEY,
     DIST_KEY,
@@ -810,33 +784,15 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          */
         if (ret == 0)
         {
-            ssize_t new_length;
             length = new_op->downcall.resp.getxattr.val_sz;
-            /*
-             * if the xattr corresponding to name was not terminated with a \0
-             * then we return the entire response length
-             */
-            if (xattr_zero_terminated(name) == 0)
-            {
-                new_length = length;
-            }
-            /*
-             * if it was terminated by a \0 then we return 1 less for the getfattr
-             * programs to play nicely with displaying it
-             */
-            else {
-                new_length = length - 1;
-            }
-            /* Just return the length of the queried attribute after
-             * subtracting the \0 thingie */
             if (size == 0)
             {
-                ret = new_length;
+                ret = length;
             }
             else
             {
-                /* check to see if key length is > provided buffer size */
-                if (new_length > size)
+                /* check to see if val length is > provided buffer size */
+                if (length > size)
                 {
                     ret = -ERANGE;
                 }
@@ -845,10 +801,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     /* No size problems */
                     memset(buffer, 0, size);
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                            new_length);
-                    ret = new_length;
-                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s "
-                            " key_sz %d, val_length %d\n", 
+                           length);
+                    ret = length; 
+                    gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: "
+                        "inode %llu key %s key_sz %d, val_length %d\n", 
                         llu(get_handle_from_ino(inode)),
                         (char*)new_op->upcall.req.getxattr.key, 
                         (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
@@ -858,8 +814,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         else if (ret == -ENOENT)
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
-            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s does not exist!\n",
-                    llu(get_handle_from_ino(inode)), (char *) new_op->upcall.req.getxattr.key);
+            gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: inode %llu "
+                                            "key %s does not exist!\n"
+                                      ,llu(get_handle_from_ino(inode))
+                                      ,(char *)new_op->upcall.req.getxattr.key);
         }
 
         /* when request is serviced properly, free req op struct */
@@ -880,6 +838,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
+    int i;
+    char *valBuf;
 
     if (size < 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
     {
@@ -955,21 +915,28 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         new_op->upcall.req.setxattr.keyval.key_sz = 
             ret + 1;
         memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
-        new_op->upcall.req.setxattr.keyval.val[size] = '\0';
-        /* For some reason, val_sz should include the \0 at the end as well */
-        new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
+        new_op->upcall.req.setxattr.keyval.val_sz = size;
 
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d "
-                " value size %zd\n", 
+        gossip_debug(GOSSIP_XATTR_DEBUG,"Upcall: size=%d\n"
+                    ,new_op->upcall.req.setxattr.keyval.val_sz);
+        valBuf = (char *)new_op->upcall.req.setxattr.keyval.val;
+        for (i=0; i<new_op->upcall.req.setxattr.keyval.val_sz; i++)
+            gossip_debug(GOSSIP_XATTR_DEBUG,"\tval[%d]=%#x\n"
+                        ,i
+                        ,(unsigned int)valBuf[i]);
+
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, "
+                "key_sz %d value size %zd\n", 
                  (char*)new_op->upcall.req.setxattr.keyval.key, 
                  (int) new_op->upcall.req.setxattr.keyval.key_sz,
-                 size + 1);
+                 size);
 
         ret = service_operation(
             new_op, "pvfs2_inode_setxattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_setxattr: returning %d\n"
+                                       , ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
