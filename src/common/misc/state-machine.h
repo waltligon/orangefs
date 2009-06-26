@@ -47,7 +47,7 @@ enum PINT_state_code {
     SM_JUMP   = 6,
     SM_TERM   = 7,
     SM_PJMP   = 8,
-    SM_RUN     = 9
+    SM_RUN    = 9
 };
 
 /* these define things like stack size and so forth for the common

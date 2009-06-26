@@ -74,7 +74,6 @@ nested machine pvfs2_pipeline_sm
     state do_comp
     {
 	run do_comp_fn;
-	DO_ALLREDUCE => setup_allreduce;
 	DO_KMEANS => setup_kmeans;
 	success => check_pipeline;
     }
@@ -89,21 +88,6 @@ nested machine pvfs2_pipeline_sm
     {
 	jump pvfs2_kmeans_sm;
 	success => cleanup_kmeans;
-    }
-
-    state setup_allreduce
-    {
-	pjmp setup_allreduce_sm
-	{
-	    success => pvfs2_allreduce_sm;
-	}
-	success => cleanup_allreduce;
-    }
-
-    state cleanup_allreduce
-    {
-	run cleanup_allreduce_fn;
-	success => check_pipeline;
     }
 
     state cleanup_kmeans

@@ -402,8 +402,8 @@ struct PINT_server_pipeline_op
 /* allreduce */
 struct PINT_server_allreduce_op
 {
-    int type; /* SEND (0) or RECV (1) */
-    int op; /* SUM, MAX, MIN */
+    int type; /* SEND (0) or RECV (1) */ /* FIXME: not used anymore? */
+    int op; /* {SUM, MAX, MIN} = {0, 1, 2} */
     int datatype; /* MPI_INT, MPI_FLOAT, MPI_DOUBLE */
     PVFS_fs_id fs_id;
     PVFS_hint hints;
@@ -417,7 +417,15 @@ struct PINT_server_allreduce_op
     int mask;
 };
 
-/* allreduce */
+/* send_recv */
+struct PINT_server_send_recv_op
+{
+    int type;
+    int myRank;
+    int mask;
+};
+
+/* bcast */
 struct PINT_server_bcast_op
 {
     int type; /* SEND (0) or RECV (1) */
@@ -597,6 +605,7 @@ typedef struct PINT_server_op
         struct PINT_server_small_io_op small_io;
 	struct PINT_server_pipeline_op pipeline;
 	struct PINT_server_allreduce_op allreduce;
+	struct PINT_server_send_recv_op send_recv;
 	struct PINT_server_bcast_op bcast;
 	struct PINT_server_kmeans_op kmeans;
 	struct PINT_server_flush_op flush;
@@ -644,6 +653,7 @@ extern struct PINT_state_machine_s pvfs2_pipeline_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_allreduce_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_bcast_sm; /* sson */
 extern struct PINT_state_machine_s pvfs2_kmeans_sm; /* sson */
+extern struct PINT_state_machine_s pvfs2_send_recv_sm; /* sson */
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
