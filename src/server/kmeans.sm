@@ -258,6 +258,14 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	  s_op->u.kmeans.newClusters[index][j] += s_op->u.kmeans.objects[i][j];
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG, "before Allreduce\n");
+    for (i=0; i<numClusters; i++)
+	for (j=0; j<numCoords; j++)
+	    gossip_debug(GOSSIP_IO_DEBUG, 
+			 "%2d: clusters[%d][%d]=%lf\n", 
+			 s_op->u.kmeans.myRank, i, j, 
+			 s_op->u.kmeans.clusters[i][j]);
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -287,7 +295,7 @@ static PINT_sm_action allreduce_1_setup_fn(struct PINT_smcb *smcb, job_status_s 
     allreduce_op->u.allreduce.dfile_array = s_op->u.kmeans.dfile_array;
     allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
     memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
-    memcpy(allreduce_op->u.allreduce.send_buf, s_op->u.kmeans.clusters[0], allreduce_op->u.allreduce.buf_sz);
+    memcpy(allreduce_op->u.allreduce.send_buf, s_op->u.kmeans.newClusters[0], allreduce_op->u.allreduce.buf_sz);
     
     ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
 
@@ -378,9 +386,12 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 	memcpy(s_op->u.kmeans.clusters[0], 
 	       allreduce_op->u.allreduce.send_buf,
 	       allreduce_op->u.allreduce.buf_sz);
-	gossip_debug(GOSSIP_IO_DEBUG, "rank=%d, buf_sz=%ld\n", 
-		     allreduce_op->u.allreduce.myRank,
-		     allreduce_op->u.allreduce.buf_sz);
+	for (i=0; i<s_op->u.kmeans.numClusters; i++)
+	    for (j=0; j<s_op->u.kmeans.numCoords; j++)
+		gossip_debug(GOSSIP_IO_DEBUG, 
+			     "%2d: clusters[%d][%d]=%lf\n", 
+			     s_op->u.kmeans.myRank, i, j, 
+			     s_op->u.kmeans.clusters[i][j]);
 	js_p->error_code = ALLREDUCE2;
 	break;
     case 1:

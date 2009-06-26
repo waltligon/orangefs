@@ -222,7 +222,7 @@ static PINT_sm_action check_allreduce_done(struct PINT_smcb *smcb, job_status_s 
 		    gossip_debug(GOSSIP_IO_DEBUG, 
 				 "%s: SUM on FLOAT, count=%d, recv_buf[0]=%f, send_buf[0]=%f\n", 
 				 __func__, count, b[0], a[0]);
-		    for(i=0; i<(s_op->u.allreduce.buf_sz)/sizeof(float); i++)
+		    for(i=0; i<count; i++)
 			a[i] = a[i] + b[i];
 		    memcpy(s_op->u.allreduce.send_buf, (void*)a, 
 			   s_op->u.allreduce.buf_sz);
