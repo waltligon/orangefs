@@ -245,7 +245,8 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 				     s_op->u.kmeans.numCoords, 
 				     s_op->u.kmeans.objects[i],
 				     s_op->u.kmeans.clusters);
-	 /* if membership changes, increase delta by 1 */
+	//gossip_debug(GOSSIP_IO_DEBUG, "i=%d: index=%d\n", i, index);
+	/* if membership changes, increase delta by 1 */
 	if (s_op->u.kmeans.membership[i] != index) 
 	    s_op->u.kmeans.delta += 1.0;
 
@@ -254,13 +255,26 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
       
 	/* update new cluster centers : sum of objects located within */
 	s_op->u.kmeans.newClusterSize[index]++;
-	for (j=0; j<s_op->u.kmeans.numCoords; j++)
+	for (j=0; j<s_op->u.kmeans.numCoords; j++) {
 	  s_op->u.kmeans.newClusters[index][j] += s_op->u.kmeans.objects[i][j];
+#if 0
+	  gossip_debug(GOSSIP_IO_DEBUG, 
+		       "newCluster[%d][%d] = objects[%d][%d] = %lf\n",
+		       index, j, i, j, s_op->u.kmeans.objects[i][j]);
+#endif
+	}
     }
 
+    for(i=0; i<s_op->u.kmeans.numClusters; i++)
+	for(j=0; j<s_op->u.kmeans.numCoords; j++)
+	    gossip_debug(GOSSIP_IO_DEBUG, 
+			 "%2d: newClusters[%d][%d]=%lf\n", 
+			 s_op->u.kmeans.myRank, i, j, 
+			 s_op->u.kmeans.newClusters[i][j]);
+
     gossip_debug(GOSSIP_IO_DEBUG, "before Allreduce\n");
-    for (i=0; i<numClusters; i++)
-	for (j=0; j<numCoords; j++)
+    for (i=0; i<s_op->u.kmeans.numClusters; i++)
+	for (j=0; j<s_op->u.kmeans.numCoords; j++)
 	    gossip_debug(GOSSIP_IO_DEBUG, 
 			 "%2d: clusters[%d][%d]=%lf\n", 
 			 s_op->u.kmeans.myRank, i, j, 

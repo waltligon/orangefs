@@ -844,10 +844,11 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     for(i=1; i<numClusters; i++)
 	kmeans_op->u.kmeans.clusters[i] = kmeans_op->u.kmeans.clusters[i-1] + numCoords;
 
-    for(i=0; i<numClusters; i++)
-	memcpy(kmeans_op->u.kmeans.objects[i], 
-	       s_op->u.pipeline.buffer+(i*numCoords*sizeof(float)), 
-	       numCoords*sizeof(float)); /* FIXME */
+    /* FIXME: better way to copy the read data to objects[][]?? */
+    for(i=0; i<kmeans_op->u.kmeans.numObjs; i++)
+	memcpy(kmeans_op->u.kmeans.objects[i],
+	       s_op->u.pipeline.buffer+(i*kmeans_op->u.kmeans.numCoords*sizeof(float)),
+	       kmeans_op->u.kmeans.numCoords*sizeof(float));
 
     /* pick first numClusters elements in feature[] as initial cluster centers*/
     if(s_op->u.pipeline.dfile_index == 0) {
