@@ -23,6 +23,7 @@
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "trove.h"
+#include "kmeans.h"
 
 #define CONTINUE_KMEANS 301
 #define ALLREDUCE2 302
@@ -98,6 +99,27 @@ nested machine pvfs2_kmeans_sm
 }
 
 %%
+
+int power(int base, int power)
+{
+    int res, is_neg_power = 0, i;
+
+    /* Check the case of a negative power. */
+    if (power < 0) {
+      is_neg_power = 1;
+      power = -power;
+    }
+    
+    /* Compute the result. */
+    res = 1;
+    for (i = 0; i < power; i++)
+	res *= base;
+
+    if (!is_neg_power)
+	return (res);
+    else
+	return (1/(double)res);
+}
 
 /* square of Euclid distance between two multi-dimensional points            */
 __inline static
@@ -183,9 +205,12 @@ static PINT_sm_action bcast_setup_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     bcast_op->u.bcast.datatype = (int)0x4c00040a; //MPI_FLOAT;
     bcast_op->u.bcast.dfile_array = s_op->u.kmeans.dfile_array;
     bcast_op->u.bcast.dfile_count = s_op->u.kmeans.dfile_count;
+    /* d = log(P) */
     bcast_op->u.bcast.tree_depth = log2(s_op->u.kmeans.dfile_count);
-    bcast_op->u.bcast.current_depth = bcast_op->u.bcast.tree_depth;
-    bcast_op->u.bcast.mask = 0x1;
+    /* mask = 2^d - 1 */
+    bcast_op->u.bcast.mask = power(2, bcast_op->u.bcast.tree_depth)-1;
+    /* index = d - 1 */
+    bcast_op->u.bcast.index = bcast_op->u.bcast.tree_depth-1;
     bcast_op->u.bcast.send_buf = (void*)malloc(bcast_op->u.bcast.buf_sz);
     memset(bcast_op->u.bcast.send_buf, 0, bcast_op->u.bcast.buf_sz);
     memcpy(bcast_op->u.bcast.send_buf, s_op->u.kmeans.clusters[0], 
@@ -213,7 +238,7 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
     
     if(s_op->u.kmeans.myRank != 0) {
 	memcpy(s_op->u.kmeans.clusters[0], 
-	       bcast_op->u.bcast.recv_buf,
+	       bcast_op->u.bcast.send_buf,
 	       bcast_op->u.bcast.buf_sz);
     }
     

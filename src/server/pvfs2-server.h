@@ -436,7 +436,7 @@ struct PINT_server_bcast_op
     int dfile_count;
     int myRank;
     int tree_depth;
-    int current_depth;
+    int index;
     void *send_buf;
     void *recv_buf;
     PVFS_size buf_sz;
