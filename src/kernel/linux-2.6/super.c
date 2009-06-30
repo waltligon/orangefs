@@ -254,6 +254,8 @@ void pvfs2_read_inode(
     if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
+        gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
 }
@@ -296,6 +298,8 @@ void pvfs2_read_inode(
 #endif
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
+            gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
             pvfs2_make_bad_inode(inode);
         }
         else {
@@ -306,8 +310,9 @@ void pvfs2_read_inode(
     }
     else
     {
-        gossip_err("Could not allocate pvfs2_inode from "
-                    "pvfs2_inode_cache\n");
+        gossip_err("%s:%s:%d Could not allocate pvfs2_inode from pvfs2_inode_cache."
+            "calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+            __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
 }

@@ -102,6 +102,7 @@ int pvfs2_file_open(
             }
             else
             {
+                gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
                 pvfs2_make_bad_inode(inode);
                 gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open returning error: %d\n", ret);
                 return(ret);
@@ -3119,6 +3120,7 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
         ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
         if (ret)
         {
+            gossip_debug(GOSSIP_FILE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
             pvfs2_make_bad_inode(inode);
             return ret;
         }

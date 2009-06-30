@@ -229,6 +229,7 @@ int pvfs2_revalidate(struct dentry *dentry)
     if (ret)
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -281,6 +282,7 @@ int pvfs2_getattr(
     else
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -328,6 +330,7 @@ int pvfs2_getattr_lite(
     else
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
