@@ -128,6 +128,11 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
     memset(status, 0, (sizeof(int) * incount));
 
+    if(incount == 0)
+    {
+        return(0);
+    }
+
     /* actually do the epoll_wait() here */
     do
     {
