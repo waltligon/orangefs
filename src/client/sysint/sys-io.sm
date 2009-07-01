@@ -39,8 +39,7 @@ enum
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
     IO_UNSTUFF,
-    IO_FATAL_ERROR,
-    IO_MIRRORING
+    IO_FATAL_ERROR
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -167,7 +166,7 @@ machine pvfs2_client_io_sm
     {   
         run io_inspect_attr;
         IO_UNSTUFF => unstuff_setup_msgpair;
-        success => io_mirroring; 
+        success => io_datafile_setup_msgpairs; 
         default => io_cleanup;
     }
 
@@ -181,23 +180,7 @@ machine pvfs2_client_io_sm
     state unstuff_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => io_mirroring; 
-        default => io_cleanup;
-    }
-
-    state io_mirroring
-    {
-        run io_mirroring;
-        IO_MIRRORING => io_get_mirrors;
-        success => io_datafile_setup_msgpairs;
-        default => io_cleanup;
-    }
-   
-    state io_get_mirrors
-    {
-       /* jump pvfs2_get_mirrors_sm;*/
-        run pvfs2_get_mirrors_sm;
-        success => io_datafile_setup_msgpairs;
+        success => io_datafile_setup_msgpairs; 
         default => io_cleanup;
     }
 
@@ -210,9 +193,8 @@ machine pvfs2_client_io_sm
         default => io_cleanup;
     }
 
-
     /*We will make changes to msgpairarray to handle mirrored copies of a 
-     *data handle.
+     *data handle when retries are warrented.
     */
     state small_io
     {
@@ -223,7 +205,8 @@ machine pvfs2_client_io_sm
 
     state io_datafile_post_msgpairs
     { /*whenever a msgpair is retried, we will use the "next" data handle, if
-       *mirrored data handles are available.
+       *mirrored data handles are available, instead of retrying the same
+       *handle.
       */
         run io_datafile_post_msgpairs;
         IO_RETRY => io_datafile_post_msgpairs_retry;
@@ -537,39 +520,6 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
-
-static PINT_sm_action pvfs2_get_mirrors_sm
-(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-   return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action io_mirroring(struct PINT_smcb *smcb, job_status_s *js_p)
-{
-
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_mirroring....\n");
-
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_getmir_state *getmir_p = &(sm_p->getmir);
-
-    js_p->error_code = 0;
-
-    /*If mirroring is not activated for the logical file, then bypass this
-     *step.
-    */
-    if (sm_p->getattr.attr.u.meta.hint.flags & PVFS_MIRROR_FL)
-        js_p->error_code = IO_MIRRORING;
-    else
-        return SM_ACTION_COMPLETE;
-
-    memset(getmir_p,0,sizeof(PINT_sm_getmir_state));
-
-    getmir_p->object_ref.handle = sm_p->object_ref.handle;
-    getmir_p->object_ref.fs_id  = sm_p->object_ref.fs_id;
-    
-
-    return SM_ACTION_COMPLETE;
-}/*end io_mirroring*/
 
 
 static PINT_sm_action io_datafile_setup_msgpairs(

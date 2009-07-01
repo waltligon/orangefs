@@ -385,10 +385,13 @@ struct PINT_server_fetch_config_sm_state
 
 typedef struct PINT_sm_getmir_state
 {
+  /* meta data handle */
   PVFS_object_ref object_ref;
 
+  /* number of mirrored copies */
   uint32_t copies;
 
+  /* retrieved handles */
   PVFS_handle *handles;
 
 } PINT_sm_getmir_state;
