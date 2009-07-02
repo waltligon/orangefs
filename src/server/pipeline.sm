@@ -343,22 +343,28 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	}
 	break;
     case ((int)0x4c00040a): /* MPI_FLOAT */
-	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
-			    file_req_offset)/((*PVFS_FLOAT).ub);
+	count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub);
 	if(s_op->u.pipeline.op == 0x5800000f) { /* KMEANS */
 	    count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub)/18; /* FIXME: 18 is numCoords */
 	    s_op->u.pipeline.unaligned_size = 0; /* FIXME */
-	    gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
-	    break;
+	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld\n", lld(count));
 	}
-	gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
-	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
-	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
-	
+	gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
+		     dparam->strip_size, lld(count));
+	//strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
+	//s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+	if(dparam->strip_size > (count*(*PVFS_FLOAT).ub)) {
+	    s_op->u.pipeline.unaligned_size = dparam->strip_size - 
+		(count*((*PVFS_FLOAT).ub));
+	    if(s_op->u.pipeline.op == 0x5800000f)
+		s_op->u.pipeline.unaligned_size = dparam->strip_size
+		    - (count*((*PVFS_FLOAT).ub)*18);
+	}
+#if 0	
 	if (loff == strip_boundary && file_req_offset != 0) {
 	    s_op->u.pipeline.unaligned_size = file_req_offset;
 	}
-
+#endif
 	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
 	    js_p->error_code = UNALIGNED;
 	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 

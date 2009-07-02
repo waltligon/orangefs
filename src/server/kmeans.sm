@@ -29,6 +29,7 @@
 #define ALLREDUCE2 302
 #define ALLREDUCE3 303
 #define DONE_ALLREDUCES 304
+#define SKIP_ALLREDUCE 305
 
 %%
 
@@ -62,6 +63,7 @@ nested machine pvfs2_kmeans_sm
     {
 	run allreduce_1_setup_fn;
 	success => do_allreduce;
+	SKIP_ALLREDUCE => cleanup_allreduce;
     }
 
     state do_allreduce
@@ -74,12 +76,14 @@ nested machine pvfs2_kmeans_sm
     {
 	run allreduce_2_setup_fn;
 	success => do_allreduce;
+	SKIP_ALLREDUCE => cleanup_allreduce;
     }
 
     state allreduce_3_setup
     {
 	run allreduce_3_setup_fn;
 	success => do_allreduce;
+	SKIP_ALLREDUCE => cleanup_allreduce;
     }
 
     state cleanup_allreduce
@@ -315,6 +319,12 @@ static PINT_sm_action allreduce_1_setup_fn(struct PINT_smcb *smcb, job_status_s 
     struct PINT_server_op *allreduce_op;
     int ret;
 
+    /* if there's only one server, we don't need to do allreduce */
+    if(log2(s_op->u.kmeans.dfile_count) == 0) {
+	js_p->error_code = SKIP_ALLREDUCE;
+	return SM_ACTION_COMPLETE;
+    }
+
     allreduce_op = malloc(sizeof(*allreduce_op));
     memset(allreduce_op, 0, sizeof(*allreduce_op));
     
@@ -335,7 +345,7 @@ static PINT_sm_action allreduce_1_setup_fn(struct PINT_smcb *smcb, job_status_s 
     allreduce_op->u.allreduce.send_buf = (void*)malloc(allreduce_op->u.allreduce.buf_sz);
     memset(allreduce_op->u.allreduce.send_buf, 0, allreduce_op->u.allreduce.buf_sz);
     memcpy(allreduce_op->u.allreduce.send_buf, s_op->u.kmeans.newClusters[0], allreduce_op->u.allreduce.buf_sz);
-    
+
     ret = PINT_sm_push_frame(smcb, 0, allreduce_op);
 
     js_p->error_code = 0;
@@ -347,6 +357,12 @@ static PINT_sm_action allreduce_2_setup_fn(struct PINT_smcb *smcb, job_status_s 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *allreduce_op;
     int ret;
+
+    /* if there's only one server, we don't need to do allreduce */
+    if(log2(s_op->u.kmeans.dfile_count) == 0) {
+	js_p->error_code = SKIP_ALLREDUCE;
+	return SM_ACTION_COMPLETE;
+    }
 
     allreduce_op = malloc(sizeof(*allreduce_op));
     memset(allreduce_op, 0, sizeof(*allreduce_op));
@@ -380,6 +396,12 @@ static PINT_sm_action allreduce_3_setup_fn(struct PINT_smcb *smcb, job_status_s 
     struct PINT_server_op *allreduce_op;
     int ret;
 
+    /* if there's only one server, we don't need to do allreduce */
+    if(log2(s_op->u.kmeans.dfile_count) == 0) {
+	js_p->error_code = SKIP_ALLREDUCE;
+	return SM_ACTION_COMPLETE;
+    }
+
     allreduce_op = malloc(sizeof(*allreduce_op));
     memset(allreduce_op, 0, sizeof(*allreduce_op));
 
@@ -391,6 +413,11 @@ static PINT_sm_action allreduce_3_setup_fn(struct PINT_smcb *smcb, job_status_s 
     allreduce_op->u.allreduce.tree_depth = log2(s_op->u.kmeans.dfile_count);
     gossip_debug(GOSSIP_IO_DEBUG, "tree_depth=%d\n", 
 		 allreduce_op->u.allreduce.tree_depth);
+    /* if there's only one server, we don't need to do allreduce */
+    if(allreduce_op->u.allreduce.tree_depth == 0) {
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+    }
     allreduce_op->u.allreduce.op = 0; /* FIXME: SUM */
     allreduce_op->u.allreduce.datatype = (int)0x4c00040a; //MPI_FLOAT;
     allreduce_op->u.allreduce.current_depth = 0;
@@ -415,16 +442,26 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
     int i, j;
     js_p->error_code = 0;
 
-    allreduce_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
-				     &remaining);
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-		 "kmeans: nested sm (allreduce) returned error code: %d, remaining=%d\n", tmp_err, remaining);
-
+    /* if there's only one server, we didn't do allreduce */
+    if(log2(s_op->u.kmeans.dfile_count) != 0) {
+	allreduce_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
+					 &remaining);
+	gossip_debug(GOSSIP_SERVER_DEBUG, 
+		     "kmeans: nested sm (allreduce) returned error code: %d, remaining=%d\n", tmp_err, remaining);
+    }
+	
     switch(s_op->u.kmeans.allreduce_step) {
     case 0:
-	memcpy(s_op->u.kmeans.clusters[0], 
-	       allreduce_op->u.allreduce.send_buf,
-	       allreduce_op->u.allreduce.buf_sz);
+	/* if there's only one server, we don't need to do allreduce */
+	if(log2(s_op->u.kmeans.dfile_count) != 0) {
+	    memcpy(s_op->u.kmeans.clusters[0], 
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	}
+	else
+	    memcpy(s_op->u.kmeans.clusters[0], 
+		   s_op->u.kmeans.newClusters[0],
+		   s_op->u.kmeans.numClusters*s_op->u.kmeans.numCoords*sizeof(float));
 	for (i=0; i<s_op->u.kmeans.numClusters; i++)
 	    for (j=0; j<s_op->u.kmeans.numCoords; j++)
 		gossip_debug(GOSSIP_IO_DEBUG, 
@@ -434,12 +471,19 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 	js_p->error_code = ALLREDUCE2;
 	break;
     case 1:
-	memcpy(s_op->u.kmeans.clusterSize, /* [numClusters] */
-	       allreduce_op->u.allreduce.send_buf,
-	       allreduce_op->u.allreduce.buf_sz);
-	gossip_debug(GOSSIP_IO_DEBUG, "rank=%d, buf_sz=%ld\n", 
-		     allreduce_op->u.allreduce.myRank,
-		     allreduce_op->u.allreduce.buf_sz);
+	/* if there's only one server, we don't need to do allreduce */
+	if(log2(s_op->u.kmeans.dfile_count) != 0) {
+	    memcpy(s_op->u.kmeans.clusterSize, /* [numClusters] */
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	    gossip_debug(GOSSIP_IO_DEBUG, "rank=%d, buf_sz=%ld\n", 
+			 allreduce_op->u.allreduce.myRank,
+			 allreduce_op->u.allreduce.buf_sz);
+	}
+	else
+	    memcpy(s_op->u.kmeans.clusterSize, 
+		   s_op->u.kmeans.newClusterSize,
+		   s_op->u.kmeans.numClusters*sizeof(int));
 
 	/* average the sum and replace old cluster 
 	   centers with newClusters */
@@ -456,26 +500,41 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 	js_p->error_code = ALLREDUCE3;
 	break;
     case 2:
-	memcpy(&s_op->u.kmeans.delta_tmp, 
-	       allreduce_op->u.allreduce.send_buf,
-	       allreduce_op->u.allreduce.buf_sz);
-	s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
-
-	gossip_debug(GOSSIP_IO_DEBUG, 
-		     "delta_tmp=%f, delta=%f, buf_sz=%ld\n", 
-		     s_op->u.kmeans.delta_tmp,
-		     s_op->u.kmeans.delta,
-		     allreduce_op->u.allreduce.buf_sz);
-	
+	/* if there's only one server, we don't need to do allreduce */
+	if(log2(s_op->u.kmeans.dfile_count) != 0) {
+	    memcpy(&s_op->u.kmeans.delta_tmp, 
+		   allreduce_op->u.allreduce.send_buf,
+		   allreduce_op->u.allreduce.buf_sz);
+	    s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
+	    gossip_debug(GOSSIP_IO_DEBUG, 
+			 "delta_tmp=%f, delta=%f, buf_sz=%ld\n", 
+			 s_op->u.kmeans.delta_tmp,
+			 s_op->u.kmeans.delta,
+			 allreduce_op->u.allreduce.buf_sz);
+	}
+	else {
+	    memcpy(&s_op->u.kmeans.delta_tmp, 
+		   &s_op->u.kmeans.delta,
+		   1*sizeof(float));
+	    s_op->u.kmeans.delta = s_op->u.kmeans.delta_tmp/s_op->u.kmeans.totalNumObjs;
+	    gossip_debug(GOSSIP_IO_DEBUG, 
+			 "delta_tmp=%f, delta=%f\n", 
+			 s_op->u.kmeans.delta_tmp,
+			 s_op->u.kmeans.delta);
+	}
+	    
 	js_p->error_code = DONE_ALLREDUCES;
 	break;
     default:
 	break;
     } /* end switch() */
-    
-    free(allreduce_op->u.allreduce.send_buf);
-    free(allreduce_op->u.allreduce.recv_buf);
-    free(allreduce_op);
+
+    /* if there's only one server, we didn't do allreduce */
+    if(log2(s_op->u.kmeans.dfile_count) != 0) {
+	free(allreduce_op->u.allreduce.send_buf);
+	free(allreduce_op->u.allreduce.recv_buf);
+	free(allreduce_op);
+    }
 
     s_op->u.kmeans.allreduce_step++;
 	
