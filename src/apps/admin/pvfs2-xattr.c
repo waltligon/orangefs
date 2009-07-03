@@ -170,7 +170,7 @@ int main(int argc, char **argv)
                    ,SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
             PVFS_metafile_hint *hint = 
                             (PVFS_metafile_hint *) user_opts->val[0].buffer;
-            printf("Metafile hints");
+            printf("Metafile hints (0x%08x)",(unsigned int)hint->flags);
             if (hint->flags & PVFS_IMMUTABLE_FL) {
                 printf(" :immutable file ");
             }
@@ -179,6 +179,9 @@ int main(int argc, char **argv)
             }
             if (hint->flags & PVFS_NOATIME_FL) {
                 printf(" :Atime updates disabled");
+            }
+            if (hint->flags & PVFS_MIRROR_FL) {
+		printf("  :Mirroring is enabled");
             }
             printf("\n");
         } else if ( strncmp(user_opts->key[0].buffer

@@ -16,10 +16,14 @@
 #include "pint-eattr.h"
 #include "pvfs2-mirror.h"
 
+/*helper functions' prototypes*/
+static void init_keyval_structs(PINT_server_op *s_op, int free_val);
 
+/*data structures*/
 enum {
    PVFS2_MAKE_IMMUTABLE_COPIES = 200,
-   CREATE_IMM_COPIES = 300
+   CREATE_IMM_COPIES = 300,
+   SKIP_UPDATE = 400
 };
 
 %%
@@ -43,6 +47,21 @@ machine pvfs2_set_eattr_sm
     state setobj_eattrib
     {
         run seteattr_setobj_eattribs;
+        success => check_mirror_mode; 
+        default => final_response;
+    }
+
+    state check_mirror_mode
+    {
+        run seteattr_get_metahint_flag;
+        success     => update_flag;
+        SKIP_UPDATE => check_immutable;
+        default     => final_response;
+    }
+
+    state update_flag
+    {
+        run seteattr_set_metahint_flag;
         success => check_immutable;
         default => final_response;
     }
@@ -87,9 +106,7 @@ machine pvfs2_set_eattr_sm
 %%
 
 /*
- * This routine checks keys to confirm that the name spaces are valid and to see
- * if the immutable flag is set for the user.pvfs2.meta_hint namespace.
- * It also prints debugging information.
+ * This routine checks keys to confirm that the name spaces are valid.
  */
 static int seteattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -196,6 +213,194 @@ static int seteattr_setobj_eattribs(
 
     return ret;
 }
+
+/*This function determines if the meta-hint flag should be updated and 
+ *retrieves it, if necessary.
+*/
+static PINT_sm_action seteattr_get_metahint_flag(struct PINT_smcb *smcb
+                                                ,job_status_s *js_p)
+{
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
+
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PVFS_servreq_seteattr *seteattr = &(s_op->req->u.seteattr);
+   char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
+   char meta_hint_key[] = "user.pvfs2.meta_hint";
+   int ret = 0;
+   job_id_t j_id;
+   int i;
+
+   for (i=0; i<seteattr->nkey; i++)
+   {
+    if (strncmp(mir_mode_key,seteattr->key[i].buffer,strlen(mir_mode_key)) == 0)
+    {
+       break;
+    }
+   }
+
+   if (i == seteattr->nkey)
+   {
+       /*mirror.mode key not found, so we don't need to change meta-hint*/
+       js_p->error_code = SKIP_UPDATE;
+       return SM_ACTION_COMPLETE;
+   }
+
+   /*setup call to retrieve meta-hint*/
+   init_keyval_structs(s_op,s_op->free_val);
+
+   /*setup key for user.pvfs2.meta_hint*/
+   s_op->key.buffer = malloc(strlen(meta_hint_key) + 1);
+   if (!s_op->key.buffer)
+   {
+       gossip_lerr("Cannot allocation memory for key.buffer\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+   }
+   memset(s_op->key.buffer,0,strlen(meta_hint_key) + 1);
+   memcpy(s_op->key.buffer,meta_hint_key,strlen(meta_hint_key));
+   s_op->key.buffer_sz = strlen(meta_hint_key) + 1;
+
+   /*assign space for key retrieval*/
+   s_op->val.buffer = &(s_op->attr.u.meta.hint.flags);
+   memset(s_op->val.buffer,0,sizeof(s_op->attr.u.meta.hint.flags));
+   s_op->val.buffer_sz = sizeof(s_op->attr.u.meta.hint.flags);
+   s_op->free_val = 0;
+
+   /*retrieve meta-hint key/value pair*/
+   ret = job_trove_keyval_read(
+       seteattr->fs_id,
+       seteattr->handle,
+       &s_op->key,
+       &s_op->val,
+       TROVE_SYNC,
+       NULL,
+       smcb,
+       0,
+       js_p,
+       &j_id,
+       server_job_context,
+       s_op->req->hints);
+
+   return ret;
+
+error_exit:
+   init_keyval_structs(s_op,s_op->free_val);
+
+   return SM_ACTION_COMPLETE;
+}/*end seteattr_get_metahint_flag*/
+
+
+/*This function updates the meta-hint flag, when the mirroring mode has 
+ *changed.
+*/
+static PINT_sm_action seteattr_set_metahint_flag(struct PINT_smcb *smcb
+                                                ,job_status_s *js_p)
+{
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s ...\n",__func__);
+
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+   struct PVFS_servreq_seteattr *seteattr = &(s_op->req->u.seteattr);
+   char mir_mode_key[] = USER_PVFS2_MIRROR_MODE;
+   char meta_hint_key[] = "user.pvfs2.meta_hint";
+   enum MIRROR_MODE_t mir_mode;
+   PVFS_flags *hint_flags = &(s_op->attr.u.meta.hint.flags);
+   PVFS_flags flags = 0;
+   int ret = 0;
+   job_id_t j_id;
+   int i;
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCurrent value of hints:%0x\n"
+                                   ,(unsigned int)*hint_flags);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAttribute object type:%d\n"
+                                   ,s_op->attr.objtype);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAttribute mask:%x\n"
+                                   ,s_op->attr.mask);
+
+   for (i=0; i<seteattr->nkey; i++)
+   {
+    if (strncmp(mir_mode_key,seteattr->key[i].buffer,strlen(mir_mode_key)) == 0)
+    {
+       mir_mode = *(enum MIRROR_MODE_t *)seteattr->val[i].buffer;
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tMirroring Mode is %d.\n"
+                                       ,mir_mode);
+       if (mir_mode == NO_MIRRORING)
+           /*turn off mirroring*/
+           flags = *hint_flags & ~PVFS_MIRROR_FL;
+       else
+           /*turn on mirroring*/
+           flags = *hint_flags | PVFS_MIRROR_FL;
+       break;
+    }
+   }
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of flags:%0x\n"
+                                   ,(unsigned int)flags);
+
+   /*setup job to modify user.pvfs2.meta-hints flag*/
+   init_keyval_structs(s_op,s_op->free_val);
+   s_op->keyval_count = 1;
+
+   s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+   s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * s_op->keyval_count);
+   if (!(s_op->key_a && s_op->val_a))
+   {
+      gossip_lerr("Cannot allocate memory for key_a and/or val_a\n");
+      js_p->error_code = -PVFS_ENOMEM;
+      goto error_exit;
+   }
+
+   i=0; /*setup key user.pvfs2.meta_hint*/
+   s_op->key_a[i].buffer = malloc(strlen(meta_hint_key) + 1);
+   if (!s_op->key_a[i].buffer)
+   {
+       gossip_lerr("Cannot allocation memory for key_a[%d].buffer\n",i);
+       js_p->error_code = -PVFS_ENOMEM;
+       goto error_exit;
+   }
+   memset(s_op->key_a[i].buffer,0,strlen(meta_hint_key) + 1);
+   memcpy(s_op->key_a[i].buffer,meta_hint_key,strlen(meta_hint_key));
+   s_op->key_a[i].buffer_sz = strlen(meta_hint_key) + 1;
+
+   /*add/remove PVFS_MIRROR_FL from user.pvfs2.meta_hint*/
+   s_op->val_a[i].buffer = malloc(sizeof(PVFS_flags));
+   if (!s_op->val_a[i].buffer)
+   {
+      gossip_lerr("Cannot allocate memory for val_a[%d].buffer\n",i);
+      js_p->error_code = -PVFS_ENOMEM;
+      goto error_exit;
+   }
+   memset(s_op->val_a[i].buffer,0,sizeof(PVFS_flags));
+   memcpy(s_op->val_a[i].buffer,&flags,sizeof(PVFS_flags));
+   s_op->val_a[i].buffer_sz = sizeof(PVFS_flags);
+
+   s_op->free_val = 1;
+
+   /*make update to key/value pair*/
+   ret = job_trove_keyval_write_list(
+       seteattr->fs_id,
+       seteattr->handle,
+       s_op->key_a,
+       s_op->val_a,
+       s_op->keyval_count,
+       TROVE_SYNC,
+       NULL,
+       smcb,
+       0,
+       js_p,
+       &j_id,
+       server_job_context,
+       s_op->req->hints);
+   
+   return ret;
+
+error_exit:
+   init_keyval_structs(s_op,s_op->free_val);
+   return SM_ACTION_COMPLETE;
+}/*end seteattr_set_metahint_flag*/
+
+
+
+
 
 static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
                                                    ,job_status_s *js_p)
@@ -368,9 +573,77 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
 static int seteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    /* do I need to free memory from decoding key and val?*/
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /*free key/val structs from the s_op*/
+    init_keyval_structs(s_op,s_op->free_val);
+
     return(server_state_machine_complete(smcb));
 }
+
+/*This function initializes the keyval structures. It also assumes that the key
+ *is always allocated, while the val may not be.  free_val is turned on, if
+ *the val must be deallocated; otherwise, val is not deallocated, just initial-
+ *ized.
+*/
+static void init_keyval_structs(PINT_server_op *s_op, int free_val)
+{
+   int i;
+
+   /*initialize val*/
+   if (free_val)
+   {
+      if (s_op->val.buffer)
+      {
+         free(s_op->val.buffer);
+         memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      }
+      memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      for (i=0; i<s_op->keyval_count; i++)
+      {
+          if (s_op->val_a && s_op->val_a[i].buffer)
+              free(s_op->val_a[i].buffer);
+      }
+      if (s_op->val_a)
+          free(s_op->val_a);
+      s_op->val_a = NULL;
+   } 
+   else
+   {
+      memset(&(s_op->val),0,sizeof(PVFS_ds_keyval));
+      if (s_op->val_a)
+          free(s_op->val_a);
+      s_op->val_a = NULL;
+   }
+
+   /*initialize key*/
+   if (s_op->key.buffer)
+   {
+      free(s_op->key.buffer);
+      memset(&(s_op->key),0,sizeof(PVFS_ds_keyval));
+   }
+   for (i=0; i<s_op->keyval_count; i++)
+   {
+       if (s_op->key_a && s_op->key_a[i].buffer)
+           free(s_op->key_a[i].buffer);
+   }
+   if (s_op->key_a)
+   {
+       free(s_op->key_a);
+       s_op->key_a = NULL;
+   } 
+
+   /*initialize the rest*/
+   if (s_op->error_a)
+       free(s_op->error_a);
+   s_op->error_a = NULL;
+   s_op->keyval_count = 0;
+   s_op->free_val = 0;
+
+   return;
+}/*end init_keyval_structs*/
+
+
 
 PINT_GET_OBJECT_REF_DEFINE(seteattr);
 
