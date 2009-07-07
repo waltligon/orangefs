@@ -174,7 +174,7 @@ static PINT_sm_action allreduce_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    send_recv_op->u.send_recv.type = 1; /* RECV */
 
 	send_recv_op->u.send_recv.myRank = s_op->u.allreduce.myRank;
-	send_recv_op->u.send_recv.mask = 0x1;
+	send_recv_op->u.send_recv.mask = s_op->u.allreduce.mask;
 
 	ret = PINT_sm_push_frame(smcb, 0, send_recv_op);
     }

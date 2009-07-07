@@ -311,15 +311,14 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    js_p->error_code = 0;
     PVFS_size file_req_offset = s_op->u.pipeline.file_req_offset;
     PINT_request_file_data fdata = s_op->u.pipeline.file_data;
     PVFS_simple_stripe_params *dparam = 
 	(PVFS_simple_stripe_params*)fdata.dist->params;
     PVFS_size count;
     PVFS_offset strip_boundary;
-
     PVFS_offset loff = fdata.dist->methods->physical_to_logical_offset(fdata.dist->params, &fdata, s_op->u.pipeline.offsets[0]);
+    js_p->error_code = 0;
     
     s_op->u.pipeline.loff = loff;
     gossip_debug(GOSSIP_IO_DEBUG, "loff=%lld, file_req_offset=%lld\n", lld(loff), lld(file_req_offset));
@@ -345,14 +344,28 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     case ((int)0x4c00040a): /* MPI_FLOAT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub);
 	if(s_op->u.pipeline.op == 0x5800000f) { /* KMEANS */
-	    count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub)/18; /* FIXME: 18 is numCoords */
-	    s_op->u.pipeline.unaligned_size = 0; /* FIXME */
+	    int cunit = ((*PVFS_FLOAT).ub)*18;
+	    PVFS_size new_size;
+	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/18;
+
+	    gossip_debug(GOSSIP_IO_DEBUG, "ctmp=%f\n", ctmp);
+
+	    /* last stripe? */
+	    if(s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))
+		count = floor(ctmp);
+	    else
+		count = ceil(ctmp);
+	    new_size = count*cunit;
+	    s_op->u.pipeline.new_buffer_used = new_size;
+	    s_op->u.pipeline.buffer= realloc(s_op->u.pipeline.buffer, new_size);
+	    s_op->u.pipeline.unaligned_size = new_size-s_op->u.pipeline.buffer_used;
 	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld\n", lld(count));
 	}
 	gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
 		     dparam->strip_size, lld(count));
-	//strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
-	//s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+#if 0
+	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
+	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
 	if(dparam->strip_size > (count*(*PVFS_FLOAT).ub)) {
 	    s_op->u.pipeline.unaligned_size = dparam->strip_size - 
 		(count*((*PVFS_FLOAT).ub));
@@ -360,13 +373,18 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		s_op->u.pipeline.unaligned_size = dparam->strip_size
 		    - (count*((*PVFS_FLOAT).ub)*18);
 	}
+#endif
 #if 0	
 	if (loff == strip_boundary && file_req_offset != 0) {
 	    s_op->u.pipeline.unaligned_size = file_req_offset;
 	}
 #endif
 	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
-	    js_p->error_code = UNALIGNED;
+	    /* if it is the last stripe, no need to bring data */
+	    /* FIXME: we assume no round-robin stripes for now, 
+	       but shound't it be more general? */
+	    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
+		js_p->error_code = UNALIGNED;
 	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
 			 lld(s_op->u.pipeline.unaligned_size));
 	}
@@ -404,6 +422,9 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_credentials creds;
     int next_server_index;
     PVFS_handle next_server_handle;
+    PINT_request_file_data fdata = s_op->u.pipeline.file_data;
+    PVFS_simple_stripe_params *dparam = 
+	(PVFS_simple_stripe_params*)fdata.dist->params;
 
     /* init msgpair */
     PINT_msgpair_init(&s_op->msgarray_op);
@@ -425,8 +446,9 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
     ret = PVFS_Request_contiguous(s_op->u.pipeline.unaligned_size, 
 				  PVFS_BYTE, &s_op->u.pipeline.file_req);
     
-    s_op->u.pipeline.file_req_offset = (((int)(s_op->u.pipeline.loff/262144))+1)*262144; /* FIXME */
-    
+    /* strip_size from dparam */
+    s_op->u.pipeline.file_req_offset = (((int)(s_op->u.pipeline.loff/dparam->strip_size))+1)*dparam->strip_size;
+
     regions = 1;
     gossip_debug(GOSSIP_IO_DEBUG, "s_op->u.pipeline.file_req_offset=%lld\n", lld(s_op->u.pipeline.file_req_offset));
 
@@ -787,7 +809,7 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
 
     kmeans_op->u.kmeans.threshold = 0.001; /* FIXME */
     kmeans_op->u.kmeans.totalNumObjs = 17695; /* FIXME: should be obtained from allreduce(numObjs, SUM) */
-    kmeans_op->u.kmeans.numObjs = s_op->u.pipeline.buffer_used/sizeof(float)/numCoords;
+    kmeans_op->u.kmeans.numObjs = s_op->u.pipeline.new_buffer_used/sizeof(float)/numCoords;
     gossip_debug(GOSSIP_IO_DEBUG, "numObjs=%d\n", kmeans_op->u.kmeans.numObjs);
 
     /* allocate space for data points */

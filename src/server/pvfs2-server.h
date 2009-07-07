@@ -385,7 +385,8 @@ struct PINT_server_pipeline_op
 
     char *buffer; 
     PVFS_size buffer_size;
-    PVFS_size buffer_used; 
+    PVFS_size buffer_used;
+    PVFS_size new_buffer_used;
     PVFS_size out_size;
     PINT_segpool_handle_t seg_handle;
     PINT_segpool_unit_id id;
