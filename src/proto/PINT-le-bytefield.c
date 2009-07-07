@@ -855,6 +855,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.seteattr.val);
                 break;
 
+	    case PVFS_SERV_GETEATTR:
+                decode_free(req->u.geteattr.key);
+                decode_free(req->u.geteattr.valsz);
+                break;
+
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
 	    case PVFS_SERV_REMOVE:
@@ -874,7 +879,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
-	    case PVFS_SERV_GETEATTR:
 
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
