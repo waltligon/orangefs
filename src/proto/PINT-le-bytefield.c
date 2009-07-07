@@ -806,7 +806,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.create.layout.server_list.servers)
                     decode_free(req->u.create.layout.server_list.servers);
 	    case PVFS_SERV_BATCH_CREATE:
-		decode_free(req->u.batch_create.handle_extent_array.extent_array);
+		decode_free(
+                    req->u.batch_create.handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_IO:
@@ -843,9 +844,21 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
 		break;
+
             case PVFS_SERV_LISTATTR:
                 if (req->u.listattr.handles)
                     decode_free(req->u.listattr.handles);
+                break;
+
+	    case PVFS_SERV_SETEATTR:
+                decode_free(req->u.seteattr.key);
+                decode_free(req->u.seteattr.val);
+                break;
+
+	    case PVFS_SERV_GETEATTR:
+                decode_free(req->u.geteattr.key);
+                decode_free(req->u.geteattr.valsz);
+                break;
 
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
@@ -866,8 +879,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
-	    case PVFS_SERV_GETEATTR:
-	    case PVFS_SERV_SETEATTR:
+
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
