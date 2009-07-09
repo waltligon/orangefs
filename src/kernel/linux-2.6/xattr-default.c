@@ -29,7 +29,8 @@ int pvfs2_xattr_set_default(struct inode *inode,
     if (!S_ISREG(inode->i_mode) &&
        (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
     {
-       return -EPERM;
+        gossip_err("pvfs2_xattr_set_default: Returning EPERM for inode %p.\n", inode);
+        return -EPERM;
     }
     gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_setxattr_default %s\n", name);
     internal_flag = convert_to_internal_xattr_flags(flags);

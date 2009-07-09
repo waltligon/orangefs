@@ -376,6 +376,7 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+    int revalidate_failed;
 
     /* State of in-memory attributes not yet flushed to disk associated with this object */
     unsigned long pinode_flags;
