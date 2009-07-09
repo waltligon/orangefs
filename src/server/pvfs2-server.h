@@ -375,7 +375,9 @@ struct PINT_server_pipeline_op
 
     /* for strip alignment */
     char tmp_buf[128]; /* FIXME */
-    PVFS_size unaligned_size;
+    PVFS_size unaligned_sz; /* cunit-right_adj_sz */
+    PVFS_size left_adj_sz;
+    PVFS_size right_adj_sz;
 
     enum PVFS_io_type io_type;
 

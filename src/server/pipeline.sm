@@ -7,7 +7,7 @@
 /*
  *  PVFS2 server state machine for driving read/write I/O operations.
  */
-#define _ISOC99_SOURCE /* log2() */ 
+#define _ISOC99_SOURCE /* log2, ceil, max, etc */ 
 
 #include <string.h>
 #include <assert.h>
@@ -329,23 +329,23 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 			    file_req_offset)/((*PVFS_INT).ub);
 	gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
 	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
-	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+	s_op->u.pipeline.unaligned_sz = loff-strip_boundary;
 	
 	if (loff == strip_boundary && file_req_offset != 0) {
-	    s_op->u.pipeline.unaligned_size = file_req_offset;
+	    s_op->u.pipeline.unaligned_sz = file_req_offset;
 	}
 
-	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
+	if (s_op->u.pipeline.unaligned_sz != 0 && count != 0) {
 	    js_p->error_code = UNALIGNED;
-	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
-			 lld(s_op->u.pipeline.unaligned_size));
+	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_sz=%lld\n", 
+			 lld(s_op->u.pipeline.unaligned_sz));
 	}
 	break;
     case ((int)0x4c00040a): /* MPI_FLOAT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub);
 	if(s_op->u.pipeline.op == 0x5800000f) { /* KMEANS */
 	    int cunit = ((*PVFS_FLOAT).ub)*18;
-	    PVFS_size new_size;
+	    PVFS_size new_size, left_adj_sz, right_adj_sz;
 	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/18;
 	    int is_last_stripe = ((s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))?1:0);
 
@@ -360,35 +360,40 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    new_size = count*cunit;
 	    s_op->u.pipeline.new_buffer_used = new_size;
 	    s_op->u.pipeline.buffer= realloc(s_op->u.pipeline.buffer, max(new_size, s_op->u.pipeline.buffer_used));
-	    s_op->u.pipeline.unaligned_size = cunit - abs(new_size-s_op->u.pipeline.buffer_used);
+	    left_adj_sz = (loff - file_req_offset)%cunit;
+	    right_adj_sz = (loff+s_op->u.pipeline.buffer_used-file_req_offset)%cunit;
+	    s_op->u.pipeline.left_adj_sz = left_adj_sz;
+	    s_op->u.pipeline.right_adj_sz = right_adj_sz;
+	    s_op->u.pipeline.unaligned_sz = cunit - right_adj_sz;
+	    
 	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld\n", lld(count));
 	}
 	gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
 		     dparam->strip_size, lld(count));
 #if 0
 	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size);
-	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+	s_op->u.pipeline.unaligned_sz = loff-strip_boundary;
 	if(dparam->strip_size > (count*(*PVFS_FLOAT).ub)) {
-	    s_op->u.pipeline.unaligned_size = dparam->strip_size - 
+	    s_op->u.pipeline.unaligned_sz = dparam->strip_size - 
 		(count*((*PVFS_FLOAT).ub));
 	    if(s_op->u.pipeline.op == 0x5800000f)
-		s_op->u.pipeline.unaligned_size = dparam->strip_size
+		s_op->u.pipeline.unaligned_sz = dparam->strip_size
 		    - (count*((*PVFS_FLOAT).ub)*18);
 	}
 #endif
 #if 0	
 	if (loff == strip_boundary && file_req_offset != 0) {
-	    s_op->u.pipeline.unaligned_size = file_req_offset;
+	    s_op->u.pipeline.unaligned_sz = file_req_offset;
 	}
 #endif
-	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
+	if (s_op->u.pipeline.unaligned_sz != 0 && count != 0) {
 	    /* if it is the last stripe, no need to bring data */
 	    /* FIXME: we assume no round-robin stripes for now, 
 	       but shound't it be more general? */
 	    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
 		js_p->error_code = UNALIGNED;
-	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
-			 lld(s_op->u.pipeline.unaligned_size));
+	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_sz=%lld\n", 
+			 lld(s_op->u.pipeline.unaligned_sz));
 	}
 	break;
     case ((int)0x4c00080b): /* MPI_DOUBLE */
@@ -396,16 +401,16 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 			    file_req_offset)/((*PVFS_DOUBLE).ub);
 	gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
 	strip_boundary = ((int)(loff/(dparam->strip_size)))*(dparam->strip_size); /* FIXME */
-	s_op->u.pipeline.unaligned_size = loff-strip_boundary;
+	s_op->u.pipeline.unaligned_sz = loff-strip_boundary;
 
 	if (loff == strip_boundary && file_req_offset != 0) {
-	    s_op->u.pipeline.unaligned_size = file_req_offset;
+	    s_op->u.pipeline.unaligned_sz = file_req_offset;
 	}
 	
-	if (s_op->u.pipeline.unaligned_size != 0 && count != 0) {
+	if (s_op->u.pipeline.unaligned_sz != 0 && count != 0) {
 	    js_p->error_code = UNALIGNED;
-	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_size=%lld\n", 
-			 lld(s_op->u.pipeline.unaligned_size));
+	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_sz=%lld\n", 
+			 lld(s_op->u.pipeline.unaligned_sz));
 	}
 	break;
     }
@@ -445,7 +450,7 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
     next_server_handle = s_op->u.pipeline.dfile_array[next_server_index];
 
     /* build a request */
-    ret = PVFS_Request_contiguous(s_op->u.pipeline.unaligned_size, 
+    ret = PVFS_Request_contiguous(s_op->u.pipeline.unaligned_sz, 
 				  PVFS_BYTE, &s_op->u.pipeline.file_req);
     
     /* strip_size from dparam */
@@ -465,7 +470,7 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
 			       s_op->u.pipeline.file_req,
 			       s_op->u.pipeline.file_req_offset,
 			       regions,
-			       s_op->u.pipeline.unaligned_size,
+			       s_op->u.pipeline.unaligned_sz,
 			       NULL /* s_op->hints */);
 
     msg_p->fs_id = s_op->u.pipeline.fs_id;
@@ -535,14 +540,14 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    {
 		int *a = (int*)s_op->u.pipeline.buffer;
 		int result;
-		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_size)/((*PVFS_INT).ub);
+		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_sz)/((*PVFS_INT).ub);
 		int *tmp;
 
 		if(count == 0)
 		    return SM_ACTION_COMPLETE;
 		/* data is not aligned perfectly, so adjust it */
-		if(s_op->u.pipeline.unaligned_size != 0) {
-		    memcpy(((char*)&a[count])+(((*PVFS_INT).ub)-s_op->u.pipeline.unaligned_size), s_op->u.pipeline.tmp_buf, s_op->u.pipeline.unaligned_size);
+		if(s_op->u.pipeline.unaligned_sz != 0) {
+		    memcpy(((char*)&a[count])+(((*PVFS_INT).ub)-s_op->u.pipeline.unaligned_sz), s_op->u.pipeline.tmp_buf, s_op->u.pipeline.unaligned_sz);
 		    count++;
 		}
 		
@@ -625,23 +630,25 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		float *a = (float*)s_op->u.pipeline.buffer;
 		float result;
 		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/18;
-		
-		/* data is not aligned perfectly, 
-		   so adjust it within the memory */
-		if(s_op->u.pipeline.unaligned_size != 0) {
-		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_size;
+
+		for(i=0; i<16; i++)
+		    gossip_debug(GOSSIP_IO_DEBUG, "a[%ld]=%lf\n", i, a[i]);
+		/* data is not aligned perfectly, then adjust it in memory */
+		if(s_op->u.pipeline.unaligned_sz != 0) {
+		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_sz;
 		    PVFS_size tmp_sz = ((*PVFS_FLOAT).ub)*18 - adj_sz;
 		    
 		    /* align start address in data dimension boundary */
 		    if(s_op->u.pipeline.dfile_index != 0) {
-			memcpy(a, (char*)&a[0]+adj_sz,
-			       s_op->u.pipeline.buffer_used-adj_sz);
+			memcpy(a, (char*)&a[0]+s_op->u.pipeline.left_adj_sz,
+			       s_op->u.pipeline.buffer_used - 
+			       s_op->u.pipeline.left_adj_sz);
 		    }
 		    
 		    /* patch the missing data from adjacent servers */
 		    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
-			memcpy(((char*)&a[count-1])+tmp_sz, s_op->u.pipeline.tmp_buf, 
-			   adj_sz);
+			memcpy(((char*)&a[count-1])+s_op->u.pipeline.right_adj_sz, 
+			       s_op->u.pipeline.tmp_buf, s_op->u.pipeline.unaligned_sz);
 		}
 		
 		s_op->u.pipeline.buffer = (void*)a;
@@ -668,7 +675,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    {
 		double *a = (double*)s_op->u.pipeline.buffer;
 		double result;
-		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_size)/((*PVFS_DOUBLE).ub);
+		PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_sz)/((*PVFS_DOUBLE).ub);
 		double *tmp;
 		PVFS_offset strip_boundary = (int)(s_op->u.pipeline.loff/262144)*262144; /* FIXME */
 
@@ -681,8 +688,8 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		    return SM_ACTION_COMPLETE;
 
 		/* data is not aligned perfectly, so adjust it within the memory*/
-		if(s_op->u.pipeline.unaligned_size != 0) {
-		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_size;
+		if(s_op->u.pipeline.unaligned_sz != 0) {
+		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_sz;
 		    PVFS_size tmp_sz = ((*PVFS_DOUBLE).ub) - adj_sz;
 		    
 		    if(s_op->u.pipeline.loff == strip_boundary) {
@@ -691,7 +698,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		    }
 
 		    memcpy(((char*)&a[count])+tmp_sz, s_op->u.pipeline.tmp_buf, 
-			   s_op->u.pipeline.unaligned_size);
+			   s_op->u.pipeline.unaligned_sz);
 
 
 		    count++;
@@ -858,6 +865,18 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
 	memcpy(kmeans_op->u.kmeans.objects[i],
 	       s_op->u.pipeline.buffer+(i*kmeans_op->u.kmeans.numCoords*sizeof(float)),
 	       kmeans_op->u.kmeans.numCoords*sizeof(float));
+
+    /* print the first 4 objects' coordinates */
+    {
+        int num = (kmeans_op->u.kmeans.numObjs < 4) ? kmeans_op->u.kmeans.numObjs : 4;
+        for (i=0; i<num; i++) {
+            gossip_debug(GOSSIP_IO_DEBUG, "%d: objects[%d]= \n", s_op->u.pipeline.dfile_index, i);
+            for (j=0; j<kmeans_op->u.kmeans.numCoords; j++) {
+                gossip_debug(GOSSIP_IO_DEBUG, "\t%10f\n", kmeans_op->u.kmeans.objects[i][j]);
+            }
+            //gossip_debug(GOSSIP_IO_DEBUG, "\n");
+        }
+    }
 
     /* pick first numClusters elements in feature[] as initial cluster centers*/
     if(s_op->u.pipeline.dfile_index == 0) {
