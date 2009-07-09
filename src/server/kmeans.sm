@@ -462,6 +462,7 @@ static PINT_sm_action cleanup_allreduce_fn(struct PINT_smcb *smcb, job_status_s 
 	    memcpy(s_op->u.kmeans.clusters[0], 
 		   s_op->u.kmeans.newClusters[0],
 		   s_op->u.kmeans.numClusters*s_op->u.kmeans.numCoords*sizeof(float));
+	gossip_debug(GOSSIP_IO_DEBUG, "After allreduce\n");
 	for (i=0; i<s_op->u.kmeans.numClusters; i++)
 	    for (j=0; j<s_op->u.kmeans.numCoords; j++)
 		gossip_debug(GOSSIP_IO_DEBUG, 

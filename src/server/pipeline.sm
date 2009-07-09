@@ -347,18 +347,20 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    int cunit = ((*PVFS_FLOAT).ub)*18;
 	    PVFS_size new_size;
 	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/18;
+	    int is_last_stripe = ((s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))?1:0);
 
 	    gossip_debug(GOSSIP_IO_DEBUG, "ctmp=%f\n", ctmp);
 
 	    /* last stripe? */
-	    if(s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))
+	    if(is_last_stripe)
 		count = floor(ctmp);
 	    else
 		count = ceil(ctmp);
+
 	    new_size = count*cunit;
 	    s_op->u.pipeline.new_buffer_used = new_size;
-	    s_op->u.pipeline.buffer= realloc(s_op->u.pipeline.buffer, new_size);
-	    s_op->u.pipeline.unaligned_size = new_size-s_op->u.pipeline.buffer_used;
+	    s_op->u.pipeline.buffer= realloc(s_op->u.pipeline.buffer, max(new_size, s_op->u.pipeline.buffer_used));
+	    s_op->u.pipeline.unaligned_size = cunit - abs(new_size-s_op->u.pipeline.buffer_used);
 	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld\n", lld(count));
 	}
 	gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
@@ -472,7 +474,7 @@ static PINT_sm_action setup_s2s_msg(struct PINT_smcb *smcb, job_status_s *js_p)
     msg_p->comp_fn = s2s_comp_fn;
 
     ret = PINT_cached_config_map_to_server(&msg_p->svr_addr, 
-					   next_server_handle, //s_op->u.pipeline.handle,
+					   next_server_handle,
 					   s_op->u.pipeline.fs_id);
     gossip_debug(GOSSIP_IO_DEBUG, "%s: msg_p->svr_addr=%llu\n", __func__,
 		 llu(msg_p->svr_addr));
@@ -622,8 +624,28 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	    {
 		float *a = (float*)s_op->u.pipeline.buffer;
 		float result;
-		PVFS_size count = (s_op->u.pipeline.buffer_used - 
-				   s_op->u.pipeline.unaligned_size)/((*PVFS_FLOAT).ub);
+		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/18;
+		
+		/* data is not aligned perfectly, 
+		   so adjust it within the memory */
+		if(s_op->u.pipeline.unaligned_size != 0) {
+		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_size;
+		    PVFS_size tmp_sz = ((*PVFS_FLOAT).ub)*18 - adj_sz;
+		    
+		    /* align start address in data dimension boundary */
+		    if(s_op->u.pipeline.dfile_index != 0) {
+			memcpy(a, (char*)&a[0]+adj_sz,
+			       s_op->u.pipeline.buffer_used-adj_sz);
+		    }
+		    
+		    /* patch the missing data from adjacent servers */
+		    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
+			memcpy(((char*)&a[count-1])+tmp_sz, s_op->u.pipeline.tmp_buf, 
+			   adj_sz);
+		}
+		
+		s_op->u.pipeline.buffer = (void*)a;
+
 		switch(s_op->u.pipeline.op) {
 		case 0x58000001: /* MAX */
 		    break;
@@ -674,6 +696,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 		    count++;
 		    
+		    /* FIXME: 262144 -> should be from strip_size */
 		    if(s_op->u.pipeline.buffer_used < (262144-((*PVFS_DOUBLE).ub)))
 			count--;
 		}
