@@ -268,7 +268,8 @@ static void lebf_initialize(void)
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
-	max_size_array[op_type].req = max_size_array[op_type].resp = init_big_size;
+	max_size_array[op_type].req = 
+                                 max_size_array[op_type].resp = init_big_size;
 
 	if (noreq)
 	    reqsize = 0;
@@ -942,7 +943,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    {
+                    decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    decode_free(resp->u.getattr.attr.u.meta.mirror_dfile_array);
+                    }
                     break;
 
                 case PVFS_SERV_UNSTUFF:

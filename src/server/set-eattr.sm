@@ -54,8 +54,8 @@ machine pvfs2_set_eattr_sm
     state check_mirror_mode
     {
         run seteattr_get_metahint_flag;
-        success     => update_flag;
         SKIP_UPDATE => check_immutable;
+        success     => update_flag;
         default     => final_response;
     }
 
@@ -290,8 +290,8 @@ error_exit:
 }/*end seteattr_get_metahint_flag*/
 
 
-/*This function updates the meta-hint flag, when the mirroring mode has 
- *changed.
+/*This function updates the meta-hint flag, whenever the mirroring mode  
+ *changes.
 */
 static PINT_sm_action seteattr_set_metahint_flag(struct PINT_smcb *smcb
                                                 ,job_status_s *js_p)
@@ -475,11 +475,13 @@ static PINT_sm_action inspect_imm_copies(struct PINT_smcb *smcb
 
     if (js_p->error_code)
     {
-       gossip_err("File NOT mirrored successfully(%d)\n",js_p->error_code);
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"File NOT mirrored "
+                                        "successfully(%d)\n"
+                                       ,js_p->error_code);
     }
     else
     {
-       gossip_err("File successfully mirrored.\n");
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"File successfully mirrored.\n");
     }
 
     /*free memory from popped stack frame*/
@@ -577,6 +579,7 @@ static int seteattr_cleanup(
 
     /*free key/val structs from the s_op*/
     init_keyval_structs(s_op,s_op->free_val);
+
 
     return(server_state_machine_complete(smcb));
 }

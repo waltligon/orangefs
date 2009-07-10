@@ -29,7 +29,8 @@
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
-#define MAX_NUM_DIRENTS    113
+/* MAX_NUM_DIRENTS cannot be any larger than PVFS_REQ_LIMIT_LISTATTR */
+#define MAX_NUM_DIRENTS  60
 
 /*
   arbitrarily restrict the number of paths
