@@ -1423,7 +1423,7 @@ bmx_create_match(struct bmx_ctx *ctx)
         int             connect = 0;
         uint64_t        type    = (uint64_t) ctx->mxc_msg_type;
         uint64_t        id      = 0ULL;
-        uint64_t        tag     = (uint64_t) ctx->mxc_tag;
+        uint64_t        tag     = (uint64_t) ((uint32_t) ctx->mxc_tag);
 
         if (ctx->mxc_msg_type == BMX_MSG_CONN_REQ || 
             ctx->mxc_msg_type == BMX_MSG_CONN_ACK) {
