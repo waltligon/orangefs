@@ -142,6 +142,13 @@ do {                                                                     \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
+#define KEYVAL_SECONDARY_DBNAME "keyval_secondary.db"
+#define DBPF_GET_KEYVAL_SECONDARY_DBNAME(__buf,__path_max,__stoname,__collid)      \
+do {                                                                     \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           KEYVAL_SECONDARY_DBNAME);                                     \
+} while (0)
+
 inline int dbpf_pread(int fd, void *buf, size_t count, off_t offset);
 inline int dbpf_pwrite(int fd, const void *buf, size_t count, off_t offset);
 
@@ -210,6 +217,7 @@ struct dbpf_collection
     DB *coll_attr_db;
     DB *ds_db;
     DB *keyval_db;
+    DB *keyval_secondary_db;
     DB_ENV *coll_env;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
@@ -243,6 +251,8 @@ struct dbpf_collection_db_entry
 
 int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_keyval_secondary_callback(
+    DB *secondary, const DBT *pkey, const DBT *pdata, DBT *skey);
 int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b);
 int PINT_trove_dbpf_ds_attr_compare_reversed(
@@ -374,6 +384,15 @@ struct dbpf_keyval_iterate_keys_op
     /* vtag? */
 };
 
+struct dbpf_keyval_read_value_op
+{
+    PVFS_dirent *dirent;
+    PVFS_ds_keyval *key;
+    PVFS_ds_keyval *val;
+    TROVE_ds_position *position_p;
+    /* vtag? */
+};
+
 struct dbpf_bstream_resize_op
 {
     TROVE_size size;
@@ -484,6 +503,7 @@ enum dbpf_op_type
     KEYVAL_WRITE_LIST,
     KEYVAL_FLUSH,
     KEYVAL_GET_HANDLE_INFO,
+    KEYVAL_READ_VALUE,
     DSPACE_CREATE = DSPACE_OP_TYPE,
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
@@ -565,6 +585,7 @@ struct dbpf_op
         struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_dspace_remove_list_op d_remove_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
+        struct dbpf_keyval_read_value_op v_read;
     } u;
 };
 

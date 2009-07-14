@@ -693,6 +693,51 @@ int PVFS_util_get_default_fsid(PVFS_fs_id* out_fs_id)
     return(-PVFS_ENOENT);
 }
 
+/* PVFS_util_get_fsid()
+ *
+ * fills in the fs identifier for file system matching the provided
+ * mount point mnt. 
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_get_fsid(char *mnt, PVFS_fs_id* out_fs_id)
+{
+    int i = 0, j = 0;
+
+    gen_mutex_lock(&s_stat_tab_mutex);
+
+    for(i = 0; i < s_stat_tab_count; i++)
+    {
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            if( strcmp(mnt, s_stat_tab_array[i].mntent_array[j].mnt_dir) == 0 )
+            {
+                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(0);
+            }
+        }
+    }
+
+    /* check the dynamic tab area if we haven't found an fs yet */
+    for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        if( strcmp(mnt, 
+            s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir)
+            == 0 )
+        {
+            *out_fs_id = 
+                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return(0);
+        }
+    }
+
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return(-PVFS_ENOENT);
+}
+
+
 /*
  * PVFS_util_add_dynamic_mntent()
  *

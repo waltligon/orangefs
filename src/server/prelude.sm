@@ -79,6 +79,35 @@ nested machine pvfs2_prelude_sm
     }
 }
 
+
+nested machine pvfs2_prelude_attr_sm
+{
+    state onlyattr_getattr_if_needed
+    {
+        run prelude_getattr_if_needed;
+        default => onlyattr_perm_check;
+    }
+
+    state onlyattr_perm_check
+    {
+        run prelude_perm_check;
+        PRELUDE_RUN_ACL_CHECKS => onlyattr_check_acls_if_needed;
+        default => return;
+    }
+
+    state onlyattr_check_acls_if_needed
+    {
+        run prelude_check_acls_if_needed;
+        default => onlyattr_check_acls;
+    }
+
+    state onlyattr_check_acls
+    {
+        run prelude_check_acls;
+        default => return;
+    }
+}
+
 %%
 
 static PINT_sm_action prelude_setup(

@@ -219,6 +219,16 @@ struct PVFS_sysresp_listeattr_s
 typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 
 
+/** Holds results of a getvalue operation (keys and dirent of handles). */
+struct PVFS_sysresp_getvalue_s
+{
+    PVFS_ds_position token;
+    PVFS_dirent      dirent;
+    PVFS_ds_keyval   *key;
+    PVFS_ds_keyval   *val;
+};
+typedef struct PVFS_sysresp_getvalue_s PVFS_sysresp_getvalue;
+
 /****************************************/
 /* system interface function prototypes */
 /****************************************/
@@ -637,6 +647,28 @@ PVFS_error PVFS_sys_listeattr(
     int32_t nkey,
     const PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp,
+    PVFS_hint hints);
+
+PVFS_error PVFS_isys_getvalue(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    const PVFS_credentials *credentials,
+    PVFS_dirent *dirent,
+    PVFS_ds_keyval *key,
+    PVFS_ds_keyval *val,
+    PVFS_sysresp_getvalue *resp,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_getvalue(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    const PVFS_credentials *credentials,
+    PVFS_dirent *dirent,
+    PVFS_ds_keyval *key,
+    PVFS_ds_keyval *val,
+    PVFS_sysresp_getvalue *resp,
     PVFS_hint hints);
 
 PVFS_error PVFS_sys_set_info(

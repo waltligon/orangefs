@@ -298,6 +298,11 @@ static int dbpf_db_create(const char *sto_path,
 static DB *dbpf_db_open(
     const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
     int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
+
+static int dbpf_db_associate( DB *p, DB *s,
+    int (*callback) (DB *db, const DBT *k, const DBT *v, DBT *r),
+    uint32_t flags);
+
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
@@ -1134,6 +1139,25 @@ int dbpf_collection_create(char *collname,
         }
     }
 
+    DBPF_GET_KEYVAL_SECONDARY_DBNAME(path_name, PATH_MAX, sto_p->name, 
+        new_coll_id);
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat keyval_secondary db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
+    {
+        ret = dbpf_db_create(sto_p->name, path_name, NULL, (DB_DUP|DB_DUPSORT));
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return ret;
+        }
+    }
+
+
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if(ret != 0)
@@ -1229,6 +1253,7 @@ int dbpf_collection_remove(char *collname,
         /* Clean up properly by closing all db handles */
         db_close(db_collection->coll_attr_db);
         db_close(db_collection->ds_db);
+        db_close(db_collection->keyval_secondary_db);
         db_close(db_collection->keyval_db);
         /* so that environment can also be cleaned up */
         dbpf_putdb_env(db_collection->coll_env, db_collection->path_name);
@@ -1252,6 +1277,14 @@ int dbpf_collection_remove(char *collname,
     if(unlink(path_name) != 0)
     {
         gossip_err("failure removing keyval db\n");
+        ret = -trove_errno_to_trove_error(errno);
+    }
+
+    DBPF_GET_KEYVAL_SECONDARY_DBNAME(path_name, PATH_MAX,
+                                     sto_p->name, db_data.coll_id);
+    if(unlink(path_name) != 0)
+    {
+        gossip_err("failure removing keyval secondary db\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 
@@ -1567,6 +1600,18 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
         gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
     }
 
+    if ((ret = coll_p->keyval_secondary_db->sync(coll_p->keyval_secondary_db, 
+        0)) != 0)
+    {
+        gossip_err("db_sync(coll_keyval_secondary_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->keyval_secondary_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_keyval_secondary_db): %s\n", 
+            db_strerror(ret));
+    }
+
     if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
@@ -1624,6 +1669,7 @@ int dbpf_collection_lookup(char *collname,
     char path_name[PATH_MAX];
     char trove_dbpf_version[32] = {0};
     int sto_major, sto_minor, sto_inc, major, minor, inc;
+    struct stat dbstat;
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_lookup of coll: %s\n", 
                  collname);
@@ -1821,8 +1867,7 @@ int dbpf_collection_lookup(char *collname,
         return ret;
     }
 
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, coll_p->coll_id);
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, coll_p->coll_id);
     coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
                                      &ret, PINT_trove_dbpf_keyval_compare, 0);
     if(coll_p->keyval_db == NULL)
@@ -1847,6 +1892,60 @@ int dbpf_collection_lookup(char *collname,
         free(coll_p->name);
         free(coll_p);
         return -TROVE_ENOMEM;
+    }
+
+    DBPF_GET_KEYVAL_SECONDARY_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, coll_p->coll_id);
+    /* if secondary index doesn't exist, just re-create it, don't error out */
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat keyval_secondary db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[KEYVAL]: Recreating secondary "
+                     "index.\n");
+        ret = dbpf_db_create(sto_p->name, path_name, NULL, (DB_DUP|DB_DUPSORT));
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return ret;
+        }
+    }
+
+    /* secondary database file already exists, try to open */
+    coll_p->keyval_secondary_db = dbpf_db_open(sto_p->name, path_name, 
+        coll_p->coll_env, &ret, NULL, (DB_DUP|DB_DUPSORT) );
+    /* TODO: add check to ensure BDB thinks secondary index is consistent */
+    if(coll_p->keyval_secondary_db == NULL)
+    {
+        db_close(coll_p->keyval_db);
+        db_close(coll_p->coll_attr_db);
+        db_close(coll_p->ds_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
+    }
+
+    /* associate the secondary index db with the primary and generate keys
+     * if it's empty */
+    ret = dbpf_db_associate(coll_p->keyval_db, coll_p->keyval_secondary_db, 
+          PINT_trove_dbpf_keyval_secondary_callback,DB_CREATE);
+    if( ret != 0 )
+    {
+        db_close(coll_p->keyval_secondary_db);
+        db_close(coll_p->keyval_db);
+        db_close(coll_p->coll_attr_db);
+        db_close(coll_p->ds_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
     }
 
     coll_p->next_p = NULL;
@@ -2168,6 +2267,33 @@ static DB *dbpf_db_open(
     return db_p;
 }
 
+
+/* dbpf_db_associate()
+ *
+ * Internal function for associating a database with the primary
+ * database to function as a secondary index.
+ *
+ * Returns 0 on success, negative value otherwise
+ */
+static int dbpf_db_associate( DB *p, DB *s,
+    int (*callback) (DB *db, const DBT *k, const DBT *d, DBT *r),
+    uint32_t flags)
+{
+    int ret = -TROVE_EINVAL;
+
+    ret = p->associate( p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                        NULL,
+#endif
+                        s,
+                        callback,
+                        flags );
+    if( ret != 0 )
+       return -dbpf_db_error_to_trove_error(ret);
+
+    return 0;
+}
+
 static void dbpf_db_error_callback(
 #ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
     const DB_ENV *dbenv, 
@@ -2250,6 +2376,7 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { KEYVAL_WRITE_LIST, "KEYVAL_WRITE_LIST" },
     { KEYVAL_FLUSH, "KEYVAL_FLUSH" },
     { KEYVAL_GET_HANDLE_INFO, "KEYVAL_GET_HANDLE_INFO" },
+    { KEYVAL_READ_VALUE, "KEYVAL_READ_VALUE" },
     { DSPACE_CREATE, "DSPACE_CREATE" },
     { DSPACE_REMOVE, "DSPACE_REMOVE" },
     { DSPACE_ITERATE_HANDLES, "DSPACE_ITERATE_HANDLES" },

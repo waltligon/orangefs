@@ -76,6 +76,10 @@ int PVFS_util_resolve(
 int PVFS_util_get_default_fsid(
     PVFS_fs_id* out_fs_id);
 
+int PVFS_util_get_fsid(
+    char *mnt, 
+    PVFS_fs_id *out_fs_id);
+
 int PVFS_util_add_dynamic_mntent(
     struct PVFS_sys_mntent *mntent);
 int PVFS_util_remove_internal_mntent(

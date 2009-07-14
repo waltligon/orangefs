@@ -38,7 +38,8 @@ TESTSRC += \
 	$(DIR)/list-eattr.c \
 	$(DIR)/test-accesses.c \
 	$(DIR)/test-hindexed-test.c \
-	$(DIR)/io-stress.c 
+	$(DIR)/io-stress.c \
+	$(DIR)/get-value.c 
 
 #	$(DIR)/test-pint-bucket.c \
 

@@ -116,6 +116,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "mirror",GOSSIP_MIRROR_DEBUG },
     /* Debug trove in direct io mode */
     {"directio", GOSSIP_DIRECTIO_DEBUG},
+    /* Debug the getvalue system call */
+    {"getvalue", GOSSIP_GETVALUE_DEBUG},
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |

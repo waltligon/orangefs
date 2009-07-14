@@ -156,6 +156,7 @@ INCLUDES := \
     src/common/gen-locks \
     src/common/events \
     src/io/trove \
+    src/io/trove/trove-dbpf \
     src/io/bmi \
     src/io/description \
     src/io/buffer \

@@ -467,6 +467,15 @@ struct PINT_client_listeattr_sm
     PVFS_sysresp_listeattr *resp_p;     /* Output */
 };
 
+struct PINT_client_getvalue_sm
+{
+    PVFS_ds_position pos_token;         /* input */
+    PVFS_ds_keyval *key_p;              /* input */
+    PVFS_ds_keyval *val_p;              /* input */
+    PVFS_dirent *dirent_p;              /* input */
+    PVFS_sysresp_getvalue *resp_p;      /* output */
+};
+
 struct PINT_client_perf_count_timer_sm
 {
     unsigned int *interval_secs;
@@ -556,6 +565,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_seteattr_sm seteattr;
 	struct PINT_client_deleattr_sm deleattr;
 	struct PINT_client_listeattr_sm listeattr;
+	struct PINT_client_getvalue_sm getvalue;
         struct PINT_client_perf_count_timer_sm perf_count_timer;
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
@@ -636,6 +646,7 @@ enum
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
+    PVFS_SYS_GETVALUE              = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -654,7 +665,7 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
-#define PVFS_OP_SYS_MAXVALID  21
+#define PVFS_OP_SYS_MAXVALID  22
 #define PVFS_OP_SYS_MAXVAL 69
 #define PVFS_OP_MGMT_MAXVALID 81
 #define PVFS_OP_MGMT_MAXVAL 199
@@ -759,6 +770,7 @@ extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
+extern struct PINT_state_machine_s pvfs2_client_get_value_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

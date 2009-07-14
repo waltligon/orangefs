@@ -538,6 +538,14 @@ struct PINT_server_listattr_op
     int parallel_sms;
 };
 
+struct PINT_server_getvalue_op
+{
+    TROVE_ds_position token;
+    PVFS_dirent dirent;
+    PVFS_ds_keyval key;
+    PVFS_ds_keyval val;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -617,6 +625,7 @@ typedef struct PINT_server_op
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
         struct PINT_server_listattr_op listattr;
+        struct PINT_server_getvalue_op getvalue;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
@@ -668,6 +677,7 @@ extern struct PINT_state_machine_s pvfs2_mirror_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
+extern struct PINT_state_machine_s pvfs2_prelude_attr_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;

@@ -317,6 +317,21 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
                           job_context_id context_id,
                           PVFS_hint hints);
 
+/* storage key/value read by value */
+int job_trove_keyval_read_value(PVFS_fs_id coll_id,
+                          PVFS_ds_position position,
+                          PVFS_dirent * dirent_p,
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_keyval * val_p,
+                          PVFS_ds_flags flags,
+                          PVFS_vtag * vtag,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id,
+                          PVFS_hint hints);
+
 /* storage key/value read list */
 int job_trove_keyval_read_list(PVFS_fs_id coll_id,
                                PVFS_handle handle,

@@ -229,6 +229,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
+    {&pvfs2_client_get_value_sm},
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -902,6 +903,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_IO, "PVFS_SYS_IO" },
         { PVFS_SYS_FLUSH, "PVFS_SYS_FLUSH" },
         { PVFS_SYS_READDIRPLUS, "PVFS_SYS_READDIR_PLUS" },
+        { PVFS_SYS_GETVALUE, "PVFS_SYS_GETVALUE" },
         { PVFS_MGMT_SETPARAM_LIST, "PVFS_MGMT_SETPARAM_LIST" },
         { PVFS_MGMT_NOOP, "PVFS_MGMT_NOOP" },
         { PVFS_SYS_TRUNCATE, "PVFS_SYS_TRUNCATE" },
@@ -920,6 +922,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },
         { PVFS_SYS_LISTEATTR, "PVFS_SYS_LISTEATTR" },
+        { PVFS_SYS_GETVALUE, "PVFS_SYS_GETVALUE" },
         { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
