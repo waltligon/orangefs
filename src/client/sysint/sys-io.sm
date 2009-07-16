@@ -10,6 +10,8 @@
  *  PVFS2 system interface routines for reading and writing files.
  */
 
+#define _ISOC99_SOURCE /* log2, ceil, max, etc */ 
+
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
@@ -25,7 +27,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 
-#define IO_MAX_SEGMENT_NUM 50 
+#define IO_MAX_SEGMENT_NUM 50
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE)
 #define PVFS2_SMALL_IO_OFF 1 /* AS: for now, ignore small_io */
 
@@ -1213,7 +1215,7 @@ static PINT_sm_action io_datafile_complete_operations(
             goto check_next_step;
         }
 
-	/* AS */
+	/* Active Storage:  */
 	if(sm_p->u.io.io_type == PVFS_IO_READ && sm_p->u.io.op != 0)
 	    {
 		ret = io_post_read_ack_recv(smcb, cur_ctx);

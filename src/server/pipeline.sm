@@ -32,6 +32,9 @@
 #define DO_ALLREDUCE 104
 #define DO_KMEANS 105
 
+#define NUM_COORDS 10 /* FIXME: should come from client */
+#define TOT_OBJS 1000000 /* FIXME: should come from client */
+
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
@@ -344,29 +347,34 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     case ((int)0x4c00040a): /* MPI_FLOAT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub);
 	if(s_op->u.pipeline.op == 0x5800000f) { /* KMEANS */
-	    int cunit = ((*PVFS_FLOAT).ub)*18;
+	    int cunit = ((*PVFS_FLOAT).ub)*NUM_COORDS;
 	    PVFS_size new_size, left_adj_sz, right_adj_sz;
-	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/18;
+	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/NUM_COORDS;
 	    int is_last_stripe = ((s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))?1:0);
 
 	    gossip_debug(GOSSIP_IO_DEBUG, "ctmp=%f\n", ctmp);
 
 	    /* last stripe? */
-	    if(is_last_stripe)
+	    if(is_last_stripe && (s_op->u.pipeline.dfile_index != 0))
 		count = floor(ctmp);
 	    else
 		count = ceil(ctmp);
 
 	    new_size = count*cunit;
 	    s_op->u.pipeline.new_buffer_used = new_size;
-	    s_op->u.pipeline.buffer= realloc(s_op->u.pipeline.buffer, max(new_size, s_op->u.pipeline.buffer_used));
+	    s_op->u.pipeline.buffer = realloc(s_op->u.pipeline.buffer, max(new_size, s_op->u.pipeline.buffer_used));
 	    left_adj_sz = (loff - file_req_offset)%cunit;
 	    right_adj_sz = (loff+s_op->u.pipeline.buffer_used-file_req_offset)%cunit;
-	    s_op->u.pipeline.left_adj_sz = left_adj_sz;
+	    s_op->u.pipeline.left_adj_sz = ((left_adj_sz==0)?0:(cunit-left_adj_sz));
 	    s_op->u.pipeline.right_adj_sz = right_adj_sz;
-	    s_op->u.pipeline.unaligned_sz = cunit - right_adj_sz;
+	    s_op->u.pipeline.unaligned_sz = ((right_adj_sz==0)?0:(cunit-right_adj_sz));
+	    s_op->u.pipeline.tmp_buf = malloc(s_op->u.pipeline.unaligned_sz);
 	    
-	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld\n", lld(count));
+	    gossip_debug(GOSSIP_IO_DEBUG, "FLOAT: count=%lld, left_adj_sz=%ld, "
+			 "right_adj_sz=%ld, unaligned_sz=%ld\n", lld(count),
+			 s_op->u.pipeline.left_adj_sz, 
+			 s_op->u.pipeline.right_adj_sz, 
+			 s_op->u.pipeline.unaligned_sz);
 	}
 	gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
 		     dparam->strip_size, lld(count));
@@ -378,7 +386,7 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		(count*((*PVFS_FLOAT).ub));
 	    if(s_op->u.pipeline.op == 0x5800000f)
 		s_op->u.pipeline.unaligned_sz = dparam->strip_size
-		    - (count*((*PVFS_FLOAT).ub)*18);
+		    - (count*((*PVFS_FLOAT).ub)*NUM_COORDS);
 	}
 #endif
 #if 0	
@@ -513,8 +521,15 @@ static int s2s_comp_fn(void *v_p, struct PVFS_server_resp *resp_p,
     }
 
     if(resp_p->u.small_io.result_size != 0) {
+	int i, count = (resp_p->u.small_io.result_size)/4;
+	float *a = (float*)resp_p->u.small_io.buffer;
+	float *b;
 	memcpy(s_op->u.pipeline.tmp_buf, resp_p->u.small_io.buffer, 
 	       resp_p->u.small_io.result_size);
+	b = (float*)s_op->u.pipeline.tmp_buf;
+	for(i=0; i<count; i++) {
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: a[%d]=%f, b[%d]=%f\n", __func__, i, a[i], i, b[i]);
+	}
     }
 
     return 0;
@@ -627,31 +642,31 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 	case ((int)0x4c00040a): /* MPI_FLOAT */
 	    {
+		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/NUM_COORDS;
 		float *a = (float*)s_op->u.pipeline.buffer;
-		float result;
-		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/18;
 
-		for(i=0; i<16; i++)
-		    gossip_debug(GOSSIP_IO_DEBUG, "a[%ld]=%lf\n", i, a[i]);
+		gossip_debug(GOSSIP_IO_DEBUG, "%s: count=%ld\n", __func__, count);
+
 		/* data is not aligned perfectly, then adjust it in memory */
-		if(s_op->u.pipeline.unaligned_sz != 0) {
-		    PVFS_size adj_sz = s_op->u.pipeline.unaligned_sz;
-		    PVFS_size tmp_sz = ((*PVFS_FLOAT).ub)*18 - adj_sz;
-		    
-		    /* align start address in data dimension boundary */
+		if(s_op->u.pipeline.left_adj_sz != 0 || 
+		   s_op->u.pipeline.right_adj_sz != 0) {
 		    if(s_op->u.pipeline.dfile_index != 0) {
-			memcpy(a, (char*)&a[0]+s_op->u.pipeline.left_adj_sz,
+			memcpy(s_op->u.pipeline.buffer, ((char*)&s_op->u.pipeline.buffer[0])+s_op->u.pipeline.left_adj_sz,
 			       s_op->u.pipeline.buffer_used - 
 			       s_op->u.pipeline.left_adj_sz);
 		    }
 		    
 		    /* patch the missing data from adjacent servers */
-		    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
-			memcpy(((char*)&a[count-1])+s_op->u.pipeline.right_adj_sz, 
+		    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1)) {
+			float *aa = (float*)s_op->u.pipeline.tmp_buf;
+			gossip_debug(GOSSIP_IO_DEBUG, "%s: tmp_buf[0]=%f\n", __func__, aa[0]);
+			gossip_debug(GOSSIP_IO_DEBUG, "%s: tmp_buf[1]=%f\n", __func__, aa[1]);
+			memcpy(s_op->u.pipeline.buffer+(s_op->u.pipeline.buffer_used-s_op->u.pipeline.left_adj_sz), 
 			       s_op->u.pipeline.tmp_buf, s_op->u.pipeline.unaligned_sz);
+		    }
 		}
 		
-		s_op->u.pipeline.buffer = (void*)a;
+		free(s_op->u.pipeline.tmp_buf);
 
 		switch(s_op->u.pipeline.op) {
 		case 0x58000001: /* MAX */
@@ -823,7 +838,7 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     int ret, i, j;
     struct PINT_server_op *kmeans_op;
     int numClusters = 20; /* FIXME: should come from client? */
-    int numCoords = 18; /* FIXME: should come from client? */
+    int numCoords = NUM_COORDS; /* FIXME: should come from client? */
 
     kmeans_op = malloc(sizeof(*kmeans_op));
     memset(kmeans_op, 0, sizeof(*kmeans_op));
@@ -838,7 +853,7 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     kmeans_op->u.kmeans.numCoords = numCoords;
 
     kmeans_op->u.kmeans.threshold = 0.001; /* FIXME */
-    kmeans_op->u.kmeans.totalNumObjs = 17695; /* FIXME: should be obtained from allreduce(numObjs, SUM) */
+    kmeans_op->u.kmeans.totalNumObjs = TOT_OBJS; /* FIXME: should be obtained from allreduce(numObjs, SUM) */
     kmeans_op->u.kmeans.numObjs = s_op->u.pipeline.new_buffer_used/sizeof(float)/numCoords;
     gossip_debug(GOSSIP_IO_DEBUG, "numObjs=%d\n", kmeans_op->u.kmeans.numObjs);
 
@@ -876,6 +891,10 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
             }
             //gossip_debug(GOSSIP_IO_DEBUG, "\n");
         }
+	/* print out the last object's coordinates */
+	gossip_debug(GOSSIP_IO_DEBUG, "%d: objects[%d]= \n", s_op->u.pipeline.dfile_index, kmeans_op->u.kmeans.numObjs-1);
+	for(j=0; j<kmeans_op->u.kmeans.numCoords; j++)
+	    gossip_debug(GOSSIP_IO_DEBUG, "\t%10f\n", kmeans_op->u.kmeans.objects[kmeans_op->u.kmeans.numObjs-1][j]);
     }
 
     /* pick first numClusters elements in feature[] as initial cluster centers*/

@@ -17,7 +17,7 @@ int main( int argc, char *argv[] )
   MPI_File fh;
   MPI_Comm comm;
   MPI_Status status;
-  char infile[80] = "pvfs2:/mnt/pvfs2/edge17695.bin";
+  char infile[80] = "pvfs2:/mnt/pvfs2/out10";
 
   /* for KMEANS */
   int numObjs;

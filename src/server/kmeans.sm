@@ -274,7 +274,10 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 				     s_op->u.kmeans.numCoords, 
 				     s_op->u.kmeans.objects[i],
 				     s_op->u.kmeans.clusters);
-	//gossip_debug(GOSSIP_IO_DEBUG, "i=%d: index=%d\n", i, index);
+
+	/* NOTE: following will generate lots of messages */
+	/* gossip_debug(GOSSIP_IO_DEBUG, "i=%d: index=%d\n", i, index); */
+
 	/* if membership changes, increase delta by 1 */
 	if (s_op->u.kmeans.membership[i] != index) 
 	    s_op->u.kmeans.delta += 1.0;

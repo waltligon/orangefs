@@ -257,7 +257,7 @@ static PINT_sm_action start_pipelining_sm(
 				       s_op->u.pipeline.fs_id);
     if(!fs_config) {
 	gossip_err("%s: Failed to get filesystem "
-d		   "config from fs_id of: %d\n", __func__,
+		   "config from fs_id of: %d\n", __func__,
 		   s_op->u.pipeline.fs_id);
 	js_p->error_code = -PVFS_EINVAL;
 	return SM_ACTION_COMPLETE;

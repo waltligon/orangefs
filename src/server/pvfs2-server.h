@@ -374,7 +374,7 @@ struct PINT_server_pipeline_op
     PINT_Request *mem_req;
 
     /* for strip alignment */
-    char tmp_buf[128]; /* FIXME */
+    char *tmp_buf; /* FIXME */
     PVFS_size unaligned_sz; /* cunit-right_adj_sz */
     PVFS_size left_adj_sz;
     PVFS_size right_adj_sz;
