@@ -650,28 +650,9 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  bmi_context_id context_id,
                   bmi_hint hints)
 {
-    ref_st_p tmp_ref = NULL;
-    int ret = -1;
-
-    gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
-                 (long)src, (long)buffer, (long)expected_size, (int)tag);
-
-    *id = 0;
-
-    gen_mutex_lock(&ref_mutex);
-    tmp_ref = ref_list_search_addr(cur_ref_list, src);
-    if (!tmp_ref)
-    {
-	gen_mutex_unlock(&ref_mutex);
-	return (bmi_errno_to_pvfs(-EPROTO));
-    }
-    gen_mutex_unlock(&ref_mutex);
-
-    ret = tmp_ref->interface->post_recv_list(
-        id, tmp_ref->method_addr, &buffer, &expected_size, 1, expected_size, actual_size,
-        buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
-    return (ret);
+    return(BMI_post_recv_list(id, src, &buffer, &expected_size, 1,
+        expected_size, actual_size, buffer_type, tag, user_ptr, context_id,
+        (PVFS_hints)hints));
 }
 
 
@@ -689,28 +670,8 @@ int BMI_post_send(bmi_op_id_t * id,
 		  bmi_context_id context_id,
                   bmi_hint hints)
 {
-    ref_st_p tmp_ref = NULL;
-    int ret = -1;
-
-    gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-                 "BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n",
-                 (long)dest, (long)buffer, (long)size, (int)tag);
-
-    *id = 0;
-
-    gen_mutex_lock(&ref_mutex);
-    tmp_ref = ref_list_search_addr(cur_ref_list, dest);
-    if (!tmp_ref)
-    {
-	gen_mutex_unlock(&ref_mutex);
-	return (bmi_errno_to_pvfs(-EPROTO));
-    }
-    gen_mutex_unlock(&ref_mutex);
-
-    ret = tmp_ref->interface->post_send_list(
-        id, tmp_ref->method_addr, &buffer, &size, 1, size, buffer_type, tag,
-        user_ptr, context_id, (PVFS_hint)hints);
-    return (ret);
+    return(BMI_post_send_list(id, dest, &buffer, &size, 1, size,
+        buffer_type, tag, user_ptr, context_id, (PVFS_hints)hints));
 }
 
 
@@ -728,28 +689,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_context_id context_id,
                             bmi_hint hints)
 {
-    ref_st_p tmp_ref = NULL;
-    int ret = -1;
-
-    gossip_debug(GOSSIP_BMI_DEBUG_OFFSETS,
-	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld, tag: %d\n", 
-	(long)dest, (long)buffer, (long)size, (int)tag);
-
-    *id = 0;
-
-    gen_mutex_lock(&ref_mutex);
-    tmp_ref = ref_list_search_addr(cur_ref_list, dest);
-    if (!tmp_ref)
-    {
-	gen_mutex_unlock(&ref_mutex);
-	return (bmi_errno_to_pvfs(-EPROTO));
-    }
-    gen_mutex_unlock(&ref_mutex);
-
-    ret = tmp_ref->interface->post_sendunexpected_list(
-        id, tmp_ref->method_addr, &buffer, &size, 1, size, buffer_type, tag,
-        user_ptr, context_id, (PVFS_hint)hints);
-    return (ret);
+    return(BMI_post_sendunexpected_list(id, dest, &buffer, &size, 1, size,
+        buffer_type, tag, user_ptr, context_id, (PVFS_hints)hints));
 }
 
 
