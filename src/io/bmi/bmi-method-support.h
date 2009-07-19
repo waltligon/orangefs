@@ -103,6 +103,7 @@ struct bmi_method_ops
     int (*testunexpected) (int,
                            int *,
                            struct bmi_method_unexpected_info *,
+                           uint8_t,
                            int);
     bmi_method_addr_p (*method_addr_lookup) (const char *);
     int (*post_send_list) (bmi_op_id_t *,
@@ -136,6 +137,7 @@ struct bmi_method_ops
                                      bmi_size_t,
                                      enum bmi_buffer_type,
                                      bmi_msg_tag_t,
+                                     uint8_t,
                                      void *,
                                      bmi_context_id,
                                      PVFS_hint hints);

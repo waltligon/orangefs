@@ -75,6 +75,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
+    uint8_t class,
     void *user_ptr,
     bmi_context_id context_id,
     PVFS_hint hints);
@@ -117,6 +118,7 @@ int BMI_gm_testcontext(int incount,
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
 			  struct bmi_method_unexpected_info *info,
+                          uint8_t class,
 			  int max_idle_time_ms);
 bmi_method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 int BMI_gm_open_context(bmi_context_id context_id);
@@ -976,6 +978,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
+    uint8_t class,
     void *user_ptr,
     bmi_context_id context_id,
     PVFS_hint hints)
@@ -1547,6 +1550,7 @@ int BMI_gm_testcontext(int incount,
 int BMI_gm_testunexpected(int incount,
 			  int *outcount,
 			  struct bmi_method_unexpected_info *info,
+                          uint8_t class,
 			  int max_idle_time_ms)
 {
     int ret = -1;

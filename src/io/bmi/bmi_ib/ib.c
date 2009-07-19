@@ -906,7 +906,9 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
 				const bmi_size_t *sizes, int list_count,
                                 bmi_size_t total_size,
 				enum bmi_buffer_type buffer_flag __unused,
-                                bmi_msg_tag_t tag, void *user_ptr,
+                                bmi_msg_tag_t tag, 
+                                uint8_t class,
+                                void *user_ptr,
 				bmi_context_id context_id)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
@@ -1335,7 +1337,7 @@ restart:
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
-  struct bmi_method_unexpected_info *ui, int max_idle_time)
+  struct bmi_method_unexpected_info *ui, uint8_t class, int max_idle_time)
 {
     struct qlist_head *l;
     int activity = 0, n;

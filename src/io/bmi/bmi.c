@@ -652,7 +652,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 {
     return(BMI_post_recv_list(id, src, &buffer, &expected_size, 1,
         expected_size, actual_size, buffer_type, tag, user_ptr, context_id,
-        (PVFS_hints)hints));
+        hints));
 }
 
 
@@ -671,7 +671,7 @@ int BMI_post_send(bmi_op_id_t * id,
                   bmi_hint hints)
 {
     return(BMI_post_send_list(id, dest, &buffer, &size, 1, size,
-        buffer_type, tag, user_ptr, context_id, (PVFS_hints)hints));
+        buffer_type, tag, user_ptr, context_id, hints));
 }
 
 
@@ -679,18 +679,19 @@ int BMI_post_send(bmi_op_id_t * id,
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_post_sendunexpected(bmi_op_id_t * id,
+int BMI_post_sendunexpected_class(bmi_op_id_t * id,
 			    BMI_addr_t dest,
 			    const void *buffer,
 			    bmi_size_t size,
 			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
+                            uint8_t class,
 			    void *user_ptr,
 			    bmi_context_id context_id,
                             bmi_hint hints)
 {
-    return(BMI_post_sendunexpected_list(id, dest, &buffer, &size, 1, size,
-        buffer_type, tag, user_ptr, context_id, (PVFS_hints)hints));
+    return(BMI_post_sendunexpected_list_class(id, dest, &buffer, &size, 1, size,
+        buffer_type, tag, class, user_ptr, context_id, hints));
 }
 
 
@@ -905,9 +906,10 @@ construct_poll_plan(int nmeth, int *idle_time_ms)
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_testunexpected(int incount,
+int BMI_testunexpected_class(int incount,
 		       int *outcount,
 		       struct BMI_unexpected_info *info_array,
+                       uint8_t class, 
 		       int max_idle_time_ms)
 {
     int i = 0;
@@ -938,7 +940,7 @@ int BMI_testunexpected(int incount,
         if (method_usage[i].plan) {
             ret = active_method_table[i]->testunexpected(
                 (incount - position), &tmp_outcount,
-                (&(sub_info[position])), max_idle_time_ms);
+                (&(sub_info[position])), class, max_idle_time_ms);
             if (ret < 0)
             {
                 /* can't recover from this */
@@ -1762,7 +1764,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
  *  \return 0 on success, 1 on immediate successful completion,
  *  -errno on failure.
  */
-int BMI_post_sendunexpected_list(bmi_op_id_t * id,
+int BMI_post_sendunexpected_list_class(bmi_op_id_t * id,
 				 BMI_addr_t dest,
 				 const void *const *buffer_list,
 				 const bmi_size_t *size_list,
@@ -1770,6 +1772,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 bmi_size_t total_size,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
+                                 uint8_t class,
 				 void *user_ptr,
 				 bmi_context_id context_id,
                                  bmi_hint hints)
@@ -1808,7 +1811,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     {
 	ret = tmp_ref->interface->post_sendunexpected_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
-            list_count, total_size, buffer_type, tag, user_ptr,
+            list_count, total_size, buffer_type, tag, class, user_ptr,
             context_id, (PVFS_hint)hints);
 
 	return (ret);

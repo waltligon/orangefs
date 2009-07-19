@@ -90,6 +90,7 @@ int BMI_tcp_testsome(int incount,
 int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct bmi_method_unexpected_info *info,
+                           uint8_t class,
 			   int max_idle_time_ms);
 int BMI_tcp_testcontext(int incount,
 		     bmi_op_id_t * out_id_array,
@@ -133,6 +134,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t total_size,
 				     enum bmi_buffer_type buffer_type,
 				     bmi_msg_tag_t tag,
+                                     uint8_t class,
 				     void *user_ptr,
 				     bmi_context_id context_id,
                                      PVFS_hint hints);
@@ -1138,6 +1140,7 @@ int BMI_tcp_testsome(int incount,
 int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct bmi_method_unexpected_info *info,
+                           uint8_t class,
 			   int max_idle_time)
 {
     int ret = -1;
@@ -1382,6 +1385,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t total_size,
 				     enum bmi_buffer_type buffer_type,
 				     bmi_msg_tag_t tag,
+                                     uint8_t class,
 				     void *user_ptr,
 				     bmi_context_id context_id,
                                      PVFS_hint hints)

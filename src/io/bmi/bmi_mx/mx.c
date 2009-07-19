@@ -1708,7 +1708,7 @@ static int
 BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                   const void *const *buffers, const bmi_size_t *sizes, int list_count,
                   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
-                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                  bmi_msg_tag_t tag, uint8_t class, void *user_ptr, bmi_context_id context_id,
                   PVFS_hint hints)
 {
         int ret = 0;
@@ -2822,7 +2822,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 /* test for unexpected receives only, not unex sends */
 static int
 BMI_mx_testunexpected(int incount __unused, int *outcount,
-            struct bmi_method_unexpected_info *ui, int max_idle_time __unused)
+            struct bmi_method_unexpected_info *ui, uint8_t class, int max_idle_time __unused)
 {
         uint32_t        result          = 0;
         uint64_t        match           = ((uint64_t) BMX_MSG_UNEXPECTED << BMX_MSG_SHIFT);

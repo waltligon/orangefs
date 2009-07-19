@@ -835,6 +835,7 @@ static int bmip_testsome(int num __unused, bmi_op_id_t *ids __unused,
  */
 static int bmip_testunexpected(int incount, int *outcount,
 			       struct bmi_method_unexpected_info *ui,
+                               uint8_t class,
 			       int max_idle_time)
 {
     struct bmip_work *w, *wn;
@@ -1189,7 +1190,9 @@ static int bmip_post_sendunexpected_list(bmi_op_id_t *id,
 					 const bmi_size_t *sizes,
 					 int list_count, bmi_size_t total_size,
 					 enum bmi_buffer_type bflag __unused,
-					 bmi_msg_tag_t tag, void *user_ptr,
+					 bmi_msg_tag_t tag, 
+                                         uint8_t class,
+                                         void *user_ptr,
 					 bmi_context_id context_id)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
