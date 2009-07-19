@@ -668,8 +668,8 @@ int BMI_post_recv(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->post_recv(
-        id, tmp_ref->method_addr, buffer, expected_size, actual_size,
+    ret = tmp_ref->interface->post_recv_list(
+        id, tmp_ref->method_addr, &buffer, &expected_size, 1, expected_size, actual_size,
         buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
@@ -707,8 +707,8 @@ int BMI_post_send(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->post_send(
-        id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
+    ret = tmp_ref->interface->post_send_list(
+        id, tmp_ref->method_addr, &buffer, &size, 1, size, buffer_type, tag,
         user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
@@ -746,8 +746,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     }
     gen_mutex_unlock(&ref_mutex);
 
-    ret = tmp_ref->interface->post_sendunexpected(
-        id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
+    ret = tmp_ref->interface->post_sendunexpected_list(
+        id, tmp_ref->method_addr, &buffer, &size, 1, size, buffer_type, tag,
         user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }

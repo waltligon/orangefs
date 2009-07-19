@@ -76,34 +76,6 @@ struct bmi_method_ops
 
     int (*unexpected_free) (void *);
 
-    int (*post_send) (bmi_op_id_t *,
-                      bmi_method_addr_p,
-                      const void *,
-                      bmi_size_t,
-                      enum bmi_buffer_type,
-                      bmi_msg_tag_t,
-                      void *,
-                      bmi_context_id,
-                      PVFS_hint hints);
-    int (*post_sendunexpected) (bmi_op_id_t *,
-                                bmi_method_addr_p,
-                                const void *,
-                                bmi_size_t,
-                                enum bmi_buffer_type,
-                                bmi_msg_tag_t,
-                                void *,
-                                bmi_context_id,
-                                PVFS_hint hints);
-    int (*post_recv) (bmi_op_id_t *,
-                      bmi_method_addr_p,
-                      void *,
-                      bmi_size_t,
-                      bmi_size_t *,
-                      enum bmi_buffer_type,
-                      bmi_msg_tag_t,
-                      void *,
-                      bmi_context_id,
-                      PVFS_hint hints);
     int (*test) (bmi_op_id_t,
                  int *,
                  bmi_error_code_t *,
