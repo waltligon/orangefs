@@ -891,16 +891,6 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 }
 
 static int
-BMI_ib_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
-                 const void *buffer, bmi_size_t total_size,
-                 enum bmi_buffer_type buffer_flag __unused,
-                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
-{
-    return post_send(id, remote_map, 0, &buffer, &total_size,
-                     total_size, tag, user_ptr, context_id, 0);
-}
-
-static int
 BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   const void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
@@ -908,17 +898,6 @@ BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
                      total_size, tag, user_ptr, context_id, 0);
-}
-
-static int
-BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
-                           const void *buffer, bmi_size_t total_size,
-                           enum bmi_buffer_type buffer_flag __unused,
-                           bmi_msg_tag_t tag, void *user_ptr,
-			   bmi_context_id context_id)
-{
-    return post_send(id, remote_map, 0, &buffer, &total_size,
-                     total_size, tag, user_ptr, context_id, 1);
 }
 
 static int
@@ -1059,16 +1038,6 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   out:
     gen_mutex_unlock(&interface_mutex);
     return ret;
-}
-
-static int
-BMI_ib_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
-  void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
-  enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
-  bmi_context_id context_id)
-{
-    return post_recv(id, remote_map, 0, &buffer, &expected_len,
-                     expected_len, tag, user_ptr, context_id);
 }
 
 static int
@@ -2115,9 +2084,6 @@ const struct bmi_method_ops bmi_ib_ops =
     .memalloc = BMI_ib_memalloc,
     .memfree = BMI_ib_memfree,
     .unexpected_free = BMI_ib_unexpected_free,
-    .post_send = BMI_ib_post_send,
-    .post_sendunexpected = BMI_ib_post_sendunexpected,
-    .post_recv = BMI_ib_post_recv,
     .test = BMI_ib_test,
     .testsome = BMI_ib_testsome,
     .testcontext = BMI_ib_testcontext,
