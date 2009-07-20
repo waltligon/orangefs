@@ -162,18 +162,18 @@ struct tcp_msg_header
     do {								\
 	*((uint32_t*)&((hdr).enc_hdr[0])) = htobmi32((hdr).magic_nr);	\
 	*((uint32_t*)&((hdr).enc_hdr[4])) = htobmi32((hdr).mode);	\
-	*((uint64_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
+	*((uint32_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
+	*((uint32_t*)&((hdr).enc_hdr[12])) = htobmi32((hdr).src_addr_hash);\
 	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
-	*((uint32_t*)&((hdr).enc_hdr[24])) = htobmi32((hdr).src_addr_hash);\
     } while(0)						    
 
 #define BMI_TCP_DEC_HDR(hdr)						\
     do {								\
 	(hdr).magic_nr = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[0])));	\
 	(hdr).mode = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[4])));	\
-	(hdr).tag = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[8])));	\
+	(hdr).tag = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[8])));	\
+	(hdr).src_addr_hash = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[12])));\
 	(hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));	\
-	(hdr).src_addr_hash = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[24])));\
     } while(0)						    
 
 /* enumerate states that we care about */
