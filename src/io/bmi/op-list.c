@@ -247,7 +247,10 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
             return(1);
         }
     }
-
+    if (my_key->class_yes && (my_key->class != my_op->class))
+    {
+        return(1);
+    }
     return (0);
 }
 

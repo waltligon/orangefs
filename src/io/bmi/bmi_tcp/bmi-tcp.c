@@ -50,7 +50,7 @@
 #include "pint-event.h"
 #include "quickhash.h"
 
-#define BMI_TCP_S2S_MAGIC_NR 51904
+#define BMI_TCP_S2S_MAGIC_NR 51912
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
@@ -145,7 +145,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id);
 char BMI_tcp_method_name[] = "bmi_tcp";
 
 /* size of encoded message header */
-#define TCP_ENC_HDR_SIZE 28
+#define TCP_ENC_HDR_SIZE 25
 
 /* structure internal to tcp for use as a message header */
 struct tcp_msg_header
@@ -155,6 +155,7 @@ struct tcp_msg_header
     bmi_msg_tag_t tag;		/* user specified message tag */
     bmi_size_t size;		/* length of trailing message */
     uint32_t src_addr_hash;     /* hash of local svr addr (if present) */
+    uint8_t class;              /* class of msg (if unexpected) */
     char enc_hdr[TCP_ENC_HDR_SIZE];  /* encoded version of header info */
 };
 
@@ -165,6 +166,7 @@ struct tcp_msg_header
 	*((uint32_t*)&((hdr).enc_hdr[8])) = htobmi64((hdr).tag);	\
 	*((uint32_t*)&((hdr).enc_hdr[12])) = htobmi32((hdr).src_addr_hash);\
 	*((uint64_t*)&((hdr).enc_hdr[16])) = htobmi64((hdr).size);	\
+	*((uint8_t*)&((hdr).enc_hdr[24])) = (hdr).class;                \
     } while(0)						    
 
 #define BMI_TCP_DEC_HDR(hdr)						\
@@ -174,6 +176,7 @@ struct tcp_msg_header
 	(hdr).tag = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[8])));	\
 	(hdr).src_addr_hash = bmitoh32(*((uint32_t*)&((hdr).enc_hdr[12])));\
 	(hdr).size = bmitoh64(*((uint64_t*)&((hdr).enc_hdr[16])));	\
+	(hdr).class = *((uint8_t*)&((hdr).enc_hdr[24]));                \
     } while(0)						    
 
 /* enumerate states that we care about */
@@ -1145,6 +1148,11 @@ int BMI_tcp_testunexpected(int incount,
 {
     int ret = -1;
     method_op_p query_op = NULL;
+    struct op_list_search_key key;
+
+    memset(&key, 0, sizeof(struct op_list_search_key));
+    key.class = class;
+    key.class_yes = 1;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -1164,11 +1172,15 @@ int BMI_tcp_testunexpected(int incount,
     /* go through the completed/unexpected list as long as we are finding 
      * stuff and we have room in the info array for it
      */
-    while ((*outcount < incount) &&
-	   (query_op =
-	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    while(*outcount < incount)
     {
-	info[*outcount].error_code = query_op->error_code;
+        query_op = op_list_search(op_list_array[IND_COMPLETE_RECV_UNEXP],
+            &key);
+        if(!query_op)
+        {
+            break;
+        }
+        info[*outcount].error_code = query_op->error_code;
         /* always show unexpected messages on primary address */
         if(query_op->addr->primary)
 	    info[*outcount].addr = query_op->addr->primary;
@@ -1181,6 +1193,7 @@ int BMI_tcp_testunexpected(int incount,
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
+
     gen_mutex_unlock(&interface_mutex);
     return (0);
 }
@@ -1406,6 +1419,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     my_header.tag = tag;
     my_header.size = total_size;
     my_header.magic_nr = BMI_TCP_S2S_MAGIC_NR;
+    my_header.class = class;
     if(tcp_method_params.method_flags & BMI_INIT_SERVER)
     {
         /* servers identify themselves to peers with an address hash */
@@ -3159,6 +3173,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
 	active_method_op->buffer_list = &(active_method_op->buffer);
 	active_method_op->size_list = &(active_method_op->actual_size);
 	active_method_op->list_count = 1;
+        active_method_op->class = new_header.class;
 	tcp_op_data = active_method_op->method_data;
 	tcp_op_data->tcp_op_state = BMI_TCP_INPROGRESS;
 	tcp_op_data->env = new_header;

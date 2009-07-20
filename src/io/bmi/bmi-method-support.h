@@ -162,6 +162,7 @@ struct method_op
     enum bmi_op_type send_recv;	/* type of operation */
     void *user_ptr;		/* user_ptr associated with this op */
     bmi_msg_tag_t msg_tag;	/* message tag */
+    uint8_t class;              /* message class (if unexpected) */
     bmi_error_code_t error_code;	/* final status of operation */
     bmi_size_t amt_complete;	/* how much is completed */
     bmi_size_t env_amt_complete;	/* amount of the envelope that is completed */
