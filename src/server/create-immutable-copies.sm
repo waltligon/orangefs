@@ -21,7 +21,7 @@
 /*Global Variables*/
 
 /*all bits turned on*/
-static uint64_t UINT64_HIGH = 0xffffffffffffffff; 
+static uint64_t UINT64_HIGH = 0xffffffffffffffffULL; 
 
 /*attribute keys used for the mirroring process*/
 static char handle_key[]     = USER_PVFS2_MIRROR_HANDLES;
@@ -251,11 +251,11 @@ static PINT_sm_action initialize_structures (struct PINT_smcb *smcb
    }
 
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tdfile_count: %d\tmetadata_handle: %llu"
-                                    "\tfs_id: %llu"
+                                    "\tfs_id: %u"
                                     "\tio_servers_count: %d\n"
                                    ,imm_p->dfile_count
                                    ,llu(imm_p->metadata_handle)
-                                   ,llu(imm_p->fs_id)
+                                   ,imm_p->fs_id
                                    ,imm_p->io_servers_count );
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tds_attr.b_size:%d\n"
                                    ,(int)s_op->ds_attr.u.datafile.b_size);
