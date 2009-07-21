@@ -38,7 +38,8 @@ enum
     IO_GET_DATAFILE_SIZE,
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
-    IO_UNSTUFF
+    IO_UNSTUFF,
+    IO_GETATTR_SERVER
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -111,7 +112,8 @@ static int unstuff_needed(
     PVFS_Request mem_req,
     PVFS_offset file_req_offset,
     PINT_dist *dist_p,
-    uint32_t mask);
+    uint32_t mask,
+    enum PVFS_io_type io_type);
 
 static int unstuff_comp_fn(
     void *v_p,
@@ -164,6 +166,7 @@ machine pvfs2_client_io_sm
     {
         run io_inspect_attr;
         IO_UNSTUFF => unstuff_setup_msgpair;
+        IO_GETATTR_SERVER => unstuff_setup_msgpair;
         success => io_datafile_setup_msgpairs;
         default => io_cleanup;
     }
@@ -449,18 +452,13 @@ static PINT_sm_action io_inspect_attr(
     }
 
     /* determine if we need to unstuff or not to service this request */
-    if(unstuff_needed(
+    js_p->error_code = unstuff_needed(
         sm_p->u.io.mem_req,
         sm_p->u.io.file_req_offset,
         sm_p->getattr.attr.u.meta.dist,
-        sm_p->getattr.attr.mask))
-    {
-        js_p->error_code = IO_UNSTUFF;
-        return SM_ACTION_COMPLETE;
-    }
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
+        sm_p->getattr.attr.mask,
+        sm_p->u.io.io_type);
+    return(SM_ACTION_COMPLETE);
 }
 
 static PINT_sm_action io_unstuff_setup_msgpair(
@@ -470,21 +468,37 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    js_p->error_code = 0;
-
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* note that unstuff must request the same attr mask that we requested
-     * earlier.  If the file has already been unstuffed then we need an 
-     * updated authoritative copy of all of the attrs relevant to I/O.
-     */
-    PINT_SERVREQ_UNSTUFF_FILL(
-            msg_p->req,
-            (*sm_p->cred_p),
-            sm_p->object_ref.fs_id,
-            sm_p->object_ref.handle,
-            IO_ATTR_MASKS);
+    if(js_p->error_code == IO_UNSTUFF)
+    {
+        /* note that unstuff must request the same attr mask that we requested
+         * earlier.  If the file has already been unstuffed then we need an 
+         * updated authoritative copy of all of the attrs relevant to I/O.
+         */
+        PINT_SERVREQ_UNSTUFF_FILL(
+                msg_p->req,
+                (*sm_p->cred_p),
+                sm_p->object_ref.fs_id,
+                sm_p->object_ref.handle,
+                IO_ATTR_MASKS);
+    }
+    else if(js_p->error_code == IO_GETATTR_SERVER)
+    {
+        PINT_SERVREQ_GETATTR_FILL(
+                msg_p->req,
+                (*sm_p->cred_p),
+                sm_p->object_ref.fs_id,
+                sm_p->object_ref.handle,
+                IO_ATTR_MASKS,
+                sm_p->hints);
+    }
+    else
+    {
+        assert(0);
+    }
+    js_p->error_code = 0;
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -2879,13 +2893,16 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
  * to determine if a stuffed file would have to be "unstuffed" in order to
  * service the request
  *
- * returns 1 if unstuff is needed, 0 otherwise.
+ * returns IO_UNSTUFF if unstuff is needed
+ * returns IO_GETATTR_SERVER if current stuffed status needs to be confirmed
+ * returns 0 otherwise
  */
 static int unstuff_needed(
     PVFS_Request mem_req,
     PVFS_offset file_req_offset,
     PINT_dist *dist_p,
-    uint32_t mask)
+    uint32_t mask,
+    enum PVFS_io_type io_type)
 {
     PVFS_offset max_offset = 0;
     PVFS_offset first_unstuffed_offset = 0;
@@ -2933,8 +2950,19 @@ static int unstuff_needed(
     /* compare to see if the file needs to be unstuffed yet */
     if(max_offset > first_unstuffed_offset)
     {
-        gossip_debug(GOSSIP_IO_DEBUG, "sys-io will unstuff the file.\n");
-        return(1);
+        if(io_type == PVFS_IO_READ)
+        {
+            /* reads should not unstuff, but we do need to confirm that the
+             * attributes are up to date before proceeding
+             */
+            gossip_debug(GOSSIP_IO_DEBUG, "sys-io will perform an extra getattr to confirm file is still stuffed.\n");
+            return(IO_GETATTR_SERVER);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_IO_DEBUG, "sys-io will unstuff the file.\n");
+            return(IO_UNSTUFF);
+        }
     }
 
     gossip_debug(GOSSIP_IO_DEBUG, "sys-io will not unstuff the file.\n");
@@ -2954,7 +2982,7 @@ static int unstuff_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_debug(GOSSIP_IO_DEBUG,
-		"unstuff completion fn: unstuff_comp_fn\n");
+		"unstuff/getattr completion fn: unstuff_comp_fn\n");
 
     /* only posted one msgpair */
     assert(i==0);
@@ -2967,15 +2995,30 @@ static int unstuff_comp_fn(
         return resp_p->status;
     }
 
-    assert(resp_p->op == PVFS_SERV_UNSTUFF);
+    assert(resp_p->op == PVFS_SERV_UNSTUFF || resp_p->op ==
+        PVFS_SERV_GETATTR);
     
-    PINT_acache_update(sm_p->object_ref,
-        &resp_p->u.unstuff.attr,
-        NULL);
+    if(resp_p->op == PVFS_SERV_UNSTUFF)
+    {
+        PINT_acache_update(sm_p->object_ref,
+            &resp_p->u.unstuff.attr,
+            NULL);
 
-    /* replace attrs found by getattr */
-    /* PINT_copy_object_attr() takes care of releasing old memory */
-    PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+        /* replace attrs found by getattr */
+        /* PINT_copy_object_attr() takes care of releasing old memory */
+        PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.unstuff.attr);
+    }
+    else 
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Updating attributes before reading beyond stuffing boundary.\n");
+        PINT_acache_update(sm_p->object_ref,
+            &resp_p->u.getattr.attr,
+            NULL);
+
+        /* replace attrs found by getattr */
+        /* PINT_copy_object_attr() takes care of releasing old memory */
+        PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.getattr.attr);
+    }
 
     return(0);
 }
