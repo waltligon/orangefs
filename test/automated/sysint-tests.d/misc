@@ -1,0 +1,150 @@
+#!/bin/bash
+
+# try all of the normal pvfs2 command line utilites and make sure they work
+# for basic cases
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-touch $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-touch failure." 1>&2
+    exit 1
+fi
+
+MYGROUP=`groups | cut -d ' ' -f 1`
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-chown $USER $MYGROUP $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-chown failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-chmod 777 $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-chmod failure." 1>&2
+    exit 1
+fi
+
+# look at the error message from this tool.  If we got an operation not
+# supported error, it just means that the server either doesn't support the
+# vm drop caches operation, or doesn't have permission.
+DC_OUT=`${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-drop-caches -m $PVFS2_MOUNTPOINT 2>&1` 
+if [ "${?}" != 0 ]
+then
+    TEST=`echo $DC_OUT | grep "not supported"`
+    if [ "${?}" != 0 ]
+    then 
+        echo $DC_OUT 1>&2
+        echo "pvfs2-drop-caches failure." 1>&2
+        exit 1
+    fi
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fsck -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fsck failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-validate -d $PVFS2_MOUNTPOINT -c -f -s
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-statfs failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fs-dump failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fs-dump failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-ls $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-ls failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-perror 0 
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-perror failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-stat $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-stat failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-viewdist -f $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-viewdist failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-xattr -s -k user.foo -v bar $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-xattr failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-rm $PVFS2_MOUNTPOINT/miscfile
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-rm failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m $PVFS2_MOUNTPOINT "none"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-debugmask failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-mode -m $PVFS2_MOUNTPOINT "admin"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-mode failure."  1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-mode -m $PVFS2_MOUNTPOINT "normal"
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-mode failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-sync -m $PVFS2_MOUNTPOINT -D 0 -M 1
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-set-sync failure." 1>&2
+    exit 1
+fi
+
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-statfs -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-statfs failure." 1>&2
+    exit 1
+fi
+
+
+
+
