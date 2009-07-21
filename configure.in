@@ -44,6 +44,8 @@ fi
 
 AC_CONFIG_HEADER(pvfs2-config.h)
 
+AC_CHECK_HEADER([pwd.h],
+    [AC_DEFINE(HAVE_GETPWUID, 1, Define if pwd.h exists)])
 AC_CHECK_HEADER([sys/vfs.h],
 		[AC_DEFINE(HAVE_SYS_VFS_H, 1, Define if sys/vfs.h exists)])
 AC_CHECK_HEADER([sys/mount.h],

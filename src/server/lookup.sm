@@ -19,7 +19,6 @@
 #include "str-utils.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
-#include "check.h"
 
 enum 
 {
