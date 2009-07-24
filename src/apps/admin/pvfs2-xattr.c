@@ -680,7 +680,11 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
         obj->u.pvfs2.perms = resp_getattr.attr.perms;
         memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr,
                sizeof(PVFS_sys_attr));
-        obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        /* we should not modify the returned mask, so we know which data fields
+         * in the attribute structure are valid.  I don't see any reason why
+         * it is being reset here.
+        */
+        //obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         obj->u.pvfs2.ref = ref;
     }
     return 0;

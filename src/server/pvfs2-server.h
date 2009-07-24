@@ -178,11 +178,11 @@ enum
     DIST_NAME_KEY        = 0,
     DIST_PARAMS_KEY      = 1,
     NUM_DFILES_KEY       = 2,
+    NUM_SPECIAL_KEYS     = 3, /* not an index */
     METAFILE_HINT_KEY    = 3,
     MIRROR_COPIES_KEY    = 4,
     MIRROR_HANDLES_KEY   = 5,
     MIRROR_STATUS_KEY    = 6,
-    NUM_SPECIAL_KEYS     = 6, /* not an index */
 };
 
 typedef enum

@@ -943,17 +943,24 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-                    {
-                    decode_free(resp->u.getattr.attr.u.meta.dfile_array);
-                    decode_free(resp->u.getattr.attr.u.meta.mirror_dfile_array);
-                    }
+                       decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+                    if (   resp->u.getattr.attr.mask 
+                         & PVFS_ATTR_META_MIRROR_DFILES ) 
+                       decode_free
+                        (resp->u.getattr.attr.u.meta.mirror_dfile_array);
                     break;
 
                 case PVFS_SERV_UNSTUFF:
                     if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
                         decode_free(resp->u.unstuff.attr.u.meta.dist);
                     if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
+                    {
                         decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
+                    }
+                    if (   resp->u.unstuff.attr.mask 
+                         & PVFS_ATTR_META_MIRROR_DFILES ) 
+                       decode_free
+                        (resp->u.unstuff.attr.u.meta.mirror_dfile_array);
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -971,24 +978,31 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 case PVFS_SERV_LISTATTR:
                     {
-                        int i;
-                        if (resp->u.listattr.error)
-                            decode_free(resp->u.listattr.error);
-                        if (resp->u.listattr.attr) {
-                            for (i = 0; i < resp->u.listattr.nhandles; i++) {
-                             if (resp->u.listattr.attr[i].mask &
-                                      PVFS_ATTR_META_DIST)
-                              decode_free(resp->u.listattr.attr[i].u.meta.dist);
-                             if (resp->u.listattr.attr[i].mask &
-                                      PVFS_ATTR_META_DFILES)
-                              decode_free(
-                                 resp->u.listattr.attr[i].u.meta.dfile_array
-                              );
-                            }
-                            decode_free(resp->u.listattr.attr);
-                        }
+                     int i;
+                     if (resp->u.listattr.error)
+                         decode_free(resp->u.listattr.error);
+                     if (resp->u.listattr.attr) {
+                         for (i = 0; i < resp->u.listattr.nhandles; i++) {
+                          if (resp->u.listattr.attr[i].mask &
+                                   PVFS_ATTR_META_DIST)
+                           decode_free(resp->u.listattr.attr[i].u.meta.dist);
+                          if (resp->u.listattr.attr[i].mask &
+                                   PVFS_ATTR_META_DFILES)
+                          {
+                           decode_free(
+                              resp->u.listattr.attr[i].u.meta.dfile_array);
+                          }
+                          if(
+                              resp->u.listattr.attr[i].mask &
+                              PVFS_ATTR_META_MIRROR_DFILES
+                            )
+                            decode_free(
+                          resp->u.listattr.attr[i].u.meta.mirror_dfile_array);
+                         }/*end for*/
+                         decode_free(resp->u.listattr.attr);
+                     }/*end if attr*/
                         break;
-                    }
+                    }/*end case*/
 
                 case PVFS_SERV_MIRROR:
                    {
