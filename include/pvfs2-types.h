@@ -500,11 +500,12 @@ struct PVFS_mgmt_setparam_value
         char *string_value;
     } u;
 };
+
 encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
 
 enum PVFS_server_mode
 {
