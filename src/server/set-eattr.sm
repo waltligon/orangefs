@@ -55,8 +55,7 @@ machine pvfs2_set_eattr_sm
     {
         run seteattr_get_metahint_flag;
         SKIP_UPDATE => check_immutable;
-        success     => update_flag;
-        default     => final_response;
+        default     => update_flag;
     }
 
     state update_flag
@@ -88,7 +87,6 @@ machine pvfs2_set_eattr_sm
          run inspect_imm_copies;
          default => final_response;
     }
-
 
     state final_response
     {
@@ -315,6 +313,11 @@ static PINT_sm_action seteattr_set_metahint_flag(struct PINT_smcb *smcb
                                    ,s_op->attr.objtype);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAttribute mask:%x\n"
                                    ,s_op->attr.mask);
+   /*check return code: if we have an error other than a not found condition,
+    *then return the error; otherwise, keep processing.
+   */
+   if (js_p->error_code < 0 && js_p->error_code != -TROVE_ENOENT)
+      return SM_ACTION_COMPLETE;
 
    for (i=0; i<seteattr->nkey; i++)
    {

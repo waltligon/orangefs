@@ -576,9 +576,9 @@ static int getattr_object_getattr_comp_fn(
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_MIRROR_DFILES)
             {
-                assert(attr->mask & PVFS_ATTR_META_MIRROR_DFILES);
-                assert(attr->u.meta.mirror_dfile_array &&
-                       (attr->u.meta.mirror_copies_count > 0));
+                if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+                    assert(attr->u.meta.mirror_dfile_array &&
+                          (attr->u.meta.mirror_copies_count > 0));
                 gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: Mirror handles and "
                                                   "copy count retrieved.\n"
                                                  ,__func__);
