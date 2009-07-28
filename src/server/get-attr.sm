@@ -344,6 +344,21 @@ static PINT_sm_action getattr_verify_attribs(
 
                 resp_attr->mask &= ~PVFS_ATTR_META_DIST;
             }
+
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+               gossip_debug(GOSSIP_GETATTR_DEBUG,"client wants mirrored "
+                                                 "handles.\n");
+               resp_attr->mask |= PVFS_ATTR_META_MIRROR_DFILES;
+               resp_attr->u.meta.mirror_copies_count = 0;
+               resp_attr->u.meta.mirror_dfile_array  = NULL;
+            }
+            else
+            {
+               gossip_debug(GOSSIP_GETATTR_DEBUG,"client doesn't want "
+                                                 "mirrored handles.\n");
+               resp_attr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
+            }
             js_p->error_code = STATE_METAFILE;
             break;
         case PVFS_TYPE_DATAFILE:
@@ -505,20 +520,15 @@ static PINT_sm_action getattr_interpret_metafile_hint(
             memcpy(&(meta->hint), s_op->val.buffer, sizeof(meta->hint));
         }
         if ((resp_attr->mask & PVFS_ATTR_META_DFILES) ||
-            (resp_attr->mask & PVFS_ATTR_META_DIST))
+            (resp_attr->mask & PVFS_ATTR_META_DIST)   ||
+            (resp_attr->mask & PVFS_ATTR_META_MIRROR_DFILES))
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG, " * client wants extra "
                          "meta info, about to retrieve it now\n");
             js_p->error_code = STATE_METAFILE;
-            if ( (meta->hint.flags & PVFS_MIRROR_FL) 
-               &&
-                 (resp_attr->mask & PVFS_ATTR_META_DFILES) )
-            {
-                /*get mirrored handles if getting primary handles*/
-                resp_attr->mask |= PVFS_ATTR_META_MIRROR_DFILES;
-                gossip_debug(GOSSIP_GETATTR_DEBUG," * client will also "
-                             "get mirrored handles\n");
-            }
+            if ( (resp_attr->mask  & PVFS_ATTR_META_MIRROR_DFILES) && 
+                !(meta->hint.flags & PVFS_MIRROR_FL) ) 
+                  resp_attr->mask &= ~(PVFS_ATTR_META_MIRROR_DFILES);
         }
         else
         {
@@ -526,11 +536,11 @@ static PINT_sm_action getattr_interpret_metafile_hint(
                          "extra meta info, preparing response now\n");
             js_p->error_code = 0;
         }
-    }
-    else {
+    } else {
         /*If we hit an error the DIST & DFILES are no longer valid*/
         resp_attr->mask &= ~PVFS_ATTR_META_DIST;
         resp_attr->mask &= ~PVFS_ATTR_META_DFILES;
+        resp_attr->mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
     }
     return SM_ACTION_COMPLETE;
 }
@@ -780,8 +790,20 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
                                          "be retrieved.\n");
         gossip_lerr("Mirror handles requested, but number of mirrored copies "
                     "cannot be retrieved.\n");
-        js_p->error_code = SKIP_NEXT_STATE;
-        resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+        if (resp->u.getattr.attr.mask & (PVFS_ATTR_META_DFILES |
+                                         PVFS_ATTR_META_DIST) )
+        {
+            resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+            js_p->error_code = SKIP_NEXT_STATE;
+        } else {
+            resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
+            resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+            resp->u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+        }
+        memset(&(s_op->key),0,sizeof(s_op->key));
+        memset(&(s_op->val),0,sizeof(s_op->val));
+        s_op->free_val = 0;
+
         return SM_ACTION_COMPLETE;
     }
 
@@ -983,6 +1005,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
        * user.pvfs2.mirror.handles(i=0) or 
        * user.pvfs2.mirror.statuses(i=1)? 
        */
+
      if (s_op->val_a[i].read_sz != s_op->val_a[i].buffer_sz)
      {
          gossip_lerr("Error: %s key found val size: %d when "

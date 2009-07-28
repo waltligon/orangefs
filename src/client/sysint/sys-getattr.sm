@@ -573,7 +573,16 @@ static int getattr_object_getattr_comp_fn(
                 assert(attr->mask & PVFS_ATTR_META_DIST);
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
             }
-
+            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
+                PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                assert(attr->mask & PVFS_ATTR_META_MIRROR_DFILES);
+                assert(attr->u.meta.mirror_dfile_array &&
+                       (attr->u.meta.mirror_copies_count > 0));
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: Mirror handles and "
+                                                  "copy count retrieved.\n"
+                                                 ,__func__);
+            }
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
             {
@@ -600,7 +609,8 @@ static int getattr_object_getattr_comp_fn(
                          * getattr requests
                          */
                         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "getattr_object_getattr_comp_fn: detected stuffed file.\n");
+                            "getattr_object_getattr_comp_fn: "
+                            "detected stuffed file.\n");
                         return(0);
                     }
                     /* if caller asked for the size, then we need
