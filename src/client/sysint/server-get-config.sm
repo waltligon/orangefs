@@ -98,21 +98,6 @@ nested machine pvfs2_server_fetch_config_nested_sm
     }
 }
 
-machine pvfs2_server_fetch_config_sm
-{
-    state run_fetch_nested 
-    {
-        jump pvfs2_server_fetch_config_nested_sm;
-        default => parent_fetch_cleanup;
-    }
-
-    state parent_fetch_cleanup
-    {
-        run server_fetch_config_parent_cleanup;
-        default => terminate;
-    }
-}
-
 %%
 
 /*
@@ -407,89 +392,6 @@ static int server_get_config_comp_fn(
     return 0;
 }
 
-/*
- * Force a fetch the configuration file from a given set of servers
- * This is different from get_config() in that we do not depend on the
- * configuration server specified in the mnt tab file
- * Assumes that servers specified in the array are unique!
- * CURRENTLY UNUSED
- */
-#ifdef __GNUC__
-static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
-                char **fs_config_bufs, int *fs_config_buf_size) __attribute__((unused));
-#endif
-
-static int PINT_fetch_config_list(int nservers, PVFS_BMI_addr_t *servers,
-                char **fs_config_bufs, int *fs_config_buf_size)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_smcb *smcb = NULL;
-    PINT_client_sm *sm_p = NULL;
-    PVFS_error error = 0;
-    PVFS_credentials creds;
-    PVFS_sys_op_id op_id;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_fetch_config_list entered\n");
-    if (nservers < 0 || !servers || !fs_config_bufs || !fs_config_buf_size)
-    {
-        return ret;
-    }
-
-    PVFS_util_gen_credentials(&creds);
-    PINT_smcb_alloc(&smcb, PVFS_SERVER_FETCH_CONFIG,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
-    if (smcb == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* NOTE: we set these fields manually here rather than use
-     * PINT_init_msgarray_params(), because we don't yet have a server
-     * configuration file to override default parameters.
-     */
-    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
-    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
-    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
-    sm_p->fetch_config.nservers = nservers;
-    sm_p->fetch_config.addr_array = servers;
-    sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
-    sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
-
-    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, nservers);
-    if(ret != 0)
-    {
-        PINT_smcb_free(smcb);
-        return ret;
-    }
-
-    ret = PINT_client_state_machine_post(
-        smcb, &op_id, NULL);
-    if (ret)
-    {
-        PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
-        error = ret;
-    }
-    else
-    {
-        ret = PVFS_sys_wait(op_id, "X-fetch_config", &error);
-        if (ret)
-        {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
-        }
-    }
-
-    PINT_sys_release(op_id);
-    return(error);
-}
-
 static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
@@ -555,15 +457,6 @@ static int server_fetch_config_comp_fn(
         return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
-}
-
-static PINT_sm_action server_fetch_config_parent_cleanup(struct PINT_smcb *smcb,
-                                    job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    sm_p->error_code  = js_p->error_code;
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
 }
         
 /*
