@@ -194,7 +194,7 @@ machine pvfs2_client_io_sm
     }
 
     /*We will make changes to msgpairarray to handle mirrored copies of a 
-     *data handle when retries are warrented.
+     *data handle when retries are warranted.
     */
     state small_io
     {
