@@ -377,7 +377,9 @@ struct PINT_server_fetch_config_sm_state
     int nservers;
     PVFS_BMI_addr_t *addr_array;
     char **fs_config_bufs;
-    int32_t *fs_config_buf_size;
+    int *fs_config_buf_size;
+    int result_count; /* number of servers that actually responded */
+    int* result_indexes; /* index into fs_config_bufs of valid responses */
 };
 
 /* flag to disable cached lookup during getattr nested sm */

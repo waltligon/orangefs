@@ -76,6 +76,12 @@ machine pvfs2_fs_add_sm
     state do_config_integrity_checks
     {
         jump pvfs2_server_fetch_config_nested_sm;
+        default => compare_hashes;
+    }
+
+    state compare_hashes
+    {
+        run fs_add_compare_hashes;
         default => final_cleanup;
     }
 
@@ -345,6 +351,23 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    sm_p->fetch_config.result_indexes = (int*)calloc(count,
+        sizeof(int));
+    if(sm_p->fetch_config.result_indexes == NULL)
+    {
+        free(sm_p->fetch_config.addr_array);
+        sm_p->fetch_config.addr_array = NULL;
+        free(sm_p->fetch_config.fs_config_bufs);
+        sm_p->fetch_config.fs_config_bufs = NULL;
+        free(sm_p->fetch_config.fs_config_buf_size);
+        sm_p->fetch_config.fs_config_buf_size = NULL;
+        free(sm_p->fetch_config.result_indexes);
+        sm_p->fetch_config.result_indexes = NULL;
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -372,10 +395,16 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
     char **sha1_fs_digests = NULL;
     size_t digest_len;
     PVFS_fs_id fsid;
+    int* indexes = sm_p->fetch_config.result_indexes;
 
-    assert(js_p->error_code == 0);
+    count = sm_p->fetch_config.result_count;
+    if(count < 2)
+    {
+        /* nothing to compare */
+        goto out;
+    }
+
     fsid = sm_p->u.get_config.mntent->fs_id;
-    count = sm_p->fetch_config.nservers;
     sha1_fs_digests = (char **) calloc(count, sizeof(char *));
     if (sha1_fs_digests == NULL)
     {
@@ -384,7 +413,8 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
     }
     for (i = 1; i < count; i++)
     {
-        if (sm_p->fetch_config.fs_config_buf_size[0] != sm_p->fetch_config.fs_config_buf_size[i])
+        if (sm_p->fetch_config.fs_config_buf_size[indexes[0]] !=
+            sm_p->fetch_config.fs_config_buf_size[indexes[i]])
         {
             fs_conf_size_mismatch = 1;
         }
@@ -395,16 +425,18 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         for (i = 0; i < count; i++)
         {
             gossip_err("     FS config file on %s -> (size) %d\n", 
-                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp),
-                   sm_p->fetch_config.fs_config_buf_size[i] - 1);
+                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
+                   sm_p->fetch_config.addr_array[indexes[i]], &tmp),
+                   sm_p->fetch_config.fs_config_buf_size[indexes[i]] - 1);
             ret = -PVFS_EINVAL;
         }
         goto out;
     }
     for (i = 0; i < count; i++)
     {
-        ret = PINT_util_digest_sha1(sm_p->fetch_config.fs_config_bufs[i], 
-                                    sm_p->fetch_config.fs_config_buf_size[i],
+        ret =
+        PINT_util_digest_sha1(sm_p->fetch_config.fs_config_bufs[indexes[i]], 
+                                    sm_p->fetch_config.fs_config_buf_size[indexes[i]],
                                     &sha1_fs_digests[i], &digest_len);
         if (ret < 0)
             goto out;
@@ -425,7 +457,8 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
             unsigned char str[256];
             hash2str((unsigned char *) sha1_fs_digests[i], digest_len, str);
             gossip_err("     FS config file on %s -> (SHA1) %s\n", 
-                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp), str);
+                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
+                   sm_p->fetch_config.addr_array[indexes[i]], &tmp), str);
         }
         ret = -PVFS_EINVAL;
         goto out;
@@ -443,6 +476,8 @@ out:
     sm_p->fetch_config.addr_array = NULL;
     free(sm_p->fetch_config.fs_config_bufs);
     sm_p->fetch_config.fs_config_bufs = NULL;
+    free(sm_p->fetch_config.result_indexes);
+    sm_p->fetch_config.result_indexes = NULL;
     free(sm_p->fetch_config.fs_config_buf_size);
     sm_p->fetch_config.fs_config_buf_size = NULL;
     js_p->error_code = (ret == -PVFS_EOPNOTSUPP) ? 0 : ret;
@@ -551,16 +586,25 @@ static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action fs_add_compare_hashes(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (js_p->error_code == SKIP_INTEGRITY_CHECK)
+        js_p->error_code = 0;
+    else
+    {
+        compare_hashes(sm_p, js_p);
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action fs_add_final_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    if (js_p->error_code == SKIP_INTEGRITY_CHECK)
-        js_p->error_code = 0;
-    else if (js_p->error_code == 0)
-    {
-        compare_hashes(sm_p, js_p);
-    }
     if(sm_p->u.get_config.free_config_flag)
     {
         PINT_config_release(sm_p->u.get_config.config);
@@ -588,10 +632,13 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        /* only try once to retrieve a config file from each server */
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = server_fetch_config_comp_fn;
         msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
     }
+    /* don't complain so much about servers we can't reach yet */
+    sm_p->msgarray_op.params.quiet_flag = 1; 
 
     js_p->error_code = 0;
 
@@ -616,6 +663,7 @@ static int server_fetch_config_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int j;
 
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
@@ -628,12 +676,32 @@ static int server_fetch_config_comp_fn(
 		resp_p->u.getconfig.fs_config_buf_size;
     }
 
-    /* if this is the last response, check all of the status values
-     * and return error code if any requests failed
-     */
+    /* is this this last response? */
     if (i == (sm_p->msgarray_op.count -1))
     {
-        return PINT_msgarray_status(&sm_p->msgarray_op);
+        /* look through responses, count the number of valid responses we
+         * received, and mark where they are in the array
+         */
+        sm_p->fetch_config.result_count = 0;
+        for(j=0; j<sm_p->msgarray_op.count; j++)
+        {
+            if(sm_p->msgarray_op.msgarray[j].op_status == 0)
+            {
+                sm_p->fetch_config.result_indexes[sm_p->fetch_config.result_count]
+                    = j;
+                sm_p->fetch_config.result_count++;
+            }
+        }
+        if(sm_p->fetch_config.result_count > 0)
+        {
+            /* we got at least one config file */
+            return(0);
+        }
+        else
+        {
+            /* pick an error code */
+            return PINT_msgarray_status(&sm_p->msgarray_op);
+        }
     }
     return 0;
 }
