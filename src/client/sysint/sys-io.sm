@@ -39,6 +39,8 @@ enum
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
     IO_UNSTUFF,
+    IO_MIRRORING,
+    IO_NO_MIRRORING,
     IO_FATAL_ERROR
 };
 
@@ -220,6 +222,21 @@ machine pvfs2_client_io_sm
        *have been tried.
       */
         run io_datafile_post_msgpairs_retry;
+        IO_MIRRORING    => io_datafile_mirror_retry;
+        IO_NO_MIRRORING => io_datafile_no_mirror_retry;
+        default => io_datafile_no_mirror_retry;
+    }
+
+    state io_datafile_no_mirror_retry
+    {
+        run io_datafile_no_mirror_retry;
+        IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
+        default => io_datafile_post_msgpairs;
+    }
+
+    state io_datafile_mirror_retry
+    {
+        run io_datafile_mirror_retry;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         default => io_datafile_post_msgpairs;
     }
@@ -555,6 +572,11 @@ static PINT_sm_action io_datafile_setup_msgpairs(
             assert(attr->u.meta.dist_size > 0);
             assert(attr->u.meta.dfile_array);
             assert(attr->u.meta.dfile_count > 0);
+            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                assert(attr->u.meta.mirror_dfile_array);
+                assert(attr->u.meta.mirror_copies_count);
+            }
             break;
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = -PVFS_EISDIR;
@@ -949,6 +971,11 @@ static PINT_sm_action io_datafile_post_msgpairs(
                  "completion count is %d\n",
                  sm_p->u.io.msgpair_completion_count);
 
+    /*remove this when I'm done testing */
+    js_p->error_code = IO_RETRY;
+    return SM_ACTION_COMPLETE;
+
+
     /* if anything posted, just wait for that to complete, else
      * go sleep then try the remaining msgpairs again */
     if (sm_p->u.io.msgpair_completion_count
@@ -964,11 +991,119 @@ static PINT_sm_action io_datafile_post_msgpairs(
 
 /*
  * For IO retry, come here to sleep a bit then go back and post
- * some more msgpairs.
+ * some more msgpairs.  If mirroring, then we have more setup before a
+ * retry can happen.  Also, the retry-count is calculated differently.
  */
-static int
-io_datafile_post_msgpairs_retry(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int (struct PINT_smcb *smcb
+                                          ,job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    struct PINT_client_io_sm *io = &(sm_p->u.io);
+
+    /* Are we mirroring on a READ request? */
+    if ( (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) &&
+         io->io_type == PVFS_IO_READ )
+    {  
+         js_p->error_code = IO_MIRRORING;
+         return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = IO_NO_MIRRORING;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static int io_datafile_mirror_retry(struct PINT_smcb *smcb
+                                   ,job_status_s *js_p )
+{
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta = &(attr->u.meta);
+    struct PINT_client_io_sm *io = &(sm_p->u.io);
+    PINT_sm_msgpair_state *msg = NULL;
+    PINT_client_io_ctx *ctx = NULL;
+    uint32_t index = 0;
+    uint32_t *copies = NULL;
+    int i;
+
+    /* Have we exhausted the number of retries */
+    if (io->retry_count == sm_p->msgarray_op.params.retry_limit)
+    {
+        js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* Find failed contexts and prepare them for retry.
+    */
+    for (i=0; i<io->context_count; i++)
+    {
+        ctx = &(io->contexts[i]);
+        if (ctx->msg_recv_has_been_posted && ctx->msg_send_has_been_posted)
+           /* this context has not failed. */
+           continue;
+
+        if (ctx->retry_original)
+        {
+           ctx->data_handle = meta->dfile_array[ctx->server_nr];
+           ctx->retry_original =  0;
+            /* setup context to retry the original */
+           continue;
+        }
+
+        /* get next mirrored handle.  note:  if a mirrored handle is zero, then
+         * this means that the creation of this mirrored object failed for its
+         * particular server.  if so, then get the next valid handle.  as a 
+         * last resort, retry the original handle.
+        */
+        copies = &(ctx->current_copies_count);
+        for (;*copies < meta->mirror_copies_count; (*copies)++)
+        {
+            index = ((*copies)*(meta->dfile_count)) + ctx->server_nr;
+            if (meta->mirror_dfile_array[index] != 0)
+            {  /* we have found a valid mirrored handle */
+               ctx->data_handle = meta->mirror_dfile_array[index];
+               break;
+            }
+        }
+
+        if ( *copies == meta->mirror_copies_count )
+        {/* we have not found a valid mirrored handle, so retry original */
+           ctx->data_handle = meta->dfile_array[ctx->server_nr];
+           ctx->retry_original = 0;
+           *copies = 0;
+           io->retry_count++;
+           /* setup context to retry original */
+           continue;
+        }
+
+        /* setup context for the discovered valid mirrored handle */
+        (*copies)++;
+        if ( (*copies) == meta->mirror_copies_count )
+        {/* we have gone through all of the mirrored handles, after this 
+          * iteration; so indicate original for the next retry event.
+         */
+            *copies = 0;
+            ctx->retry_original = 1;
+            io->retry_count++;
+        }
+        /* setup context using mirrored handle identified in ctx->data_handle */
+        continue;
+    }/*end for each context*/
+
+    /* sleep a small while before starting the next round of retries */
+    return (job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay
+                                    ,smcb
+                                    ,0
+                                    ,js_p
+                                    ,NULL
+                                    ,pint_client_sm_context));
+
+}/*end io_datafile_mirror_retry*/
+
+static int io_datafile_no_mirror_retry(struct PINT_smcb *smcb
+                                      ,job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* give up if beyond retry limit */
@@ -988,6 +1123,12 @@ io_datafile_post_msgpairs_retry(
     return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
         smcb, 0, js_p, NULL, pint_client_sm_context);
 }
+
+
+
+
+
+
 
 /*
   This state allows us to make sure all posted operations complete and

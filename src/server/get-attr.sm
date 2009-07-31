@@ -30,6 +30,8 @@
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 
+static uint64_t UINT64_HIGH = 0xffffffffffffffff;
+
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
     {"user.pvfs2.dist_name"    , SPECIAL_DIST_NAME_KEYLEN},
@@ -1036,7 +1038,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
       for (col=0; col<meta->dfile_count; col++)
       {
          index = (row*meta->dfile_count) + col;
-         if ( s_op->u.getattr.mirror_dfile_status_array[index] )
+         if ( s_op->u.getattr.mirror_dfile_status_array[index] == UINT64_HIGH )
             meta->mirror_dfile_array[index] = 0;
          gossip_debug(GOSSIP_MIRROR_DEBUG,
                       "\tmirror handle[%d]:%llu \t"
