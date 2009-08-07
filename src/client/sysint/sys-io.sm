@@ -994,7 +994,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
  * some more msgpairs.  If mirroring, then we have more setup before a
  * retry can happen.  Also, the retry-count is calculated differently.
  */
-static int (struct PINT_smcb *smcb
+static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
                                           ,job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1025,8 +1025,8 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
     PINT_sm_msgpair_state *msg = NULL;
     PINT_client_io_ctx *ctx = NULL;
     uint32_t index = 0;
-    uint32_t *copies = NULL;
-    int i;
+    uint32_t copies = 0;
+    int i,ret;
 
     /* Have we exhausted the number of retries */
     if (io->retry_count == sm_p->msgarray_op.params.retry_limit)
@@ -1040,15 +1040,41 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
     for (i=0; i<io->context_count; i++)
     {
         ctx = &(io->contexts[i]);
+        msg = &(ctx->msg);
         if (ctx->msg_recv_has_been_posted && ctx->msg_send_has_been_posted)
            /* this context has not failed. */
            continue;
 
+        /* cleanup the failed context */
+        PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
+        BMI_memfree(msg->svr_addr
+                   ,msg->encoded_resp_p
+                   ,msg->max_resp_sz
+                   ,BMI_RECV);
+        memset(&(msg->encoded_req),0,sizeof(msg->encoded_req));
+        memset(&(msg->svr_addr),0,sizeof(msg->svr_addr));
+        msg->encoded_resp_p = NULL;
+        
+        /* use the primary data handle */
         if (ctx->retry_original)
         {
-           ctx->data_handle = meta->dfile_array[ctx->server_nr];
-           ctx->retry_original =  0;
             /* setup context to retry the original */
+           ctx->data_handle     = meta->dfile_array[ctx->server_nr];
+           ctx->retry_original  =  0;
+           msg->handle          = ctx->data_handle;
+           msg->req.u.io.handle = ctx->data_handle;
+           ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                               ,msg->handle
+                                               ,msg->fs_id);
+           if (ret)
+           {
+              gossip_lerr("Unable to determine the server address "
+                          "for this handle (%llu)"
+                          ,llu(msg->handle));
+              js_p->error_code = ret;
+              return SM_ACTION_COMPLETE;
+           }
+           PINT_flow_reset(&(ctx->flow_desc));
            continue;
         }
 
@@ -1057,10 +1083,10 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
          * particular server.  if so, then get the next valid handle.  as a 
          * last resort, retry the original handle.
         */
-        copies = &(ctx->current_copies_count);
-        for (;*copies < meta->mirror_copies_count; (*copies)++)
+        copies = ctx->current_copies_count;
+        for (;copies < meta->mirror_copies_count; copies++)
         {
-            index = ((*copies)*(meta->dfile_count)) + ctx->server_nr;
+            index = (copies*meta->dfile_count) + ctx->server_nr;
             if (meta->mirror_dfile_array[index] != 0)
             {  /* we have found a valid mirrored handle */
                ctx->data_handle = meta->mirror_dfile_array[index];
@@ -1068,28 +1094,58 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
             }
         }
 
-        if ( *copies == meta->mirror_copies_count )
-        {/* we have not found a valid mirrored handle, so retry original */
+        /* we have NOT found a valid mirrored handle, so retry the primary */
+        if ( copies == meta->mirror_copies_count )
+        {
            ctx->data_handle = meta->dfile_array[ctx->server_nr];
            ctx->retry_original = 0;
-           *copies = 0;
+           ctx->current_copies_count = 0;
            io->retry_count++;
            /* setup context to retry original */
+           msg->handle          = ctx->data_handle;
+           msg->req.u.io.handle = ctx->data_handle;
+           ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                               ,msg->handle
+                                               ,msg->fs_id);
+           if (ret)
+           {
+              gossip_lerr("Unable to determine the server address "
+                          "for this handle (%llu)"
+                          ,llu(msg->handle));
+              js_p->error_code = ret;
+              return SM_ACTION_COMPLETE;
+           }
+           PINT_flow_reset(&(ctx->flow_desc));
            continue;
         }
 
-        /* setup context for the discovered valid mirrored handle */
-        (*copies)++;
-        if ( (*copies) == meta->mirror_copies_count )
+        /* setup the context for the discovered mirrored handle */
+        msg->handle          = ctx->data_handle;
+        msg->req.u.io.handle = ctx->data_handle;
+        ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                            ,msg->handle
+                                            ,msg->fs_id);
+        if (ret)
+        {
+           gossip_lerr("Unable to determine the server address "
+                       "for this handle (%llu)"
+                       ,llu(msg->handle));
+           js_p->error_code = ret;
+           return SM_ACTION_COMPLETE;
+        }
+        PINT_flow_reset(&(ctx->flow_desc));
+
+
+        /* setup for the NEXT io-retry event for this context */
+        ctx->current_copies_count++;
+        if ( ctx->current_copies_count == meta->mirror_copies_count )
         {/* we have gone through all of the mirrored handles, after this 
-          * iteration; so indicate original for the next retry event.
+          * iteration executes; so, indicate original for the next retry event.
          */
-            *copies = 0;
+            ctx->current_copies_count = 0;
             ctx->retry_original = 1;
             io->retry_count++;
         }
-        /* setup context using mirrored handle identified in ctx->data_handle */
-        continue;
     }/*end for each context*/
 
     /* sleep a small while before starting the next round of retries */
@@ -1123,11 +1179,6 @@ static int io_datafile_no_mirror_retry(struct PINT_smcb *smcb
     return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
         smcb, 0, js_p, NULL, pint_client_sm_context);
 }
-
-
-
-
-
 
 
 /*
