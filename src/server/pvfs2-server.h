@@ -540,10 +540,11 @@ struct PINT_server_listattr_op
 
 struct PINT_server_getvalue_op
 {
-    TROVE_ds_position token;
-    PVFS_dirent dirent;
-    PVFS_ds_keyval key;
-    PVFS_ds_keyval val;
+    void *buffer;
+    uint32_t match_count;
+    uint32_t count;
+    uint32_t original_count;
+    uint32_t target_i;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */

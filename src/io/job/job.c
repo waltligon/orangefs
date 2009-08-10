@@ -1921,18 +1921,24 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 }
 
 int job_trove_keyval_read_value(PVFS_fs_id coll_id,
-                          PVFS_ds_position position,
-                          PVFS_dirent * dirent_p,
-                          PVFS_ds_keyval * key_p,
-                          PVFS_ds_keyval * val_p,
-                          PVFS_ds_flags flags,
-                          PVFS_vtag * vtag,
-                          void *user_ptr,
-                          job_aint status_user_tag,
-                          job_status_s * out_status_p,
-                          job_id_t * id,
-                          job_context_id context_id,
-                          PVFS_hint hints)
+                                PVFS_ds_position position,
+                                uint32_t query_type,
+                                PVFS_ds_keyval * key_p,
+                                PVFS_ds_keyval *val_p,
+                                PVFS_dirent * dirent_array,
+                                PVFS_ds_keyval * key_array,
+                                PVFS_ds_keyval * val_array,
+                                uint32_t * count,
+                                uint32_t * match_count,
+                                PVFS_ds_flags flags,
+                                PVFS_vtag * vtag,
+                                void *user_ptr,
+                                job_aint status_user_tag,
+                                job_status_s * out_status_p,
+                                job_id_t * id,
+                                job_context_id context_id,
+                                PVFS_hint hints)
+
 {
     int ret = -1;
     struct job_desc *jd = NULL;
@@ -1953,10 +1959,10 @@ int job_trove_keyval_read_value(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_read_value(coll_id, &(jd->u.trove.position), 
-                                  dirent_p, key_p, val_p, flags, 
+    ret = trove_keyval_read_value(coll_id, &(jd->u.trove.position), query_type,
+                                  key_p, val_p, dirent_array, key_array,
+                                  val_array, count, match_count, flags, 
                                   jd->u.trove.vtag, user_ptr_internal, 
                                   global_trove_context, &(jd->u.trove.id), 
                                   hints);

@@ -265,7 +265,10 @@ static void lebf_initialize(void)
             case PVFS_SERV_GETVALUE:
                 req.u.getvalue.key.buffer_sz = 0;
                 req.u.getvalue.val.buffer_sz = 0;
-                resp.u.getvalue.token = 1;
+                req.u.getvalue.count = 0;
+                resp.u.getvalue.count = 0;
+                resp.u.getvalue.match_count = 0;
+                resp.u.getvalue.token = 0;
                 reqsize = extra_size_PVFS_servreq_getvalue;
                 respsize = extra_size_PVFS_servresp_getvalue;
                 break;

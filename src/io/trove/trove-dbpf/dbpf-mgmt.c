@@ -1157,6 +1157,23 @@ int dbpf_collection_create(char *collname,
         }
     }
 
+    DBPF_GET_KEYVAL_SECONDARY_NORM_DBNAME(path_name, PATH_MAX, sto_p->name, 
+        new_coll_id);
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat keyval_secondary_norm db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
+    {
+        ret = dbpf_db_create(sto_p->name, path_name, NULL, (DB_DUP|DB_DUPSORT));
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return ret;
+        }
+    }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
@@ -1253,6 +1270,7 @@ int dbpf_collection_remove(char *collname,
         /* Clean up properly by closing all db handles */
         db_close(db_collection->coll_attr_db);
         db_close(db_collection->ds_db);
+        db_close(db_collection->keyval_secondary_norm_db);
         db_close(db_collection->keyval_secondary_db);
         db_close(db_collection->keyval_db);
         /* so that environment can also be cleaned up */
@@ -1285,6 +1303,14 @@ int dbpf_collection_remove(char *collname,
     if(unlink(path_name) != 0)
     {
         gossip_err("failure removing keyval secondary db\n");
+        ret = -trove_errno_to_trove_error(errno);
+    }
+
+    DBPF_GET_KEYVAL_SECONDARY_NORM_DBNAME(path_name, PATH_MAX,
+                                          sto_p->name, db_data.coll_id);
+    if(unlink(path_name) != 0)
+    {
+        gossip_err("failure removing keyval secondary norm db\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 
@@ -1612,6 +1638,18 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
             db_strerror(ret));
     }
 
+    if ((ret = coll_p->keyval_secondary_norm_db->sync(coll_p->keyval_secondary_norm_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_keyval_secondary_norm_db): %s\n", 
+            db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->keyval_secondary_norm_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_keyval_secondary_norm_db): %s\n", 
+            db_strerror(ret));
+    }
+
     if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
@@ -1917,7 +1955,8 @@ int dbpf_collection_lookup(char *collname,
 
     /* secondary database file already exists, try to open */
     coll_p->keyval_secondary_db = dbpf_db_open(sto_p->name, path_name, 
-        coll_p->coll_env, &ret, NULL, (DB_DUP|DB_DUPSORT) );
+        coll_p->coll_env, &ret, PINT_trove_dbpf_keyval_secondary_compare, 
+        (DB_DUP|DB_DUPSORT) );
     /* TODO: add check to ensure BDB thinks secondary index is consistent */
     if(coll_p->keyval_secondary_db == NULL)
     {
@@ -1937,6 +1976,63 @@ int dbpf_collection_lookup(char *collname,
           PINT_trove_dbpf_keyval_secondary_callback,DB_CREATE);
     if( ret != 0 )
     {
+        db_close(coll_p->keyval_secondary_db);
+        db_close(coll_p->keyval_db);
+        db_close(coll_p->coll_attr_db);
+        db_close(coll_p->ds_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
+    }
+
+    DBPF_GET_KEYVAL_SECONDARY_NORM_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, coll_p->coll_id);
+    /* if secondary normalized index doesn't exist, just re-create it */
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat keyval_secondary_norm db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
+    {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[KEYVAL]: Recreating secondary "
+                     "normalized index.\n");
+        ret = dbpf_db_create(sto_p->name, path_name, NULL, (DB_DUP|DB_DUPSORT));
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return ret;
+        }
+    }
+
+    /* secondary normalized database file already exists, try to open */
+    coll_p->keyval_secondary_norm_db = dbpf_db_open(sto_p->name, path_name, 
+        coll_p->coll_env, &ret, PINT_trove_dbpf_keyval_secondary_compare, 
+        (DB_DUP|DB_DUPSORT) );
+    /* TODO: add check to ensure BDB thinks secondary index is consistent */
+    if(coll_p->keyval_secondary_norm_db == NULL)
+    {
+        db_close(coll_p->keyval_secondary_db);
+        db_close(coll_p->keyval_db);
+        db_close(coll_p->coll_attr_db);
+        db_close(coll_p->ds_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
+    }
+
+    /* associate the secondary index db with the primary and generate keys
+     * if it's empty */
+    ret = dbpf_db_associate(coll_p->keyval_db, coll_p->keyval_secondary_norm_db,
+          PINT_trove_dbpf_keyval_secondary_norm_callback,DB_CREATE);
+    if( ret != 0 )
+    {
+        db_close(coll_p->keyval_secondary_norm_db);
         db_close(coll_p->keyval_secondary_db);
         db_close(coll_p->keyval_db);
         db_close(coll_p->coll_attr_db);

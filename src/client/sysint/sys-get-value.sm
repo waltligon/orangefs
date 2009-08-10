@@ -60,9 +60,10 @@ PVFS_error PVFS_isys_getvalue(
         PVFS_object_ref ref,
         PVFS_ds_position token,
         const PVFS_credentials *credentials,
-        PVFS_dirent *dirent_p,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
+        uint32_t query_type,
+        uint32_t count,
         PVFS_sysresp_getvalue *resp_p,
         PVFS_sys_op_id *op_id,
         PVFS_hint hints,
@@ -95,9 +96,10 @@ PVFS_error PVFS_isys_getvalue(
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.getvalue.pos_token = token;
-    sm_p->u.getvalue.dirent_p = dirent_p;
     sm_p->u.getvalue.key_p = key_p;
     sm_p->u.getvalue.val_p = val_p;
+    sm_p->u.getvalue.query_type = query_type;
+    sm_p->u.getvalue.count = count;
     sm_p->u.getvalue.resp_p = resp_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
@@ -110,6 +112,7 @@ PVFS_error PVFS_isys_getvalue(
                  sm_p->u.getvalue.val_p, sm_p->u.getvalue.key_p);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: PVFS_isys_getvalue exit\n");
+
     return PINT_client_state_machine_post( smcb, op_id, user_ptr);
 }
 
@@ -117,9 +120,10 @@ PVFS_error PVFS_sys_getvalue(
         PVFS_object_ref ref,
         PVFS_ds_position token,
         const PVFS_credentials *credentials,
-        PVFS_dirent *dirent,
         PVFS_ds_keyval *key,
         PVFS_ds_keyval *val,
+        uint32_t query_type,
+        uint32_t count,
         PVFS_sysresp_getvalue *resp_p,
         PVFS_hint hints)
 {
@@ -139,8 +143,11 @@ PVFS_error PVFS_sys_getvalue(
         return ret;
     }
 
-    ret = PVFS_isys_getvalue(ref, token, credentials, dirent, key, val, 
-                            resp_p, &op_id, hints, NULL);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "[GETVALUE]: PVFS_sys_getvalue: count: %u\n", count);
+
+    ret = PVFS_isys_getvalue(ref, token, credentials, key, val, query_type,
+                            count, resp_p, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -159,6 +166,7 @@ PVFS_error PVFS_sys_getvalue(
 
     PINT_sys_release(op_id);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: PVFS_sys_getvalue exit\n");
+
     return error;
 }
 
@@ -179,28 +187,24 @@ static PINT_sm_action get_value_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_setup_msgpair: prefill: id: %d, "
                  "handle: %llu, pos_token: %llu, key_p: %p, val_p: %p,"
-                 "resp_p: %p, resp_p->key: %p\n",
+                 "resp_p: %p, query_type: %d, count: %d\n",
                  sm_p->object_ref.fs_id, sm_p->object_ref.handle, 
                  sm_p->u.getvalue.pos_token, sm_p->u.getvalue.key_p,
                  sm_p->u.getvalue.val_p, sm_p->u.getvalue.resp_p,
-                 sm_p->u.getvalue.resp_p->key);
+                 sm_p->u.getvalue.query_type, sm_p->u.getvalue.count);
 
     PINT_SERVREQ_GETVALUE_FILL(
         msg_p->req,
         (*sm_p->cred_p),
         sm_p->object_ref.fs_id,
+        sm_p->u.getvalue.query_type,
+        sm_p->u.getvalue.count,
         sm_p->object_ref.handle,
         sm_p->u.getvalue.pos_token,
         (*sm_p->u.getvalue.key_p),
         (*sm_p->u.getvalue.val_p),
         sm_p->hints
         );
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: get_value_setup_msgpair: postfill: id: %d, "
-                 "handle: %llu, pos_token: %llu, val_p: %p, val: %s\n",
-                 sm_p->object_ref.fs_id, sm_p->object_ref.handle, 
-                 sm_p->u.getvalue.pos_token, sm_p->u.getvalue.val_p,
-                 (char *)sm_p->u.getvalue.val_p->buffer);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -222,6 +226,7 @@ static PINT_sm_action get_value_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
                  "[GETVALUE]: get_value_setup_msgpair exit\n");
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -229,6 +234,7 @@ static PINT_sm_action get_value_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_cleanup enter\n");
 
@@ -237,6 +243,7 @@ static PINT_sm_action get_value_cleanup(
     PINT_SET_OP_COMPLETE;
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_cleanup exit\n");
+
    return SM_ACTION_TERMINATE;
 }
 
@@ -247,7 +254,7 @@ static int get_value_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    int ret=0;
+    int ret=0, j=0;
 
     assert(i==0);
 
@@ -265,35 +272,42 @@ static int get_value_comp_fn(
                      sm_p->msgarray_op.msgarray[i].op_status);
       return sm_p->msgarray_op.msgarray[i].op_status;
     }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: get_value_comp_fn: resp: token: %llu, "
-                 "dirent handle: %llu, dirent name: %s, "
-                 "key->buffer: %s, key->buffer_sz: %d, "
-                 "val->buffer: %s, val->buffer_sz: %d\n",
-                 resp_p->u.getvalue.token,
-                 resp_p->u.getvalue.dirent.handle,
-                 resp_p->u.getvalue.dirent.d_name,
-                 (char *)(resp_p->u.getvalue.key.buffer+sizeof(TROVE_handle)),
-                 resp_p->u.getvalue.key.buffer_sz,
-                 (char *)resp_p->u.getvalue.val.buffer,
-                 resp_p->u.getvalue.val.buffer_sz);
-
+    
     sm_p->u.getvalue.resp_p->token = resp_p->u.getvalue.token;
+    sm_p->u.getvalue.resp_p->count = resp_p->u.getvalue.count;
+    sm_p->u.getvalue.resp_p->match_count = resp_p->u.getvalue.match_count;
 
-    sm_p->u.getvalue.resp_p->key->read_sz = resp_p->u.getvalue.key.buffer_sz;
-    sm_p->u.getvalue.resp_p->key->buffer_sz = resp_p->u.getvalue.key.buffer_sz;
-    memcpy(sm_p->u.getvalue.resp_p->key->buffer, resp_p->u.getvalue.key.buffer,
-        sm_p->u.getvalue.resp_p->key->buffer_sz);
+     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Count is %d\n", 
+                  sm_p->u.getvalue.resp_p->count);
+     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Match is %d\n", 
+                  sm_p->u.getvalue.resp_p->match_count);
 
-    sm_p->u.getvalue.resp_p->val->read_sz = resp_p->u.getvalue.val.buffer_sz;
-    sm_p->u.getvalue.resp_p->val->buffer_sz = resp_p->u.getvalue.val.buffer_sz;
-    memcpy(sm_p->u.getvalue.resp_p->val->buffer, resp_p->u.getvalue.val.buffer,
-        sm_p->u.getvalue.resp_p->val->buffer_sz);
+    for( j = 0; j < sm_p->u.getvalue.resp_p->count; j++ )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: j: %d\n", j);
 
-    memcpy(&(sm_p->u.getvalue.resp_p->dirent), &(resp_p->u.getvalue.dirent), 
-        sizeof(PVFS_dirent));
-                
+        /* attribute key */
+        sm_p->u.getvalue.resp_p->key[j].buffer_sz = 
+        sm_p->u.getvalue.resp_p->key[j].read_sz = 
+            resp_p->u.getvalue.key[j].buffer_sz;
+
+        memcpy(sm_p->u.getvalue.resp_p->key[j].buffer, 
+            resp_p->u.getvalue.key[j].buffer, 
+            sm_p->u.getvalue.resp_p->key[j].buffer_sz );
+
+        /* value datum */
+        sm_p->u.getvalue.resp_p->val[j].buffer_sz = 
+        sm_p->u.getvalue.resp_p->val[j].read_sz = 
+            resp_p->u.getvalue.val[j].buffer_sz;
+
+        memcpy(sm_p->u.getvalue.resp_p->val[j].buffer, 
+            resp_p->u.getvalue.val[j].buffer, 
+            sm_p->u.getvalue.resp_p->val[j].buffer_sz );
+
+        /* dirent information for the key */
+        memcpy(&(sm_p->u.getvalue.resp_p->dirent[j]), 
+            &(resp_p->u.getvalue.dirent[j]), sizeof(PVFS_dirent));
+    }    
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_comp_fn exit\n");
     return ret;

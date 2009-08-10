@@ -15,7 +15,6 @@
 #include <stdlib.h>
 #include <getopt.h>
 
-#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
@@ -25,6 +24,8 @@
 #include "client-state-machine.h"
 #include "server-config-mgr.h"
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
+
 #define KEYBUFSZ 1024
 #define VALBUFSZ 4096
 
@@ -33,6 +34,8 @@ struct opts
     PVFS_ds_keyval key;
     PVFS_ds_keyval val;
     char *pvfs_root;
+    uint32_t count;
+    uint32_t query;
 };
 
 struct dbpf_keyval_db_entry
@@ -57,12 +60,11 @@ int main(int argc, char **argv)
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
-    if(!user_opts)
+    if(user_opts==NULL)
     {
           fprintf(stderr, "Error: failed to parse command line arguments.\n");
           return(-1);
     }
-
     if( (ret = PVFS_util_init_defaults()) < 0 )
     {
           PVFS_perror("PVFS_util_init_defaults", ret);
@@ -113,7 +115,7 @@ int main(int argc, char **argv)
 static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt, 
                         const PVFS_credentials *creds) 
 {
-    int ret = -1, lpath_len = 0;
+    int ret = -1, lpath_len = 0, i = 0;
     char *local_path = NULL;
     struct PINT_client_getvalue_sm resp;
     struct dbpf_keyval_db_entry *key_entry;
@@ -125,20 +127,36 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
     memset(&resp_getvalue, 0, sizeof(struct PINT_client_getvalue_sm));
     memset(&d, 0, sizeof(PVFS_dirent));
 
-    resp_getvalue.key = malloc( sizeof(PVFS_ds_keyval));
-    resp_getvalue.val = malloc( sizeof(PVFS_ds_keyval));
+    resp_getvalue.key = 
+        (PVFS_ds_keyval *)malloc( sizeof(PVFS_ds_keyval) * opt->count );
+    resp_getvalue.val = 
+        (PVFS_ds_keyval *)malloc( sizeof(PVFS_ds_keyval) * opt->count );
+    resp_getvalue.dirent = malloc( sizeof(PVFS_dirent) * opt->count );
 
-    resp_getvalue.key->buffer = malloc( KEYBUFSZ + 1);
-    resp_getvalue.val->buffer = malloc( VALBUFSZ + 1);
+    memset( resp_getvalue.key, 0, sizeof(PVFS_ds_keyval) * opt->count );
+    memset( resp_getvalue.val, 0, sizeof(PVFS_ds_keyval) * opt->count );
+    memset( resp_getvalue.dirent, 0, sizeof(PVFS_dirent) * opt->count );
 
-    resp_getvalue.key->buffer_sz = KEYBUFSZ + 1;
-    resp_getvalue.val->buffer_sz = VALBUFSZ + 1;
+    for( i = 0; i < opt->count; i++ )
+    {
+        resp_getvalue.key[i].buffer = malloc( KEYBUFSZ + 1);
+        resp_getvalue.val[i].buffer = malloc( VALBUFSZ + 1);
+        memset( resp_getvalue.key[i].buffer, 0, KEYBUFSZ+1 );
+        memset( resp_getvalue.val[i].buffer, 0, VALBUFSZ+1 );
 
-    printf("\nMatching files:\n");
+        resp_getvalue.key[i].buffer_sz = KEYBUFSZ + 1;
+        resp_getvalue.val[i].buffer_sz = VALBUFSZ + 1;
+    }
+
+    printf("Asking for %u records\n", opt->count );
+
     while( token != PVFS_ITERATE_END )
     {
-        ret = PVFS_sys_getvalue(obj, token, creds,  &d, &(opt->key), 
-                                &(opt->val), &resp_getvalue, NULL);
+        ret = PVFS_sys_getvalue(obj, token, creds,  &(opt->key), &(opt->val), 
+            opt->query, opt->count, &resp_getvalue, NULL);
+
+        printf("Call returned, query matched records: %d \n", 
+            resp_getvalue.match_count);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_getvalue", ret);
@@ -147,25 +165,30 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
         else
         {
             token = resp_getvalue.token;
+            printf("\tThis call returned %d records\n", resp_getvalue.count);
 
             /* have to prepend local mount point to path returned
              * from server */
-            lpath_len = strlen(resp_getvalue.dirent.d_name) +
-                        strlen(opt->pvfs_root) + 1;
-            local_path = malloc(lpath_len);
-            memset(local_path, 0, lpath_len);
-            strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));
-            strncpy( local_path+strlen(opt->pvfs_root ), 
-                     resp_getvalue.dirent.d_name, 
-                     strlen(resp_getvalue.dirent.d_name) );
+            for( i = 0; i < resp_getvalue.count; i++ )
+            {
+                lpath_len = strlen(resp_getvalue.dirent[i].d_name) +
+                         strlen(opt->pvfs_root) + 1;
+                local_path = malloc(lpath_len);
+                memset(local_path, 0, lpath_len);
+                strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));
+                strncpy( local_path+strlen(opt->pvfs_root ), 
+                      resp_getvalue.dirent[i].d_name, 
+                         strlen(resp_getvalue.dirent[i].d_name) );
                
-            key_entry = resp_getvalue.key->buffer;
-            printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
-                   local_path, llu(key_entry->handle), 
-                   resp_getvalue.token, key_entry->key, 
-                   (char *)opt->val.buffer);
+                key_entry = resp_getvalue.key[i].buffer;
+                printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
+                       local_path, llu(key_entry->handle), 
+                       resp_getvalue.token, key_entry->key, 
+                       (char *)resp_getvalue.val[i].buffer);
+            }
         }
     }
+
     return 0;
 }
 
@@ -177,12 +200,12 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
  */
 static struct opts* parse_args(int argc, char* argv[])
 {
-    char flags[] = "k:v:";
+    char flags[] = "ck:v:n:q:";
     int one_opt = 0;
 
     struct opts* tmp_opts = NULL;
 
-    if( argc < 5 )
+    if( argc < 9 )
     {
         usage(argc, argv);
     }
@@ -202,6 +225,9 @@ static struct opts* parse_args(int argc, char* argv[])
     while((one_opt = getopt(argc, argv, flags)) != EOF)
     {
 	switch(one_opt){
+            case 'c':
+                tmp_opts->query |= PVFS_KEYVAL_QUERY_NORM;
+                break;
             case 'k':
                 tmp_opts->key.buffer = strdup(optarg);
                 tmp_opts->key.buffer_sz = strlen(tmp_opts->key.buffer) + 1;
@@ -210,8 +236,33 @@ static struct opts* parse_args(int argc, char* argv[])
                 tmp_opts->val.buffer = strdup(optarg);
                 tmp_opts->val.buffer_sz = strlen(tmp_opts->val.buffer) + 1;
                 break;
+            case 'n':
+                tmp_opts->count = atoi( optarg );
+                break;
+            case 'q':
+                if( strncmp( "LT", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_LT; }
+                else if( strncmp( "LE", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_LE; }
+                else if( strncmp( "EQ", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_EQ; }
+                else if( strncmp( "GE", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_GE; }
+                else if( strncmp( "GT", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_GT; }
+                else if( strncmp( "NT", optarg, 2) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_NT; }
+                else if( strncmp( "PEQ", optarg, 3) == 0 )
+                { tmp_opts->query |= PVFS_KEYVAL_QUERY_PEQ; }
+                else
+                {
+                    printf("?: %s\n", optarg);
+		    usage(argc, argv);
+		    exit(EXIT_FAILURE);
+                }
+                break;
 	    case('?'):
-                printf("?\n");
+                printf("?: %d\n", one_opt);
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
@@ -229,13 +280,21 @@ static struct opts* parse_args(int argc, char* argv[])
       usage(argc, argv);
       exit(EXIT_FAILURE);
     }
+    if( tmp_opts->count < 1 )
+    {
+        fprintf(stderr, "Count must be 1 or greater");
+        usage(argc, argv);
+        exit(EXIT_FAILURE);
+    }
     return(tmp_opts);
 }
 
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,"Usage: %s -k <key> -v <val> <pvfs fs root>\n",argv[0]);
+    fprintf(stderr, 
+        "Usage: %s -k <key> -v <val> -n <num> [-c] -q [LT|LE|EQ|GE|GT|NT|PEQ] <pvfs fs root>\n", 
+        argv[0]);
     return;
 }
 

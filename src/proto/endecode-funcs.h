@@ -705,6 +705,36 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta2(pptr, &(x)->a2[i]); \
 }
 
+/* special case, 3 fields then 3 arrays */
+#define endecode_fields_3aaa_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, ta2, a2, ta3, a3) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn1(pptr, &x->n1); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta1(pptr, &(x)->a1[i]); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta3(pptr, &(x)->a3[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn1(pptr, &x->n1); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    x->a2 = decode_malloc(x->n1 * sizeof(*x->a2)); \
+    x->a3 = decode_malloc(x->n1 * sizeof(*x->a3)); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta1(pptr, &(x)->a1[i]); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta2(pptr, &(x)->a2[i]); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta3(pptr, &(x)->a3[i]); \
+}
+
 /* 3 fields, then an array */
 #define endecode_fields_3a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \

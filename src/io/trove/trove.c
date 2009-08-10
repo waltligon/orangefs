@@ -343,16 +343,20 @@ int trove_keyval_read(
            hints);
 }
 
-
 /** Initiate read of a single keyword/value pair based on <attr><value>. 
  * The secondary keyval index is used to perform this lookup.
  */
 int trove_keyval_read_value(
     TROVE_coll_id coll_id,
     TROVE_ds_position *position_p,
-    PVFS_dirent* dirent_p,
-    TROVE_keyval_s* key_p,
-    TROVE_keyval_s* val_p,
+    uint32_t query_type,
+    TROVE_keyval_s *key_p,
+    TROVE_keyval_s *val_p,
+    PVFS_dirent *dirent_array,
+    TROVE_keyval_s *key_array,
+    TROVE_keyval_s *val_array,
+    uint32_t * count,
+    uint32_t * match_count,
     TROVE_ds_flags flags,
     TROVE_vtag_s* vtag,
     void* user_ptr,
@@ -380,9 +384,14 @@ int trove_keyval_read_value(
     return keyval_method_table[method_id]->keyval_read_value(
            coll_id,
            position_p,
-           dirent_p,
+           query_type,
            key_p,
            val_p,
+           dirent_array,
+           key_array,
+           val_array,
+           count,
+           match_count,
            flags,
            vtag,
            user_ptr,

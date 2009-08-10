@@ -1819,16 +1819,20 @@ endecode_fields_2a_struct(
 
 struct PVFS_servreq_getvalue
 {
-    PVFS_handle handle;     /* handle */
-    PVFS_fs_id  fs_id;      /* file system */
-    PVFS_ds_position token; /* offset */
-    PVFS_ds_keyval key;     /* attribute to search on*/
-    PVFS_ds_keyval val;     /* (optional) value to search on*/
+    PVFS_handle handle;                       /* handle */
+    PVFS_fs_id  fs_id;                        /* file system */
+    uint32_t query_type;                      /* type of query to perform  */
+    uint32_t count;                           /* number of records to return */
+    PVFS_ds_position token;                   /* offset */
+    PVFS_ds_keyval key;                       /* attribute */
+    PVFS_ds_keyval val;                       /* (optional) value */
 };
-endecode_fields_5_struct(
+endecode_fields_7_struct(
     PVFS_servreq_getvalue,
-    PVFS_fs_id, fs_id,
     PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    uint32_t, query_type,
+    uint32_t, count,
     PVFS_ds_position, token,
     PVFS_ds_keyval, key,
     PVFS_ds_keyval, val)
@@ -1838,6 +1842,8 @@ endecode_fields_5_struct(
 #define PINT_SERVREQ_GETVALUE_FILL(__req,                \
                                   __creds,               \
                                   __fsid,                \
+                                  __query_type,          \
+                                  __count,               \
                                   __handle,              \
                                   __token,               \
                                   __key,                 \
@@ -1849,6 +1855,8 @@ do {                                                     \
     (__req).credentials = (__creds);                     \
     (__req).hints = (__hints);                           \
     (__req).u.getvalue.fs_id = (__fsid);                 \
+    (__req).u.getvalue.query_type = (__query_type);       \
+    (__req).u.getvalue.count = (__count);  \
     (__req).u.getvalue.handle = (__handle);              \
     (__req).u.getvalue.token = (__token);                \
     (__req).u.getvalue.key.buffer_sz = (__key).buffer_sz;\
@@ -1860,18 +1868,24 @@ do {                                                     \
 struct PVFS_servresp_getvalue
 {
     PVFS_ds_position token;     /* new offset in query */
-    PVFS_dirent dirent;         /* array with handle info */
-    PVFS_ds_keyval key;         /* key returned */
-    PVFS_ds_keyval val;         /* key returned */
+    uint32_t count;             /* number of items returned in response */
+    uint32_t match_count;       /* number of items (estimate) matching query */
+    PVFS_dirent *dirent;         /* array with handle info */
+    PVFS_ds_keyval *key;         /* key returned */
+    PVFS_ds_keyval *val;         /* key returned */
 };
-endecode_fields_4_struct(
+endecode_fields_3aaa_struct(
     PVFS_servresp_getvalue,
     PVFS_ds_position, token,
+    uint32_t, match_count,
+    skip4,,
+    uint32_t, count,
     PVFS_dirent, dirent,
     PVFS_ds_keyval, key,
     PVFS_ds_keyval, val)
 #define extra_size_PVFS_servresp_getvalue \
-    (PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN)
+    ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN + sizeof(PVFS_dirent)) * \
+      PVFS_REQ_LIMIT_KEYVAL_LIST)
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
