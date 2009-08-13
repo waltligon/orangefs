@@ -124,6 +124,67 @@ enum
     PVFS_MGMT_META_SERVER = 2
 };
 
+typedef enum PVFS_mgmt_fsck_op_e
+{
+    FSCK_NOOP   = 0,
+    FSCK_START  = 1,
+    FSCK_STOP   = 2,
+    FSCK_REPORT = 3,
+    FSCK_REMOTE = 4
+} PVFS_mgmt_fsck_op;
+#define encode_PVFS_mgmt_fsck_op encode_enum
+#define decode_PVFS_mgmt_fsck_op decode_enum
+
+typedef enum PVFS_mgmt_fsck_state_e
+{
+    FSCK_IDLE   = 1,
+    FSCK_IP     = 2,
+    FSCK_CANCEL = 3 
+} PVFS_mgmt_fsck_state;
+#define encode_PVFS_mgmt_fsck_state encode_enum
+#define decode_PVFS_mgmt_fsck_state decode_enum
+
+typedef enum PVFS_mgmt_fsck_phase_e
+{
+    FSCK_ERROR         = 0,
+    FSCK_COMPLETE      = 1,
+    FSCK_PHASE_REPAIR  = 2,
+    FSCK_PHASE_ORPHAN  = 3,
+    FSCK_PHASE_BSTREAM = 4,
+} PVFS_mgmt_fsck_phase;
+#define encode_PVFS_mgmt_fsck_phase encode_enum
+#define decode_PVFS_mgmt_fsck_phase decode_enum
+
+typedef enum PVFS_fsck_op_e
+{
+    FSCK_OP_MOVE   = 1,
+    FSCK_OP_DELETE = 2,
+    FSCK_OP_CREATE = 3
+} PVFS_fsck_op;
+#define encode_PVFS_fsck_op encode_enum
+#define decode_PVFS_fsck_op decode_enum
+
+typedef struct PVFS_mgmt_fsck_repair_s
+{
+    PVFS_handle parent;
+    PVFS_fsck_op operation;
+    PVFS_handle child;
+} PVFS_mgmt_fsck_repair;
+endecode_fields_4_struct(
+    PVFS_mgmt_fsck_repair_s,
+    PVFS_handle, parent,
+    PVFS_fsck_op, operation,
+    skip4,,
+    PVFS_handle, child
+);
+
+typedef struct PVFS_mgmt_fsck_resp_s
+{
+    PVFS_mgmt_fsck_state  state;
+    PVFS_mgmt_fsck_phase  phase;
+    PVFS_mgmt_fsck_repair *log;
+} PVFS_mgmt_fsck_resp;
+
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -413,6 +474,30 @@ PVFS_error PVFS_mgmt_map_handle(
     PVFS_fs_id fs_id,
     PVFS_handle handle,
     PVFS_BMI_addr_t *addr);
+
+PVFS_error PVFS_imgmt_fsck(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t *addr,
+    PVFS_mgmt_fsck_op operation,
+    int64_t uid,
+    PVFS_ds_position *position,
+    uint64_t *count,
+    PVFS_mgmt_fsck_resp *resp,
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_fsck(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_BMI_addr_t *addr,
+    PVFS_mgmt_fsck_op operation,
+    int64_t uid,
+    PVFS_ds_position *position,
+    uint64_t *count,
+    PVFS_mgmt_fsck_resp *resp,
+    PVFS_hint hints);
 
 #endif /* __PVFS2_MGMT_H */
 

@@ -1,0 +1,1864 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ *
+ */
+#include <assert.h>
+
+#include "pvfs2-server.h"
+#include "request-scheduler/request-scheduler.h"
+#include "thread-mgr.h"
+#include "gossip.h"
+#include "pint-util.h"
+#include "server-config.h"
+#include "trove-handle-mgmt/trove-extentlist.h"
+#include "pint-cached-config.h"
+#include "pvfs2-util.h"
+
+#define TROVE_FSCK_KEY "trove-fsck-control"
+#define DS_MAINT_FSCK (1<<0)
+
+QLIST_HEAD(repair_q);
+struct TROVE_handle_extentlist remote_list;
+
+/*
+ * Enums for use in state machine control
+ */
+enum
+{
+    FSCK_SM_ACTION_START = 170,
+    FSCK_SM_ACTION_STOP,
+    FSCK_SM_ACTION_REPORT,
+    FSCK_SM_ACTION_REMOTE,
+    FSCK_SM_ACTION_CANCEL,
+    FSCK_SM_ACTION_EMPTY,
+    FSCK_SM_ACTION_REPAIR,
+    FSCK_SM_ACTION_COMPLETE
+};
+
+/*
+ * fsck control structure
+ *
+ * This structure is store in the db and maintains
+ * the state of a running fsck.
+ */
+typedef struct fsck_control_s
+{
+    PVFS_ds_position position;
+    int              state;
+    int              phase;
+    int              uid;
+} fsck_control;
+
+/*
+ * Repair List structure
+ */
+typedef struct repair_item_s
+{
+    struct qlist_head     link;
+    PVFS_mgmt_fsck_repair repair;
+} repair_item;
+
+/*
+ * Prototypes
+ */
+static int fsck_get_control(PVFS_fs_id coll_id, fsck_control *ctrl);
+static int fsck_put_control(PVFS_fs_id coll_id, fsck_control *ctrl);
+
+static int fsck_get_repair (PVFS_ds_position *position, uint64_t *count,
+    PVFS_mgmt_fsck_repair *repair_list);
+static int fsck_put_repair (PVFS_handle parent, PVFS_fsck_op operation,
+    PVFS_handle child);
+static void fsck_flush_repair (void);
+
+static PINT_sm_action fsck_sm_phase_1_callback(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static PINT_sm_action fsck_sm_phase_2_callback(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+%%
+
+nested machine pvfs2_fsck_phase_1_sm
+{
+    state phase_1_init
+    {
+        run fsck_sm_phase_1_init;
+        success => phase_1_lookup;
+        default => return;
+    }
+
+    state phase_1_lookup
+    {
+        run fsck_sm_phase_1_lookup;
+        success => phase_1_validate;
+        default => return;
+    }
+
+    state phase_1_validate
+    {
+        run fsck_sm_phase_1_validate;
+        success => phase_1_post;
+        default => phase_1_result;
+    }
+
+    state phase_1_post
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => phase_1_result; 
+    }
+
+    state phase_1_result
+    {
+        run fsck_sm_phase_1_result;
+        default => return;
+    }
+}
+
+nested machine pvfs2_fsck_phase_2_sm
+{
+    state phase_2_init
+    {
+        run fsck_sm_phase_2_init;
+        success => phase_2_iterate;
+        default => phase_2_result;
+    }
+
+    state phase_2_iterate
+    {
+        run fsck_sm_phase_2_iterate;
+        success => phase_2_post;
+        default => phase_2_result;
+    }
+
+    state phase_2_post
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => phase_2_result;
+    }
+
+    state phase_2_result
+    {
+        run fsck_sm_phase_2_result;
+        /* FSCK_SM_ACTION_COMPLETE => phase_2_analyze; */
+        FSCK_SM_ACTION_COMPLETE => return;
+        default => phase_2_result;
+    }
+
+    state phase_2_analyze
+    {
+        run fsck_sm_phase_2_analyze;
+        FSCK_SM_ACTION_COMPLETE => return;
+        default => phase_2_analyze;
+    }
+}
+
+nested machine pvfs2_fsck_validate_and_repair_sm
+{
+    state vnr_init
+    {
+        run fsck_sm_vnr_init;
+        success => vnr_get_handles;
+        default => return;
+    }
+
+    state vnr_get_handles
+    {
+        run fsck_sm_vnr_get_handles;
+        success => vnr_phase_1;
+        FSCK_SM_ACTION_EMPTY => vnr_phase_2; 
+        default => return;
+    }
+
+    state vnr_phase_1
+    {
+        pjmp fsck_sm_vnr_phase_1
+        {
+            success => pvfs2_fsck_phase_1_sm;
+        }
+        default => vnr_phase_1_cleanup;
+    }
+
+    state vnr_phase_1_cleanup
+    {
+        run fsck_sm_vnr_phase_1_cleanup;
+        success => vnr_get_handles;
+        default => vnr_phase_2;
+    }
+
+    state vnr_phase_2
+    {
+        pjmp fsck_sm_vnr_phase_2
+        {
+            success => pvfs2_fsck_phase_2_sm;
+        }
+        default => vnr_phase_2_cleanup;
+    }
+
+    state vnr_phase_2_cleanup
+    {
+        run fsck_sm_vnr_phase_2_cleanup;
+        default => vnr_complete;
+    }
+
+    state vnr_complete
+    {
+        run fsck_sm_vnr_complete;
+        default => return;
+    }
+}
+
+machine pvfs2_fsck_sm
+{
+    state fsck_prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => fsck_command;
+        default => fsck_response;
+    }
+
+    state fsck_command
+    {
+        run fsck_sm_command;
+        FSCK_SM_ACTION_START => fsck_start;
+        FSCK_SM_ACTION_STOP => fsck_stop;
+        FSCK_SM_ACTION_REPORT => fsck_report;
+        FSCK_SM_ACTION_REMOTE => fsck_remote_handles;
+        default => fsck_response;
+    }
+
+    state fsck_start
+    {
+        run fsck_sm_start;
+        success => fsck_start_response;
+        default => fsck_response;
+    }
+
+    state fsck_start_response
+    {
+        jump pvfs2_final_response_sm;
+        success => fsck_check;
+        default => fsck_cleanup;
+    }
+
+    state fsck_check
+    {
+        jump pvfs2_fsck_validate_and_repair_sm;
+        default => fsck_cleanup;
+    }
+
+    state fsck_stop
+    {
+        run fsck_sm_stop;
+        default => fsck_response;
+    }
+
+    state fsck_report
+    {
+        run fsck_sm_report;
+        default => fsck_response;
+    }
+
+    state fsck_remote_handles
+    {
+        run fsck_sm_remote_handles;
+        default => fsck_response;
+    }
+
+    state fsck_response
+    {
+        jump pvfs2_final_response_sm;
+        default => fsck_cleanup;
+    }
+
+    state fsck_cleanup
+    {
+        run fsck_sm_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * pvfs2_fsck_sm
+ */
+
+/*
+ * fsck_command
+ *
+ * Determine which command was requested
+ *   validate the state is acceptable for the request
+ *   start the request
+ */
+static PINT_sm_action fsck_sm_command(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+
+    gossip_err("%s: enter\n", __func__);
+    assert(s_op->op == PVFS_SERV_MGMT_FSCK);
+
+    switch (s_op->req->u.mgmt_fsck.operation)
+    {
+        case FSCK_NOOP:
+            s_op->resp.u.mgmt_fsck.state    = FSCK_IDLE;
+            s_op->resp.u.mgmt_fsck.phase    = FSCK_COMPLETE;
+            s_op->resp.u.mgmt_fsck.position  = PVFS_ITERATE_END;
+            s_op->resp.u.mgmt_fsck.count     = 3;
+            s_op->resp.u.mgmt_fsck.log       = malloc(3*sizeof(PVFS_mgmt_fsck_repair));
+            s_op->resp.u.mgmt_fsck.log[0].parent = 12345678;
+            s_op->resp.u.mgmt_fsck.log[0].operation = FSCK_OP_DELETE;
+            s_op->resp.u.mgmt_fsck.log[0].child = 87654321;
+            s_op->resp.u.mgmt_fsck.log[1].parent = 1092837465;
+            s_op->resp.u.mgmt_fsck.log[1].operation = FSCK_OP_MOVE;
+            s_op->resp.u.mgmt_fsck.log[1].child = 0;
+            s_op->resp.u.mgmt_fsck.log[2].parent = 345;
+            s_op->resp.u.mgmt_fsck.log[2].operation = FSCK_OP_DELETE;
+            s_op->resp.u.mgmt_fsck.log[2].child = 897;
+
+            js_p->error_code = 0;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case FSCK_START:
+            js_p->error_code = FSCK_SM_ACTION_START;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case FSCK_STOP:
+            js_p->error_code = FSCK_SM_ACTION_STOP;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case FSCK_REPORT:
+            js_p->error_code = FSCK_SM_ACTION_REPORT;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case FSCK_REMOTE:
+            js_p->error_code = FSCK_SM_ACTION_REMOTE;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        default:
+            s_op->resp.u.mgmt_fsck.state     = 0;
+            s_op->resp.u.mgmt_fsck.phase     = FSCK_ERROR;
+            s_op->resp.u.mgmt_fsck.position  = PVFS_ITERATE_END;
+            s_op->resp.u.mgmt_fsck.count     = 0;
+            s_op->resp.u.mgmt_fsck.log       = NULL;
+            js_p->error_code = -PVFS_EINVAL;
+            ret = SM_ACTION_COMPLETE;
+            break;
+    }
+
+    gossip_err("%s: leave\n", __func__);
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_start(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+    fsck_control  ctrl;
+    int r;
+
+    gossip_err("%s: enter\n", __func__);
+
+    /* get info from db */
+    r = fsck_get_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = r;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* verify fsck is idle */
+    if (ctrl.state == FSCK_IP)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* verify admin mode is set */
+    if (PINT_req_sched_get_mode() != PVFS_SERVER_ADMIN_MODE)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* start fsck */
+    ctrl.state     = FSCK_IP;
+    ctrl.phase     = FSCK_PHASE_REPAIR;
+    ctrl.uid       = s_op->req->u.mgmt_fsck.uid;
+
+    r = fsck_put_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = r;
+        gossip_err("fsck_sm_start: failed: %d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    extentlist_init (&remote_list);
+
+    js_p->error_code = 0;
+    ret = SM_ACTION_COMPLETE;
+
+    gossip_err("%s: leave\n", __func__);
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_stop(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+    fsck_control ctrl;
+    int r;
+
+    gossip_err("%s: enter\n", __func__);
+
+    r = fsck_get_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* verify fsck is in-progress */
+    if (ctrl.state == FSCK_IDLE)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ctrl.state = FSCK_CANCEL; 
+
+    r = fsck_put_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.mgmt_fsck.state    = ctrl.state;
+    s_op->resp.u.mgmt_fsck.phase    = ctrl.phase;
+    s_op->resp.u.mgmt_fsck.position = PVFS_ITERATE_END;
+    s_op->resp.u.mgmt_fsck.count    = 0;
+    s_op->resp.u.mgmt_fsck.log      = NULL;
+
+    ret = SM_ACTION_COMPLETE;
+    js_p->error_code = 0;
+
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_report(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_context_id context_id;
+    TROVE_keyval_s  key;
+    TROVE_keyval_s  val;
+    TROVE_op_id     op_id;
+    TROVE_coll_id   coll_id;
+    PINT_sm_action  ret;
+    PVFS_ds_position pos;
+    uint64_t         cnt;
+    fsck_control ctrl;
+    int r;
+#define MAX_HANDLES 1000
+    int handle_index;
+    int handle_count;
+    TROVE_handle handle_array[MAX_HANDLES];
+    int trove_completion;
+
+    coll_id = s_op->target_fs_id;
+
+    gossip_err("%s: enter\n", __func__);
+
+    r = fsck_get_control(coll_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("fsck_get_control: r=%d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    pos = s_op->req->u.mgmt_fsck.position;
+    cnt = s_op->req->u.mgmt_fsck.count;
+
+    /* allocate return message */
+    s_op->resp.u.mgmt_fsck.log = 
+        malloc(cnt*sizeof(PVFS_mgmt_fsck_repair));
+    if (!s_op->resp.u.mgmt_fsck.log)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        gossip_err("malloc failed");
+        return SM_ACTION_COMPLETE;
+    }
+
+    fsck_get_repair(&pos, &cnt, s_op->resp.u.mgmt_fsck.log);
+
+    s_op->resp.u.mgmt_fsck.state    = ctrl.state;
+    s_op->resp.u.mgmt_fsck.phase    = ctrl.phase;
+    s_op->resp.u.mgmt_fsck.position = pos;
+    s_op->resp.u.mgmt_fsck.count    = cnt; 
+
+    js_p->error_code = 0;
+
+    gossip_err("%s: leave\n", __func__);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * assumes that it can send the max extents per message
+ */
+static PINT_sm_action fsck_sm_remote_handles(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_ds_position pos;
+    PVFS_ds_position i;
+    PVFS_ds_position cnt;
+
+    gossip_err("%s: enter\n", __func__);
+
+    s_op->resp.u.mgmt_fsck.state = FSCK_ERROR;
+    s_op->resp.u.mgmt_fsck.phase = FSCK_ERROR;
+    s_op->resp.u.mgmt_fsck.count = 0;
+
+    pos = s_op->resp.u.mgmt_fsck.position;
+
+    if (pos == PVFS_ITERATE_START)
+    {
+        i = 0;
+    }
+    else
+    {
+        i = pos;
+    }
+
+    s_op->resp.u.mgmt_fsck.remote_handles.extent_count = 
+        remote_list.num_extents;
+    s_op->resp.u.mgmt_fsck.remote_handles.extent_array = 
+        malloc(sizeof(PVFS_handle_extent)*PVFS_REQ_LIMIT_MAX_EXTENTS);
+
+    if (!s_op->resp.u.mgmt_fsck.remote_handles.extent_array)
+    {
+        gossip_err("%s: malloc failed\n", __func__);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    gossip_err("%s: num=%llu\n", __func__, llu(remote_list.num_extents));
+
+    for (cnt=0;
+         i<remote_list.num_extents && cnt<PVFS_REQ_LIMIT_MAX_EXTENTS;
+         i++,cnt++)
+    {
+        gossip_err("%s: i=%llu first=%llu last=%llu\n",
+            __func__, llu(i), llu(remote_list.extents[i].first),
+            llu(remote_list.extents[i].last));
+
+        PVFS_handle_extent *he_p = 
+            &s_op->resp.u.mgmt_fsck.remote_handles.extent_array[i];
+        he_p->first = remote_list.extents[i].first;
+        he_p->last  = remote_list.extents[i].last;
+    }
+    s_op->resp.u.mgmt_fsck.remote_handles.extent_count = cnt;
+    
+    if (pos >= remote_list.num_extents)
+    {
+        pos = PVFS_ITERATE_END;
+    }
+    else
+    {
+        pos = i;
+    }
+
+    s_op->resp.u.mgmt_fsck.position = pos;
+
+    gossip_err("%s: leave\n", __func__);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+
+    gossip_err("%s: enter\n", __func__);
+    ret = server_state_machine_complete(smcb);
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+/*
+ * pvfs2_fsck_validate_and_repair_sm actions
+ */
+
+static PINT_sm_action fsck_sm_vnr_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    fsck_control           ctrl;
+    int                    r;
+
+    gossip_err("%s: enter\n", __func__);
+
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    r = fsck_get_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("fsck_get_control: r=%d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->u.fsck.position     = ctrl.position;
+    s_op->u.fsck.parallel_sm  = 0;
+    s_op->u.fsck.handle       = 0;
+    s_op->u.fsck.handle_count = 1000;
+    s_op->u.fsck.handle_array = malloc(s_op->u.fsck.handle_count*
+                                       sizeof(PVFS_handle));
+    s_op->u.fsck.error_array  = malloc(s_op->u.fsck.handle_count*
+                                       sizeof(PVFS_handle));
+    if (!s_op->u.fsck.handle_array || !s_op->u.fsck.error_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = 0;
+    gossip_err("%s: leave\n", __func__);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_vnr_get_handles(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    PVFS_fs_id             fs_id;
+    fsck_control           ctrl;
+    PVFS_ds_position       position;
+    PVFS_handle           *handle_array;
+    int                    handle_count;
+    int                    r;
+    job_id_t               job_id;
+
+    gossip_err("%s: enter\n", __func__);
+
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    fs_id        = s_op->target_fs_id;
+    position     = s_op->u.fsck.position;
+    handle_array = s_op->u.fsck.handle_array;
+    handle_count = s_op->u.fsck.handle_count;
+
+    fsck_flush_repair();
+
+    r = fsck_get_control(fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("fsck_get_control: r=%d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (ctrl.state == FSCK_CANCEL)
+    {
+        js_p->error_code = FSCK_SM_ACTION_CANCEL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_err("fsid:%llu pos:%llu count:%d\n",
+        llu(s_op->target_fs_id), llu(position), handle_count);
+
+    if (position != PVFS_ITERATE_END)
+    {
+        r = job_trove_dspace_iterate_handles(fs_id, position,
+                handle_array, handle_count, 0, NULL, smcb, 0, js_p,
+                &job_id, server_job_context);
+    }
+    else
+    {
+        /* all handles have been processed */
+        js_p->error_code = FSCK_SM_ACTION_EMPTY;
+        r = SM_ACTION_COMPLETE;
+    }
+
+    gossip_err("%s: leave\n", __func__);
+    return r;
+}
+
+static PINT_sm_action fsck_sm_vnr_phase_1(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    struct PINT_server_op *p_op;
+    int ret;
+    int i;
+
+    gossip_err("%s: enter\n", __func__);
+
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_err("handles: %d\n", s_op->u.fsck.handle_count);
+
+    s_op->u.fsck.handle_count = js_p->count;
+    s_op->u.fsck.position     = js_p->position;
+
+    for (i=0; i<s_op->u.fsck.handle_count; i++)
+    {
+        p_op = malloc(sizeof(*p_op));
+        if (!p_op)
+        {
+            p_op->u.fsck.error_array[i] = -PVFS_ENOMEM;
+            continue;
+        }
+        memcpy(p_op, s_op, sizeof(*s_op)); 
+        p_op->u.fsck.handle = s_op->u.fsck.handle_array[i];
+        p_op->target_handle = s_op->u.fsck.handle_array[i];
+
+        ret = PINT_sm_push_frame(smcb, 0, p_op);
+        if (ret < 0)
+        {
+            s_op->u.fsck.error_array[i] = -PVFS_ENOMEM;
+            continue;
+        }
+        s_op->u.fsck.parallel_sm++;
+    }
+
+    if (s_op->u.fsck.parallel_sm < 1)
+    {
+        js_p->error_code = s_op->u.fsck.error_array[0];
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    gossip_err("%s: leave\n", __func__);
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action fsck_sm_vnr_phase_1_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *p_op;
+    PVFS_error             tmp_error;
+    int                    i;
+    int                    task_id;
+    int                    remaining;
+
+    for (i=0; i<s_op->u.fsck.parallel_sm; i++)
+    {
+        p_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_error, &remaining);
+        free(p_op);
+    }
+
+    /* pass previous error code through */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_vnr_phase_2(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    struct PINT_server_op *p_op;
+    server_configuration_s *config;
+    PVFS_BMI_addr_t *addr_array;
+    PVFS_BMI_addr_t  local_addr;
+    int server_count;
+    int ret;
+    int i;
+
+    gossip_err("%s: enter\n", __func__);
+
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    config = get_server_config_struct();
+    ret = BMI_addr_lookup(&local_addr, config->host_id);
+    if (ret < 0)
+    {
+        gossip_err("%s: BMI_addr_lookup failed: %d\n",
+            __func__, ret);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_cached_config_count_servers(
+              s_op->target_fs_id, 
+              PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+              &server_count);
+    if (ret < 0)
+    {
+        gossip_err("%s: PINT_cached_config_count_servers failed: %d\n",
+            __func__, ret);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    addr_array = malloc(server_count*sizeof(PVFS_BMI_addr_t));
+    if (!addr_array)
+    {
+         gossip_err("%s: malloc failed: %d\n", __func__, errno);
+         js_p->error_code = -PVFS_ENOMEM;
+         return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_cached_config_get_server_array(
+              s_op->target_fs_id,
+              PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+              addr_array,
+              &server_count);
+    if (ret < 0)
+    {
+        gossip_err("%s: PINT_cached_config_count_servers failed: %d\n",
+            __func__, ret);
+        free(addr_array);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->u.fsck.parallel_sm = 0;
+    for (i=0; i<server_count; i++)
+    {
+        if (local_addr == addr_array[i])
+            continue;
+
+        p_op = malloc(sizeof(*p_op));
+        if (!p_op)
+        {
+            p_op->u.fsck.error_array[i] = -PVFS_ENOMEM;
+            continue;
+        }
+        memcpy(p_op, s_op, sizeof(*s_op)); 
+
+        p_op->u.fsck.server_addr = addr_array[i];
+
+        ret = PINT_sm_push_frame(smcb, 0, p_op);
+        if (ret < 0)
+        {
+            s_op->u.fsck.error_array[i] = -PVFS_ENOMEM;
+            continue;
+        }
+        s_op->u.fsck.parallel_sm++;
+    }
+
+    /* check if there was more than on server */
+    if (s_op->u.fsck.parallel_sm < 1)
+    {
+        js_p->error_code = FSCK_SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    free(addr_array);
+
+    gossip_err("%s: leave\n", __func__);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_vnr_phase_2_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *p_op;
+    PVFS_error             tmp_error;
+    int                    i;
+    int                    task_id;
+    int                    remaining;
+
+    for (i=0; i<s_op->u.fsck.parallel_sm; i++)
+    {
+        p_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_error, &remaining);
+        free(p_op);
+    }
+
+    /* pass previous error code through */
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action fsck_sm_vnr_complete(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op;
+    fsck_control           ctrl;
+    int                    r;
+
+    gossip_err("%s: enter\n", __func__);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    r = fsck_get_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("fsck_get_control: r=%d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    ctrl.state = FSCK_IDLE;
+    ctrl.phase = FSCK_COMPLETE;
+
+    r = fsck_put_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("fsck_put_control: r=%d\n", r);
+        return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = 0;
+    gossip_err("%s: leave\n", __func__);
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * pvfs2_fsck_phase_1_sm
+ */
+
+static PINT_sm_action fsck_sm_phase_1_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+    job_id_t tmp_id;
+
+    gossip_err("%s: enter\n", __func__);
+
+    ret = job_trove_dspace_getattr(
+        s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
+        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
+
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_phase_1_lookup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret;
+    PVFS_ds_position token = PVFS_ITERATE_START;
+    job_id_t j_id;
+    int i;
+
+    gossip_err("%s: enter\n", __func__);
+    gossip_err("fsid:%llu handle:%llu type:%d\n",
+        llu(s_op->target_fs_id), llu(s_op->target_handle), s_op->ds_attr.type);
+
+    switch(s_op->ds_attr.type)
+    {
+        case PVFS_TYPE_METAFILE:
+            if (s_op->ds_attr.u.metafile.dfile_count > 0)
+            {
+                s_op->u.fsck.dfile_array = malloc(
+                    s_op->ds_attr.u.metafile.dfile_count*sizeof(PVFS_handle));
+                if (!s_op->u.fsck.dfile_array)
+                {
+                    ret = SM_ACTION_COMPLETE;
+                    js_p->error_code = -PVFS_ENOMEM;
+                }
+                s_op->key.buffer  = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
+                s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
+                s_op->val.buffer  = s_op->u.fsck.dfile_array;
+                s_op->val.buffer_sz = s_op->ds_attr.u.metafile.dfile_count*sizeof(PVFS_handle);
+
+                ret = job_trove_keyval_read(
+                          s_op->target_fs_id,
+                          s_op->target_handle,
+                          &s_op->key, &s_op->val,
+                          0, NULL, smcb, 0, js_p,
+                          &j_id, server_job_context, s_op->req->hints);
+            }
+            else
+            {
+                js_p->error_code = FSCK_SM_ACTION_EMPTY;
+                ret = SM_ACTION_COMPLETE;
+            }
+            break;
+        case PVFS_TYPE_DIRDATA:
+            if (s_op->ds_attr.u.dirdata.count > 0)
+            {
+                s_op->u.fsck.dirent_array =
+                  malloc(s_op->ds_attr.u.dirdata.count*sizeof(PVFS_dirent));
+                s_op->key_a =
+                  malloc(s_op->ds_attr.u.dirdata.count*sizeof(PVFS_ds_keyval));
+                s_op->val_a =
+                  malloc(s_op->ds_attr.u.dirdata.count*sizeof(PVFS_ds_keyval));
+                if (!s_op->key_a || !s_op->val_a || !s_op->u.fsck.dirent_array)
+                {
+                    ret = SM_ACTION_COMPLETE;
+                    js_p->error_code = -PVFS_ENOMEM;
+                }
+
+                for (i=0; i < s_op->ds_attr.u.dirdata.count; i++)
+                {
+                    s_op->key_a[i].buffer =
+                        s_op->u.fsck.dirent_array[i].d_name;
+                    s_op->key_a[i].buffer_sz = PVFS_NAME_MAX;
+                    s_op->val_a[i].buffer =
+                        &s_op->u.fsck.dirent_array[i].handle;
+                    s_op->val_a[i].buffer_sz = sizeof(PVFS_handle);
+                }
+
+                js_p->error_code = 0;
+                ret = job_trove_keyval_iterate(
+                          s_op->target_fs_id,
+                          s_op->target_handle,
+                          token,
+                          s_op->key_a,
+                          s_op->val_a,
+                          s_op->ds_attr.u.dirdata.count,
+                          0, NULL, smcb, 0, js_p, &j_id,
+                          server_job_context, s_op->req->hints);
+            }
+            else
+            {
+                js_p->error_code = FSCK_SM_ACTION_EMPTY;
+                ret = SM_ACTION_COMPLETE;
+            }
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+            s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+            s_op->val.buffer    = &s_op->u.fsck.dirdata_handle;
+            s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+            ret = job_trove_keyval_read(
+                      s_op->target_fs_id,
+                      s_op->target_handle,
+                      &s_op->key, &s_op->val,
+                      0, NULL, smcb, 0, js_p,
+                      &j_id, server_job_context, s_op->req->hints);
+            break;
+        case PVFS_TYPE_DATAFILE:
+        case PVFS_TYPE_SYMLINK:
+        case PVFS_TYPE_NONE:
+        case PVFS_TYPE_INTERNAL:
+        default:
+            ret = SM_ACTION_COMPLETE;
+            js_p->error_code = 0;
+            break;
+    }
+
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_phase_1_validate(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_fsck_op *fsck_p = &s_op->u.fsck;
+    PVFS_credentials creds;
+    PINT_sm_msgpair_state *msg_p;
+    PINT_sm_action ret = SM_ACTION_COMPLETE;
+    server_configuration_s *config;
+    BMI_addr_t local_addr;
+    int index;
+    int r;
+
+    gossip_err("%s: enter\n", __func__);
+
+    config = get_server_config_struct();
+    ret = BMI_addr_lookup(&local_addr, config->host_id);
+    assert(ret == 0);
+
+    PINT_util_gen_credentials(&creds);
+
+    switch(s_op->ds_attr.type)
+    {
+        case PVFS_TYPE_METAFILE:
+            ret = PINT_msgpairarray_init(
+                &fsck_p->msgarray_op,
+                s_op->ds_attr.u.metafile.dfile_count);
+            if (ret != 0)
+            {
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                assert(msg_p);
+
+                PINT_SERVREQ_GETATTR_FILL(
+                    msg_p->req,
+                    creds,
+                    s_op->target_fs_id,
+                    fsck_p->dfile_array[index],
+                    PVFS_ATTR_DATA_SIZE,
+                    s_op->req->hints);
+           
+                msg_p->fs_id      = s_op->target_fs_id;
+                msg_p->handle     = fsck_p->dfile_array[index];
+                msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                msg_p->comp_fn    = fsck_sm_phase_1_callback;
+            }
+
+            ret = PINT_serv_msgpairarray_resolve_addrs(&fsck_p->msgarray_op);
+            if (ret < 0)
+            {
+                gossip_lerr("failed to resolve server addresses.\n");
+                js_p->error_code = ret;
+            }
+
+            /* record remote handles */
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                if (msg_p->svr_addr != local_addr)
+                {
+                    r = extentlist_addextent(&remote_list,
+                            fsck_p->dfile_array[index],
+                            fsck_p->dfile_array[index]);
+                    assert(r==0);
+                }
+            }
+
+            PINT_sm_push_frame(smcb, 0, &fsck_p->msgarray_op);
+            js_p->error_code = 0;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case PVFS_TYPE_DIRDATA:
+            assert(js_p->position == PVFS_ITERATE_END);
+            ret = PINT_msgpairarray_init(
+                &fsck_p->msgarray_op,
+                s_op->ds_attr.u.dirdata.count);
+            if (ret != 0)
+            {
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                assert(msg_p);
+
+                PINT_SERVREQ_GETATTR_FILL(
+                    msg_p->req,
+                    creds,
+                    s_op->target_fs_id,
+                    fsck_p->dirent_array[index].handle,
+                    PVFS_ATTR_DATA_SIZE,
+                    s_op->req->hints);
+           
+                msg_p->fs_id      = s_op->target_fs_id;
+                msg_p->handle     = fsck_p->dirent_array[index].handle;
+                msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                msg_p->comp_fn    = fsck_sm_phase_1_callback;
+            }
+
+            ret = PINT_serv_msgpairarray_resolve_addrs(&fsck_p->msgarray_op);
+            if (ret < 0)
+            {
+                gossip_lerr("failed to resolve server addresses.\n");
+                js_p->error_code = ret;
+            }
+
+            /* record remote handles */
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                if (msg_p->svr_addr != local_addr)
+                {
+                     r = extentlist_addextent(&remote_list,
+                             fsck_p->dfile_array[index],
+                             fsck_p->dfile_array[index]);
+                     assert(r==0);
+                }
+            }
+
+            PINT_sm_push_frame(smcb, 0, &fsck_p->msgarray_op);
+            js_p->error_code = 0;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            ret = PINT_msgpairarray_init(
+                &fsck_p->msgarray_op,
+                1);
+            if (ret != 0)
+            {
+                js_p->error_code = ret;
+                return SM_ACTION_COMPLETE;
+            }
+
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                assert(msg_p);
+
+                PINT_SERVREQ_GETATTR_FILL(
+                    msg_p->req,
+                    creds,
+                    s_op->target_fs_id,
+                    fsck_p->dirdata_handle,
+                    PVFS_ATTR_DATA_SIZE,
+                    s_op->req->hints);
+           
+                msg_p->fs_id      = s_op->target_fs_id;
+                msg_p->handle     = fsck_p->dirdata_handle;
+                msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+                msg_p->comp_fn    = fsck_sm_phase_1_callback;
+            }
+
+            ret = PINT_serv_msgpairarray_resolve_addrs(&fsck_p->msgarray_op);
+            if (ret < 0)
+            {
+                gossip_lerr("failed to resolve server addresses.\n");
+                js_p->error_code = ret;
+            }
+
+            /* record remote handles */
+            foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
+            {
+                if (msg_p->svr_addr != local_addr)
+                {
+                     r = extentlist_addextent(&remote_list,
+                             fsck_p->dfile_array[index],
+                             fsck_p->dfile_array[index]);
+                     assert(r==0);
+                }
+            }
+
+            PINT_sm_push_frame(smcb, 0, &fsck_p->msgarray_op);
+            js_p->error_code = 0;
+            ret = SM_ACTION_COMPLETE;
+            break;
+        case PVFS_TYPE_DATAFILE:
+        case PVFS_TYPE_SYMLINK:
+        case PVFS_TYPE_NONE:
+        case PVFS_TYPE_INTERNAL:
+            ret = SM_ACTION_COMPLETE;
+            js_p->error_code = 0;
+            break;
+    }
+
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_phase_1_result(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_fsck_op *fsck_p = &s_op->u.fsck;
+    int fault = 0;
+    int i;
+
+    js_p->error_code = 0;
+
+    gossip_err("%s: enter\n", __func__);
+
+    /* decide if we need to repair */
+    switch (s_op->ds_attr.type)
+    {
+        case PVFS_TYPE_METAFILE:
+            for (i=0; i<s_op->ds_attr.u.metafile.dfile_count; i++)
+            {
+                if (fsck_p->error_array[i] == -PVFS_ENOENT)
+                {
+                    fault=1;
+                    fsck_put_repair(s_op->target_handle,
+                                    FSCK_OP_DELETE,
+                                    fsck_p->dfile_array[i]);
+                } 
+                else if (fsck_p->error_array[i] != 0)
+                {
+                    gossip_err("log for retry: handle:%llu ret=%d\n",
+                               llu(s_op->target_handle),
+                               fsck_p->error_array[i]);
+                }
+            }
+            if (fault)
+            {
+                fsck_put_repair(s_op->target_handle,
+                                FSCK_OP_MOVE,
+                                s_op->target_handle);
+            }
+            if (s_op->u.fsck.dfile_array) free(s_op->u.fsck.dfile_array);
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            if (fsck_p->error_array[0] == -PVFS_ENOENT)
+            {
+                fsck_put_repair(s_op->target_handle,
+                                FSCK_OP_MOVE,
+                                s_op->target_handle);
+                fsck_put_repair(s_op->target_handle,
+                                FSCK_OP_CREATE,
+                                0);
+            }
+            break;
+        case PVFS_TYPE_DIRDATA:
+            for (i=0; i<s_op->ds_attr.u.dirdata.count; i++)
+            {
+                if (fsck_p->error_array[i] == -PVFS_ENOENT)
+                {
+                    fsck_put_repair(s_op->target_handle,
+                                    FSCK_OP_DELETE, 
+                                    fsck_p->dirent_array[i].handle);
+                } 
+                else if (fsck_p->error_array[i] != 0)
+                {
+                    gossip_err("log for retry: handle:%llu ret=%d\n",
+                               llu(s_op->target_handle),
+                               fsck_p->error_array[i]);
+                }
+            }
+            if (s_op->key_a) free(s_op->key_a);    
+            if (s_op->val_a) free(s_op->val_a);
+            if (s_op->u.fsck.dirent_array) free(s_op->u.fsck.dirent_array);
+            break;
+        case PVFS_TYPE_SYMLINK:
+        case PVFS_TYPE_DATAFILE: 
+        case PVFS_TYPE_NONE:
+        case PVFS_TYPE_INTERNAL:
+            break;
+    }
+ 
+    gossip_err("%s: leave\n", __func__);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_phase_1_callback(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    PINT_smcb *smcb = v_p;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    
+    gossip_err("%s: enter\n", __func__);
+
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+
+    s_op->u.fsck.error_array[index] = resp_p->status;
+
+    gossip_err("%s: leave\n", __func__);
+
+    return 0;
+}
+
+/*
+ * pvfs2_fsck_phase_2_sm
+ */
+
+static PINT_sm_action fsck_sm_phase_2_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_err("%s: enter\n", __func__);
+
+    gossip_err("%s: server=%llu\n", __func__, llu(s_op->u.fsck.server_addr));
+
+    s_op->u.fsck.position = PVFS_ITERATE_START;
+    s_op->u.fsck.remote_handles.extent_array =
+        malloc(sizeof(PVFS_handle_extent)*PVFS_REQ_LIMIT_MAX_EXTENTS);
+
+    gossip_err("%s: leave\n", __func__);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_phase_2_iterate(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p;
+    struct PINT_server_fsck_op *fsck_p = &s_op->u.fsck;
+    PVFS_credentials creds;
+    PINT_sm_action ret;
+
+    gossip_err("%s: enter\n", __func__);
+
+    PINT_util_gen_credentials(&creds);
+
+    ret = PINT_msgpairarray_init(&fsck_p->msgarray_op, 1);
+    if (ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    msg_p = &fsck_p->msgarray_op.msgarray[0];
+
+    PINT_SERVREQ_MGMT_FSCK_FILL(msg_p->req,
+                                creds,
+                                s_op->target_fs_id,
+                                FSCK_REMOTE,
+                                0,
+                                s_op->u.fsck.position,
+                                0,
+                                s_op->req->hints);
+
+    msg_p->fs_id      = s_op->target_fs_id;
+    msg_p->handle     = PVFS_HANDLE_NULL;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn    = fsck_sm_phase_2_callback;
+    msg_p->svr_addr   = fsck_p->server_addr;
+
+    PINT_sm_push_frame(smcb, 0, &fsck_p->msgarray_op);
+
+    gossip_err("%s: leave\n", __func__);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_phase_2_result(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_action ret = SM_ACTION_COMPLETE;
+    job_id_t tmp_id;
+    
+    gossip_err("%s: enter\n", __func__);
+    gossip_err("%s: extent_handle=%llu extent_index=%d\n",
+        __func__,
+        llu(s_op->u.fsck.extent_handle),
+        s_op->u.fsck.extent_index);
+
+    js_p->error_code = 0;
+
+    /* no handles to process */
+    if (s_op->u.fsck.remote_handles.extent_count == 0)
+    {
+        js_p->error_code = FSCK_SM_ACTION_COMPLETE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* increment index (if finished with all handles) */
+    if (s_op->u.fsck.extent_handle > 
+        s_op->u.fsck.remote_handles.extent_array[s_op->u.fsck.extent_index].last)
+    {
+        s_op->u.fsck.extent_index++;
+    }
+
+    /* processed all handles */
+    if (s_op->u.fsck.extent_index >=
+        s_op->u.fsck.remote_handles.extent_count)
+    {
+        js_p->error_code = FSCK_SM_ACTION_COMPLETE;
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        s_op->u.fsck.extent_handle =
+            s_op->u.fsck.remote_handles.extent_array[s_op->u.fsck.extent_index].first;
+    }
+
+    /* set ds_attr */
+    if (s_op->u.fsck.ds_op == 1)
+    {
+        s_op->u.fsck.ds_attr.__pad1 |= DS_MAINT_FSCK;
+
+        ret = job_trove_dspace_setattr(
+                  s_op->target_fs_id,
+                  s_op->u.fsck.extent_handle,
+                  &s_op->u.fsck.ds_attr,
+                  TROVE_SYNC,
+                  smcb,
+                  0,
+                  js_p,
+                  &tmp_id,
+                  server_job_context,
+                  s_op->req->hints);
+
+        s_op->u.fsck.ds_op = 0;
+
+        /* increment handle */
+        s_op->u.fsck.extent_handle++;
+    }
+    /* get ds_attr */
+    else
+    {
+        ret = job_trove_dspace_getattr(
+                  s_op->target_fs_id,
+                  s_op->u.fsck.extent_handle,
+                  smcb,
+                  &s_op->u.fsck.ds_attr,
+                  0,
+                  js_p,
+                  &tmp_id,
+                  server_job_context,
+                  s_op->req->hints);
+
+        s_op->u.fsck.ds_op = 1;
+    }
+ 
+    gossip_err("%s: leave\n", __func__);
+
+    return ret;
+}
+
+static PINT_sm_action fsck_sm_phase_2_analyze(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_context_id context_id;
+    PINT_sm_action ret;
+    TROVE_op_id tmp_id; 
+    int trove_completion;
+    PVFS_handle *handle_array;
+    int handle_count;
+    PVFS_ds_attributes ds_attr;
+    int i;
+
+    gossip_err("%s: enter\n", __func__);
+
+    if (s_op->u.fsck.position == PVFS_ITERATE_END)
+    {
+        js_p->error_code = FSCK_SM_ACTION_COMPLETE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    handle_count = 100;
+    handle_array = malloc(sizeof(PVFS_handle)*handle_count);
+    if (!handle_array)
+    {
+        gossip_err("%s: malloc failed\n", __func__);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = trove_open_context(s_op->target_fs_id, &context_id);
+    if (ret < 0)
+    {
+        gossip_err("trove_open_context failed: ret=%d coll=%llu cntx=%llu\n",
+                   ret, llu(s_op->target_fs_id), llu(context_id));
+        goto complete;
+    }
+
+    /* force immediate completion for these ops */
+    trove_completion=1;
+    ret = trove_collection_setinfo(s_op->target_fs_id, context_id,
+                                   TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                                   &trove_completion);
+    if (ret < 0)
+    {
+        gossip_err("trove_collection_setinfo failed: "
+                   "ret=%d coll=%llu cntx=%llu\n",
+                   ret, llu(s_op->target_fs_id), llu(context_id));
+        goto complete;
+    }
+
+    ret = trove_dspace_iterate_handles(
+              s_op->target_fs_id,
+              &s_op->u.fsck.position,
+              handle_array,
+              &handle_count,
+              0,
+              NULL,
+              NULL,
+              context_id,
+              &tmp_id);
+    if (ret != 1)
+    {
+        gossip_err("%s: trove_dspace_iterate_handles failed\n", __func__);
+        js_p->error_code = ret;
+        ret = SM_ACTION_COMPLETE;
+        goto complete;
+    }
+
+    for (i=0; i<handle_count; i++)
+    {
+        ret = trove_dspace_getattr(
+                  s_op->target_fs_id,
+                  handle_array[i],
+                  &ds_attr,
+                  0,
+                  NULL,
+                  context_id,
+                  &tmp_id,
+                  s_op->req->hints);
+        if (ret == 1)
+        {
+            if ((ds_attr.__pad1 & DS_MAINT_FSCK) != DS_MAINT_FSCK)
+            {
+                fsck_put_repair(handle_array[i], FSCK_OP_MOVE, handle_array[i]);
+            }
+        }
+    }
+
+complete:
+    (void) trove_close_context(s_op->target_fs_id, context_id);
+    free(handle_array);
+
+    gossip_err("%s: leave\n", __func__);
+
+    js_p->error_code = ret;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fsck_sm_phase_2_callback(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    PINT_smcb *smcb = v_p;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    
+    gossip_err("%s: enter\n", __func__);
+
+    assert(resp_p->op == PVFS_SERV_MGMT_FSCK);
+
+    s_op->u.fsck.error_array[index] = resp_p->status;
+    s_op->u.fsck.remote_handles.extent_count =
+        resp_p->u.mgmt_fsck.remote_handles.extent_count;
+    memcpy(s_op->u.fsck.remote_handles.extent_array,
+           resp_p->u.mgmt_fsck.remote_handles.extent_array,
+           sizeof(PVFS_handle_extent)*
+               resp_p->u.mgmt_fsck.remote_handles.extent_count);
+
+    gossip_err("%s: status=%d\n", __func__, resp_p->status);
+    gossip_err("%s: count=%d\n", __func__,
+         resp_p->u.mgmt_fsck.remote_handles.extent_count);
+    gossip_err("%s: leave\n", __func__);
+
+    return 0;
+}
+
+/*
+ * Support Functions
+ */
+
+static int fsck_get_control(PVFS_fs_id coll_id, fsck_control *ctrl)
+{
+    TROVE_keyval_s  key;
+    TROVE_keyval_s  val;
+    TROVE_op_id     op_id;
+    PVFS_context_id context_id;
+    int             trove_completion;
+    int             ret;
+    int             op_count = 1;
+
+    key.buffer    = TROVE_FSCK_KEY;
+    key.buffer_sz = strlen(TROVE_FSCK_KEY);
+    val.buffer    = ctrl;
+    val.buffer_sz = sizeof(fsck_control);
+
+    ret = trove_open_context(coll_id, &context_id);
+    if (ret < 0)
+    {
+        gossip_err("trove_open_context failed: ret=%d coll=%llu cntx=%llu\n",
+                   ret, llu(coll_id), llu(context_id));
+        return ret;
+    }
+
+    /* force immediate completion for these ops */
+    trove_completion=1;
+    ret = trove_collection_setinfo(coll_id, context_id,
+                                   TROVE_COLLECTION_IMMEDIATE_COMPLETION,
+                                   &trove_completion);
+    if (ret < 0)
+    {
+        gossip_err("trove_collection_setinfo failed: "
+                   "ret=%d coll=%llu cntx=%llu\n",
+                   ret, llu(coll_id), llu(context_id));
+        goto complete;
+    }
+
+    ret = trove_collection_geteattr(coll_id, &key, &val, 0,
+              NULL, context_id, &op_id);
+    if (ret == -TROVE_ENOENT)
+    {
+        /* create default state */
+        ctrl->state     = FSCK_IDLE;
+        ctrl->phase     = FSCK_COMPLETE;
+        ctrl->uid       = 0;
+        ret = 1;
+    }
+    else if (ret < 0)
+    {
+        gossip_err("trove_collection_geteattr failed: err=%d coll=%d \
+                   op=%llu context=%llu count=%d\n",
+                   ret, coll_id, llu(op_id), llu(context_id),
+                   op_count);
+    }
+
+complete:
+    (void) trove_close_context(coll_id, context_id);
+
+    return ret;
+}
+
+static int fsck_put_control(PVFS_fs_id coll_id, fsck_control *ctrl)
+{
+    TROVE_keyval_s  key;
+    TROVE_keyval_s  val;
+    TROVE_op_id     op_id;
+    TROVE_ds_state  state;
+    PVFS_context_id context_id;
+    int             ret;
+    int             op_count = 1;
+
+    key.buffer    = TROVE_FSCK_KEY;
+    key.buffer_sz = strlen(TROVE_FSCK_KEY);
+    val.buffer    = ctrl;
+    val.buffer_sz = sizeof(fsck_control);
+
+    ret = trove_open_context(coll_id, &context_id);
+    if (ret < 0)
+    {
+        gossip_err("trove_open_context failed: ret=%d coll=%llu cntx=%llu\n",
+                   ret, llu(coll_id), llu(context_id));
+        return ret;
+    }
+
+    ret = trove_collection_seteattr(coll_id, &key, &val, 0,
+              NULL, context_id, &op_id);
+    while (ret == 0)
+    {
+        ret = trove_dspace_test(coll_id, op_id, context_id, &op_count,
+                  NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
+    }
+    if (ret < 0)
+    {
+        gossip_err("trove failed: err=%d coll=%d \
+                   op=%llu context=%llu count=%d state=%d\n",
+                   ret, coll_id, llu(op_id), llu(context_id),
+                   op_count, state);
+    }
+
+    (void) trove_close_context(coll_id, context_id);
+
+    return ret;
+}
+
+static int fsck_get_repair (
+    PVFS_ds_position *position,
+    uint64_t *count,
+    PVFS_mgmt_fsck_repair *repair_list)
+{
+    FILE  *f;
+    size_t offset;
+    size_t n_read;
+
+    if (*position == PVFS_ITERATE_START) *position = 0;
+
+    offset = (*position)*sizeof(*repair_list);
+
+    f = fopen("/tmp/repair.log", "r");
+
+    (void) fseek(f, offset, SEEK_SET);
+
+    n_read = fread(repair_list, sizeof(*repair_list), *count, f);
+    if (n_read < 0)
+    {
+        gossip_err("%s: read error: %d\n", __func__, errno);
+    }
+
+    *count = n_read;
+
+    if (feof(f))
+        *position = PVFS_ITERATE_END;
+    else
+        *position += n_read;
+
+    fclose(f);
+
+    return 0;
+}
+
+#define fsck_repair_op2str(op) \
+  ((op) == FSCK_OP_DELETE) ? "delete" : \
+   (((op) == FSCK_OP_CREATE ? "create" : \
+    (((op) == FSCK_OP_MOVE) ? "move" : "unknown")))
+
+static int fsck_put_repair (
+    PVFS_handle parent, PVFS_fsck_op operation, PVFS_handle child)
+{
+    repair_item        *item;
+    int                 ret;
+
+    gossip_err("%s: enter\n", __func__);
+    printf ("repair: parent:%llu op:%s target:%llu\n",
+            llu(parent), fsck_repair_op2str(operation), llu(child));
+
+    item = malloc(sizeof(*item));
+    if (!item)
+    {
+        gossip_err("%s: malloc failed: size=%ld\n", __func__, sizeof(*item));
+    }
+
+    item->repair.parent    = parent;
+    item->repair.child     = child;
+    item->repair.operation = operation;
+
+    qlist_add_tail(&item->link, &repair_q);
+
+    gossip_err("%s: leave\n", __func__);
+
+    return 0;
+}
+
+static void fsck_flush_repair (void)
+{
+    FILE *f;
+    repair_item *item;
+    size_t b_write;
+
+    f = fopen("/tmp/repair.log", "a");
+    if (!f)
+    {
+        gossip_err("%s: open failed: errno=%d path=%s\n",
+            __func__, errno, "/tmp/repair.log");
+        return;
+    }
+
+    while (!qlist_empty(&repair_q))
+    {
+        item = (repair_item *) qlist_pop(&repair_q);
+        b_write = fwrite(&item->repair, sizeof(item->repair), 1, f);
+        if (b_write != sizeof(item->repair))
+        {
+            gossip_err("%s: write failed: size=%ld\n", __func__, b_write);
+        }
+    }
+    fclose(f);
+
+    return;
+}
+
+/*
+ * Server State Machine Hooks
+ */
+
+static inline int PINT_get_object_ref_fsck(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id  = req->u.mgmt_fsck.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_fsck_params =
+{
+    .string_name    = "fsck",
+    .perm           = PINT_SERVER_CHECK_NONE,
+    .access_type    = PINT_server_req_readonly,
+    .sched_policy   = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_fsck,
+    .state_machine  = &pvfs2_fsck_sm
+};
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

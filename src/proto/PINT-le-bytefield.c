@@ -254,6 +254,11 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listattr;
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
+            case PVFS_SERV_MGMT_FSCK:
+                resp.u.mgmt_fsck.count = 0;
+                reqsize  = 0;
+                respsize = extra_size_PVFS_servresp_mgmt_fsck;
+                break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -413,6 +418,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+        CASE(PVFS_SERV_MGMT_FSCK, mgmt_fsck);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -508,6 +514,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_MGMT_FSCK, mgmt_fsck);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -617,6 +624,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_MGMT_FSCK, mgmt_fsck);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -702,6 +710,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_MGMT_FSCK, mgmt_fsck);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -845,6 +854,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
+            case PVFS_SERV_MGMT_FSCK:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
@@ -941,6 +951,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         }
                         break;
                     }
+                case PVFS_SERV_MGMT_FSCK:
+                    if (resp->u.mgmt_fsck.log)
+                        decode_free(resp->u.mgmt_fsck.log);
+                    if (resp->u.mgmt_fsck.remote_handles.extent_array)
+                        decode_free(resp->u.mgmt_fsck.remote_handles.extent_array);
+                    break;
                 case PVFS_SERV_GETCONFIG:
                 case PVFS_SERV_REMOVE:
                 case PVFS_SERV_MGMT_REMOVE_OBJECT:

@@ -43,7 +43,8 @@ ifdef BUILD_SERVER
 		$(DIR)/list-eattr.c \
 		$(DIR)/unexpected.c \
 		$(DIR)/precreate-pool-refiller.c \
-		$(DIR)/unstuff.c
+		$(DIR)/unstuff.c \
+                $(DIR)/fsck.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

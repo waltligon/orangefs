@@ -27,7 +27,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 0
+#define PVFS2_PROTO_MINOR 1
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -79,6 +79,7 @@ enum PVFS_server_op
     PVFS_SERV_BATCH_REMOVE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
+    PVFS_SERV_MGMT_FSCK = 39,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -148,6 +149,10 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 113
+/* max number of handle repairs to return */
+#define PVFS_REQ_LIMIT_MAX_REPAIRS 1000
+/* max number of handle extents to return */
+#define PVFS_REQ_LIMIT_MAX_EXTENTS 512
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -1426,6 +1431,70 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_mgmt_iterate_handles \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
+/* mgmt_fsck **************************************************/
+/* initiates a fsck on the server                             */
+
+struct PVFS_servreq_mgmt_fsck
+{
+    PVFS_fs_id        fs_id;
+    PVFS_mgmt_fsck_op operation;
+    int64_t           uid;
+    PVFS_ds_position  position;
+    uint64_t          count;
+};
+endecode_fields_5_struct(
+    PVFS_servreq_mgmt_fsck,
+    PVFS_fs_id,        fs_id,
+    PVFS_mgmt_fsck_op, operation,
+    int64_t,           uid,
+    PVFS_ds_position,  position,
+    uint64_t,          count);
+
+#define PINT_SERVREQ_MGMT_FSCK_FILL(__req,                         \
+                                    __creds,                       \
+                                    __fs_id,                       \
+                                    __operation,                   \
+                                    __uid,                         \
+                                    __position,                    \
+                                    __count,                       \
+                                    __hints)                       \
+do {                                                               \
+    memset(&(__req), 0, sizeof(__req));                            \
+    (__req).op = PVFS_SERV_MGMT_FSCK;                              \
+    (__req).credentials = (__creds);                               \
+    (__req).hints = (__hints);                                     \
+    (__req).u.mgmt_fsck.fs_id = (__fs_id);                         \
+    (__req).u.mgmt_fsck.operation = (__operation);                 \
+    (__req).u.mgmt_fsck.uid  = (__uid);                            \
+    (__req).u.mgmt_fsck.position  = (__position);                  \
+    (__req).u.mgmt_fsck.count  = (__count);                        \
+} while (0)
+
+struct PVFS_servresp_mgmt_fsck
+{
+    PVFS_mgmt_fsck_state  state;
+    PVFS_mgmt_fsck_phase  phase;
+    PVFS_ds_position      position;
+    PVFS_handle_extent_array remote_handles;
+    uint64_t              count;
+    PVFS_mgmt_fsck_repair *log;
+};
+endecode_fields_6a_struct(
+    PVFS_servresp_mgmt_fsck,
+    PVFS_mgmt_fsck_state,    state,
+    skip4,,
+    PVFS_mgmt_fsck_phase,    phase,
+    skip4,,
+    PVFS_ds_position,        position,
+    PVFS_handle_extent_array, remote_handles,
+    uint64_t,                count,
+    PVFS_mgmt_fsck_repair_s, log
+);
+#define extra_size_PVFS_servresp_mgmt_fsck  \
+    (PVFS_REQ_LIMIT_MAX_REPAIRS * sizeof(PVFS_mgmt_fsck_repair) + \
+     PVFS_REQ_LIMIT_MAX_EXTENTS * sizeof(PVFS_handle_extent))
+
+
 /* mgmt_dspace_info_list **************************************/
 /* - returns low level dspace information for a list of handles */
 
@@ -1745,6 +1814,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
+        struct PVFS_servreq_mgmt_fsck mgmt_fsck;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1798,6 +1868,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_mgmt_fsck mgmt_fsck;
     } u;
 };
 endecode_fields_2_struct(

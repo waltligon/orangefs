@@ -396,6 +396,27 @@ struct PINT_server_unstuff_op
     void* encoded_layout;
 };
 
+/* comment which SM actions use these variables */
+struct PINT_server_fsck_op
+{
+    PINT_sm_msgarray_op  msgarray_op;
+    PVFS_ds_position     position;
+    PVFS_BMI_addr_t      server_addr;
+    int                  parallel_sm;
+    int                  handle_count;
+    PVFS_error          *error_array;
+    PVFS_handle          handle;
+    PVFS_handle         *handle_array;
+    PVFS_handle         *dfile_array;
+    PVFS_dirent         *dirent_array;
+    PVFS_handle          dirdata_handle;
+    PVFS_handle_extent_array remote_handles;
+    PVFS_handle          extent_handle;
+    int                  extent_index;
+    int                  ds_op;
+    PVFS_ds_attributes   ds_attr;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -480,6 +501,7 @@ typedef struct PINT_server_op
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;
+        struct PINT_server_fsck_op fsck;
     } u;
 
 } PINT_server_op;
