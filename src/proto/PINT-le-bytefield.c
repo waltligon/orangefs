@@ -128,6 +128,8 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_MIRROR:
                  req.u.mirror.dist = &tmp_dist;
+                 req.u.mirror.bsize = 0;
+                 req.u.mirror.dst_count = 0;
                  reqsize = extra_size_PVFS_servreq_mirror;
                  respsize = extra_size_PVFS_servresp_mirror;
                  break;
