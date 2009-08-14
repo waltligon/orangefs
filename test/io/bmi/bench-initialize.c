@@ -350,7 +350,7 @@ int bench_initialize_bmi_addresses_client(
     {
 	ret = BMI_post_sendunexpected(&bmi_id, server_array[i], &ret,
 				      sizeof(int), BMI_EXT_ALLOC, 0, NULL,
-				      context);
+				      context, NULL);
 	if (ret == 0)
 	{
 	    do

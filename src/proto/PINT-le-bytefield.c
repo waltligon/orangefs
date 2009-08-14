@@ -91,6 +91,7 @@ static void lebf_initialize(void)
     }
 
     for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
+        memset(&req.u, 0, sizeof(req.u));
 	req.op = resp.op = op_type;
 	reqsize = 0;
 	respsize = 0;
@@ -128,6 +129,7 @@ static void lebf_initialize(void)
                 break;
             case PVFS_SERV_MIRROR:
                  req.u.mirror.dist = &tmp_dist;
+                 req.u.mirror.dst_count = 0;
                  reqsize = extra_size_PVFS_servreq_mirror;
                  respsize = extra_size_PVFS_servresp_mirror;
                  break;
@@ -165,7 +167,7 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_UNSTUFF:
 		resp.u.unstuff.attr.mask = 0;
-		respsize = extra_size_PVFS_servresp_getattr;
+		respsize = extra_size_PVFS_servresp_unstuff;
 		break;
 	    case PVFS_SERV_SETATTR:
 		req.u.setattr.attr.mask = 0;

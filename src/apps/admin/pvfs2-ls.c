@@ -961,7 +961,7 @@ int main(int argc, char **argv)
             substr = &user_opts->start[i][strlen(user_opts->start[i])-1];
         }
 
-        while (index != substr)
+        while ((index != substr) && (substr != NULL))
         {
             index++;
             j++;

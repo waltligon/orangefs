@@ -11,6 +11,7 @@
 #include <math.h>
 #include <mpi.h>
 #include "bench-args.h"
+#include "pvfs2.h"
 
 #ifndef __BENCH_INITIALIZE_H
 #define __BENCH_INITIALIZE_H
