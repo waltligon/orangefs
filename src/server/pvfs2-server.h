@@ -551,7 +551,7 @@ struct PINT_server_unstuff_op
     void* encoded_layout;
 };
 
-struct PINT_server_tree_remove_op
+struct PINT_server_tree_communicate_op
 {
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
@@ -650,7 +650,7 @@ typedef struct PINT_server_op
         struct PINT_server_unstuff_op unstuff;
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
-        struct PINT_server_tree_remove_op tree_remove;
+        struct PINT_server_tree_communicate_op tree_communicate;
     } u;
 
 } PINT_server_op;
@@ -715,6 +715,7 @@ extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

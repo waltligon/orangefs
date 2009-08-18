@@ -465,7 +465,9 @@ static PINT_sm_action getattr_interpret(
         return(SM_ACTION_COMPLETE);
     }
 
+/*
   gossip_err("Attributes show file as stuffed.\n");
+*/
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "unstuff found stuffed file.\n");
     js_p->error_code = STATE_UNSTUFF;

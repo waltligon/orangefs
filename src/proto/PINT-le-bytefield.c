@@ -267,6 +267,11 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_listattr;
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
+	    case PVFS_SERV_TREE_GET_FILE_SIZE:
+		req.u.tree_get_file_size.handle_array = NULL;
+		req.u.tree_get_file_size.num_data_files = 0;
+		reqsize = extra_size_PVFS_servreq_tree_get_file_size;
+		break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -411,6 +416,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
+	CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
@@ -531,6 +537,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -621,6 +628,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_TREE_REMOVE, tree_remove);
+	CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
@@ -731,6 +739,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -855,6 +864,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
 	    case PVFS_SERV_TREE_REMOVE:
 		decode_free(req->u.tree_remove.handle_array);
+		break;
+
+	    case PVFS_SERV_TREE_GET_FILE_SIZE:
+		decode_free(req->u.tree_get_file_size.handle_array);
 		break;
 
 
@@ -1020,6 +1033,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_REMOVE:
+                case PVFS_SERV_TREE_GET_FILE_SIZE:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:

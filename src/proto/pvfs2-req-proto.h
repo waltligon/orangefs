@@ -82,6 +82,7 @@ enum PVFS_server_op
     PVFS_SERV_MIRROR = 39,
     PVFS_SERV_IMM_COPIES = 40,
     PVFS_SERV_TREE_REMOVE = 41,
+    PVFS_SERV_TREE_GET_FILE_SIZE = 42,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -424,6 +425,44 @@ do {                                                                     \
     (__req).u.tree_remove.num_data_files = (__num_data_files);           \
     (__req).u.tree_remove.handle_array = (__handle_array);               \
 } while (0)
+
+struct PVFS_servreq_tree_get_file_size
+{
+    PVFS_fs_id  fs_id;
+    uint32_t num_data_files;
+    PVFS_handle *handle_array;
+};
+endecode_fields_1a_struct(
+    PVFS_servreq_tree_get_file_size,
+    PVFS_fs_id, fs_id,
+    uint32_t, num_data_files,
+    PVFS_handle, handle_array)
+#define extra_size_PVFS_servreq_tree_get_file_size \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                      \
+                                 __creds,                                \
+                                 __fsid,                                 \
+                                 __num_data_files,                       \
+                                 __handle_array,                         \
+                                 __hints)                                \
+do {                                                                     \
+    memset(&(__req), 0, sizeof(__req));                                  \
+    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                           \
+    (__req).hints = (__hints);                                           \
+    (__req).credentials = (__creds);                                     \
+    (__req).u.tree_get_file_size.fs_id = (__fsid);                       \
+    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);    \
+    (__req).u.tree_get_file_size.handle_array = (__handle_array);        \
+} while (0)
+
+struct PVFS_servresp_tree_get_file_size
+{
+    PVFS_size size;
+};
+endecode_fields_1_struct(
+    PVFS_servresp_tree_get_file_size,
+    PVFS_size, size)
 
 /* mgmt_get_dirdata_handle */
 /* - used to retrieve the dirdata handle of the specified parent ref */
@@ -1889,6 +1928,7 @@ struct PVFS_server_req
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
+        struct PVFS_servreq_tree_get_file_size tree_get_file_size;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1943,6 +1983,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
+        struct PVFS_servresp_tree_get_file_size tree_get_file_size;
     } u;
 };
 endecode_fields_2_struct(
