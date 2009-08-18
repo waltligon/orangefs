@@ -140,7 +140,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     struct server_configuration_s *server_config = get_server_config_struct();
     int ret = -PVFS_EINVAL;
 //    PINT_sm_msgpair_state *msg_p = NULL;
-    struct PVFS_server_req *req;
+    struct PVFS_server_req *req = NULL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "tree_communicate_partition_handles entered\n");
     s_op->u.tree_communicate.handle_array_local = malloc(
