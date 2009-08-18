@@ -653,7 +653,7 @@ PVFS_error PVFS_sys_listeattr(
 
 PVFS_error PVFS_isys_getvalue(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_ds_position *token,
     const PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
     PVFS_ds_keyval *val_p,
@@ -666,7 +666,7 @@ PVFS_error PVFS_isys_getvalue(
 
 PVFS_error PVFS_sys_getvalue(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_ds_position *token,
     const PVFS_credentials *credentials,
     PVFS_ds_keyval *key,
     PVFS_ds_keyval *val,

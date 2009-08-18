@@ -96,7 +96,6 @@ int main(int argc, char **argv)
         (char *)user_opts->val.buffer, ref.fs_id, llu(ref.handle));
 
     PVFS_util_gen_credentials(&credentials);
-
     ret = pvfs2_getval( ref, user_opts, &credentials);
 
     if (ret != 0) 
@@ -115,48 +114,91 @@ int main(int argc, char **argv)
 static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt, 
                         const PVFS_credentials *creds) 
 {
-    int ret = -1, lpath_len = 0, i = 0;
+    int ret = -1, lpath_len = 0, i = 0, j = 0, srv_count=0, all_end=0;
     char *local_path = NULL;
     struct PINT_client_getvalue_sm resp;
     struct dbpf_keyval_db_entry *key_entry;
-    PVFS_ds_position token = PVFS_ITERATE_START;
-    PVFS_sysresp_getvalue resp_getvalue;
+    PVFS_ds_position *token = NULL;
+    PVFS_sysresp_getvalue *resp_getvalue;
     PVFS_dirent d;
 
     memset(&resp, 0, sizeof(struct PINT_client_getvalue_sm));
-    memset(&resp_getvalue, 0, sizeof(struct PINT_client_getvalue_sm));
     memset(&d, 0, sizeof(PVFS_dirent));
 
-    resp_getvalue.key = 
-        (PVFS_ds_keyval *)malloc( sizeof(PVFS_ds_keyval) * opt->count );
-    resp_getvalue.val = 
-        (PVFS_ds_keyval *)malloc( sizeof(PVFS_ds_keyval) * opt->count );
-    resp_getvalue.dirent = malloc( sizeof(PVFS_dirent) * opt->count );
-
-    memset( resp_getvalue.key, 0, sizeof(PVFS_ds_keyval) * opt->count );
-    memset( resp_getvalue.val, 0, sizeof(PVFS_ds_keyval) * opt->count );
-    memset( resp_getvalue.dirent, 0, sizeof(PVFS_dirent) * opt->count );
-
-    for( i = 0; i < opt->count; i++ )
+    ret = PINT_cached_config_count_servers( obj.fs_id,
+        PINT_SERVER_TYPE_META, &(srv_count) );
+    if( srv_count < 1 )
     {
-        resp_getvalue.key[i].buffer = malloc( KEYBUFSZ + 1);
-        resp_getvalue.val[i].buffer = malloc( VALBUFSZ + 1);
-        memset( resp_getvalue.key[i].buffer, 0, KEYBUFSZ+1 );
-        memset( resp_getvalue.val[i].buffer, 0, VALBUFSZ+1 );
+        gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
+                   ret, srv_count);
+    }
 
-        resp_getvalue.key[i].buffer_sz = KEYBUFSZ + 1;
-        resp_getvalue.val[i].buffer_sz = VALBUFSZ + 1;
+    printf("Number of servers: %d\n", srv_count);
+
+    if( (token = malloc(srv_count * sizeof(PVFS_ds_position)) ) == 0 )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: malloc failure for "
+                     " token\n");
+        PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+        return -PVFS_ENOMEM;
+    }
+
+    for( i = 0; i < srv_count; i++ )
+    {
+        token[i] = PVFS_ITERATE_START;
+    }
+
+    if( (resp_getvalue = calloc(srv_count, sizeof(PVFS_sysresp_getvalue)))
+        == 0 )
+    {
+        PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+        return -PVFS_ENOMEM;
+    }
+
+    for( i = 0; i < srv_count; i++ )
+    {
+        if( (resp_getvalue[i].key = 
+             (PVFS_ds_keyval *)calloc(opt->count, sizeof(PVFS_ds_keyval)))==0 )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return -PVFS_ENOMEM;
+        }
+
+        if( (resp_getvalue[i].val = 
+             (PVFS_ds_keyval *)calloc(opt->count, sizeof(PVFS_ds_keyval)))==0 )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return -PVFS_ENOMEM;
+        }
+        
+        if( (resp_getvalue[i].dirent = 
+             calloc(opt->count, sizeof(PVFS_dirent)))==0 )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return -PVFS_ENOMEM;
+        }
+
+        for( j = 0; j < opt->count; j++ )
+        {
+            resp_getvalue[i].key[j].buffer = malloc( KEYBUFSZ + 1);
+            resp_getvalue[i].val[j].buffer = malloc( VALBUFSZ + 1);
+            memset( resp_getvalue[i].key[j].buffer, 0, KEYBUFSZ+1 );
+            memset( resp_getvalue[i].val[j].buffer, 0, VALBUFSZ+1 );
+
+            resp_getvalue[i].key[j].buffer_sz = KEYBUFSZ + 1;
+            resp_getvalue[i].val[j].buffer_sz = VALBUFSZ + 1;
+        }
     }
 
     printf("Asking for %u records\n", opt->count );
 
-    while( token != PVFS_ITERATE_END )
+    while( ! all_end )
     {
         ret = PVFS_sys_getvalue(obj, token, creds,  &(opt->key), &(opt->val), 
-            opt->query, opt->count, &resp_getvalue, NULL);
+            opt->query, opt->count, resp_getvalue, NULL);
 
         printf("Call returned, query matched records: %d \n", 
-            resp_getvalue.match_count);
+            resp_getvalue[i].match_count);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_getvalue", ret);
@@ -164,27 +206,33 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
         }
         else
         {
-            token = resp_getvalue.token;
-            printf("\tThis call returned %d records\n", resp_getvalue.count);
-
-            /* have to prepend local mount point to path returned
-             * from server */
-            for( i = 0; i < resp_getvalue.count; i++ )
+            all_end = 0;
+            for( i = 0; i < srv_count; i++ )
             {
-                lpath_len = strlen(resp_getvalue.dirent[i].d_name) +
-                         strlen(opt->pvfs_root) + 1;
-                local_path = malloc(lpath_len);
-                memset(local_path, 0, lpath_len);
-                strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));
-                strncpy( local_path+strlen(opt->pvfs_root ), 
-                      resp_getvalue.dirent[i].d_name, 
-                         strlen(resp_getvalue.dirent[i].d_name) );
+                token[i] = resp_getvalue[i].token;
+                printf("\tResp %d returned %d records\n", i, 
+                    resp_getvalue[i].count);
+
+                /* have to prepend local mount point to path returned
+                 * from server */
+                for( j = 0; j < resp_getvalue[i].count; j++ )
+                {
+                    lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
+                             strlen(opt->pvfs_root) + 1;
+                    local_path = malloc(lpath_len);
+                    memset(local_path, 0, lpath_len);
+                    strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));
+                    strncpy( local_path+strlen(opt->pvfs_root ), 
+                          resp_getvalue[i].dirent[j].d_name, 
+                             strlen(resp_getvalue[i].dirent[j].d_name) );
                
-                key_entry = resp_getvalue.key[i].buffer;
-                printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
-                       local_path, llu(key_entry->handle), 
-                       resp_getvalue.token, key_entry->key, 
-                       (char *)resp_getvalue.val[i].buffer);
+                    key_entry = resp_getvalue[i].key[j].buffer;
+                    printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
+                        local_path, llu(key_entry->handle), 
+                        token[i], key_entry->key, 
+                        (char *)resp_getvalue[i].val[j].buffer);
+                }
+                all_end = (token[i] == PVFS_ITERATE_END)? 1 : 0;
             }
         }
     }

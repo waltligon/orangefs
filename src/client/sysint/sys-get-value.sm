@@ -34,14 +34,14 @@ static int get_value_comp_fn(
 
 machine pvfs2_client_get_value_sm
 {
-    state setup_msgpair
+    state init
     {
         run get_value_setup_msgpair;
-        success => xfer_msgpair;
+        success => getvalue_xfer_msgpair;
         default => cleanup;
     }
 
-    state xfer_msgpair
+    state getvalue_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         default => cleanup;
@@ -58,7 +58,7 @@ machine pvfs2_client_get_value_sm
 
 PVFS_error PVFS_isys_getvalue(
         PVFS_object_ref ref,
-        PVFS_ds_position token,
+        PVFS_ds_position *token,
         const PVFS_credentials *credentials,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
@@ -107,7 +107,7 @@ PVFS_error PVFS_isys_getvalue(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: PVFS_isys_getvalue: sm_p->u.getvalue: "
-                 "resp_p: %p, pos_token: %llu, key_p: %p, val_p: %p\n",  
+                 "resp_p: %p, pos_token: %p, key_p: %p, val_p: %p\n",  
                  sm_p->u.getvalue.resp_p, sm_p->u.getvalue.pos_token, 
                  sm_p->u.getvalue.val_p, sm_p->u.getvalue.key_p);
 
@@ -118,7 +118,7 @@ PVFS_error PVFS_isys_getvalue(
 
 PVFS_error PVFS_sys_getvalue(
         PVFS_object_ref ref,
-        PVFS_ds_position token,
+        PVFS_ds_position *token,
         const PVFS_credentials *credentials,
         PVFS_ds_keyval *key,
         PVFS_ds_keyval *val,
@@ -133,7 +133,7 @@ PVFS_error PVFS_sys_getvalue(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: PVFS_sys_getvalue enter\n");
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: PVFS_sys_getvalue: resp_p: %p, pos_token: %llu, "
+                 "[GETVALUE]: PVFS_sys_getvalue: resp_p: %p, pos_token: %p, "
                  "val: %p\n", resp_p, token, val);
 
     if( resp_p == NULL )
@@ -174,54 +174,85 @@ static PINT_sm_action get_value_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p;
+    int ret = -PVFS_EINVAL, i = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
                  "[GETVALUE]: get_value_setup_msgpair enter, sm_p: %p\n",
                 sm_p);
-
-    PINT_msgpair_init(&sm_p->msgarray_op);
-    msg_p = &sm_p->msgarray_op.msgpair;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: get_value_setup_msgpair: prefill: id: %d, "
-                 "handle: %llu, pos_token: %llu, key_p: %p, val_p: %p,"
-                 "resp_p: %p, query_type: %d, count: %d\n",
-                 sm_p->object_ref.fs_id, sm_p->object_ref.handle, 
-                 sm_p->u.getvalue.pos_token, sm_p->u.getvalue.key_p,
-                 sm_p->u.getvalue.val_p, sm_p->u.getvalue.resp_p,
-                 sm_p->u.getvalue.query_type, sm_p->u.getvalue.count);
-
-    PINT_SERVREQ_GETVALUE_FILL(
-        msg_p->req,
-        (*sm_p->cred_p),
-        sm_p->object_ref.fs_id,
-        sm_p->u.getvalue.query_type,
-        sm_p->u.getvalue.count,
-        sm_p->object_ref.handle,
-        sm_p->u.getvalue.pos_token,
-        (*sm_p->u.getvalue.key_p),
-        (*sm_p->u.getvalue.val_p),
-        sm_p->hints
-        );
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = get_value_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr,
-        msg_p->handle,
-        msg_p->fs_id);
-
-    if (ret)
+    ret = PINT_cached_config_count_servers( sm_p->object_ref.fs_id,
+            PINT_SERVER_TYPE_META, &(sm_p->u.getvalue.srv_count) );
+    if( sm_p->u.getvalue.srv_count < 1 )
     {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = 0;
+        gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
+                   ret, sm_p->u.getvalue.srv_count);
+        js_p->error_code = -PVFS_EINVAL;
+        if( ret != 0 )
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+        }
+        return SM_ACTION_COMPLETE;
     }
 
+    /* allocate server address for msg pairs */
+    if( (sm_p->u.getvalue.server_addresses = 
+         calloc(sm_p->u.getvalue.srv_count, sizeof(PVFS_BMI_addr_t))) == 0 )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "[GETVALUE]: malloc for server address array failed\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_cached_config_get_server_array(sm_p->object_ref.fs_id,
+            PINT_SERVER_TYPE_META, sm_p->u.getvalue.server_addresses,
+            &(sm_p->u.getvalue.srv_count) );
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 
+        sm_p->u.getvalue.srv_count);
+    if( ret != 0 )
+    {
+        gossip_err("Failed to initialize %d msgpairs\n", 
+            sm_p->u.getvalue.srv_count);
+    }
+
+    foreach_msgpair( &sm_p->msgarray_op, msg_p, i)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: FILL\n"
+                     "\ti=%d\n"
+                     "\tmsg_p=%p\n"
+                     "\tcred_p=%p\n"
+                     "\tfs_id=%d\n"
+                     "\tquery_type=%u\n"
+                     "\tcount=%u\n"
+                     "\thandle=%llu\n"
+                     "\tpos_token=%llu\n"
+                     "\tkey_p=%p\n"
+                     "\tval_p=%p\n",
+                     i, msg_p, sm_p->cred_p, sm_p->object_ref.fs_id,
+                     sm_p->u.getvalue.query_type, sm_p->u.getvalue.count,
+                     sm_p->object_ref.handle, sm_p->u.getvalue.pos_token[i],
+                     sm_p->u.getvalue.key_p, sm_p->u.getvalue.val_p );
+        PINT_SERVREQ_GETVALUE_FILL(
+            msg_p->req,
+            (*sm_p->cred_p),
+            sm_p->object_ref.fs_id,
+            sm_p->u.getvalue.query_type,
+            sm_p->u.getvalue.count,
+            sm_p->object_ref.handle,
+            sm_p->u.getvalue.pos_token[i],
+            (*sm_p->u.getvalue.key_p),
+            (*sm_p->u.getvalue.val_p),
+            sm_p->hints
+            );
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = sm_p->object_ref.handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = get_value_comp_fn;
+        msg_p->svr_addr = sm_p->u.getvalue.server_addresses[i];
+    }
+
+    js_p->error_code = 0;
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
@@ -240,6 +271,7 @@ static PINT_sm_action get_value_cleanup(
 
     sm_p->error_code  = js_p->error_code;
 
+    free( sm_p->u.getvalue.server_addresses );
     PINT_SET_OP_COMPLETE;
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_cleanup exit\n");
@@ -256,14 +288,9 @@ static int get_value_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int ret=0, j=0;
 
-    assert(i==0);
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: get_value_comp_fn enter\n");
-    if( resp_p->status != 0 )
-    {
-        return resp_p->status;
-    }
+                 "[GETVALUE]: get_value_comp_fn enter for msgpair %d\n", i);
+    assert(resp_p->op == PVFS_SERV_GETVALUE);
 
     if (sm_p->msgarray_op.msgarray[i].op_status != 0)
     {
@@ -273,41 +300,43 @@ static int get_value_comp_fn(
       return sm_p->msgarray_op.msgarray[i].op_status;
     }
     
-    sm_p->u.getvalue.resp_p->token = resp_p->u.getvalue.token;
-    sm_p->u.getvalue.resp_p->count = resp_p->u.getvalue.count;
-    sm_p->u.getvalue.resp_p->match_count = resp_p->u.getvalue.match_count;
+    sm_p->u.getvalue.resp_p[i].token = resp_p->u.getvalue.token;
+    sm_p->u.getvalue.resp_p[i].count = resp_p->u.getvalue.count;
+    sm_p->u.getvalue.resp_p[i].match_count = resp_p->u.getvalue.match_count;
 
-     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Count is %d\n", 
-                  sm_p->u.getvalue.resp_p->count);
-     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Match is %d\n", 
-                  sm_p->u.getvalue.resp_p->match_count);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Count is %d\n", 
+                 sm_p->u.getvalue.resp_p[i].count);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: Match is %d\n", 
+                 sm_p->u.getvalue.resp_p[i].match_count);
 
-    for( j = 0; j < sm_p->u.getvalue.resp_p->count; j++ )
+    for( j = 0; j < sm_p->u.getvalue.resp_p[i].count; j++ )
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: j: %d\n", j);
 
         /* attribute key */
-        sm_p->u.getvalue.resp_p->key[j].buffer_sz = 
-        sm_p->u.getvalue.resp_p->key[j].read_sz = 
+        sm_p->u.getvalue.resp_p[i].key[j].buffer_sz = 
+        sm_p->u.getvalue.resp_p[i].key[j].read_sz = 
             resp_p->u.getvalue.key[j].buffer_sz;
 
-        memcpy(sm_p->u.getvalue.resp_p->key[j].buffer, 
+        memcpy(sm_p->u.getvalue.resp_p[i].key[j].buffer, 
             resp_p->u.getvalue.key[j].buffer, 
-            sm_p->u.getvalue.resp_p->key[j].buffer_sz );
+            sm_p->u.getvalue.resp_p[i].key[j].buffer_sz );
 
         /* value datum */
-        sm_p->u.getvalue.resp_p->val[j].buffer_sz = 
-        sm_p->u.getvalue.resp_p->val[j].read_sz = 
+        sm_p->u.getvalue.resp_p[i].val[j].buffer_sz = 
+        sm_p->u.getvalue.resp_p[i].val[j].read_sz = 
             resp_p->u.getvalue.val[j].buffer_sz;
 
-        memcpy(sm_p->u.getvalue.resp_p->val[j].buffer, 
+        memcpy(sm_p->u.getvalue.resp_p[i].val[j].buffer, 
             resp_p->u.getvalue.val[j].buffer, 
-            sm_p->u.getvalue.resp_p->val[j].buffer_sz );
+            sm_p->u.getvalue.resp_p[i].val[j].buffer_sz );
 
         /* dirent information for the key */
-        memcpy(&(sm_p->u.getvalue.resp_p->dirent[j]), 
+        memcpy(&(sm_p->u.getvalue.resp_p[i].dirent[j]), 
             &(resp_p->u.getvalue.dirent[j]), sizeof(PVFS_dirent));
     }    
+
+    /* only used internal to calls, safe to free */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "[GETVALUE]: get_value_comp_fn exit\n");
     return ret;

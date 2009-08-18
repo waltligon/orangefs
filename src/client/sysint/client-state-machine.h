@@ -469,12 +469,14 @@ struct PINT_client_listeattr_sm
 
 struct PINT_client_getvalue_sm
 {
-    PVFS_ds_position pos_token;             /* input */
+    PVFS_ds_position *pos_token;            /* input */
     PVFS_ds_keyval *key_p;                  /* input */
     PVFS_ds_keyval *val_p;                  /* input */
     uint32_t query_type;                    /* input */
     uint32_t count;                         /* input */
+    int32_t srv_count;                      /* input */
     PVFS_sysresp_getvalue *resp_p;          /* output */
+    PVFS_BMI_addr_t *server_addresses;
 };
 
 struct PINT_client_perf_count_timer_sm
