@@ -412,29 +412,25 @@ static int dbpf_keyval_read_value_op_svc(struct dbpf_op *op_p)
     memset(&pkey, 0, sizeof(pkey));
     memset(&key_entry, 0, sizeof(key_entry));
 
-    /* size of key to lookup is length of the key and the value */
+    /* size of key is length of the attr and value (minus 1 null) */
     lookup_key_sz = op_p->u.v_read.key->buffer_sz + 
-                    op_p->u.v_read.val->buffer_sz;
+                    op_p->u.v_read.val->buffer_sz - 1;
 
-    if( (lookup_key = malloc( DBPF_MAX_KEY_LENGTH * 2 )) == 0 )
+    if( (lookup_key = calloc( 2, DBPF_MAX_KEY_LENGTH )) == 0 )
     { 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: malloc for "
                      "key_data failed.\n");
         return -TROVE_ENOMEM;
     }
 
-    if( (original_key = malloc( DBPF_MAX_KEY_LENGTH * 2 )) == 0 )
+    if( (original_key = calloc( 2, DBPF_MAX_KEY_LENGTH )) == 0 )
     { 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: malloc for "
                      "key_data failed.\n");
         free(lookup_key);
         return -TROVE_ENOMEM;
     }
-    memset(lookup_key, 0, DBPF_MAX_KEY_LENGTH * 2 );
-    memset(original_key, 0, DBPF_MAX_KEY_LENGTH * 2 );
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: key buffer: %d\n",
-                 op_p->u.v_read.key->buffer_sz);
     /* only copy  data into key if buffer is greater than 1 (null-string) */
     if( op_p->u.v_read.key->buffer_sz > 1 )
     { 
@@ -459,21 +455,18 @@ static int dbpf_keyval_read_value_op_svc(struct dbpf_op *op_p)
         return -TROVE_EINVAL;
     }
     /* store the original lookup key based on key, val from v_read */
-    memcpy(original_key, lookup_key, 
-        (op_p->u.v_read.key->buffer_sz + op_p->u.v_read.val->buffer_sz - 1) );
+    memcpy(original_key, lookup_key, lookup_key_sz );
 
     /* malloc for largest possible datum as 'value' portion of query may be
      * partial */
-    if( (val_datum = malloc(DBPF_MAX_KEY_LENGTH)) == 0)
+    if( (val_datum = calloc(1, DBPF_MAX_KEY_LENGTH)) == 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: malloc for "
                    " val_datum failed.\n");
         free(lookup_key);
         free(original_key);
         return -TROVE_ENOMEM;
-    
     }
-    memset(val_datum, 0, DBPF_MAX_KEY_LENGTH );
 
     key.data = lookup_key;
     key.ulen = (2 * DBPF_MAX_KEY_LENGTH);
@@ -759,6 +752,7 @@ return_error:
     }
     dbc_p->c_close(dbc_p);
     free(lookup_key);
+    free(original_key);
     free(val_datum);
     return ret;
 }
@@ -2739,10 +2733,11 @@ static int dbpf_build_path_of_handle( DBC *dbc_p,
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "[DBPF KEYVAL]: Failed finding parent handle for: "
-                         "handle %llu, ulen: %d, size: %d, %s\n", 
+                         "[DBPF KEYVAL]: No parent handle for "
+                         "%llu, ulen: %d, size: %d, had built: %s, "
+                         "bdb error: %s\n", 
                          llu( key_entry.handle), data.ulen, data.size,
-                         db_strerror(ret));
+                         path, db_strerror(ret));
             ret = -dbpf_db_error_to_trove_error(ret);
             return ret;
         }
@@ -2764,33 +2759,30 @@ int PINT_trove_dbpf_keyval_secondary_callback(
 
     /* for attributes prefixed with user create a secondary key of the form
      * <attribute><value> */
-    if( ( pkey->size > ((sizeof(PVFS_handle) + strlen("user."))) ) &&
-        ( memcmp(k->key, "user.", 5) == 0) )
+    if( ( ( pkey->size-sizeof(PVFS_handle)) > strlen("user.")) && 
+          ( memcmp(k->key, "user.", 5) == 0 ) )
     {
         /* size of new key is length of the attribute plus length of value */
-        if( (key_data = malloc(strlen(k->key)+strlen(pdata->data) + 1) ) == 0 )
+        if( (key_data = calloc( 1, (strlen(k->key) + pdata->size + 1) )) == 0 )
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "[DBPF KEYVAL]: malloc for secondary_callback "
                          "for new attribute/value key failed.\n");
             return TROVE_ENOMEM;
         }
-        memset(key_data, 0, (strlen(k->key) + strlen(pdata->data)+1));
     
         /* copy attribute to start of key */
         memcpy(key_data, k->key, strlen(k->key) );
     
         /* copy value directly after key */
-        memcpy((key_data + strlen(k->key)), pdata->data, strlen(pdata->data));
-        skey->ulen = skey->size = strlen(key_data) + 1;
+        memcpy((key_data + strlen(k->key)), pdata->data, pdata->size);
+        skey->ulen = skey->size = strlen(k->key) + pdata->size;
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: CREATING "
-                     "SECONDARY INDEX (%s) (%d) -> "
-                     "[(%llu)(%s) (%d)]:[(%s) (%d)]\n", 
+                     "SECONDARY INDEX [(%s) (%d)] -> "
+                     "[(%llu)(%s) (%d)] : [(%s) (%d)]\n", 
                      (char *)key_data, skey->size, 
-                     llu(k->handle),
-                     (char *)k->key,
-                     pkey->size,
+                     llu(k->handle), (char *)k->key, pkey->size,
                      (char *)pdata->data, pdata->size); 
     }
     else if((pdata->size == sizeof(TROVE_handle)) && (strcmp("dh", k->key)!=0))
@@ -2862,13 +2854,14 @@ int PINT_trove_dbpf_keyval_secondary_norm_callback(
             key_data[i+strlen(k->key)] = tolower( ((char *)pdata->data)[i] );
         }
         skey->ulen = skey->size = strlen(key_data) + 1;
-
+/*
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: CREATING "
                      "SECONDARY NORM INDEX (%s) (%d) -> "
                      "[(%llu)(%s) (%d)]:[(%s) (%d)]\n", 
                      (char *)key_data, skey->size, llu(k->handle), 
                      (char *)k->key, pkey->size,
                      (char *)pdata->data, pdata->size); 
+ */
     }
     else
     {
