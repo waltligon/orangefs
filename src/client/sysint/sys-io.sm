@@ -965,15 +965,11 @@ static PINT_sm_action io_datafile_post_msgpairs(
             cur_ctx->msg_send_has_been_posted = 1;
             ++sm_p->u.io.msgpair_completion_count;
         }
-    }
+    }/*end for*/
 
     gossip_debug(GOSSIP_IO_DEBUG, "io_datafile_post_msgpairs: "
                  "completion count is %d\n",
                  sm_p->u.io.msgpair_completion_count);
-
-    /*remove this when I'm done testing */
-    js_p->error_code = IO_RETRY;
-    return SM_ACTION_COMPLETE;
 
 
     /* if anything posted, just wait for that to complete, else
@@ -1026,10 +1022,11 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
     PINT_client_io_ctx *ctx = NULL;
     uint32_t index = 0;
     uint32_t copies = 0;
-    int i,ret;
+    int i,j,ret;
+    char *enc_req_bytes = NULL;
 
     /* Have we exhausted the number of retries */
-    if (io->retry_count == sm_p->msgarray_op.params.retry_limit)
+    if (io->retry_count >= sm_p->msgarray_op.params.retry_limit)
     {
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return SM_ACTION_COMPLETE;
@@ -1046,11 +1043,22 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
            continue;
 
         /* cleanup the failed context */
-        PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
-        BMI_memfree(msg->svr_addr
-                   ,msg->encoded_resp_p
-                   ,msg->max_resp_sz
-                   ,BMI_RECV);
+        enc_req_bytes = (char *)&(msg->encoded_req);
+        for (j=0; j<sizeof(msg->encoded_req); j++)
+        {
+           if (enc_req_bytes[j] != '\0')
+           {
+              PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
+              break;
+           }
+        }/*end for*/
+        if (msg->encoded_resp_p)
+        {
+           BMI_memfree(msg->svr_addr
+                      ,msg->encoded_resp_p
+                      ,msg->max_resp_sz
+                      ,BMI_RECV);
+        }
         memset(&(msg->encoded_req),0,sizeof(msg->encoded_req));
         memset(&(msg->svr_addr),0,sizeof(msg->svr_addr));
         msg->encoded_resp_p = NULL;
@@ -1354,7 +1362,8 @@ static PINT_sm_action io_datafile_complete_operations(
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
                      "context %p%s\n", cur_ctx,
                      ((cur_ctx->write_ack_in_progress ?
-                       " and reset write_recv timeout" : "")));
+ 
+                      " and reset write_recv timeout" : "")));
 
         cur_ctx->flow_in_progress = 0;
         sm_p->u.io.flow_completion_count--;
@@ -1363,7 +1372,8 @@ static PINT_sm_action io_datafile_complete_operations(
         /* look for flow error when no write ack is in progress (usually a
          * read case) 
          */
-        if (js_p->error_code < 0 && !cur_ctx->write_ack_in_progress) {
+        if (js_p->error_code < 0 && !cur_ctx->write_ack_in_progress) 
+        {
             if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) ||
                  (PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_FLOW) ||
                  (js_p->error_code == -ECONNRESET) || 
@@ -1384,7 +1394,21 @@ static PINT_sm_action io_datafile_complete_operations(
                 /* forcing the count high insures that the sm won't restart */
                 sm_p->u.io.retry_count = sm_p->msgarray_op.params.retry_limit;
             }
+
         }
+
+        /*To test fail-over uncomment the following and set the client
+         *retry limit in the config file to 1.  This will allow the code to go
+         * through the retry state at least one time.
+        */
+        //if (!cur_ctx->write_ack_in_progress && sm_p->u.io.retry_count==0)
+        //{
+        //gossip_err("\tForcing io retry for %llu\n",llu(cur_ctx->data_handle));
+        //   cur_ctx->msg_send_has_been_posted = 0;
+        //   cur_ctx->msg_recv_has_been_posted = 0;
+        //}
+
+
     }
     else if (STATUS_USER_TAG_TYPE(status_user_tag, IO_SM_PHASE_FINAL_ACK))
     {
@@ -1993,6 +2017,8 @@ static inline int io_decode_ack_response(
             &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
             decoded_resp, &cur_ctx->msg.svr_addr,
             cur_ctx->msg.max_resp_sz);
+        memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
+        cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
 }
@@ -2352,6 +2378,8 @@ static inline int io_process_context_recv(
         &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
         &decoded_resp, &cur_ctx->msg.svr_addr,
         cur_ctx->msg.max_resp_sz);
+    memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
+    cur_ctx->msg.encoded_resp_p = NULL;
 
     if (ret)
     {
