@@ -1,0 +1,195 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* pvfs2_get_path_sm
+ *
+ * This state machine handles incoming server getpath operations.  These
+ * are the operations sent by PVFS_sys_getpath().
+ *
+ * The pvfs2_prelude_sm is responsible for reading the actual metadata
+ * to begin with, because it does this as part of the permission checking
+ * process.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-perf-counter.h"
+#include "dbpf-keyval.h"
+
+%%
+
+machine pvfs2_get_path_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_resp;
+        default => final_response;
+    }
+
+    state setup_resp
+    {
+        run getpath_setup_resp;
+        success => read_path;
+        default => final_response;
+    }
+
+    state read_path
+    {
+        run getpath_read_path;
+        success => get_parents;
+        default => final_response;
+    }
+
+    state get_parents
+    {
+        run getpath_get_parents;
+        success => check_resp;
+        default => final_response;
+    }
+
+    state check_resp
+    {
+        run getpath_check_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup   
+    {
+        run getpath_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * getpath_setup_resp()
+ * Set up the response - allocate needed resources
+ */
+static PINT_sm_action getpath_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret=0, i=0;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    js_p->error_code = 0;
+    ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
+                             s_op->access_type, s_op->sched_policy,
+                             smcb, 0, js_p, 
+                             &(s_op->scheduled_id), server_job_context);
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
+
+    s_op->u.getpath.count = s_op->req->u.getpath.count;
+    s_op->u.getpath.dirent = s_op->req->u.getpath.dirent;
+
+    s_op->resp.u.getpath.count = s_op->req->u.getpath.count;
+
+    if( (s_op->resp.u.getpath.dirent = calloc( s_op->req->u.getpath.count, 
+                                               sizeof(PVFS_dirent))) == 0)
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ *
+ */
+static PINT_sm_action getpath_read_path(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+ 
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    js_p->error_code = 0;
+
+    ret = job_trove_keyval_read_value_path(
+        s_op->req->u.getpath.fs_id,
+        &(s_op->u.getpath.count),
+        s_op->u.getpath.dirent,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    gossip_debug(GOSSIP_GETPATH_DEBUG, 
+                 "[GETPATH]: getpath_read_value: exit\n");
+*/
+    return ret;
+}
+
+static PINT_sm_action getpath_get_parents(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+ //   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* getpath_check_resp()
+ */
+static PINT_sm_action getpath_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+  //  struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* getpath_cleanup()
+ * free resources alloc'd by state machine
+ */
+static PINT_sm_action getpath_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+  //  struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* free(s_op->u.getpath.buffer); */
+    
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(getpath);
+
+struct PINT_server_req_params pvfs2_get_path_params =
+{
+    .string_name = "getpath",
+    .perm = PINT_SERVER_CHECK_READ,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_getpath,
+    .state_machine = &pvfs2_get_path_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

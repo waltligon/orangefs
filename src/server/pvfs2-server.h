@@ -547,6 +547,14 @@ struct PINT_server_getvalue_op
     uint32_t target_i;
 };
 
+struct PINT_server_getpath_op
+{
+    uint32_t count;
+    PVFS_dirent *dirent;
+    PVFS_handle root_handle;
+    PVFS_handle lookup_handle;
+};
+
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -648,6 +656,7 @@ typedef struct PINT_server_op
         struct PINT_server_unstuff_op unstuff;
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
+        struct PINT_server_getpath_op getpath;
     } u;
 
 } PINT_server_op;

@@ -118,6 +118,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     {"directio", GOSSIP_DIRECTIO_DEBUG},
     /* Debug the getvalue system call */
     {"getvalue", GOSSIP_GETVALUE_DEBUG},
+    /* Debug the getpath system call */
+    {"getpath", GOSSIP_GETPATH_DEBUG},
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |

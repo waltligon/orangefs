@@ -398,7 +398,14 @@ struct dbpf_keyval_iterate_keys_op
     /* vtag? */
 };
 
-struct dbpf_keyval_read_value_op
+struct dbpf_keyval_read_value_path_op
+{
+    PVFS_dirent *dirent_p;
+    PVFS_handle *next_handle;
+    /* vtag? */
+};
+
+struct dbpf_keyval_read_value_query_op
 {
     PVFS_ds_keyval *key;
     PVFS_ds_keyval *val;
@@ -604,7 +611,8 @@ struct dbpf_op
         struct dbpf_dspace_getattr_list_op d_getattr_list;
         struct dbpf_dspace_remove_list_op d_remove_list;
         struct dbpf_keyval_get_handle_info_op k_get_handle_info;
-        struct dbpf_keyval_read_value_op v_read;
+        struct dbpf_keyval_read_value_path_op v_path;
+        struct dbpf_keyval_read_value_query_op v_query;
     } u;
 };
 

@@ -274,6 +274,12 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_getvalue;
                 respsize = extra_size_PVFS_servresp_getvalue;
                 break;
+            case PVFS_SERV_GETPATH:
+                req.u.getpath.count = 0;
+                resp.u.getvalue.count = 0;
+                reqsize = extra_size_PVFS_servreq_getpath;
+                respsize = extra_size_PVFS_servresp_getpath;
+                break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -441,6 +447,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
         CASE(PVFS_SERV_GETVALUE, getvalue);
+        CASE(PVFS_SERV_GETPATH, getpath);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -539,6 +546,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_GETVALUE, getvalue);
+        CASE(PVFS_SERV_GETPATH, getpath);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -651,6 +659,7 @@ static int lebf_decode_req(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_GETVALUE, getvalue);
+        CASE(PVFS_SERV_GETPATH, getpath);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -739,6 +748,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_GETVALUE, getvalue);
+        CASE(PVFS_SERV_GETPATH, getpath);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -898,10 +908,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
-            case PVFS_SERV_GETVALUE:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
             case PVFS_SERV_IMM_COPIES:
+            case PVFS_SERV_GETVALUE:
+            case PVFS_SERV_GETPATH:
               /*nothing to free*/
                   break;
 	    case PVFS_SERV_INVALID:
@@ -983,6 +994,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.listeattr.key);
                     break;
                 case PVFS_SERV_GETVALUE:
+                    if( resp->u.getvalue.key)
+                        decode_free(resp->u.getvalue.key);
+                    if( resp->u.getvalue.val)
+                        decode_free(resp->u.getvalue.val);
+                    break;
+                case PVFS_SERV_GETPATH:
                     break;
                 case PVFS_SERV_LISTATTR:
                     {

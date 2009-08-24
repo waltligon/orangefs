@@ -264,7 +264,18 @@ int trove_keyval_read(
 		      TROVE_op_id *out_op_id_p,
               PVFS_hint hints);
 
-int trove_keyval_read_value(
+int trove_keyval_read_value_path(
+		      TROVE_coll_id coll_id,
+                      PVFS_dirent *dirent_p,
+                      TROVE_handle *handle_p,
+		      TROVE_ds_flags flags,
+		      TROVE_vtag_s *vtag, 
+		      void *user_ptr,
+		      TROVE_context_id context_id,
+		      TROVE_op_id *out_op_id_p,
+              PVFS_hint hints);
+
+int trove_keyval_read_value_query(
 		      TROVE_coll_id coll_id,
                       TROVE_ds_position *position_p,
                       uint32_t query_type,

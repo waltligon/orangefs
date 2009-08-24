@@ -1920,7 +1920,73 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     return (0);
 }
 
-int job_trove_keyval_read_value(PVFS_fs_id coll_id,
+int job_trove_keyval_read_value_path(PVFS_fs_id coll_id,
+                                uint32_t *count_p,
+                                PVFS_dirent *dirent_p,
+                                PVFS_ds_flags flags,
+                                PVFS_vtag * vtag,
+                                void *user_ptr,
+                                job_aint status_user_tag,
+                                job_status_s * out_status_p,
+                                job_id_t * id,
+                                job_context_id context_id,
+                                PVFS_hint hints)
+
+{
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->hints = hints;
+    jd->job_user_ptr = user_ptr;
+    jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_keyval_read_value_path(coll_id, count_p, dirent_p, flags, 
+                                  jd->u.trove.vtag, user_ptr_internal, 
+                                  global_trove_context, &(jd->u.trove.id), 
+                                  hints);
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0) /* error posting trove operation */
+    {
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)  /* immediate completion */
+    {
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->vtag = jd->u.trove.vtag;
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    *id = jd->job_id;
+    trove_pending_count++;
+
+    return (0);
+}
+
+int job_trove_keyval_read_value_query(PVFS_fs_id coll_id,
                                 PVFS_ds_position position,
                                 uint32_t query_type,
                                 PVFS_ds_keyval * key_p,
@@ -1960,10 +2026,10 @@ int job_trove_keyval_read_value(PVFS_fs_id coll_id,
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_read_value(coll_id, &(jd->u.trove.position), query_type,
-                                  key_p, val_p, dirent_array, key_array,
-                                  val_array, count, match_count, flags, 
-                                  jd->u.trove.vtag, user_ptr_internal, 
+    ret = trove_keyval_read_value_query(coll_id, &(jd->u.trove.position), 
+                                  query_type, key_p, val_p, dirent_array, 
+                                  key_array, val_array, count, match_count, 
+                                  flags, jd->u.trove.vtag, user_ptr_internal, 
                                   global_trove_context, &(jd->u.trove.id), 
                                   hints);
 #else

@@ -27,7 +27,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 1
+#define PVFS2_PROTO_MINOR 2
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -82,6 +82,7 @@ enum PVFS_server_op
     PVFS_SERV_MIRROR = 39,
     PVFS_SERV_IMM_COPIES = 40,
     PVFS_SERV_GETVALUE = 41,
+    PVFS_SERV_GETPATH = 42,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1835,7 +1836,7 @@ endecode_fields_7_struct(
     uint32_t, count,
     PVFS_ds_position, token,
     PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val)
+    PVFS_ds_keyval, val);
 #define extra_size_PVFS_servreq_getvalue \
     (PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN)
 
@@ -1882,10 +1883,56 @@ endecode_fields_3aaa_struct(
     uint32_t, count,
     PVFS_dirent, dirent,
     PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val)
+    PVFS_ds_keyval, val);
 #define extra_size_PVFS_servresp_getvalue \
     ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN + sizeof(PVFS_dirent)) * \
       PVFS_REQ_LIMIT_KEYVAL_LIST)
+
+/* getpath **************************************************/
+struct PVFS_servreq_getpath
+{
+    PVFS_fs_id  fs_id;                          /* file system */
+    PVFS_handle handle;                         /* handle */
+    uint32_t    count;                          /* number of handles */
+    PVFS_dirent *dirent;                        /* directory entry*/
+};
+endecode_fields_2a_struct(
+    PVFS_servreq_getpath,
+    PVFS_fs_id, fs_id,
+    PVFS_handle, handle,
+    uint32_t, count,
+    PVFS_dirent, dirent);
+#define extra_size_PVFS_servreq_getpath \
+    sizeof(PVFS_dirent) * PVFS_REQ_LIMIT_KEYVAL_LIST
+
+#define PINT_SERVREQ_GETPATH_FILL(__req,                \
+                                  __creds,              \
+                                  __fsid,               \
+                                  __count,              \
+                                  __dirent,             \
+                                  __hints)              \
+do {                                                    \
+    memset(&(__req), 0, sizeof(__req));                 \
+    (__req).op = PVFS_SERV_GETPATH;                     \
+    (__req).credentials = (__creds);                    \
+    (__req).hints = (__hints);                          \
+    (__req).u.getpath.fs_id = (__fsid);                 \
+    (__req).u.getpath.count = (__count);                \
+    (__req).u.getdir.dirent = (__dirent);               \
+} while (0);
+
+struct PVFS_servresp_getpath
+{
+    uint32_t count;             /* number of items returned in response */
+    PVFS_dirent *dirent;         /* array with handle info */
+};
+endecode_fields_1a_struct(
+    PVFS_servresp_getpath,
+    skip4,,
+    uint32_t, count,
+    PVFS_dirent, dirent);
+#define extra_size_PVFS_servresp_getpath \
+    sizeof(PVFS_dirent) * PVFS_REQ_LIMIT_KEYVAL_LIST
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1931,6 +1978,7 @@ struct PVFS_server_req
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_getvalue getvalue;
+        struct PVFS_servreq_getpath getpath;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1986,6 +2034,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_getvalue getvalue;
+        struct PVFS_servresp_getpath getpath;
     } u;
 };
 endecode_fields_2_struct(

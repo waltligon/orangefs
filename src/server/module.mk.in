@@ -44,6 +44,7 @@ ifdef BUILD_SERVER
 		$(DIR)/del-eattr.c \
 		$(DIR)/list-eattr.c \
 		$(DIR)/get-value.c \
+		$(DIR)/get-path.c \
 		$(DIR)/unexpected.c \
 		$(DIR)/precreate-pool-refiller.c \
 		$(DIR)/unstuff.c
