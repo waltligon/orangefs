@@ -865,16 +865,21 @@ enum PVFS_io_type
 
 /* PVFS keyval query operation types used in both system and server interfaces
  */
-#define PVFS_KEYVAL_QUERY_LT    0
-#define PVFS_KEYVAL_QUERY_LE    1
-#define PVFS_KEYVAL_QUERY_EQ    2
-#define PVFS_KEYVAL_QUERY_GE    3
-#define PVFS_KEYVAL_QUERY_GT    4
-#define PVFS_KEYVAL_QUERY_NT    5
-#define PVFS_KEYVAL_QUERY_PEQ   6
-#define PVFS_KEYVAL_QUERY_NORM  (1 << 7)
-#define PVFS_KEYVAL_QUERY_MASK_NORM(__q) (__q&127)
-#define PVFS_KEYVAL_QUERY_MASK_QUERY(__q) (__q&128)
+#define PVFS_KEYVAL_QUERY_LT                    0
+#define PVFS_KEYVAL_QUERY_LE                    1
+#define PVFS_KEYVAL_QUERY_EQ                    2
+#define PVFS_KEYVAL_QUERY_GE                    3
+#define PVFS_KEYVAL_QUERY_GT                    4 
+#define PVFS_KEYVAL_QUERY_NT                    5
+#define PVFS_KEYVAL_QUERY_PEQ                   6
+#define PVFS_KEYVAL_QUERY_NORM                  (1 << 30)
+#define PVFS_KEYVAL_RESULT_NO_PATHS             (1 << 31)
+
+/* all but two bits are used for query types */
+#define PVFS_KEYVAL_QUERY_UNMASK_QUERY(__q)     ( (__q << 2) >> 2 )
+#define PVFS_KEYVAL_QUERY_UNMASK_NORM(__q)      (__q & (1<<30) )
+#define PVFS_KEYVAL_QUERY_UNMASK_PATHS(__q)     (__q & (1<<31) )
+
 #endif /* __PVFS2_TYPES_H */
 
 /*

@@ -496,7 +496,7 @@ static int dbpf_keyval_read_value_op_svc(struct dbpf_op *op_p)
     }
     query_p = dbc_p;
 
-    if( PVFS_KEYVAL_QUERY_MASK_QUERY(op_p->u.v_read.query_type) ==
+    if( PVFS_KEYVAL_QUERY_UNMASK_NORM(op_p->u.v_read.query_type) ==
         PVFS_KEYVAL_QUERY_NORM )
 
     {
@@ -523,25 +523,25 @@ static int dbpf_keyval_read_value_op_svc(struct dbpf_op *op_p)
                  query_p->dbp->fname);
    
     /* figure out query type and set once */
-    if( (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+    if( (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
             PVFS_KEYVAL_QUERY_LT) ||
-        (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+        (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
             PVFS_KEYVAL_QUERY_LE) || 
-        (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+        (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
             PVFS_KEYVAL_QUERY_PEQ) )
     {
         cursor_flags = DB_FIRST;
         get_flags = DB_NEXT;
     }
-    else if( (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+    else if( (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
                 PVFS_KEYVAL_QUERY_GT) || 
-             (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+             (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
                 PVFS_KEYVAL_QUERY_GE) )
     {
         cursor_flags = DB_SET_RANGE;
         get_flags = DB_NEXT;
     }
-    else if( (PVFS_KEYVAL_QUERY_MASK_NORM(op_p->u.v_read.query_type) == 
+    else if( (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_read.query_type) == 
                 PVFS_KEYVAL_QUERY_NT) )
     {
         cursor_flags = DB_FIRST;
@@ -718,14 +718,19 @@ static int dbpf_keyval_read_value_op_svc(struct dbpf_op *op_p)
         }
     }
 
-    /* have to build the path after finding matching values because the
-     * cursor position gets whacked when building the path */
-    for( i = 0; i < (*op_p->u.v_read.count); i++ )
+    /* only lookup local path info if requested */
+    if( PVFS_KEYVAL_QUERY_UNMASK_PATHS( op_p->u.v_read.query_type ) !=
+        PVFS_KEYVAL_RESULT_NO_PATHS )
     {
-        /* build path of read handle, use un-normalized associated db */
-        ret = dbpf_build_path_of_handle( dbc_p, 
-            op_p->u.v_read.dirent_array[i].d_name,
-            op_p->coll_p->coll_id, op_p->u.v_read.dirent_array[i].handle );
+        /* have to build the path after finding matching values because the
+         * cursor position gets whacked when building the path */
+        for( i = 0; i < (*op_p->u.v_read.count); i++ )
+        {
+            /* build path of read handle, use un-normalized associated db */
+            ret = dbpf_build_path_of_handle( dbc_p, 
+                op_p->u.v_read.dirent_array[i].d_name,
+                op_p->coll_p->coll_id, op_p->u.v_read.dirent_array[i].handle );
+        }
     }
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
@@ -2550,22 +2555,22 @@ static int dbpf_result_iterate_selector(char *a, char *b,
     {
         /* if key doesn't begin with user. it's not a valid attribute 
          * if less than, just don't include it. if it's greater we're done */
-        if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_LT ||
-            PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_LE || 
-            PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_NT )
+        if( PVFS_KEYVAL_QUERY_UNMASK_NORM(query)==PVFS_KEYVAL_QUERY_LT ||
+            PVFS_KEYVAL_QUERY_UNMASK_NORM(query)==PVFS_KEYVAL_QUERY_LE || 
+            PVFS_KEYVAL_QUERY_UNMASK_NORM(query)==PVFS_KEYVAL_QUERY_NT )
         {
             return 1;
         }
-        else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_GT ||
-                 PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_GE ||
-                 PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_EQ ||
-                 PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_PEQ )
+        else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query)==PVFS_KEYVAL_QUERY_GT ||
+                 PVFS_KEYVAL_QUERY_UNMASK_QUERY(query)==PVFS_KEYVAL_QUERY_GE ||
+                 PVFS_KEYVAL_QUERY_UNMASK_QUERY(query)==PVFS_KEYVAL_QUERY_EQ ||
+                 PVFS_KEYVAL_QUERY_UNMASK_QUERY(query)==PVFS_KEYVAL_QUERY_PEQ )
         {
             return -1;
         }
     }
 
-    if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_LT )
+    if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_LT )
     {
         if( memcmp( b, a, max_len ) < 0 )
         {
@@ -2577,7 +2582,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
 
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_LE )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_LE )
     {
         if( memcmp( b, a, max_len) <= 0 )
         {
@@ -2588,7 +2593,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
             return -1;
         }
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_EQ )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_EQ )
     {
         if( memcmp( b, a, max_len) == 0 )
         {
@@ -2600,7 +2605,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
     
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_PEQ )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_PEQ )
     {
         if( memcmp( b, a, strlen(a)) == 0 )
         {
@@ -2616,7 +2621,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
     
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_GE )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_GE )
     {
         if( memcmp( b, a, max_len) >= 0 )
         {
@@ -2628,7 +2633,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
     
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_GT )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_GT )
     {
         /* will be called starting with equal keys */
         if( memcmp( b, a, max_len) == 0 )
@@ -2645,7 +2650,7 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
     
     }
-    else if( PVFS_KEYVAL_QUERY_MASK_NORM(query) == PVFS_KEYVAL_QUERY_NT )
+    else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(query) == PVFS_KEYVAL_QUERY_NT )
     {
         if( memcmp( b, a, max_len) != 0 )
         {
