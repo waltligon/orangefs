@@ -195,9 +195,6 @@ machine pvfs2_client_io_sm
         default => io_cleanup;
     }
 
-    /*We will make changes to msgpairarray to handle mirrored copies of a 
-     *data handle when retries are warranted.
-    */
     state small_io
     {
         jump pvfs2_client_small_io_sm;
@@ -206,10 +203,7 @@ machine pvfs2_client_io_sm
     }
 
     state io_datafile_post_msgpairs
-    { /*whenever a msgpair is retried, we will use the "next" data handle, if
-       *mirrored data handles are available, instead of retrying the same
-       *handle.
-      */
+    { 
         run io_datafile_post_msgpairs;
         IO_RETRY => io_datafile_post_msgpairs_retry;
         IO_FATAL_ERROR => io_cleanup;
@@ -218,9 +212,6 @@ machine pvfs2_client_io_sm
 
     state io_datafile_post_msgpairs_retry
     {
-      /*We will not up the retry count unless all the handles for a msgpair
-       *have been tried.
-      */
         run io_datafile_post_msgpairs_retry;
         IO_MIRRORING    => io_datafile_mirror_retry;
         IO_NO_MIRRORING => io_datafile_no_mirror_retry;

@@ -30,7 +30,7 @@
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 
-static uint64_t UINT64_HIGH = 0xffffffffffffffff;
+static uint64_t UINT64_HIGH = 0xffffffffffffffffLL;
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
@@ -563,6 +563,7 @@ static PINT_sm_action getattr_read_metafile_hint(
         /*If we hit an error the DIST & DFILES are no longer valid*/
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
+        s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_MIRROR_DFILES;
         return 1;
     }
 
