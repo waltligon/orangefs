@@ -8,8 +8,8 @@
 #include <string.h>
 #include <errno.h>
 
-#ifdef __LIBCATAMOUNT__
-/* Cray XT3 version */
+#if defined(__LIBCATAMOUNT__) || defined(__CRAYXT_COMPUTE_LINUX_TARGET) || defined(__CRAYXT_SERVICE)
+/* Cray XT3 and XT4 version, both catamount and compute-node-linux */
 #define PTL_IFACE_DEFAULT PTL_IFACE_SS
 #include <portals/portals3.h>
 #include <sys/utsname.h>
@@ -23,6 +23,7 @@
 #endif
 
 #include <assert.h>
+#include <sys/signal.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-method-support.h>   /* bmi_method_ops */
 #include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
@@ -72,7 +73,6 @@ static gen_mutex_t eq_mutex = GEN_MUTEX_INITIALIZER;
  * method_addrs.
  */
 static int bmi_portals_method_id;
-static int bmi_portals_nic_type;
 
 /*
  * Various static ptls objects.  One per instance of the code.
@@ -125,13 +125,32 @@ static const char *PtlEventKindStr(ptl_event_kind_t ev_kind)
 
 /*
  * Match bits.  The lower 32 bits always carry the bmi_tag.  If this bit
- * in the top is set, it is an unexpected message.  The second set is used
- * when posting a _send_, strangely enough.  If the send is too long,
+ * in the top is set, it is an unexpected message.  The secondmost top bit is
+ * used when posting a _send_, strangely enough.  If the send is too long,
  * and the receiver has not preposted, later the receiver will issue a Get
  * to us for the data.  That get will use the second set of match bits.
+ *
+ * The rest of the 30 top bits are used to encode a sequence number per
+ * peer.  As BMI can post multiple sends with the same tag, we have to
+ * be careful that if send #2 for a given tag goes to the zero_md, that
+ * when he does the get, he grabs from buffer #2, not buffer #1 because
+ * the sender was too slow in unlinking it.
  */
-static const uint64_t match_bits_unexpected = 1ULL << 32;
-static const uint64_t match_bits_long_send = 2ULL << 32;
+static const uint64_t match_bits_unexpected = 1ULL << 63;  /* 8... */
+static const uint64_t match_bits_long_send = 1ULL << 62;   /* 4... */
+static const uint32_t match_bits_seqno_max = 1UL << 30;
+static const int      match_bits_seqno_shift = 32;
+
+static uint64_t mb_from_tag_and_seqno(uint32_t tag, uint32_t seqno)
+{
+    uint64_t mb;
+
+    mb = seqno;
+    mb <<= match_bits_seqno_shift;
+    mb |= tag;
+    /* caller may set the long send bit too */
+    return mb;
+}
 
 /*
  * Buffer for incoming unexpected send messages.  Only the server needs
@@ -145,20 +164,33 @@ static const uint64_t match_bits_long_send = 2ULL << 32;
 #define UNEXPECTED_MESSAGE_SIZE (8 << 10)
 #define UNEXPECTED_QUEUE_SIZE   (256 << 10)
 #define UNEXPECTED_NUM_MD 2
+#define UNEXPECTED_SIZE_PER_MD  (UNEXPECTED_QUEUE_SIZE/UNEXPECTED_NUM_MD)
+
+#define UNEXPECTED_MD_INDEX_OFFSET (1)
+#define NONPREPOST_MD_INDEX_OFFSET (UNEXPECTED_NUM_MD + 1)
 
 static char *unexpected_buf = NULL;
 /* poor-man's circular buffer */
 static ptl_handle_me_t unexpected_me[UNEXPECTED_NUM_MD];
 static ptl_handle_md_t unexpected_md[UNEXPECTED_NUM_MD];
+static int unexpected_need_repost[UNEXPECTED_NUM_MD];
+static int unexpected_need_repost_sum;
+static int unexpected_is_posted[UNEXPECTED_NUM_MD];
 
-static int unexpected_md_index(ptl_handle_md_t md)
+/*
+ * This scheme relies on the zero page being unused, i.e. addrsesses
+ * from 0 up to 4k or so.
+ */
+static int unexpected_md_index(void *user_ptr)
 {
     int i;
+    uintptr_t d = (uintptr_t) user_ptr;
 
-    for (i=0; i<UNEXPECTED_NUM_MD; i++)
-	if (unexpected_md[i] == md)
-	    return i;
-    return -1;
+    if (d >= UNEXPECTED_MD_INDEX_OFFSET &&
+        d < UNEXPECTED_MD_INDEX_OFFSET + UNEXPECTED_NUM_MD)
+	return d - UNEXPECTED_MD_INDEX_OFFSET;
+    else
+	return -1;
 }
 
 /*
@@ -191,14 +223,16 @@ static ptl_handle_md_t nonprepost_md[NONPREPOST_NUM_MD];
 static int nonprepost_is_posted[NONPREPOST_NUM_MD];
 static int nonprepost_refcnt[NONPREPOST_NUM_MD];
 
-static int nonprepost_md_index(ptl_handle_md_t md)
+static int nonprepost_md_index(void *user_ptr)
 {
     int i;
+    uintptr_t d = (uintptr_t) user_ptr;
 
-    for (i=0; i<UNEXPECTED_NUM_MD; i++)
-	if (nonprepost_md[i] == md)
-	    return i;
-    return -1;
+    if (d >= NONPREPOST_MD_INDEX_OFFSET &&
+        d < NONPREPOST_MD_INDEX_OFFSET + NONPREPOST_NUM_MD)
+	return d - NONPREPOST_MD_INDEX_OFFSET;
+    else
+	return -1;
 }
 
 /*
@@ -212,6 +246,8 @@ struct bmip_method_addr {
     char *hostname;  /* given by user, converted to a nid by us */
     char *peername;  /* for rev_lookup */
     ptl_process_id_t pid;  /* this is a struct with u32 nid + u32 pid */
+    uint32_t seqno_out;  /* each send has a separate sequence number */
+    uint32_t seqno_in;
 };
 static QLIST_HEAD(pma_list);
 
@@ -226,6 +262,7 @@ enum work_state {
     RQ_WAITING_INCOMING,
     RQ_WAITING_GET,
     RQ_WAITING_USER_TEST,
+    RQ_WAITING_USER_POST,
     RQ_LEN_ERROR,
     RQ_CANCELLED,
 };
@@ -247,6 +284,8 @@ static const char *state_name(enum work_state state)
 	return "RQ_WAITING_GET";
     case RQ_WAITING_USER_TEST:
 	return "RQ_WAITING_USER_TEST";
+    case RQ_WAITING_USER_POST:
+	return "RQ_WAITING_USER_POST";
     case RQ_LEN_ERROR:
 	return "RQ_LEN_ERROR";
     case RQ_CANCELLED:
@@ -269,6 +308,7 @@ struct bmip_work {
     bmi_size_t actual_len;  /* recv: possibly shorter than posted */
 
     bmi_msg_tag_t bmi_tag;  /* recv: unexpected or nonpp tag that arrived */
+    uint64_t match_bits;    /* recv: full match bits, including seqno */
 
     int is_unexpected;      /* send: if user posted this as unexpected */
 
@@ -276,7 +316,9 @@ struct bmip_work {
 			    /* send: send me for possible get */
     ptl_handle_md_t md;     /* recv: prepost or get destination, to cancel */
 			    /* send: send md for possible get */
-    int me_unlink;          /* send: me must be unlinked at test time */
+    ptl_handle_me_t tme;
+    ptl_handle_md_t tmd;
+    int saw_send_end_and_ack; /* send: make sure both states before unlink */
 
     /* non-preposted receive, keep ref to a nonpp static buffer */
     const void *nonpp_buf;   /* pointer to nonpp buffer in MD */
@@ -314,7 +356,10 @@ static QLIST_HEAD(q_done);
 static struct bmi_method_addr *addr_from_nidpid(ptl_process_id_t pid);
 static void unexpected_repost(int which);
 static int nonprepost_init(void);
+static int nonprepost_fini(void);
+static int unexpected_fini(void);
 static void nonprepost_repost(int which);
+static const char *bmip_rev_lookup(struct bmi_method_addr *addr);
 
 
 /*----------------------------------------------------------------------------
@@ -327,36 +372,71 @@ static void nonprepost_repost(int which);
 static int handle_event(ptl_event_t *ev)
 {
     struct bmip_work *sq, *rq;
-    int which;
+    int which, ret;
 
     if (ev->ni_fail_type != 0) {
 	gossip_err("%s: ni err %d\n", __func__, ev->ni_fail_type);
 	return -EIO;
     }
 
-    debug(2, "%s: event type %s\n", __func__, PtlEventKindStr(ev->type));
+    debug(6, "%s: event type %s\n", __func__, PtlEventKindStr(ev->type));
 
     switch (ev->type) {
     case PTL_EVENT_SEND_END:
-	/* ignore this state, already on the waiting list */
+	/*
+	 * Sometimes this state happens _after_ the ACK.  Boggle.  Cannot
+	 * unlink the sq until this state.  Doing it in the ack state may be
+	 * too early.  But we don't know if it is safe to unlink until the
+	 * ack comes back and says if he received it, or if he will do a
+	 * Get on the MD.  So just mark a flag.  It goes to two only if
+	 * the ack indicated the other side will not need to do a get.
+	 *
+	 * Note that an outgoing get request also triggers this.  Sigh.
+	 */
 	sq = ev->md.user_ptr;
-	debug(2, "%s: sq %p went out\n", __func__, sq);
+	if (sq->type == BMI_RECV) {
+		rq = ev->md.user_ptr;
+		debug(2, "%s, rq %p stat %s get went out\n", __func__, rq,
+		      state_name(rq->state));
+		break;
+	}
+	debug(2, "%s: sq %p went out len %llu/%llu mb %llx\n", __func__, sq,
+	      ev->mlength, ev->rlength, ev->match_bits);
+	if (!sq->is_unexpected && ++sq->saw_send_end_and_ack == 2) {
+		debug(2, "%s: saw end last, unlinking %p me %d (md %d)\n",
+		      __func__, sq, sq->me, sq->md);
+		ret = PtlMEUnlink(sq->me);
+		if (ret)
+		    gossip_err("%s: PtlMEUnlink sq %p: %s\n", __func__,
+			       sq, PtlErrorStr(ret));
+	}
 	break;
 
     case PTL_EVENT_ACK:
 	/* recv an ack from him, advance the state and unlink */
 	sq = ev->md.user_ptr;
-	debug(2, "%s: sq %p ack received\n", __func__, sq);
+	debug(2, "%s: sq %p ack rcvd len %llu/%llu\n",
+	      __func__, sq, ev->mlength, ev->rlength);
+
+	/*
+	 * the rlength always comes back as 0 on catamount, even if we
+	 * sent 51200 bytes
+	 */
 	if (ev->mlength != ev->rlength) {
-	    assert(ev->mlength == 0);
-	    debug(2, "%s: truncated, get ready for the get\n", __func__);
+	    gossip_err("%s: mlen %llu and rlen %llu do not agree\n", __func__,
+	    	       ev->mlength, ev->rlength);
+	    exit(1);
 	}
 
 	if (ev->mlength > 0) {
-	    /* Would like to unlink here, but "me in use" error happens
-	     * sometimes.  Avoid race by doing it at test time. */
-	    if (!sq->is_unexpected)
-		sq->me_unlink = 1;
+	    /* make sure both SEND_END and ACK happened for these */
+	    if (!sq->is_unexpected && ++sq->saw_send_end_and_ack == 2) {
+		    debug(2, "%s: saw ack last, unlinking %p\n", __func__, sq);
+		    ret = PtlMEUnlink(sq->me);
+		    if (ret)
+			gossip_err("%s: PtlMEUnlink sq %p: %s\n", __func__,
+				   sq, PtlErrorStr(ret));
+	    }
 	    sq->state = SQ_WAITING_USER_TEST;
 	    gen_mutex_lock(&list_mutex);
 	    qlist_del(&sq->list);
@@ -375,21 +455,23 @@ static int handle_event(ptl_event_t *ev)
     case PTL_EVENT_PUT_END:
 	/*
 	 * Peer did a send to us.  Four cases:
-	 *   1.  expected pre-posted receive, our rq in user_ptr.
-	 *   2.  unexpected message, user_ptr is &unexpected_md[i];
-	 *   3.  non-preposted message, user_ptr is &preposted_md[i];
-	 *   4.  zero md, non-preposted that was too big and truncated
+	 *   1.  unexpected message, user_ptr is &unexpected_md[i];
+	 *   2a. non-preposted message, user_ptr is &preposted_md[i];
+	 *   2b. zero md, non-preposted that was too big and truncated
+	 *   3.  expected pre-posted receive, our rq in user_ptr.
 	 */
-	which = unexpected_md_index(ev->md_handle);
+	which = unexpected_md_index(ev->md.user_ptr);
 	if (which >= 0) {
 	    /* build new unexpected rq and copy in the data */
-	    debug(2, "%s: unexpected len %lld put to us\n", __func__,
-		  lld(ev->mlength));
+	    debug(2, "%s: unexpected len %lld put to us, mb %llx\n", __func__,
+		  lld(ev->mlength), llu(ev->match_bits));
 	    rq = malloc(sizeof(*rq));
 	    if (!rq) {
 		    gossip_err("%s: alloc unexpected rq\n", __func__);
 		    break;
 	    }
+	    if (ev->mlength > UNEXPECTED_MESSAGE_SIZE)
+		exit(1);
 
 	    /*
 	     * malloc this separately to hand to testunexpected caller; that
@@ -397,7 +479,6 @@ static int handle_event(ptl_event_t *ev)
 	     * easier.
 	     */
 	    rq->type = BMI_RECV;
-	    rq->me_unlink = 0;
 	    rq->unex_buf = malloc(ev->mlength);
 	    if (!rq->unex_buf) {
 		    gossip_err("%s: alloc unexpected rq data\n", __func__);
@@ -412,17 +493,38 @@ static int handle_event(ptl_event_t *ev)
 	    gen_mutex_lock(&list_mutex);
 	    qlist_add_tail(&rq->list, &q_unexpected_done);
 	    gen_mutex_unlock(&list_mutex);
+	    debug(1, "%s: unexpected %d offset %llu\n", __func__, which,
+	    	  llu(ev->offset));
+	    if (UNEXPECTED_SIZE_PER_MD - ev->offset < UNEXPECTED_MESSAGE_SIZE) {
+		debug(1, "%s: reposting unexpected %d\n", __func__, which);
+		if (unexpected_need_repost[which] == 0) {
+		    unexpected_need_repost[which] = 1;
+		    ++unexpected_need_repost_sum;
+		}
+	    }
+	    /* try to unpost some, if they are free now */
+	    if (unexpected_need_repost_sum) {
+		for (which = 0; which < UNEXPECTED_NUM_MD; which++) {
+		    if (unexpected_need_repost[which])
+			unexpected_repost(which);
+		}
+	    }
 	    break;
 	}
 
-	which = nonprepost_md_index(ev->md_handle);
+	which = nonprepost_md_index(ev->md.user_ptr);
 	if (which >= 0 || ev->md_handle == zero_md) {
 	    /* build new nonprepost rq, but just keep pointer to the data, or
 	     * if truncated, build the req but no data to hang onto */
-	    debug(2, "%s: nonprepost len %llu tag %llu put to us%s\n",
-		  __func__, llu(ev->rlength),
-		  llu(ev->match_bits & 0xffffffffULL),
+	    debug(1, "%s: nonprepost len %llu/%llu mb %llx%s\n",
+		  __func__, llu(ev->mlength), llu(ev->rlength),
+		  ev->match_bits,
 		  ev->md_handle == zero_md ? ", truncated" : "");
+
+	    if (which >= 0 && ev->md_handle == zero_md) {
+		gossip_err("%s: which %d but zero md\n", __func__, which);
+		exit(1);
+	    }
 
 	    rq = malloc(sizeof(*rq));
 	    if (!rq) {
@@ -431,9 +533,10 @@ static int handle_event(ptl_event_t *ev)
 	    }
 
 	    rq->type = BMI_RECV;
-	    rq->me_unlink = 0;
+	    rq->state = RQ_WAITING_USER_POST;
 	    rq->actual_len = ev->rlength;
 	    rq->bmi_tag = ev->match_bits & 0xffffffffULL;  /* just 32 bits */
+	    rq->match_bits = ev->match_bits;
 	    rq->mop.addr = addr_from_nidpid(ev->initiator);
 	    if (ev->md_handle == zero_md) {
 		rq->nonpp_buf = NULL;
@@ -443,6 +546,9 @@ static int handle_event(ptl_event_t *ev)
 		/* keep a ref to this md until the recv finishes */
 		++nonprepost_refcnt[rq->nonpp_md];
 	    }
+	    debug(2, "%s: rq %p NEW NONPREPOST mb 0x%llx%s\n", __func__,
+	          rq, llu(rq->match_bits),
+		  ev->md_handle == zero_md ? ", truncated" : "");
 	    gen_mutex_lock(&list_mutex);
 	    qlist_add_tail(&rq->list, &q_recv_nonprepost);
 	    gen_mutex_unlock(&list_mutex);
@@ -451,21 +557,45 @@ static int handle_event(ptl_event_t *ev)
 
 	/* must be something we preposted, with user_ptr is rq */
 	rq = ev->md.user_ptr;
+#ifdef DEBUG_CNL_ODDITIES
+	if ((uintptr_t) rq & 1) {
+	    debug(1, "%s: OFF BY 1 rq %p\n", __func__, rq);
+	    rq = (void *) ((uintptr_t) rq - 1);
+	}
+#endif
 	rq->actual_len = ev->rlength;  /* attempted length sent */
 	rq->state = RQ_WAITING_USER_TEST;
 	if (rq->actual_len > rq->tot_len)
 	    rq->state = RQ_LEN_ERROR;
-	debug(2, "%s: rq %p len %lld tag %d put to us\n", __func__, rq,
-	      lld(rq->actual_len), rq->bmi_tag);
+	debug(1, "%s: rq %p len %lld tag 0x%llx mb 0x%llx thresh %d put to us\n",
+	      __func__, rq, lld(rq->actual_len), llu(rq->bmi_tag),
+	      llu(rq->match_bits), ev->md.threshold);
 	gen_mutex_lock(&list_mutex);
 	qlist_del(&rq->list);
 	qlist_add_tail(&rq->list, &q_done);
 	gen_mutex_unlock(&list_mutex);
+
+#ifdef DEBUG_CNL_ODDITIES
+	/*
+	 * At least on linux compute nodes, the me does not auto-unlink
+	 * properly, even though the md did get unlinked.  It is necessary
+	 * to undo the ME too.  Note that the MD threshold is not updated
+	 * to zero; it still sits at one (or whatever it was originally
+	 * set up to be).
+	 */
+	/* ret = PtlMDUnlink(rq->md); debug(2, "md unlink %d gives %s\n", rq->md, PtlErrorStr(ret)); */
+	/* ret = PtlMDUnlink(rq->tmd); debug(2, "tmd unlink %d gives %s\n", rq->tmd, PtlErrorStr(ret)); */
+	ret = PtlMEUnlink(rq->me); debug(2, "me unlink %d gives %s\n", rq->me, PtlErrorStr(ret));
+	ret = PtlMEUnlink(rq->tme); debug(2, "tme unlink %d gives %s\n", rq->tme, PtlErrorStr(ret));
+#endif
 	break;
 
     case PTL_EVENT_GET_END:
-	/* our send, turned into a get from the receiver, is now done */
+	/* our send, turned into a get from the receiver, is now done, as
+	 * far as we are conerned, as he has gotten it from us */
 	sq = ev->md.user_ptr;
+	debug(1, "%s: peer got sq %p len %llu/%llu mb %llx\n", __func__, sq,
+	      llu(ev->mlength), llu(ev->rlength), ev->match_bits);
 	sq->state = SQ_WAITING_USER_TEST;
 	gen_mutex_lock(&list_mutex);
 	qlist_del(&sq->list);
@@ -474,8 +604,8 @@ static int handle_event(ptl_event_t *ev)
 	break;
 
     case PTL_EVENT_REPLY_END:
-	debug(2, "%s: get completed\n", __func__);
 	rq = ev->md.user_ptr;
+	debug(2, "%s: get completed, rq %p\n", __func__, rq);
 	rq->state = RQ_WAITING_USER_TEST;
 	gen_mutex_lock(&list_mutex);
 	qlist_del(&rq->list);
@@ -484,19 +614,13 @@ static int handle_event(ptl_event_t *ev)
 	break;
 
     case PTL_EVENT_UNLINK:
-	which = unexpected_md_index(ev->md_handle);
+	/* XXX: does this ever get called on CNL?  Apparently not. */
+	debug(2, "%s: unlink event! user_ptr %p\n", __func__, ev->md.user_ptr);
+	which = nonprepost_md_index(ev->md.user_ptr);
 	if (which >= 0) {
-	    /* me was also unlinked; put both back at the end */
-	    debug(2, "%s: unlinked unexpected md %d, repost\n", __func__,
-		  which);
-	    unexpected_repost(which);
-	    break;
-	}
-
-	which = nonprepost_md_index(ev->md_handle);
-	if (which >= 0) {
-	    debug(2, "%s: unlinked nonprepost md %d, maybe repost\n", __func__,
-		  which);
+	    debug(1, "%s: unlinked nonprepost md %d, is_posted %d refcnt %d\n",
+	    	  __func__, which, nonprepost_is_posted[which],
+		  nonprepost_refcnt[which]);
 	    nonprepost_is_posted[which] = 0;
 	    if (nonprepost_refcnt[which] == 0)
 		/* already satisfied all the recvs, can this happen so fast? */
@@ -504,12 +628,21 @@ static int handle_event(ptl_event_t *ev)
 	    break;
 	}
 
-	debug(2, "%s: unlinked a send or recv\n", __func__);
+	debug(1, "%s: unlinked a send or recv, nothing to do\n", __func__);
 
 	/*
 	 * Expected recv, unlink just cleans it up.  Already got the send
 	 * event.
 	 */
+	break;
+
+    case PTL_EVENT_SEND_START:
+    	debug(0, "%s: send start, a debugging message thresh %d\n", __func__,
+	      ev->md.threshold);
+	break;
+    case PTL_EVENT_PUT_START:
+    	debug(0, "%s: put start, a debugging message, thresh %d\n", __func__,
+	      ev->md.threshold);
 	break;
 
     default:
@@ -547,14 +680,14 @@ static int __check_eq(int idle_ms)
 	    ms = 0;  /* just quickly pull events off */
 	    if (ret == PTL_EQ_DROPPED) {
 		/* oh well, hope things retry, just point this out */
-		gossip_err("%s: PtlEQGet: dropped some completions\n",
+		gossip_err("%s: PtlEQPoll: dropped some completions\n",
 			   __func__);
 	    }
 	} else if (ret == PTL_EQ_EMPTY) {
 	    ret = 0;
 	    break;
 	} else {
-	    gossip_err("%s: PtlEQGet: %s", __func__, PtlErrorStr(ret));
+	    gossip_err("%s: PtlEQPoll: %s\n", __func__, PtlErrorStr(ret));
 	    ret = -EIO;
 	    break;
 	}
@@ -595,15 +728,13 @@ static void fill_done(struct bmip_work *w, bmi_op_id_t *id, bmi_size_t *size,
     if (w->state == RQ_LEN_ERROR)
 	*err = -PVFS_EOVERFLOW;
 
+    debug(2, "%s: %s %p size %llu peer %s\n", __func__,
+	  w->type == BMI_SEND ? "sq" : "rq", w, llu(*size),
+	  bmip_rev_lookup(w->mop.addr));
+
     /* free resources too */
     id_gen_fast_unregister(w->mop.op_id);
     qlist_del(&w->list);
-    /* work around "me/md in use" problem with doing this in the ack */
-    if (w->me_unlink) {
-	int ret = PtlMEUnlink(w->me);
-	if (ret)
-	    gossip_err("%s: PtlMEUnlink: %s\n", __func__, PtlErrorStr(ret));
-    }
     free(w);
 }
 
@@ -754,12 +885,14 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
 				 ptl_process_id_t my_pid)
 {
     int ret = 0;
-    static ptl_process_id_t no_pid;
+    ptl_process_id_t no_pid;
+    int nic_type;
     ptl_md_t zero_mdesc = {
 	.threshold = PTL_MD_THRESH_INF,
 	.max_size = 0,
 	.options = PTL_MD_OP_PUT | PTL_MD_TRUNCATE | PTL_MD_MAX_SIZE |
 		   PTL_MD_EVENT_START_DISABLE,
+	.user_ptr = 0,
     };
 
     /* already initialized */
@@ -778,19 +911,30 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
      * lookup server, figure out how route would go to it, choose
      * that interface.  Yeah.
      */
+
+#if defined(__CRAYXT_SERVICE) || defined(__CRAYXT_COMPUTE_LINUX_TARGET)
+    /*
+     * Magic for Cray XT service nodes and compute node linux.
+     * Catamount uses default, TCP uses default.
+     */
+    nic_type = CRAY_USER_NAL;
+#else
+    nic_type = PTL_IFACE_DEFAULT;
+#endif
+
+    /* needed for TCP */
     /* setenv("PTL_IFACE", "eth0", 0); */
-    ret = PtlNIInit(bmi_portals_nic_type, my_pid.pid, NULL, NULL, &ni);
-#ifdef __LIBCATAMOUNT__
-    if (bmi_portals_nic_type == PTL_IFACE_DEFAULT) {
-	if (ret == PTL_IFACE_DUP && ni != PTL_INVALID_HANDLE) {
-	    ret = 0;  /* already set up by pre-main on Cray compute nodes */
-	    ni_init_dup = 1;
-	}
+
+    ret = PtlNIInit(nic_type, my_pid.pid, NULL, NULL, &ni);
+#if defined(__LIBCATAMOUNT__) || defined(__CRAYXT_COMPUTE_LINUX_TARGET)
+    if (ret == PTL_IFACE_DUP && ni != PTL_INVALID_HANDLE) {
+	ret = 0;  /* already set up by pre-main on catamount nodes */
+	ni_init_dup = 1;
     }
 #endif
     if (ret) {
 	/* error number is bogus here, do not try to decode it */
-	gossip_err("%s: PtlNIInit failed: %d\n", __func__, ret);
+	gossip_err("%s: PtlNIInit failed: %s\n", __func__, PtlErrorStr(ret));
 	ni = PTL_INVALID_HANDLE;  /* init call nulls it out */
 	ret = -EIO;
 	goto out;
@@ -812,7 +956,7 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
     debug(0, "%s: runtime thinks my id is %d.%d\n", __func__, id.nid, id.pid);
     }
 
-#ifndef __LIBCATAMOUNT__
+#if !(defined(__LIBCATAMOUNT__) || defined(__CRAYXT_SERVICE) || defined(__CRAYXT_COMPUTE_LINUX_TARGET))
     /*
      * Need an access control entry to allow everybody to talk, else root
      * cannot talk to random user, e.g.  Not implemented on Cray.
@@ -850,7 +994,8 @@ static int ensure_ni_initialized(struct bmip_method_addr *peer __unused,
 
     /* "zero" grabs just the header (of nonprepost, not unexpected), drops the
      * contents */
-    ret = PtlMEAttach(ni, ptl_index, any_pid, 0, 0xffffffffULL, PTL_RETAIN,
+    ret = PtlMEAttach(ni, ptl_index, any_pid, 0,
+		      (0x3fffffffULL << 32) | 0xffffffffULL, PTL_RETAIN,
 		      PTL_INS_AFTER, &zero_me);
     if (ret) {
 	gossip_err("%s: PtlMEAttach zero: %s\n", __func__, PtlErrorStr(ret));
@@ -906,7 +1051,7 @@ static void build_mdesc(struct bmip_work *w, ptl_md_t *mdesc, int numbufs,
 			void *const *buffers, const bmi_size_t *sizes)
 {
     mdesc->threshold = 1;
-    mdesc->options = PTL_MD_EVENT_START_DISABLE;
+    mdesc->options = 0;  /* PTL_MD_EVENT_START_DISABLE; */
     mdesc->eq_handle = eq;
     mdesc->user_ptr = w;
 
@@ -937,7 +1082,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 {
     struct bmip_method_addr *pma = addr->method_data;
     struct bmip_work *sq;
-    uint64_t tag;
+    uint64_t mb;
     int ret;
     ptl_md_t mdesc;
 
@@ -955,7 +1100,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	goto out;
     }
     sq->type = BMI_SEND;
-    sq->me_unlink = 0;
+    sq->saw_send_end_and_ack = 0;
     sq->tot_len = total_size;
     sq->is_unexpected = is_unexpected;
     fill_mop(sq, id, addr, user_ptr, context_id);
@@ -963,26 +1108,36 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
     build_mdesc(sq, &mdesc, numbufs, (void *const *)(uintptr_t) buffers, sizes);
     mdesc.threshold = 2;  /* put, ack */
 
-    debug(2, "%s: sq %p len %lld peer %s tag %d\n", __func__, sq,
-	  lld(total_size), pma->peername, bmi_tag);
-
     sq->state = SQ_WAITING_ACK;
     gen_mutex_lock(&list_mutex);
     qlist_add_tail(&sq->list, &q_send_waiting_ack);
     gen_mutex_unlock(&list_mutex);
 
     /* if not unexpected, use an ME in case he has to come get it */
-    tag = bmi_tag;
     if (sq->is_unexpected) {
+
+	debug(2, "%s: sq %p len %lld peer %s tag %d unexpected\n", __func__, sq,
+	      lld(total_size), pma->peername, bmi_tag);
 	/* md without any match entry, for sending */
-	tag |= match_bits_unexpected;
+	mb = match_bits_unexpected | bmi_tag;
 	ret = PtlMDBind(ni, mdesc, PTL_UNLINK, &sq->md);
 	if (ret) {
 	    gossip_err("%s: PtlMDBind: %s\n", __func__, PtlErrorStr(ret));
 	    return -EIO;
 	}
+	debug(2, "%s: bound md %d\n", __func__, sq->md);
     } else {
-	ret = PtlMEInsert(mark_me, pma->pid, match_bits_long_send | tag,
+	/* seqno increments on every expected send (only) */
+	if (++pma->seqno_out >= match_bits_seqno_max)
+	    pma->seqno_out = 0;
+	mb = mb_from_tag_and_seqno(bmi_tag, pma->seqno_out);
+
+	debug(2, "%s: sq %p len %lld peer %s tag %d seqno %u mb 0x%llx\n",
+	      __func__, sq, lld(total_size), pma->peername, bmi_tag,
+	      pma->seqno_out, llu(mb));
+
+	/* long-send bit only on the ME, not as the outgoing mb in PtlPut */
+	ret = PtlMEInsert(mark_me, pma->pid, match_bits_long_send | mb,
 			  0, PTL_UNLINK, PTL_INS_BEFORE, &sq->me);
 	if (ret) {
 	    gossip_err("%s: PtlMEInsert: %s\n", __func__, PtlErrorStr(ret));
@@ -1003,7 +1158,10 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	}
     }
 
-    ret = PtlPut(sq->md, PTL_ACK_REQ, pma->pid, ptl_index, 0, tag, 0, 0);
+    sq->bmi_tag = bmi_tag;  /* both for debugging dumps */
+    sq->match_bits = mb;
+
+    ret = PtlPut(sq->md, PTL_ACK_REQ, pma->pid, ptl_index, 0, mb, 0, 0);
     if (ret) {
 	gossip_err("%s: PtlPut: %s\n", __func__, PtlErrorStr(ret));
 	return -EIO;
@@ -1103,10 +1261,18 @@ static int match_nonprepost_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
     int ret = 0;
     ptl_md_t mdesc;
     struct bmip_work *rq;
+    uint64_t mb;
 
+    /* expected match bits */
+    mb = mb_from_tag_and_seqno(tag, pma->seqno_in);
+
+    /* XXX: remove bmi_tag comparison if match_bits works */
     gen_mutex_lock(&list_mutex);
     qlist_for_each_entry(rq, &q_recv_nonprepost, list) {
-	if (rq->mop.addr == addr && rq->bmi_tag == tag) {
+	debug(2, "%s: compare rq %p addr %p =? %p tag %u =? %u mb 0x%llx =? 0x%llx\n", __func__,
+	      rq, rq->mop.addr, addr, rq->bmi_tag, tag, llu(rq->match_bits),
+	      llu(mb));
+	if (rq->mop.addr == addr && rq->bmi_tag == tag && rq->match_bits == mb) {
 	    found = 1;
 	    qlist_del(&rq->list);
 	    break;
@@ -1137,6 +1303,7 @@ static int match_nonprepost_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	    nonprepost_repost(rq->nonpp_md);
 	}
 	rq->state = RQ_WAITING_USER_TEST;
+	debug(2, "%s: found short message rq %p, copied\n", __func__, rq);
 	goto foundout;
     }
 
@@ -1156,7 +1323,7 @@ static int match_nonprepost_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
 
     rq->tot_len = total_size;
     build_mdesc(rq, &mdesc, numbufs, buffers, sizes);
-    mdesc.options |= PTL_MD_OP_GET;
+    mdesc.threshold = 2;  /* XXX: on Cray only, this must be 2, not 1 */
 
     ret = PtlMDBind(ni, mdesc, PTL_UNLINK, &rq->md);
     if (ret) {
@@ -1166,9 +1333,11 @@ static int match_nonprepost_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	goto out;
     }
 
-    ret = PtlGet(rq->md, pma->pid, ptl_index, 0, match_bits_long_send | tag, 0);
+    mb |= match_bits_long_send;
+    debug(2, "%s: rq %p doing get mb 0x%llx\n", __func__, rq, llu(mb));
+    ret = PtlGet(rq->md, pma->pid, ptl_index, 0, mb, 0);
     if (ret) {
-	gossip_err("%s: PtlGetRegion: %s\n", __func__, PtlErrorStr(ret));
+	gossip_err("%s: PtlGet: %s\n", __func__, PtlErrorStr(ret));
 	ret = -EIO;
 	free(rq);
 	goto out;
@@ -1200,25 +1369,31 @@ static int post_recv(bmi_op_id_t *id, struct bmi_method_addr *addr,
     struct bmip_work *rq = NULL;
     ptl_md_t mdesc;
     int ret, ms = 0;
+    uint64_t mb = 0;
 
     ret = ensure_ni_initialized(pma, any_pid);
     if (ret)
 	goto out;
 
-    debug(2, "%s: len %lld peer %s tag %d\n", __func__, lld(total_size),
-	  pma->peername, tag);
+    /* increment the expected seqno of the message he will send us */
+    if (++pma->seqno_in >= match_bits_seqno_max)
+	pma->seqno_in = 0;
+
+    debug(2, "%s: len %lld peer %s tag %d seqno %u\n", __func__,
+          lld(total_size), pma->peername, tag, pma->seqno_in);
 
     rq = NULL;
     gen_mutex_lock(&eq_mutex);  /* do not let test threads manipulate eq */
 restart:
     /* drain the EQ */
-    debug(4, "%s: check eq\n", __func__);
+    debug(2, "%s: check eq\n", __func__);
     __check_eq(ms);
 
-    /* first check the unexpected receive queue */
-    debug(4, "%s: match nonprepost?\n", __func__);
+    /* first check the nonpreposted receive queue */
+    debug(2, "%s: match nonprepost?\n", __func__);
     ret = match_nonprepost_recv(id, addr, numbufs, buffers, sizes,
 				total_size, tag, user_ptr, context_id);
+
     if (ret != 0) {
 	if (ret > 0)  /* handled it via the nonprepost queue */
 	    ret = 0;
@@ -1234,11 +1409,11 @@ restart:
 	    goto out;
 	}
 	rq->type = BMI_RECV;
-	rq->me_unlink = 0;
 	rq->tot_len = total_size;
 	rq->actual_len = 0;
 	rq->bmi_tag = tag;
 	fill_mop(rq, id, addr, user_ptr, context_id);
+	memset(&mdesc, 0, sizeof(mdesc));
 	build_mdesc(rq, &mdesc, numbufs, buffers, sizes);
 	mdesc.threshold = 0;  /* initially inactive */
 	mdesc.options |= PTL_MD_OP_PUT;
@@ -1246,8 +1421,10 @@ restart:
 	/* put at the end of the preposted list, just before the first
 	 * nonprepost or unex ME. */
 	rq->me = PTL_INVALID_HANDLE;
-	debug(4, "%s: me insert\n", __func__);
-	ret = PtlMEInsert(mark_me, pma->pid, tag, 0, PTL_UNLINK,
+	debug(2, "%s: me insert\n", __func__);
+	mb = mb_from_tag_and_seqno(tag, pma->seqno_in);
+	rq->match_bits = mb;
+	ret = PtlMEInsert(mark_me, pma->pid, mb, 0, PTL_UNLINK,
 			  PTL_INS_BEFORE, &rq->me);
 	if (ret) {
 	    gossip_err("%s: PtlMEInsert: %s\n", __func__, PtlErrorStr(ret));
@@ -1255,22 +1432,24 @@ restart:
 	    goto out;
 	}
 
-	debug(4, "%s: md attach\n", __func__);
+	debug(2, "%s: md attach\n", __func__);
 	ret = PtlMDAttach(rq->me, mdesc, PTL_UNLINK, &rq->md);
 	if (ret) {
 	    gossip_err("%s: PtlMDAttach: %s\n", __func__, PtlErrorStr(ret));
 	    ret = -EIO;
 	    goto out;
 	}
+	debug(2, "%s: me %d, md %d\n", __func__, rq->me, rq->md);
     }
 
     /* now update it atomically with respect to the event stream from the NIC */
     mdesc.threshold = 1;
-    debug(4, "%s: md update\n", __func__);
+    debug(2, "%s: md update threshold to 1\n", __func__);
     ret = PtlMDUpdate(rq->md, NULL, &mdesc, eq);
     if (ret) {
 	if (ret == PTL_MD_NO_UPDATE) {
 	    /* cannot block, other thread may have processed the event for us */
+	    debug(2, "%s: md update: no update\n", __func__);
 	    ms = PTL_TIME_FOREVER;
 	    goto restart;
 	}
@@ -1279,8 +1458,33 @@ restart:
 	goto out;
     }
 
+#ifdef DEBUG_CNL_ODDITIES
+    {
+    debug(2, "insert another\n");
+    ret = PtlMEInsert(mark_me, pma->pid, 0, -1ULL, PTL_UNLINK,
+		      PTL_INS_BEFORE, &rq->tme);
+    if (ret) {
+	gossip_err("%s: PtlMEInsert: %s\n", __func__, PtlErrorStr(ret));
+	ret = -EIO;
+	goto out;
+    }
 
-    debug(4, "%s: done\n", __func__);
+    debug(2, "%s: md attach\n", __func__);
+    mdesc.user_ptr = (void *) ((uintptr_t) mdesc.user_ptr + 1);
+    ret = PtlMDAttach(rq->tme, mdesc, PTL_UNLINK, &rq->tmd);
+    if (ret) {
+	gossip_err("%s: PtlMDAttach: %s\n", __func__, PtlErrorStr(ret));
+	ret = -EIO;
+	goto out;
+    }
+    debug(2, "%s: me %d, md %d\n", __func__, rq->tme, rq->tmd);
+    }
+#endif
+
+
+    debug(2, "%s: rq %p waiting incoming, len %lld peer %s tag %d seqno %u mb 0x%llx\n",
+          __func__, rq, lld(total_size), pma->peername, tag, pma->seqno_in,
+	  llu(mb));
     rq->state = RQ_WAITING_INCOMING;
     gen_mutex_lock(&list_mutex);
     qlist_add_tail(&rq->list, &q_recv_waiting_incoming);
@@ -1324,6 +1528,31 @@ static int bmip_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_m
 		     tot_expected_len, tag, user_ptr, context_id);
 }
 
+/* debugging */
+#define show_queue(q) do { \
+    fprintf(stderr, #q "\n"); \
+    qlist_for_each_entry(w, &q, list) { \
+	fprintf(stderr, "%s %p state %s len %llu tag 0x%llx mb 0x%0llx\n", \
+		w->type == BMI_SEND ? "sq" : "rq", \
+		w, state_name(w->state), \
+		w->type == BMI_SEND ? llu(w->tot_len) : llu(w->actual_len), \
+		llu(w->bmi_tag), llu(w->match_bits)); \
+    } \
+} while (0)
+
+static void dump_queues(int sig __unused)
+{
+    struct bmip_work *w;
+
+    /* debugging */
+    show_queue(q_send_waiting_ack);
+    show_queue(q_send_waiting_get);
+    show_queue(q_recv_waiting_incoming);
+    show_queue(q_recv_waiting_get);
+    show_queue(q_recv_nonprepost);
+    show_queue(q_unexpected_done);
+    show_queue(q_done);
+}
 
 /*
  * Cancel.  Grab the eq lock to keep things from finishing as we are
@@ -1340,7 +1569,9 @@ static int bmip_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     __check_eq(0);
     mop = id_gen_fast_lookup(id);
     w = mop->method_data;
-    debug(2, "%s: cancel %p state %s\n", __func__, w, state_name(w->state));
+    fprintf(stderr, "%s: cancel %p state %s len %llu tag 0x%llx mb 0x%llx\n",
+    	    __func__, w, state_name(w->state), llu(w->tot_len),
+	    llu(w->bmi_tag), llu(w->match_bits));
     switch (w->state) {
 
     case SQ_WAITING_ACK:
@@ -1371,6 +1602,7 @@ static int bmip_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
     case SQ_WAITING_USER_TEST:
     case RQ_WAITING_USER_TEST:
+    case RQ_WAITING_USER_POST:
     case RQ_LEN_ERROR:
     case SQ_CANCELLED:
     case RQ_CANCELLED:
@@ -1387,6 +1619,11 @@ link_done:
 
 out:
     gen_mutex_unlock(&eq_mutex);
+
+    /* debugging */
+    dump_queues(0);
+
+    exit(1);
     return 0;
 }
 
@@ -1418,7 +1655,7 @@ static struct bmi_method_addr *bmip_alloc_method_addr(const char *hostname,
 	if (pma->pid.pid == pid.pid && pma->pid.nid == pid.nid) {
 	    /* relies on alloc_method_addr() working like it does */
 	    map = &((struct bmi_method_addr *) pma)[-1];
-	    debug(2, "%s: found map %p from pma %p\n", __func__, map, pma);
+	    debug(2, "%s: found matching peer %s\n", __func__, pma->peername);
 	    goto out;
 	}
     }
@@ -1436,16 +1673,19 @@ static struct bmi_method_addr *bmip_alloc_method_addr(const char *hostname,
     sprintf(pma->peername, "%s:%d", hostname, pid.pid);
 
     pma->pid = pid;
+    pma->seqno_in = 0;
+    pma->seqno_out = 0;
     qlist_add(&pma->list, &pma_list);
 
     if (register_with_bmi) {
 	ret = bmi_method_addr_reg_callback(map);
-	if (ret < 0) {
+	if (!ret) {
 	    gossip_err("%s: bmi_method_addr_reg_callback failed\n", __func__);
 	    free(map);
 	    map = NULL;
 	}
     }
+    debug(2, "%s: new peer %s\n", __func__, pma->peername);
 
 out:
     gen_mutex_unlock(&pma_mutex);
@@ -1453,7 +1693,7 @@ out:
 }
 
 
-#ifndef __LIBCATAMOUNT__
+#if !(defined(__LIBCATAMOUNT__) || defined(__CRAYXT_COMPUTE_LINUX_TARGET) || defined(__CRAYXT_SERVICE))
 /*
  * Clients give hostnames.  Convert these to Portals nids.  This routine
  * specific for Portals-over-IP (tcp or utcp).
@@ -1632,8 +1872,12 @@ static int unexpected_init(struct bmi_method_addr *listen_addr)
      * to repost the first.  Sort of a circular buffer structure.  This is
      * hopefully better than wasting a full 8k for every small control message.
      */
-    for (i=0; i<UNEXPECTED_NUM_MD; i++)
+    unexpected_need_repost_sum = 0;
+    for (i=0; i<UNEXPECTED_NUM_MD; i++) {
+	unexpected_is_posted[i] = 0;
+	unexpected_need_repost[i] = 0;
 	unexpected_repost(i);
+    }
 
 out:
     return ret;
@@ -1644,6 +1888,21 @@ static void unexpected_repost(int which)
     int ret;
     ptl_md_t mdesc;
 
+    /* unlink used-up one */
+    if (unexpected_is_posted[which]) {
+	debug(1, "%s: trying unpost %d\n", __func__, which);
+	ret = PtlMEUnlink(unexpected_me[which]);
+	if (ret) {
+	    gossip_err("%s: PtlMEUnlink %d: %s\n", __func__, which,
+		       PtlErrorStr(ret));
+	    return;
+	}
+	debug(1, "%s: unposted %d\n", __func__, which);
+	unexpected_need_repost[which] = 0;
+	unexpected_is_posted[which] = 0;
+	--unexpected_need_repost_sum;
+    }
+
     /* unexpected messages are limited by the API to a certain size */
     mdesc.start = unexpected_buf + which * (UNEXPECTED_QUEUE_SIZE / 2);
     mdesc.length = UNEXPECTED_QUEUE_SIZE / 2;
@@ -1652,24 +1911,37 @@ static void unexpected_repost(int which)
 		  | PTL_MD_MAX_SIZE;
     mdesc.max_size = UNEXPECTED_MESSAGE_SIZE;
     mdesc.eq_handle = eq;
+    mdesc.user_ptr = (void *) (uintptr_t) (UNEXPECTED_MD_INDEX_OFFSET + which);
 
     /*
-     * Take any tag, as long as it has the unexpected bit set.  This always
-     * goes at the very end of the match list.
+     * Take any tag, as long as it has the unexpected bit set, and not
+     * the long send bit.  Not sure if we need both bits for this.  This always
+     * goes at the very end of the list, just in front of zero.  The nonpp
+     * and unex ones can be comingled, as they select different things, but
+     * they must come after the preposts and before the zero md.
      */
-    ret = PtlMEAttach(ni, ptl_index, any_pid, match_bits_unexpected,
-		      0xffffffffULL, PTL_UNLINK, PTL_INS_AFTER,
-		      &unexpected_me[which]);
+    ret = PtlMEInsert(zero_me, any_pid, match_bits_unexpected,
+		      (0x3fffffffULL << 32) | 0xffffffffULL, PTL_UNLINK,
+		      PTL_INS_BEFORE, &unexpected_me[which]);
     if (ret) {
-	gossip_err("%s: PtlMEAttach: %s\n", __func__, PtlErrorStr(ret));
+	gossip_err("%s: PtlMEInsert: %s\n", __func__, PtlErrorStr(ret));
 	return;
     }
 
-    /* put data here when it matches; when full, unlink it */
-    ret = PtlMDAttach(unexpected_me[which], mdesc, PTL_UNLINK,
+    /*
+     * Put data here when it matches.  Do not auto-unlink else a new md
+     * may get stuck in and cause a false match in unexpected_md_index above.
+     * Do it all manually.  Also have to make sure these do not get reused
+     * in case things sitting in the queue haven't been looked at yet.  Maybe
+     * need to use md.user_ptr, or look at the match bits.
+     */
+    ret = PtlMDAttach(unexpected_me[which], mdesc, PTL_RETAIN,
 		      &unexpected_md[which]);
     if (ret)
 	gossip_err("%s: PtlMDAttach: %s\n", __func__, PtlErrorStr(ret));
+
+    unexpected_is_posted[which] = 1;
+    debug(1, "%s: reposted %d\n", __func__, which);
 }
 
 static int unexpected_fini(void)
@@ -1677,14 +1949,14 @@ static int unexpected_fini(void)
     int i, ret;
 
     for (i=0; i<UNEXPECTED_NUM_MD; i++) {
-	ret = PtlMDUnlink(unexpected_md[i]);
+	/* MDs go away when MEs unlinked */
+	ret = PtlMEUnlink(unexpected_me[i]);
 	if (ret) {
-	    gossip_err("%s: PtlMDUnlink %d: %s\n", __func__, i,
+	    gossip_err("%s: PtlMEUnlink %d: %s\n", __func__, i,
 		       PtlErrorStr(ret));
 	    return ret;
 	}
     }
-    /* MEs are automatically discarded when MDs go away */
     free(unexpected_buf);
     return 0;
 }
@@ -1719,6 +1991,27 @@ static void nonprepost_repost(int which)
 {
     int ret;
     ptl_md_t mdesc;
+    static int count = 0;
+
+    debug(0, "%s: WHICH %d\n", __func__, which);
+    ++count;
+    if (count > 2)
+	exit(0);
+
+    /* unlink used-up one */
+    if (unexpected_is_posted[which]) {
+	debug(1, "%s: trying unpost %d\n", __func__, which);
+	ret = PtlMEUnlink(unexpected_me[which]);
+	if (ret) {
+	    gossip_err("%s: PtlMEUnlink %d: %s\n", __func__, which,
+		       PtlErrorStr(ret));
+	    return;
+	}
+	debug(1, "%s: unposted %d\n", __func__, which);
+	unexpected_need_repost[which] = 0;
+	unexpected_is_posted[which] = 0;
+	--unexpected_need_repost_sum;
+    }
 
     /* only short messages that fit max_size go in here */
     mdesc.start = nonprepost_buf + which * (NONPREPOST_QUEUE_SIZE / 2);
@@ -1728,13 +2021,17 @@ static void nonprepost_repost(int which)
 		  | PTL_MD_MAX_SIZE;
     mdesc.max_size = NONPREPOST_MESSAGE_SIZE;
     mdesc.eq_handle = eq;
+    mdesc.user_ptr = (void *) (uintptr_t) (NONPREPOST_MD_INDEX_OFFSET + which);
+
+    /* XXX: maybe need manual unlink like for unexpecteds on CNL */
 
     /* also at the very end of the list */
-    ret = PtlMEAttach(ni, ptl_index, any_pid, 0,
-		      0xffffffffULL, PTL_UNLINK, PTL_INS_AFTER,
-		      &nonprepost_me[which]);
+    /* match anything as long as top two bits are zero */
+    ret = PtlMEInsert(zero_me, any_pid, 0,
+		      (0x3fffffffULL << 32) | 0xffffffffULL,
+		      PTL_UNLINK, PTL_INS_BEFORE, &nonprepost_me[which]);
     if (ret) {
-	gossip_err("%s: PtlMEAttach: %s\n", __func__, PtlErrorStr(ret));
+	gossip_err("%s: PtlMEInsert: %s\n", __func__, PtlErrorStr(ret));
 	return;
     }
 
@@ -1759,14 +2056,13 @@ static int nonprepost_fini(void)
 		       nonprepost_refcnt[i]);
 	if (!nonprepost_is_posted[i])
 	    continue;
-	ret = PtlMDUnlink(nonprepost_md[i]);
+	/* MDs go away when MEs unlinked */
+	ret = PtlMEUnlink(nonprepost_me[i]);
 	if (ret) {
-	    gossip_err("%s: PtlMDUnlink %d: %s\n", __func__, i,
+	    gossip_err("%s: PtlMEUnlink %d: %s\n", __func__, i,
 		       PtlErrorStr(ret));
-	    return ret;
 	}
     }
-    /* MEs are automatically discarded when MDs go away */
     free(nonprepost_buf);
     return 0;
 }
@@ -1873,24 +2169,6 @@ static int bmip_initialize(struct bmi_method_addr *listen_addr,
 
     bmi_portals_method_id = method_id;
 
-    bmi_portals_nic_type = PTL_IFACE_DEFAULT;
-#ifdef __LIBCATAMOUNT__
-    {
-	/* magic for Cray XT3 service nodes only; compute uses default,
-	 * and TCP uses default */
-	struct utsname buf;
-
-	ret = uname(&buf);
-	if (ret) {
-	    gossip_err("%s: uname failed: %m\n", __func__);
-	    ret = -EIO;
-	    goto out;
-	}
-	if (strcmp(buf.sysname, "Linux") == 0)
-	    bmi_portals_nic_type = CRAY_USER_NAL;
-    }
-#endif
-
     ret = PtlInit(&numint);
     if (ret) {
 	gossip_err("%s: PtlInit failed\n", __func__);
@@ -1911,6 +2189,17 @@ static int bmip_initialize(struct bmi_method_addr *listen_addr,
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x001f0000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_ALL | 0x00000000); */
     /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DBG_DROP | 0x00000000); */
+
+    /* catamount has different debug symbols, but never prints anything */
+    PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_ALL | PTL_DEBUG_NI_ALL);
+    /* PtlNIDebug(PTL_INVALID_HANDLE, PTL_DEBUG_DROP | 0x00000000); */
+
+#if defined(__CRAYXT_SERVICE)
+    /*
+     * debug
+     */
+    signal(SIGUSR1, dump_queues);
+#endif
 
     /*
      * Allocate and build MDs for a queue of unexpected messages from
@@ -1951,6 +2240,19 @@ static int bmip_finalize(void)
     nonprepost_fini();
     if (unexpected_buf)
 	unexpected_fini();
+
+#if 0  /* example code:  stick this somewhere to test if the EQ is freeable */
+    /* unexpected_fini(); */
+    nonprepost_fini();
+    ret = PtlMEUnlink(zero_me);
+    if (ret)
+	gossip_err("%s: PtlMEUnlink zero: %s\n", __func__, PtlErrorStr(ret));
+    ret = PtlEQFree(eq);
+    if (ret)
+	gossip_err("%s: PtlEQFree: %s\n", __func__, PtlErrorStr(ret));
+    printf("eqfree okay\n");
+    exit(1);
+#endif
 
     /* destroy connection structures */
     ret = PtlMEUnlink(mark_me);

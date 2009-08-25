@@ -144,7 +144,7 @@ static options_t *parse_args(int argc, char **argv)
 		break;
             case 'd':
           do_dirent:
-                snprintf(tmp_opts->dirent_name, PATH_MAX, optarg);
+                snprintf(tmp_opts->dirent_name, PATH_MAX, "%s", optarg);
                 break;
 	    case 'f':
           do_fsid:
@@ -164,7 +164,10 @@ int main(int argc, char **argv)
     int ret = -1;
     options_t *user_opts = NULL;
     PVFS_object_ref ref;
-    PVFS_credential *credential;
+    PVFS_credential *creds;
+    PVFS_credential *cred;
+    int ncreds;
+    int i;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -211,15 +214,22 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    credential = PVFS_util_gen_fake_credential();
-    assert(credential);
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
+    cred = PVFS_util_find_credential_by_fsid(ref.fs_id, creds, ncreds);
 
     if (user_opts->remove_object_only)
     {
         fprintf(stderr,"Attempting to remove object %llu,%d\n",
                 llu(ref.handle), ref.fs_id);
 
-        ret = PVFS_mgmt_remove_object(ref, credential);
+        ret = PVFS_mgmt_remove_object(ref, cred, NULL);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_object", ret);
@@ -231,13 +241,18 @@ int main(int argc, char **argv)
                 "\n", user_opts->dirent_name, llu(ref.handle), ref.fs_id);
 
         ret = PVFS_mgmt_remove_dirent(
-            ref, user_opts->dirent_name, credential);
+            ref, user_opts->dirent_name, cred, NULL);
         if (ret)
         {
             PVFS_perror("PVFS_mgmt_remove_dirent", ret);
         }
     }
 
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     free(user_opts);
     return ret;
 }

@@ -316,7 +316,9 @@ int dbpf_queue_or_service(
     struct dbpf_op *op_p,
     dbpf_queued_op_t *q_op_p,
     struct dbpf_collection *coll_p,
-    TROVE_op_id *out_op_id_p)
+    TROVE_op_id *out_op_id_p,
+    PINT_event_type event_type,
+    PINT_event_id event_id)
 {
     int ret;
 
@@ -347,13 +349,14 @@ int dbpf_queue_or_service(
         }
 
         /* only one that allocs anything, see dbpf_queued_op_free */
-        if(op_p->type == DSPACE_CREATE)
+        if(op_p->type == DSPACE_CREATE || op_p->type == DSPACE_CREATE_LIST)
         {
             free(op_p->u.d_create.extent_array.extent_array);
             op_p->u.d_create.extent_array.extent_array = NULL;
         }
 
         ret = 1;
+        DBPF_EVENT_END(event_type, event_id);
 
     }
     else
@@ -370,6 +373,20 @@ exit:
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
                             enum dbpf_op_state state)
 {
+    if(qop_p->event_type != trove_dbpf_read_event_id &&
+       qop_p->event_type != trove_dbpf_write_event_id)
+    {
+        if(qop_p->event_type == trove_dbpf_dspace_create_event_id)
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id,
+                           *qop_p->op.u.d_create.out_handle_p);
+        }
+        else
+        {
+            PINT_EVENT_END(qop_p->event_type, dbpf_pid, NULL, qop_p->event_id);
+        }
+    }
+
     DBPF_COMPLETION_START(qop_p, state);
     DBPF_COMPLETION_SIGNAL();
     DBPF_COMPLETION_FINISH(qop_p->op.context_id);

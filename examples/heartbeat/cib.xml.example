@@ -49,7 +49,7 @@
              </attributes>
            </instance_attributes>
            <operations>
-             <op id="server0_daemon_monitor" name="monitor" interval="20s" timeout="12s"/>
+             <op id="server0_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
            </operations>
          </primitive>
        </group>
@@ -82,7 +82,7 @@
              </attributes>
            </instance_attributes>
            <operations>
-             <op id="server1_daemon_monitor" name="monitor" interval="20s" timeout="12s"/>
+             <op id="server1_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
            </operations>
          </primitive>
        </group>
@@ -116,7 +116,7 @@
              </attributes>
            </instance_attributes>
            <operations>
-             <op id="server2_daemon_monitor" name="monitor" interval="20s" timeout="12s"/>
+             <op id="server2_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
            </operations>
          </primitive>
        </group>
@@ -150,7 +150,7 @@
              </attributes>
            </instance_attributes>
            <operations>
-             <op id="server3_daemon_monitor" name="monitor" interval="20s" timeout="12s"/>
+             <op id="server3_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
            </operations>
          </primitive>
        </group>

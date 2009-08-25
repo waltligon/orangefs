@@ -229,6 +229,11 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
         gossip_err("SM next called on invald smcb\n");
         return -1;
     }
+    if(PINT_smcb_cancelled(smcb))
+    {
+        return SM_ACTION_TERMINATE;
+    }
+
     /* loop while invoke of new state returns COMPLETED */
     do {
         /* loop while returning from nested SM */

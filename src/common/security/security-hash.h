@@ -1,5 +1,5 @@
 /* 
- * (C) 2008 Clemson University and The University of Chicago 
+ * (C) 2009 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -10,47 +10,11 @@
 
 #include <openssl/evp.h>
 
-#include "pvfs2-types.h"
 
-
-/*  SECURITY_hash_initialize
- *
- *  Initializes the hash table for use
- *
- *  returns PVFS_EALREADY if already initialized
- *  returns PVFS_ENOMEM if memory cannot be allocated
- *  returns 0 on success
- */
 int SECURITY_hash_initialize(void);
-
-/*  SECURITY_hash_finalize
- *
- *  Frees everything allocated within the table
- *  and anything used to set it up
- *
- *  returns nothing
- */
 void SECURITY_hash_finalize(void);
 
-/*  SECURITY_add_pubkey
- *
- *  Takes an EVP_PKEY and inserts it into the hash table
- *  based on the hash key.  If the hash key already
- *  exists in the table, it's corresponding EVP_PKEY is replaced 
- *  with the new one
- *
- *  returns PVFS_ENOMEM if memory cannot be allocated
- *  returns 0 on success
- */
 int SECURITY_add_pubkey(char *hash_key, EVP_PKEY *pubkey);
-
-/*  SECURITY_lookup_pubkey
- *
- *  Takes a hash key and returns a pointer to the
- *  matching EVP_PKEY structure
- *
- *  returns NULL if no matching key is found
- */
 EVP_PKEY *SECURITY_lookup_pubkey(char *hash_key);
 
 
@@ -64,4 +28,3 @@ EVP_PKEY *SECURITY_lookup_pubkey(char *hash_key);
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
- 

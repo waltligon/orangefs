@@ -2,6 +2,52 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs-2.8.0
+=============
+
+* Many bug fixes.
+* Support for the latest kernel releases, including 2.6.28.
+* Support for the latest releases of Berkeley DB, including 4.7.25.
+* New Direct I/O mode for enterprise storage backends.
+* Optimizations for small file workloads, including inode-stuffing
+  and object pre-creation.
+* Improved performance for directory listing (readdir).
+* Better integration with high-availability environments.
+* New tracing component to integrated with TAU trace logs.
+* Support for creating and building BMI only packages.
+* Experimental support for a PVFS FUSE module.
+
+pvfs-2.7.1
+==============
+
+* support for the latest kernel versions
+
+* kernel module:
+   - fixes to kernel dcache revalidate for multiple clients
+   - fixes to kernel getattr update race conditions
+   - modified kernel slot timeout to be separate (and much longer) from
+     the upcall timeout
+
+* bmi-ib: fixes to infiniband double free bugs
+* bmi-tcp: fixes to eager mode for slower client platforms
+
+* fixes to state machine processing.
+* fixes for the migration utility to work with single config file.
+* memory corruption fixes.
+* improved support for multithreaded system interface usage
+
+* performance:
+    - removed unecessary locks in server metadata operations
+    - better caching of long-term attributes for IO
+    - improved pvfs2-lsplus and readdirplus() performance
+
+* configuration:
+    --enable-threaded-kmod configure time option replaces -threaded run time
+      option to pvfs2-client
+    - segfault backtraces enabled by default
+    - HA script examples updated for use with Heartbeat 2.1.2 and newer
+
+
 pvfs-2.7.0
 ==============
 * ib: free cached registrations when out of space (openib only)

@@ -82,9 +82,12 @@ int main(int argc, char **argv)
     int ret = 0;
     int cur_fs = 0;
     char pvfs_path[PVFS_NAME_MAX] = { 0 };
+    PVFS_credential *creds;
     PVFS_credential *cred;
+    int ncreds;
     PVFS_sysresp_lookup lookup_resp;
     struct PINT_fsck_options *fsck_options = NULL;
+    int i;
 
     memset(&lookup_resp, 0, sizeof(lookup_resp));
     
@@ -112,6 +115,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(
             fsck_options->start_path, 
@@ -126,6 +137,8 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+
     if (fsck_options->check_stranded_objects && (strcmp(pvfs_path, "/") != 0))
     {
         fprintf(stderr, "Error: -d must specify the pvfs2 root directory when utilizing the -c option.\n");
@@ -135,20 +148,16 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-
     ret = PVFS_sys_lookup(
             cur_fs, pvfs_path, 
             cred, 
             &lookup_resp,
-            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
             
     if (ret != 0)
     {
         fprintf(stderr, "Error: failed lookup on [%s]\n", pvfs_path);
         PVFS_perror("PVFS_sys_lookup", ret);
-        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return -1;
@@ -158,7 +167,6 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
         PVFS_perror("PVFS_fsck_initialize", ret);
-        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return(-1);
@@ -169,7 +177,6 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "Error: a difference was detected while validating the server fs configs.\n");
         PVFS_perror("PVFS_fsck_check_server_configs", ret);
-        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return(-1);
@@ -179,7 +186,6 @@ int main(int argc, char **argv)
     if (fsck_options->check_fs_configs)
     {
         printf("All PVFS2 servers have consistent fs configurations.\n");
-        PINT_release_credential(cred);
         PVFS_sys_finalize();
         free(fsck_options);
         return 0;
@@ -208,7 +214,11 @@ int main(int argc, char **argv)
     }
 
     PVFS_fsck_finalize(fsck_options, &cur_fs, cred);
-    PINT_release_credential(cred);
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     PVFS_sys_finalize();
     free(fsck_options);
 

@@ -30,7 +30,7 @@
 #if CONFIG_MODVERSIONS==1
 #define MODVERSIONS
 #include <linux/modversions.h>
-#endif
+#endif 
 
 #define __NO_VERSION__
 #include <linux/version.h>
@@ -114,15 +114,6 @@ typedef unsigned long sector_t;
 #ifdef HAVE_LINUX_EXPORTFS_H
 #include <linux/exportfs.h>
 #endif
-
-/* taken from include/linux/fs.h from 2.4.19 or later kernels */
-#ifndef MAX_LFS_FILESIZE
-#if BITS_PER_LONG == 32
-#define MAX_LFS_FILESIZE     (((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG))-1)
-#elif BITS_PER_LONG == 64
-#define MAX_LFS_FILESIZE     0x7fffffffffffffff
-#endif
-#endif /* MAX_LFS_FILESIZE */
 
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -228,7 +219,7 @@ enum pvfs2_vfs_op_states {
 #endif
 
 /* Defines for controlling whether I/O upcalls are for async or sync operations */
-enum PVFS_async_io_type
+enum PVFS_async_io_type 
 {
      PVFS_VFS_SYNC_IO = 0,
     PVFS_VFS_ASYNC_IO = 1,
@@ -308,11 +299,11 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
     return internal_flag;
 }
 
-int pvfs2_xattr_set_trusted(struct inode *inode,
+int pvfs2_xattr_set_trusted(struct inode *inode, 
     const char *name, const void *buffer, size_t size, int flags);
 int pvfs2_xattr_get_trusted(struct inode *inode,
     const char *name, void *buffer, size_t size);
-int pvfs2_xattr_set_default(struct inode *inode,
+int pvfs2_xattr_set_default(struct inode *inode, 
     const char *name, const void *buffer, size_t size, int flags);
 int pvfs2_xattr_get_default(struct inode *inode,
     const char *name, void *buffer, size_t size);
@@ -322,7 +313,7 @@ int pvfs2_xattr_get_default(struct inode *inode,
 
 #ifndef HAVE_STRUCT_XTVEC
 /* Redefine xtvec structure so that we could move helper functions out of the define */
-struct xtvec
+struct xtvec 
 {
     __kernel_off_t xtv_off;  /* must be off_t */
     __kernel_size_t xtv_len; /* must be size_t */
@@ -348,9 +339,9 @@ typedef struct
 
     /* upcalls requiring variable length trailers require that this struct
      * be in the request list even after client-core does a read() on the device
-     * to dequeue the upcall
+     * to dequeue the upcall 
      * if op_linger field goes to 0, we dequeue this op off the list.
-     * else we let it stay. What gets passed to the read() is
+     * else we let it stay. What gets passed to the read() is 
      * a) if op_linger field is = 1, pvfs2_kernel_op_t itself
      * b) else if = 0, we pass ->upcall.trailer_buf
      * We expect to have only a single upcall trailer buffer, so we expect callers with trailers
@@ -371,6 +362,7 @@ typedef struct
 {
     PVFS_object_ref refn;
     char link_target[PVFS_NAME_MAX];
+    PVFS_size blksize;
     /*
      * Reading/Writing Extended attributes need to acquire the appropriate
      * reader/writer semaphore on the pvfs2_inode_t structure.
@@ -384,6 +376,7 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+    int revalidate_failed;
 
     /* State of in-memory attributes not yet flushed to disk associated with this object */
     unsigned long pinode_flags;
@@ -427,11 +420,11 @@ typedef struct
      */
     int intr;
     /** acl option (if set) is inspired by the ext2 acl option that
-     * requires the file system to honor acl's
+     * requires the file system to honor acl's 
      */
     int acl;
     /** suid option (if set) is inspired by the nfs mount option
-    * that requires the file system to honor the setuid bit of a
+    * that requires the file system to honor the setuid bit of a 
     * file if set. NOTE: this is disabled by default.
     */
     int suid;
@@ -475,14 +468,14 @@ typedef struct
     int id;
 } pvfs2_mount_sb_info_t;
 
-/** PVFS2 specific structure that we use for constructing an opaque handle at the time
+/** PVFS2 specific structure that we use for constructing an opaque handle at the time 
  * an openg() system call that will be used at subsequent openfh system call
  * We stuff in enough information into this buffer that subsequent
  * openfh calls don't have to communicate with server. Padding is inserted so that
  * size of structure is the same and offset is also same on both 32 and 64
  * bit machines.
  */
-typedef struct
+typedef struct 
 {
     PVFS_handle handle;
     PVFS_fs_id  fsid;
@@ -559,7 +552,7 @@ typedef struct
 
 #ifdef HAVE_AIO_VFS_SUPPORT
 
-/** structure that holds the state of any async I/O operation issued
+/** structure that holds the state of any async I/O operation issued 
  *  through the VFS. Needed especially to handle cancellation requests
  *  or even completion notification so that the VFS client-side daemon
  *  can free up its vfs_request slots.
@@ -724,7 +717,7 @@ void purge_waiting_ops(void);
  * defined in super.c
  ****************************/
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
-extern struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
+extern struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb, 
         const struct file_handle *handle);
 #endif
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -736,7 +729,7 @@ struct super_block* pvfs2_get_sb(
 #ifdef HAVE_VFSMOUNT_GETSB
 int pvfs2_get_sb(
     struct file_system_type *fst, int flags,
-    const char *devname, void *data,
+    const char *devname, void *data, 
     struct vfsmount *mnt);
 #else
 struct super_block *pvfs2_get_sb(
@@ -815,11 +808,11 @@ struct inode *pvfs2_iget_common(
 #define pvfs2_iget(sb, ref)        pvfs2_iget_common(sb, ref, 0)
 #define pvfs2_iget_locked(sb, ref) pvfs2_iget_common(sb, ref, 1)
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
+#if defined(PVFS2_LINUX_KERNEL_2_4) || defined(HAVE_TWO_PARAM_PERMISSION)
 int pvfs2_permission(struct inode *, int);
 #else
-int pvfs2_permission(struct inode *inode,
-        int mask, struct nameidata *nd);
+int pvfs2_permission(struct inode *inode, 
+					 int mask, struct nameidata *nd);
 #endif
 
 /*****************************
@@ -851,8 +844,6 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
-int pvfs2_gen_credentials(
-    PVFS_credential *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 int pvfs2_flush_inode(struct inode *inode);
 
@@ -1009,7 +1000,7 @@ do {                                                         \
 #define PVFS2_OP_NO_SEMAPHORE  8   /**< don't acquire semaphore */
 #define PVFS2_OP_ASYNC         16  /* Queue it, but don't wait */
 
-int service_operation(pvfs2_kernel_op_t* op, const char* op_name,
+int service_operation(pvfs2_kernel_op_t* op, const char* op_name, 
     int flags);
 
 /** handles two possible error cases, depending on context.
@@ -1113,8 +1104,8 @@ do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
 #define pvfs2_kernel_readpage block_read_full_page
 
 static inline struct dentry *pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
-{
-    d_add(dentry, inode);
+{ 
+    d_add(dentry, inode); 
     return dentry;
 }
 
@@ -1165,9 +1156,21 @@ static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry, struct 
     return d_splice_alias(inode, dentry);
 }
 
+#ifdef HAVE_CURRENT_FSUID 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
 {                                                 \
+    sys_attr.owner = current_fsuid();             \
+    sys_attr.group = current_fsgid();             \
+    sys_attr.size = 0;                            \
+    sys_attr.perms = PVFS_util_translate_mode(mode,0); \
+    sys_attr.objtype = type;                      \
+    sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
+} while(0)
+#else
+#define fill_default_sys_attrs(sys_attr,type,mode)\
+do                                                \
+{ \
     sys_attr.owner = current->fsuid;              \
     sys_attr.group = current->fsgid;              \
     sys_attr.size = 0;                            \
@@ -1175,6 +1178,7 @@ do                                                \
     sys_attr.objtype = type;                      \
     sys_attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;    \
 } while(0)
+#endif /* HAVE_CURRENT_FSUID */
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 

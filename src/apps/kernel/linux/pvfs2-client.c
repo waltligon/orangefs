@@ -38,6 +38,8 @@ static char s_client_core_path[PATH_MAX];
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
+#define DEFAULT_CLIENT_DIR "/var/pvfs2-client-dir"
+
 #define CLIENT_RESTART_INTERVAL_SECS 10
 #define CLIENT_MAX_RESTARTS 10
 
@@ -45,6 +47,7 @@ typedef struct
 {
     int verbose;
     int foreground;
+    char *client_dir;
     char *acache_timeout;
     char *acache_hard_limit;
     char *acache_soft_limit;
@@ -62,6 +65,7 @@ typedef struct
     char *dev_buffer_count;
     char *dev_buffer_size;
     char *logtype;
+    char *events;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -199,9 +203,12 @@ static int monitor_pvfs2_client(options_t *opts)
             }
 
             /* get rid of stdout/stderr/stdin */
-            freopen("/dev/null", "r", stdin);
-            freopen("/dev/null", "w", stdout);
-            freopen("/dev/null", "w", stderr);
+            if(!freopen("/dev/null", "r", stdin))
+                gossip_err("Error: failed to reopen stdin.\n");
+            if(!freopen("/dev/null", "w", stdout))
+                gossip_err("Error: failed to reopen stdout.\n");
+            if(!freopen("/dev/null", "w", stderr))
+                gossip_err("Error: failed to reopen stderr.\n");
 
             wpid = waitpid(core_pid, &ret, 0);
             assert(wpid != -1);
@@ -328,6 +335,8 @@ static int monitor_pvfs2_client(options_t *opts)
             arg_list[arg_index++] = opts->acache_timeout;
             arg_list[arg_index++] = "-n";
             arg_list[arg_index++] = opts->ncache_timeout;
+            arg_list[arg_index++] = "-c";
+            arg_list[arg_index++] = opts->client_dir;
             if(opts->logtype)
             {
                 arg_list[arg_index] = "--logtype";
@@ -411,6 +420,12 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->dev_buffer_size;
                 arg_index+=2;
             }
+            if(opts->events)
+            {
+                arg_list[arg_index] = "--events";
+                arg_list[arg_index+1] = opts->events;
+                arg_index+=2;
+            }
 
             if(opts->verbose)
             {
@@ -444,6 +459,7 @@ static void print_help(char *progname)
     printf("-f, --foreground              run in foreground mode\n");
     printf("-L  --logfile                 specify log file to write to\n"
             "   (defaults to /tmp/pvfs2-client.log)\n");
+    printf("-c  --client-dir              client certificate/key directory\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is %s ms)\n", DEFAULT_ACACHE_TIMEOUT_STR);
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
@@ -461,6 +477,7 @@ static void print_help(char *progname)
            "PATH\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
+    printf("--events=EVENTS               enable tracing of certain EVENTS\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -476,6 +493,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"foreground",0,0,0},
         {"logfile",1,0,0},
         {"logtype",1,0,0},
+        {"client-dir",1,0,0},
         {"acache-timeout",1,0,0},
         {"acache-soft-limit",1,0,0},
         {"acache-hard-limit",1,0,0},
@@ -491,12 +509,13 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {"logstamp",1,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "hvVfa:n:p:L:",
+    while((ret = getopt_long(argc, argv, "hvVfa:n:p:L:c:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -535,6 +554,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("client-dir", cur_option) == 0)
+                {
+                    goto do_client_dir;
                 }
                 else if (strcmp("logtype", cur_option) == 0)
                 {
@@ -599,6 +622,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->gossip_mask = optarg;
                     break;
                 }
+                else if (strcmp("events", cur_option) == 0)
+                {
+                    opts->events = optarg;
+                }
+
                 break;
             case 'h':
           do_help:
@@ -629,6 +657,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'L':
           do_logfile:
                 opts->logfile = optarg;
+                break;
+            case 'c':
+          do_client_dir:
+                opts->client_dir = optarg;
                 break;
             case 'p':
           do_path:
@@ -665,6 +697,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
                     opts->logfile);
             exit(1);
         } 
+    }
+
+    if (!opts->client_dir)
+    {
+        opts->client_dir = DEFAULT_CLIENT_DIR;
     }
 
     if (!opts->path)

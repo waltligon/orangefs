@@ -53,6 +53,7 @@
 #define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
 #define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
 #define endecode_fields_6(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6)
+#define endecode_fields_6_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6)
 #define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7)
 #define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8)
 #define endecode_fields_9_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9)
@@ -70,7 +71,9 @@
 #define endecode_fields_1a_1a_struct(n,t1,x1,tn1,n1,ta1,a1,t2,x2,tn2,n2,ta2,a2)
 #define endecode_fields_4a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1)
 #define endecode_fields_5a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,tn1,n1,ta1,a1)
-#define endecode_fields_2a2a_struct(name,t1,x1,t2,x2,tn1,n1,ta1,a1,t3,x3,t4,x4,tn2,n2,ta2,a2)
+#define endecode_fields_3a2a_struct(name,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1,t4,x4,t5,x5,tn2,n2,ta2,a2)
+
+#define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)
 
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 

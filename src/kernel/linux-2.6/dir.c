@@ -123,6 +123,7 @@ static int pvfs2_readdir(
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
+    int buffer_full = 0;
 
     pos = (PVFS_ds_position)file->f_pos;
     /* are we done? */
@@ -271,6 +272,7 @@ static int pvfs2_readdir(
                         gossip_err("Filldir failed on one of the first two true PVFS directory entries.\n");
                         gossip_err("Duplicate entries may appear.\n");
                     }
+                    buffer_full = 1;
                     ret = 0;
                     break;
                 }
@@ -289,13 +291,14 @@ static int pvfs2_readdir(
                 else 
                 {
                     /* this means a filldir call failed */
-                    file->f_pos = i - 1;
+                    file->f_pos = rhandle.readdir_response.token - 
+                        (rhandle.readdir_response.pvfs_dirent_outcount - i + 1);
                     gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
                 }
             }
 
             /* did we hit the end of the directory? */
-            if(rhandle.readdir_response.token == PVFS_READDIR_END)
+            if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
             {
                 gossip_debug(GOSSIP_DIR_DEBUG,
                     "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
@@ -907,7 +910,6 @@ struct file_operations pvfs2_dir_operations =
     readdir : pvfs2_readdir,
     open : pvfs2_file_open,
     release : pvfs2_file_release,
-    llseek : pvfs2_dir_llseek
 #else
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,

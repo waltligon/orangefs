@@ -24,6 +24,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "pint-event.h"
 
 static char *lost_and_found_string = "lost+found";
 
@@ -286,7 +287,7 @@ int pvfs2_mkspace(
             coll_id, &extent_array, &new_root_handle,
             PVFS_TYPE_DIRECTORY, NULL,
             (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
-            NULL, trove_context, &op_id);
+            NULL, trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -338,7 +339,7 @@ int pvfs2_mkspace(
 
         ret = trove_dspace_setattr(
             coll_id, new_root_handle, &attr, TROVE_SYNC, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -390,7 +391,7 @@ int pvfs2_mkspace(
         ret = trove_dspace_create(
             coll_id, &extent_array, &root_dirdata_handle,
             PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -417,7 +418,7 @@ int pvfs2_mkspace(
         ret = trove_keyval_write(
             coll_id, new_root_handle, &key, &val, 
             TROVE_SYNC, 0, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -466,7 +467,7 @@ int pvfs2_mkspace(
         ret = trove_dspace_create(
             coll_id, &extent_array, &lost_and_found_handle,
             PVFS_TYPE_DIRECTORY, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -497,7 +498,7 @@ int pvfs2_mkspace(
 
         ret = trove_dspace_setattr(
             coll_id, lost_and_found_handle, &attr, TROVE_SYNC, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -540,7 +541,7 @@ int pvfs2_mkspace(
         ret = trove_dspace_create(
             coll_id, &extent_array, &lost_and_found_dirdata_handle,
             PVFS_TYPE_DIRDATA, NULL, TROVE_SYNC, NULL,
-            trove_context, &op_id);
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -568,7 +569,7 @@ int pvfs2_mkspace(
         ret = trove_keyval_write(
             coll_id, lost_and_found_handle, &key, &val, 
             TROVE_SYNC,
-            0, NULL, trove_context, &op_id);
+            0, NULL, trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -601,7 +602,7 @@ int pvfs2_mkspace(
             coll_id, root_dirdata_handle, &key, &val, 
             TROVE_SYNC | TROVE_NOOVERWRITE | TROVE_KEYVAL_HANDLE_COUNT, 
 	    0,
-            NULL, trove_context, &op_id);
+            NULL, trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -690,3 +691,11 @@ int pvfs2_rmspace(
     return ret;
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

@@ -67,7 +67,7 @@ static PINT_sm_action mgmt_remove_dspace(
         0,
         js_p,
         &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }

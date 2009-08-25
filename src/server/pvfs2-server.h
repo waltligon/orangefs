@@ -31,6 +31,8 @@
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
 #include "state-machine.h"
+#include "pint-event.h"
+#include "security-types.h"
 
 extern job_context_id server_job_context;
 
@@ -55,6 +57,13 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
+/* Specifies the number of handles to be preceated at a time from each
+ * server using the batch create request.
+ */
+#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
+/* precreate pools will be topped off if they fall below this value */
+#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
+
 /* types of permission checking that a server may need to perform for
  * incoming requests
  */
@@ -69,15 +78,6 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
                                       needs write and execute */
 };
-
-#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
-static inline int PINT_get_object_ref_##req_name(                        \
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
-{                                                                        \
-    *fs_id = req->u.req_name.fs_id;                                      \
-    *handle = req->u.req_name.handle;                                    \
-    return 0;                                                            \
-}
 
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
@@ -95,6 +95,8 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
+    METAFILE_LAYOUT_KEY  = 5,
+    NUM_DFILES_REQ_KEY   = 6
 };
 
 /* optional; user-settable keys */
@@ -128,8 +130,22 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
-    SERVER_SECURITY_INIT       = (1 << 18)
+    SERVER_PRECREATE_INIT      = (1 << 18),
+    SERVER_SECURITY_INIT       = (1 << 19)
 } PINT_server_status_flag;
+
+struct PINT_server_create_op
+{
+    const char **io_servers;
+    const char **remote_io_servers;
+    int num_io_servers;
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    PVFS_error saved_error_code;
+    int handle_index;
+};
 
 /* struct PINT_server_lookup_op
  *
@@ -202,6 +218,29 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
+struct PINT_server_precreate_pool_refiller_op
+{
+    PVFS_handle pool_handle;
+    PVFS_handle* precreate_handle_array;
+    PVFS_fs_id fsid;
+    char* host;
+    PVFS_BMI_addr_t host_addr;
+    PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_capability capability;
+};
+
+struct PINT_server_batch_create_op
+{
+    int saved_error_code;
+    int batch_index;
+};
+
+struct PINT_server_batch_remove_op
+{
+    int handle_index;
+    int error_code;
+};
+
 struct PINT_server_mgmt_get_dirdata_op
 {
     PVFS_handle dirdata_handle;
@@ -249,11 +288,12 @@ struct PINT_server_getattr_op
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
+    int num_dfiles_req;
+    PVFS_credential credential;
 };
 
 struct PINT_server_listattr_op
@@ -268,7 +308,7 @@ struct PINT_server_getcred_op
 {
     char *certificate;
     uint32_t sig_size;
-    PVFS_sig signature;
+    PVFS_signature signature;
     PVFS_credential credential;
 };
 
@@ -277,7 +317,15 @@ struct PINT_server_eattr_op
 {
     void *buffer;
 };
-    
+
+struct PINT_server_unstuff_op
+{
+    PVFS_handle* dfile_array;
+    int num_dfiles_req;
+    PVFS_sys_layout layout;
+    void* encoded_layout;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -286,16 +334,21 @@ typedef struct PINT_server_op
 {
     struct qlist_head   next; /* used to queue structures used for unexp style messages */
     int op_cancelled; /* indicates unexp message was cancelled */
+    job_id_t unexp_id;
+
     enum PVFS_server_op op;  /* type of operation that we are servicing */
+
+    PINT_event_id event_id;
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
 
     /* generic structures used in most server operations */
     PVFS_ds_keyval key, val;
-    PVFS_ds_keyval key2, val2; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
+    int *error_a;
+    int keyval_count;
 
     int free_val;
 
@@ -334,6 +387,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
+        struct PINT_server_create_op create;
         struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
         struct PINT_server_listattr_op listattr;
@@ -351,15 +405,21 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_precreate_pool_refiller_op
+            precreate_pool_refiller;
+        struct PINT_server_batch_create_op batch_create;
+        struct PINT_server_batch_remove_op batch_remove;
+        struct PINT_server_unstuff_op unstuff;
         struct PINT_server_getcred_op getcred;
     } u;
 
 } PINT_server_op;
 
-/* TODO: consider passing request only */
-/* in that case we can move this whole block back to the file's top */
+/* nlmills: TODO: consider passing request only */
+/* nlmills: in that case we can move this whole block back to the file's top */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
+/* nlmills: TODO: remove these? */
 /* default checks that should work for most ops */
 extern int PINT_server_perm_read(PINT_server_op *s_op);
 extern int PINT_server_perm_write(PINT_server_op *s_op);
@@ -438,14 +498,16 @@ PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 
 
+/* nlmills: TODO: fix this to work with capabilities */
 /* PINT_ACCESS_DEBUG()
  *
  * macro for consistent printing of access records
  *
  * no return value
  */
-#ifdef GOSSIP_DISABLE_DEBUG
+/*#ifdef GOSSIP_DISABLE_DEBUG*/
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+/*
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
     PINT_server_access_debug(__s_op, __mask, format, ##f)
@@ -455,6 +517,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
+*/
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

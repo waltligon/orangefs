@@ -12,6 +12,8 @@
 #define PVFS_HINT_MAX_LENGTH 1024
 #define PVFS_HINT_MAX_NAME_LENGTH 512
 
+#define PINT_HINT_TRANSFER 0x01
+
 #include "pvfs2-hint.h"
 
 enum PINT_hint_type
@@ -21,6 +23,8 @@ enum PINT_hint_type
     PINT_HINT_CLIENT_ID,
     PINT_HINT_HANDLE,
     PINT_HINT_OP_ID,
+    PINT_HINT_RANK,
+    PINT_HINT_SERVER_ID
 };
 
 typedef struct PVFS_hint_s
@@ -41,13 +45,19 @@ typedef struct PVFS_hint_s
 void encode_PINT_hint(char **pptr, const PINT_hint *hint);
 void decode_PINT_hint(char **pptr, PINT_hint **hint);
 
-void *PINT_hint_get_value_by_type(PINT_hint *hint, enum PINT_hint_type type,
+void *PINT_hint_get_value_by_type(struct PVFS_hint_s *hint, enum PINT_hint_type type,
                                   int *length);
 
 void *PINT_hint_get_value_by_name(
-    PINT_hint *hint, const char *name, int *length);
+    struct PVFS_hint_s *hint, const char *name, int *length);
 
 int PVFS_hint_add_internal(
+    PVFS_hint *hint,
+    enum PINT_hint_type type,
+    int length,
+    void *value);
+
+int PVFS_hint_replace_internal(
     PVFS_hint *hint,
     enum PINT_hint_type type,
     int length,
@@ -68,6 +78,10 @@ int PVFS_hint_add_internal(
 #define PINT_HINT_GET_OP_ID(hints) \
     PINT_hint_get_value_by_type(hints, PINT_HINT_OP_ID, NULL) ? \
     *(uint32_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_OP_ID, NULL) : 0
+
+#define PINT_HINT_GET_RANK(hints) \
+    PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) ? \
+    *(uint32_t *)PINT_hint_get_value_by_type(hints, PINT_HINT_RANK, NULL) : 0
 
 #endif /* __PINT_HINT_H__ */
 

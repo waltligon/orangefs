@@ -25,6 +25,14 @@
 #include "pvfs2-internal.h"
 #include "state-machine.h"
 
+#define gossip_err_unless_quiet(format, f...) \
+do {\
+    if(mop->params.quiet_flag)\
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, format, ##f); \
+    else \
+        gossip_err(format, ##f); \
+} while(0)
+
 enum
 {
     MSGPAIRS_COMPLETE = 190,
@@ -251,7 +259,8 @@ static PINT_sm_action msgpairarray_post(
                            &msg_p->recv_status,
                            &msg_p->recv_id,
                            mop->params.job_context,
-                           mop->params.job_timeout);
+                           mop->params.job_timeout,
+                           msg_p->req.hints);
         if (ret == 0)
         {
             /* perform a quick test to see if the recv failed before posting
@@ -323,7 +332,8 @@ static PINT_sm_action msgpairarray_post(
                                 &msg_p->send_status,
                                 &msg_p->send_id,
                                 mop->params.job_context,
-                                mop->params.job_timeout);
+                                mop->params.job_timeout,
+                                msg_p->req.hints);
 
          if ((ret < 0) ||
             ((ret == 1) && (msg_p->send_status.error_code != 0)))
@@ -338,7 +348,7 @@ static PINT_sm_action msgpairarray_post(
                     msg_p->send_status.error_code);
             }
 
-            gossip_err("Send error: cancelling recv.\n");
+            gossip_err_unless_quiet("Send error: cancelling recv.\n");
 
             job_bmi_cancel(msg_p->recv_id, mop->params.job_context);
             
@@ -493,7 +503,16 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         if (msg_p->op_status != 0)
         {
-            PVFS_perror_gossip("msgpair failed, will retry", msg_p->op_status);
+            char s[1024];
+            PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
+            server_string = PINT_cached_config_map_addr(
+                msg_p->fs_id, msg_p->svr_addr, &server_type);
+            if(!server_string)
+            {
+                server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
+            }
+
+            gossip_err("Warning: msgpair failed to %s, will retry: %s\n", server_string, s);
                        
             ++need_retry;
             continue;
@@ -632,20 +651,20 @@ static PINT_sm_action msgpairarray_completion_fn(
                     server_string = "[UNKNOWN]";
                 }
                 PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
-                gossip_err("*** %s: msgpair to server %s failed: %s\n",
-                    __func__, server_string, s);
+                gossip_err_unless_quiet("*** %s: msgpair to server %s failed: %s\n",
+                        __func__, server_string, s);
                 if(msg_p->retry_flag != PVFS_MSGPAIR_RETRY)
                 {
-                    gossip_err("*** No retries requested.\n");
+                    gossip_err_unless_quiet("*** No retries requested.\n");
                 }
                 else if(PVFS_ERROR_CLASS(-msg_p->op_status) !=
                     PVFS_ERROR_BMI)
                 {
-                    gossip_err("*** Non-BMI failure.\n");
+                    gossip_err_unless_quiet("*** Non-BMI failure.\n");
                 }
                 else
                 {
-                    gossip_err("*** Out of retries.\n");
+                    gossip_err_unless_quiet("*** Out of retries.\n");
                 }
                 if (js_p->error_code == 0)
                     js_p->error_code = msg_p->op_status;

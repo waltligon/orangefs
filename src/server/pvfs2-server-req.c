@@ -35,7 +35,6 @@ extern struct PINT_server_req_params pvfs2_perf_update_params;
 extern struct PINT_server_req_params pvfs2_job_timer_params;
 extern struct PINT_server_req_params pvfs2_proto_error_params;
 extern struct PINT_server_req_params pvfs2_perf_mon_params;
-extern struct PINT_server_req_params pvfs2_event_mon_params;
 extern struct PINT_server_req_params pvfs2_iterate_handles_params;
 extern struct PINT_server_req_params pvfs2_get_eattr_params;
 extern struct PINT_server_req_params pvfs2_get_eattr_list_params;
@@ -43,6 +42,11 @@ extern struct PINT_server_req_params pvfs2_set_eattr_params;
 extern struct PINT_server_req_params pvfs2_set_eattr_list_params;
 extern struct PINT_server_req_params pvfs2_del_eattr_params;
 extern struct PINT_server_req_params pvfs2_list_eattr_params;
+extern struct PINT_server_req_params pvfs2_batch_create_params;
+extern struct PINT_server_req_params pvfs2_batch_remove_params;
+extern struct PINT_server_req_params pvfs2_unstuff_params;
+extern struct PINT_server_req_params pvfs2_stuffed_create_params;
+extern struct PINT_server_req_params pvfs2_precreate_pool_refiller_params;
 extern struct PINT_server_req_params pvfs2_get_cred_params;
 
 /* table of incoming request types and associated parameters */
@@ -71,7 +75,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 20 */ {PVFS_SERV_MGMT_PERF_MON, &pvfs2_perf_mon_params},
     /* 21 */ {PVFS_SERV_MGMT_ITERATE_HANDLES, &pvfs2_iterate_handles_params},
     /* 22 */ {PVFS_SERV_MGMT_DSPACE_INFO_LIST, NULL},
-    /* 23 */ {PVFS_SERV_MGMT_EVENT_MON, &pvfs2_event_mon_params},
+    /* 23 */ {PVFS_SERV_MGMT_EVENT_MON, NULL},
     /* 24 */ {PVFS_SERV_MGMT_REMOVE_OBJECT, &pvfs2_mgmt_remove_object_params},
     /* 25 */ {PVFS_SERV_MGMT_REMOVE_DIRENT, &pvfs2_mgmt_remove_dirent_params},
     /* 26 */ {PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, &pvfs2_mgmt_get_dirdata_handle_params},
@@ -83,7 +87,12 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 32 */ {PVFS_SERV_LISTEATTR, &pvfs2_list_eattr_params},
     /* 33 */ {PVFS_SERV_SMALL_IO, &pvfs2_small_io_params},
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
-    /* 35 */ {PVFS_SERV_GETCRED, &pvfs2_get_cred_params}
+    /* 35 */ {PVFS_SERV_BATCH_CREATE, &pvfs2_batch_create_params},
+    /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
+    /* 37 */ {PVFS_SERV_PRECREATE_POOL_REFILLER, &pvfs2_precreate_pool_refiller_params},
+    /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
+    /* nlmills: TODO: does this list need to be in a specific order? */
+    /* 39 */ {PVFS_SERV_GETCRED, &pvfs2_get_cred_params}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

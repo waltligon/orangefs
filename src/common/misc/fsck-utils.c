@@ -1,5 +1,5 @@
 /*
- * Copyright © Acxiom Corporation, 2005
+ * Copyright (C) Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */
@@ -146,7 +146,6 @@ int PVFS_fsck_check_server_configs(
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(*cur_fs,
-                                cred,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &num_servers);
     if(ret < 0)
@@ -165,7 +164,6 @@ int PVFS_fsck_check_server_configs(
     /* get a list of the pvfs2 servers */
     ret = PVFS_mgmt_get_server_array(
         *cur_fs,
-        cred,
         PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
         addresses, &num_servers);
     if(ret < 0)
@@ -476,7 +474,7 @@ int PVFS_fsck_validate_metafile(
 
     err = PVFS_mgmt_get_dfile_array(*obj_ref,
                                   cred,
-                                  df_handles, attributes->attr.dfile_count);
+                                  df_handles, attributes->attr.dfile_count, NULL);
     if(err < 0)
     {
         PVFS_perror("PVFS_mgmt_get_dfile_array", err);
@@ -782,7 +780,7 @@ int PVFS_fsck_validate_dir(
 
     /* get the dirdata handle and validate */
     err = PVFS_mgmt_get_dirdata_handle
-        (*obj_ref, &dirdata_handle, cred);
+        (*obj_ref, &dirdata_handle, cred, NULL);
     if(err < 0)
     {
         gossip_err("Error: unable to get dirdata handle\n");
@@ -806,7 +804,7 @@ int PVFS_fsck_validate_dir(
         err = PVFS_sys_readdir(*obj_ref,
                              token,
                              MAX_DIR_ENTS,
-                             cred, &readdir_resp);
+                             cred, &readdir_resp, NULL);
         if(err < 0)
         {
             gossip_err("Error: could not read directory entries\n");
@@ -941,10 +939,8 @@ int PVFS_fsck_get_attributes(
 {
     time_t r_atime, r_mtime, r_ctime;
     int ret = 0;
-    
-    /* TODO: replace with a real credential */
 
-    ret = PVFS_sys_getattr(*pref, PVFS_ATTR_SYS_ALL, cred, getattr_resp);
+    ret = PVFS_sys_getattr(*pref, PVFS_ATTR_SYS_ALL, cred, getattr_resp, NULL);
     if(ret < 0)
     {
         gossip_err("Error: unable to retrieve attributes\n");
@@ -1018,6 +1014,9 @@ int PVFS_fsck_get_attributes(
     case PVFS_TYPE_DIRDATA:
         gossip_debug(GOSSIP_FSCK_DEBUG, "dirdata\n");
         break;
+    case PVFS_TYPE_INTERNAL:
+        gossip_debug(GOSSIP_FSCK_DEBUG, "internal\n");
+        break;
     }
     gossip_debug(GOSSIP_FSCK_DEBUG, "\n");
 
@@ -1076,7 +1075,6 @@ static int PINT_handle_wrangler_load_handles(
 
     /* count how many servers we have */
     err = PVFS_mgmt_count_servers(*cur_fs,
-                                cred,
                                 PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &server_count);
     if(err < 0)
@@ -1097,7 +1095,6 @@ static int PINT_handle_wrangler_load_handles(
 
     /* get a list of the pvfs2 servers */
     err = PVFS_mgmt_get_server_array(*cur_fs,
-                               cred,
                                PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                PINT_handle_wrangler_handlelist.addr_array,
                                &server_count);
@@ -1121,7 +1118,7 @@ static int PINT_handle_wrangler_load_handles(
                           cred,
                           stat_array,
                           PINT_handle_wrangler_handlelist.addr_array,
-                          server_count, NULL);
+                          server_count, NULL, NULL);
     if(err < 0)
     {
         ret = -PVFS_ENOMEM;
@@ -1243,12 +1240,15 @@ static int PINT_handle_wrangler_load_handles(
     {
         /* mgmt call to get block of handles */
         err = PVFS_mgmt_iterate_handles_list(*cur_fs,
-                                       cred,
-                                       handle_matrix,
-                                       handle_count_array,
-                                       position_array,
-                                       PINT_handle_wrangler_handlelist.
-                                       addr_array, server_count, NULL);
+                                             cred,
+                                             handle_matrix,
+                                             handle_count_array,
+                                             position_array,
+                                             PINT_handle_wrangler_handlelist.addr_array,
+                                             server_count,
+                                             0,
+                                             NULL,
+                                             NULL);
         if(err < 0)
         {
             PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);
@@ -1291,6 +1291,54 @@ static int PINT_handle_wrangler_load_handles(
         PINT_handle_wrangler_handlelist.stranded_array[i] =
             PINT_handle_wrangler_handlelist.used_array[i];
     }
+
+    /* now look for reserved handles from each server */
+    for (i = 0; i < server_count; i++)
+    {
+        position_array[i] = PVFS_ITERATE_START;
+        handle_count_array[i] = HANDLE_BATCH;
+    }
+
+    do
+    {
+        err = PVFS_mgmt_iterate_handles_list(*cur_fs,
+                                             cred,
+                                             handle_matrix,
+                                             handle_count_array,
+                                             position_array,
+                                             PINT_handle_wrangler_handlelist.addr_array,
+                                             server_count,
+                                             PVFS_MGMT_RESERVED,
+                                             NULL,
+                                             NULL);
+        if(err < 0)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_iterate_handles", err);
+            ret = err;
+            goto load_handles_error;
+        }
+
+        more_handles = 0;
+
+        for (i = 0; i < server_count; i++)
+        {
+            /* remove these handles */
+            int j = 0;
+            for (j = 0; j < handle_count_array[i]; j++)
+            {
+                PINT_handle_wrangler_remove_handle(&handle_matrix[i][j],
+                    cur_fs);
+            }
+
+            /* are there more handles? */
+            if (position_array[i] != PVFS_ITERATE_END)
+            {
+                more_handles = 1;
+                handle_count_array[i] = HANDLE_BATCH;
+            }
+        }
+    } while (more_handles != 0);
+
     ret = 0;
     goto load_handles_success;
 
@@ -1474,6 +1522,7 @@ static int PINT_handle_wrangler_display_stranded_handles(
     PVFS_object_ref pref;
     const char *server_name = NULL;
     int header = 0;
+    char buf[128] = {0};
 
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
@@ -1501,46 +1550,51 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 /* get this objects attributes */
                 ret = PVFS_fsck_get_attributes(fsck_options, &pref, cred,
                                          &attributes);
-                if(ret < 0)
-                {
-                    PVFS_perror_gossip("PVFS_fsck_get_attributes", ret);
-                    gossip_err("Error: unable to retrieve attributes for handle [%llu]\n", 
-                        llu(pref.handle));
-                    return(ret);
-                }
-
+                
                 printf(" %llu   %d  ",
                        llu(PINT_handle_wrangler_handlelist.list_array[i][j]),
                        *cur_fs);
 
-                if (attributes.attr.mask & PVFS_ATTR_SYS_SIZE)
+                if(ret < 0)
                 {
-                    printf("%13lld   ", lld(attributes.attr.size));
+                    PVFS_strerror_r(ret, buf, 127);
+                    printf("Unknown: getattr error: %s)\n", buf);
                 }
+                else
+                {
 
-                switch (attributes.attr.objtype)
-                {
-                case PVFS_TYPE_NONE:
-                    printf("none     ");
-                    break;
-                case PVFS_TYPE_METAFILE:
-                    printf("meta file");
-                    break;
-                case PVFS_TYPE_DATAFILE:
-                    printf("data file");
-                    break;
-                case PVFS_TYPE_DIRECTORY:
-                    printf("directory");
-                    break;
-                case PVFS_TYPE_SYMLINK:
-                    printf("symlink  ");
-                    free(attributes.attr.link_target);
-                    break;
-                case PVFS_TYPE_DIRDATA:
-                    printf("dirdata  ");
-                    break;
+                    if (attributes.attr.mask & PVFS_ATTR_SYS_SIZE)
+                    {
+                        printf("%13lld   ", lld(attributes.attr.size));
+                    }
+
+                    switch (attributes.attr.objtype)
+                    {
+                    case PVFS_TYPE_NONE:
+                        printf("none     ");
+                        break;
+                    case PVFS_TYPE_METAFILE:
+                        printf("meta file");
+                        break;
+                    case PVFS_TYPE_DATAFILE:
+                        printf("data file");
+                        break;
+                    case PVFS_TYPE_DIRECTORY:
+                        printf("directory");
+                        break;
+                    case PVFS_TYPE_SYMLINK:
+                        printf("symlink  ");
+                        free(attributes.attr.link_target);
+                        break;
+                    case PVFS_TYPE_DIRDATA:
+                        printf("dirdata  ");
+                        break;
+                    case PVFS_TYPE_INTERNAL:
+                        printf("internal  ");
+                        break;
+                    }
+                    printf("   %s\n", server_name);
                 }
-                printf("   %s\n", server_name);
             }
         }
     }

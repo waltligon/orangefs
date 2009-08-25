@@ -66,6 +66,7 @@ PVFS_error PVFS_isys_seteattr_list(
         PVFS_ds_keyval *val_array,
         int32_t flags,
         PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
@@ -115,6 +116,7 @@ PVFS_error PVFS_isys_seteattr_list(
     sm_p->u.seteattr.flags = flags;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     PINT_SM_GETATTR_STATE_FILL(
                                sm_p->getattr,
@@ -133,7 +135,8 @@ PVFS_error PVFS_sys_seteattr_list(
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_ds_keyval *val_array,
-        int32_t flags)
+        int32_t flags,
+        PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -141,7 +144,7 @@ PVFS_error PVFS_sys_seteattr_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_seteattr entered\n");
 
     ret = PVFS_isys_seteattr_list(ref, credential,
-            nkey, key_array, val_array, flags, &op_id, NULL);
+            nkey, key_array, val_array, flags, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -167,9 +170,10 @@ PVFS_error PVFS_sys_seteattr(
         const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
-        int32_t flags)
+        int32_t flags,
+        PVFS_hint hints)
 {
-    return PVFS_sys_seteattr_list(ref, credential, 1, key_p, val_p, flags);
+    return PVFS_sys_seteattr_list(ref, credential, 1, key_p, val_p, flags, hints);
 }
 
 
@@ -193,7 +197,9 @@ static PINT_sm_action set_eattr_setup_msgpair(
             sm_p->u.seteattr.flags,
             sm_p->u.seteattr.nkey,
             sm_p->u.seteattr.key_array,
-            sm_p->u.seteattr.val_array);
+            sm_p->u.seteattr.val_array,
+            sm_p->hints
+            );
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

@@ -17,7 +17,6 @@
 #include "trove-types.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "thread-mgr.h"
-#include "pvfs2-event.h"
 
 /* describes BMI operations */
 struct bmi_desc
@@ -40,6 +39,30 @@ struct trove_desc
     PVFS_ds_attributes attr;
     PVFS_ds_type type;
     int count;
+};
+
+/* describes precreate pool operations */
+struct precreate_pool_desc
+{
+    PVFS_handle precreate_pool;
+    PVFS_fs_id fsid;
+    PVFS_handle* precreate_handle_array;
+    int precreate_handle_count;
+    int precreate_handle_index;
+    int posted_count;
+    const char** servers;
+    struct qlist_head* current_pool;
+    int trove_pending;
+    int low_threshold;
+    void* data;
+    int first_callback_flag;
+    TROVE_keyval_s* key_array;
+    PVFS_ds_flags flags;
+    PVFS_ds_position position;
+    PVFS_ds_position pool_index;
+    int count;
+    
+    PVFS_error error_code;
 };
 
 /* describes unexpected BMI operations */
@@ -85,6 +108,7 @@ enum job_type
     JOB_REQ_SCHED,
     JOB_DEV_UNEXP,
     JOB_REQ_SCHED_TIMER,
+    JOB_PRECREATE_POOL,
     JOB_NULL
 };
 
@@ -99,7 +123,7 @@ struct job_desc
     job_context_id context_id;  /* context */
     struct PINT_thread_mgr_bmi_callback bmi_callback;  /* callback information */
     struct PINT_thread_mgr_trove_callback trove_callback;  /* callback information */
-    enum PVFS_event_op event_type;
+    PVFS_hint hints;
 
     /* union of information for lower level interfaces */
     union
@@ -111,6 +135,7 @@ struct job_desc
 	struct req_sched_desc req_sched;
 	struct dev_unexp_desc dev_unexp;
 	struct null_info_desc null_info;
+        struct precreate_pool_desc precreate_pool;
     }
     u;
 

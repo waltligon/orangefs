@@ -21,6 +21,7 @@ cfiles := bmi-gm-addr-list.c bmi-gm-bufferpool.c bmi-gm.c
 src := $(patsubst %,$(DIR)/%,$(cfiles))
 LIBSRC    += $(src)
 SERVERSRC += $(src)
+LIBBMISRC += $(src)
 
 #
 # Extra cflags for files in this directory.

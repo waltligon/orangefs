@@ -61,6 +61,7 @@
 
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
+#include "pvfs2-hint.h"
 
 /* Basic types used throughout the code. */
 typedef uint8_t PVFS_boolean;
@@ -71,6 +72,10 @@ typedef int64_t PVFS_id_gen_t;
 
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
+
+inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
+inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
+inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
 
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
@@ -83,7 +88,7 @@ typedef int64_t PVFS_BMI_addr_t;
 
 /* Basic types used by communication subsystems. */
 typedef int32_t PVFS_msg_tag_t;
-typedef int32_t PVFS_context_id;
+typedef PVFS_id_gen_t PVFS_context_id;
 
 enum PVFS_flowproto_type
 {
@@ -125,6 +130,8 @@ typedef uint64_t PVFS_handle;
 typedef int32_t PVFS_fs_id;
 typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
+
+
 #define encode_PVFS_handle encode_uint64_t
 #define decode_PVFS_handle decode_uint64_t
 #define encode_PVFS_fs_id encode_int32_t
@@ -189,7 +196,7 @@ enum PVFS_sys_layout_algorithm
     /* order the datafiles based on the list specified */
     PVFS_SYS_LAYOUT_LIST = 4
 };
-#define PVFS_SYS_LAYOUT_DEFAULT PVFS_SYS_LAYOUT_ROUND_ROBIN
+#define PVFS_SYS_LAYOUT_DEFAULT NULL
 
 /* The list of datafile servers that can be passed into PVFS_sys_create
  * to specify the exact layout of a file.  The count parameter will override
@@ -216,11 +223,17 @@ typedef struct PVFS_sys_layout_s
      */
     struct PVFS_sys_server_list server_list;
 } PVFS_sys_layout;
+#define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
+
+inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
+inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 
 /* predefined special values for types */
+#define PVFS_CONTEXT_NULL    ((PVFS_context_id)-1)
 #define PVFS_HANDLE_NULL     ((PVFS_handle)0)
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
-#define PVFS_OP_NULL            ((id_gen_t)0)
+#define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
+#define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
 #define PVFS_ITERATE_START    (INT32_MAX - 1)
 #define PVFS_ITERATE_END      (INT32_MAX - 2)
 #define PVFS_READDIR_START PVFS_ITERATE_START
@@ -266,7 +279,8 @@ typedef enum
     PVFS_TYPE_DATAFILE =    (1 << 1),
     PVFS_TYPE_DIRECTORY =   (1 << 2),
     PVFS_TYPE_SYMLINK =     (1 << 3),
-    PVFS_TYPE_DIRDATA =     (1 << 4)
+    PVFS_TYPE_DIRDATA =     (1 << 4),
+    PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 
 #define decode_PVFS_ds_type decode_enum
@@ -322,7 +336,8 @@ typedef struct
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
-#define PVFS_ATTR_SYS_CAPABILITY            (1 << 28)
+#define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
+#define PVFS_ATTR_SYS_CAPABILITY            (1 << 29)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -341,15 +356,15 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
- PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT)
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
- PVFS_ATTR_SYS_DIRENT_COUNT)
+ PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
- | PVFS_ATTR_SYS_DIR_HINT)
+ | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
@@ -404,6 +419,17 @@ typedef struct
     int32_t    __pad1;
 } PVFS_object_ref;
 
+/** Credentials (stubbed for future authentication methods). */
+typedef struct
+{
+    PVFS_uid uid;
+    PVFS_gid gid;
+} PVFS_credentials;
+endecode_fields_2(
+    PVFS_credentials,
+    PVFS_uid, uid,
+    PVFS_gid, gid);
+
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
 /* max length of PVFS filename */
@@ -418,7 +444,7 @@ typedef struct
  */
 #define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
                                         by <linux/xattr.h> */
-#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+#define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
 #define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
@@ -452,12 +478,33 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_FSID_CHECK = 2,  /* verify that an fsid is ok */
     PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
     PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
-    PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
-    PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
+    PVFS_SERV_PARAM_EVENT_ENABLE = 5,    /* event enable */
+    PVFS_SERV_PARAM_EVENT_DISABLE = 6, /* event disable */
     PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
     PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
-    PVFS_SERV_PARAM_DROP_CACHES = 9, /* ask server's OS to drop disk caches */
+    PVFS_SERV_PARAM_DROP_CACHES = 9
 };
+
+enum PVFS_mgmt_param_type
+{
+    PVFS_MGMT_PARAM_TYPE_UINT64,
+    PVFS_MGMT_PARAM_TYPE_STRING
+} ;
+
+struct PVFS_mgmt_setparam_value
+{
+    enum PVFS_mgmt_param_type type;
+    union
+    {
+        uint64_t value;
+        char *string_value;
+    } u;
+};
+encode_enum_union_2_struct(
+    PVFS_mgmt_setparam_value,
+    type, u,
+    uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
 
 enum PVFS_server_mode
 {
@@ -497,6 +544,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);
 PVFS_error PVFS_get_errno_mapping(PVFS_error error);
+PVFS_error PVFS_errno_to_error(int err);
 
 /* special bits used to differentiate PVFS error codes from system
  * errno values
@@ -765,6 +813,19 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
     }                                                      \
     return ret;                        			   \
 }                                                          \
+PVFS_error PVFS_errno_to_error(int err)                    \
+{                                                          \
+    PVFS_error e = 0;                                      \
+    \
+    for(; e < PVFS_ERRNO_MAX; ++e)                         \
+    {                                                      \
+        if(PINT_errno_mapping[e] == err)                   \
+        {                                                  \
+            return e;                                      \
+        }                                                  \
+    }                                                      \
+    return 0;                                              \
+}                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
 
@@ -803,6 +864,11 @@ enum PVFS_io_type
  * ROMIO to auto-detect access method given a mounted path.
  */
 #define PVFS2_SUPER_MAGIC 0x20030528
+
+/* flag value that can be used with mgmt_iterate_handles to retrieve
+ * reserved handle values
+ */
+#define PVFS_MGMT_RESERVED 1
 
 #endif /* __PVFS2_TYPES_H */
 

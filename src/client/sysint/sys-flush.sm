@@ -72,6 +72,7 @@ PVFS_error PVFS_isys_flush(
     PVFS_object_ref ref,
     const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -101,6 +102,8 @@ PVFS_error PVFS_isys_flush(
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
 
     /* NOTE: This state machine previously multiplied the default job timeout
      * by five to allow for potentially long sync delays.  We instead now set
@@ -123,14 +126,15 @@ PVFS_error PVFS_isys_flush(
  */
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
-    const PVFS_credential *credential)
+    const PVFS_credential *credential,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush entered\n");
 
-    ret = PVFS_isys_flush(ref, credential, &op_id, NULL);
+    ret = PVFS_isys_flush(ref, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_flush call", ret);
@@ -157,14 +161,14 @@ static int flush_datafile_setup_msgpairarray(
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    const PVFS_capability *capability;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) flush state: "
                  "datafile_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
 
-    capability = PINT_null_capability();
+    PINT_null_capability(&capability);
 
     attr = &sm_p->getattr.attr;
     assert(attr);
@@ -190,9 +194,10 @@ static int flush_datafile_setup_msgpairarray(
                          llu(attr->u.meta.dfile_array[i]));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
-                                    *capability,
+                                    capability,
                                     sm_p->object_ref.fs_id,
-                                    attr->u.meta.dfile_array[i]);
+                                    attr->u.meta.dfile_array[i],
+                                    sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = attr->u.meta.dfile_array[i];
@@ -208,9 +213,10 @@ static int flush_datafile_setup_msgpairarray(
                          llu(sm_p->object_ref.handle));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
-                                    *capability,
+                                    capability,
                                     sm_p->object_ref.fs_id,
-                                    sm_p->object_ref.handle);
+                                    sm_p->object_ref.handle,
+                                    sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->object_ref.handle;

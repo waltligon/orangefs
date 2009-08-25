@@ -29,10 +29,8 @@ struct options
 {
     char* mnt_point;
     int mnt_point_set;
-    int api_mask;
-    int api_mask_set;
-    int op_mask;
-    int op_mask_set;
+    char *event_string;
+    int events_set;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -44,9 +42,12 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
+    PVFS_credential *creds;
     PVFS_credential *cred;
+    int ncreds;
+    struct PVFS_mgmt_setparam_value param_value;
+    int i;
 
-    /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
@@ -63,6 +64,14 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -73,41 +82,33 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
 
-    if(!user_opts->op_mask || !user_opts->api_mask)
+    param_value.type = PVFS_MGMT_PARAM_TYPE_STRING;
+    if(!user_opts->event_string)
     {
-	/* turn off event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
-	    PVFS_SERV_PARAM_EVENT_ON, 0, NULL, NULL);
+        param_value.u.string_value = "none";
     }
     else
     {
-	/* set mask */
-	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
-	    PVFS_SERV_PARAM_EVENT_MASKS, 
-	    (int64_t)(((int64_t)user_opts->op_mask << 32) 
-		+ user_opts->api_mask),
-	    NULL, NULL);
-	if(ret < 0)
-	{
-	    PVFS_perror("PVFS_mgmt_setparam_all", ret);
-	    return(-1);
-	}
-
-	/* turn on event logging */
-	ret = PVFS_mgmt_setparam_all(cur_fs, cred, 
-	    PVFS_SERV_PARAM_EVENT_ON, 1, NULL, NULL);
+        param_value.u.string_value = user_opts->event_string;
     }
 
+    ret = PVFS_mgmt_setparam_all(
+        cur_fs, cred,
+        PVFS_SERV_PARAM_EVENT_ENABLE,
+        &param_value, NULL, NULL);
     if(ret < 0)
     {
-	PVFS_perror("PVFS_mgmt_setparam_all", ret);
-	return(-1);
+        PVFS_perror("PVFS_mgmt_setparam_all", ret);
+        return(-1);
     }
 
-    PINT_release_credential(cred);
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     PVFS_sys_finalize();
 
     return(ret);
@@ -122,7 +123,7 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:a:o:";
+    char flags[] = "vm:e:";
     int one_opt = 0;
     int len = 0;
 
@@ -164,23 +165,14 @@ static struct options* parse_args(int argc, char* argv[])
 		strcat(tmp_opts->mnt_point, "/");
 		tmp_opts->mnt_point_set = 1;
 		break;
-	    case('a'):
-		sscanf(optarg, "%x", &tmp_opts->api_mask);
+            case('e'):
+                tmp_opts->event_string = strdup(optarg);
 		if(ret < 1){
 		    if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
 		    free(tmp_opts);
 		    return(NULL);
 		}
-		tmp_opts->api_mask_set = 1;
-		break;
-	    case('o'):
-		sscanf(optarg, "%x", &tmp_opts->op_mask);
-		if(ret < 1){
-		    if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		tmp_opts->op_mask_set = 1;
+                tmp_opts->events_set = 1;
 		break;
 	    case('?'):
 		usage(argc, argv);
@@ -188,8 +180,7 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
-    if(!tmp_opts->mnt_point_set || !tmp_opts->api_mask_set ||
-	!tmp_opts->op_mask_set)
+    if(!tmp_opts->mnt_point_set || !tmp_opts->events_set)
     {
 	if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
 	free(tmp_opts);
@@ -204,8 +195,8 @@ static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
     fprintf(stderr, "Usage  : %s [-m fs_mount_point] "
-            "[-a hex_api_mask] [-o hex_operation_mask]\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -a 0xFFFF -o 0xFFFF\n",
+            "[-e events]\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -e bmi-send,dbpf-write\n",
             argv[0]);
     return;
 }

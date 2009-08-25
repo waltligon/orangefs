@@ -58,7 +58,8 @@ int main(int argc, char **argv)
                      i            =  0;
    char           ** ppszPvfsPath = NULL;
    PVFS_fs_id     *  pfs_id       = NULL;
-   PVFS_credential * credential;
+   PVFS_credential * creds;
+   int               ncreds;
    struct options    user_opts;
 
    /* Initialize any memory */
@@ -114,6 +115,14 @@ int main(int argc, char **argv)
       PVFS_perror("PVFS_util_init_defaults", ret);
       return(-1);
    }
+
+   ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+   if (ret < 0)
+   {
+       PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+       PVFS_sys_finalize();
+       exit(EXIT_FAILURE);
+   }
    
    /* Let's verify that all the given files reside on a PVFS2 filesytem */
    for(i = 0; i < user_opts.nNumFiles; i++)
@@ -131,15 +140,16 @@ int main(int argc, char **argv)
       }
    }
 
-   credential = PVFS_util_gen_fake_credential();
-   assert(credential);
-   
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
+      PVFS_credential *cred;
+
+      cred = PVFS_util_find_credential_by_fsid(pfs_id[i], creds, ncreds);
+
       ret = do_stat(user_opts.pszFiles[i], 
                     ppszPvfsPath[i], 
                     pfs_id[i], 
-                    credential,
+                    cred,
                     &user_opts);
       if(ret != 0)
       {
@@ -147,7 +157,11 @@ int main(int argc, char **argv)
       }
    }
 
-   PINT_release_credential(credential);
+   for (i = 0; i < ncreds; i++)
+   {
+       PINT_cleanup_credential(&creds[i]);
+   }
+   free(creds);
    PVFS_sys_finalize();
 
    /* Deallocate any allocated memory */
@@ -201,7 +215,7 @@ static int do_stat(const char            * pszFile,
                             (char *) pszRelativeFile, 
                             credential, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_FOLLOW);
+                            PVFS2_LOOKUP_LINK_FOLLOW, NULL);
    }
    else
    {
@@ -209,7 +223,7 @@ static int do_stat(const char            * pszFile,
                             (char *) pszRelativeFile, 
                             credential, 
                             &lk_response, 
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
    }
    
    if(ret < 0)
@@ -228,7 +242,7 @@ static int do_stat(const char            * pszFile,
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credential, 
-                          &getattr_response);
+                          &getattr_response, NULL);
 
    if(ret < 0)
    {                          

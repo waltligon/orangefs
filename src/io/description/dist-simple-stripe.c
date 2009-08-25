@@ -191,6 +191,13 @@ static PVFS_simple_stripe_params simple_stripe_params = {
     PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE /* strip size */
 };
 
+static PVFS_size get_blksize(void* params)
+{
+    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    /* report the strip size as the block size */
+    return(dparam->strip_size);
+}
+
 static PINT_dist_methods simple_stripe_methods = {
     logical_to_physical_offset,
     physical_to_logical_offset,
@@ -199,6 +206,7 @@ static PINT_dist_methods simple_stripe_methods = {
     logical_file_size,
     PINT_dist_default_get_num_dfiles,
     PINT_dist_default_set_param,
+    get_blksize,
     encode_lebf,
     decode_lebf,
     registration_init,

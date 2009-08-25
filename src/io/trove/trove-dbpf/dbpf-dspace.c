@@ -53,6 +53,9 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 
+extern TROVE_method_callback global_trove_method_callback;
+extern struct TROVE_bstream_ops *bstream_method_table[];
+
 static inline void organize_post_op_statistics(
     enum dbpf_op_type op_type, TROVE_op_id op_id)
 {
@@ -77,31 +80,30 @@ static inline void organize_post_op_statistics(
             UPDATE_PERF_METADATA_READ();
             break;
         case BSTREAM_READ_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id); 
             break;
         case BSTREAM_WRITE_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id); 
-            break;
-        default:
             break;
         case DSPACE_CREATE:
             UPDATE_PERF_METADATA_WRITE();
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id); 
+            break;
+        case DSPACE_CREATE_LIST:
+            UPDATE_PERF_METADATA_WRITE();
+            break;
+        default:
             break;
     }
 }
 
-static int dbpf_dspace_remove_keyval(
-    void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
-static int getattr_one_handle(TROVE_object_ref ref, 
-    TROVE_ds_attributes *attr, 
-    DB* ds_db);
-
+static int dbpf_dspace_create_store_handle(
+    struct dbpf_collection* coll_p,
+    TROVE_ds_type type,
+    TROVE_handle new_handle);
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p);
+static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p);
-static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p);
 
@@ -113,13 +115,17 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_type event_type;
+    PINT_event_id event_id = 0;
+
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -149,7 +155,12 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, op_p->id);
+    event_type = trove_dbpf_dspace_create_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     PINT_HINT_GET_OP_ID(hints));
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
      * in dbpf_queue_or_service in the case of immediate completion */
@@ -157,6 +168,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         extent_array->extent_count;
     op_p->u.d_create.extent_array.extent_array =
         malloc(extent_array->extent_count * sizeof(TROVE_extent));
+    op_p->hints = hints;
 
     if (op_p->u.d_create.extent_array.extent_array == NULL)
     {
@@ -173,21 +185,15 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_ds_storedattr_s s_attr;
-    TROVE_ds_attributes attr;
     TROVE_handle new_handle = TROVE_HANDLE_NULL;
-    DBT key, data;
     TROVE_extent cur_extent;
-    TROVE_object_ref ref = {TROVE_HANDLE_NULL, op_p->coll_p->coll_id};
-    char filename[PATH_MAX + 1];
-
-    memset(filename, 0, PATH_MAX + 1);
 
     cur_extent = op_p->u.d_create.extent_array.extent_array[0];
 
@@ -243,102 +249,217 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     if (new_handle == TROVE_HANDLE_NULL)
     {
         gossip_err("Error: handle allocator returned a zero handle.\n");
-        ret = -TROVE_ENOSPC;
-        goto return_error;
+        return(-TROVE_ENOSPC);
     }
 
-    memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
-    s_attr.type = op_p->u.d_create.type;
-
-    memset(&key, 0, sizeof(key));
-    key.data = &new_handle;
-    key.size = key.ulen = sizeof(new_handle);
-
-    memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
-    data.flags |= DB_DBT_USERMEM;
-
-    /* check to see if handle is already used */
-    ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, NULL, &key, &data, 0);
-    if (ret == 0)
+    ret = dbpf_dspace_create_store_handle(op_p->coll_p, op_p->u.d_create.type,
+        new_handle);
+    if(ret < 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
-                     llu(new_handle));
-        ret = -TROVE_EEXIST;
-        goto return_error;
+        trove_handle_free(op_p->coll_p->coll_id, new_handle);
+        return(ret);
     }
-    else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))
-    {
-        gossip_err("error in dspace create (db_p->get failed).\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
-    }
-    
-    /* check for old bstream files (these should not exist, but it is
-     * possible if the db gets out of sync with the rest of the collection
-     * somehow
-     */
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
-                              op_p->coll_p->coll_id, llu(new_handle));
-    ret = access(filename, F_OK);
-    if(ret == 0)
-    {
-        char new_filename[PATH_MAX+1];
-        memset(new_filename, 0, PATH_MAX+1);
-
-        gossip_err("Warning: found old bstream file %s; "
-                   "moving to stranded-bstreams.\n", 
-                   filename);
-        
-        DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
-                                           my_storage_p->name, 
-                                           op_p->coll_p->coll_id,
-                                           llu(new_handle));
-        /* an old file exists.  Move it to the stranded subdirectory */
-        ret = rename(filename, new_filename);
-        if(ret != 0)
-        {
-            ret = -trove_errno_to_trove_error(errno);
-            gossip_err("Error: trove failed to rename stranded bstream: %s\n",
-                       filename);
-            goto return_error;
-        }
-    }
-     
-    memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = sizeof(s_attr);
-    
-    /* create new dataspace entry */
-    ret = op_p->coll_p->ds_db->put(op_p->coll_p->ds_db, NULL, &key, &data, 0);
-    if (ret != 0)
-    {
-        gossip_err("error in dspace create (db_p->put failed).\n");
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
-    }
-
-    trove_ds_stored_to_attr(s_attr, attr, 0);
-
-    /* add retrieved ds_attr to dbpf_attr cache here */
-    ref.handle = new_handle;
-    gen_mutex_lock(&dbpf_attr_cache_mutex);
-    dbpf_attr_cache_insert(ref, &attr);
-    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
     *op_p->u.d_create.out_handle_p = new_handle;
     return DBPF_OP_COMPLETE;
+}
 
-return_error:
-    if (new_handle != TROVE_HANDLE_NULL)
+static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
+                              TROVE_handle_extent_array *extent_array,
+                              TROVE_handle *handle_array_p,
+                              int count,
+                              TROVE_ds_type type,
+                              TROVE_keyval_s *hint,
+                              TROVE_ds_flags flags,
+                              void *user_ptr,
+                              TROVE_context_id context_id,
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint hints)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
+    struct dbpf_collection *coll_p = NULL;
+    int ret;
+    PINT_event_type event_type;
+    PINT_event_id event_id = 0;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
     {
-        trove_handle_free(op_p->coll_p->coll_id, new_handle);
+        return -TROVE_EINVAL;
     }
-    return ret;
+
+    if (flags & TROVE_FORCE_REQUESTED_HANDLE ||
+        extent_array->extent_array[0].first == TROVE_HANDLE_NULL)
+    {
+        gossip_err("Error: dbpf_dspace_create_list() does not support forced handles or empty extent specifier.\n");
+        return(-TROVE_EINVAL);
+    }
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op,
+        &q_op_p,
+        DSPACE_CREATE,
+        coll_p,
+        TROVE_HANDLE_NULL,
+        dbpf_dspace_create_list_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
+    {
+        return ret;
+    }
+
+    if (!extent_array || (extent_array->extent_count < 1))
+    {
+        return -TROVE_EINVAL;
+    }
+
+    event_type = trove_dbpf_dspace_create_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     PINT_HINT_GET_OP_ID(hints));
+
+    /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
+     * in dbpf_queue_or_service in the case of immediate completion */
+    op_p->u.d_create_list.extent_array.extent_count =
+        extent_array->extent_count;
+    op_p->u.d_create_list.extent_array.extent_array =
+        malloc(extent_array->extent_count * sizeof(TROVE_extent));
+
+    if (op_p->u.d_create_list.extent_array.extent_array == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    memcpy(op_p->u.d_create_list.extent_array.extent_array,
+           extent_array->extent_array,
+           extent_array->extent_count * sizeof(TROVE_extent));
+
+    op_p->u.d_create_list.out_handle_array_p = handle_array_p;
+    op_p->u.d_create_list.count = count;
+    op_p->u.d_create_list.type = type;
+
+    /* memset handle array for safety if we have to clean up later */
+    memset(handle_array_p, 0, count*sizeof(TROVE_handle));
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_ADD);
+
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
+}
+
+static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL;
+    TROVE_handle new_handle = TROVE_HANDLE_NULL;
+    DBT key;
+    int i;
+    int j;
+
+    for(i=0; i<op_p->u.d_create_list.count; i++)
+    {
+
+        /*
+          try to allocate a handle from the specified range that we're given
+        */
+        new_handle = trove_handle_alloc_from_range(
+            op_p->coll_p->coll_id, &op_p->u.d_create_list.extent_array);
+
+        /*
+          if we got a zero handle, we're either completely out of handles
+          -- or else something terrible has happened
+        */
+        if (new_handle == TROVE_HANDLE_NULL)
+        {
+            gossip_err("Error: handle allocator returned a zero handle.\n");
+            return(-TROVE_ENOSPC);
+        }
+
+        ret = dbpf_dspace_create_store_handle(op_p->coll_p, 
+            op_p->u.d_create.type,
+            new_handle);
+        if(ret < 0)
+        {
+            /* release any handles we grabbed so far */
+            for(j=0; j<=i; j++)
+            {
+                if(op_p->u.d_create_list.out_handle_array_p[j] 
+                    != TROVE_HANDLE_NULL)
+                {
+                    memset(&key, 0, sizeof(key));
+                    key.data = &op_p->u.d_create_list.out_handle_array_p[j];
+                    key.size = key.ulen = sizeof(TROVE_handle);
+                    op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, 
+                        NULL, &key, 0);
+
+                    trove_handle_free(op_p->coll_p->coll_id, 
+                        op_p->u.d_create_list.out_handle_array_p[j]);
+                }
+            }
+            return(ret);
+        }
+
+        op_p->u.d_create_list.out_handle_array_p[i] = new_handle;
+    }
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+        1, PINT_PERF_SUB);
+
+    return DBPF_OP_COMPLETE;
+}
+
+static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
+                              TROVE_handle* handle_array,
+                              TROVE_ds_state *error_array,
+                              int count,
+                              TROVE_ds_flags flags,
+                              void *user_ptr,
+                              TROVE_context_id context_id,
+                              TROVE_op_id *out_op_id_p)
+{
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    dbpf_queued_op_init(
+        q_op_p,
+        DSPACE_REMOVE_LIST,
+        TROVE_HANDLE_NULL,
+        coll_p,
+        dbpf_dspace_remove_list_op_svc,
+        user_ptr,
+        flags,
+        context_id);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.d_remove_list.count = count;
+    q_op_p->op.u.d_remove_list.handle_array = handle_array;
+    q_op_p->op.u.d_remove_list.error_p = error_array;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
 }
 
 static int dbpf_dspace_remove(TROVE_coll_id coll_id,
@@ -346,7 +467,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -375,25 +497,27 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     {
         return ret;
     }
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
-static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
+static int remove_one_handle(
+    TROVE_object_ref ref, 
+    struct dbpf_collection* coll_p)
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
     DBT key;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     memset(&key, 0, sizeof(key));
-    key.data = &op_p->handle;
+    key.data = &ref.handle;
     key.size = sizeof(TROVE_handle);
 
-    ret = op_p->coll_p->ds_db->del(op_p->coll_p->ds_db, NULL, &key, 0);
+    ret = coll_p->ds_db->del(coll_p->ds_db, NULL, &key, 0);
     switch (ret)
     {
         case DB_NOTFOUND:
@@ -401,13 +525,13 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
             ret = -TROVE_ENOENT;
             goto return_error;
         default:
-            op_p->coll_p->ds_db->err(
-                op_p->coll_p->ds_db, ret, "dbpf_dspace_remove");
+            coll_p->ds_db->err(
+                coll_p->ds_db, ret, "dbpf_dspace_remove");
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         case 0:
             gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %llu\n", llu(op_p->handle));
+                         "handle %llu\n", llu(ref.handle));
             break;
     }
 
@@ -419,7 +543,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* remove bstream if it exists.  Not a fatal
      * error if this fails (may not have ever been created)
      */
-    ret = dbpf_open_cache_remove(op_p->coll_p->coll_id, op_p->handle);
+    ret = dbpf_open_cache_remove(coll_p->coll_id, ref.handle);
 
     /* remove the keyval entries for this handle if any exist.
      * this way seems a bit messy to me, i.e. we're operating
@@ -428,17 +552,49 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
      * of a handle without having to post more operations though.
      */
     ret = PINT_dbpf_keyval_iterate(
-        op_p->coll_p->keyval_db,
-        op_p->handle,
-        op_p->coll_p->pcache,
+        coll_p->keyval_db,
+        ref.handle,
+        coll_p->pcache,
         NULL,
         NULL,
         &count,
         TROVE_ITERATE_START,
-        dbpf_dspace_remove_keyval);
+        PINT_dbpf_dspace_remove_keyval);
     if(ret != 0 && ret != -TROVE_ENOENT)
     {
         goto return_error;
+    }
+
+    /* return handle to free list */
+    trove_handle_free(coll_p->coll_id, ref.handle);
+    return 0;
+
+return_error:
+    return ret;
+}
+
+
+static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
+{
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    int ret = -TROVE_EINVAL;
+    int i;
+
+    for(i=0; i<op_p->u.d_remove_list.count; i++)
+    {
+        ref.handle = op_p->u.d_remove_list.handle_array[i];
+        ref.fs_id = op_p->coll_p->coll_id;
+        
+        /* if error_p is NULL, assume that the caller is ignoring errors */
+        if(op_p->u.d_remove_list.error_p)
+        {
+            op_p->u.d_remove_list.error_p[i] = 
+                remove_one_handle(ref, op_p->coll_p);
+        }
+        else
+        {
+                remove_one_handle(ref, op_p->coll_p);
+        }
     }
 
     /* we still do a non-coalesced sync of the keyval db here
@@ -447,21 +603,43 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
-        goto return_error;
+        return(ret);
     }
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    /* return handle to free list */
-    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     return DBPF_OP_COMPLETE;
-
-return_error:
-    return ret;
 }
 
-static int dbpf_dspace_remove_keyval(
+
+static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
+{
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    int ret = -TROVE_EINVAL;
+
+    ret = remove_one_handle(ref, op_p->coll_p);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* we still do a non-coalesced sync of the keyval db here
+     * because we're in a dspace operation
+     */
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
+    return DBPF_OP_COMPLETE;
+}
+
+int PINT_dbpf_dspace_remove_keyval(
     void * args, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val)
 {
     int ret;
@@ -520,7 +698,7 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     op_p->u.d_iterate_handles.position_p = position_p;
     op_p->u.d_iterate_handles.count_p = inout_count_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
@@ -529,7 +707,6 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DBC *dbc_p = NULL;
     DBT key, data;
     void * multiples_buffer = NULL;
-    TROVE_ds_storedattr_s s_attr;
     TROVE_handle dummy_handle;
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
@@ -537,6 +714,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     void *tmp_handle;
     void *tmp_attr;
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
+    TROVE_ds_attributes attr;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -578,8 +756,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
-        data.data = &s_attr;
-        data.size = data.ulen = sizeof(s_attr);
+        data.data = &attr;
+        data.size = data.ulen = sizeof(attr);
         data.flags |= DB_DBT_USERMEM;
 
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RANGE);
@@ -603,8 +781,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
-        data.data = &s_attr;
-        data.size = data.ulen = sizeof(s_attr);
+        data.data = &attr;
+        data.size = data.ulen = sizeof(attr);
         data.flags |= DB_DBT_USERMEM;
 
         ret = dbc_p->c_get(dbc_p, &key, &data, DB_FIRST);
@@ -624,7 +802,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     op_p->u.d_iterate_handles.handle_array[i] = dummy_handle;
     ++i;
 
-    start_size = ((sizeof(TROVE_handle) + sizeof(s_attr)) *
+    start_size = ((sizeof(TROVE_handle) + sizeof(attr)) *
                   (*op_p->u.d_iterate_handles.count_p - 1));
     /* round up to the nearest 1024 */
     start_size = (start_size + 1023) & (~(unsigned long)1023);
@@ -706,7 +884,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
             /* verify sizes are correct */
             if(sizeof_handle != sizeof(TROVE_handle) ||
-               sizeof_attr != sizeof(s_attr))
+               sizeof_attr != sizeof(attr))
             {
                 /* something is wrong with the result */
                 ret = -TROVE_EINVAL;
@@ -736,7 +914,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 
         /* verify sizes are correct */
         if(sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(s_attr))
+           sizeof_attr != sizeof(attr))
         {
             /* something is wrong with the result */
             ret = -TROVE_EINVAL;
@@ -758,8 +936,8 @@ get_next:
     key.flags |= DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(s_attr);
+    data.data = &attr;
+    data.size = data.ulen = sizeof(attr);
     data.flags |= DB_DBT_USERMEM;
 
     ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
@@ -820,7 +998,8 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
                               TROVE_ds_flags flags,
                               void *user_ptr,
                               TROVE_context_id context_id,
-                              TROVE_op_id *out_op_id_p)
+                              TROVE_op_id *out_op_id_p,
+                              PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -852,24 +1031,26 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     }
 
    /* initialize op-specific members */
+    op_p->hints = hints;
     op_p->u.d_verify.type_p = type_p;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
 
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
     DBT key, data;
-    TROVE_ds_storedattr_s s_attr;
+    TROVE_ds_attributes attr;
 
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
     key.size = key.ulen = sizeof(TROVE_handle);
+    key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(s_attr);
+    data.data = &attr;
+    data.size = data.ulen = sizeof(attr);
     data.flags |= DB_DBT_USERMEM;
 
     /* check to see if dspace handle is used (ie. object exists) */
@@ -892,7 +1073,7 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     }
 
     /* copy type value back into user's memory */
-    *op_p->u.d_verify.type_p = s_attr.type;
+    *op_p->u.d_verify.type_p = attr.type;
 
     return 1;
 
@@ -906,7 +1087,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
@@ -914,6 +1096,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     TROVE_object_ref ref = {handle, coll_id};
     int ret;
+    PINT_event_id event_id = 0;
+    PINT_event_type event_type;
 
     /* fast path cache hit; skips queueing */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -929,10 +1113,26 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
             (int)ds_attr_p->dist_size);
 #endif
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
-                     "path attr cache hit on %llu\n (dfile_count=%d | "
-                     "dist_size=%d | data_size=%lld)\n", llu(handle),
-                     ds_attr_p->dfile_count, ds_attr_p->dist_size,
-                     lld(ds_attr_p->b_size));
+                     "path attr cache hit on %llu\n", llu(handle));
+        if(ds_attr_p->type == PVFS_TYPE_METAFILE)
+        {
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                         "(dfile_count=%d, dist_size=%d)",
+                         ds_attr_p->u.metafile.dfile_count,
+                         ds_attr_p->u.metafile.dist_size);
+        }
+        else if(ds_attr_p->type == PVFS_TYPE_DATAFILE)
+        {
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                         "(bstream_size=%lld)\n",
+                         lld(ds_attr_p->u.datafile.b_size));
+        }
+        else if(ds_attr_p->type == PVFS_TYPE_DIRDATA)
+        {
+            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                         "(dir_count=%llu)\n",
+                         llu(ds_attr_p->u.dirdata.count));
+        }
 
         UPDATE_PERF_METADATA_READ();
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
@@ -962,10 +1162,20 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
         return ret;
     }
 
+    event_type = trove_dbpf_dspace_getattr_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     handle,
+                     PINT_HINT_GET_OP_ID(hints));
+
    /* initialize op-specific members */
     op_p->u.d_getattr.attr_p = ds_attr_p;
+    op_p->hints = hints;
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
 static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
@@ -976,7 +1186,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;
@@ -1002,11 +1213,30 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                 (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
                 (int)ds_attr_p->dist_size);
 #endif
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list fast "
-                         "path attr cache hit on %llu\n (dfile_count=%d | "
-                         "dist_size=%d | data_size=%lld)\n", llu(handle_array[i]),
-                         ds_attr_p[i].dfile_count, ds_attr_p[i].dist_size,
-                         lld(ds_attr_p[i].b_size));
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG, "dspace_getattr_list fast "
+                "path attr cache hit on %llu, uid=%d, mode=%d, type=%d\n",
+                llu(handle_array[i]), (int)ds_attr_p[i].uid, (int)ds_attr_p[i].mode,
+                (int)ds_attr_p[i].type);
+            if(ds_attr_p[i].type == PVFS_TYPE_METAFILE)
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "\tdfile_count = %d, dist_size = %d\n",
+                             ds_attr_p[i].u.metafile.dfile_count,
+                             ds_attr_p[i].u.metafile.dist_size);
+            }
+            else if(ds_attr_p[i].type == PVFS_TYPE_DATAFILE)
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "\tbstream_size = %llu\n",
+                             llu(ds_attr_p[i].u.datafile.b_size));
+            }
+            else if(ds_attr_p[i].type == PVFS_TYPE_DIRDATA)
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "\tcount = %llu\n",
+                             llu(ds_attr_p[i].u.dirdata.count));
+            }
 
             UPDATE_PERF_METADATA_READ();
             error_array[i] = 0;
@@ -1068,13 +1298,16 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                                TROVE_ds_flags flags,
                                void *user_ptr,
                                TROVE_context_id context_id,
-                               TROVE_op_id *out_op_id_p)
+                               TROVE_op_id *out_op_id_p,
+                               PVFS_hint  hints)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
     struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     int ret;
+    PINT_event_id event_id = 0;
+    PINT_event_type event_type;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -1098,124 +1331,124 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
         return ret;
     }
 
+    event_type = trove_dbpf_dspace_setattr_event_id;
+    DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
+                     PINT_HINT_GET_CLIENT_ID(hints),
+                     PINT_HINT_GET_REQUEST_ID(hints),
+                     PINT_HINT_GET_RANK(hints),
+                     handle,
+                     PINT_HINT_GET_OP_ID(hints));
+
    /* initialize op-specific members */
     op_p->u.d_setattr.attr_p = ds_attr_p;
+    op_p->hints = hints;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p);
+    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
+                                 event_type, event_id);
 }
 
-static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
+int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
+                         TROVE_object_ref ref,
+                         TROVE_ds_attributes *attr)
 {
-    int ret = -TROVE_EINVAL;
+    int ret;
     DBT key, data;
-    TROVE_ds_storedattr_s s_attr;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     memset(&key, 0, sizeof(key));
-    key.data = &op_p->handle;
+    key.data = &ref.handle;
     key.size = sizeof(TROVE_handle);
-    
+
     memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = sizeof(s_attr);
+    data.data = attr;
+    data.size = sizeof(*attr);
 
-    trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
-
-#if 0
-    gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_setattr storing "
-                 "attributes (2) on key %llu\n uid = %d, mode = %d, "
-                 "type = %d, dfile_count = %d, dist_size = %d\n",
-                 llu(op_p->handle), (int) s_attr.uid, (int) s_attr.mode,
-                 (int) s_attr.type, (int) s_attr.dfile_count,
-                 (int) s_attr.dist_size);
-#endif
-
-    ret = op_p->coll_p->ds_db->put(
-        op_p->coll_p->ds_db, NULL, &key, &data, 0);
+    ret = coll_p->ds_db->put(
+        coll_p->ds_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        op_p->coll_p->ds_db->err(
-            op_p->coll_p->ds_db, ret, "dspace_db->put setattr");
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+        coll_p->ds_db->err(
+            coll_p->ds_db, ret, "dspace_db->put setattr");
+        return -dbpf_db_error_to_trove_error(ret);
     }
 
     /* now that the disk is updated, update the cache if necessary */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
-    dbpf_attr_cache_ds_attr_update_cached_data(
-        ref, op_p->u.d_setattr.attr_p);
+    dbpf_attr_cache_ds_attr_update_cached_data(ref, attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
+
+    return 0;
+}
+
+int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+
+    ret = dbpf_dspace_attr_set(op_p->coll_p, ref, op_p->u.d_setattr.attr_p);
+    if(ret != 0)
+    {
+        return ret;
+    }
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
     return DBPF_OP_COMPLETE;
-    
-return_error:
-    return ret;
 }
 
-static int getattr_one_handle(TROVE_object_ref ref, 
-    TROVE_ds_attributes *attr, 
-    DB* ds_db)
+int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
+                         TROVE_object_ref ref,
+                         TROVE_ds_attributes *attr)
 {
-    int ret = -TROVE_EINVAL;
     DBT key, data;
-    TROVE_ds_storedattr_s s_attr;
-    TROVE_size b_size;
-    struct stat b_stat;
-    struct open_cache_ref tmp_ref;
-
-    /* get an fd for the bstream so we can check size */
-    ret = dbpf_open_cache_get(
-        ref.fs_id, ref.handle, 0, &tmp_ref);
-    if (ret < 0)
-    {
-        b_size = 0;
-    }
-    else
-    {
-        ret = DBPF_FSTAT(tmp_ref.fd, &b_stat);
-        dbpf_open_cache_put(&tmp_ref);
-        if (ret < 0)
-        {
-            return(-TROVE_EBADF);
-        }
-        b_size = (TROVE_size)b_stat.st_size;
-    }
+    int ret;
 
     memset(&key, 0, sizeof(key));
     key.data = &ref.handle;
-    key.size = key.ulen = sizeof(TROVE_handle);
+    key.size = key.ulen = sizeof(ref.handle);
+    key.flags = DB_DBT_USERMEM;
 
     memset(&data, 0, sizeof(data));
-    memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
+    data.data = attr;
+    data.size = data.ulen = sizeof(*attr);
     data.flags |= DB_DBT_USERMEM;
 
-    ret = ds_db->get(ds_db, NULL, &key, &data, 0);
+    ret = coll_p->ds_db->get(coll_p->ds_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
         if(ret != DB_NOTFOUND)
         {
-            ds_db->err(ds_db, ret, "DB->get");
+            coll_p->ds_db->err(coll_p->ds_db, ret, "DB->get");
         }
         return(-dbpf_db_error_to_trove_error(ret));
     }
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-        "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
-        "dfile_count = %d, dist_size = %d\n\tb_size = %lld\n",
-        llu(ref.handle), (int)s_attr.uid, (int)s_attr.mode,
-        (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
-        llu(b_size));
-
-    trove_ds_stored_to_attr(s_attr, *attr, b_size);
+        "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d\n",
+        llu(ref.handle), (int)attr->uid, (int)attr->mode, (int)attr->type);
+    if(attr->type == PVFS_TYPE_METAFILE)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "\tdfile_count = %d, dist_size = %d\n",
+                     attr->u.metafile.dfile_count,
+                     attr->u.metafile.dist_size);
+    }
+    else if(attr->type == PVFS_TYPE_DATAFILE)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "\tbstream_size = %llu\n",
+                     llu(attr->u.datafile.b_size));
+    }
+    else if(attr->type == PVFS_TYPE_DIRDATA)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+                     "\tcount = %llu\n",
+                     llu(attr->u.dirdata.count));
+    }
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -1230,10 +1463,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
-    ret = getattr_one_handle(ref, 
-        op_p->u.d_getattr.attr_p, 
-        op_p->coll_p->ds_db);
-
+    ret = dbpf_dspace_attr_get(op_p->coll_p, ref, op_p->u.d_getattr.attr_p);
     if(ret < 0)
     {
         return(ret);
@@ -1255,16 +1485,16 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
              * skip to the next element
              */
             gossip_debug(GOSSIP_TROVE_DEBUG, 
-                "dbpf_dspace_getattr_list_op_svc() skipping element %d resolved from cache.\n", i);
+                "dbpf_dspace_getattr_list_op_svc() skipping "
+                "element %d resolved from cache.\n", i);
             continue;
         }
 
         ref.handle = op_p->u.d_getattr_list.handle_array[i];
         ref.fs_id = op_p->coll_p->coll_id;
 
-        op_p->u.d_getattr_list.error_p[i] = getattr_one_handle(ref,
-           &op_p->u.d_getattr_list.attr_p[i],
-           op_p->coll_p->ds_db);
+        op_p->u.d_getattr_list.error_p[i] = dbpf_dspace_attr_get(
+           op_p->coll_p, ref, &op_p->u.d_getattr_list.attr_p[i]);
     }
 
     return 1;
@@ -1297,6 +1527,24 @@ static int dbpf_dspace_cancel(
         return -TROVE_EINVAL;
     }
 
+    /*
+     * for bstream ops, call the bstream cancel instead.  for other ops,
+     * there's not much we can do other than let the op
+     * complete normally
+     */
+    if(cur_op->op.type >= BSTREAM_OP_TYPE &&
+       cur_op->op.type < KEYVAL_OP_TYPE)
+    {
+        int method_id = global_trove_method_callback(coll_id);
+        if(method_id < 0)
+        {
+            return -TROVE_EINVAL;
+        }
+
+        return bstream_method_table[method_id]->bstream_cancel(
+            coll_id, id, context_id);
+    }
+
     /* check the state of the current op to see if it's completed */
     gen_mutex_lock(&cur_op->mutex);
     state = cur_op->op.state;
@@ -1307,60 +1555,30 @@ static int dbpf_dspace_cancel(
     switch(state)
     {
         case OP_QUEUED:
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "op %p is queued: handling\n", cur_op);
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "op %p is queued: handling\n", cur_op);
 
-            /* dequeue and complete the op in canceled state */
-            cur_op->op.state = OP_IN_SERVICE;
-            dbpf_queued_op_put_and_dequeue(cur_op);
-            assert(cur_op->op.state == OP_DEQUEUED);
+                /* dequeue and complete the op in canceled state */
+                cur_op->op.state = OP_IN_SERVICE;
+                dbpf_queued_op_put_and_dequeue(cur_op);
+                assert(cur_op->op.state == OP_DEQUEUED);
 
-	    cur_op->state = 0;
-            /* this is a macro defined in dbpf-thread.h */
-            dbpf_queued_op_complete(cur_op, OP_CANCELED);
+                cur_op->state = 0;
+                /* this is a macro defined in dbpf-thread.h */
+                dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
-            gossip_debug(
-                GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
-            ret = 0;
-        }
-        break;
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                ret = 0;
+            }
+            break;
         case OP_IN_SERVICE:
-        {
-            /*
-              for bstream i/o op, try an aio_cancel.  for other ops,
-              there's not much we can do other than let the op
-              complete normally
-            */
-            if ((cur_op->op.type == BSTREAM_READ_LIST) ||
-                (cur_op->op.type == BSTREAM_WRITE_LIST))
-            {
-#if 0
-                ret = aio_cancel(cur_op->op.u.b_rw_list.fd,
-                                 cur_op->op.u.b_rw_list.aiocb_array);
-#endif
-                ret = cur_op->op.u.b_rw_list.aio_ops->aio_cancel(
-                    cur_op->op.u.b_rw_list.fd,
-                    cur_op->op.u.b_rw_list.aiocb_array);
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "aio_cancel returned %s\n",
-                    ((ret == AIO_CANCELED) ? "CANCELED" :
-                     "NOT CANCELED"));
-                /*
-                  NOTE: the normal aio notification method takes care
-                  of completing the op and moving it to the completion
-                  queue
-                */
-            }
-            else
-            {
-                gossip_debug(
-                    GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
-                    "operation type %d\n", cur_op->op.type);
-            }
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
+                "operation type %d\n", cur_op->op.type);
             ret = 0;
-        }
-        break;
+            break;
         case OP_COMPLETED:
         case OP_CANCELED:
             /* easy cancelation case; do nothing */
@@ -1370,6 +1588,7 @@ static int dbpf_dspace_cancel(
             break;
         default:
             gossip_err("Invalid dbpf_op state found (%d)\n", state);
+            gossip_err("   from op type: %d\n", cur_op->op.type);
             assert(0);
     }
 #endif
@@ -1621,6 +1840,11 @@ static int dbpf_dspace_testcontext(
         }
         ds_id_array[out_count] = cur_op->op.id;
 
+        if(cur_op->event_type == trove_dbpf_read_event_id ||
+           cur_op->event_type == trove_dbpf_write_event_id)
+        {
+            DBPF_EVENT_END(cur_op->event_type, cur_op->event_id);
+        }
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);
 
@@ -1837,10 +2061,110 @@ int PINT_trove_dbpf_ds_attr_compare(
     return (*handle_a > *handle_b) ? -1 : 1;
 }
 
+/* dbpf_dspace_create_store_handle()
+ *
+ * records persisent record of new dspace within trove
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int dbpf_dspace_create_store_handle(
+    struct dbpf_collection* coll_p,
+    TROVE_ds_type type,
+    TROVE_handle new_handle)
+{
+    int ret = -TROVE_EINVAL;
+    TROVE_ds_attributes attr;
+    DBT key, data;
+    TROVE_object_ref ref = {TROVE_HANDLE_NULL, coll_p->coll_id};
+    char filename[PATH_MAX + 1] = {0};
+
+    memset(&attr, 0, sizeof(attr));
+    attr.type = type;
+
+    memset(&key, 0, sizeof(key));
+    key.data = &new_handle;
+    key.size = key.ulen = sizeof(new_handle);
+    key.flags = DB_DBT_USERMEM;
+
+    memset(&data, 0, sizeof(data));
+    data.data = &attr;
+    data.size = data.ulen = sizeof(attr);
+    data.flags |= DB_DBT_USERMEM;
+
+    /* check to see if handle is already used */
+    ret = coll_p->ds_db->get(coll_p->ds_db, NULL, &key, &data, 0);
+    if (ret == 0)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
+                     llu(new_handle));
+        return(-TROVE_EEXIST);
+    }
+    else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))
+    {
+        gossip_err("error in dspace create (db_p->get failed).\n");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        return(ret);
+    }
+    
+    /* check for old bstream files (these should not exist, but it is
+     * possible if the db gets out of sync with the rest of the collection
+     * somehow
+     */
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
+                              coll_p->coll_id, llu(new_handle));
+    ret = access(filename, F_OK);
+    if(ret == 0)
+    {
+        char new_filename[PATH_MAX+1];
+        memset(new_filename, 0, PATH_MAX+1);
+
+        gossip_err("Warning: found old bstream file %s; "
+                   "moving to stranded-bstreams.\n", 
+                   filename);
+        
+        DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
+                                           my_storage_p->name, 
+                                           coll_p->coll_id,
+                                           llu(new_handle));
+        /* an old file exists.  Move it to the stranded subdirectory */
+        ret = rename(filename, new_filename);
+        if(ret != 0)
+        {
+            ret = -trove_errno_to_trove_error(errno);
+            gossip_err("Error: trove failed to rename stranded bstream: %s\n",
+                       filename);
+            return(ret);
+        }
+    }
+     
+    memset(&data, 0, sizeof(data));
+    data.data = &attr;
+    data.size = sizeof(attr);
+    
+    /* create new dataspace entry */
+    ret = coll_p->ds_db->put(coll_p->ds_db, NULL, &key, &data, 0);
+    if (ret != 0)
+    {
+        gossip_err("error in dspace create (db_p->put failed).\n");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        return(ret);
+    }
+
+    /* add retrieved ds_attr to dbpf_attr cache here */
+    ref.handle = new_handle;
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
+    dbpf_attr_cache_insert(ref, &attr);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
+
+    return(0);
+}
+
 struct TROVE_dspace_ops dbpf_dspace_ops =
 {
     dbpf_dspace_create,
+    dbpf_dspace_create_list,
     dbpf_dspace_remove,
+    dbpf_dspace_remove_list,
     dbpf_dspace_iterate_handles,
     dbpf_dspace_verify,
     dbpf_dspace_getattr,

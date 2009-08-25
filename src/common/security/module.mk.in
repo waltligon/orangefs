@@ -1,5 +1,6 @@
 DIR := src/common/security
 SERVERSRC += $(DIR)/pint-security.c \
              $(DIR)/security-hash.c \
-             $(DIR)/security-util.c
+             $(DIR)/security-util.c \
+             $(DIR)/getugroups.c
 LIBSRC += $(DIR)/security-util.c

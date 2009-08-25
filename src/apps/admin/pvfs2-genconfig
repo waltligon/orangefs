@@ -20,6 +20,7 @@ my $opt_protocol = '';
 my $opt_port = '';
 my $opt_board = '';
 my $opt_tcpport = '';
+my $opt_tcpbindspecific = '0';
 my $opt_gmport = '';
 my $opt_mxboard = '';
 my $opt_mxendpoint = '';
@@ -35,6 +36,7 @@ my $opt_trovesync = '1';
 my $opt_trovemethod = '';
 my $opt_quiet = '';
 my $opt_logging = '';
+my $opt_tracing = '';
 my $opt_logstamp = '';
 my $opt_server_job_timeout = '';
 my $opt_client_job_timeout = '';
@@ -42,6 +44,7 @@ my $opt_first_handle = '';
 my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
+my $opt_fsname = '';
 my $opt_default_num_dfiles = '';
 my $opt_default_flow_buffer_size = '';
 my $opt_default_flow_buffer_count = '';
@@ -153,16 +156,17 @@ sub parse_hostlist
     # hostb
     # hostc{1,2,3}
     #
-    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?))/g;
+    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?[^,]*))/g;
     foreach my $comp (@components)
     {
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
-        if($comp =~ /([^{]+){([^}]+)}/)
+        if($comp =~ /([^{]+){([^}]+)}(.*)$/)
         {
             my $prefix = $1;
             my $ranges = $2;
-            
+            my $suffix = $3;
+
             # split the ranges string on the commas
             foreach my $r (split(/,/, $ranges))
             {
@@ -176,7 +180,7 @@ sub parse_hostlist
                     my ($s, $f) = $r =~ /([0-9]+)-([0-9]+)/; 
                     for(my $i = $s; $i <= $f; ++$i)
                     {
-                        push @hosts, "$prefix$i";
+                        push @hosts, "$prefix$i$suffix";
                     }
                 }
             }
@@ -191,11 +195,12 @@ sub parse_hostlist
 sub emit_defaults
 {
     my ($target, $num_unexp, $bmi_module, $logfile,
-        $logging, $logstamp, $server_job_timeout, $client_job_timeout) = @_;
+        $logging, $tracing, $logstamp, $server_job_timeout, $client_job_timeout) = @_;
 
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
     print $target "\tEventLogging $logging\n";
+    print $target "\tEnableTracing $tracing\n";
     print $target "\tLogStamp $logstamp\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
@@ -206,6 +211,8 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
+    print $target "\tPrecreateBatchSize 512\n";
+    print $target "\tPrecreateLowThreshold 256\n";
 
     if(defined($default_storage))
     {
@@ -215,6 +222,11 @@ sub emit_defaults
     if(defined($default_logfile))
     {
         print $target "\tLogFile " . $default_logfile . "\n";
+    }
+
+    if($opt_tcpbindspecific)
+    {
+        print $target "\tTCPBindSpecific yes\n";
     }
     
     if(!($default_pubkey eq ""))
@@ -260,7 +272,7 @@ sub emit_filesystem
         $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
 
     # divide handle range space equally among servers ((2^63)-1 for now)
-    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
+    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
     $num_ranges = $count;
     $total_num_handles_available = $last_handle->copy();
     $total_num_handles_available->bsub($first_handle);
@@ -279,6 +291,23 @@ sub emit_filesystem
     {
         print $target "\tDefaultNumDFiles $default_num_dfiles\n";
     }
+
+    # Rules for default stuffing setting: only enable it if every I/O server
+    # is also a metadata server, otherwise we would tend to unbalance by
+    # always stuffing on the subset that does metadata.  User can override
+    # if desired.
+    $stuffing = "yes";
+    foreach my $alias (keys %all_endpoints)
+    {
+        if($all_endpoints{$alias}->{TYPE} & $IO_ENDPOINT)
+        {
+            if(!($all_endpoints{$alias}->{TYPE} & $META_ENDPOINT))
+            {
+                $stuffing = "no";
+            }
+        }
+    }
+    print $target "\tFileStuffing $stuffing\n";
 
     print $target "\t<MetaHandleRanges>\n";
     $start = $end = $first_handle->copy();
@@ -510,6 +539,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
   to run pvfs2-genconfig in interactive or non-interactive mode:
 
      --tcpport     <NUM>               TCP port to use (default: 3334)
+     --tcpbindspecific                 Bind TCP only to specific interfaces
      --gmport      <NUM>               GM port to use (default: 6)
      --mxboard     <NUM>               MX board to use (default is 0)
      --mxendpoint  <NUM>               MX endpoint to use (default is 3)
@@ -517,6 +547,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --portal      <NUM>               Portals index for
                                        listening server (default is 5)
      --logging     <STRING>            debugging mask for log messages
+     --tracing                         Enable event tracing in the server
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
      --storage <STRING>                path to pvfs storage directory.
@@ -529,6 +560,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
      --fsid         <NUM>              fs identifier value
+     --fsname <STRING>                 fs name
      --default-num-dfiles <NUM>        number of datafiles to use per file
                                        (defaults to number of I/O servers)
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
@@ -663,6 +695,17 @@ sub get_logging
     return $logging;
 }
 
+sub get_tracing
+{
+    my $tracing;
+    if ($opt_tracing) {
+        $tracing = "yes";
+    } else {
+        $tracing = "no";
+    }
+    return $tracing;
+}
+
 sub get_logstamp
 {
     my $logstamp;
@@ -695,6 +738,17 @@ sub get_fsid
         $fsid = int((rand() * 2147483647));
     }
     return $fsid;
+}
+
+sub get_fsname
+{
+    my $fsname;
+    if ($opt_fsname) {
+        $fsname = $opt_fsname;
+    } else {
+        $fsname = "pvfs2-fs";
+    }
+    return $fsname;
 }
 
 sub get_last_handle
@@ -987,17 +1041,36 @@ sub get_metanames
     my $pubkey = shift;
     my $privkey = shift;
     my $metaline = '';
+    my @meta_hosts;
     if ($opt_metaservers) {
         $metaline = $opt_metaservers;
-    } else {
-        print $OUT "Now list the hostnames of the machines that will act as " .
-                   "Metadata\nservers.  This list may or may not overlap " .
-                   "with the I/O server list.\n";
+        @meta_hosts = parse_hostlist($metaline);
+    } 
+    else 
+    {
+        print $OUT "Use same servers for metadata? (recommended)\n";
         $metaline = prompt_word(
-            "Enter hostnames [Default is localhost]: ",
-            "localhost");
+            "Enter yes or no [Default is yes]: ",
+            "yes");
+        if($metaline =~ /^yes$/i)
+        {
+            foreach my $alias (keys %all_endpoints)
+            {
+                $all_endpoints{$alias}->{TYPE} |= $META_ENDPOINT;
+            }
+        }
+        else
+        {
+            print $OUT "Now list the hostnames of the machines that will act as " .
+                       "Metadata\nservers.  This list may or may not overlap " .
+                       "with the I/O server list.\n";
+            $metaline = prompt_word(
+                "Enter hostnames [Default is localhost]: ",
+                "localhost");
+            @meta_hosts = parse_hostlist($metaline);
+        }
     }
-    my @meta_hosts = parse_hostlist($metaline);
+
     foreach my $meta_host (@meta_hosts)
     {
         if(exists $all_endpoints{$meta_host})
@@ -1358,6 +1431,7 @@ my $show_specusage = '';
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
     'tcpport=i'     => \$opt_tcpport,
+    'tcpbindspecific'  => \$opt_tcpbindspecific,
     'gmport=i'      => \$opt_gmport,
     'mxboard=i'     => \$opt_mxboard,
     'mxendpoint=i'  => \$opt_mxendpoint,
@@ -1367,6 +1441,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'metaservers=s' => \$opt_metaservers,
     'logfile=s'     => \$opt_logfile,
     'logging=s'     => \$opt_logging,
+    'tracing'       => \$opt_tracing,
     'logstamp=s'    => \$opt_logstamp,
     'first-handle=i' => \$opt_first_handle,
     'last-handle=i' => \$opt_last_handle,
@@ -1375,6 +1450,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'flow-buffer-count=i'=> \$opt_default_flow_buffer_count,
     'root-handle=i' => \$opt_root_handle,
     'fsid=i'        => \$opt_fsid,
+    'fsname=s'      => \$opt_fsname,
     'trusted=i'        => \$opt_security,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
@@ -1578,6 +1654,7 @@ if (!$opt_quiet) {
 
 
 my $logging = get_logging();
+my $tracing = get_tracing();
 my $logstamp = get_logstamp();
 my $first_handle = get_first_handle();
 my $last_handle = get_last_handle();
@@ -1586,6 +1663,7 @@ my $default_flow_buffer_size = get_default_flow_buffer_size();
 my $default_flow_buffer_count = get_default_flow_buffer_count();
 my $root_handle = get_root_handle();
 my $fsid = get_fsid();
+my $fsname = get_fsname();
 my $server_job_timeout = get_server_job_timeout();
 my $client_job_timeout = get_client_job_timeout();
 
@@ -1601,7 +1679,7 @@ if (!$opt_quiet) {
 }
 
 emit_defaults($output_target, $num_unexp_reqs,
-    $bmi_module, $default_logfile, $logging, 
+    $bmi_module, $default_logfile, $logging, $tracing,
     $logstamp, $server_job_timeout, $client_job_timeout);
 if ($opt_security == 1) 
 {
@@ -1609,7 +1687,7 @@ if ($opt_security == 1)
         $opt_trusted_network, $opt_trusted_netmask);
 }
 emit_aliases($output_target);
-emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle, 
+emit_filesystem($output_target, $fsname , $fsid, $root_handle, 
     $last_handle, $first_handle, $meta_count + $io_count, $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count);
 
 if ($opt_metaspec) {

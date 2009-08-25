@@ -13,6 +13,7 @@
 
 #include "quicklist.h"
 #include "bmi-types.h"
+#include "pint-event.h"
 
 #define BMI_MAX_CONTEXTS 16
 
@@ -43,6 +44,7 @@ struct bmi_method_addr
 {
     int method_type;
     void *method_data;		/* area to be used by specific methods */
+    void *parent;               /* pointer back to generic BMI address info */  
 };
 typedef struct bmi_method_addr *bmi_method_addr_p;
 
@@ -78,7 +80,8 @@ struct bmi_method_ops
                       enum bmi_buffer_type,
                       bmi_msg_tag_t,
                       void *,
-                      bmi_context_id);
+                      bmi_context_id,
+                      PVFS_hint hints);
     int (*post_sendunexpected) (bmi_op_id_t *,
                                 bmi_method_addr_p,
                                 const void *,
@@ -86,7 +89,8 @@ struct bmi_method_ops
                                 enum bmi_buffer_type,
                                 bmi_msg_tag_t,
                                 void *,
-                                bmi_context_id);
+                                bmi_context_id,
+                                PVFS_hint hints);
     int (*post_recv) (bmi_op_id_t *,
                       bmi_method_addr_p,
                       void *,
@@ -95,7 +99,8 @@ struct bmi_method_ops
                       enum bmi_buffer_type,
                       bmi_msg_tag_t,
                       void *,
-                      bmi_context_id);
+                      bmi_context_id,
+                      PVFS_hint hints);
     int (*test) (bmi_op_id_t,
                  int *,
                  bmi_error_code_t *,
@@ -134,7 +139,8 @@ struct bmi_method_ops
                            enum bmi_buffer_type,
                            bmi_msg_tag_t,
                            void *,
-                           bmi_context_id);
+                           bmi_context_id,
+                           PVFS_hint hints);
     int (*post_recv_list) (bmi_op_id_t *,
                            bmi_method_addr_p,
                            void *const *,
@@ -145,7 +151,8 @@ struct bmi_method_ops
                            enum bmi_buffer_type,
                            bmi_msg_tag_t,
                            void *,
-                           bmi_context_id);
+                           bmi_context_id,
+                           PVFS_hint Hints);
     int (*post_sendunexpected_list) (bmi_op_id_t *,
                                      bmi_method_addr_p,
                                      const void *const *,
@@ -155,7 +162,8 @@ struct bmi_method_ops
                                      enum bmi_buffer_type,
                                      bmi_msg_tag_t,
                                      void *,
-                                     bmi_context_id);
+                                     bmi_context_id,
+                                     PVFS_hint hints);
     int (*open_context)(bmi_context_id);
     void (*close_context)(bmi_context_id);
     int (*cancel)(bmi_op_id_t, bmi_context_id);
@@ -200,6 +208,7 @@ struct method_op
     int list_index;		/* index of current buffer to xfer */
     /* how much is completed in current buffer */
     bmi_size_t cur_index_complete;
+    PINT_event_id event_id;
 };
 typedef struct method_op method_op_st, *method_op_p;
 

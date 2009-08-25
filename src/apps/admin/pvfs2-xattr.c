@@ -59,6 +59,7 @@ typedef struct pvfs2_file_object_s {
     char user_path[PVFS_NAME_MAX];
     PVFS_sys_attr attr;
     PVFS_permissions perms;
+    PVFS_credential *cred;
 } pvfs2_file_object;
 
 typedef struct unix_file_object_s {
@@ -77,9 +78,9 @@ typedef struct file_object_s {
 } file_object;
 
 static struct options* parse_args(int argc, char* argv[]);
-static int generic_open(file_object *obj, PVFS_credential *credential);
+static int generic_open(file_object *obj);
 static int pvfs2_eattr(int get, file_object *, PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p, PVFS_credential *cred);
+        PVFS_ds_keyval *val_p);
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
 static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p);
@@ -91,7 +92,9 @@ int main(int argc, char **argv)
   int ret = 0;
   struct options* user_opts = NULL;
   file_object src;
-  PVFS_credential *credential;
+  PVFS_credential *creds;
+  int ncreds;
+  int i;
 
   memset(&src, 0, sizeof(src));
   /* look at command line arguments */
@@ -109,12 +112,25 @@ int main(int argc, char **argv)
     PVFS_perror("PVFS_util_init_defaults", ret);
     return(-1);
   }
+
+  ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+  if (ret < 0)
+  {
+      PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+      PVFS_sys_finalize();
+      exit(EXIT_FAILURE);
+  }
+
   resolve_filename(&src, user_opts->srcfile);
 
-  credential = PVFS_util_gen_fake_credential();
-  assert(credential);
+  if (src.fs_type == PVFS2_FILE)
+  {
+      src.u.pvfs2.cred = PVFS_util_find_credential_by_fsid(src.u.pvfs2.fs_id,
+                                                           creds,
+                                                           ncreds);
+  }
 
-  ret = generic_open(&src, credential);
+  ret = generic_open(&src);
   if (ret < 0)
   {
       fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
@@ -139,35 +155,38 @@ int main(int argc, char **argv)
       }
   }
 
-    ret = pvfs2_eattr(user_opts->get, &src, &user_opts->key, &user_opts->val, 
-                      credential);
-    if (ret != 0) 
-    {
-        return ret;
-    }
-    if (user_opts->get && user_opts->text)  
-    {
-        if (strncmp(user_opts->key.buffer, "user.pvfs2.meta_hint", SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
-            PVFS_metafile_hint *hint = (PVFS_metafile_hint *) user_opts->val.buffer;
-            printf("Metafile hints: ");
-            if (hint->flags & PVFS_IMMUTABLE_FL) {
-                printf("immutable file ");
-            }
-            if (hint->flags & PVFS_APPEND_FL) {
-                printf("Append-only file ");
-            }
-            if (hint->flags & PVFS_NOATIME_FL) {
-                printf("Atime updates disabled.");
-            }
-            printf("\n");
-        } else {
-            printf("key:%s Value:\n%s\n",
-                    (char *)user_opts->key.buffer,
-                    (char *)user_opts->val.buffer);
-        }
-    }
+  ret = pvfs2_eattr(user_opts->get, &src, &user_opts->key, &user_opts->val);
+  if (ret != 0) 
+  {
+      return ret;
+  }
+  if (user_opts->get && user_opts->text)  
+  {
+      if (strncmp(user_opts->key.buffer, "user.pvfs2.meta_hint", SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
+          PVFS_metafile_hint *hint = (PVFS_metafile_hint *) user_opts->val.buffer;
+          printf("Metafile hints: ");
+          if (hint->flags & PVFS_IMMUTABLE_FL) {
+              printf("immutable file ");
+          }
+          if (hint->flags & PVFS_APPEND_FL) {
+              printf("Append-only file ");
+          }
+          if (hint->flags & PVFS_NOATIME_FL) {
+              printf("Atime updates disabled.");
+          }
+          printf("\n");
+      } else {
+          printf("key:%s Value:\n%s\n",
+                 (char *)user_opts->key.buffer,
+                 (char *)user_opts->val.buffer);
+      }
+  }
 
-  PINT_release_credential(credential);
+  for (i = 0; i < ncreds; i++)
+  {
+      PINT_cleanup_credential(&creds[i]);
+  }
+  free(creds);
   PVFS_sys_finalize();
   return(ret);
 }
@@ -214,7 +233,7 @@ static int permit_set(PVFS_ds_keyval *key_p)
  * returns zero on success and negative one on failure
  */
 static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p, PVFS_credential *cred) 
+        PVFS_ds_keyval *val_p) 
 {
   int ret = -1;
 
@@ -254,10 +273,12 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
   {
       if (get == 1)
       {
-          ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, cred, key_p, val_p);
+          ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, obj->u.pvfs2.cred, 
+                                  key_p, val_p, NULL);
       }
       else {
-          ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, cred, key_p, val_p, 0);
+          ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, obj->u.pvfs2.cred, 
+                                  key_p, val_p, 0, NULL);
       }
 
       if (ret < 0)
@@ -378,7 +399,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credential *credential)
+static int generic_open(file_object *obj)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
@@ -419,9 +440,9 @@ static int generic_open(file_object *obj, PVFS_credential *credential)
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, 
                               (char *) obj->u.pvfs2.pvfs2_path,
-                              credential, 
+                              obj->u.pvfs2.cred, 
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -432,7 +453,7 @@ static int generic_open(file_object *obj, PVFS_credential *credential)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                               credential, &resp_getattr);
+                               obj->u.pvfs2.cred, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
@@ -469,6 +490,7 @@ static int eattr_is_prefixed(char* key_name)
     }
     return(0);
 }
+
 
 
 /*

@@ -20,6 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include "bmi.h"
 #include "security-util.h"
 
 #ifndef PVFS2_VERSION
@@ -30,7 +31,13 @@
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
-#define MAX_NUM_DIRENTS    32
+#define MAX_NUM_DIRENTS    113
+
+/*
+  arbitrarily restrict the number of paths
+  that this ls version can take as arguments
+*/
+#define MAX_NUM_PATHS       8
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -38,6 +45,7 @@ struct options
     int list_human_readable;
     int list_long;
     int list_verbose;
+    int list_recursive;
     int list_numeric_uid_gid;
     int list_directory;
     int list_no_group;
@@ -46,23 +54,35 @@ struct options
     int list_no_owner;
     int list_inode;
     int list_use_si_units;
-    char **start;
+    char *start[MAX_NUM_PATHS];
     int num_starts;
 };
+
+struct subdir_list
+{
+    char *path;
+    struct subdir_list *next;
+};
+typedef struct subdir_list subdir;
+
+static char *process_name = NULL;
+static int do_timing = 0;
 
 static struct options* parse_args(int argc, char* argv[]);
 
 static void usage(int argc, char** argv);
-static int do_timing = 0;
 
 static void print_entry(
     char *entry_name,
     PVFS_handle handle,
     PVFS_fs_id fs_id,
+    PVFS_sys_attr *attr,
+    int attr_error,
     struct options *opts,
     PVFS_credential *cred);
 
 static int do_list(
+    char *full_path,
     char *start,
     int fs_id,
     struct options *opts,
@@ -90,9 +110,9 @@ do {                                                        \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
-                        refn.fs_id, opts, cred);                  \
+                        refn.fs_id, NULL, 0, opts, cred);         \
             print_entry(".. (faked)", refn.handle,          \
-                        refn.fs_id, opts, cred);                  \
+                        refn.fs_id, NULL, 0, opts, cred);         \
         }                                                   \
         else {                                              \
             printf(".\n");                                  \
@@ -181,8 +201,8 @@ void print_entry_attr(
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
-    time_t mtime = (time_t)attr->mtime;
-    struct tm *time = localtime(&mtime);
+    time_t mtime;
+    struct tm *time;    
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
@@ -193,6 +213,12 @@ void print_entry_attr(
     {
         return;
     }
+    if (attr == NULL)
+    {
+        return;
+    }
+    mtime = (time_t)attr->mtime;
+    time = localtime(&mtime);
 
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
@@ -327,7 +353,6 @@ void print_entry_attr(
         {
             printf("%s\n",buf);
         }
-        free(attr->link_target);
     }
     else
     {
@@ -339,6 +364,8 @@ void print_entry(
     char *entry_name,
     PVFS_handle handle,
     PVFS_fs_id fs_id,
+    PVFS_sys_attr *attr,
+    int attr_error,
     struct options *opts,
     PVFS_credential *cred)
 {
@@ -359,21 +386,34 @@ void print_entry(
         return;
     }
 
-    ref.handle = handle;
-    ref.fs_id = fs_id;
-
-    memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-
-    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           cred, &getattr_response);
-    if (ret)
+    if (attr_error == 0)
     {
-        fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
-                llu(handle),fs_id);
-        PVFS_perror("Getattr failure", ret);
-        return;
+        if(!attr)
+        {
+            /* missing attributes (possibly for . or .. entries); get them
+             * the old fashioned way
+             */
+            ref.handle = handle;
+            ref.fs_id = fs_id;
+
+            memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+
+            ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                cred, &getattr_response, NULL);
+            if (ret)
+            {
+                fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
+                    llu(handle),fs_id);
+                PVFS_perror("Getattr failure", ret);
+                return;
+            }
+            print_entry_attr(handle, entry_name,  &getattr_response.attr, opts);
+        }
+        else
+        {
+            print_entry_attr(handle, entry_name, attr, opts);
+        }
     }
-    print_entry_attr(handle, entry_name, &getattr_response.attr, opts);
 }
 
 static double Wtime(void)
@@ -384,6 +424,7 @@ static double Wtime(void)
 }
 
 int do_list(
+    char *full_path,
     char *start,
     int fs_id,
     struct options *opts,
@@ -395,19 +436,25 @@ int do_list(
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
-    PVFS_sysresp_readdir rd_response;
+    PVFS_sysresp_readdirplus rdplus_response;
     PVFS_sysresp_getattr getattr_response;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
     double begin = 0., end;
+    subdir *current, *head = NULL, *tail = NULL;
 
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
 
+    if (opts->list_recursive || opts->num_starts > 1)
+    {
+        printf("%s%s:\n",full_path,start);
+    }
+
     ret = PVFS_sys_lookup(fs_id, name, cred,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret < 0)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
@@ -419,9 +466,8 @@ int do_list(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                           cred, &getattr_response);
-    if(ret == 0)
+    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
+                         cred, &getattr_response, NULL) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -439,7 +485,7 @@ int do_list(
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
                 if (PVFS_sys_getparent(ref.fs_id, name, cred,
-                                       &getparent_resp) == 0)
+                                       &getparent_resp, NULL) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
                         getparent_resp.parent_ref);
@@ -453,15 +499,14 @@ int do_list(
             }
             else
             {
-                print_entry(segment, ref.handle, ref.fs_id, opts, cred);
+                print_entry(segment, ref.handle, ref.fs_id, 
+                        NULL,
+                        0,
+                        opts,
+                        cred);
             }
             return 0;
         }
-    }
-    else
-    {
-        PVFS_perror("PVFS_sys_getattr", ret);
-        return -1;
     }
 
     if (do_timing)
@@ -469,10 +514,14 @@ int do_list(
     token = 0;
     do
     {
-        memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
-        ret = PVFS_sys_readdir(
+        memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
+        ret = PVFS_sys_readdirplus(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, cred, &rd_response);
+                pvfs_dirent_incount, cred,
+                (opts->list_long) ? 
+                PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
+                &rdplus_response,
+                NULL);
         if(ret < 0)
         {
             PVFS_perror("PVFS_sys_readdir", ret);
@@ -481,15 +530,15 @@ int do_list(
 
         if (dir_version == 0)
         {
-            dir_version = rd_response.directory_version;
+            dir_version = rdplus_response.directory_version;
         }
         else if (opts->list_verbose)
         {
-            if (dir_version != rd_response.directory_version)
+            if (dir_version != rdplus_response.directory_version)
             {
                 fprintf(stderr, "*** directory changed! listing may "
                         "not be correct\n");
-                dir_version = rd_response.directory_version;
+                dir_version = rdplus_response.directory_version;
             }
         }
 
@@ -503,32 +552,102 @@ int do_list(
             printed_dot_info = 1;
         }
 
-        for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
+        for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
         {
-            cur_file = rd_response.dirent_array[i].d_name;
-            cur_handle = rd_response.dirent_array[i].handle;
+            cur_file = rdplus_response.dirent_array[i].d_name;
+            cur_handle = rdplus_response.dirent_array[i].handle;
 
-            print_entry(cur_file, cur_handle, fs_id, opts, cred);
+            print_entry(cur_file, cur_handle, fs_id,
+                    &rdplus_response.attr_array[i],
+                    rdplus_response.stat_err_array[i],
+                    opts,
+                    cred);
+
+            PVFS_sys_attr *attr = &rdplus_response.attr_array[i];
+            if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
+            {
+                int path_len = strlen(start) + strlen(cur_file) + 1;
+                current = (subdir *) malloc(sizeof(subdir));
+
+                /* Prevent duplicate slashes in path */
+                if(start[strlen(start)-1] == '/')
+                {
+                    current->path = (char *) malloc(path_len);
+                    snprintf(current->path,path_len,"%s%s",start,cur_file);
+                }
+                else
+                {
+                    current->path = (char *) malloc(path_len + 1);
+                    snprintf(current->path,path_len+1,"%s/%s",start,cur_file);
+                }
+
+                /* Update linked list of subdirectories to recurse */
+                current->next = NULL;
+                if(!head)
+                {
+                    head = current;
+                    tail = current;
+                }
+                else
+                {
+                    tail->next = current;
+                    tail = current;
+                }
+            }
         }
-        token += rd_response.pvfs_dirent_outcount;
+        token = rdplus_response.token;
 
-        if (rd_response.pvfs_dirent_outcount)
+        if (rdplus_response.pvfs_dirent_outcount)
         {
-            free(rd_response.dirent_array);
-            rd_response.dirent_array = NULL;
+            free(rdplus_response.dirent_array);
+            rdplus_response.dirent_array = NULL;
+            free(rdplus_response.stat_err_array);
+            rdplus_response.stat_err_array = NULL;
+            for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
+                if (rdplus_response.attr_array)
+                {
+                    PVFS_util_release_sys_attr(&rdplus_response.attr_array[i]);
+                }
+            }
+            free(rdplus_response.attr_array);
+            rdplus_response.attr_array = NULL;
         }
 
-    } while(rd_response.pvfs_dirent_outcount == pvfs_dirent_incount);
+    } while(rdplus_response.pvfs_dirent_outcount == pvfs_dirent_incount);
     if (do_timing) {
         end = Wtime();
-        printf("PVFS_sys_readdir+sys_getattr took %g msecs\n",
+        printf("PVFS_sys_readdirplus took %g msecs\n", 
                 (end - begin));
     }
 
-    if (rd_response.pvfs_dirent_outcount)
+    if (rdplus_response.pvfs_dirent_outcount)
     {
-        free(rd_response.dirent_array);
-        rd_response.dirent_array = NULL;
+        free(rdplus_response.dirent_array);
+        rdplus_response.dirent_array = NULL;
+        free(rdplus_response.stat_err_array);
+        rdplus_response.stat_err_array = NULL;
+        for (i = 0; i < rdplus_response.pvfs_dirent_outcount; i++) {
+            if (rdplus_response.attr_array)
+            {
+                PVFS_util_release_sys_attr(&rdplus_response.attr_array[i]);
+            }
+        }
+        free(rdplus_response.attr_array);
+        rdplus_response.attr_array = NULL;
+    }
+
+    if (opts->list_recursive)
+    {
+        current = head;
+        while(current)
+        {
+            printf("\n");
+            do_list(full_path,current->path,fs_id,opts,cred);
+            current = current->next;
+            free(head->path);
+            free(head);
+            head = current;
+        }
     }
     return 0;
 }
@@ -550,6 +669,7 @@ static struct options* parse_args(int argc, char* argv[])
         {"human-readable",0,0,0},
         {"si",0,0,0},
         {"version",0,0,0},
+        {"recursive",0,0,0},
         {"verbose",0,0,0},
         {"numeric-uid-gid",0,0,0},
         {"directory",0,0,0},
@@ -568,7 +688,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    while((ret = getopt_long(argc, argv, "hVndGoAaiglt",
+    while((ret = getopt_long(argc, argv, "hRVndGoAaiglt",
                              long_opts, &option_index)) != -1)
     {
 	switch(ret)
@@ -594,6 +714,10 @@ static struct options* parse_args(int argc, char* argv[])
                 {
                     printf("%s\n", PVFS2_VERSION);
                     exit(0);
+                }
+                else if (strcmp("recursive", cur_option) == 0)
+                {
+                    goto list_recursive;
                 }
                 else if (strcmp("verbose", cur_option) == 0)
                 {
@@ -633,12 +757,13 @@ static struct options* parse_args(int argc, char* argv[])
           list_human_readable:
                 tmp_opts->list_human_readable = 1;
                 break;
+            case 'R':
+          list_recursive:
+                tmp_opts->list_recursive = 1;
+                break;
             case 'V':
           list_verbose:
                 tmp_opts->list_verbose = 1;
-                break;
-            case 't':
-                do_timing = 1;
                 break;
 	    case 'l':
                 tmp_opts->list_long = 1;
@@ -673,22 +798,27 @@ static struct options* parse_args(int argc, char* argv[])
           list_inode:
                 tmp_opts->list_inode = 1;
                 break;
+            case 't':
+                do_timing = 1;
+                break;
 	    case '?':
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
-    tmp_opts->start = (char **) calloc(1, (argc-optind+1) * sizeof(char *));
-    if (tmp_opts->start == NULL) {
-       exit(EXIT_FAILURE);
-    }
 
     for(i = optind; i < argc; i++)
     {
-         tmp_opts->start[i-optind] = argv[i];
-         tmp_opts->num_starts++;
+        if (tmp_opts->num_starts < MAX_NUM_PATHS)
+        {
+            tmp_opts->start[i-optind] = argv[i];
+            tmp_opts->num_starts++;
+        }
+        else
+        {
+            fprintf(stderr,"Ignoring path %s\n",argv[i]);
+        }
     }
-    assert(tmp_opts->num_starts < (argc - optind + 1));
     return tmp_opts;
 }
 
@@ -721,6 +851,8 @@ static void usage(int argc, char** argv)
             "list group information\n");
     fprintf(stderr,"      --help                 display this help "
             "and exit\n");
+    fprintf(stderr,"  -R, --recursive            list subdirectories "
+            "recursively\n");
     fprintf(stderr,"  -V, --verbose              reports if the dir is "
             "changing during listing\n");
     fprintf(stderr,"      --version              output version "
@@ -731,13 +863,16 @@ static void usage(int argc, char** argv)
 int main(int argc, char **argv)
 {
     int ret = -1, i = 0;
-    char **pvfs_path;
-    PVFS_fs_id *fs_id_array = NULL;
+    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
+    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
     const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
     int found_one = 0;
-    PVFS_credential *cred;
+    PVFS_credential *creds;
+    int ncreds;
+
+    process_name = argv[0];
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -753,6 +888,11 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
+    }
+
+    for(i = 0; i < MAX_NUM_PATHS; i++)
+    {
+        memset(pvfs_path[i],0,PVFS_NAME_MAX);
     }
 
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
@@ -779,38 +919,53 @@ int main(int argc, char **argv)
 	PVFS_sys_finalize();
 	return(-1);
     }
-    
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
 
+    /* generate a credential for each known file system */
+
+    creds = calloc(tab->mntent_count, sizeof(PVFS_credential));
+    if (!creds)
+    {
+        perror("calloc");
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+    ncreds = 0;
+
+    for (i = 0; i < tab->mntent_count; i++)
+    {
+        PVFS_BMI_addr_t addr;
+
+        ret = BMI_addr_lookup(&addr, 
+                              tab->mntent_array[i].the_pvfs_config_server);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to resolve BMI address %s\n",
+                    tab->mntent_array[i].the_pvfs_config_server);
+            ret = EXIT_FAILURE;
+            goto error;
+        }
+
+        ret = PVFS_util_gen_credential(tab->mntent_array[i].fs_id,
+                                       addr,
+                                       NULL,
+                                       NULL,
+                                       &creds[i]);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to generate credential for fsid %d\n",
+                    tab->mntent_array[i].fs_id);
+            ret = EXIT_FAILURE;
+            goto error;
+        }
+        ncreds += 1;
+    }
+            
     if (user_opts->num_starts == 0)
     {
 	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
 		 tab->mntent_array[0].mnt_dir);
 	user_opts->start[0] = current_dir;
 	user_opts->num_starts = 1;
-    }
-
-    pvfs_path = (char **) calloc(1, user_opts->num_starts * sizeof(char *));
-    if (!pvfs_path)
-    {
-       fprintf(stderr, "Could not alloc memory\n");
-       return -1;
-    }
-    for(i = 0; i < user_opts->num_starts; i++)
-    {
-       pvfs_path[i] = (char *) calloc(1, PVFS_NAME_MAX);
-       if (pvfs_path[i] == NULL) 
-       {
-         fprintf(stderr, "Could not alloc memory\n");
-         return -1;
-       }
-    }
-    fs_id_array = (PVFS_fs_id *) calloc(1, user_opts->num_starts * sizeof(*fs_id_array));
-    if (fs_id_array == NULL)
-    {
-      fprintf(stderr, "Could not alloc memory\n");
-      return -1;
     }
 
     for(i = 0; i < user_opts->num_starts; i++)
@@ -832,30 +987,56 @@ int main(int argc, char **argv)
 
     for(i = 0; i < user_opts->num_starts; i++)
     {
-        if (user_opts->num_starts > 1)
+        char *substr = strstr(user_opts->start[i],pvfs_path[i]);
+        char *index = user_opts->start[i];
+        char *search = substr; 
+        PVFS_credential *cred;
+        int j = 0;
+
+        /* Keep the mount path info to mimic /bin/ls output */
+        if( strncmp(pvfs_path[i],"/",strlen(pvfs_path[i])) )
         {
-            printf("%s:\n", pvfs_path[i]);
+            /* Get last matching substring */
+            while (search) 
+            {
+                substr = search;
+                search = strstr(++search,pvfs_path[i]);
+            }
+        }
+        else /* Root directory case has nothing to match */
+        {
+            substr = &user_opts->start[i][strlen(user_opts->start[i])-1];
         }
 
-        do_list(pvfs_path[i], fs_id_array[i], user_opts, cred);
+        while (index != substr)
+        {
+            index++;
+            j++;
+        }
+        user_opts->start[i][j] = '\0';
+
+        cred = PVFS_util_find_credential_by_fsid(fs_id_array[i],
+                                                 creds,
+                                                 ncreds);
+
+        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], 
+                user_opts, cred);
 
         if (user_opts->num_starts > 1)
         {
             printf("\n");
         }
     }
-    for (i = 0; i < user_opts->num_starts; i++) 
+
+ error:
+
+    for (i = 0; i < ncreds; i++)
     {
-      free(pvfs_path[i]);
+        PINT_cleanup_credential(&creds[i]);
     }
-    free(user_opts->start);
-    free(pvfs_path);
-    free(fs_id_array);
-    
-    PINT_release_credential(cred);
+    free(creds);
     PVFS_sys_finalize();
-    if (user_opts)
-        free(user_opts);
+    free(user_opts);
 
     return(ret);
 }

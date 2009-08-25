@@ -31,7 +31,8 @@
 #include "realpath.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
-#include "security-types.h"
+#include "pint-util.h"
+#include "security-util.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -155,34 +156,258 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
-/* a temporary helper function */
-PVFS_credential *PVFS_util_gen_fake_credential(void)
+/* nlmills: TODO: document credential utilities */
+int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds)
 {
-    PVFS_credential *cred;
+    int nmntent;
+    int i, j;
+    int ret;
+
+    assert(creds);
+    assert(ncreds);
+
+    gen_mutex_lock(&s_stat_tab_mutex);
+
+    /* first time through count the total (static and dynamic) number of 
+     * mount entries
+     */
     
-    cred = (PVFS_credential*)calloc(1, sizeof(PVFS_credential));
-    if (!cred)
+    nmntent = 0;
+ 
+    for (i = 0; i < s_stat_tab_count; i++)
     {
-        return NULL;
+        for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            if (PVFS_FS_ID_NULL != s_stat_tab_array[i].mntent_array[j].fs_id)
+            {
+                nmntent++;
+            }
+        }
     }
-    
-    cred->group_array = (PVFS_gid*)calloc(1, sizeof(PVFS_gid));
-    if (!cred->group_array)
+
+    for (i = 0; i < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
     {
-        free(cred);
-        return NULL;
+        if (PVFS_FS_ID_NULL !=
+            s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].fs_id)
+        {
+            nmntent++;
+        }
     }
-    
-    cred->serial = 0xDEADBEEF;
-    cred->userid = geteuid();
-    cred->num_groups = 1;
-    cred->group_array[0] = getegid();
-    cred->issuer_id = strdup("FAKE");
-    cred->timeout = 1230786000; /* 1 Jan. 2009 00:00 UTC */
-    cred->sig_size = 0;
-    cred->signature = NULL;
-    
-    return cred;
+
+    /* nlmills: TODO: find why this isn't really being zeroed out */
+    *ncreds = 0;
+    *creds = calloc(nmntent, sizeof(PVFS_credential));
+    if (*creds == NULL)
+    {
+        gen_mutex_unlock(&s_stat_tab_mutex);
+        return -PVFS_ENOMEM;
+    }
+
+    /* second time through request the actual credentials */
+
+    /* static tab mount entries */
+    for (i = 0; i < s_stat_tab_count; i++)
+    {
+        for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            PVFS_fs_id fsid;
+            
+            fsid = s_stat_tab_array[i].mntent_array[j].fs_id;
+            if (PVFS_FS_ID_NULL != fsid)
+            {
+                PVFS_BMI_addr_t addr;
+
+                ret = BMI_addr_lookup(&addr,
+                    s_stat_tab_array[i].mntent_array[j].the_pvfs_config_server);
+                if (ret < 0)
+                {
+                    gossip_lerr("Failed to resolve BMI address %s\n",
+                        s_stat_tab_array[i].mntent_array[j].the_pvfs_config_server);
+                    goto error;
+                }
+                
+                ret = PVFS_util_gen_credential(fsid,
+                                               addr,
+                                               NULL,
+                                               NULL,
+                                               &(*creds)[*ncreds]);
+                if (ret < 0)
+                {
+                    goto error;
+                }
+                *ncreds += 1;
+            }
+        }
+    }
+                                               
+    /* dynamic tab mount entries */
+    for (i = 0; i < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+    {
+        PVFS_fs_id fsid;
+
+        fsid = s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].fs_id;
+        if (PVFS_FS_ID_NULL != fsid)
+        {
+            PVFS_BMI_addr_t addr;
+            
+            ret = BMI_addr_lookup(&addr,
+                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].the_pvfs_config_server);
+            if (ret < 0)
+            {
+                gossip_lerr("Failed to resolve BMI address %s\n",
+                    s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].the_pvfs_config_server);
+                goto error;
+            }
+
+            ret = PVFS_util_gen_credential(fsid,
+                                           addr,
+                                           NULL,
+                                           NULL,
+                                           &(*creds)[*ncreds]);
+            if (ret < 0)
+            {
+                goto error;
+            }
+            *ncreds += 1;
+        }
+    }
+
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return 0;
+
+ error:
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    for (i = 0; i < *ncreds; i++)
+    {
+        PINT_cleanup_credential(&(*creds)[i]);
+    }
+    free(*creds);
+    *creds = NULL;
+    return ret;
+}
+
+/* nlmills: WARNING: that damn mutex is held. fix that? */
+int PVFS_util_gen_credential(PVFS_fs_id fsid,
+                             PVFS_BMI_addr_t addr,
+                             const char *certpath,
+                             const char *keypath,
+                             PVFS_credential *cred)
+{
+    FILE *certfile, *keyfile;
+    char *certbuf, *keybuf;
+    PVFS_sysresp_getcred sysresp;
+    int ret;
+
+    if (!certpath)
+    {
+        certpath = getenv("PVFS2CERT_FILE");
+        if (!certpath)
+        {
+            certpath = PVFS2_DEFAULT_CERT_FILE;
+        }
+    }
+
+    if (!keypath)
+    {
+        keypath = getenv("PVFS2KEY_FILE");
+        if (!keypath)
+        {
+            keypath = PVFS2_DEFAULT_KEY_FILE;
+        }
+    }
+
+    certfile = fopen(certpath, "rb");
+    if (!certfile)
+    {
+        /* nlmills: TODO: error handling */
+        return -PVFS_ERROR_CODE(errno);
+    }
+
+    keyfile = fopen(keypath, "rb");
+    if (!keyfile)
+    {
+        /* nlmills: TODO: error handling */
+        ret = -PVFS_ERROR_CODE(errno);
+        fclose(certfile);
+        return ret;
+    }
+
+    certbuf = calloc(PVFS_REQ_LIMIT_CERTIFICATE+1, 1);
+    if (!certbuf)
+    {
+        /* nlmills: TODO: error handling */
+        fclose(keyfile);
+        fclose(certfile);
+        return -PVFS_ENOMEM;
+    }
+
+    /* nlmills: TODO: figure out a max size for this buffer */
+    keybuf = calloc(4096, 1);
+    if (!keybuf)
+    {
+        /* nlmills: TODO: error handling */
+        free(certbuf);
+        fclose(keyfile);
+        fclose(certfile);
+        return -PVFS_ENOMEM;
+    }
+
+    fread(certbuf, 1, PVFS_REQ_LIMIT_CERTIFICATE, certfile);
+    if (ferror(certfile))
+    {
+        /* nlmills: TODO: error handling */
+        ret = -PVFS_ERROR_CODE(errno);
+        free(keybuf);
+        free(certbuf);
+        fclose(keyfile);
+        fclose(certfile);
+        return ret;
+    }
+
+    /* nlmills: TODO: replace static size */
+    fread(keybuf, 1, 4096, keyfile);
+    if (ferror(keyfile))
+    {
+        /* nlmills: TODO: error handling */
+        ret = -PVFS_ERROR_CODE(errno);
+        free(keybuf);
+        free(certbuf);
+        fclose(keyfile);
+        fclose(certfile);
+        return ret;
+    }
+
+    ret = PVFS_sys_getcred(fsid, certbuf, keybuf, addr, &sysresp);
+    if (ret >= 0)
+    {
+        *cred = sysresp.credential;
+    }
+
+    free(keybuf);
+    free(certbuf);
+    fclose(keyfile);
+    fclose(certfile);
+
+    /* nlmills: TODO: add last-ditch error handling */
+
+    return ret;
+}
+
+PVFS_credential *PVFS_util_find_credential_by_fsid(PVFS_fs_id fsid,
+                                                   PVFS_credential *creds,
+                                                   int ncreds)
+{
+    int i;
+
+    for (i = 0; i < ncreds; i++)
+    {
+        if (creds[i].fsid == fsid)
+        {
+            return &creds[i];
+        }
+    }
+
+    return NULL;
 }
 
 int PVFS_util_get_umask(void)
@@ -970,6 +1195,7 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
 
     /* Search for mntent by fsid */
     gen_mutex_lock(&s_stat_tab_mutex);
+
     for(i = 0; i < s_stat_tab_count; i++)
     {
         int j;
@@ -986,7 +1212,25 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
             }
         }
     }
+
+    /* check the dynamic region if we haven't found a match yet */
+    for (i = 0; i < s_stat_tab_array[
+             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+    {
+        struct PVFS_sys_mntent *mnt_iter;
+        mnt_iter = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
+                     mntent_array[i]);
+
+        if (mnt_iter->fs_id == fs_id)
+        {
+            PVFS_util_copy_mntent(out_mntent, mnt_iter);
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return 0;
+        }
+    }
+
     gen_mutex_unlock(&s_stat_tab_mutex);
+
     return -PVFS_EINVAL;
 }
 
@@ -1007,6 +1251,12 @@ int PVFS_util_resolve(
     char* tmp_path = NULL;
     char* parent_path = NULL;
     int base_len = 0;
+
+    if(strlen(local_path) > (PVFS_NAME_MAX-1))
+    {
+        gossip_err("Error: PVFS_util_resolve() input path too long.\n");
+        return(-PVFS_ENAMETOOLONG);
+    }
 
     /* the most common case first; just try to resolve the path that we
      * were given
@@ -1393,6 +1643,15 @@ int PVFS_util_copy_mntent(
             }
         }
 
+        /* nlmills: TODO: this copy will leak memory. fix that */
+        dest_mntent->the_pvfs_config_server = 
+            strdup(src_mntent->the_pvfs_config_server);
+        if (!dest_mntent->the_pvfs_config_server)
+        {
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
+        }
+
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
         if (!dest_mntent->pvfs_fs_name)
         {
@@ -1609,6 +1868,12 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    /* we need the distribution in order to calculate block size */
+    if (sys_attrmask & PVFS_ATTR_SYS_BLKSIZE)
+    {
+        attrmask |= PVFS_ATTR_META_DIST;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
     {
         attrmask |= PVFS_ATTR_CAPABILITY;
@@ -1689,6 +1954,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     }
+    if (obj_mask & PVFS_ATTR_META_DIST)
+    {
+        sys_mask |= PVFS_ATTR_SYS_BLKSIZE;
+    }
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
@@ -1697,6 +1966,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     {
         sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
     }
+
+    /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
+     * outside of the system interface
+     */
     return sys_mask;
 }
 
@@ -1958,6 +2231,7 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
 
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

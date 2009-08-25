@@ -262,14 +262,14 @@ int PINT_tcache_set_info(
 }
 
 /**
- * Adds an entry to the tcache. The caller must not retain a pointer
- * to the payload; it could be destroyed at any time. The default
- * timeout value is used.
+ * Adds an entry to the tcache.  Caller must not retain a pointer to the 
+ * payload; it could be destroyed at any time. The default timeout value
+ * is used.
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_tcache_insert_entry(
     struct PINT_tcache* tcache, /**< pointer to tcache instance */
-    void* key,                  /**< uniquely identifies the payload */
+    void* key,                  /**< that uniquely identifies the payload */
     void* payload,              /**< data to store in the cache */
     int* purged)                /**< number of entries purged to make room */
 {
@@ -277,9 +277,9 @@ int PINT_tcache_insert_entry(
 }
 
 /**
- * Adds an entry to the tcache with the given expiration date.  
- * The caller must not retain a pointer to the payload; it could 
- * be destroyed at any time.
+ * Adds an entry to the tcache with the given expiration date. The caller
+ * must not retain a pointer to the payload; it could be destroyed
+ * upon subsequent calls to PINT_tcache_*.
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_tcache_insert_entry_ex(
@@ -288,6 +288,7 @@ int PINT_tcache_insert_entry_ex(
     void* payload,              /**< data to store in the cache */
     struct timeval* expiration, /**< when the entry will expire */
     int* purged)                /**< number of entries purged to make room */
+
 {
     struct PINT_tcache_entry* tmp_entry = NULL;
     int tmp_status = 0;
@@ -351,7 +352,7 @@ int PINT_tcache_insert_entry_ex(
     tmp_entry->payload = payload;
 
     /* set expiration date */
-    if(expiration)
+    if (expiration)
     {
         memcpy(&tmp_entry->expiration_date, expiration,
                sizeof(struct timeval));

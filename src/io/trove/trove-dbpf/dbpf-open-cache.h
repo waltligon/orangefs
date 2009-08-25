@@ -12,16 +12,19 @@
 #include "trove.h"
 #include "trove-internal.h"
 
-struct open_cache_ref
-{
-    int fd;
-    void* internal; /* pointer to underlying data structure */
-};
-
 enum open_cache_open_type
 {
     DBPF_FD_BUFFERED_READ = 1,
-    DBPF_FD_BUFFERED_WRITE
+    DBPF_FD_BUFFERED_WRITE,
+    DBPF_FD_DIRECT_READ,
+    DBPF_FD_DIRECT_WRITE
+};
+
+struct open_cache_ref
+{
+    int fd;
+    enum open_cache_open_type type;
+    void* internal; /* pointer to underlying data structure */
 };
 
 void dbpf_open_cache_initialize(void);

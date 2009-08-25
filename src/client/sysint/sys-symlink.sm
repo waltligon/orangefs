@@ -180,6 +180,7 @@ PVFS_error PVFS_isys_symlink(
     const PVFS_credential *credential,
     PVFS_sysresp_symlink *resp,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -230,6 +231,7 @@ PVFS_error PVFS_isys_symlink(
     sm_p->u.sym.stored_error_code = 0;
     sm_p->u.sym.retry_count = 0;
     sm_p->object_ref = parent_ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %llu "
@@ -248,7 +250,8 @@ PVFS_error PVFS_sys_symlink(
     char *target,
     PVFS_sys_attr attr,
     const PVFS_credential *credential,
-    PVFS_sysresp_symlink *resp)
+    PVFS_sysresp_symlink *resp,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -256,7 +259,7 @@ PVFS_error PVFS_sys_symlink(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_symlink entered\n");
 
     ret = PVFS_isys_symlink(entry_name, parent_ref, target, attr,
-                            credential, resp, &op_id, NULL);
+                            credential, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_symlink call", ret);
@@ -303,7 +306,7 @@ static PINT_sm_action symlink_init(
         PVFS_ATTR_COMMON_ALL | PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_DIRECTORY,
         0);
-        
+
     return ret;
 }
 
@@ -316,7 +319,7 @@ static int symlink_create_comp_fn(void *v_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_CREATE);
+    assert(resp_p->op == PVFS_SERV_BATCH_CREATE);
 
     if (resp_p->status != 0)
     {
@@ -324,7 +327,16 @@ static int symlink_create_comp_fn(void *v_p,
     }
 
     /* otherwise, just store the newly symlink'd meta handle */
-    sm_p->u.sym.symlink_handle = resp_p->u.create.handle;
+
+    if(resp_p->u.batch_create.handle_count != 1)
+    {
+        gossip_err("We requested one metafile handle for the symlink, "
+                   "but we got %d.\n",
+                   resp_p->u.batch_create.handle_count);
+        return -PVFS_EINVAL;
+    }
+
+    sm_p->u.sym.symlink_handle = resp_p->u.batch_create.handle_array[0];
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got newly created symlink "
                  "handle %llu\n", llu(sm_p->u.sym.symlink_handle));
@@ -336,7 +348,7 @@ static int symlink_setattr_comp_fn(void *v_p,
                                   int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr attr;
     PVFS_object_ref tmp_ref;
 
@@ -401,13 +413,14 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_SERVREQ_CREATE_FILL(
+    PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
-        *sm_p->newcred_p,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
-        meta_handle_extent_array);
+        1,
+        meta_handle_extent_array,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
@@ -465,7 +478,8 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
+        sm_p->object_ref.fs_id,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
@@ -543,7 +557,8 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
         sm_p->u.sym.sys_attr,
-        PVFS_ATTR_SYMLNK_ALL);
+        PVFS_ATTR_SYMLNK_ALL,
+        sm_p->hints);
 
     /* fill in symlink specific attributes */
     msg_p->req.u.setattr.attr.u.sym.target_path =
@@ -586,9 +601,9 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    const PVFS_capability *capability;
+    PVFS_capability capability;
 
-    capability = PINT_null_capability();
+    PINT_null_capability(&capability);
 
     js_p->error_code = 0;
 
@@ -597,9 +612,10 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *capability,
+        capability,
         sm_p->object_ref.fs_id,
-        sm_p->u.sym.symlink_handle);
+        sm_p->u.sym.symlink_handle,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.sym.symlink_handle;
@@ -646,8 +662,8 @@ static PINT_sm_action symlink_cleanup(
         sm_p->u.sym.sym_resp->ref = symlink_ref;
 
         /* insert newly created symlink into the ncache */
-        PINT_ncache_update((const char*) sm_p->u.sym.link_name, 
-                           (const PVFS_object_ref*) &symlink_ref, 
+        PINT_ncache_update((const char*) sm_p->u.sym.link_name,
+                           (const PVFS_object_ref*) &symlink_ref,
                            (const PVFS_object_ref*) &(sm_p->object_ref));
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&

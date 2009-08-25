@@ -81,10 +81,8 @@ static void encourage_recv_incoming(struct buf_head *bh, msg_type_t type,
 static void encourage_rts_done_waiting_buffer(struct ib_work *sq);
 static int send_cts(struct ib_work *rq);
 static void ib_close_connection(ib_connection_t *c);
-#ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
                                  struct bmi_method_addr *remote_map);
-#endif
 static int ib_tcp_server_check_new_connections(void);
 static int ib_block_for_activity(int timeout_ms);
 
@@ -792,13 +790,13 @@ ensure_connected(struct bmi_method_addr *remote_map)
     int ret = 0;
     ib_method_addr_t *ibmap = remote_map->method_data;
 
-    if (!ibmap->c)
-#ifdef __PVFS2_SERVER__
-	/* cannot actively connect */
-	ret = 1;
-#else
+    if (!ibmap->c && ibmap->reconnect_flag)
 	ret = ib_tcp_client_connect(ibmap, remote_map);
-#endif
+    else if(!ibmap->c && !ibmap->reconnect_flag)
+	ret = 1; /* cannot actively connect */
+    else
+        ret = 0;
+
     return ret;
 }
 
@@ -1542,7 +1540,8 @@ BMI_ib_rev_lookup(struct bmi_method_addr *meth)
  * Build and fill an IB-specific method_addr structure.
  */
 static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
-                                                char *hostname, int port)
+                                                char *hostname, int port, 
+                                                int reconnect_flag)
 {
     struct bmi_method_addr *map;
     ib_method_addr_t *ibmap;
@@ -1552,6 +1551,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     ibmap->c = c;
     ibmap->hostname = hostname;
     ibmap->port = port;
+    ibmap->reconnect_flag = reconnect_flag;
 
     return map;
 }
@@ -1614,7 +1614,11 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	free(hostname);  /* found it */
     else
     {
-	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
+        /* set reconnect flag on this addr; we will be acting as a client
+         * for this connection and will be responsible for making sure that
+         * the connection is established
+         */
+	map = ib_alloc_method_addr(0, hostname, port, 1);  /* alloc new one */
 	/* but don't call bmi_method_addr_reg_callback! */
     }
 
@@ -1710,7 +1714,6 @@ static void ib_close_connection(ib_connection_t *c)
     free(c);
 }
 
-#ifndef __PVFS2_SERVER__
 /*
  * Blocking connect initiated by a post_sendunexpected{,_list}, or
  * post_recv*
@@ -1758,7 +1761,6 @@ static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
     }
     return 0;
 }
-#endif
 
 /*
  * On a server, initialize a socket for listening for new connections.
@@ -1828,7 +1830,11 @@ static int ib_tcp_server_check_new_connections(void)
 	    goto out_unlock;
 	}
 
-	c->remote_map = ib_alloc_method_addr(c, hostname, port);
+        /* don't set reconnect flag on this addr; we are a server in this
+         * case and the peer will be responsible for maintaining the
+         * connection
+         */
+	c->remote_map = ib_alloc_method_addr(c, hostname, port, 0);
 	/* register this address with the method control layer */
 	c->bmi_addr = bmi_method_addr_reg_callback(c->remote_map);
 	if (c->bmi_addr == 0)

@@ -428,7 +428,7 @@ static int gossip_debug_syslog(
         return -errno;
     }
 
-    syslog(internal_syslog_priority, buffer);
+    syslog(internal_syslog_priority, "%s", buffer);
 
     return 0;
 }
@@ -509,7 +509,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
         return -errno;
     }
 
-    ret = fprintf(fp, buffer);
+    ret = fprintf(fp, "%s", buffer);
     if (ret < 0)
     {
         return -errno;

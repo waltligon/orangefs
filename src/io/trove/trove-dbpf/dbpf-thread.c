@@ -18,6 +18,8 @@
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-sync.h"
+#include "pint-context.h"
+#include "pint-mgmt.h"
 
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
@@ -30,6 +32,8 @@ static int dbpf_thread_running = 0;
 pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 #endif
+
+extern int TROVE_max_concurrent_io;
 
 int dbpf_thread_initialize(void)
 {
@@ -54,6 +58,7 @@ int dbpf_thread_initialize(void)
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
     }
+
 #endif
     return ret;
 }
@@ -83,6 +88,7 @@ void *dbpf_thread_function(void *ptr)
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
 
+    PINT_event_thread_start("TROVE-DBPF");
     while(dbpf_thread_running)
     {
         /* check if we any have ops to service in our work queue */
@@ -137,6 +143,7 @@ void *dbpf_thread_function(void *ptr)
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
+    PINT_event_thread_stop();
 #endif
     return ptr;
 }

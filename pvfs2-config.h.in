@@ -43,6 +43,9 @@
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
+/* Define if cred.h contains current_fsuid */
+#undef HAVE_CURRENT_FSUID
+
 /* Define if DB error callback function takes dbenv parameter */
 #undef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
 
@@ -57,6 +60,12 @@
 
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
+
+/* Define if kernel super_operations contains drop_inode field */
+#undef HAVE_DROP_INODE
+
+/* Define if dcache.h contains d_alloc_annon */
+#undef HAVE_D_ALLOC_ANON
 
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
@@ -103,6 +112,9 @@
 
 /* Define if struct inode_operations in kernel has getattr_lite callback */
 #undef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
+/* Define if distro has getgrouplist */
+#undef HAVE_GETGROUPLIST
 
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
@@ -165,8 +177,18 @@
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
 
+/* Define if kernel has class_device_create */
+#undef HAVE_KERNEL_CLASS_DEVICE_CREATE
+
 /* Define if kernel has device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
+
+/* Define if kernel has device_create */
+#undef HAVE_KERNEL_DEVICE_CREATE
+
+/* Define if kernel kmem_cache_create constructor has newer-style
+   one-parameter form */
+#undef HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM
 
 /* Define if kernel kmem_cache_create constructor has new-style two-parameter
    form */
@@ -226,9 +248,6 @@
 /* Define if mount.h contains MNT_NODIRATIME flags */
 #undef HAVE_MNT_NODIRATIME
 
-/* Use the MPE profiling library */
-#undef HAVE_MPE
-
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
@@ -241,14 +260,8 @@
 /* Define if struct page defines a count member without leading underscore */
 #undef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
 
-/* Define to 1 if you have the <openssl/crypto.h> header file. */
-#undef HAVE_OPENSSL_CRYPTO_H
-
-/* Define to 1 if you have the <openssl/evp.h> header file. */
-#undef HAVE_OPENSSL_EVP_H
-
-/* Define if Pablo library is used */
-#undef HAVE_PABLO
+/* Define to 1 if the libssl is available */
+#undef HAVE_OPENSSL
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
@@ -261,6 +274,9 @@
 
 /* Define to 1 if you have the `PtlEventKindStr' function. */
 #undef HAVE_PTLEVENTKINDSTR
+
+/* Define if kernel super_operations contains put_inode field */
+#undef HAVE_PUT_INODE
 
 /* Define if struct file_operations in kernel has readdirplus_lite callback */
 #undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
@@ -284,6 +300,10 @@
    instead of rw_lock -- used by RT linux */
 #undef HAVE_RT_PRIV_LOCK_ADDR_SPACE_STRUCT
 
+/* Define if kernel address_space struct has a rw_lock_t member named
+   tree_lock */
+#undef HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT
+
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
 
@@ -303,8 +323,8 @@
    page_lock instead of rw_lock */
 #undef HAVE_SPIN_LOCK_PAGE_ADDR_SPACE_STRUCT
 
-/* Define if kernel address_space struct has a spin_lock member named
-   tree_lock instead of rw_lock */
+/* Define if kernel address_space struct has a spin_lock_t member named
+   tree_lock */
 #undef HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
@@ -364,8 +384,15 @@
 /* Define to 1 if you have the <sys/xattr.h> header file. */
 #undef HAVE_SYS_XATTR_H
 
+/* Define if TAU library is used */
+#undef HAVE_TAU
+
 /* Define if register_sysctl_table takes two arguments */
 #undef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
+
+/* Define if kernel's inode_operations has two parameters permission function
+   */
+#undef HAVE_TWO_PARAM_PERMISSION
 
 /* Define if DB open function takes a txnid parameter */
 #undef HAVE_TXNID_PARAMETER_TO_DB_OPEN
@@ -421,9 +448,6 @@
 /* DSA encryption */
 #undef SECURITY_ENCRYPTION_DSA
 
-/* No encryption */
-#undef SECURITY_ENCRYPTION_NONE
-
 /* RSA encryption */
 #undef SECURITY_ENCRYPTION_RSA
 
@@ -447,9 +471,6 @@
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
-
-/* Define if openssl exists */
-#undef WITH_OPENSSL
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */

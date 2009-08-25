@@ -15,6 +15,7 @@
 #include "bmi.h"
 #include "bmi-byteswap.h"
 #include "gossip.h"
+#include "pvfs2-debug.h"
 #include "pvfs2-dist-basic.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
@@ -23,11 +24,14 @@
 #include "src/io/description/pint-request.h"  /* for PINT_Request */
 #include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
 #include "pvfs2-internal.h"
+#include "pint-hint.h"
 #include "security-util.h"
 
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
+static void zero_capability(PVFS_capability*);
+static void zero_credential(PVFS_credential*);
 
 static int initializing_sizes = 0;
 
@@ -56,7 +60,8 @@ static void lebf_initialize(void)
     PINT_dist tmp_dist;
     PINT_Request tmp_req;
     char *tmp_name = strdup("foo");
-    const int init_big_size = 1024 * 1024;
+    const int init_big_size = 4 * 1024 * 1024;
+    int i;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_initialize\n");
 
@@ -80,6 +85,14 @@ static void lebf_initialize(void)
 
     initializing_sizes = 1;
 
+    /* set number of hints in request to the max */
+    for(i = 0; i < PVFS_HINT_MAX; ++i)
+    {
+        char name[PVFS_HINT_MAX_NAME_LENGTH] = {0};
+        char val[PVFS_HINT_MAX_LENGTH] = {0};
+        PVFS_hint_add(&req.hints, name, PVFS_HINT_MAX_LENGTH, val);
+    }
+
     for (op_type=0; op_type<PVFS_SERV_NUM_OPS; op_type++) {
 	req.op = resp.op = op_type;
 	reqsize = 0;
@@ -88,6 +101,7 @@ static void lebf_initialize(void)
 	switch (op_type) {
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 		/* never used, skip initialization */
 		continue;
@@ -100,19 +114,28 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_lookup_path;
 		respsize = extra_size_PVFS_servresp_lookup_path;
 		break;
-	    case PVFS_SERV_CREATE:
-		req.u.create.credential.num_groups = 0;
-                req.u.create.credential.issuer_id = "";
-                req.u.create.credential.sig_size = 0;
-                /* can request a range of handles */
-		req.u.create.handle_extent_array.extent_count = 0;
-                resp.u.create.capability.sig_size = 0;
-                resp.u.create.capability.num_handles = 0;
+	    case PVFS_SERV_BATCH_CREATE:
+		/* can request a range of handles */
+		req.u.batch_create.handle_extent_array.extent_count = 0;
+		req.u.batch_create.object_count = 0;
+		resp.u.batch_create.handle_count = 0;
+		reqsize = extra_size_PVFS_servreq_batch_create;
+		respsize = extra_size_PVFS_servresp_batch_create;
+		break;
+            case PVFS_SERV_CREATE:
+                zero_credential(&req.u.create.credential);
+                zero_capability(&resp.u.create.capability);
+		/* can request a range of handles */
 		reqsize = extra_size_PVFS_servreq_create;
                 respsize = extra_size_PVFS_servresp_create;
 		break;
 	    case PVFS_SERV_REMOVE:
 		/* nothing special, let normal encoding work */
+		break;
+	    case PVFS_SERV_BATCH_REMOVE:
+		req.u.batch_remove.handles = NULL;
+		req.u.batch_remove.handle_count = 0;
+		reqsize = extra_size_PVFS_servreq_batch_remove;
 		break;
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 		/* nothing special, let normal encoding work */
@@ -132,10 +155,14 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_small_io;
                 respsize = extra_size_PVFS_servresp_small_io;
                 break;
+            case PVFS_SERV_UNSTUFF:
+                zero_credential(&req.u.unstuff.credential);
+                resp.u.unstuff.attr.mask = 0;
+                reqsize = extra_size_PVFS_servreq_unstuff;
+                respsize = extra_size_PVFS_servresp_unstuff;
+                break;
 	    case PVFS_SERV_GETATTR:
-                req.u.getattr.credential.num_groups = 0;
-                req.u.getattr.credential.issuer_id = "";
-                req.u.getattr.credential.sig_size = 0;
+                zero_credential(&req.u.getattr.credential);
                 /* clearing the mask ensures the rest is not encoded */
 		resp.u.getattr.attr.mask = 0;
 		reqsize = extra_size_PVFS_servreq_getattr;
@@ -143,9 +170,7 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_SETATTR:
 		req.u.setattr.attr.mask = 0;
-                req.u.setattr.credential.num_groups = 0;
-                req.u.setattr.credential.issuer_id = "";
-                req.u.setattr.credential.sig_size = 0;
+                zero_credential(&req.u.setattr.credential);
 		reqsize = extra_size_PVFS_servreq_setattr;
 		break;
 	    case PVFS_SERV_CRDIRENT:
@@ -164,13 +189,10 @@ static void lebf_initialize(void)
 		/* nothing special */
 		break;
 	    case PVFS_SERV_MKDIR:
-                req.u.mkdir.credential.num_groups = 0;
-                req.u.mkdir.credential.issuer_id = "";
-                req.u.mkdir.credential.sig_size = 0;
+                zero_credential(&req.u.mkdir.credential);
 		req.u.mkdir.handle_extent_array.extent_count = 0;
 		req.u.mkdir.attr.mask = 0;
-                resp.u.mkdir.capability.num_handles = 0;
-                resp.u.mkdir.capability.sig_size = 0;
+                zero_capability(&resp.u.mkdir.capability);
 		reqsize = extra_size_PVFS_servreq_mkdir;
                 respsize = extra_size_PVFS_servresp_mkdir;
 		break;
@@ -248,9 +270,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_GETCRED:
                 req.u.getcred.certificate = "";
                 req.u.getcred.sig_size = 0;
-                resp.u.getcred.credential.num_groups = 0;
-                resp.u.getcred.credential.issuer_id = "";
-                resp.u.getcred.credential.sig_size = 0;
+                zero_credential(&resp.u.getcred.credential);
                 reqsize = extra_size_PVFS_servreq_getcred;
                 respsize = extra_size_PVFS_servresp_getcred;
                 break;
@@ -263,8 +283,7 @@ static void lebf_initialize(void)
 	max_size_array[op_type].req = max_size_array[op_type].resp = init_big_size;
 
 	/* account for extra structures in every request */
-        req.capability.num_handles = 0;
-        req.capability.sig_size = 0;
+        zero_capability(&req.capability);
         reqsize += extra_size_PVFS_servreq;
 
         if (noreq)
@@ -285,6 +304,7 @@ static void lebf_initialize(void)
     }
 
     /* clean up stuff just used for initialization */
+    PVFS_hint_free(req.hints);
     free(tmp_dist.dist_name);
     free(tmp_name);
     initializing_sizes = 0;
@@ -338,6 +358,8 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
            BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
     if (!buf)
     {
+        gossip_err("Error: failed to BMI_malloc memory for response.\n");
+        gossip_err("Error: is BMI address %llu still valid?\n", llu(target_msg->dest));
 	ret = -PVFS_ENOMEM;
 	goto out;
     }
@@ -386,6 +408,9 @@ static int lebf_encode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -423,6 +448,7 @@ static int lebf_encode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
@@ -488,6 +514,8 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+        CASE(PVFS_SERV_BATCH_CREATE, batch_create);
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
@@ -496,7 +524,6 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MKDIR, mkdir);
         CASE(PVFS_SERV_READDIR, readdir);
         CASE(PVFS_SERV_STATFS, statfs);
-        CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
         CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
         CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
         CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
@@ -518,12 +545,15 @@ static int lebf_encode_resp(
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_MGMT_SETPARAM:
             /* nothing else */
             break;
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
@@ -584,6 +614,9 @@ static int lebf_decode_req(
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
+        CASE(PVFS_SERV_BATCH_REMOVE, batch_remove);
 	CASE(PVFS_SERV_REMOVE, remove);
 	CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, mgmt_remove_object);
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
@@ -620,6 +653,7 @@ static int lebf_decode_req(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -676,6 +710,8 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
+        CASE(PVFS_SERV_UNSTUFF, unstuff);
+	CASE(PVFS_SERV_BATCH_CREATE, batch_create);
 	CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
@@ -684,7 +720,6 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_STATFS, statfs);
-	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
 	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
@@ -697,6 +732,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_GETCRED, getcred);
 
         case PVFS_SERV_REMOVE:
+        case PVFS_SERV_BATCH_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_SETATTR:
@@ -707,11 +743,13 @@ static int lebf_decode_resp(
         case PVFS_SERV_FLUSH:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_MGMT_SETPARAM:
 	    /* nothing else */
 	    break;
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
@@ -772,9 +810,15 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         switch (req->op) {
 
 	    case PVFS_SERV_CREATE:
-		decode_free(req->u.create.handle_extent_array.extent_array);
                 decode_free(req->u.create.credential.group_array);
                 decode_free(req->u.create.credential.signature);
+                if (req->u.create.attr.mask & PVFS_ATTR_META_DIST)
+                    decode_free(req->u.create.attr.u.meta.dist);
+                if (req->u.create.layout.server_list.servers)
+                    decode_free(req->u.create.layout.server_list.servers);
+                break;
+            case PVFS_SERV_BATCH_CREATE:
+                decode_free(req->u.batch_create.handle_extent_array.extent_array);
 		break;
 
 	    case PVFS_SERV_IO:
@@ -816,6 +860,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_LISTATTR:
                 if (req->u.listattr.handles)
                     decode_free(req->u.listattr.handles);
+                break;
 
             case PVFS_SERV_GETATTR:
                 decode_free(req->u.getattr.credential.group_array);
@@ -825,6 +870,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_GETCRED:
                 decode_free(req->u.getcred.signature);
                 break;
+
+            case PVFS_SERV_UNSTUFF:
+                decode_free(req->u.unstuff.credential.group_array);
+                decode_free(req->u.unstuff.credential.signature);
+                break;
+
 
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_LOOKUP_PATH:
@@ -848,11 +899,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
+            case PVFS_SERV_BATCH_REMOVE:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
+	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
@@ -867,11 +920,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         {
             switch (resp->op)
             {
-                case PVFS_SERV_LOOKUP_PATH:
-                    {
-                        break;
-                    }
-
                 case PVFS_SERV_READDIR:
                     decode_free(resp->u.readdir.dirent_array);
                     break;
@@ -882,6 +930,16 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
                 case PVFS_SERV_MGMT_ITERATE_HANDLES:
                     decode_free(resp->u.mgmt_iterate_handles.handle_array);
+                    break;
+                
+                case PVFS_SERV_BATCH_CREATE:
+                    decode_free(resp->u.batch_create.handle_array);
+                    break;
+                
+                case PVFS_SERV_CREATE:
+                    decode_free(resp->u.create.capability.signature);
+                    decode_free(resp->u.create.capability.handle_array);
+                    decode_free(resp->u.create.datafile_handles);
                     break;
 
                 case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
@@ -897,6 +955,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.capability.handle_array);
                         decode_free(resp->u.getattr.attr.capability.signature);
                     }
+                    break;
+
+                case PVFS_SERV_UNSTUFF:
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DIST)
+                        decode_free(resp->u.unstuff.attr.u.meta.dist);
+                    if (resp->u.unstuff.attr.mask & PVFS_ATTR_META_DFILES)
+                        decode_free(resp->u.unstuff.attr.u.meta.dfile_array);
                     break;
 
                 case PVFS_SERV_MGMT_EVENT_MON:
@@ -932,11 +997,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         }
                         break;
                     }
-                case PVFS_SERV_CREATE:
-                    decode_free(resp->u.create.capability.handle_array);
-                    decode_free(resp->u.create.capability.signature);
-                    break;
-                case PVFS_SERV_GETCRED:
+               case PVFS_SERV_GETCRED:
                     decode_free(resp->u.getcred.credential.group_array);
                     decode_free(resp->u.getcred.credential.signature);
                     break;
@@ -961,11 +1022,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_STATFS:
                 case PVFS_SERV_WRITE_COMPLETION:
                 case PVFS_SERV_PROTO_ERROR:
+                case PVFS_SERV_BATCH_REMOVE:
+                case PVFS_SERV_LOOKUP_PATH:
                     /* nothing to free */
                     break;
 
                 case PVFS_SERV_INVALID:
                 case PVFS_SERV_PERF_UPDATE:
+                case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
                 case PVFS_SERV_NUM_OPS:  /* sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",
@@ -998,6 +1062,20 @@ static int check_resp_size(struct PVFS_server_resp *resp)
     size = msg.total_size;
     lebf_encode_rel(&msg, 0);
     return size;
+}
+
+static void zero_capability(PVFS_capability *cap)
+{
+    cap->issuer = "";
+    cap->sig_size = 0;
+    cap->num_handles = 0;
+}
+
+static void zero_credential(PVFS_credential *cred)
+{
+    cred->issuer = "";
+    cred->num_groups = 0;
+    cred->sig_size = 0;
 }
 
 static PINT_encoding_functions lebf_functions = {

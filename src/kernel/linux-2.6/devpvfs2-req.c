@@ -1034,10 +1034,18 @@ int pvfs2_dev_init(void)
         ret = PTR_ERR(pvfs2_dev_class);
         return ret;
     }
+#if defined (HAVE_KERNEL_CLASS_DEVICE_CREATE)
     class_device_create(pvfs2_dev_class, NULL,
                         MKDEV(pvfs2_dev_major, 0), NULL,
-                        PVFS2_REQDEVICE_NAME);
+                        "%s", PVFS2_REQDEVICE_NAME);
+#elif defined (HAVE_KERNEL_DEVICE_CREATE)
+    device_create(pvfs2_dev_class, NULL,
+                  MKDEV(pvfs2_dev_major, 0), NULL,
+                  "%s", PVFS2_REQDEVICE_NAME);
+#else
+    #error "Your kernel does not fully implement device classes"
 #endif
+#endif /* HAVE_KERNEL_DEVICE_CLASSES */
 
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
@@ -1049,7 +1057,11 @@ int pvfs2_dev_init(void)
 void pvfs2_dev_cleanup(void)
 {
 #ifdef HAVE_KERNEL_DEVICE_CLASSES
+#if defined (HAVE_KERNEL_CLASS_DEVICE_CREATE)
     class_device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
+#elif defined (HAVE_KERNEL_DEVICE_CREATE)
+    device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
+#endif
     class_destroy(pvfs2_dev_class);
 #endif
     unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
@@ -1091,6 +1103,7 @@ struct file_operations pvfs2_devreq_file_operations =
     ioctl : pvfs2_devreq_ioctl,
     poll : pvfs2_devreq_poll
 #else
+    .owner = THIS_MODULE,
     .read = pvfs2_devreq_read,
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,

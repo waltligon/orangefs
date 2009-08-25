@@ -295,7 +295,7 @@ static int print_dspace(TROVE_coll_id coll_id,
 			       0 /* flags */,
 			       NULL /* user ptr */,
                                trove_context,
-			       &op_id);
+			       &op_id, NULL);
     while (ret == 0) {
 	ret = trove_dspace_test(
             coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
@@ -307,7 +307,7 @@ static int print_dspace(TROVE_coll_id coll_id,
 	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld)\n",
 	    llu(handle),
 	    type_to_string(ds_attr.type),
-	    lld(ds_attr.b_size));
+	    lld(ds_attr.u.datafile.b_size));
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,
@@ -374,7 +374,7 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 				   NULL /* vtag */,
 				   NULL /* user ptr */,
                                    trove_context,
-				   &op_id);
+				   &op_id, NULL);
 
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,

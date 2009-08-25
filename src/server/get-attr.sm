@@ -12,7 +12,7 @@
  * This state machine handles incoming server getattr operations.  These
  * are the operations sent by PVFS_sys_getattr() among others.
  *
- * The pvfs2_prelude_sm is responsible for reading the actual metadata
+ * The pvfs2_prelude_sm is respsonsible for reading the actual metadata
  * to begin with, because it does this as part of the permission checking
  * process.
  */
@@ -28,6 +28,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "pint-cached-config.h"
 #include "pint-security.h"
 #include "security-util.h"
 #include "check.h"
@@ -42,11 +43,12 @@ PINT_server_trove_keys_s Trove_Special_Keys[] =
 
 enum
 {
-    STATE_METAFILE = 7,
-    STATE_SYMLINK  = 9,
-    STATE_DIR      = 10,
-    STATE_DIR_HINT = 11,
-    STATE_DONE     = 12
+    STATE_METAFILE   = 7,
+    STATE_SYMLINK    = 9,
+    STATE_DIR        = 10,
+    STATE_DIR_HINT   = 11,
+    STATE_DONE       = 12,
+    STATE_CAPABILITY = 13
 };
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
@@ -61,13 +63,13 @@ nested machine pvfs2_get_attr_work_sm
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
         STATE_DIR => get_dirdata_handle;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
 
     state read_symlink_target
     {
         run getattr_read_symlink_target;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
 
     state read_metafile_hint
@@ -80,40 +82,60 @@ nested machine pvfs2_get_attr_work_sm
     {
         run getattr_interpret_metafile_hint;
         STATE_METAFILE => read_metafile_datafile_handles_if_required;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
 
     state read_metafile_datafile_handles_if_required
     {
         run getattr_read_metafile_datafile_handles_if_required;
         success => datafile_handles_safety_check;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
 
     state datafile_handles_safety_check
     {
         run getattr_datafile_handles_safety_check;
         success => read_metafile_distribution_if_required; 
-        default => setup_acl;
+        default => check_if_capability_required;
     }
-
+ 
     state read_metafile_distribution_if_required
     {
         run getattr_read_metafile_distribution_if_required;
-        default => distribution_safety_check;
+        default => interpret_metafile_distribution;
     }
 
-    state distribution_safety_check
+    state interpret_metafile_distribution
     {
-        run getattr_distribution_safety_check;
-        default => setup_acl;
+        run interpret_metafile_distribution;
+        success => detect_stuffed;
+        default => check_if_capability_required;
+    }
+
+    state detect_stuffed
+    {
+        run getattr_detect_stuffed;
+        default => read_stuffed_size;
+    }
+
+    state read_stuffed_size
+    {
+        run getattr_read_stuffed_size;
+        success => interpret_stuffed_size;
+        default => check_if_capability_required;
+    }
+
+    state interpret_stuffed_size
+    {
+        run getattr_interpret_stuffed_size;
+        default => check_if_capability_required;
     }
 
     state get_dirdata_handle
     {
         run getattr_get_dirdata_handle;
         success => get_dirent_count;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
 
     state get_dirent_count
@@ -132,19 +154,32 @@ nested machine pvfs2_get_attr_work_sm
     state get_dir_hint
     {
         run getattr_get_dir_hint;
-        STATE_DONE => setup_resp;
+        STATE_DONE => check_if_capability_required;
         default => interpret_dir_hint;
     }
 
     state interpret_dir_hint
     {
         run getattr_interpret_dir_hint;
-        default => setup_acl;
+        default => check_if_capability_required;
     }
-    
-    state setup_acl
+
+    state check_if_capability_required
     {
-        run getattr_setup_acl;
+        run getattr_check_if_capability_required;
+        STATE_CAPABILITY => read_acl;
+        default => setup_resp;
+    }
+
+    state read_acl
+    {
+        run getattr_read_acl;
+        default => create_capability;
+    }
+
+    state create_capability
+    {
+        run getattr_create_capability;
         default => setup_resp;
     }
 
@@ -167,7 +202,8 @@ machine pvfs2_get_attr_sm
     state setup_op
     {
         run getattr_setup_op;
-        default => do_work;
+        success => do_work;
+        default => final_response;
     }
 
     state do_work
@@ -190,60 +226,6 @@ machine pvfs2_get_attr_sm
 }
 
 %%
-
-
-/* getattr_setup_acl
- *
- * Grabs the ACL from trove when the client requests a capability
- */
-PINT_sm_action getattr_setup_acl(
-    struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    job_id_t i;
-    js_p->error_code = 0;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (getattr sm) state: getattr_setup_acl\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op));
-
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-        memset(&s_op->key2, 0, sizeof(PVFS_ds_keyval));
-        memset(&s_op->val2, 0, sizeof(PVFS_ds_keyval));
-        s_op->key2.buffer = "system.posix_acl_access";
-        s_op->key2.buffer_sz = strlen(s_op->key2.buffer) + 1;
-        s_op->val2.buffer = (char *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
-        if (!s_op->val2.buffer)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-        s_op->val2.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
-    
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
-                     "for handle %llu\n", llu(s_op->target_handle));
-    
-        /* Read acl keys */
-        ret = job_trove_keyval_read(
-            s_op->target_fs_id,
-            s_op->target_handle,
-            &s_op->key2,
-            &s_op->val2,
-            0,
-            NULL,
-            smcb,
-            0,
-            js_p,
-            &i,
-            server_job_context);
-        return ret;
-    }
-    else 
-        return SM_ACTION_COMPLETE;
-}
-
 
 /* getattr_verify_attribs()
  *
@@ -324,128 +306,130 @@ static PINT_sm_action getattr_verify_attribs(
       have the original client request attr mask
       (s_op->u.getattr.attrmask).
     */
-    if (resp_attr->objtype == PVFS_TYPE_METAFILE)
+    switch(resp_attr->objtype)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "  Req handle %llu refers to a metafile\n",
-                     llu(s_op->u.getattr.handle));
-
-        if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
-        {
+        case PVFS_TYPE_METAFILE:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
             gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         " dspace has dfile_count of %d\n",
-                         resp_attr->u.meta.dfile_count);
-            resp_attr->mask |= PVFS_ATTR_META_DFILES;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " client doesn't want "
-                         "dfile info, clearing response attr mask\n");
-            resp_attr->mask &= ~PVFS_ATTR_META_DFILES;
-        }
+                         "  Req handle %llu refers to a metafile\n",
+                         llu(s_op->u.getattr.handle));
 
-        if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         " dspace has dist size of %d\n",
-                         resp_attr->u.meta.dist_size);
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " dspace has dfile_count of %d\n",
+                             resp_attr->u.meta.dfile_count);
+                resp_attr->mask |= PVFS_ATTR_META_DFILES;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG, " client doesn't want "
+                             "dfile info, clearing response attr mask\n");
+                resp_attr->mask &= ~PVFS_ATTR_META_DFILES;
+            }
 
-            resp_attr->mask |= PVFS_ATTR_META_DIST;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, " client doesn't want "
-                         "dist info, clearing response attr mask\n");
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " dspace has dist size of %d\n",
+                             resp_attr->u.meta.dist_size);
 
-            resp_attr->mask &= ~PVFS_ATTR_META_DIST;
-        }
-        js_p->error_code = STATE_METAFILE;
-    }
-    else if (resp_attr->objtype == PVFS_TYPE_DATAFILE)
-    {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
-        /*
-          note: the prelude already retrieved the size for us, so
-          there's no special action that needs to be taken if we have
-          a datafile here (other than adjusting our mask to include
-          the data information and copying the retrieved size from the
-          ds_attribute the prelude used)
-        */
-        resp_attr->u.data.size = s_op->ds_attr.b_size;
-        resp_attr->mask |= PVFS_ATTR_DATA_ALL;
+                resp_attr->mask |= PVFS_ATTR_META_DIST;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG, " client doesn't want "
+                             "dist info, clearing response attr mask\n");
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
-                     "a datafile (size = %lld).\n",
-                     llu(s_op->u.getattr.handle),
-                     lld(resp_attr->u.data.size));
-    }
-    else if (resp_attr->objtype == PVFS_TYPE_DIRECTORY)
-    {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
-        if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         " getattr: dirent_count needed.\n");
+                resp_attr->mask &= ~PVFS_ATTR_META_DIST;
+            }
+            js_p->error_code = STATE_METAFILE;
+            break;
+        case PVFS_TYPE_DATAFILE:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
+            /*
+              note: the prelude already retrieved the size for us, so
+              there's no special action that needs to be taken if we have
+              a datafile here (other than adjusting our mask to include
+              the data information and copying the retrieved size from the
+              ds_attribute the prelude used)
+            */
+            resp_attr->u.data.size = s_op->ds_attr.u.datafile.b_size;
+            resp_attr->mask |= PVFS_ATTR_DATA_ALL;
+
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+                         "a datafile (size = %lld).\n",
+                         llu(s_op->u.getattr.handle),
+                         lld(resp_attr->u.data.size));
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_count needed.\n");
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+                resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+                js_p->error_code = STATE_DIR;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_count not needed.\n");
+                js_p->error_code = 0;
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+            }
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dfile_count needed.\n");
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+                resp_attr->mask |= PVFS_ATTR_DIR_HINT;
+                js_p->error_code = STATE_DIR;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                            " getattr: dfile_count not needed\n");
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+            }
+            break;
+        case PVFS_TYPE_DIRDATA:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
+            gossip_debug(
+                GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+                "a dirdata object. doing nothing special\n",
+                llu(s_op->u.getattr.handle));
             assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-            resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-            js_p->error_code = STATE_DIR;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         " getattr: dirent_count not needed.\n");
-            js_p->error_code = 0;
-            assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-        }
-        if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                        " getattr: dfile_count needed.\n");
-            assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-            resp_attr->mask |= PVFS_ATTR_DIR_HINT;
-            js_p->error_code = STATE_DIR;
-        }
-        else
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                        " getattr: dfile_count not needed\n");
-            assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-        }
-    }
-    else if (resp_attr->objtype == PVFS_TYPE_DIRDATA)
-    {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
-    gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
-            "a dirdata object. doing nothing special\n",
-            llu(s_op->u.getattr.handle));
-        assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-    }
-    else if (resp_attr->objtype == PVFS_TYPE_SYMLINK)
-    {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
-    gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to a symlink.\n",
-            llu(s_op->u.getattr.handle));
+            break;
+        case PVFS_TYPE_SYMLINK:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
+            gossip_debug(
+                GOSSIP_GETATTR_DEBUG, "  handle %llu refers to a symlink.\n",
+                llu(s_op->u.getattr.handle));
 
-        /*
-          we'll definitely have to fetch the symlink target in this
-          case, as the prelude will never retrieve it for us
-        */
-        js_p->error_code = STATE_SYMLINK;
+            /*
+              we'll definitely have to fetch the symlink target in this
+              case, as the prelude will never retrieve it for us
+            */
+            js_p->error_code = STATE_SYMLINK;
+            break;
+        case PVFS_TYPE_INTERNAL:
+            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
+            /* nothing interesting to add; this is meaningless to a client */
+            break;
+        default:
+            /* if we don't understand the object type, then it probably indicates
+             * a bug or some data corruption.  All trove objects should have a
+             * type set.
+             */
+            gossip_err(
+                "Error: got unknown type when verifying attributes for handle %llu.\n", 
+                llu(s_op->u.getattr.handle));
+            js_p->error_code = -PVFS_ENXIO;
+            break;
     }
-    else
-    {
-        /* if we don't understand the object type, then it probably indicates
-         * a bug or some data corruption.  All trove objects should have a
-         * type set.
-         */
-        gossip_err(
-            "Error: got unknown type when verifying attributes for handle %llu.\n", 
-            llu(s_op->u.getattr.handle));
-        js_p->error_code = -PVFS_ENXIO;
-    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -475,11 +459,11 @@ static PINT_sm_action getattr_read_symlink_target(
 
     s_op->resp.u.getattr.attr.u.sym.target_path_len = PVFS_NAME_MAX;
     s_op->resp.u.getattr.attr.u.sym.target_path =
-    malloc(s_op->resp.u.getattr.attr.u.sym.target_path_len);
+	malloc(s_op->resp.u.getattr.attr.u.sym.target_path_len);
     if (!s_op->resp.u.getattr.attr.u.sym.target_path)
     {
-    js_p->error_code = -PVFS_ENOMEM;
-    return SM_ACTION_COMPLETE;
+	js_p->error_code = -PVFS_ENOMEM;
+	return SM_ACTION_COMPLETE;
     }
 
     if(s_op->free_val)
@@ -493,10 +477,11 @@ static PINT_sm_action getattr_read_symlink_target(
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &(s_op->key), &(s_op->val), 
-        0, 
+        &s_op->key, &s_op->val,
+        0,
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
+
 
     return ret;
 }
@@ -535,7 +520,7 @@ static PINT_sm_action getattr_interpret_metafile_hint(
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
     }
-    return 1;
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action getattr_read_metafile_hint(
@@ -571,19 +556,19 @@ static PINT_sm_action getattr_read_metafile_hint(
     s_op->free_val = 1;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-         "  reading metafile hint (coll_id = %d, "
+		 "  reading metafile hint (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-         s_op->u.getattr.fs_id,
-         llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
-         s_op->key.buffer_sz, s_op->val.buffer,
-         s_op->val.buffer_sz);
+		 s_op->u.getattr.fs_id,
+		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 s_op->key.buffer_sz, s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -619,7 +604,7 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     {
         gossip_err("The requested dfile count of %d is invalid; "
                    "aborting operation.\n", dfile_count);
-    gossip_err(
+	gossip_err(
             "+ attrs read from dspace: (owner = %d, group = %d, "
             "perms = %o, type = %d\n   atime = %lld, mtime = %lld, "
             "ctime = %lld |\n   dfile_count = %d | dist_size = %d)\n",
@@ -633,16 +618,16 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
             (int)s_op->resp.u.getattr.attr.u.meta.dfile_count,
             (int)s_op->resp.u.getattr.attr.u.meta.dist_size);
 
-    gossip_err("handle: %llu (%llx), fsid: %d.\n",
-        llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
-        (int)s_op->u.getattr.fs_id);
+	gossip_err("handle: %llu (%llx), fsid: %d.\n",
+	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
+	    (int)s_op->u.getattr.fs_id);
 
         /*If we hit an error the DIST & DFILES are no longer valid*/
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
         
-    js_p->error_code = -PVFS_EOVERFLOW;
-    return SM_ACTION_COMPLETE;
+	js_p->error_code = -PVFS_EOVERFLOW;
+	return SM_ACTION_COMPLETE;
     }
 
     s_op->key.buffer = Trove_Common_Keys[METAFILE_HANDLES_KEY].key;
@@ -657,8 +642,8 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     {
         gossip_err("Cannot allocate dfile array of count %d\n",
                    dfile_count);
-    js_p->error_code = -PVFS_ENOMEM;
-    return SM_ACTION_COMPLETE;
+	js_p->error_code = -PVFS_ENOMEM;
+	return SM_ACTION_COMPLETE;
     }
 
     if(s_op->free_val)
@@ -671,19 +656,19 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
     s_op->free_val = 0;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-         "  reading %d datafile handles (coll_id = %d, "
+		 "  reading %d datafile handles (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-         dfile_count, s_op->u.getattr.fs_id,
-         llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
-         s_op->key.buffer_sz, s_op->val.buffer,
-         s_op->val.buffer_sz);
+		 dfile_count, s_op->u.getattr.fs_id,
+		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 s_op->key.buffer_sz, s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &s_op->key, &s_op->val, 
-        0, 
+        &s_op->key, &s_op->val,
+        0,
         NULL, smcb, 0, js_p,
-        &i, server_job_context);
+        &i, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -738,19 +723,307 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     {
         gossip_err("Cannot allocate dist of size %d\n",
                    s_op->val.buffer_sz);
-    js_p->error_code = -PVFS_ENOMEM;
-    return SM_ACTION_COMPLETE;
+	js_p->error_code = -PVFS_ENOMEM;
+	return SM_ACTION_COMPLETE;
     }
     s_op->free_val = 1;
 
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
-        &(s_op->key), &(s_op->val), 
-        0, 
+        &(s_op->key), &(s_op->val),
+        0,
         NULL,
-        smcb, 0, js_p, &i, server_job_context);
+        smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
+}
+
+static PINT_sm_action getattr_read_stuffed_size(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t job_id;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(
+            GOSSIP_GETATTR_DEBUG, "Getattr detected non-stuffed file.\n");
+        /* this means that the keyval fields used to indicate a file is
+         * stuffed are not present.  Set mask accordingly and continue.
+         */
+        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_UNSTUFFED;
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+    if(js_p->error_code)
+    {
+        /* any other error code here is just a normal error case */
+        /* preserve error code and catch next error transition */
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(
+        GOSSIP_GETATTR_DEBUG, "Getattr detected stuffed file.\n");
+    /* otherwise, we found keyval fields indicating that the file is
+     * stuffed.  It does not matter if the client asked for the size or not;
+     * we must retrieve a valid stuffed_size value for the attrs.
+     */
+    s_op->resp.u.getattr.attr.mask &= (~(PVFS_ATTR_META_UNSTUFFED));
+
+    return(job_trove_dspace_getattr(
+        s_op->u.getattr.fs_id,
+        s_op->resp.u.getattr.attr.u.meta.dfile_array[0],
+        smcb,
+        &s_op->ds_attr,
+        0,
+        js_p,
+        &job_id,
+        server_job_context,
+        s_op->req->hints));
+}
+
+static PINT_sm_action getattr_interpret_stuffed_size(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if(js_p->error_code == 0)
+    {
+        s_op->resp.u.getattr.attr.u.meta.stuffed_size = s_op->ds_attr.u.datafile.b_size;
+    }
+
+    /* deliberately leave error_code unchanged so that any errors get 
+     * handled in the next state
+     */
+    return SM_ACTION_COMPLETE;
+}
+
+
+/* interpret_metafile_distribution()
+ *
+ * capture and encode results of reading distribution
+ */
+static PINT_sm_action interpret_metafile_distribution(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    
+    if(js_p->error_code < 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    if(s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+    {
+        /* successfully read dist key; make sure we got something valid */
+        if(s_op->val.read_sz != s_op->val.buffer_sz)
+        {
+            gossip_err("Error: %s key found val size: %d when expecting val size: %d\n",
+                Trove_Common_Keys[METAFILE_DIST_KEY].key,
+                s_op->val.read_sz,
+                s_op->val.buffer_sz);
+
+            /* clear bitmask to prevent double free between setup_resp and
+             * PINT_free_object_attr()
+             */
+            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
+
+            js_p->error_code = -PVFS_EIO;
+            return SM_ACTION_COMPLETE;
+        }
+
+        assert(s_op->val.buffer);
+        PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
+
+        if(resp_attr->u.meta.dist == 0) {
+            gossip_err("Found dist of 0 for handle %llu,%d\n",
+                    llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
+            PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
+            js_p->error_code = -PVFS_EIO;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+/* check_if_capability_required
+ *
+ * Branch point for capability creation.
+ */
+static PINT_sm_action getattr_check_if_capability_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* errors fall through */
+    if (js_p->error_code < 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        js_p->error_code = STATE_CAPABILITY;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* getattr_read_acl
+ * 
+ * Reads any ACL data from Trove if a capability is requested.
+ */
+static PINT_sm_action getattr_read_acl(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+    int ret;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (getattr sm) state: getattr_read_acl\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op));
+
+    assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
+
+    /* nlmills: TODO: make key a constant */
+    s_op->key.buffer = "system.posix_acl_access";
+    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+        s_op->free_val = 0;
+    }
+    s_op->val.buffer = malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+    s_op->free_val = 1;
+    
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
+                     "for handle %llu\n", llu(s_op->target_handle));
+
+    ret = job_trove_keyval_read(
+        s_op->u.getattr.fs_id,
+        s_op->u.getattr.handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context,
+        s_op->req->hints);
+
+    return ret;
+}
+
+/* getattr_create_capability
+ * 
+ * nlmills: TODO: document me
+ */
+static PINT_sm_action getattr_create_capability(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
+    void *acl_buf;
+    size_t acl_size;
+    int ret;
+
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        acl_buf = NULL;
+        acl_size = 0;
+        js_p->error_code = 0;
+    }
+    else if (js_p->error_code < 0)
+    {
+        /* let fatal errors fall through */
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        acl_buf = s_op->val.buffer;
+        acl_size = s_op->val.read_sz;
+    }
+
+    ret = PINT_init_capability(&resp_attr->capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "getattr: capability init failed\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    resp_attr->capability.num_handles = 1;
+
+    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
+        (resp_attr->mask & PVFS_ATTR_META_DFILES))
+    {
+        resp_attr->capability.num_handles += resp_attr->u.meta.dfile_count;
+    }
+
+    resp_attr->capability.handle_array = 
+        calloc(resp_attr->capability.num_handles, sizeof(PVFS_handle));
+    if (!resp_attr->capability.handle_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
+    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
+        (resp_attr->mask & PVFS_ATTR_META_DFILES))
+    {
+        /* copy datafile handles after the metafile handle */
+        memcpy((resp_attr->capability.handle_array + 1),
+               resp_attr->u.meta.dfile_array,
+               resp_attr->u.meta.dfile_count * sizeof(PVFS_handle));
+    }
+
+    ret = PINT_get_capabilities(acl_buf,
+                                acl_size,
+                                s_op->u.getattr.credential.userid,
+                                s_op->u.getattr.credential.group_array,
+                                s_op->u.getattr.credential.num_groups,
+                                resp_attr,
+                                &resp_attr->capability.op_mask);
+    if (ret < 0)
+    {
+        PINT_cleanup_capability(&resp_attr->capability);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    resp_attr->capability.fsid = s_op->u.getattr.fs_id;
+
+    ret = PINT_sign_capability(&resp_attr->capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "getattr: failed to sign capability\n");
+        PINT_cleanup_capability(&resp_attr->capability);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+                                 
+    resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action getattr_setup_resp(
@@ -758,73 +1031,6 @@ static PINT_sm_action getattr_setup_resp(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
-    
-    /* initial filling out and signing of capability structure */
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-    	resp_attr->mask |= PVFS_ATTR_CAPABILITY;
-        js_p->error_code = PINT_init_capability(&(resp_attr->capability));
-        if (js_p->error_code)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: Capability init failed\n");
-            return SM_ACTION_COMPLETE;
-        }
-        if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
-        {
-            /* Metafile is in position 0, datafiles if requested in the rest */
-            resp_attr->capability.num_handles = 
-                s_op->resp.u.getattr.attr.u.meta.dfile_count + 1;
-            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
-                sizeof(PVFS_handle) * resp_attr->capability.num_handles);
-            if (resp_attr->capability.handle_array == NULL)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                    "Getattr: Malloc for handle array failed\n");
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            memcpy(resp_attr->capability.handle_array + 1, 
-                s_op->resp.u.getattr.attr.u.meta.dfile_array,
-                sizeof(PVFS_handle) *
-                s_op->resp.u.getattr.attr.u.meta.dfile_count);
-        }
-        else
-        {
-            resp_attr->capability.handle_array = (PVFS_handle *)malloc(
-                sizeof(PVFS_handle));
-            if (resp_attr->capability.handle_array == NULL)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                    "Getattr: Malloc for handle array failed\n");
-                js_p->error_code = -PVFS_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-            resp_attr->capability.num_handles = 1;
-        }
-        resp_attr->capability.handle_array[0] = s_op->u.getattr.handle;
-        
-        /* TODO:  Optimize function for speed */
-        PINT_getattr_check_perms(smcb, s_op->req->u.getattr.credential.userid, 
-            s_op->req->u.getattr.credential.group_array, 
-            s_op->req->u.getattr.credential.num_groups, 
-            s_op->attr, &resp_attr->capability.op_mask);
-            
-        /* free ACL buffer */
-        free(s_op->val2.buffer);
-
-        resp_attr->capability.fsid = s_op->u.getattr.fs_id;
-            
-        if (PINT_sign_capability(&(resp_attr->capability)))
-        {
-            /* sign failed */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                "Getattr: Capability sign failed\n");
-            PINT_release_capability(&(resp_attr->capability));
-            js_p->error_code = -PVFS_EINVAL;
-            return SM_ACTION_COMPLETE;
-        }
-    }
 
     if(js_p->error_code > 0)
     {
@@ -848,6 +1054,7 @@ static PINT_sm_action getattr_setup_resp(
         resp_attr->owner, resp_attr->group, resp_attr->perms,
         resp_attr->objtype, llu(resp_attr->atime),
         llu(resp_attr->mtime), llu(resp_attr->ctime),
+
         (int)resp_attr->u.meta.dist_size);
 
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
@@ -865,18 +1072,7 @@ static PINT_sm_action getattr_setup_resp(
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
-            assert(s_op->val.buffer);
-            PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
-
-            if(resp_attr->u.meta.dist == 0) {
-                gossip_err("Found dist of 0 for handle %llu,%d\n",
-                        llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
-                PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
-                free_nested_getattr_data(s_op);
-                js_p->error_code = -PVFS_EIO;
-                return SM_ACTION_COMPLETE;
-            }
-            
+            /* we have already gathered the dist field in an earlier state */
             gossip_debug(GOSSIP_GETATTR_DEBUG,
                          "  also returning dist size of %d\n",
                          resp_attr->u.meta.dist_size);
@@ -892,33 +1088,19 @@ static PINT_sm_action getattr_setup_resp(
     else if ((resp_attr->objtype == PVFS_TYPE_SYMLINK) &&
              (resp_attr->mask & PVFS_ATTR_SYMLNK_TARGET))
     {
-        if (js_p->error_code == 0)
-        {
-            assert(resp_attr->u.sym.target_path);
-            assert(resp_attr->u.sym.target_path_len);
-            /*
-              adjust target path len down to actual size ; always
-              include the null termination char in the target_path_len
-            */
-            resp_attr->u.sym.target_path_len =
-                (strlen(resp_attr->u.sym.target_path) + 1);
-
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "  also returning link target of %s (len %d)\n",
-                         resp_attr->u.sym.target_path,
-                         resp_attr->u.sym.target_path_len);
-        }
-        else
-        {
-            gossip_err("Failed to retrieve symlink target path for "
-                       "handle %llu,%d\n",llu(s_op->u.getattr.handle),
-                       s_op->u.getattr.fs_id);
-            PVFS_perror("Symlink retrieval failure",js_p->error_code);
-
-            free_nested_getattr_data(s_op);
-            js_p->error_code = -PVFS_EINVAL;
-            return SM_ACTION_COMPLETE;
-        }
+        assert(resp_attr->u.sym.target_path);
+        assert(resp_attr->u.sym.target_path_len);
+        /*
+          adjust target path len down to actual size ; always
+          include the null termination char in the target_path_len
+        */
+        resp_attr->u.sym.target_path_len =
+            (strlen(resp_attr->u.sym.target_path) + 1);
+        
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  also returning link target of %s (len %d)\n",
+                     resp_attr->u.sym.target_path,
+                     resp_attr->u.sym.target_path_len);
     }
     else if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
             (resp_attr->mask & PVFS_ATTR_DIR_HINT))
@@ -934,46 +1116,23 @@ static PINT_sm_action getattr_setup_resp(
             resp_attr->u.dir.hint.dist_params_len);
     }
 
+    if (resp_attr->mask & PVFS_ATTR_CAPABILITY)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  also returning capability with mask %#x\n",
+                     resp_attr->capability.op_mask);
+    }
+
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
                  "status %d (error = %d)\n",
                  PINT_util_get_object_type(resp_attr->objtype),
-         s_op->resp.status, js_p->error_code);
+		 s_op->resp.status, js_p->error_code);
 
 #if 0
     gossip_debug(GOSSIP_GETATTR_DEBUG, "returning attrmask ");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,
                         s_op->resp.u.getattr.attr.mask);
 #endif
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Owner: %u\n", 
-            (unsigned int) resp_attr->capability.owner);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Op mask: %d\n", 
-            resp_attr->capability.op_mask);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Fsid: %d\n", 
-            resp_attr->capability.fsid);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Handles: %d\n", 
-            resp_attr->capability.num_handles);
-        if (resp_attr->capability.num_handles > 0) 
-            gossip_debug(GOSSIP_GETATTR_DEBUG,"First handle: %llu\n", 
-                (long long unsigned int) resp_attr->capability.handle_array[0]);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig size: %d\n", 
-            resp_attr->capability.sig_size);
-        if (resp_attr->capability.signature)
-        {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,"Sig: %d%d%d%d%d%d%d%d%d%d\n", 
-                resp_attr->capability.signature[0],
-                resp_attr->capability.signature[1],
-                resp_attr->capability.signature[2],
-                resp_attr->capability.signature[3],
-                resp_attr->capability.signature[4],
-                resp_attr->capability.signature[5],
-                resp_attr->capability.signature[6],
-                resp_attr->capability.signature[7],
-                resp_attr->capability.signature[8],
-                resp_attr->capability.signature[9]);
-        }
-    }
 
     free_nested_getattr_data(s_op);
     return SM_ACTION_COMPLETE;
@@ -1011,7 +1170,9 @@ static PINT_sm_action getattr_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    PINT_cleanup_credential(&s_op->u.getattr.credential);
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
+
     return(server_state_machine_complete(smcb));
 }
 
@@ -1019,11 +1180,18 @@ static PINT_sm_action getattr_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+
+    memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr));
+
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
 
-    js_p->error_code = 0;
+    ret = PINT_copy_credential(&s_op->req->u.getattr.credential,
+                               &s_op->u.getattr.credential);
+
+    js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
 
@@ -1047,36 +1215,6 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
              * PINT_free_object_attr()
              */
             s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DFILES;
-
-            js_p->error_code = -PVFS_EIO;
-            return SM_ACTION_COMPLETE;
-        }
-    }
-
-    /* otherwise deliberately preserve existing error code */
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action getattr_distribution_safety_check(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    if((js_p->error_code == 0) &&
-        (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST))
-    {
-        /* successfully read dist key; make sure we got something valid */
-        if(s_op->val.read_sz != s_op->val.buffer_sz)
-        {
-            gossip_err("Error: %s key found val size: %d when expecting val size: %d\n",
-                Trove_Common_Keys[METAFILE_DIST_KEY].key,
-                s_op->val.read_sz,
-                s_op->val.buffer_sz);
-
-            /* clear bitmask to prevent double free between setup_resp and
-             * PINT_free_object_attr()
-             */
-            s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_DIST;
 
             js_p->error_code = -PVFS_EIO;
             return SM_ACTION_COMPLETE;
@@ -1113,7 +1251,7 @@ static PINT_sm_action getattr_get_dirdata_handle(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -1143,7 +1281,7 @@ static PINT_sm_action getattr_get_dirent_count(
         0,
         js_p,
         &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -1270,7 +1408,7 @@ static PINT_sm_action getattr_get_dir_hint(
         s_op->u.getattr.handle,
         s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
         0, NULL, smcb, 0, js_p, &tmp_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -1351,6 +1489,39 @@ static PINT_sm_action getattr_interpret_dir_hint(
         js_p->error_code = 0;
     }
     return SM_ACTION_COMPLETE;
+}
+
+/* getattr_detect_stuffed()
+ *
+ * determine if a file is stuffed or not
+ */
+static PINT_sm_action getattr_detect_stuffed(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+
+    /* we can determine stuffedness by the presence of the dfiles req key */
+
+    s_op->key.buffer = Trove_Common_Keys[NUM_DFILES_REQ_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[NUM_DFILES_REQ_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+    s_op->val.buffer =  &s_op->u.getattr.num_dfiles_req;
+    s_op->val.buffer_sz =  sizeof(s_op->u.getattr.num_dfiles_req);
+    s_op->free_val = 0;
+
+    return(job_trove_keyval_read(
+        s_op->u.getattr.fs_id, 
+        s_op->u.getattr.handle,
+        &(s_op->key), 
+        &(s_op->val), 
+        0, 
+        NULL, smcb, 0, js_p,
+        &tmp_id, server_job_context,
+        s_op->req->hints));
 }
 
 static int perm_getattr(PINT_server_op *s_op)

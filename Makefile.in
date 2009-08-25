@@ -10,7 +10,7 @@
 # docsclean      cleans up documentation files
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
-# kernapps       builds userland helper programs for kernel driver 
+# kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
 # codecheck      checks source code for nonconformance to our std.
@@ -53,7 +53,9 @@
 # be overridden on the command line during make install
 DESTDIR =
 srcdir = @srcdir@
+builddir = @BUILD_ABSOLUTE_TOP@
 prefix = @prefix@
+datarootdir = @datarootdir@
 exec_prefix = @exec_prefix@
 includedir = $(DESTDIR)@includedir@
 mandir = $(DESTDIR)@mandir@
@@ -69,6 +71,7 @@ BISON = bison
 FLEX = flex
 LN_S = ln -snf
 BUILD_BMI_TCP = @BUILD_BMI_TCP@
+BUILD_BMI_ONLY = @BUILD_BMI_ONLY@
 BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
@@ -76,7 +79,10 @@ BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
+BUILD_TAU = @BUILD_TAU@
+BUILD_KERNEL = @BUILD_KERNEL@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -124,6 +130,21 @@ build_static = @build_static@
 MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
 
 # List of directories to search for headers.
+ifdef BUILD_BMI_ONLY
+BUILD_SERVER=""
+INCLUDES := \
+	include \
+    src/io/bmi \
+    src/common/misc \
+    src/common/quickhash \
+    src/common/quicklist \
+    src/common/id-generator \
+    src/common/gossip \
+    src/common/gen-locks \
+    src/common/events
+GENINCLUDES := \
+	include
+else
 INCLUDES := \
     src/client/sysint \
     src/common/misc \
@@ -132,6 +153,7 @@ INCLUDES := \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
+    src/common/events \
     src/common/security \
     src/io/trove \
     src/io/bmi \
@@ -139,7 +161,11 @@ INCLUDES := \
     src/io/buffer \
     src/io/job \
     src/io/dev \
-    src/proto
+    src/proto \
+    src/common/mgmt
+GENINCLUDES := \
+	include
+endif
 
 #################################################################
 # Setup global flags
@@ -189,6 +215,8 @@ CFLAGS += -I .
 CFLAGS += -I $(srcdir)
   # add selected include directories
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
+CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
+
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
@@ -284,7 +312,7 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lpthread 
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -296,9 +324,9 @@ endif
 # run ./configure --help for information on how to do this cleanly.
 LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
-LIBS += @THREAD_LIB@
-DEPLIBS += @THREAD_LIB@
-LIBS_THREADED += @THREAD_LIB@
+LIBS += @THREAD_LIB@ @OPENSSL_LIB@
+DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
+LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
 
 ################################################################
 # build BMI TCP?
@@ -411,6 +439,10 @@ ADMINSRC_SERVER :=
 LIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
+ifdef BUILD_BMI_ONLY
+# LIBBMISRC is source code for libbmi
+LIBBMISRC :=
+endif
 # SERVERBINSRC is source files that don't get added to the server library but must be added to the server binary
 SERVERBINSRC :=
 # DOCSRC is source code for documentation
@@ -422,6 +454,8 @@ VISSRC :=
 VISMISCSRC :=
 # KARMASRC is source for the karma gui
 KARMASRC :=
+# FUSESRC is source for the FUSE interface daemon
+FUSESRC :=
 # userland helper programs for kernel drivers
 KERNAPPSRC :=
 KERNAPPTHRSRC :=
@@ -444,16 +478,27 @@ endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
 LIBRARIES :=
+ifdef BUILD_BMI_ONLY
+BMILIBRARIES :=
+endif
 LIBRARIES_THREADED :=
 ifeq ($(build_shared),yes)
+ifdef BUILD_BMI_ONLY
+BMILIBRARIES := lib/libbmi.so
+endif
 LIBRARIES_SHARED = lib/libpvfs2.so
 LIBRARIES += $(LIBRARIES_SHARED)
-LIBRARIES_THREADED += lib/libpvfs2-threaded.so
+LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_SHARED)
 endif
 ifeq ($(build_static),yes)
+ifdef BUILD_BMI_ONLY
+BMILIBRARIES += lib/libbmi.a
+endif
 LIBRARIES_STATIC = lib/libpvfs2.a
 LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED += lib/libpvfs2-threaded.a
+LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a
+LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
 ################################################################
@@ -482,6 +527,15 @@ LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+ifdef BUILD_BMI_ONLY
+# LIBBMIOBJS is a list of objects to put in the bmi lib
+LIBBMIOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBBMISRC)))
+# LIBBMIPICOBJS are the same, but compiled for use in a shared library
+LIBBMIPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBBMISRC)))
+# LIBBMIDEPENDS is a list of dependency files for the bmi lib
+LIBBMIDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBBMISRC)))
+endif
 
 # LIBTHREADEDOBJS is a list of objects to put in the multithreaded client lib
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
@@ -546,6 +600,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
+# FUSEOBJS
+FUSEOBJS := $(patsubst %.c,%.o, $(filter %.c,$(FUSESRC)))
+FUSEDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FUSESRC)))
+
 # state machine generation tool, built for the build machine, not the
 # host machine, in the case of cross-compilation
 STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
@@ -566,16 +624,24 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
+ifdef BUILD_BMI_ONLY
+DEPENDS := $(sort $(LIBBMIDEPENDS))
+else
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
     $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
-    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
+    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
+endif
 
 ####################################################################
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
+ifdef BUILD_BMI_ONLY
+all:: $(BMILIBRARIES)
+else
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE)
+endif
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
@@ -639,6 +705,20 @@ $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
+ifdef BUILD_BMI_ONLY
+# rule for building the bmi library
+lib/libbmi.a: $(LIBBMIOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(LIBBMIOBJS)
+
+# rule for building the shared bmi library
+lib/libbmi.so: $(LIBBMIPICOBJS)
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,libbmi.so -o $@ $(LIBBMIPICOBJS) $(DEPLIBS)
+endif
+
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
 	$(Q) "  RANLIB	$@"
@@ -673,6 +753,11 @@ lib/libpvfs2-server.a: $(SERVEROBJS)
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(KARMAOBJS) $(LIBS) $(call modldflags,$<)
+
+# fule for building FUSE interface and its objects
+$(FUSE): $(FUSEOBJS) $(LIBRARIES)
+	$(Q) " LD 		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $(FUSEOBJS) $(LIBS) $(call modldflags,$<)
 
 # rule for building vis executables from object files
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
@@ -710,6 +795,31 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building shared objects 
 %.po: %.c
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building server objects
+%-server.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(CFLAGS) $(SERVERCFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects for threaded library
+%-threaded.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects for threaded library
+%-threaded.po: %.cpp
+	$(Q) "  CCPIC		$@"
+	$(E)$(CC) $(LIBTHREADEDCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ default rule for building objects 
+%.o: %.cpp
+	$(Q) "  CC		$@"
+	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# c++ rule for building shared objects 
+%.po: %.cpp
 	$(Q) "  CCPIC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
@@ -806,9 +916,11 @@ clean::
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
+		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
 		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma 
+		src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
 endif
@@ -823,12 +935,16 @@ clean::
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4 clean
 endif
 
-saveconfig::
-	@sh cp $(srcdir)/config.status $(srcdir)/config.save
-
 # builds a tarball of the source tree suitable for distribution
-dist: saveconfig $(SMCGEN) cleaner
+dist: $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
+
+ifdef BUILD_BMI_ONLY
+# builds a tarball of the BMI source tree suitable for distribution
+bmidist: cleaner
+	@sh $(srcdir)/maint/make-bmi-dist.sh $(srcdir) $(builddir) @PVFS2_VERSION@
+	if test -f $(builddir)/config.save; then  cp -u $(builddir)/config.save $(builddir)/config.status; fi
+endif
 
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
@@ -842,6 +958,7 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
+	if test -f config.status; then cp -p config.status config.save; fi
 	rm -f config.log config.status config.cache 
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
@@ -904,6 +1021,7 @@ src/server/simple.conf: src/apps/admin/pvfs2-genconfig
 
 # whether this is a distribution tarball or not, drop some config files
 # into the "examples" subdir of the build dir
+ifndef BUILD_BMI_ONLY
 all:: examples/fs.conf
 examples/fs.conf: src/apps/admin/pvfs2-genconfig
 	$(Q) "  GENCONFIG     $@"
@@ -911,6 +1029,7 @@ examples/fs.conf: src/apps/admin/pvfs2-genconfig
  --ioservers localhost --metaservers localhost --logfile /tmp/pvfs2-server.log \
  --storage /tmp/pvfs2-test-space \
  --quiet examples/fs.conf
+endif
 
 install_doc:
 	install -d $(mandir)/man1
@@ -918,9 +1037,18 @@ install_doc:
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 
+ifdef BUILD_BMI_ONLY
+install:: all
+	install -d $(includedir)
+	install -m 644 $(srcdir)/src/io/bmi/bmi.h $(includedir)
+	install -m 644 $(srcdir)/src/io/bmi/bmi-types.h $(includedir)
+
+	install -d $(libdir)
+	install -m 755 lib/*.* $(libdir)
+else
 install:: all install_doc
 	install -d $(includedir)
-	install -m 644 $(srcdir)/include/pvfs2.h $(includedir)
+	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
@@ -928,12 +1056,19 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-hint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-compat.h $(includedir)
 
 	install -d $(libdir)
 ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
+ifneq (,$(KERNAPPSTHR))
+	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
+	    install -m 755 lib/$$i $(libdir) ;\
+	done
+endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
 	for i in $(notdir $(LIBRARIES_SHARED)) ; do \
@@ -941,6 +1076,13 @@ ifneq (,$(LIBRARIES_SHARED))
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
+ifneq (,$(KERNAPPSTHR))
+	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
+	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
+	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
+	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
+	done
+endif
 endif
 
 ifdef TARGET_OS_DARWIN
@@ -950,12 +1092,18 @@ endif
 
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
+	# for compatibility in case anyone really wants "lsplus"
+	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
 	@# if we ever auto-generate genconfig, remove the $(srcdir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(bindir)
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-config-convert $(bindir)
 ifdef BUILD_KARMA
 	install -m 755 $(KARMA) $(bindir)
+endif
+
+ifdef BUILD_FUSE
+	install -m 755 $(FUSE) $(prefix)/bin
 endif
 
 	install -d $(sbindir)
@@ -968,6 +1116,7 @@ ifdef BUILD_SERVER
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(sbindir)/pvfs2-server
 	install -m 755 $(SERVER) $(sbindir)/pvfs2-server.bin
     endif
+endif
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))

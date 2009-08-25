@@ -317,7 +317,8 @@ static int null_aio_bstream_read_list(TROVE_coll_id coll_id,
                                      TROVE_vtag_s *vtag,
                                      void *user_ptr,
                                      TROVE_context_id context_id,
-                                     TROVE_op_id *out_op_id_p)
+                                     TROVE_op_id *out_op_id_p,
+                                     PVFS_hint hints)
 {
     return dbpf_bstream_rw_list(coll_id,
                                 handle,
@@ -334,7 +335,8 @@ static int null_aio_bstream_read_list(TROVE_coll_id coll_id,
                                 context_id,
                                 out_op_id_p,
                                 LIO_READ,
-                                &null_aio_ops);
+                                &null_aio_ops,
+                                hints);
 }
 
 static int null_aio_bstream_write_list(TROVE_coll_id coll_id,
@@ -350,7 +352,8 @@ static int null_aio_bstream_write_list(TROVE_coll_id coll_id,
                                       TROVE_vtag_s *vtag,
                                       void *user_ptr,
                                       TROVE_context_id context_id,
-                                      TROVE_op_id *out_op_id_p)
+                                      TROVE_op_id *out_op_id_p,
+                                      PVFS_hint hints)
 {
     return dbpf_bstream_rw_list(coll_id,
                                 handle,
@@ -367,7 +370,8 @@ static int null_aio_bstream_write_list(TROVE_coll_id coll_id,
                                 context_id,
                                 out_op_id_p,
                                 LIO_WRITE,
-                                &null_aio_ops);
+                                &null_aio_ops,
+                                hints);
 }
 
 static struct dbpf_aio_ops null_aio_ops =

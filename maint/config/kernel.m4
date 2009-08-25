@@ -20,7 +20,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
 	if test -n "${ARCH}" ; then
-		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include"
+		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
+        else
+            SUBARCH=`uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+            -e s/arm.*/arm/ -e s/sa110/arm/ \
+            -e s/s390x/s390/ -e s/parisc64/parisc/ \
+            -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
+            -e s/sh.*/sh/`
+            if test "x$SUBARCH" = "xi386"; then
+                ARCH=x86    
+            elif test "x$SUBARCH" = "xx86_64"; then
+                ARCH=x86    
+            elif test "x$SUBARCH" = "xsparc64"; then
+                ARCH=sparc    
+            else
+                ARCH=$SUBARCH
+            fi
+
+            CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
 	fi
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
@@ -891,18 +908,39 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl old linux kernels do not have class_create and related functions
-        dnl
-        dnl check for class_device_destroy() to weed out RHEL4 kernels that
-        dnl have some class functions but not others
 	AC_MSG_CHECKING(if kernel has device classes)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/device.h>
 	], [
-	    class_device_destroy(NULL, "pvfs2")
+	    class_create(NULL, NULL);
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(for device_create)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/device.h>
+	], [
+	    device_create(NULL, NULL, 0, NULL, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KERNEL_DEVICE_CREATE, 1, Define if kernel has device_create),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(for class_device_create)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/device.h>
+	], [
+	    class_device_create(NULL, NULL, 0, NULL, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KERNEL_CLASS_DEVICE_CREATE, 1, Define if kernel has class_device_create),
 	AC_MSG_RESULT(no)
 	)
 
@@ -918,6 +956,61 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM, 1, [Define if kernel kmem_cache_create has destructor param]),
 	AC_MSG_RESULT(no)
 	)
+
+        dnl 2.6.27 changed the constructor parameter signature of
+	dnl kmem_cache_create.  Check for this newer one-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror.  Note that the next configure test will
+        dnl determine if we have a two param constructor or not.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for one-param kmem_cache_create constructor)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		void ctor(void *req)
+		{
+		}
+	], [
+		kmem_cache_create("config-test", 0, 0, 0, ctor);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM, 1, [Define if kernel kmem_cache_create constructor has newer-style one-parameter form]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
+        dnl 2.6.27 changed the parameter signature of
+	dnl inode_operations->permission.  Check for this newer two-param style
+        dnl If they don't match, gcc complains about
+	dnl passing argument ... from incompatible pointer type, hence the
+	dnl need for the -Werror and -Wall.
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror -Wall"
+	AC_MSG_CHECKING(for two param permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/slab.h>
+		#include <linux/fs.h>
+		#include <linux/namei.h>
+		int ctor(struct inode *i, int a)
+		{
+			return 0;
+		}
+		struct inode_operations iop = {
+			.permission = ctor,
+		};
+	], [
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_PERMISSION, 1, [Define if kernel's inode_operations has two parameters permission function]),
+	AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+
 
         dnl 2.6.24 changed the constructor parameter signature of
 	dnl kmem_cache_create.  Check for this newer two-param style and
@@ -958,6 +1051,8 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
         AC_MSG_CHECKING(if kernel address_space struct has a rwlock_t field named tree_lock)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -967,9 +1062,26 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		read_lock(&as.tree_lock);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock member named tree_lock instead of rw_lock]),
+	AC_DEFINE(HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a rw_lock_t member named tree_lock]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
+
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(if kernel address_space struct has a spinlock_t field named tree_lock)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct address_space as;
+		spin_lock(&as.tree_lock);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT, 1, [Define if kernel address_space struct has a spin_lock_t member named tree_lock]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(if kernel address_space struct has a priv_lock field - from RT linux)
 	AC_TRY_COMPILE([
@@ -1011,6 +1123,34 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains drop_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.drop_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DROP_INODE, 1, [Define if kernel super_operations contains drop_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Starting with 2.6.26, drop_inode and put_inode go away
+	AC_MSG_CHECKING(if kernel super_operations contains put_inode field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [
+		struct super_operations sops;
+		sops.put_inode(NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_PUT_INODE, 1, [Define if kernel super_operations contains put_inode field]),
+	AC_MSG_RESULT(no)
+	)
+
 	dnl older 2.6 kernels don't have MNT_NOATIME
 	AC_MSG_CHECKING(if mount.h defines MNT_NOATIME)
 	AC_TRY_COMPILE([
@@ -1039,5 +1179,40 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        dnl newer 2.6 kernels (2.6.28) use d_obtain_alias instead of d_alloc_anon
+        AC_MSG_CHECKING(for d_alloc_anon)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/dcache.h>
+        ], [
+                struct inode *i;
+                d_alloc_anon(i);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_D_ALLOC_ANON, 1, [Define if dcache.h contains 
+                  d_alloc_annon]),
+        AC_MSG_RESULT(no)
+        )
+
+        dnl newer 2.6 kernels (2.6.29-ish) use current_fsuid() macro instead
+        dnl of accessing task struct fields directly
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for current_fsuid)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/sched.h>
+                #include <linux/cred.h>
+        ], [
+                int uid = current_fsuid();
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_CURRENT_FSUID, 1, [Define if cred.h contains current_fsuid]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
+
 	CFLAGS=$oldcflags
+
 ])

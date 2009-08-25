@@ -412,6 +412,26 @@ static char *params_string(void *params)
     return strdup(dparam->strips);
 }
 
+static PVFS_size get_blksize(void* params)
+{
+    PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
+    PINT_dist_strips *strips;
+    uint32_t ui_count;
+    PVFS_size blksize;
+
+    if (PINT_dist_strips_parse(
+            varstrip_params->strips, &strips, &ui_count) == -1)
+    {
+        return -1;
+    }
+ 
+    /* report the first trip size in the set as the block size */
+    blksize = strips[0].size;
+
+    PINT_dist_strips_free_mem(&strips);
+
+    return(blksize);
+}
 
 static PVFS_varstrip_params varstrip_params = { "\0" };
 
@@ -423,6 +443,7 @@ static PINT_dist_methods varstrip_methods = {
     logical_file_size,
     get_num_dfiles,
     set_param,
+    get_blksize,
     encode_params,
     decode_params,
     registration_init,

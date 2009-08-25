@@ -14,6 +14,20 @@
 #include <pthread.h>
 #include <signal.h>
 #include <getopt.h>
+#include <net/if.h>
+#include <netinet/in.h>
+
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
+
+#ifdef __PVFS2_SEGV_BACKTRACE__
+#include <execinfo.h>
+#define __USE_GNU
+#include <ucontext.h>
+#endif
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
@@ -26,6 +40,7 @@
 #include "job.h"
 #include "acache.h"
 #include "ncache.h"
+#include "tcache.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
@@ -35,6 +50,9 @@
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
 #include "pvfs2-encode-stubs.h"
+#include "pint-event.h"
+#include "security-util.h"
+#include "security-types.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -81,6 +99,7 @@ typedef struct
     int ncache_timeout;
     char* logfile;
     char* logtype;
+    char *client_dir;
     unsigned int acache_hard_limit;
     int acache_hard_limit_set;
     unsigned int acache_soft_limit;
@@ -104,6 +123,7 @@ typedef struct
     int dev_buffer_count_set;
     unsigned int dev_buffer_size;
     int dev_buffer_size_set;
+    char *events;
 } options_t;
 
 /*
@@ -129,7 +149,8 @@ typedef struct
 
     job_status_s jstat;
     struct PINT_dev_unexp_info info;
-
+    PVFS_hint hints;
+    
     /* iox requests may post multiple operations at one shot */
     int num_ops, num_incomplete_ops;
     PVFS_sys_op_id op_id;
@@ -182,13 +203,26 @@ typedef struct
 
 } vfs_request_t;
 
+typedef struct
+{
+    PVFS_fs_id fsid;
+    PVFS_uid uid;
+} credential_key_t;
+
+typedef struct
+{
+    PVFS_fs_id fsid;
+    PVFS_uid uid;
+    PVFS_credential *credential;
+} credential_payload_t;
+
 static options_t s_opts;
 
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
 static int s_client_signal = 0;
 
-/* We have 2 sets of description buffers, one used for staging I/O
+/* We have 2 sets of description buffers, one used for staging I/O 
  * and one for readdir/readdirplus */
 #define NUM_MAP_DESC 2
 static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
@@ -197,9 +231,13 @@ static struct PINT_dev_params s_desc_params[NUM_MAP_DESC];
 static struct PINT_perf_counter* acache_pc = NULL;
 static struct PINT_perf_counter* static_acache_pc = NULL;
 static struct PINT_perf_counter* ncache_pc = NULL;
+/* static char hostname[100]; */
 
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
+
+/* nlmills: TODO: does a mutex need to protect these credential objects? */
+static struct PINT_tcache *credential_cache = NULL;
 
 /* this hashtable is used to keep track of operations in progress */
 #define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
@@ -213,16 +251,20 @@ static void reset_acache_timeout(void);
 #ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
 #endif
+static int setup_credential_cache(options_t *s_opts);
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
+static PVFS_credential *lookup_credential(PVFS_fs_id fsid, PVFS_uid uid);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
     char *entry_name,
-    PVFS_credential *credentials,
-    int follow_link);
+    PVFS_credential *credential,
+    int follow_link,
+    PVFS_hint hints);
 
 static int write_device_response(
     void *buffer_list,
@@ -284,8 +326,8 @@ static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
     /* Do something useful with siginfo_t */
     if (signum == SIGSEGV)
     {
-        gossip_err("PVFS2 client: signal %d, faulty address is %p, "
-            "from %p\n", signum, info->si_addr,
+        gossip_err("PVFS2 client: signal %d, faulty address is %p, " 
+            "from %p\n", signum, info->si_addr, 
             (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
@@ -519,6 +561,8 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
 static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -527,14 +571,18 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.lookup.parent_refn.handle));
 
+    /* get rank from pid */
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.lookup.parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_ref_lookup(
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         vfs_request->in_upcall.req.lookup.d_name,
         vfs_request->in_upcall.req.lookup.parent_refn,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.lookup,
         vfs_request->in_upcall.req.lookup.sym_follow,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -550,7 +598,9 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 static PVFS_error post_create_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a create request for %s (fsid %d | parent %llu)\n",
@@ -558,13 +608,16 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.create.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.create.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.create.parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_create(
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn,
         vfs_request->in_upcall.req.create.attributes,
-        vfs_request->in_upcall.credentials, NULL, NULL,
+        credential, NULL, NULL,
         &vfs_request->response.create,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -576,6 +629,8 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
 static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -585,15 +640,18 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
         llu(vfs_request->in_upcall.req.sym.parent_refn.handle),
         vfs_request->in_upcall.req.sym.target);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.sym.parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_symlink(
         vfs_request->in_upcall.req.sym.entry_name,
         vfs_request->in_upcall.req.sym.parent_refn,
         vfs_request->in_upcall.req.sym.target,
         vfs_request->in_upcall.req.sym.attributes,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.symlink,
-        &vfs_request->op_id, (void *)vfs_request);
-
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting symlink create failed", ret);
@@ -604,19 +662,24 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a getattr request for fsid %d | handle %llu\n",
         vfs_request->in_upcall.req.getattr.refn.fs_id,
         llu(vfs_request->in_upcall.req.getattr.refn.handle));
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.getattr.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_getattr(
         vfs_request->in_upcall.req.getattr.refn,
         vfs_request->in_upcall.req.getattr.mask,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.getattr,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -628,6 +691,8 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -636,11 +701,14 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
         llu(vfs_request->in_upcall.req.setattr.refn.handle),
         vfs_request->in_upcall.req.setattr.attributes.mask);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.setattr.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_setattr(
         vfs_request->in_upcall.req.setattr.refn,
         vfs_request->in_upcall.req.setattr.attributes,
-        vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        credential,
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -652,7 +720,9 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a remove request for %s under fsid %d and "
@@ -660,11 +730,14 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.remove.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.remove.parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_remove(
         vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn,
-        vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        credential,
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -676,6 +749,8 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -684,13 +759,16 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.mkdir.parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.mkdir.parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_mkdir(
         vfs_request->in_upcall.req.mkdir.d_name,
         vfs_request->in_upcall.req.mkdir.parent_refn,
         vfs_request->in_upcall.req.mkdir.attributes,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.mkdir,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -702,6 +780,8 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
                  "for %llu,%d (token %llu)\n",
@@ -709,13 +789,16 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.req.readdir.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdir.token));
 
+    fill_hints(&hints, vfs_request);
+     credential = lookup_credential(vfs_request->in_upcall.req.readdir.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_readdir(
         vfs_request->in_upcall.req.readdir.refn,
         vfs_request->in_upcall.req.readdir.token,
         vfs_request->in_upcall.req.readdir.max_dirent_count,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.readdir,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -726,7 +809,9 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 
 static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
 {
+    PVFS_hint hints;
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_credential *credential;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
                  "for %llu,%d (token %llu)\n",
@@ -734,14 +819,16 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
                  vfs_request->in_upcall.req.readdirplus.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdirplus.token));
 
+    fill_hints(&hints, vfs_request);
+     credential = lookup_credential(vfs_request->in_upcall.req.readdirplus.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_readdirplus(
         vfs_request->in_upcall.req.readdirplus.refn,
         vfs_request->in_upcall.req.readdirplus.token,
         vfs_request->in_upcall.req.readdirplus.max_dirent_count,
-        vfs_request->in_upcall.credentials,
+        credential,
         vfs_request->in_upcall.req.readdirplus.mask,
         &vfs_request->response.readdirplus,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, (void *)vfs_request, hints);
 
     if (ret < 0)
     {
@@ -753,6 +840,8 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
 static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -765,13 +854,16 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.rename.new_parent_refn.fs_id,
         llu(vfs_request->in_upcall.req.rename.new_parent_refn.handle));
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.rename.old_parent_refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_rename(
         vfs_request->in_upcall.req.rename.d_old_name,
         vfs_request->in_upcall.req.rename.old_parent_refn,
         vfs_request->in_upcall.req.rename.d_new_name,
         vfs_request->in_upcall.req.rename.new_parent_refn,
-        vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        credential,
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -783,7 +875,9 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %llu under "
         "fsid %d to be size %lld\n",
@@ -791,11 +885,14 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
         vfs_request->in_upcall.req.truncate.refn.fs_id,
         lld(vfs_request->in_upcall.req.truncate.size));
 
+    fill_hints(&hints, vfs_request);
+     credential = lookup_credential(vfs_request->in_upcall.req.truncate.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_truncate(
         vfs_request->in_upcall.req.truncate.refn,
         vfs_request->in_upcall.req.truncate.size,
-        vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
+        credential,
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -807,7 +904,9 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a getxattr request for fsid %d | handle %llu\n",
@@ -817,26 +916,26 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.getxattr.key;
     vfs_request->key.buffer_sz = vfs_request->in_upcall.req.getxattr.key_sz;
-    gossip_debug( GOSSIP_CLIENTCORE_DEBUG,
-            "getxattr key %s keysz %d\n",
+    gossip_debug( GOSSIP_CLIENTCORE_DEBUG, 
+            "getxattr key %s keysz %d\n", 
             (char *) vfs_request->key.buffer, vfs_request->key.buffer_sz);
 
     /* We also need to allocate memory for the vfs_request->response.geteattr */
 
-    vfs_request->response.geteattr.val_array =
+    vfs_request->response.geteattr.val_array = 
         (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval));
     if (vfs_request->response.geteattr.val_array == NULL)
     {
         return -PVFS_ENOMEM;
     }
-    vfs_request->response.geteattr.err_array =
+    vfs_request->response.geteattr.err_array = 
         (PVFS_error *) malloc(sizeof(PVFS_error));
     if(vfs_request->response.geteattr.err_array == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
         return -PVFS_ENOMEM;
     }
-    vfs_request->response.geteattr.val_array[0].buffer =
+    vfs_request->response.geteattr.val_array[0].buffer = 
         (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
     if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
     {
@@ -844,18 +943,22 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
         free(vfs_request->response.geteattr.err_array);
         return -PVFS_ENOMEM;
     }
-    vfs_request->response.geteattr.val_array[0].buffer_sz =
+    vfs_request->response.geteattr.val_array[0].buffer_sz = 
         PVFS_REQ_LIMIT_VAL_LEN;
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.getxattr.refn.fs_id, vfs_request->in_upcall.uid);
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
         vfs_request->in_upcall.req.getxattr.refn,
-        vfs_request->in_upcall.credentials,
+        credential,
         1,
         &vfs_request->key,
         &vfs_request->response.geteattr,
-        &vfs_request->op_id,
+        &vfs_request->op_id, 
+        hints, 
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -867,6 +970,8 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -876,25 +981,29 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.setxattr.keyval.key;
-    vfs_request->key.buffer_sz =
+    vfs_request->key.buffer_sz = 
         vfs_request->in_upcall.req.setxattr.keyval.key_sz;
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "setxattr key %s\n", (char *) vfs_request->key.buffer);
     /* We need to fill in the vfs_request->val field here */
     vfs_request->val.buffer = vfs_request->in_upcall.req.setxattr.keyval.val;
-    vfs_request->val.buffer_sz =
+    vfs_request->val.buffer_sz = 
         vfs_request->in_upcall.req.setxattr.keyval.val_sz;
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.setxattr.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_seteattr_list(
         vfs_request->in_upcall.req.setxattr.refn,
-        vfs_request->in_upcall.credentials,
+        credential,
         1,
         &vfs_request->key,
         &vfs_request->val,
         vfs_request->in_upcall.req.setxattr.flags,
-        &vfs_request->op_id,
+        &vfs_request->op_id, 
+        hints, 
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -906,6 +1015,8 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
@@ -920,12 +1031,16 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_DEBUG,
         "removexattr key %s\n", (char *) vfs_request->key.buffer);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.setxattr.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_deleattr(
         vfs_request->in_upcall.req.setxattr.refn,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->key,
-        &vfs_request->op_id,
+        &vfs_request->op_id, 
+        hints,
         (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
@@ -938,7 +1053,9 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
     int i = 0, j = 0;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "got a listxattr request for fsid %d | handle %llu\n",
@@ -954,8 +1071,8 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
     }
 
     /* We also need to allocate memory for the vfs_request->response.listeattr if the user requested */
-    vfs_request->response.listeattr.key_array =
-        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval)
+    vfs_request->response.listeattr.key_array = 
+        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval) 
                                   * vfs_request->in_upcall.req.listxattr.requested_count);
     if (vfs_request->response.listeattr.key_array == NULL)
     {
@@ -980,15 +1097,20 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
         free(vfs_request->response.listeattr.key_array);
         return -PVFS_ENOMEM;
     }
+
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.listxattr.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_listeattr(
         vfs_request->in_upcall.req.listxattr.refn,
         vfs_request->in_upcall.req.listxattr.token,
         vfs_request->in_upcall.req.listxattr.requested_count,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.listeattr,
-        &vfs_request->op_id,
+        &vfs_request->op_id, 
+        hints,
         (void *)vfs_request);
-
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting listxattr failed", ret);
@@ -998,11 +1120,11 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 
 
 static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
-        pvfs2_upcall_t *in_upcall, int mount)
+        pvfs2_upcall_t *in_upcall, int mount) 
 {
     char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
-    /*
+    /*                                                                
       generate a unique dynamic mount point; the id will be passed to
       the kernel via the downcall so we can match it with a proper
       unmount request at unmount time.  if we're unmounting, use the
@@ -1057,7 +1179,7 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
     else
         mntent->pvfs_config_servers[0] = strdup(
             in_upcall->req.fs_umount.pvfs2_config_server);
-
+                                                                     
     if (!mntent->pvfs_config_servers[0])
     {
         return -PVFS_ENOMEM;
@@ -1075,22 +1197,65 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
     {
         return -PVFS_ENOMEM;
     }
-
-    gossip_debug(
+                                                       
+    gossip_debug(                                     
         GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",
         mntent->pvfs_fs_name, (int)strlen(mntent->pvfs_fs_name));
-
-    mntent->encoding = ENCODING_DEFAULT;
-    mntent->flowproto = FLOWPROTO_DEFAULT;
-
-    /* also fill in the fs_id for umount */
-    if (!mount)
-        mntent->fs_id = in_upcall->req.fs_umount.fs_id;
-
+                                                              
+    mntent->encoding = ENCODING_DEFAULT;                      
+    mntent->flowproto = FLOWPROTO_DEFAULT;                   
+                                                           
+    /* also fill in the fs_id for umount */               
+    if (!mount)                                           
+        mntent->fs_id = in_upcall->req.fs_umount.fs_id;     
+    
     /* By default, the VFS does not wish to perform integrity checks */
     mntent->integrity_check = 0;
     return 0;
 }
+
+#if 0
+static PVFS_error add_user_credential(struct PVFS_sys_mntent *mntent, 
+                                      PVFS_uid uid)
+{
+    PVFS_BMI_addr_t addr;
+    char certpath[PATH_MAX];
+    char keypath[PATH_MAX];
+    PVFS_credential credential;
+    int ret;
+
+    assert(mntent);
+
+    if (num_user_credentials >= MAX_USER_CREDENTIALS)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    ret = BMI_addr_lookup(&addr, mntent->the_pvfs_config_server);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to resolve BMI "
+                     "address %s\n", mntent->the_pvfs_config_server);
+        return ret;
+    }
+
+    snprintf(certpath, PATH_MAX, "%s/%u.cert", s_opts.client_dir, uid);
+    snprintf(keypath, PATH_MAX, "%s/%u.key", s_opts.client_dir, uid);
+
+    ret = PVFS_util_gen_credential(mntent->fs_id, addr, certpath, 
+                                   keypath, &credential);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to get credential for "
+                     "userid %u\n", uid);
+        return ret;
+    }
+
+    user_credentials[num_user_credentials++] = credential;
+
+    return 0;
+}
+#endif
 
 static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
 {
@@ -1107,7 +1272,7 @@ static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
         return -PVFS_ENOMEM;
     }
     memset(vfs_request->mntent, 0, sizeof(struct PVFS_sys_mntent));
-
+        
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got an fs mount request for host:\n  %s\n",
@@ -1334,9 +1499,9 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             }
             else
             {
-                s_opts.perf_time_interval_secs =
+                s_opts.perf_time_interval_secs = 
                     vfs_request->in_upcall.req.param.value;
-            }
+            }    
             vfs_request->out_downcall.status = 0;
             return(0);
             break;
@@ -1357,7 +1522,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                     static_acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
                 ret = PINT_perf_set_info(
                     ncache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
-            }
+            }    
             vfs_request->out_downcall.status = ret;
             return(0);
             break;
@@ -1368,7 +1533,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
                 PINT_perf_reset(acache_pc);
                 PINT_perf_reset(static_acache_pc);
                 PINT_perf_reset(ncache_pc);
-            }
+            }    
             vfs_request->out_downcall.resp.param.value = 0;
             vfs_request->out_downcall.status = 0;
             return(0);
@@ -1388,12 +1553,12 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     {
         if(tmp_subsystem == ACACHE)
         {
-            vfs_request->out_downcall.status =
+            vfs_request->out_downcall.status = 
                 PINT_acache_get_info(tmp_param, &val);
         }
         else
         {
-            vfs_request->out_downcall.status =
+            vfs_request->out_downcall.status = 
                 PINT_ncache_get_info(tmp_param, &val);
         }
         vfs_request->out_downcall.resp.param.value = val;
@@ -1404,33 +1569,38 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
         vfs_request->out_downcall.resp.param.value = 0;
         if(tmp_subsystem == ACACHE)
         {
-            vfs_request->out_downcall.status =
+            vfs_request->out_downcall.status = 
                 PINT_acache_set_info(tmp_param, val);
         }
         else
         {
-            vfs_request->out_downcall.status =
+            vfs_request->out_downcall.status = 
                 PINT_ncache_set_info(tmp_param, val);
         }
     }
     return 0;
 }
-#undef ACACHE
-#undef NCACHE
+#undef ACACHE 
+#undef NCACHE 
 
 static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.statfs.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_statfs(
         vfs_request->in_upcall.req.statfs.fs_id,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.statfs,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
@@ -1465,7 +1635,7 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
     /* get a secure shared key for this file system */
     PINT_config_get_fs_key(
             sconfig,
-            vfs_request->in_upcall.req.fs_key.fsid,
+            vfs_request->in_upcall.req.fs_key.fsid, 
             &key, &key_len);
     /* drop reference to the server configuration */
     PINT_put_server_config_struct(sconfig);
@@ -1481,11 +1651,11 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
         goto out;
     }
     /* Copy the key length of the FS */
-    vfs_request->out_downcall.resp.fs_key.fs_keylen =
+    vfs_request->out_downcall.resp.fs_key.fs_keylen = 
         key_len > FS_KEY_BUF_SIZE ? FS_KEY_BUF_SIZE : key_len;
     /* Copy the secret key of the FS */
     memcpy(vfs_request->out_downcall.resp.fs_key.fs_key, key,
-            vfs_request->out_downcall.resp.fs_key.fs_keylen);
+            vfs_request->out_downcall.resp.fs_key.fs_keylen); 
 out:
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
@@ -1497,6 +1667,7 @@ out:
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_credential *credential;
 
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG,
@@ -1530,10 +1701,11 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
         PVFS_BYTE, &vfs_request->file_req);
     assert(ret == 0);
 
+    credential = lookup_credential(vfs_request->in_upcall.req.io.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req, 0,
         vfs_request->io_tmp_buf, vfs_request->mem_req,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
         &vfs_request->op_id, (void *)vfs_request);
@@ -1551,7 +1723,9 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 static PVFS_error post_io_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
 #ifdef USE_MMAP_RA_CACHE
     int val = 0, amt_returned = 0;
     void *buf = NULL;
@@ -1655,8 +1829,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             s_desc_params[BM_IO].dev_buffer_count));
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    vfs_request->io_kernel_mapped_buf =
-        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc,
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
             vfs_request->in_upcall.req.io.buf_index);
     assert(vfs_request->io_kernel_mapped_buf);
 
@@ -1665,14 +1839,16 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         PVFS_BYTE, &vfs_request->file_req);
     assert(ret == 0);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.io.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req,
-        vfs_request->in_upcall.req.io.offset,
+        vfs_request->in_upcall.req.io.offset, 
         vfs_request->io_kernel_mapped_buf, vfs_request->mem_req,
-        vfs_request->in_upcall.credentials,
+        credential,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
 
     if (ret < 0)
     {
@@ -1715,6 +1891,9 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     int32_t i, num_ops_posted, iox_count, iox_index;
     int32_t *mem_sizes = NULL;
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
+    PVFS_credential *credential;
+
     struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
 
     if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
@@ -1727,7 +1906,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             (unsigned long) vfs_request->in_upcall.req.iox.count);
 
     if ((vfs_request->in_upcall.req.iox.buf_index < 0) ||
-           (vfs_request->in_upcall.req.iox.buf_index >=
+           (vfs_request->in_upcall.req.iox.buf_index >= 
             s_desc_params[BM_IO].dev_buffer_count))
     {
         gossip_err("post_iox_request: invalid buffer index %d\n",
@@ -1736,8 +1915,8 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
     }
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    vfs_request->io_kernel_mapped_buf =
-        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc,
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
             vfs_request->in_upcall.req.iox.buf_index);
     if (vfs_request->io_kernel_mapped_buf == NULL)
     {
@@ -1805,7 +1984,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
         gossip_err("post_iox_request: mem_req_a allocation failed\n");
         goto err_filereq;
     }
-    vfs_request->response.iox = (PVFS_sysresp_io *) malloc(num_ops_posted * sizeof(PVFS_sysresp_io));
+    vfs_request->response.iox = (PVFS_sysresp_io *) malloc(num_ops_posted * sizeof(PVFS_sysresp_io)); 
     if (vfs_request->response.iox == NULL)
     {
         gossip_err("post_iox_request: iox response allocation failed\n");
@@ -1831,25 +2010,29 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
             break;
         }
         /* file request is now a hindexed request type */
-        ret = PVFS_Request_hindexed(iox_stage,
+        ret = PVFS_Request_hindexed(iox_stage, 
                 &vfs_request->iox_sizes[iox_index],
                 &vfs_request->iox_offsets[iox_index],
-                PVFS_BYTE,
+                PVFS_BYTE, 
                 &vfs_request->file_req_a[i]);
         if (ret != 0)
         {
             gossip_err("post_iox_request: request_hindexed failed\n");
             break;
         }
+
+        fill_hints(&hints, vfs_request);
+        credential = lookup_credential(vfs_request->in_upcall.req.iox.refn.fs_id, vfs_request->in_upcall.uid);
         /* post the I/O */
         ret = PVFS_isys_io(
             vfs_request->in_upcall.req.iox.refn, vfs_request->file_req_a[i],
-            0,
+            0, 
             vfs_request->io_kernel_mapped_buf, vfs_request->mem_req_a[i],
-            vfs_request->in_upcall.credentials,
+            credential,
             &vfs_request->response.iox[i],
             vfs_request->in_upcall.req.iox.io_type,
             &vfs_request->op_ids[i],
+            hints,
             (void *)vfs_request);
 
         if (ret < 0)
@@ -1943,17 +2126,22 @@ static PVFS_error service_operation_cancellation(
 static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
-
+    PVFS_hint hints;
+    PVFS_credential *credential;
+    
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %llu,%d\n",
         llu(vfs_request->in_upcall.req.fsync.refn.handle),
         vfs_request->in_upcall.req.fsync.refn.fs_id);
 
+    fill_hints(&hints, vfs_request);
+    credential = lookup_credential(vfs_request->in_upcall.req.fsync.refn.fs_id, vfs_request->in_upcall.uid);
     ret = PVFS_isys_flush(
         vfs_request->in_upcall.req.fsync.refn,
-        vfs_request->in_upcall.credentials,
-        &vfs_request->op_id, (void *)vfs_request);
-
+        credential,
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
+    
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting flush failed", ret);
@@ -1964,16 +2152,17 @@ static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
     char *entry_name,
-    PVFS_credential *credentials,
-    int follow_link)
+    PVFS_credential *credential,
+    int follow_link,
+    PVFS_hint hints)
 {
     PVFS_error ret = 0;
     PVFS_sysresp_lookup lookup_response;
     PVFS_object_ref refn = { PVFS_HANDLE_NULL, PVFS_FS_ID_NULL };
 
     ret = PVFS_sys_ref_lookup(
-        parent.fs_id, entry_name, parent, credentials,
-        &lookup_response, follow_link);
+        parent.fs_id, entry_name, parent, credential,
+        &lookup_response, follow_link, hints);
 
     if (ret)
     {
@@ -2003,7 +2192,7 @@ PVFS_error write_device_response(
     PVFS_error ret = -1;
     int outcount = 0;
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
                  "%s: writing device response.  tag: %llu\n",
                  __func__, llu(tag));
 
@@ -2041,7 +2230,7 @@ PVFS_error write_device_response(
 /* encoding needed by client-core to copy readdir entries to the shared page */
 static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *readdir)
 {
-    int i;
+    int i; 
     char *buf = (char *) ptr;
     char **pptr = &buf;
 
@@ -2054,7 +2243,7 @@ static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *
 #endif
 
     *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
-    for (i = 0; i < readdir->pvfs_dirent_outcount; i++)
+    for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
     {
         enc_string(pptr, &readdir->dirent_array[i].d_name);
         *(int64_t *) *pptr = readdir->dirent_array[i].handle;
@@ -2067,8 +2256,8 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
 {
     int ret = 0;
     /* get a buffer for xfer of dirents */
-    vfs_request->out_downcall.trailer_buf =
-        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc,
+    vfs_request->out_downcall.trailer_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
             vfs_request->in_upcall.req.readdir.buf_index);
     if (vfs_request->out_downcall.trailer_buf == NULL)
     {
@@ -2077,11 +2266,11 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
     }
 
     /* Simply encode the readdir system response into the shared buffer */
-    vfs_request->out_downcall.trailer_size =
+    vfs_request->out_downcall.trailer_size = 
         encode_dirents((pvfs2_readdir_response_t *) vfs_request->out_downcall.trailer_buf,
                 &vfs_request->response.readdir);
 
-    if (vfs_request->out_downcall.trailer_size <= 0)
+    if (vfs_request->out_downcall.trailer_size <= 0) 
     {
         gossip_err("copy_dirents_to_downcall: invalid trailer size %ld\n",
                 (long) vfs_request->out_downcall.trailer_size);
@@ -2094,7 +2283,7 @@ err:
     return ret;
 }
 
-static long encode_sys_attr(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
+static long encode_sys_attr(char *ptr, PVFS_sysresp_readdirplus *readdirplus) 
 {
     char *buf = ptr;
     char **pptr = &buf;
@@ -2102,7 +2291,7 @@ static long encode_sys_attr(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
 
     memcpy(buf, readdirplus->stat_err_array, sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount);
     *pptr += sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount;
-    if (readdirplus->pvfs_dirent_outcount % 2)
+    if (readdirplus->pvfs_dirent_outcount % 2) 
     {
         *pptr += 4;
     }
@@ -2141,8 +2330,8 @@ static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
 {
     int i, ret = 0;
     /* get a buffer for xfer of direntplus */
-    vfs_request->out_downcall.trailer_buf =
-        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc,
+    vfs_request->out_downcall.trailer_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
         vfs_request->in_upcall.req.readdirplus.buf_index);
     if (vfs_request->out_downcall.trailer_buf == NULL)
     {
@@ -2151,7 +2340,7 @@ static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
     }
 
     /* Simply encode the readdirplus system response into the shared buffer */
-    vfs_request->out_downcall.trailer_size =
+    vfs_request->out_downcall.trailer_size = 
         encode_readdirplus_to_buffer(vfs_request->out_downcall.trailer_buf,
                 &vfs_request->response.readdirplus);
     if (vfs_request->out_downcall.trailer_size <= 0)
@@ -2168,7 +2357,7 @@ err:
     free(vfs_request->response.readdirplus.stat_err_array);
     vfs_request->response.readdirplus.stat_err_array = NULL;
     /* free sysresp attribute array */
-    for (i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++)
+    for (i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++) 
     {
         PVFS_util_release_sys_attr(&vfs_request->response.readdirplus.attr_array[i]);
     }
@@ -2177,7 +2366,7 @@ err:
     return ret;
 }
 
-/*
+/* 
    this method has the ability to overwrite/scrub the error code
    passed down to the vfs
 */
@@ -2228,11 +2417,17 @@ static inline void package_downcall_members(
                 */
                 if (*error_code == -PVFS_EEXIST)
                 {
+                    PVFS_hint hints;
+                    PVFS_credential *credential;
+
+                    fill_hints(&hints, vfs_request);
+                    credential = lookup_credential(vfs_request->in_upcall.req.create.parent_refn.fs_id, vfs_request->in_upcall.uid);
                     vfs_request->out_downcall.resp.create.refn =
                         perform_lookup_on_create_error(
                             vfs_request->in_upcall.req.create.parent_refn,
                             vfs_request->in_upcall.req.create.d_name,
-                            vfs_request->in_upcall.credentials, 1);
+                            credential, 1, hints);
+                    vfs_request->hints = hints;
 
                     if (vfs_request->out_downcall.resp.create.refn.handle ==
                         PVFS_HANDLE_NULL)
@@ -2387,7 +2582,7 @@ static inline void package_downcall_members(
                 */
                 PVFS_BMI_addr_t tmp_addr;
 
-                if (BMI_addr_lookup(&tmp_addr,
+                if (BMI_addr_lookup(&tmp_addr, 
                     vfs_request->mntent->the_pvfs_config_server) == 0)
                 {
                     if (BMI_set_info(
@@ -2418,14 +2613,14 @@ static inline void package_downcall_members(
                     *error_code = ret;
                     break;
                 }
-
+                    
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                              "FS mount got root handle %llu on fs id %d\n",
                              llu(root_handle), vfs_request->mntent->fs_id);
 
                 vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
                 vfs_request->out_downcall.status = 0;
-                vfs_request->out_downcall.resp.fs_mount.fs_id =
+                vfs_request->out_downcall.resp.fs_mount.fs_id = 
                     vfs_request->mntent->fs_id;
                 vfs_request->out_downcall.resp.fs_mount.root_handle =
                     root_handle;
@@ -2465,7 +2660,7 @@ static inline void package_downcall_members(
                       get a shared kernel/userspace buffer for the I/O
                       transfer
                     */
-                    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc,
+                    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
                         vfs_request->in_upcall.req.io.buf_index);
                     assert(buf);
 
@@ -2531,9 +2726,9 @@ static inline void package_downcall_members(
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                /* if an ECANCEL shows up here without going through the
-                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is
-                 * a better errno approximation than -PVFS_EINTR
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
                  */
                 *error_code = -PVFS_ETIMEDOUT;
             }
@@ -2561,13 +2756,13 @@ static inline void package_downcall_members(
             free(vfs_request->iox_sizes);
             free(vfs_request->in_upcall.trailer_buf);
             vfs_request->in_upcall.trailer_buf = NULL;
-
+            
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
-                /* if an ECANCEL shows up here without going through the
-                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is
-                 * a better errno approximation than -PVFS_EINTR
+                /* if an ECANCEL shows up here without going through the 
+                 * cancel_op_in_progress() path, then -PVFS_ETIMEDOUT is 
+                 * a better errno approximation than -PVFS_EINTR 
                  */
                 *error_code = -PVFS_ETIMEDOUT;
             }
@@ -2576,11 +2771,11 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_GETXATTR:
             if (*error_code == 0)
             {
-                int val_sz =
+                int val_sz = 
                     vfs_request->response.geteattr.val_array[0].read_sz;
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
                         "getxattr: val_sz %d, val %s\n",
-                        val_sz,
+                        val_sz, 
                         (char *) vfs_request->response.geteattr.val_array[0].buffer);
                 /* copy the requested key's value out to the downcall */
                 if (val_sz > PVFS_MAX_XATTR_VALUELEN)
@@ -2620,12 +2815,12 @@ static inline void package_downcall_members(
                     vfs_request->response.listeattr.nkey;
                 if (vfs_request->in_upcall.req.listxattr.requested_count == 0)
                 {
-                    vfs_request->out_downcall.resp.listxattr.token =
+                    vfs_request->out_downcall.resp.listxattr.token = 
                         PVFS_ITERATE_START;
                 }
-                else
+                else 
                 {
-                    vfs_request->out_downcall.resp.listxattr.token =
+                    vfs_request->out_downcall.resp.listxattr.token = 
                         vfs_request->response.listeattr.token;
                     vfs_request->out_downcall.resp.listxattr.keylen = 0;
                     for (i = 0; i < vfs_request->response.listeattr.nkey; i++)
@@ -2634,7 +2829,7 @@ static inline void package_downcall_members(
                                 + vfs_request->out_downcall.resp.listxattr.keylen,
                                 vfs_request->response.listeattr.key_array[i].buffer,
                                 vfs_request->response.listeattr.key_array[i].read_sz);
-                        vfs_request->out_downcall.resp.listxattr.lengths[i] =
+                        vfs_request->out_downcall.resp.listxattr.lengths[i] = 
                                 vfs_request->response.listeattr.key_array[i].read_sz;
                         vfs_request->out_downcall.resp.listxattr.keylen +=
                                 vfs_request->response.listeattr.key_array[i].read_sz;
@@ -2686,6 +2881,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     PINT_dev_release_unexpected(&vfs_request->info);
     PINT_sys_release(vfs_request->op_id);
 
+    PVFS_hint_free(vfs_request->hints);
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
 
@@ -2884,7 +3080,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     }
 
     /* if we failed to post the operation, then we should go ahead and write
-     * a generic response down with the error code filled in
+     * a generic response down with the error code filled in 
      */
     if(ret < 0)
     {
@@ -2918,7 +3114,7 @@ static inline PVFS_error handle_unexp_vfs_request(
                 int error = ret; /* error code of the SM> */
                 vfs_request->num_incomplete_ops--;
                 package_downcall_members(vfs_request,  &error);
-                write_inlined_device_response(vfs_request);
+                write_inlined_device_response(vfs_request); 
                 ret = repost_unexp_vfs_request(
                     vfs_request, "inlined completion");
             }
@@ -2957,7 +3153,7 @@ static inline PVFS_error handle_unexp_vfs_request(
 
 static PVFS_error process_vfs_requests(void)
 {
-    PVFS_error ret = 0;
+    PVFS_error ret = 0; 
     int op_count = 0, i = 0;
     vfs_request_t *vfs_request = NULL;
     vfs_request_t *vfs_request_array[MAX_NUM_OPS] = {NULL};
@@ -3277,9 +3473,12 @@ int main(int argc, char **argv)
     }
 
     /* get rid of stdout/stderr/stdin */
-    freopen("/dev/null", "r", stdin);
-    freopen("/dev/null", "w", stdout);
-    freopen("/dev/null", "w", stderr);
+    if(!freopen("/dev/null", "r", stdin))
+        gossip_err("Error: failed to reopen stdin.\n");
+    if(!freopen("/dev/null", "w", stdout))
+        gossip_err("Error: failed to reopen stdout.\n");
+    if(!freopen("/dev/null", "w", stderr))
+        gossip_err("Error: failed to reopen stderr.\n");
 
     start_time = time(NULL);
     local_time = localtime(&start_time);
@@ -3299,6 +3498,13 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
+    ret = setup_credential_cache(&s_opts);
+    if (ret < 0)
+    {
+        PVFS_perror("setup_credential_cache", ret);
+        return(ret);
+    }
+
     ret = set_acache_parameters(&s_opts);
     if(ret < 0)
     {
@@ -3312,6 +3518,11 @@ int main(int argc, char **argv)
         return(ret);
     }
     set_device_parameters(&s_opts);
+
+    if(s_opts.events)
+    {
+        PINT_event_enable(s_opts.events);
+    }
 
     /* start performance counters for acache */
     acache_pc = PINT_perf_initialize(acache_keys);
@@ -3371,7 +3582,7 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
     acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    acache_timer_sm_p->u.perf_count_timer.interval_secs =
+    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
     ret = PINT_client_state_machine_post(smcb, NULL, NULL);
@@ -3391,7 +3602,7 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
     static_acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    static_acache_timer_sm_p->u.perf_count_timer.interval_secs =
+    static_acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     static_acache_timer_sm_p->u.perf_count_timer.pc = static_acache_pc;
     ret = PINT_client_state_machine_post(smcb, NULL, NULL);
@@ -3411,7 +3622,7 @@ int main(int argc, char **argv)
         return(-PVFS_ENOMEM);
     }
     ncache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    ncache_timer_sm_p->u.perf_count_timer.interval_secs =
+    ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
     ret = PINT_client_state_machine_post(smcb, NULL, NULL);
@@ -3426,7 +3637,7 @@ int main(int argc, char **argv)
     {
 	PVFS_perror("initialize_ops_in_progress_table", ret);
         return ret;
-    }
+    }   
 
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if (ret < 0)
@@ -3498,6 +3709,9 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
+    PINT_tcache_finalize(credential_cache);
+    credential_cache = NULL;
+
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
     if (PVFS_sys_finalize())
@@ -3524,6 +3738,7 @@ static void print_help(char *progname)
     printf("-h, --help                    display this help and exit\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
+    printf("-c     --client-dir           client certificate/key directory\n");
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
@@ -3538,8 +3753,10 @@ static void print_help(char *progname)
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--logstamp=none|usec|datetime overrides the default log message's time stamp\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
+    printf("--create-request-id           create a id which is transfered to the server\n");
     printf("--desc-count=VALUE            overrides the default # of kernel buffer descriptors\n");
     printf("--desc-size=VALUE             overrides the default size of each kernel buffer descriptor\n");
+    printf("--events=EVENT_LIST           specify the events to enable\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -3563,9 +3780,11 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"desc-count",1,0,0},
         {"desc-size",1,0,0},
         {"logfile",1,0,0},
+        {"client-dir",1,0,0},
         {"logtype",1,0,0},
         {"logstamp",1,0,0},
         {"child",0,0,0},
+        {"events",1,0,0},
         {0,0,0,0}
     };
 
@@ -3573,14 +3792,14 @@ static void parse_args(int argc, char **argv, options_t *opts)
     opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
-    while((ret = getopt_long(argc, argv, "ha:n:L:",
+    while((ret = getopt_long(argc, argv, "ha:n:L:c:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
         {
             case 0:
                 cur_option = (char *)long_opts[option_index].name;
-
+ 
                 if (strcmp("help", cur_option) == 0)
                 {
                     goto do_help;
@@ -3593,7 +3812,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_ncache;
                 }
-                else if (strcmp("desc-count", cur_option) == 0)
+                else if (strcmp("desc-count", cur_option) == 0) 
                 {
                     ret = sscanf(optarg, "%u", &opts->dev_buffer_count);
                     if(ret != 1)
@@ -3618,6 +3837,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("client-dir", cur_option) == 0)
+                {
+                    goto do_client_dir;
                 }
                 else if (strcmp("logtype", cur_option) == 0)
                 {
@@ -3744,6 +3967,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     opts->child = 1;
                 }
+                else if (strcmp("events", cur_option) == 0)
+                {
+                    opts->events = optarg;
+                }
                 break;
             case 'h':
           do_help:
@@ -3752,6 +3979,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'L':
           do_logfile:
                 opts->logfile = optarg;
+                break;
+            case 'c':
+          do_client_dir:
+                opts->client_dir = optarg;
                 break;
             case 'a':
           do_acache:
@@ -3789,6 +4020,9 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         opts->logtype = "file";
     }
+    /* nlmills: TODO: add real error handling */
+    assert(opts->client_dir);
+        
 }
 
 static void reset_acache_timeout(void)
@@ -3931,6 +4165,66 @@ static char *get_vfs_op_name_str(int op_type)
 }
 #endif
 
+static int credential_compare_fn(void *key, struct qhash_head *link)
+{
+    credential_key_t *ckey = (credential_key_t*)key;
+    struct PINT_tcache_entry *tmp;
+    credential_payload_t *cpayload;
+
+    tmp = qhash_entry(link, struct PINT_tcache_entry, hash_link);
+    assert(tmp);
+
+    cpayload = (credential_payload_t*)tmp->payload;
+    
+    return ((ckey->fsid == cpayload->fsid) && 
+            (ckey->uid == cpayload->uid));
+}
+
+static int ckey_hash_fn(void *key, int table_size)
+{
+    credential_key_t *ckey = (credential_key_t*)key;
+    int hash;
+
+    hash = quickhash_32bit_hash(&ckey->fsid, table_size);
+    hash ^= quickhash_32bit_hash(&ckey->uid, table_size);
+
+    return hash;
+}
+
+static int credential_free_fn(void *payload)
+{
+    credential_payload_t *cpayload = (credential_payload_t*)payload;
+
+    PINT_cleanup_credential(cpayload->credential);
+    free(cpayload->credential);
+    free(cpayload);
+
+    return 0;
+}
+
+/* nlmills: TODO: make use of options */
+static int setup_credential_cache(options_t* s_opts)
+{
+    int ret;
+
+    /* nlmills: TODO: find a good table size */
+    credential_cache = PINT_tcache_initialize(credential_compare_fn,
+                                              ckey_hash_fn,
+                                              credential_free_fn,
+                                              0);
+    if (credential_cache == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    /* nlmills: TODO: find a good timeout value */
+    ret = PINT_tcache_set_info(credential_cache,
+                               TCACHE_TIMEOUT_MSECS,
+                               3600000 /* 60 minutes */);
+
+    return ret;
+}
+
 static int set_acache_parameters(options_t* s_opts)
 {
     int ret = -1;
@@ -3938,7 +4232,7 @@ static int set_acache_parameters(options_t* s_opts)
     /* pass along acache settings if they were specified on command line */
     if(s_opts->acache_reclaim_percentage_set)
     {
-        ret = PINT_acache_set_info(ACACHE_RECLAIM_PERCENTAGE,
+        ret = PINT_acache_set_info(ACACHE_RECLAIM_PERCENTAGE, 
             s_opts->acache_reclaim_percentage);
         if(ret < 0)
         {
@@ -3948,7 +4242,7 @@ static int set_acache_parameters(options_t* s_opts)
     }
     if(s_opts->acache_hard_limit_set)
     {
-        ret = PINT_acache_set_info(ACACHE_HARD_LIMIT,
+        ret = PINT_acache_set_info(ACACHE_HARD_LIMIT, 
             s_opts->acache_hard_limit);
         if(ret < 0)
         {
@@ -3958,7 +4252,7 @@ static int set_acache_parameters(options_t* s_opts)
     }
     if(s_opts->acache_soft_limit_set)
     {
-        ret = PINT_acache_set_info(ACACHE_SOFT_LIMIT,
+        ret = PINT_acache_set_info(ACACHE_SOFT_LIMIT, 
             s_opts->acache_soft_limit);
         if(ret < 0)
         {
@@ -3985,7 +4279,7 @@ static int set_ncache_parameters(options_t* s_opts)
     /* pass along ncache settings if they were specified on command line */
     if(s_opts->ncache_reclaim_percentage_set)
     {
-        ret = PINT_ncache_set_info(NCACHE_RECLAIM_PERCENTAGE,
+        ret = PINT_ncache_set_info(NCACHE_RECLAIM_PERCENTAGE, 
             s_opts->ncache_reclaim_percentage);
         if(ret < 0)
         {
@@ -3995,7 +4289,7 @@ static int set_ncache_parameters(options_t* s_opts)
     }
     if(s_opts->ncache_hard_limit_set)
     {
-        ret = PINT_ncache_set_info(NCACHE_HARD_LIMIT,
+        ret = PINT_ncache_set_info(NCACHE_HARD_LIMIT, 
             s_opts->ncache_hard_limit);
         if(ret < 0)
         {
@@ -4005,7 +4299,7 @@ static int set_ncache_parameters(options_t* s_opts)
     }
     if(s_opts->ncache_soft_limit_set)
     {
-        ret = PINT_ncache_set_info(NCACHE_SOFT_LIMIT,
+        ret = PINT_ncache_set_info(NCACHE_SOFT_LIMIT, 
             s_opts->ncache_soft_limit);
         if(ret < 0)
         {
@@ -4047,6 +4341,143 @@ static void set_device_parameters(options_t *s_opts)
     s_desc_params[BM_READDIR].dev_buffer_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     s_desc_params[BM_READDIR].dev_buffer_size  = PVFS2_READDIR_DEFAULT_DESC_SIZE;
     return;
+}
+
+static int get_mac(void);
+
+inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req)
+{
+    int32_t mac;
+
+    *hints = NULL;
+    if(!s_opts.events) return;
+
+    mac = get_mac();
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "mac: %d\n", mac);
+    PVFS_hint_add(hints, PVFS_HINT_CLIENT_ID_NAME, sizeof(mac), &mac);
+}
+
+static int get_mac(void)
+{
+    int sock;
+    struct ifreq iface;
+    int mac;
+
+    strcpy(iface.ifr_name,"eth0");
+
+    if((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+    else
+    {
+        if((ioctl(sock, SIOCGIFHWADDR, &iface)) < 0)
+        {
+            perror("ioctl SIOCGIFHWADDR");
+            return -1;
+        }
+        else
+        {
+            mac = iface.ifr_hwaddr.sa_data[0] & 0xff;
+            mac |= (iface.ifr_hwaddr.sa_data[1] & 0xff) << 8;
+            mac |= (iface.ifr_hwaddr.sa_data[2] & 0xff) << 8;
+            mac |= (iface.ifr_hwaddr.sa_data[3] & 0xff) << 8;
+            return mac;
+        }
+    }
+}
+
+static int request_credential(PVFS_credential **credential, 
+    PVFS_fs_id fsid, PVFS_uid uid)
+{
+    struct PVFS_sys_mntent mntent;
+    PVFS_BMI_addr_t addr;
+    char certpath[PATH_MAX];
+    char keypath[PATH_MAX];
+    int ret;
+    
+    ret = PVFS_util_get_mntent_copy(fsid, &mntent);
+    if (ret < 0)
+    {
+        /* nlmills: TODO: error handling */
+        return ret;
+    }
+
+    ret = BMI_addr_lookup(&addr, mntent.the_pvfs_config_server);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to resolve BMI "
+                     "address %s\n", mntent.the_pvfs_config_server);
+        return ret;
+    }
+
+    snprintf(certpath, PATH_MAX, "%s/%u.cert", s_opts.client_dir, uid);
+    snprintf(keypath, PATH_MAX, "%s/%u.key", s_opts.client_dir, uid);
+
+    *credential = malloc(sizeof(PVFS_credential));
+    if (*credential == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    ret = PVFS_util_gen_credential(fsid, addr, certpath, keypath, *credential);
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to get credential for "
+                     "userid %u\n", uid);
+        return ret;
+    }
+
+    return 0;
+}
+
+static PVFS_credential *lookup_credential(PVFS_fs_id fsid, PVFS_uid uid)
+{
+    credential_key_t ckey;
+    credential_payload_t *cpayload;
+    struct PINT_tcache_entry *entry;
+    PVFS_credential *credential;
+    struct timeval tval;
+    int status;
+    int ret;
+    
+    ckey.fsid = fsid;
+    ckey.uid = uid;
+
+    /* see if a fresh credential is in our cache */
+    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
+    if (ret >= 0 && status >= 0)
+    {
+        cpayload = (credential_payload_t*)entry->payload;
+        return (PVFS_credential*)cpayload->credential;
+    }
+
+    /* otherwise request a new credential and store it */
+    
+    ret = request_credential(&credential, fsid, uid);
+    if (ret < 0)
+    {
+        gossip_err("Unable to fetch client credential for uid %d\n", uid);
+        return NULL;
+    }
+
+    cpayload = malloc(sizeof(credential_payload_t));
+    if (!cpayload)
+    {
+        gossip_lerr("Out of memory\n");
+        return NULL;
+    }
+    cpayload->uid = uid;
+    cpayload->fsid = fsid;
+    cpayload->credential = credential;
+
+    tval.tv_sec = credential->timeout;
+    tval.tv_usec = 0;
+
+    ret = PINT_tcache_insert_entry_ex(credential_cache, &ckey, 
+                                      cpayload, &tval, &status);
+
+    return credential;
 }
 
 /*

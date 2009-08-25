@@ -69,6 +69,7 @@ EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/ \
     -I$(absolute_build_dir)/ \
     -I$(absolute_src_dir)/include \
+    -I$(absolute_build_dir)/include \
     -I$(absolute_src_dir)/src/io/dev \
     -I$(absolute_src_dir)/src/io/bmi \
     -I$(absolute_src_dir)/src/common/quickhash \
@@ -95,7 +96,7 @@ KDIR    := @LINUX_KERNEL_SRC@
 PWD	:= $(shell pwd)
 
 default: links
-	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
+	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules Q=@
 
 # link to real source directory if out-of-tree build
 links:

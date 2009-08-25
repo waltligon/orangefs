@@ -48,7 +48,10 @@ int main(int argc, char **argv)
     char                szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id          fs_id                     = 0;
     struct options      user_opts;
-    PVFS_credential     *credential;
+    PVFS_credential     *creds;
+    PVFS_credential     *cred;
+    int                 ncreds;
+    int                 i;
 
     /* Initialize any memory */
     memset(&user_opts,   0, sizeof(user_opts));
@@ -68,6 +71,14 @@ int main(int argc, char **argv)
         return (-1);
     }
 
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
     /* Let's verify that all the given files reside on a PVFS2 filesytem */
     ret = PVFS_util_resolve(user_opts.pszLinkName, 
                             &fs_id, 
@@ -82,10 +93,9 @@ int main(int argc, char **argv)
         return(-1);
    }
 
-    credential = PVFS_util_gen_fake_credential();
-    assert(credential);
+    cred = PVFS_util_find_credential_by_fsid(fs_id, creds, ncreds);
 
-    ret = make_link(credential,
+    ret = make_link(cred,
                     fs_id,
                     user_opts.pszLinkTarget,
                     szPvfsPath,
@@ -99,7 +109,11 @@ int main(int argc, char **argv)
     }
 
     /* TODO: need to free the request descriptions */
-    PINT_release_credential(credential);
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     PVFS_sys_finalize();
 
     return(0);
@@ -189,7 +203,7 @@ static int make_link(PVFS_credential      * pCredential,
                            (char *) pszLinkTarget,
                            attr, 
                            pCredential, 
-                           &resp_sym);
+                           &resp_sym, NULL);
 
     if (ret < 0)
     {

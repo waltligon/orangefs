@@ -45,7 +45,9 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
+    PVFS_credential *creds;
     PVFS_credential *cred;
+    int ncreds;
     int io_server_count;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms_array;
@@ -71,6 +73,14 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -80,11 +90,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, cred, PVFS_MGMT_IO_SERVER,
+    ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
 	&io_server_count);
     if(ret < 0)
     {
@@ -139,7 +148,6 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     cred,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -153,14 +161,14 @@ int main(int argc, char **argv)
     while (1)
     {
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				      cred,
+                                      cred,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,
 				      next_id_array,
 				      io_server_count, 
 				      HISTORY,
-				      NULL);
+				      NULL, NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
@@ -172,7 +180,7 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -200,7 +208,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -231,7 +239,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -243,7 +251,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, cred,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -268,7 +276,11 @@ int main(int argc, char **argv)
 	sleep(FREQUENCY);
     }
 
-    PINT_release_credential(cred);
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     PVFS_sys_finalize();
 
     return(ret);

@@ -4,6 +4,15 @@
  *
  * See COPYING in top-level directory.
  */
+/* twod-stripe will take all of the servers in the filesystem and
+ * partition them into num_groups groups.  Data will then be striped to
+ * each group before we move onto the next group.  The strip_factor will
+ * determine how many chunks of strip_size are written to each server
+ * in each group before we transition to the next group.
+ * The striping on the group level is done round-robin in the same
+ * fashion as simple-stripe
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,12 +71,15 @@ static PVFS_offset logical_to_physical_offset(void* params,
     num_groups = dparam->num_groups;
     strip_size = dparam->strip_size;
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err("%s: Invalid num_groups/server_ct options: "
                    "gr:%d server:%d\n",
                    __func__, num_groups, server_ct);
     }
+
+    if(num_groups > server_ct )
+        num_groups = server_ct;
 
     /* size of all groups that are of equal size: all groups
      * except when server_ct doesnt divide evenly into num_groups */
@@ -181,7 +193,7 @@ static PVFS_offset physical_to_logical_offset(void* params,
     PVFS_size global_stripes = 0;
     uint32_t num_groups = dparam->num_groups;
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err(
             "%s: Invalid num_groups/server_ct options: "
@@ -189,6 +201,9 @@ static PVFS_offset physical_to_logical_offset(void* params,
             __func__,num_groups,server_ct);
     }
 
+    if(num_groups > server_ct)
+        num_groups = server_ct;
+    
     /* if we are a server in the last group, make sure things are happy */
     if(server_nr >= (num_groups-1)*(small_group_size))
     {
@@ -325,7 +340,7 @@ static PVFS_offset next_mapped_offset(void* params,
         return physical_to_logical_offset(params,fd,0);
     }
 
-    if(num_groups > server_ct || num_groups == 0 || server_ct == 0 )
+    if( num_groups == 0 || server_ct == 0 )
     {
         gossip_err("%s: Invalid num_groups/server_ct options: "
                    "gr:%d server:%d\n",
@@ -333,7 +348,8 @@ static PVFS_offset next_mapped_offset(void* params,
                    num_groups,
                    server_ct);
     }
-
+    if(num_groups > server_ct)
+        num_groups = server_ct;
     total_stripes += global_stripes * factor;
 
     /* if we are a server in the last group, make sure things are happy */
@@ -433,29 +449,29 @@ static int set_param(const char* dist_name, void* params,
     }
     else if(strcmp(param_name, "num_groups")==0)
     {
-        if(*(uint32_t*)value <= 0)
+        if(*(int64_t*)value <= 0)
         {
             gossip_err("ERROR: num_groups param <= 0!\n");
         }
         else
         {
             gossip_debug(GOSSIP_DIST_DEBUG,
-                         "%s: num_groups: %d\n",
-                         __func__, *(uint32_t*)value);
-            dparam->num_groups = *(uint32_t*)value;
+                         "%s: num_groups: %lld\n",
+                         __func__, lld(*(int64_t*)value));
+            dparam->num_groups = *(int64_t*)value;
         }
     }
     else if(strcmp(param_name, "group_strip_factor")==0)
     {
-        if(*(uint32_t*)value <= 0)
+        if(*(int64_t*)value <= 0)
             gossip_err("ERROR: group_strip_factor param <= 0!\n");
         else
         {
             gossip_debug(GOSSIP_DIST_DEBUG,
-                         "%s: group_strip_factor: %d\n",
-                         __func__,*(uint32_t*)value);
+                         "%s: group_strip_factor: %lld\n",
+                         __func__,lld(*(int64_t*)value));
 
-            dparam->group_strip_factor = *(uint32_t*)value;
+            dparam->group_strip_factor = *(int64_t*)value;
         }
     }
     else
@@ -470,7 +486,7 @@ static void encode_params(char **pptr, void* params)
     PVFS_twod_stripe_params *dparam =(PVFS_twod_stripe_params*)params;
     encode_uint32_t(pptr,&dparam->num_groups);
     encode_PVFS_size(pptr, &dparam->strip_size);
-    encode_int32_t(pptr,&dparam->group_strip_factor);
+    encode_uint32_t(pptr,&dparam->group_strip_factor);
 }
 
 
@@ -502,6 +518,13 @@ static char *params_string(void *params)
     return strdup(param_string);
 }
 
+static PVFS_size get_blksize(void* params)
+{
+    PVFS_twod_stripe_params* dparam = (PVFS_twod_stripe_params*)params;
+    /* report the strip size as the block size */
+    return(dparam->strip_size);
+}
+
 /* default twod_stripe_params */
 static PVFS_twod_stripe_params twod_stripe_params = {
     PVFS_DIST_TWOD_STRIPE_DEFAULT_GROUPS,   /* num_groups */
@@ -517,6 +540,7 @@ static PINT_dist_methods twod_stripe_methods = {
     logical_file_size,
     PINT_dist_default_get_num_dfiles,
     set_param,
+    get_blksize,
     encode_params,
     decode_params,
     registration_init,

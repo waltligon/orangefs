@@ -27,6 +27,10 @@
 #include "str-utils.h"
 #include "id-generator.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-debug.h"
+
+static int bmi_initialized_count = 0;
+static gen_mutex_t bmi_initialize_mutex = GEN_MUTEX_INITIALIZER;
 
 /*
  * List of BMI addrs currently managed.
@@ -44,7 +48,7 @@ static gen_mutex_t forget_list_mutex = GEN_MUTEX_INITIALIZER;
 struct forget_item
 {
     struct qlist_head link;
-    PVFS_BMI_addr_t addr;
+    BMI_addr_t addr;
 };
 
 /*
@@ -112,6 +116,7 @@ static struct {
 } *method_usage = NULL;
 static const int usage_iters_starvation = 100000;
 static const int usage_iters_active = 10000;
+static int global_flags;
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -141,6 +146,19 @@ int BMI_initialize(const char *method_list,
     char *proto = NULL;
     int addr_count = 0;
 
+    gen_mutex_lock(&bmi_initialize_mutex);
+    if(bmi_initialized_count > 0)
+    {
+        /* Already initialized! Just increment ref count and return. */
+	++bmi_initialized_count;
+	gen_mutex_unlock(&bmi_initialize_mutex);
+        return 0;
+    }
+    ++bmi_initialized_count;
+    gen_mutex_unlock(&bmi_initialize_mutex);
+
+    global_flags = flags;
+
     /* server must specify method list at startup, optional for client */
     if (flags & BMI_INIT_SERVER) {
 	if (!listen_addr || !method_list)
@@ -151,6 +169,13 @@ int BMI_initialize(const char *method_list,
 	if (flags) {
 	    gossip_lerr("Warning: flags ignored on client.\n");
 	}
+    }
+
+    /* make sure that id generator is initialized if not already */
+    ret = id_gen_safe_initialize();
+    if(ret < 0)
+    {
+        return(ret);
     }
 
     /* make a new reference list */
@@ -199,7 +224,7 @@ int BMI_initialize(const char *method_list,
 	        gossip_err("%s: Invalid method name: %s.  Method names "
 			   "must start with 'bmi_'\n",
 			   __func__, requested_methods[i]);
-		ret = -PVFS_EINVAL;
+		ret = -EINVAL;
 		gen_mutex_unlock(&active_method_count_mutex);
 		goto bmi_initialize_failure;
 	    }
@@ -225,7 +250,7 @@ int BMI_initialize(const char *method_list,
 		gossip_err("%s: Failed to find an appropriate listening "
 			   "address for the bmi method: %s\n",
 			   __func__, requested_methods[i]);
-		ret = -PVFS_EINVAL;
+		ret = -EINVAL;
 		gen_mutex_unlock(&active_method_count_mutex);
 		goto bmi_initialize_failure;
 	    }
@@ -296,6 +321,9 @@ int BMI_initialize(const char *method_list,
 
     active_method_count = 0;
     gen_mutex_unlock(&active_method_count_mutex);
+
+    /* shut down id generator */
+    id_gen_safe_finalize();
 
     return (ret);
 }
@@ -467,6 +495,15 @@ int BMI_finalize(void)
 {
     int i = -1;
 
+    gen_mutex_lock(&bmi_initialize_mutex);
+    --bmi_initialized_count;
+    if(bmi_initialized_count > 0)
+    {
+        gen_mutex_unlock(&bmi_initialize_mutex);
+        return 0;
+    }
+    gen_mutex_unlock(&bmi_initialize_mutex);
+
     gen_mutex_lock(&active_method_count_mutex);
     /* attempt to shut down active methods */
     for (i = 0; i < active_method_count; i++)
@@ -486,6 +523,9 @@ int BMI_finalize(void)
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
+
+    /* shut down id generator */
+    id_gen_safe_finalize();
 
     return (0);
 }
@@ -587,14 +627,15 @@ void BMI_close_context(bmi_context_id context_id)
  *  \return 0 on success, -errno on failure.
  */
 int BMI_post_recv(bmi_op_id_t * id,
-		  PVFS_BMI_addr_t src,
+		  BMI_addr_t src,
 		  void *buffer,
 		  bmi_size_t expected_size,
 		  bmi_size_t * actual_size,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id)
+		  bmi_context_id context_id,
+                  bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -616,7 +657,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_recv(
         id, tmp_ref->method_addr, buffer, expected_size, actual_size,
-        buffer_type, tag, user_ptr, context_id);
+        buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -626,13 +667,14 @@ int BMI_post_recv(bmi_op_id_t * id,
  *  \return 0 on success, -errno on failure.
  */
 int BMI_post_send(bmi_op_id_t * id,
-		  PVFS_BMI_addr_t dest,
+		  BMI_addr_t dest,
 		  const void *buffer,
 		  bmi_size_t size,
 		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
-		  bmi_context_id context_id)
+		  bmi_context_id context_id,
+                  bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -654,7 +696,7 @@ int BMI_post_send(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_send(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
-        user_ptr, context_id);
+        user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -664,13 +706,14 @@ int BMI_post_send(bmi_op_id_t * id,
  *  \return 0 on success, -errno on failure.
  */
 int BMI_post_sendunexpected(bmi_op_id_t * id,
-			    PVFS_BMI_addr_t dest,
+			    BMI_addr_t dest,
 			    const void *buffer,
 			    bmi_size_t size,
 			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
 			    void *user_ptr,
-			    bmi_context_id context_id)
+			    bmi_context_id context_id,
+                            bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -692,7 +735,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->post_sendunexpected(
         id, tmp_ref->method_addr, buffer, size, buffer_type, tag,
-        user_ptr, context_id);
+        user_ptr, context_id, (PVFS_hint)hints);
     return (ret);
 }
 
@@ -972,6 +1015,10 @@ int BMI_testunexpected(int incount,
 	    gen_mutex_unlock(&ref_mutex);
 	    return (bmi_errno_to_pvfs(-EPROTO));
 	}
+        if(global_flags & BMI_AUTO_REF_COUNT)
+        {
+            tmp_ref->ref_count++;
+        }
 	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
     }
@@ -1077,7 +1124,7 @@ int BMI_testcontext(int incount,
  *
  *  \return Pointer to string on success, NULL on failure.
  */
-const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
+const char* BMI_addr_rev_lookup(BMI_addr_t addr)
 {
     ref_st_p tmp_ref = NULL;
     char* tmp_str = NULL;
@@ -1106,7 +1153,7 @@ const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
  *
  *  \return Pointer to string on success, NULL on failure.
  */
-const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr)
+const char* BMI_addr_rev_lookup_unexpected(BMI_addr_t addr)
 {
     ref_st_p tmp_ref = NULL;
 
@@ -1134,7 +1181,7 @@ const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr)
  *
  *  \return Pointer to buffer on success, NULL on failure.
  */
-void *BMI_memalloc(PVFS_BMI_addr_t addr,
+void *BMI_memalloc(BMI_addr_t addr,
 		   bmi_size_t size,
 		   enum bmi_op_type send_recv)
 {
@@ -1161,7 +1208,7 @@ void *BMI_memalloc(PVFS_BMI_addr_t addr,
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_memfree(PVFS_BMI_addr_t addr,
+int BMI_memfree(BMI_addr_t addr,
 		void *buffer,
 		bmi_size_t size,
 		enum bmi_op_type send_recv)
@@ -1190,7 +1237,7 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_unexpected_free(PVFS_BMI_addr_t addr,
+int BMI_unexpected_free(BMI_addr_t addr,
 		void *buffer)
 {
     ref_st_p tmp_ref = NULL;
@@ -1221,7 +1268,7 @@ int BMI_unexpected_free(PVFS_BMI_addr_t addr,
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_set_info(PVFS_BMI_addr_t addr,
+int BMI_set_info(BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter)
 {
@@ -1329,7 +1376,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_get_info(PVFS_BMI_addr_t addr,
+int BMI_get_info(BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter)
 {
@@ -1417,7 +1464,7 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
  * \return 1 on success, -errno on failure and 0 if it is not part of
  * the specified range
  */
-int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netmask)
+int BMI_query_addr_range (BMI_addr_t addr, const char *id_string, int netmask)
 {
     int ret = -1;
     int i = 0, failed = 1;
@@ -1493,7 +1540,7 @@ int BMI_query_addr_range (PVFS_BMI_addr_t addr, const char *id_string, int netma
  *
  *  \return 0 on success, -errno on failure.
  */
-int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
+int BMI_addr_lookup(BMI_addr_t * new_addr,
                     const char *id_string)
 {
 
@@ -1584,6 +1631,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     /* fill in the details */
     new_ref->method_addr = meth_addr;
+    meth_addr->parent = new_ref;
     new_ref->id_string = (char *) malloc(strlen(id_string) + 1);
     if (!new_ref->id_string)
     {
@@ -1625,7 +1673,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
  *  -errno on failure.
  */
 int BMI_post_send_list(bmi_op_id_t * id,
-		       PVFS_BMI_addr_t dest,
+		       BMI_addr_t dest,
 		       const void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
@@ -1634,7 +1682,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id)
+		       bmi_context_id context_id,
+                       bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1670,7 +1719,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_send_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
-            context_id);
+            context_id, (PVFS_hint)hints);
 
 	return (ret);
     }
@@ -1692,7 +1741,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
  *  -errno on failure.
  */
 int BMI_post_recv_list(bmi_op_id_t * id,
-		       PVFS_BMI_addr_t src,
+		       BMI_addr_t src,
 		       void *const *buffer_list,
 		       const bmi_size_t *size_list,
 		       int list_count,
@@ -1701,7 +1750,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
-		       bmi_context_id context_id)
+		       bmi_context_id context_id,
+                       bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1737,7 +1787,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_recv_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_expected_size, total_actual_size,
-            buffer_type, tag, user_ptr, context_id);
+            buffer_type, tag, user_ptr, context_id, (PVFS_hint)hints);
 
 	return (ret);
     }
@@ -1758,7 +1808,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
  *  -errno on failure.
  */
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
-				 PVFS_BMI_addr_t dest,
+				 BMI_addr_t dest,
 				 const void *const *buffer_list,
 				 const bmi_size_t *size_list,
 				 int list_count,
@@ -1766,7 +1816,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 bmi_context_id context_id)
+				 bmi_context_id context_id,
+                                 bmi_hint hints)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1803,7 +1854,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 	ret = tmp_ref->interface->post_sendunexpected_list(
             id, tmp_ref->method_addr, buffer_list, size_list,
             list_count, total_size, buffer_type, tag, user_ptr,
-            context_id);
+            context_id, (PVFS_hint)hints);
 
 	return (ret);
     }
@@ -1874,7 +1925,7 @@ int BMI_cancel(bmi_op_id_t id,
  *
  * returns 0 on success, -errno on failure
  */
-PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
+BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
 {
     ref_st_p new_ref = NULL;
 
@@ -1894,6 +1945,7 @@ PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
     */
     new_ref->method_addr = map;
     new_ref->id_string = NULL;
+    map->parent = new_ref;
 
     /* check the method_type from the method_addr pointer to know
      * which interface to use */
@@ -1905,7 +1957,7 @@ PVFS_BMI_addr_t bmi_method_addr_reg_callback(bmi_method_addr_p map)
     return new_ref->bmi_addr;
 }
 
-int bmi_method_addr_forget_callback(PVFS_BMI_addr_t addr)
+int bmi_method_addr_forget_callback(BMI_addr_t addr)
 {
     struct forget_item* tmp_item = NULL;
 
@@ -2100,7 +2152,7 @@ case err: bmi_errno = BMI_##err; break
  */
 static void bmi_check_forget_list(void)
 {
-    PVFS_BMI_addr_t tmp_addr;
+    BMI_addr_t tmp_addr;
     struct forget_item* tmp_item;
     ref_st_p tmp_ref = NULL;
     

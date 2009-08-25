@@ -11,6 +11,8 @@
 #include <malloc.h>
 #endif
 
+#include "pint-mem.h"
+
 /* PINT_mem_aligned_alloc()
  *
  * allocates a memory region of the specified size and returns a 

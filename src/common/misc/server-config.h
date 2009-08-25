@@ -87,6 +87,7 @@ typedef struct filesystem_configuration_s
     int immediate_completion;
     int coalescing_high_watermark;
     int coalescing_low_watermark;
+    int file_stuffing;
 
     char *secret_key;
 
@@ -102,20 +103,11 @@ typedef struct filesystem_configuration_s
     char **ro_hosts;
     int   *ro_netmasks;
 
-    int    root_squash_count;
-    char **root_squash_hosts;
-    int   *root_squash_netmasks;
+    int32_t small_file_size;
 
-    int    root_squash_exceptions_count;
-    char **root_squash_exceptions_hosts;
-    int   *root_squash_exceptions_netmasks;
-
-    int    all_squash_count;
-    char **all_squash_hosts;
-    int   *all_squash_netmasks;
-
-    PVFS_uid exp_anon_uid;
-    PVFS_gid exp_anon_gid;
+    int32_t directio_thread_num;
+    int32_t directio_ops_per_queue;
+    int32_t directio_timeout;
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -151,6 +143,7 @@ typedef struct security_mapping_s
 typedef struct server_configuration_s
 {
     char *host_id;
+    int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
     char *storage_path;
@@ -166,10 +159,13 @@ typedef struct server_configuration_s
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
+    int  precreate_batch_size;
+    int  precreate_low_threshold;
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
     char *event_logging;
+    int enable_events;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
 
@@ -188,7 +184,7 @@ typedef struct server_configuration_s
     int   *allowed_masks;            /* Netmasks for each of the specified trusted network */
     void  *security;                /* BMI module specific information */
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
-#endif
+#endif /* USE_TRUSTED */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
@@ -206,11 +202,9 @@ typedef struct server_configuration_s
                                      */
     int trove_method;
 	
-#ifndef SECURITY_ENCRYPTION_NONE
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
     char *cabundle_path;             /* location of trusted CA bundle */
-#endif
 
     int security_timeout;
     PINT_llist *security_mappings;   /* ptrs are type security_mapping_s */

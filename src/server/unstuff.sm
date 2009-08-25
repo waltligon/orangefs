@@ -1,10 +1,7 @@
 /* 
- * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2009 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
- *
- * Changes by Acxiom Corporation to add dirent_count field to attributes
- * Copyright © Acxiom Corporation, 2005.
  */
 
 #include <string.h>
@@ -19,8 +16,14 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "pint-security.h"
+#include "security-util.h"
+#include "check.h"
 
-#define STATE_UNSTUFF 33
+enum {
+    STATE_UNSTUFF = 33,
+    STATE_CAPABILITY
+};
 
 %%
 
@@ -90,6 +93,25 @@ machine pvfs2_unstuff_sm
     state remove_layout
     {
         run remove_layout;
+        default => check_if_capability_required;
+    }
+
+    state check_if_capability_required
+    {
+        run check_if_capability_required;
+        STATE_CAPABILITY => read_acl;
+        default => final_response;
+    }
+
+    state read_acl
+    {
+        run read_acl;
+        default => create_capability;
+    }
+
+    state create_capability
+    {
+        run create_capability;
         default => final_response;
     }
 
@@ -363,6 +385,189 @@ static PINT_sm_action remove_layout(
         s_op->req->hints);
 }
 
+/* nlmills: TODO: replace all this messy capability code with
+ * a call to the getattr nested state machine
+ */
+
+/* check_if_capability_required
+ *
+ * Branch point for capability creation.
+ */
+static PINT_sm_action check_if_capability_required(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* errors fall through */
+    if (js_p->error_code < 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY)
+    {
+        /* get rid of the old capability */
+        PINT_cleanup_capability(&s_op->resp.u.unstuff.attr.capability);
+        js_p->error_code = STATE_CAPABILITY;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* read_acl
+ * 
+ * Reads any ACL data from Trove if a capability is requested.
+ */
+static PINT_sm_action read_acl(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+    int ret;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (unstuff sm) state: read_acl\n",
+                 s_op, PINT_map_server_op_to_string(s_op->req->op));
+
+    assert(s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY);
+
+    /* nlmills: TODO: make key a constant */
+    s_op->key.buffer = "system.posix_acl_access";
+    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+        s_op->free_val = 0;
+    }
+    s_op->val.buffer = malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
+    s_op->free_val = 1;
+    
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
+                     "for handle %llu\n", llu(s_op->target_handle));
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.unstuff.fs_id,
+        s_op->req->u.unstuff.handle,
+        &s_op->key,
+        &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context,
+        s_op->req->hints);
+
+    return ret;
+}
+
+/* create_capability
+ * 
+ * nlmills: TODO: document me
+ */
+static PINT_sm_action create_capability(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *resp_attr = &s_op->resp.u.unstuff.attr;
+    void *acl_buf;
+    size_t acl_size;
+    int ret;
+
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        acl_buf = NULL;
+        acl_size = 0;
+        js_p->error_code = 0;
+    }
+    else if (js_p->error_code < 0)
+    {
+        /* let fatal errors fall through */
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        acl_buf = s_op->val.buffer;
+        acl_size = s_op->val.read_sz;
+    }
+
+    ret = PINT_init_capability(&resp_attr->capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "unstuff: capability init failed\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    resp_attr->capability.num_handles = 1;
+
+    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
+        (resp_attr->mask & PVFS_ATTR_META_DFILES))
+    {
+        resp_attr->capability.num_handles += resp_attr->u.meta.dfile_count;
+    }
+
+    resp_attr->capability.handle_array = 
+        calloc(resp_attr->capability.num_handles, sizeof(PVFS_handle));
+    if (!resp_attr->capability.handle_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    resp_attr->capability.handle_array[0] = s_op->req->u.unstuff.handle;
+    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
+        (resp_attr->mask & PVFS_ATTR_META_DFILES))
+    {
+        /* copy datafile handles after the metafile handle */
+        memcpy((resp_attr->capability.handle_array + 1),
+               resp_attr->u.meta.dfile_array,
+               resp_attr->u.meta.dfile_count * sizeof(PVFS_handle));
+    }
+
+    ret = PINT_get_capabilities(acl_buf,
+                                acl_size,
+                                s_op->req->u.unstuff.credential.userid,
+                                s_op->req->u.unstuff.credential.group_array,
+                                s_op->req->u.unstuff.credential.num_groups,
+                                resp_attr,
+                                &resp_attr->capability.op_mask);
+    if (ret < 0)
+    {
+        PINT_cleanup_capability(&resp_attr->capability);
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    resp_attr->capability.fsid = s_op->req->u.unstuff.fs_id;
+
+    ret = PINT_sign_capability(&resp_attr->capability);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "unstuff: failed to sign capability\n");
+        PINT_cleanup_capability(&resp_attr->capability);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+                                 
+    resp_attr->mask |= PVFS_ATTR_CAPABILITY;
+
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -471,13 +676,29 @@ static PINT_sm_action getattr_interpret(
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_unstuff(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: probably just need write permission */
+    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
 
 PINT_GET_OBJECT_REF_DEFINE(unstuff);
 
 struct PINT_server_req_params pvfs2_unstuff_params =
 {
     .string_name = "unstuff",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_unstuff,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_unstuff,

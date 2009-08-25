@@ -59,6 +59,7 @@ PVFS_error PVFS_isys_geteattr_list(
         PVFS_ds_keyval *key_array,
         PVFS_sysresp_geteattr *resp_p,
         PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
@@ -93,6 +94,7 @@ PVFS_error PVFS_isys_geteattr_list(
     sm_p->u.geteattr.resp_p = resp_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
@@ -103,7 +105,8 @@ PVFS_error PVFS_sys_geteattr_list(
         const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
-        PVFS_sysresp_geteattr *resp_p)
+        PVFS_sysresp_geteattr *resp_p,
+        PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -111,7 +114,7 @@ PVFS_error PVFS_sys_geteattr_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_geteattr entered\n");
 
     ret = PVFS_isys_geteattr_list(ref, credential,
-            nkey, key_array, resp_p, &op_id, NULL);
+            nkey, key_array, resp_p, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -136,13 +139,14 @@ PVFS_error PVFS_sys_geteattr(
         PVFS_object_ref ref,
         const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p)
+        PVFS_ds_keyval *val_p,
+        PVFS_hint hints)
 {
     PVFS_sysresp_geteattr resp_p;
     PVFS_error tmp_err;
     resp_p.val_array = val_p;
     resp_p.err_array = &tmp_err;
-    return PVFS_sys_geteattr_list(ref, credential, 1, key_p, &resp_p);
+    return PVFS_sys_geteattr_list(ref, credential, 1, key_p, &resp_p, hints);
 }
 
 static PINT_sm_action get_eattr_setup_msgpair(
@@ -152,12 +156,12 @@ static PINT_sm_action get_eattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     int i;
     PINT_sm_msgpair_state *msg_p;
-    const PVFS_capability *capability;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_setup_msgpair\n");
 
-    capability = PINT_null_capability();
+    PINT_null_capability(&capability);
 
     /* this will be the array of value buffer sizes */
     sm_p->u.geteattr.size_array =
@@ -175,12 +179,13 @@ static PINT_sm_action get_eattr_setup_msgpair(
 
     PINT_SERVREQ_GETEATTR_FILL(
         msg_p->req,
-        *capability,
+        capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         sm_p->u.geteattr.nkey,
         sm_p->u.geteattr.key_array,
-        sm_p->u.geteattr.size_array);
+        sm_p->u.geteattr.size_array,
+        sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;

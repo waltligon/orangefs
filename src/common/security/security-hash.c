@@ -1,5 +1,5 @@
 /* 
- * (C) 2008 Clemson University and The University of Chicago 
+ * (C) 2009 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -17,19 +17,16 @@
 #include "gen-locks.h"
 
 
-/*  71 seems to be a reasonable size, could be increased
+/*  1009 seems to be a reasonable size, could be increased
  *  if collisions start to become a problem. Prime numbers
  *  are preferred. */
-#define DEFAULT_SECURITY_TABLE_SIZE 71
-
-
-/*  TODO: Serialize hash table at some point if wanted */
+#define DEFAULT_SECURITY_TABLE_SIZE 1009
 
 
 typedef struct pubkey_entry_s {
-    struct qlist_head hash_link;    /* holds prev/next pointers */
-    char *hash_key;                     /* hash key */
-    EVP_PKEY *pubkey;               /* public key for above hash_key */
+    struct qlist_head hash_link;  /* holds prev/next pointers */
+    char *hash_key;               /* hash key */
+    EVP_PKEY *pubkey;             /* public key for above hash_key */
 } pubkey_entry_t;
 
 
@@ -77,8 +74,6 @@ int SECURITY_hash_initialize(void)
  *
  *  Frees everything allocated within the table
  *  and anything used to set it up
- *
- *  returns nothing
  */
 void SECURITY_hash_finalize(void)
 {
@@ -101,7 +96,9 @@ void SECURITY_hash_finalize(void)
  *  Takes an EVP_PKEY and inserts it into the hash table
  *  based on the hash key.  If the hash key already
  *  exists in the table, it's corresponding EVP_PKEY is replaced 
- *  with the new one
+ *  with the new one.
+ *
+ *  The public key will be freed upon removal from the table.
  *
  *  returns PVFS_ENOMEM if memory cannot be allocated
  *  returns 0 on success

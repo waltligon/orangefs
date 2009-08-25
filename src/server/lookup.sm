@@ -135,7 +135,7 @@ static PINT_sm_action lookup_read_directory_entry_handle(
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
         0, 
-        NULL, smcb, 0, js_p, &j_id, server_job_context);
+        NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -179,27 +179,12 @@ static PINT_sm_action lookup_read_directory_entry(
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p, &j_id,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
 
 
-/*
- * Function: lookup_cleanup
- *
- * Synopsis: Free memory allocated during request processing.
- *
- * There are a bunch of regions that must be freed after processing
- * completes:
- * - decoded request (s_op->decoded)
- * - encoded request (s_op->unexp_bmi_buff.buffer)
- * - encoded response (s_op->encoded)
- * - original (decoded) response (s_op->resp)
- * - dynamically allocated space (in this case 
- *   s_op->resp.u.lookup_path.handle_array)
- * - the server operation structure itself
- */
 static PINT_sm_action lookup_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {

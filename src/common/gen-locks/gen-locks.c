@@ -77,7 +77,7 @@ int gen_posix_mutex_trylock(
 /*
  * gen_mutex_destroy()
  *
- * uninitializes the mutex.
+ * uninitializes the mutex and frees all memory associated with it.
  *
  * returns 0 on success, -errno on failure.
  */
@@ -97,6 +97,42 @@ int gen_posix_mutex_destroy(
 pthread_t gen_posix_thread_self(void)
 {
     return pthread_self();
+}
+
+int gen_posix_cond_destroy(pthread_cond_t *cond)
+{
+    if(!cond)
+    {
+        return -EINVAL;
+    }
+    pthread_cond_destroy(cond);
+    return 0;
+}
+
+int gen_posix_cond_wait(pthread_cond_t *cond, pthread_mutex_t *mut)
+{
+    return pthread_cond_wait(cond, mut);
+}
+
+int gen_posix_cond_timedwait(pthread_cond_t *cond, pthread_mutex_t *mut,
+                             const struct timespec *abstime)
+{
+    return pthread_cond_timedwait(cond, mut, abstime);
+}
+
+int gen_posix_cond_signal(pthread_cond_t *cond)
+{
+    return pthread_cond_signal(cond);
+}
+
+int gen_posix_cond_broadcast(pthread_cond_t *cond)
+{
+    return pthread_cond_broadcast(cond);
+}
+
+int gen_posix_cond_init(pthread_cond_t *cond, pthread_condattr_t *attr)
+{
+    return pthread_cond_init(cond, attr);
 }
 
 #endif

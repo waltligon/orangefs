@@ -19,7 +19,6 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-util.h"
-#include "pint-util.h"
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"
@@ -29,7 +28,9 @@
 #include "pint-sysint-utils.h"
 #include "pint-perf-counter.h"
 #include "state-machine.h"
-#include "security-types.h"
+#include "pvfs2-hint.h"
+#include "pint-event.h"
+#include "pint-util.h"
 #include "security-util.h"
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
@@ -47,12 +48,67 @@
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
 /* Default timout buffer for capabilities */
-/* TODO:  Figure out a better way to handle this */
+/* nlmills: TODO:  Figure out a better way to handle this */
 #define CAP_TIMEOUT_BUFFER 120
 
 int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
+
+/* flag to disable cached lookup during getattr nested sm */
+#define PINT_SM_GETATTR_BYPASS_CACHE 1
+
+typedef struct PINT_sm_getattr_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+    PVFS_ds_type ref_type;
+
+    PVFS_size * size_array;
+    PVFS_size size;
+
+    int flags;
+    
+} PINT_sm_getattr_state;
+
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
+        (_state).flags = _flags; \
+    } while(0)
+
+#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
+    do { \
+        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
+        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
+    do { \
+        free(*(_array)); \
+        *(_array) = NULL; \
+    } while(0)
 
 /* PINT_client_sm_recv_state_s
  *
@@ -78,64 +134,24 @@ struct PINT_client_remove_sm
 struct PINT_client_create_sm
 {
     char *object_name;                /* input parameter */
-    PVFS_sysresp_create *create_resp; /* in/out parameter*/
-    PVFS_sys_attr sys_attr;           /* input parameter */
+    PVFS_object_attr attr;            /* input parameter */
+    PVFS_sysresp_create *create_resp; /* in/out parameter */
 
     int retry_count;
     int num_data_files;
+    int user_requested_num_data_files;
     int stored_error_code;
 
     PINT_dist *dist;
     PVFS_sys_layout layout;
+
     PVFS_handle metafile_handle;
+    int datafile_count;
     PVFS_handle *datafile_handles;
-    PVFS_BMI_addr_t *data_server_addrs;
-    PVFS_handle_extent_array *io_handle_extent_array;
-    PVFS_object_attr cache_attr;
+    int stuffed;
+
+    PVFS_handle handles[2];
 };
-
-/* flag to disable cached lookup during getattr nested sm */
-#define PINT_SM_GETATTR_BYPASS_CACHE 1
-
-typedef struct PINT_sm_getattr_state
-{
-    PVFS_object_ref object_ref;
-
-   /* request sys attrmask.  Some combination of
-     * PVFS_ATTR_SYS_*
-     */
-    uint32_t req_attrmask;
-
-    /*
-      Either from the acache or full getattr op, this is the resuling
-      attribute that can be used by calling state machines
-    */
-    PVFS_object_attr attr;
-
-    PVFS_ds_type ref_type;
-
-    PVFS_size * size_array;
-    PVFS_size size;
-
-    int flags;
-
-} PINT_sm_getattr_state;
-
-#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
-    do { \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref.fs_id = (_objref).fs_id; \
-        (_state).object_ref.handle = (_objref).handle; \
-        (_state).req_attrmask = _mask; \
-        (_state).ref_type = _reftype; \
-        (_state).flags = _flags; \
-    } while(0)
-
-#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
-    do { \
-        PINT_free_object_attr(&(_state).attr); \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-    } while(0)
 
 struct PINT_client_mkdir_sm
 {
@@ -288,7 +304,7 @@ struct PINT_client_readdirplus_sm
     int attrmask;                       /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
     /* scratch variables */
-    int nhandles;
+    int nhandles;  
     int svr_count;
     PVFS_size        **size_array;
     PVFS_object_attr *obj_attr_array;
@@ -342,14 +358,13 @@ struct PINT_client_rename_sm
     PVFS_handle old_dirent_handle;
 };
 
-struct PINT_client_mgmt_setparam_list_sm
+struct PINT_client_mgmt_setparam_list_sm 
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
-    int64_t value;
+    struct PVFS_mgmt_setparam_value *value;
     PVFS_id_gen_t *addr_array;
     int count;
-    uint64_t *old_value_array;
     int *root_check_status_array;
     PVFS_error_details *details;
 };
@@ -358,7 +373,7 @@ struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_server_stat *stat_array;
-    int count;
+    int count; 
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
     PVFS_sysresp_statfs* resp; /* ignored by mgmt functions */
@@ -369,8 +384,8 @@ struct PINT_client_mgmt_perf_mon_list_sm
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_perf_stat **perf_matrix;
     uint64_t *end_time_ms_array;
-    int server_count;
-    int history_count;
+    int server_count; 
+    int history_count; 
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
     PVFS_error_details *details;
@@ -380,8 +395,8 @@ struct PINT_client_mgmt_event_mon_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_event **event_matrix;
-    int server_count;
-    int event_count;
+    int server_count; 
+    int event_count; 
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
 };
@@ -389,12 +404,13 @@ struct PINT_client_mgmt_event_mon_list_sm
 struct PINT_client_mgmt_iterate_handles_list_sm
 {
     PVFS_fs_id fs_id;
-    int server_count;
+    int server_count; 
     PVFS_id_gen_t *addr_array;
     PVFS_handle **handle_matrix;
     int *handle_count_array;
     PVFS_ds_position *position_array;
     PVFS_error_details *details;
+    int flags;
 };
 
 struct PINT_client_mgmt_get_dfile_array_sm
@@ -425,18 +441,6 @@ struct PINT_server_fetch_config_sm_state
     char **fs_config_bufs;
     int32_t *fs_config_buf_size;
 };
-
-#define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
-    do { \
-        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
-        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
-    } while(0)
-
-#define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
-    do { \
-        free(*(_array)); \
-        *(_array) = NULL; \
-    } while(0)
 
 struct PINT_client_geteattr_sm
 {
@@ -484,7 +488,7 @@ struct PINT_sysdev_unexp_sm
     struct PINT_dev_unexp_info *info;
 };
 
-typedef struct
+typedef struct 
 {
     PVFS_dirent **dirent_array;
     uint32_t      *dirent_outcount;
@@ -497,7 +501,8 @@ typedef struct
 struct PINT_client_getcred_sm
 {
     char *certificate;
-    PVFS_sig signature;
+    char *key;
+    PVFS_signature signature;
     uint32_t sig_size;
     PVFS_sysresp_getcred *getcred_resp;
 };
@@ -510,6 +515,8 @@ typedef struct PINT_client_sm
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;
     void *user_ptr;
+
+    PINT_event_id event_id;
 
     /* stores the final operation error code on operation exit */
     PVFS_error error_code;
@@ -525,6 +532,8 @@ typedef struct PINT_client_sm
 
     /* fetch_config state used by the nested fetch config state machines */
     struct PINT_server_fetch_config_sm_state fetch_config;
+
+    PVFS_hint hints;
 
     PINT_sm_msgarray_op msgarray_op;
 

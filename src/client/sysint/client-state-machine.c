@@ -25,11 +25,17 @@
 #include "id-generator.h"
 #include "ncache.h"
 #include "acache.h"
+#include "pint-event.h"
+#include "pint-hint.h"
 #include "security-util.h"
 
 #define MAX_RETURNED_JOBS   256
 
 job_context_id pint_client_sm_context = -1;
+
+extern int pint_client_pid;
+
+extern PINT_event_id PINT_client_sys_event_id;
 
 /*
   used for locally storing completed operations from test() call so
@@ -40,6 +46,8 @@ static int s_completion_list_index = 0;
 static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t test_mutex = GEN_MUTEX_INITIALIZER;
+
+static void PINT_sys_release_smcb(PINT_smcb *smcb);
 
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
 do { assert(pint_client_sm_context != -1); } while(0)
@@ -299,9 +307,16 @@ int client_state_machine_terminate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    PINT_client_sm *sm_p;
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
+
+    PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+
+    PVFS_hint_free(sm_p->hints);
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
@@ -356,8 +371,17 @@ PVFS_error PINT_client_state_machine_post(
     PINT_sm_action sm_ret;
     PVFS_error ret = -PVFS_EINVAL;
     job_status_s js;
-    int pvfs_sys_op __attribute__((unused)) = PINT_smcb_op(smcb);
+    int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PVFS_hint_add_internal(&sm_p->hints, PINT_HINT_OP_ID, sizeof(pvfs_sys_op), &pvfs_sys_op);
+
+    PINT_EVENT_START(PINT_client_sys_event_id, pint_client_pid, NULL, &sm_p->event_id,
+                     PINT_HINT_GET_CLIENT_ID(sm_p->hints),
+                     PINT_HINT_GET_RANK(sm_p->hints),
+                     PINT_HINT_GET_REQUEST_ID(sm_p->hints),
+                     PINT_HINT_GET_HANDLE(sm_p->hints),
+                     pvfs_sys_op);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_client_state_machine_post smcb %p, op: %s\n",
@@ -394,10 +418,12 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_TERMINATE);
 
+        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+
         *op_id = -1;
 
-        /* free the smcb */
-        PINT_smcb_free(smcb);
+        /* free the smcb and any other extra data allocated there */
+        PINT_sys_release_smcb(smcb);
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (%llu) "
@@ -405,6 +431,7 @@ PVFS_error PINT_client_state_machine_post(
                     PINT_client_get_name_str(pvfs_sys_op),
                     llu((op_id ? *op_id : -1)),
                     js.error_code);
+
     }
     else
     {
@@ -788,13 +815,12 @@ PVFS_error PINT_client_wait_internal(
     return ret;
 }
 
-/** Frees resources associated with state machine instance.
+/** Finds state machine referenced by op_id and releases resources
+ * associated with it
  */
 void PINT_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_smcb *smcb; 
-    PINT_client_sm *sm_p; 
-    PVFS_credential *newcred_p; 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: id %lld\n", __func__, lld(op_id));
     smcb = PINT_id_gen_safe_lookup(op_id);
@@ -802,6 +828,20 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     {
         return;
     }
+    PINT_id_gen_safe_unregister(op_id);
+    PINT_sys_release_smcb(smcb);
+
+    return;
+}
+
+/** releases resources associated with an smcb.  Can be used both on
+ * immediate completion and asynchronous completion
+ */
+static void PINT_sys_release_smcb(PINT_smcb *smcb)
+{
+    PINT_client_sm *sm_p; 
+    PVFS_credential *newcred_p; 
+
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p == NULL) 
     {
@@ -811,11 +851,11 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     {
         newcred_p = sm_p->newcred_p;
     }
-    PINT_id_gen_safe_unregister(op_id);
 
     if (PINT_smcb_op(smcb) && newcred_p)
     {
-        PINT_release_credential(newcred_p);
+        PINT_cleanup_credential(newcred_p);
+        free(newcred_p);
         if (sm_p) sm_p->newcred_p = NULL;
     }
 

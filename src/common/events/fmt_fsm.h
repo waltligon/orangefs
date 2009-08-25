@@ -1,6 +1,6 @@
 /*****************************************************
  * File    : fmt_fsm.h   
- * Version : $Id: fmt_fsm.h,v 1.2 2008-11-20 01:16:52 slang Exp $
+ * Version : $Id: fmt_fsm.h,v 1.2.30.1 2009-08-25 17:55:57 nlmills Exp $
  ****************************************************/
 
 /* Author: Aroon Nataraj */
@@ -220,6 +220,6 @@ int ff_format::promoteIntegral(int patn_index, char* src, int src_sz, int *upto,
 #endif //_FMT_FSM_H
 
 /***************************************************************************
- * $RCSfile: fmt_fsm.h,v $   $Author: slang $
- * $Revision: 1.2 $   $Date: 2008-11-20 01:16:52 $
+ * $RCSfile: fmt_fsm.h,v $   $Author: nlmills $
+ * $Revision: 1.2.30.1 $   $Date: 2009-08-25 17:55:57 $
  ***************************************************************************/

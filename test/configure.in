@@ -49,8 +49,6 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
-AC_CHECK_HEADERS(openssl/evp.h)
-AC_CHECK_HEADERS(openssl/crypto.h)
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
 dnl check if it is an Intel compiler; those lie and claim to be gcc but are
@@ -151,10 +149,11 @@ PVFS2_TOP_PREFIX=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-confi
 AC_SUBST(SERVERLIBS)
 AC_SUBST(PVFS2_TOP_PREFIX)
 
+AX_OPENSSL
+
 dnl make sure the libs exist and work
 AC_CHECK_LIB(pvfs2, PVFS_sys_create, ,
-    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2-build")
-    )
+    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2-build"), -lssl -lcrypto)
 
 MPI_INTELC=
 MPI_GNUC=
@@ -204,13 +203,6 @@ AC_ARG_WITH(db,
 	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
 	[AX_BERKELEY_DB(${withval})],
 	[AX_BERKELEY_DB("")])
-
-AC_ARG_WITH(openssl,
-		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)
-		 	 --without-openssl     Don't build with openssl.
-		 ],
-		 [AX_OPENSSL(${withval})],
-		 [AX_OPENSSL_OPTIONAL])
 
 AC_ARG_WITH(libaio,
 		 [  --with-libaio=<dir>  Location of installed libaio package (default=/usr)

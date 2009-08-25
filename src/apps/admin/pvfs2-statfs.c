@@ -48,7 +48,9 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_statfs resp_statfs;
     int i,j;
+    PVFS_credential *creds;
     PVFS_credential *cred;
+    int ncreds;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
     int server_type;
@@ -72,6 +74,14 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -82,11 +92,10 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
 
     /* gather normal statfs statistics from system interface */
-    ret = PVFS_sys_statfs(cur_fs, cred, &resp_statfs);
+    ret = PVFS_sys_statfs(cur_fs, cred, &resp_statfs, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_statfs", ret);
@@ -148,7 +157,7 @@ int main(int argc, char **argv)
 
     outcount = resp_statfs.server_count;
     ret = PVFS_mgmt_statfs_all(cur_fs, cred, stat_array,
-                               &outcount, NULL);
+                               &outcount, NULL, NULL);
 
     for(j = 0; j<2; j++)
     {
@@ -247,7 +256,11 @@ int main(int argc, char **argv)
         }
     }
 
-    PINT_release_credential(cred);
+    for (i = 0; i < ncreds; i++)
+    {
+        PINT_cleanup_credential(&creds[i]);
+    }
+    free(creds);
     PVFS_sys_finalize();
     free(stat_array);
     return(ret);

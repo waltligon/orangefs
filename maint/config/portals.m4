@@ -30,7 +30,8 @@ AC_DEFUN([AX_PORTALS],
 	fi
     )
     AC_ARG_WITH(portals-includes,
-    [  --with-portals-includes=<dir>  Extra CFLAGS to specify Portals includes],
+[  --with-portals-includes=<dir>
+                          Extra CFLAGS to specify Portals includes],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-portals-includes requires an argument.])
 	elif test "$withval" != no ; then
@@ -38,7 +39,8 @@ AC_DEFUN([AX_PORTALS],
 	fi
     )
     AC_ARG_WITH(portals-libs,
-    [  --with-portals-libs=<dir>      Extra LIBS to link Portals libraries],
+[  --with-portals-libs=<dir>
+                          Extra LIBS to link Portals libraries],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-portals-libs requires an argument.])
 	elif test "$withval" != no ; then

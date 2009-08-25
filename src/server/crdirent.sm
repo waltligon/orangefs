@@ -203,7 +203,7 @@ static PINT_sm_action crdirent_read_directory_entry_handle(
         0,
         js_p,
         &i,
-        server_job_context);
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -280,7 +280,7 @@ static PINT_sm_action crdirent_write_directory_entry(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
         &s_op->key, &s_op->val, 
         keyval_flags,
-        NULL, smcb, 0, js_p, &i, server_job_context);
+        NULL, smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     /*
      * creating an entry will cause directory times to be updated.
@@ -330,7 +330,7 @@ static PINT_sm_action crdirent_update_directory_attr(
         s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
         ds_attr, 
         TROVE_SYNC,
-        smcb, 0, js_p, &j_id, server_job_context);
+        smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
     return ret;
 }

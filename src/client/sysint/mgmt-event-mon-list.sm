@@ -64,6 +64,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
     int event_count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PINT_smcb *smcb = NULL;
@@ -98,6 +99,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
     sm_p->u.event_mon_list.event_count = event_count;
     sm_p->u.event_mon_list.addr_array = addr_array;
     sm_p->u.event_mon_list.details = details;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, server_count);
     if(ret != 0)
@@ -117,7 +119,8 @@ PVFS_error PVFS_mgmt_event_mon_list(
     PVFS_BMI_addr_t *addr_array,
     int server_count,
     int event_count,
-    PVFS_error_details *details)
+    PVFS_error_details *details,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
@@ -127,7 +130,7 @@ PVFS_error PVFS_mgmt_event_mon_list(
 
     ret = PVFS_imgmt_event_mon_list(
         fs_id, credential, event_matrix, addr_array, server_count,
-        event_count, details, &op_id, NULL);
+        event_count, details, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -157,21 +160,22 @@ static PINT_sm_action mgmt_event_mon_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-    const PVFS_capability *capability;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "event_mon_list state: "
                  "mgmt_event_mon_list_setup_msgpair\n");
 
     js_p->error_code = 0;
 
-    capability = PINT_null_capability();
+    PINT_null_capability(&capability);
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_MGMT_EVENT_MON_FILL(
             msg_p->req,
-            *capability,
-            sm_p->u.event_mon_list.event_count);
+            capability,
+            sm_p->u.event_mon_list.event_count,
+            sm_p->hints);
 
         msg_p->fs_id = sm_p->u.event_mon_list.fs_id;
         msg_p->handle = PVFS_HANDLE_NULL;

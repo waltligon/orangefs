@@ -12,15 +12,11 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-#ifdef WITH_OPENSSL
+#ifdef HAVE_OPENSSL
 
 
-#ifdef HAVE_OPENSSL_EVP_H
 #include <openssl/evp.h>
-#endif
-#ifdef HAVE_OPENSSL_CRYPTO_H
 #include <openssl/crypto.h>
-#endif
 #include <errno.h>
 #include "gen-locks.h"
 
@@ -158,7 +154,7 @@ static int digest(const char *digest_name,
     return 0;
 }
 
-#else /* WITH_OPENSSL */
+#else /* !HAVE_OPENSSL */
 
 void PINT_util_digest_init(void)
 {
@@ -180,7 +176,7 @@ static int digest(const char *digest_name,
     return -PVFS_EOPNOTSUPP;
 }
 
-#endif
+#endif /* HAVE_OPENSSL */
 
 int PINT_util_digest_sha1(const void *input_message, size_t input_length,
                           char **output, size_t *output_length)

@@ -136,7 +136,8 @@ static PINT_sm_action final_response_send_resp(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, smcb, 0, js_p, &tmp_id,
-        server_job_context, user_opts->server_job_bmi_timeout);
+        server_job_context, user_opts->server_job_bmi_timeout,
+        s_op->req->hints);
 
     return ret;
 }
@@ -224,6 +225,9 @@ static void PINT_gossip_err_server_resp(
                         break;
                     case PVFS_TYPE_DIRDATA:
                         gossip_err("DIRDATA [ n/a ]\n");
+                        break;
+                    case PVFS_TYPE_INTERNAL:
+                        gossip_err("INTERNAL [ n/a ]\n");
                         break;
                     case PVFS_TYPE_NONE:
                         gossip_err("NONE [ n/a ]\n");

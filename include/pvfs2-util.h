@@ -14,6 +14,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-types.h"
+#include "security-types.h"
 
 /* Define min macro with pvfs2 prefix */
 #ifndef PVFS_util_min
@@ -42,7 +43,19 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(
 
 void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
-PVFS_credential *PVFS_util_gen_fake_credential(void);
+/* nlmills: TODO: find sensible defaults */
+#define PVFS2_DEFAULT_CERT_FILE "client.cert"
+#define PVFS2_DEFAULT_KEY_FILE "client.key"
+
+int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds);
+int PVFS_util_gen_credential(PVFS_fs_id fsid,
+                             PVFS_BMI_addr_t addr,
+                             const char *certpath,
+                             const char *keypath,
+                             PVFS_credential *cred);
+PVFS_credential *PVFS_util_find_credential_by_fsid(PVFS_fs_id fsid,
+                                                   PVFS_credential *creds,
+                                                   int ncreds);
 
 int PVFS_util_copy_sys_attr(
     PVFS_sys_attr *dest_attr,

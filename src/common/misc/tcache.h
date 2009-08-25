@@ -156,10 +156,10 @@ int PINT_tcache_insert_entry(
     int* purged);
 
 int PINT_tcache_insert_entry_ex(
-    struct PINT_tcache* tcache,
-    void* key,
-    void* payload,
-    struct timeval* expiration,
+    struct PINT_tcache *tcache,
+    void *key,
+    void *payload,
+    struct timeval *expiration,
     int* purged);
 
 int PINT_tcache_lookup(

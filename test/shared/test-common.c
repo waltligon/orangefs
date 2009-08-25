@@ -19,6 +19,10 @@
 #include "test-common.h"
 #include "libgen.h"
 #include "pvfs2-util.h"
+#include "pvfs2.h"
+#include "str-utils.h"
+#include "pvfs2-internal.h"
+#include "bmi.h"
 #include "security-util.h"
 
 /** \file
@@ -333,7 +337,36 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
 
-        cred = PVFS_util_gen_fake_credential();
+    cred = calloc(1, sizeof(PVFS_credential));
+    if (!cred)
+    {
+        perror("calloc");
+        return(TEST_COMMON_FAIL);
+    }
+
+        PVFS_BMI_addr_t addr;
+
+        ret = BMI_addr_lookup(&addr, 
+                              szPvfsPath);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to resolve BMI address %s\n",
+                    szPvfsPath);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ret = PVFS_util_gen_credential(fs_id,
+                                       addr,
+                                       NULL,
+                                       NULL,
+                                       cred);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to generate credential for fsid %d\n",
+                    fs_id);
+            return(TEST_COMMON_FAIL);
+        }
+
         assert(cred);
  
         if(followLink)
@@ -342,7 +375,8 @@ int stat_file(
                                   szPvfsPath, 
                                   cred, 
                                   &lk_response, 
-                                  PVFS2_LOOKUP_LINK_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_FOLLOW,
+								  NULL);
         }
         else
         {
@@ -350,7 +384,8 @@ int stat_file(
                                   szPvfsPath, 
                                   cred, 
                                   &lk_response, 
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,
+								  NULL);
         }
    
         if(ret < 0)
@@ -365,14 +400,14 @@ int stat_file(
         ret = PVFS_sys_getattr(ref, 
                                PVFS_ATTR_SYS_ALL,
                                cred, 
-                               &getattr_response);
+                               &getattr_response,
+							   NULL);
 
         if(ret < 0)
         {                          
             PVFS_perror("PVFS_sys_getattr", ret);
             return(TEST_COMMON_FAIL);
         }
-        PINT_release_credential(cred);
         copy_pvfs2_to_stat(&getattr_response.attr, fileStats);
     }
     else
@@ -480,7 +515,35 @@ int create_file(
             return(TEST_COMMON_FAIL);
         }
 
-        cred = PVFS_util_gen_fake_credential();
+        cred = calloc(1, sizeof(PVFS_credential));
+    if (!cred)
+    {
+        perror("calloc");
+        return(TEST_COMMON_FAIL);
+    }
+
+        PVFS_BMI_addr_t addr;
+
+        ret = BMI_addr_lookup(&addr, 
+                              szPvfsPath);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to resolve BMI address %s\n",
+                    szPvfsPath);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ret = PVFS_util_gen_credential(fs_id,
+                                       addr,
+                                       NULL,
+                                       NULL,
+                                       cred);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to generate credential for fsid %d\n",
+                    fs_id);
+            return(TEST_COMMON_FAIL);
+        }
         assert(cred);
 
         ret = pvfs2_create_file(szPvfsPath,
@@ -495,7 +558,6 @@ int create_file(
             print_error("Error: could not create test file [%s]\n", fileName);
             return(TEST_COMMON_FAIL);
         }
-        PINT_release_credential(cred);
     }
     else
     {
@@ -999,7 +1061,35 @@ int pvfs2_open(
         return(ret);
     }
 
-    cred = PVFS_util_gen_fake_credential();
+    cred = calloc(1, sizeof(PVFS_credential));
+    if (!cred)
+    {
+        perror("calloc");
+        return(TEST_COMMON_FAIL);
+    }
+
+        PVFS_BMI_addr_t addr;
+
+        ret = BMI_addr_lookup(&addr, 
+                              szPvfsPath);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to resolve BMI address %s\n",
+                    szPvfsPath);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ret = PVFS_util_gen_credential(fs_id,
+                                       addr,
+                                       NULL,
+                                       NULL,
+                                       cred);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to generate credential for fsid %d\n",
+                    fs_id);
+            return(TEST_COMMON_FAIL);
+        }
     assert(cred);
 
     if(followLink)
@@ -1008,7 +1098,8 @@ int pvfs2_open(
                               szPvfsPath, 
                               cred, 
                               &resp_lookup, 
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW,
+							  NULL);
     }
     else
     {
@@ -1016,7 +1107,8 @@ int pvfs2_open(
                               szPvfsPath, 
                               cred, 
                               &resp_lookup, 
-                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              PVFS2_LOOKUP_LINK_NO_FOLLOW,
+							  NULL);
     }
 
     if( (ret < 0) && 
@@ -1043,7 +1135,6 @@ int pvfs2_open(
             return(ret);
         }                              
     }
-    PINT_release_credential(cred);
 
     return ret;
 }
@@ -1098,7 +1189,8 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
                           parentDirectory, 
                           (PVFS_credential *) cred, 
                           &resp_lookup, 
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW,
+						  NULL);
   
     if (ret < 0)
     {
@@ -1121,10 +1213,11 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     ret = PVFS_sys_create(baseName, 
                           parent_ref,     /* handle & fs_id of parent  */
                           attr, 
-                          (PVFS_credential *) cred,
+                          cred,
                           NULL,           /* Accept default distribution for fs */
+                          &resp_create,
                           NULL,
-                          &resp_create);
+						  NULL);
 
     if (ret < 0)
     {
@@ -1182,7 +1275,8 @@ int lookup_parent(char             * filename,    /**< File Name */
                           szSegment, 
                           cred, 
                           &resp_look, 
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          PVFS2_LOOKUP_LINK_FOLLOW,
+						  NULL);
     if (ret < 0)
     {
         if(verbose)

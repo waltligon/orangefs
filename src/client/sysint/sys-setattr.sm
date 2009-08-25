@@ -34,6 +34,12 @@ static int setattr_msg_comp_fn(
 
 machine pvfs2_client_setattr_sm
 {
+    state init
+    {
+        run setattr_init;
+        default => setattr_getattr;
+    }
+
     state setattr_getattr
     {
         jump pvfs2_client_getattr_sm;
@@ -77,6 +83,7 @@ PVFS_error PVFS_isys_setattr(
     PVFS_sys_attr attr,
     const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -125,7 +132,9 @@ PVFS_error PVFS_isys_setattr(
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credential(sm_p->newcred_p, credential);
     sm_p->object_ref = ref;
-    
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+
     ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
     if(ret < 0)
     {
@@ -154,14 +163,15 @@ PVFS_error PVFS_isys_setattr(
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    const PVFS_credential *credential)
+    const PVFS_credential *credential,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
 
-    ret = PVFS_isys_setattr(ref, attr, credential, &op_id, NULL);
+    ret = PVFS_isys_setattr(ref, attr, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_setattr call", ret);
@@ -182,6 +192,13 @@ PVFS_error PVFS_sys_setattr(
 }
 
 /****************************************************************/
+
+static PINT_sm_action setattr_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    assert(js_p->error_code == 0);
+    return SM_ACTION_COMPLETE;
+}
 
 static int setattr_msg_comp_fn(void *v_p,
                                struct PVFS_server_resp *resp_p,
@@ -221,7 +238,8 @@ static PINT_sm_action setattr_msg_setup_msgpair(
         sm_p->object_ref.handle,
         objtype,
         sm_p->u.setattr.sys_attr,
-        0);
+        0,
+        sm_p->hints);
 
     /* clients should not be able to mess with dfile and distribution
      * information here.  Those parameters should only be set at create time.

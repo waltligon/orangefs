@@ -60,6 +60,11 @@ static int get_num_dfiles(void* params,
     return 1;
 }
 
+static PVFS_size get_blksize(void* params)
+{
+    /* this is arbitrary; all data is on one server */
+    return CONTIGBLOCKSZ;
+}
 
 static void encode_lebf(char **pptr, void* params)
 {
@@ -89,6 +94,7 @@ static PINT_dist_methods basic_methods = {
     logical_file_size,
     get_num_dfiles,
     PINT_dist_default_set_param,
+    get_blksize,
     encode_lebf,
     decode_lebf,
     registration_init,

@@ -12,7 +12,19 @@
 #include <assert.h>
 
 #include "client.h"
-#include "pvfs2-util.h"
+#include "pvfs2.h"
+#include "str-utils.h"
+#include "pvfs2-internal.h"
+#include "bmi.h"
+#include "security-util.h"
+
+/*
+  arbitrarily restrict the number of paths
+  that this ls version can take as arguments
+*/
+#define MAX_NUM_PATHS       8
+
+static PVFS_hint hints = NULL;
 
 void gen_rand_str(
     int len,
@@ -39,7 +51,6 @@ int main(
     char *filename;
     //char dirname[256] = "/parl/fshorte/sysint/home";
     int ret = -1, i = 0;
-    PVFS_fs_id fs_id;
     char *name = "/";
     PVFS_credential *cred;
     char *entry_name;
@@ -52,31 +63,95 @@ int main(
     PVFS_handle lk_handle;
     PVFS_handle lk_fsid;
 
+    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
+    const PVFS_util_tab* tab;
+    int found_one = 0;
+    int ncreds;
+    PVFS_BMI_addr_t addr;
+
     gen_rand_str(10, &filename);
 
     printf("creating a file named %s\n", filename);
 
-    ret = PVFS_util_init_defaults();
-    if (ret < 0)
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return (-1);
-    }
-    ret = PVFS_util_get_default_fsid(&fs_id);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_util_get_default_fsid", ret);
-	return (-1);
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
+        return(-1);
     }
 
-    printf("SYSTEM INTERFACE INITIALIZED\n");
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    for(i = 0; i < MAX_NUM_PATHS; i++)
+    {
+        memset(pvfs_path[i],0,PVFS_NAME_MAX);
+    }
+
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_sys_initialize", ret);
+	return(-1);
+    }
+
+    /* initialize each file system that we found in the tab file */
+    for(i = 0; i < tab->mntent_count; i++)
+    {
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if (ret == 0)
+        {
+	    found_one = 1;
+        }
+    }
+
+    if (!found_one)
+    {
+	fprintf(stderr, "Error: could not initialize any file systems "
+                "from %s\n", tab->tabfile_name);
+	PVFS_sys_finalize();
+	return(-1);
+    }
+
+    /* generate a credential for each known file system */
+
+    cred = calloc(tab->mntent_count, sizeof(PVFS_credential));
+    if (!cred)
+    {
+        perror("calloc");
+        PVFS_sys_finalize();
+        exit(EXIT_FAILURE);
+    }
+    ncreds = 0;
+
+    for (i = 0; i < tab->mntent_count; i++)
+    {
+
+        ret = BMI_addr_lookup(&addr, 
+                              tab->mntent_array[i].the_pvfs_config_server);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to resolve BMI address %s\n",
+                    tab->mntent_array[i].the_pvfs_config_server);
+            ret = EXIT_FAILURE;
+        }
+
+        ret = PVFS_util_gen_credential(tab->mntent_array[i].fs_id,
+                                       addr,
+                                       NULL,
+                                       NULL,
+                                       &cred[i]);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failed to generate credential for fsid %d\n",
+                    tab->mntent_array[i].fs_id);
+            ret = EXIT_FAILURE;
+        }
+        ncreds += 1;
+    }
+    
 
     /* lookup the root handle */
-    printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, name, cred,
-			  &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    printf("looking up the root handle for fsid = %d\n", tab->mntent_array[0].fs_id);
+    ret = PVFS_sys_lookup(tab->mntent_array[0].fs_id, name, cred,
+			  &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -110,7 +185,7 @@ int main(
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     parent_refn.handle = resp_look.ref.handle;
-    parent_refn.fs_id = fs_id;
+    parent_refn.fs_id = tab->mntent_array[0].fs_id;
 
 
 #if 0
@@ -124,7 +199,7 @@ int main(
 
     // call create 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  cred, NULL, NULL, resp_create);
+			  cred, NULL, resp_create, NULL, hints);
     if (ret < 0)
     {
 	printf("create failed with errcode = %d\n", ret);
@@ -204,8 +279,8 @@ int main(
     name[0] = '/';
     memcpy(name + 1, filename, strlen(filename) + 1);
 
-    ret = PVFS_sys_lookup(fs_id, name, cred,
-			  resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    ret = PVFS_sys_lookup(tab->mntent_array[0].fs_id, name, cred,
+			  resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -475,13 +550,13 @@ int main(
     // Fill in the dir info 
 
     pinode_refn.handle = resp_look.ref.handle;
-    pinode_refn.fs_id = fs_id;
+    pinode_refn.fs_id = tab->mntent_array[0].fs_id;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;
 
     // call readdir 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
-			   cred, resp_readdir);
+			   cred, resp_readdir, NULL);
     if (ret < 0)
     {
 	printf("readdir failed with errcode = %d\n", ret);

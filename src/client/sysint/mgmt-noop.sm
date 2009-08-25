@@ -60,6 +60,7 @@ PVFS_error PVFS_imgmt_noop(
     const PVFS_credential *credential,
     PVFS_BMI_addr_t addr,
     PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PINT_smcb *smcb = NULL;
@@ -85,6 +86,8 @@ PVFS_error PVFS_imgmt_noop(
     sm_p->msgarray_op.msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgarray_op.msgpair.svr_addr = addr;
 
+    PVFS_hint_copy(hints, &sm_p->hints);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                  "PINT_client_state_machine_post()\n");
 
@@ -97,14 +100,15 @@ PVFS_error PVFS_imgmt_noop(
 PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id fs_id,
     const PVFS_credential *credential,
-    PVFS_BMI_addr_t addr)
+    PVFS_BMI_addr_t addr,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_mgmt_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");
 
-    ret = PVFS_imgmt_noop(fs_id, credential, addr, &op_id, NULL);
+    ret = PVFS_imgmt_noop(fs_id, credential, addr, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_noop call", ret);
@@ -128,13 +132,13 @@ static PINT_sm_action mgmt_noop_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    const PVFS_capability *capability;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
 
-    capability = PINT_null_capability();
-    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, *capability);
+    PINT_null_capability(&capability);
+    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgarray_op.msgpair.req, capability, sm_p->hints);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     js_p->error_code = 0;

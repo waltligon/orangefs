@@ -1,5 +1,5 @@
 /* 
- * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2009 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -16,6 +16,7 @@
 #include "pint-perf-counter.h"
 #include "server-config.h"
 #include "pint-util.h"
+#include "security-util.h"
 
 static int batch_create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -155,7 +156,6 @@ static PINT_sm_action setup_batch_create_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_credentials creds;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
@@ -174,11 +174,10 @@ static PINT_sm_action setup_batch_create_fn(
     s_op->msgarray_op.params.quiet_flag = 1;
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
-    PINT_util_gen_credentials(&creds);
 
     PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
-        creds,
+        s_op->u.precreate_pool_refiller.capability,
         s_op->u.precreate_pool_refiller.fsid,
         PVFS_TYPE_DATAFILE,
         user_opts->precreate_batch_size,
@@ -206,6 +205,28 @@ static PINT_sm_action setup_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
+    PVFS_capability *cap = &s_op->u.precreate_pool_refiller.capability;
+    int ret;
+
+    /* nlmills: TODO: ensure this is freed in all cases */
+    ret = PINT_init_capability(cap);
+    if (ret < 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    cap->fsid = s_op->u.precreate_pool_refiller.fsid;
+    cap->op_mask = PINT_CAP_BATCH_CREATE;
+    cap->num_handles = 0;
+    cap->handle_array = NULL;
+
+    ret = PINT_sign_capability(cap);
+    if (ret < 0)
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
         
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
         malloc(user_opts->precreate_batch_size * sizeof(PVFS_handle));
@@ -238,6 +259,8 @@ static PINT_sm_action error_fn(
     {
         free(s_op->u.precreate_pool_refiller.precreate_handle_array);
     }
+
+    PINT_cleanup_capability(&s_op->u.precreate_pool_refiller.capability);
 
     return(job_req_sched_post_timer(
         (30*1000),
@@ -286,10 +309,19 @@ static int batch_create_comp_fn(void *v_p,
     return 0;
 }
 
+static int perm_precreate_pool_refiller(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = -PVFS_EINVAL;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_precreate_pool_refiller_params =
 {
     .string_name = "precreate_pool_refiller",
-    .perm = PINT_SERVER_CHECK_INVALID,
+    .perm = perm_precreate_pool_refiller,
     .state_machine = &pvfs2_precreate_pool_refiller_sm
 };
 

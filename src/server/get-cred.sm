@@ -1,5 +1,5 @@
 /* 
- * Copyright 2008 Clemson University and The University of Chicago
+ * Copyright 2009 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -17,7 +17,6 @@
 
 %%
 
-/* TODO: lots of work is done here. figure out a way to subdivide it */
 nested machine pvfs2_get_cred_work_sm
 {
     state verify_cert
@@ -151,7 +150,10 @@ static PINT_sm_action get_cred_make_cred(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    /* TODO: remove the serial field if it is never used */
+    /* nlmills: TODO: implement fine-grained (per filesystem) security */
+    s_op->u.getcred.credential.fsid = s_op->target_fs_id;
+
+    /* nlmills: TODO: implement serial numbers */
     s_op->u.getcred.credential.serial = 0;
 
     return SM_ACTION_COMPLETE;
@@ -164,7 +166,7 @@ static PINT_sm_action get_cred_sign_cred(struct PINT_smcb *smcb,
     int ret;
 
     ret = PINT_sign_credential(&s_op->u.getcred.credential);
-    if (ret == -1)
+    if (ret < 0)
     {
         gossip_err("Unable to sign credential\n");
         js_p->error_code = -PVFS_EINVAL;
@@ -193,6 +195,16 @@ static PINT_sm_action get_cred_cleanup(struct PINT_smcb *smcb,
     return server_state_machine_complete(smcb);
 }
 
+static int get_object_ref_getcred(struct PVFS_server_req *req, 
+                                  PVFS_fs_id *fs_id, 
+                                  PVFS_handle *handle)
+{
+    *fs_id = req->u.getcred.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+
+    return 0;
+}
+
 static int perm_getcred(PINT_server_op *s_op)
 {
     int ret;
@@ -205,6 +217,7 @@ static int perm_getcred(PINT_server_op *s_op)
 struct PINT_server_req_params pvfs2_get_cred_params =
 {
     .string_name = "getcred",
+    .get_object_ref = get_object_ref_getcred,
     .perm = perm_getcred,
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_get_cred_sm

@@ -81,7 +81,9 @@ int dbpf_queue_or_service(
     struct dbpf_op *op_p,
     dbpf_queued_op_t *q_op_p,
     struct dbpf_collection *coll_p,
-    TROVE_op_id *out_op_id_p);
+    TROVE_op_id *out_op_id_p,
+    PINT_event_type event_type,
+    PINT_event_id event_id);
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * op,
                             enum dbpf_op_state state);

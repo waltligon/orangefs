@@ -10,403 +10,457 @@
 
 #include <stdio.h>
 
+#include <unistd.h>
+
 #include "pint-event.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gossip.h"
+#include "quicklist.h"
+#include "quickhash.h"
+#include "id-generator.h"
+#include "str-utils.h"
+
+#include "pvfs2-config.h"
+
+#ifdef HAVE_TAU
+#include "pvfs_tau_api.h"
+#endif
 
 /* variables that provide runtime control over which events are recorded */
-int PINT_event_on = 0;
-int32_t PINT_event_api_mask = 0;
-int32_t PINT_event_op_mask = 0;
 
-/* global data structures for storing measurements */
-static struct PVFS_mgmt_event* ts_ring = NULL;
-static int ts_head = 0;
-static int ts_tail = 0;
-static int ts_ring_size = 0;
-static gen_mutex_t event_mutex = GEN_MUTEX_INITIALIZER;
+static PINT_event_group default_group;
 
-#ifdef HAVE_MPE
-int PINT_event_job_start, PINT_event_job_stop;
-int PINT_event_trove_rd_start, PINT_event_trove_rd_stop;
-int PINT_event_trove_wr_start, PINT_event_trove_wr_stop;
-int PINT_event_bmi_start, PINT_event_bmi_stop;
-int PINT_event_flow_start, PINT_event_flow_stop;
+static struct qhash_table *events_table = NULL;
+static struct qhash_table *groups_table = NULL;
+static uint32_t event_count = 0;
+uint64_t PINT_event_enabled_mask = 0;
+
+#ifdef HAVE_TAU
+static int PINT_event_default_buffer_size = 1024*1024;
+static int PINT_event_default_max_traces = 1024;
 #endif
 
-
-/* PINT_event_initialize()
- *
- * starts up the event logging interface
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_event_initialize(int ring_size)
+struct PINT_group
 {
-    gen_mutex_lock(&event_mutex);
+    char *name;
+    PINT_event_group id;
+    struct qlist_head events;
+    uint64_t mask;
+    struct qhash_head link;
+};
 
-#if defined(HAVE_PABLO)
-    PINT_event_pablo_init();
+struct PINT_event
+{
+    char *name;
+    PINT_event_type type;
+    PINT_event_group group;
+    uint64_t mask;
+    struct qlist_head group_link;
+    struct qlist_head link;
+};
+
+#if defined(HAVE_TAU)
+
+static void PINT_event_tau_init(void);
+static void PINT_event_tau_fini(void);
+static void PINT_event_tau_thread_init(char* gname);
+static void PINT_event_tau_thread_fini(void);
+
+#endif /* HAVE_TAU */
+
+static int PINT_group_compare(void *key, struct qhash_head *link)
+{
+    struct PINT_group *eg = qhash_entry(link, struct PINT_group, link);
+
+    if(!strcmp(eg->name, (char *)key))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+static int PINT_events_compare(void *key, struct qhash_head *link)
+{
+    struct PINT_event *e = qhash_entry(link, struct PINT_event, link);
+
+    if(!strcmp(e->name, (char *)key))
+    {
+        return 1;
+    }
+    return 0;
+}
+
+int PINT_event_init(enum PINT_event_method method)
+{
+    int ret;
+
+    events_table = qhash_init(PINT_events_compare, quickhash_string_hash, 1024);
+    if(!events_table)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    groups_table = qhash_init(PINT_group_compare, quickhash_string_hash, 1024);
+    if(!groups_table)
+    {
+        qhash_finalize(events_table);
+        return -PVFS_ENOMEM;
+    }
+
+    ret = PINT_event_define_group("defaults", &default_group);
+    if(ret < 0)
+    {
+        qhash_finalize(events_table);
+        qhash_finalize(groups_table);
+        return ret;
+    }
+
+    switch(method)
+    {
+        case PINT_EVENT_TRACE_TAU:
+#if defined(HAVE_TAU)
+            PINT_event_tau_init();
+            break;
+#else
+            return -PVFS_ENOSYS;
 #endif
-#if defined(HAVE_MPE)
-    PINT_event_mpe_init();
-#endif
+    }
 
-    PINT_event_default_init(ring_size);
-
-    gen_mutex_unlock(&event_mutex);
     return(0);
 }
 
-#if defined(HAVE_MPE)
-/*
- * PINT_event_mpe_init
- *   initialize the mpe profiling interface
- */
-int PINT_event_mpe_init(void)
-{
-    MPI_Init(NULL, NULL);
-    MPE_Init_log();
-
-    PINT_event_job_start = MPE_Log_get_event_number();
-    PINT_event_job_stop = MPE_Log_get_event_number();
-    PINT_event_trove_rd_start = MPE_Log_get_event_number();
-    PINT_event_trove_rd_stop = MPE_Log_get_event_number();
-    PINT_event_trove_wr_start = MPE_Log_get_event_number();
-    PINT_event_trove_wr_stop = MPE_Log_get_event_number();
-    PINT_event_bmi_start = MPE_Log_get_event_number();
-    PINT_event_bmi_stop = MPE_Log_get_event_number();
-    PINT_event_flow_start = MPE_Log_get_event_number();
-    PINT_event_flow_stop = MPE_Log_get_event_number();
-
-
-    MPE_Describe_state(PINT_event_job_start, PINT_event_job_stop, "Job", "red");
-    MPE_Describe_state(PINT_event_trove_rd_start, PINT_event_trove_rd_stop, 
-	    "Trove Read", "orange");
-    MPE_Describe_state(PINT_event_trove_wr_start, PINT_event_trove_wr_stop, 
-	    "Trove Write", "blue");
-    MPE_Describe_state(PINT_event_bmi_start, PINT_event_bmi_stop, 
-	    "BMI", "yellow");
-    MPE_Describe_state(PINT_event_flow_start, PINT_event_flow_stop, 
-	    "Flow", "green");
-
-    return 0;
-}
-
-void PINT_event_mpe_finalize(void)
-{
-    /* TODO: use mkstemp like pablo_finalize does */
-    MPE_Finish_log("/tmp/pvfs2-server");
-    MPI_Finalize();
-    return;
-}
-#endif
-
-#if defined(HAVE_PABLO)
-/* PINT_event_pablo_init
- *   initialize the pablo trace library 
- */
-int PINT_event_pablo_init(void)
-{
-    char tracefile[PATH_MAX];
-    snprintf(tracefile, PATH_MAX, "/tmp/pvfs2-server.pablo.XXXXXX");
-    mkstemp(tracefile);
-    setTraceFileName(tracefile);
-    return 0;
-}
-
-void PINT_event_pablo_finalize(void)
-{
-    endTracing();
-}
-
-#endif
-
-
-int PINT_event_default_init(int ring_size)
-{
-    if(ts_ring != NULL)
-    {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_EALREADY);
-    }
-
-    /* give a reasonable ring buffer size to work with! */
-    if(ring_size < 4)
-    {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_EINVAL);
-    }
-
-    /* allocate a ring buffer for time stamped events */
-    ts_ring = (struct PVFS_mgmt_event*)malloc(ring_size
-	*sizeof(struct PVFS_mgmt_event));
-    if(!ts_ring)
-    {
-	gen_mutex_unlock(&event_mutex);
-	return(-PVFS_ENOMEM);
-    }
-    memset(ts_ring, 0, ring_size*sizeof(struct PVFS_mgmt_event));
-
-    ts_head = 0;
-    ts_tail = 0;
-    ts_ring_size = ring_size;
-
-    return 0;
-}
-
-void PINT_event_default_finalize(void)
-{
-    if(ts_ring == NULL)
-    {
-	gen_mutex_unlock(&event_mutex);
-	return;
-    }
-
-    free(ts_ring);
-    ts_ring = NULL;
-    ts_head = 0;
-    ts_tail = 0;
-    ts_ring_size = 0;
-}
-
-
-
-/* PINT_event_finalize()
- *
- * shuts down the event logging interface 
- *
- * returns 0 on success, -PVFS_error on failure
- */
 void PINT_event_finalize(void)
 {
-    
-    gen_mutex_lock(&event_mutex);
-#if defined(HAVE_PABLO)
-    PINT_event_pablo_finalize();
-#endif
-#if defined(HAVE_MPE)
-    PINT_event_mpe_finalize();
-#endif
-    PINT_event_default_finalize();
 
-    gen_mutex_unlock(&event_mutex);
+#if defined(HAVE_TAU)
+    PINT_event_tau_fini();
+#endif
+
+    qhash_finalize(groups_table);
+    qhash_finalize(events_table);
     return;
 }
 
-/* PINT_event_set_masks()
- *
- * sets masks that determine if event logging is enabled, what the api mask
- * is, and what the operation mask is.  The combination of these values
- * determines which events are recorded
- *
- * no return value
- */
-void PINT_event_set_masks(int event_on, int32_t api_mask, int32_t op_mask)
+int PINT_event_thread_start(char *name)
 {
-    gen_mutex_lock(&event_mutex);
-
-    PINT_event_on = event_on;
-    PINT_event_api_mask = api_mask;
-    PINT_event_op_mask = op_mask;
-
-    gen_mutex_unlock(&event_mutex);
-    return;
-}
-
-
-/* PINT_event_get_masks()
- *
- * retrieves current mask values 
- *
- * no return value
- */
-void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
-{
-    gen_mutex_lock(&event_mutex);
-
-    *event_on = PINT_event_on;
-    *api_mask = PINT_event_api_mask;
-    *op_mask = PINT_event_op_mask;
-
-    gen_mutex_unlock(&event_mutex);
-    return;
-}
-
-/* PINT_event_timestamp()
- *
- * records a timestamp in the ring buffer
- *
- * returns 0 on success, -PVFS_error on failure
- */
-void __PINT_event_timestamp(enum PVFS_event_api api,
-			    int32_t operation,
-			    int64_t value,
-			    PVFS_id_gen_t id,
-			    int8_t flags)
-{
-    gen_mutex_lock(&event_mutex);
-
-#if defined(HAVE_PABLO)
-    __PINT_event_pablo(api, operation, value, id, flags);
-#endif
-
-#if defined (HAVE_MPE)
-    __PINT_event_mpe(api, operation, value, id, flags);
-#endif
-
-    __PINT_event_default(api, operation, value, id, flags);
-
-    gen_mutex_unlock(&event_mutex);
-
-    return;
-}
-
-void __PINT_event_default(enum PVFS_event_api api,
-			  int32_t operation,
-			  int64_t value,
-			  PVFS_id_gen_t id,
-			  int8_t flags)
-{
-    struct timeval tv;
-
-    /* immediately grab timestamp */
-    gettimeofday(&tv, NULL);
-
-    /* fill in event */
-    ts_ring[ts_head].api = api;
-    ts_ring[ts_head].operation = operation;
-    ts_ring[ts_head].value = value;
-    ts_ring[ts_head].id = id;
-    ts_ring[ts_head].flags = flags;
-    ts_ring[ts_head].tv_sec = tv.tv_sec;
-    ts_ring[ts_head].tv_usec = tv.tv_usec;
-
-    /* update ring buffer positions */
-    ts_head = (ts_head+1)%ts_ring_size;
-    if(ts_head == ts_tail)
+    if(!groups_table)
     {
-	ts_tail = (ts_tail+1)%ts_ring_size;
-    }
-}
-
-#ifdef HAVE_PABLO
-/* enter a pablo trace into the log */
-void __PINT_event_pablo(enum PVFS_event_api api,
-			int32_t operation,
-			int64_t value,
-			PVFS_id_gen_t id,
-			int8_t flags)
-{
-    /* TODO: this can all go once there is a nice "enum to string" function */
-    char description[100];
-    switch(api) {
-	case PVFS_EVENT_API_BMI:
-	    sprintf(description, "bmi operation");
-	    break;
-	case PVFS_EVENT_API_JOB:
-	    sprintf(description, "job operation");
-	    break;
-	case PVFS_EVENT_API_TROVE:
-	    sprintf(description, "trove operation");
-	    break;
-        case PVFS_EVENT_API_ENCODE_REQ:
-        case PVFS_EVENT_API_ENCODE_RESP:
-        case PVFS_EVENT_API_DECODE_REQ:
-        case PVFS_EVENT_API_DECODE_RESP:
-        case PVFS_EVENT_API_SM:
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
     }
 
-    /* PVFS_EVENT_API_BMI, operation(SEND|RECV), value, id, FLAG (start|end) */
-    /* our usage better maps to the "startTimeEvent/endTimeEvent" model */
-    switch(flags) {
-	case PVFS_EVENT_FLAG_START:
-	    startTimeEvent( ((api<<6)&(operation<<3)) );
-	    traceEvent( ( (api<<6) & (operation<<3) & flags), 
-		    description, strlen(description));
-	    break;
-	case PVFS_EVENT_FLAG_END:
-	    endTimeEvent( ((api<6)&(operation<3)) );
-	    break;
-	default:
-	    /* TODO: someone fed us bad flags */
-    }
-
-
-}
+#if defined(HAVE_TAU)
+    PINT_event_tau_thread_init(name);
 #endif
 
-#if defined(HAVE_MPE)
-void __PINT_event_mpe(enum PVFS_event_api api,
-		      int32_t operation,
-		      int64_t value,
-		      PVFS_id_gen_t id,
-		      int8_t flags)
+    return 0;
+}
+
+int PINT_event_thread_stop(void)
 {
-    switch(api) {
-	case PVFS_EVENT_API_BMI:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_bmi_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_JOB:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_job_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_job_stop, value, NULL);
-	    }
-	case PVFS_EVENT_API_TROVE:
-	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
-	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
-	    }
-        case PVFS_EVENT_API_ENCODE_REQ:
-        case PVFS_EVENT_API_ENCODE_RESP:
-        case PVFS_EVENT_API_DECODE_REQ:
-        case PVFS_EVENT_API_DECODE_RESP:
-        case PVFS_EVENT_API_SM:
-            ; /* XXX: NEEDS SOMETHING */
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
     }
 
-}
+#if defined(HAVE_TAU)
+    PINT_event_tau_thread_fini();
+    return 0;
 #endif
 
-/* PINT_event_retrieve()
- *
- * fills in an array with current snapshot of event buffer
- *
- * no return value
- */
-void PINT_event_retrieve(struct PVFS_mgmt_event* event_array,
-			 int count)
+    return 0;
+}
+
+int PINT_event_enable(const char *events)
 {
-    int tmp_tail = ts_tail;
-    int cur_index = 0;
-    int i;
+    struct qhash_head *entry;
+    struct PINT_event *event;
+    struct PINT_group *group;
+    char **event_strings;
+    int count, i;
+    int ret = 0;
 
-    gen_mutex_lock(&event_mutex);
-
-    /* copy out any events from the ring buffer */
-    while(tmp_tail != ts_head && cur_index < count)
+    if(!groups_table)
     {
-	event_array[cur_index] = ts_ring[tmp_tail];
-	tmp_tail = (tmp_tail+1)%ts_ring_size;
-	cur_index++;
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
     }
 
-    gen_mutex_unlock(&event_mutex);
+    count = PINT_split_string_list(&event_strings, events);
 
-    /* fill in remainder of array with invalid flag */
-    for(i=cur_index; i<count; i++)
+    for(i = 0; i < count; ++i)
     {
-	event_array[i].flags = PVFS_EVENT_FLAG_INVALID;
+        entry = qhash_search(events_table, event_strings[i]);
+        if(entry)
+        {
+            event = qhash_entry(entry, struct PINT_event, link);
+            PINT_event_enabled_mask |= event->mask;
+        }
+        else
+        {
+            entry = qhash_search(groups_table, event_strings[i]);
+            if(entry)
+            {
+                group = qhash_entry(entry, struct PINT_group, link);
+                PINT_event_enabled_mask |= group->mask;
+            }
+        }
+
+        if(!strcmp(events, "all"))
+        {
+            PINT_event_enabled_mask = 0xFFFFFFFF;
+            goto done;
+        }
+
+        if(!entry)
+        {
+            gossip_err("Unknown event or event group: %s\n", event_strings[i]);
+            ret = -PVFS_EINVAL;
+            goto done;
+        }
     }
+
+done:
+    for(i = 0; i < count; ++i)
+    {
+        free(event_strings[i]);
+    }
+    free(event_strings);
+
+    return ret;
+}
+
+int PINT_event_disable(const char *events)
+{
+    struct qhash_head *entry;
+    struct PINT_event *event;
+    struct PINT_group *group;
+    char **event_strings;
+    int count, i;
+    int ret = 0;
+
+    count = PINT_split_string_list(&event_strings, events);
+
+    for(i = 0; i < count; ++i)
+    {
+        entry = qhash_search(events_table, event_strings[i]);
+        if(entry)
+        {
+            event = qhash_entry(entry, struct PINT_event, link);
+            PINT_event_enabled_mask &= ~(event->mask);
+        }
+        else
+        {
+            entry = qhash_search(groups_table, event_strings[i]);
+            if(entry)
+            {
+                group = qhash_entry(entry, struct PINT_group, link);
+                PINT_event_enabled_mask &= ~(group->mask);
+            }
+        }
+
+        if(!entry)
+        {
+            gossip_err("Unknown event or event group: %s\n", event_strings[i]);
+            ret = -PVFS_EINVAL;
+            goto done;
+        }
+    }
+
+    if(!strcmp(events, "none"))
+    {
+        PINT_event_enabled_mask = 0;
+    }
+
+done:
+    for(i = 0; i < count; ++i)
+    {
+        free(event_strings[i]);
+    }
+    free(event_strings);
+
+    return ret;
+}
+
+int PINT_event_define_group(const char *name, PINT_event_group *group)
+{
+    struct PINT_group *g;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
+    g = malloc(sizeof(*g));
+    if(!g)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(g, 0, sizeof(*g));
+
+    g->name = strdup(name);
+    if(!g->name)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    INIT_QLIST_HEAD(&g->events);
+
+    qhash_add(groups_table, g->name, &g->link);
+    id_gen_fast_register(&g->id, g);
+
+    *group = g->id;
+    return 0;
+}
+
+int PINT_event_define_event(PINT_event_group *group,
+                            char *name,
+                            char *format_start,
+                            char *format_end,
+                            PINT_event_type *et)
+{
+    struct PINT_group *g;
+    PINT_event_group ag;
+    struct PINT_event *event;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
+    if(!group)
+    {
+        /* use default group */
+        ag = default_group;
+    }
+    else
+    {
+        ag = *group;
+    }
+
+    event = malloc(sizeof(*event));
+    if(!event)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(event, 0, sizeof(*event));
+
+    event->name = strdup(name);
+    if(!event->name)
+    {
+        free(event);
+        return -PVFS_ENOMEM;
+    }
+
+#ifdef HAVE_TAU
+    Ttf_event_define(name, format_start, format_end, (int *)&event->type);
+#endif
+
+    event->group = ag;
+    event->mask = (1 << event_count);
+    ++event_count;
+
+    g = id_gen_fast_lookup(ag);
+    g->mask |= event->mask;
+    qlist_add(&event->group_link, &g->events);
+    qhash_add(events_table, event->name, &event->link);
+
+    id_gen_fast_register(et, event);
+    return 0;
+}
+
+int PINT_event_start_event(
+    PINT_event_type type, int process_id, int *thread_id, PINT_event_id *id, ...)
+{
+    va_list ap;
+    struct PINT_event *event;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
+event = id_gen_fast_lookup(type);
+    if(event && (event->mask & PINT_event_enabled_mask))
+    {
+        va_start(ap, id);
+#ifdef HAVE_TAU
+        Ttf_EnterState_info_va(event->type, process_id, thread_id, (int *)id, ap);
+#endif
+        va_end(ap);
+    }
+    return 0;
+}
+
+int PINT_event_end_event(
+    PINT_event_type type, int process_id, int *thread_id, PINT_event_id id, ...)
+{
+    va_list ap;
+    struct PINT_event *event;
+
+    if(!groups_table)
+    {
+        /* assume that the events interface just hasn't been initialized */
+        return 0;
+    }
+
+    event = id_gen_fast_lookup(type);
+    if(event && (event->mask & PINT_event_enabled_mask))
+    {
+        va_start(ap, id);
+#ifdef HAVE_TAU
+        Ttf_LeaveState_info_va(event->type, process_id, thread_id, id, ap);
+#endif
+        va_end(ap);
+    }
+    return 0;
+}
+
+/******************************************************************************/
+#if defined(HAVE_TAU)
+
+void PINT_event_tau_init(void) {
+    char* foldername = "/tmp/";
+    char* prefix = "pvfs2";
+    int bufsz = 0; //use default
+
+    Ttf_init(getpid(), foldername, prefix, bufsz);
 
     return;
 }
+
+
+void PINT_event_tau_fini(void) {
+    Ttf_finalize();
+    return;
+}
+
+static void PINT_event_tau_thread_init(char* gname) {
+    int tid = 0;
+    struct tau_thread_group_info tg_info;
+    strncpy(tg_info.name, gname, sizeof(tg_info.name));
+    tg_info.buffer_size = PINT_event_default_buffer_size;
+    tg_info.max = PINT_event_default_max_traces;
+    int isnew = 0;
+    Ttf_thread_start(&tg_info,  &tid, &isnew);
+
+    return;
+}
+
+
+static void PINT_event_tau_thread_fini() {
+    Ttf_thread_stop();
+    return;
+}
+
+#endif /* HAVE_TAU */
+/******************************************************************************/
+
 
 /*
  * Local variables:

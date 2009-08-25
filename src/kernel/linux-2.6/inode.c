@@ -229,6 +229,7 @@ int pvfs2_revalidate(struct dentry *dentry)
     if (ret)
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -243,6 +244,7 @@ int pvfs2_getattr(
 {
     int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
+    pvfs2_inode_t *pvfs2_inode = NULL;
 
     gossip_debug(GOSSIP_INODE_DEBUG, 
         "pvfs2_getattr: called on %s\n", dentry->d_name.name);
@@ -273,10 +275,14 @@ int pvfs2_getattr(
     if (ret == 0)
     {
         generic_fillattr(inode, kstat);
+        /* override block size reported to stat */
+        pvfs2_inode = PVFS2_I(inode);
+        kstat->blksize = pvfs2_inode->blksize;
     }
     else
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -324,6 +330,7 @@ int pvfs2_getattr_lite(
     else
     {
         /* assume an I/O error and flag inode as bad */
+        gossip_debug(GOSSIP_INODE_DEBUG, "%s:%s:%d calling make bad inode\n", __FILE__,  __func__, __LINE__);
         pvfs2_make_bad_inode(inode);
     }
     return ret;
@@ -552,8 +559,13 @@ struct inode *pvfs2_get_custom_inode_common(
                 "pvfs2_get_custom_inode_common: inode: %p, inode->i_mode %o\n",
                 inode, inode->i_mode);
         inode->i_mapping->host = inode;
+#ifdef HAVE_CURRENT_FSUID
+        inode->i_uid = current_fsuid();
+        inode->i_gid = current_fsgid();
+#else
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
+#endif
         inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
         inode->i_size = PAGE_CACHE_SIZE;
 #ifdef HAVE_I_BLKSIZE_IN_STRUCT_INODE

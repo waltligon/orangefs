@@ -18,6 +18,8 @@
 #include <stdlib.h>
 #include <glob.h>
 #include "trove.h"
+#include "pint-context.h"
+#include "pint-mgmt.h"
 
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -41,6 +43,25 @@
 #include "pint-util.h"
 #include "dbpf-sync.h"
 
+PINT_event_group trove_dbpf_event_group;
+
+PINT_event_type trove_dbpf_read_event_id;
+PINT_event_type trove_dbpf_write_event_id;
+PINT_event_type trove_dbpf_keyval_write_event_id;
+PINT_event_type trove_dbpf_keyval_read_event_id;
+PINT_event_type trove_dbpf_dspace_create_event_id;
+PINT_event_type trove_dbpf_dspace_create_list_event_id;
+PINT_event_type trove_dbpf_dspace_getattr_event_id;
+PINT_event_type trove_dbpf_dspace_setattr_event_id;
+
+int dbpf_pid;
+
+PINT_manager_t io_thread_mgr;
+PINT_worker_id io_worker_id;
+PINT_queue_id io_queue_id;
+PINT_context_id io_ctx;
+static int directio_threads_started = 0;
+
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
 extern int TROVE_db_cache_size_bytes;
@@ -49,6 +70,18 @@ extern int TROVE_shm_key_hint;
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 static void unlink_db_cache_files(const char* path);
+static int start_directio_threads(void);
+static int stop_directio_threads(void);
+
+static int trove_directio_threads_num = 30;
+static int trove_directio_ops_per_queue = 10;
+static int trove_directio_timeout = 1000;
+
+static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors);
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
@@ -335,7 +368,6 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
     struct dbpf_collection* coll;
     coll = dbpf_collection_find_registered(coll_id);
 
-    assert(coll);
 
     switch(option)
     {
@@ -396,6 +428,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             gossip_debug(GOSSIP_TROVE_DEBUG, 
                          "dbpf collection %d - Setting HIGH_WATERMARK to %d\n",
                          (int) coll_id, *(int *)parameter);
+            assert(coll);
             dbpf_queued_op_set_sync_high_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -403,6 +436,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             gossip_debug(GOSSIP_TROVE_DEBUG, 
                          "dbpf collection %d - Setting LOW_WATERMARK to %d\n",
                          (int) coll_id, *(int *)parameter);
+            assert(coll);
             dbpf_queued_op_set_sync_low_watermark(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -411,6 +445,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - %s sync mode\n",
                          (int) coll_id,
                          (*(int *)parameter) ? "Enabling" : "Disabling");
+            assert(coll);
             dbpf_queued_op_set_sync_mode(*(int *)parameter, coll);
             ret = 0;
             break;
@@ -419,7 +454,20 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - %s immediate completion\n",
                          (int) coll_id,
                          (*(int *)parameter) ? "Enabling" : "Disabling");
+            assert(coll);
             coll->immediate_completion = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_THREADS_NUM:
+            trove_directio_threads_num = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_OPS_PER_QUEUE:
+            trove_directio_ops_per_queue = *(int *)parameter;
+            ret = 0;
+            break;
+        case TROVE_DIRECTIO_TIMEOUT:
+            trove_directio_timeout = *(int *)parameter;
             ret = 0;
             break;
     }
@@ -503,6 +551,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     memset(&db_data, 0, sizeof(db_data));
     db_key.data = key_p->buffer;
     db_key.size = key_p->buffer_sz;
+    db_key.flags = DB_DBT_USERMEM;
 
     db_data.data  = val_p->buffer;
     db_data.ulen  = val_p->buffer_sz;
@@ -512,7 +561,7 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                                     NULL, &db_key, &db_data, 0);
     if (ret != 0)
     {
-        gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_geteattr: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -525,6 +574,99 @@ static int dbpf_initialize(char *stoname,
 {
     int ret = -TROVE_EINVAL;
     struct dbpf_storage *sto_p = NULL;
+
+    /* initialize events */
+    PINT_event_define_group("trove_dbpf", &trove_dbpf_event_group);
+
+    /* Define the read event:
+     * START:
+     * (client_id, request_id, rank, metafile_handle,
+     *  datafile_handle, op_id, requested_read_size)
+     * STOP: (size_read)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_read",
+                            "%d%d%d%llu%llu%d%d",
+                            "%llu",
+                            &trove_dbpf_read_event_id);
+
+    /* Define the write event:
+     * START:
+     * (client_id, request_id, rank, metafile-handle, datafile-handle, op_id, write size)
+     * STOP: (size_written)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_write",
+                            "%d%d%d%llu%llu%d%d",
+                            "%llu",
+                            &trove_dbpf_write_event_id);
+
+    /* Define the keyval read event:
+     * START: (client_id, request_id, rank, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_keyval_read",
+                            "%d%d%d%llu%d",
+                            "",
+                            &trove_dbpf_keyval_read_event_id);
+
+    /* Define the keyval write event:
+     * START:
+     * (client_id, request_id, rank, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_keyval_write",
+                            "%d%d%d%llu%d",
+                            "",
+                            &trove_dbpf_keyval_write_event_id);
+
+    /* Define the dspace create event:
+     * START:
+     * (client_id, request_id, rank, op_id)
+     * STOP: (new-handle)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_create",
+                            "%d%d%d%d",
+                            "%llu",
+                            &trove_dbpf_dspace_create_event_id);
+
+    /* Define the dspace create list event:
+     * START:
+     * (client_id, request_id, rank, op_id)
+     * STOP: (new-handle)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_create_list",
+                            "%d%d%d%d",
+                            "%llu",
+                            &trove_dbpf_dspace_create_list_event_id);
+
+    /* Define the dspace getattr event:
+     * START:
+     * (client_id, request_id, rank, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_getattr",
+                            "%d%d%d%llu%d",
+                            "",
+                            &trove_dbpf_dspace_getattr_event_id);
+
+    /* Define the dspace setattr event:
+     * START:
+     * (client_id, request_id, rank, metafile-handle, op_id)
+     * STOP: (none)
+     */
+    PINT_event_define_event(&trove_dbpf_event_group,
+                            "dbpf_dspace_setattr",
+                            "%d%d%d%llu%d",
+                            "",
+                            &trove_dbpf_dspace_setattr_event_id);
+
+    dbpf_pid = getpid();
 
     if (!stoname)
     {
@@ -548,6 +690,112 @@ static int dbpf_initialize(char *stoname,
     return dbpf_thread_initialize();
 }
 
+static int start_directio_threads(void)
+{
+    int ret;
+    PINT_worker_attr_t io_worker_attrs;
+
+    if(directio_threads_started)
+    {
+        /* already running */
+        return(0);
+    }
+
+    ret = PINT_open_context(&io_ctx, PINT_dbpf_io_completion_callback);
+    if(ret < 0)
+    {
+        dbpf_finalize();
+        return ret;
+    }
+
+    ret = PINT_manager_init(&io_thread_mgr, io_ctx);
+    if(ret < 0)
+    {
+        PINT_close_context(io_ctx);
+        dbpf_finalize();
+        return ret;
+    }
+
+    io_worker_attrs.type = PINT_WORKER_TYPE_THREADED_QUEUES;
+    io_worker_attrs.u.threaded.thread_count = trove_directio_threads_num;
+    io_worker_attrs.u.threaded.ops_per_queue = trove_directio_ops_per_queue;
+    io_worker_attrs.u.threaded.timeout = trove_directio_timeout;
+    ret = PINT_manager_worker_add(io_thread_mgr, &io_worker_attrs, &io_worker_id);
+    if(ret < 0)
+    {
+        PINT_manager_destroy(io_thread_mgr);
+        PINT_close_context(io_ctx);
+        dbpf_finalize();
+        return ret;
+    }
+
+    ret = PINT_queue_create(&io_queue_id, NULL);
+    if(ret < 0)
+    {
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+        dbpf_finalize();
+	return ret;
+    }
+
+    ret = PINT_manager_queue_add(io_thread_mgr, io_worker_id, io_queue_id);
+    if(ret < 0)
+    {
+	PINT_queue_destroy(io_queue_id);
+	PINT_manager_destroy(io_thread_mgr);
+	PINT_close_context(io_ctx);
+        dbpf_finalize();
+	return ret;
+    }
+
+    directio_threads_started = 1;
+
+    return(0);
+}
+
+static int stop_directio_threads(void)
+{
+    if(directio_threads_started != 1)
+    {
+        return 0;
+    }
+
+    PINT_manager_queue_remove(io_thread_mgr, io_queue_id);
+    PINT_queue_destroy(io_queue_id);
+    PINT_manager_destroy(io_thread_mgr);
+    PINT_close_context(io_ctx);
+    return 0;
+}
+
+static int dbpf_direct_initialize(char *stoname, TROVE_ds_flags flags)
+{
+    int ret;
+
+    /* some parts of initialization are shared with other methods */
+    ret = dbpf_initialize(stoname, flags);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* fire up the IO threads for direct IO */
+    ret = start_directio_threads();
+    if(ret < 0)
+    {
+        dbpf_finalize();
+        return(ret);
+    }
+    
+    return(0);
+}
+
+static int dbpf_direct_finalize(void)
+{
+    stop_directio_threads();
+    dbpf_finalize();
+    return 0;
+}
+
 int dbpf_finalize(void)
 {
     int ret = -TROVE_EINVAL;
@@ -557,8 +805,6 @@ int dbpf_finalize(void)
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
-
-    dbpf_collection_clear_registered();
 
     if (my_storage_p)
     {
@@ -725,6 +971,7 @@ int dbpf_collection_create(char *collname,
 
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -949,6 +1196,7 @@ int dbpf_collection_remove(char *collname,
 
     key.data = collname;
     key.size = strlen(collname) + 1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1286,6 +1534,82 @@ return_error:
     return ret;
 }
 
+static int dbpf_direct_collection_clear(TROVE_coll_id coll_id)
+{
+    stop_directio_threads();
+    return dbpf_collection_clear(coll_id);
+}
+
+int dbpf_collection_clear(TROVE_coll_id coll_id)
+{
+    int ret;
+    struct dbpf_collection *coll_p = dbpf_collection_find_registered(coll_id);
+
+    dbpf_collection_deregister(coll_p);
+
+    if ((ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->coll_attr_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->ds_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->keyval_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+    free(coll_p->name);
+    free(coll_p->path_name);
+    PINT_dbpf_keyval_pcache_finalize(coll_p->pcache);
+
+    free(coll_p);
+    return 0;
+}
+
+static int dbpf_direct_collection_lookup(char *collname,
+                                         TROVE_coll_id *out_coll_id_p,
+                                         void *user_ptr,
+                                         TROVE_op_id *out_op_id_p)
+{
+    int ret;
+
+    /* most of this is shared with the other methods */
+    ret = dbpf_collection_lookup(collname, out_coll_id_p, 
+        user_ptr, out_op_id_p);
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    /* start directio threads if they aren't already running */
+    ret = start_directio_threads();
+    if(ret < 0)
+    {
+        return(ret);
+    }
+
+    return(0);
+}
 
 int dbpf_collection_lookup(char *collname,
                            TROVE_coll_id *out_coll_id_p,
@@ -1313,6 +1637,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = collname;
     key.size = strlen(collname)+1;
+    key.flags = DB_DBT_USERMEM;
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
@@ -1398,6 +1723,7 @@ int dbpf_collection_lookup(char *collname,
     memset(&data, 0, sizeof(data));
     key.data = TROVE_DBPF_VERSION_KEY;
     key.size = strlen(TROVE_DBPF_VERSION_KEY);
+    key.flags = DB_DBT_USERMEM;
     data.data = &trove_dbpf_version;
     data.ulen = 32;
     data.flags = DB_DBT_USERMEM;
@@ -1855,6 +2181,28 @@ static void dbpf_db_error_callback(
     gossip_err("%s: %s\n", errpfx, msg);
 }
 
+/* dbpf_mgmt_direct_ops
+ *
+ * Structure holding pointers to all the management operations
+ * functions for this storage interface implementation.
+ */
+struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
+{
+    dbpf_direct_initialize,
+    dbpf_direct_finalize,
+    dbpf_storage_create,
+    dbpf_storage_remove,
+    dbpf_collection_create,
+    dbpf_collection_remove,
+    dbpf_direct_collection_lookup,
+    dbpf_direct_collection_clear,
+    dbpf_collection_iterate,
+    dbpf_collection_setinfo,
+    dbpf_collection_getinfo,
+    dbpf_collection_seteattr,
+    dbpf_collection_geteattr
+};
+
 /* dbpf_mgmt_ops
  *
  * Structure holding pointers to all the management operations
@@ -1869,6 +2217,7 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_create,
     dbpf_collection_remove,
     dbpf_collection_lookup,
+    dbpf_collection_clear,
     dbpf_collection_iterate,
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
@@ -1907,7 +2256,9 @@ static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
     { DSPACE_VERIFY, "DSPACE_VERIFY" },
     { DSPACE_GETATTR, "DSPACE_GETATTR" },
     { DSPACE_SETATTR, "DSPACE_SETATTR" },
-    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" }
+    { DSPACE_GETATTR_LIST, "DSPACE_GETATTR_LIST" },
+    { DSPACE_CREATE_LIST, "DSPACE_CREATE_LIST" },
+    { DSPACE_REMOVE_LIST, "DSPACE_REMOVE_LIST" }
     /* NOTE: this list should be kept in sync with enum dbpf_op_type 
      * from dbpf.h 
      */ 
@@ -1951,14 +2302,34 @@ static void unlink_db_cache_files(const char* path)
     {
         for(i=0; i<pglob.gl_pathc; i++)
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "Unlinking old db cache file: %s\n", pglob.gl_pathv[i]);
-            unlink(pglob.gl_pathv[i]);   
+            gossip_debug(GOSSIP_TROVE_DEBUG, "Unlinking old db cache file: %s\n", pglob.gl_pathv[i]); unlink(pglob.gl_pathv[i]);   
         }
         globfree(&pglob);
     }
     free(db_region_file);
 
     return;
+}
+
+static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
+                                     int count,
+                                     PINT_op_id *op_ids,
+                                     void **user_ptrs,
+                                     PVFS_error *errors)
+{
+    int i;
+    dbpf_queued_op_t *qop_p;
+
+    for(i = 0; i < count; ++i)
+    {
+        if(errors[i] == PINT_MGMT_OP_COMPLETED)
+        {
+            qop_p = (dbpf_queued_op_t *)(user_ptrs[i]);
+            dbpf_queued_op_complete(qop_p, OP_COMPLETED);
+        }
+    }
+
+    return 0;
 }
 
 /*

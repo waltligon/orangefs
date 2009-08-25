@@ -114,7 +114,6 @@ int main(int argc, char **argv)
 {
     const PVFS_util_tab* mnt;
     int rc;
-    PVFS_credential *cred;
 
     /* Ensure no arguments were passed */
     if (1 < argc)
@@ -131,9 +130,6 @@ int main(int argc, char **argv)
         return -1;
     }
     
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-
     /* Construct the list of mount points */
     mnt = PVFS_util_parse_pvfstab(0);
     if (0 != mnt)
@@ -160,7 +156,7 @@ int main(int argc, char **argv)
             fs_id = mnt->mntent_array[i].fs_id;
             
             /* Retrieve the list of all servers for the fs id*/
-            rc = PVFS_mgmt_count_servers(fs_id, cred, PVFS_MGMT_IO_SERVER,
+            rc = PVFS_mgmt_count_servers(fs_id, PVFS_MGMT_IO_SERVER,
                                          &server_count);
 
             if (0 != rc)
@@ -169,7 +165,7 @@ int main(int argc, char **argv)
                 break;
             }
             server_addrs = malloc(server_count * sizeof(PVFS_BMI_addr_t));
-            rc = PVFS_mgmt_get_server_array(fs_id, cred, PVFS_MGMT_IO_SERVER,
+            rc = PVFS_mgmt_get_server_array(fs_id, PVFS_MGMT_IO_SERVER,
                                             server_addrs, &server_count);
             if (0 != rc)
             {
@@ -210,7 +206,6 @@ int main(int argc, char **argv)
         }
     }    
 
-    PINT_release_credential(cred);
     printf("Check Complete.\n");
     return 0;
 }

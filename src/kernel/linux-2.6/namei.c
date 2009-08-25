@@ -81,7 +81,7 @@ static struct dentry *pvfs2_lookup(
     */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup called on %s\n", dentry->d_name.name);
 
-    if (dentry->d_name.len > PVFS2_NAME_LEN)
+    if (dentry->d_name.len > (PVFS2_NAME_LEN-1))
     {
 	return ERR_PTR(-ENAMETOOLONG);
     }
@@ -112,6 +112,8 @@ static struct dentry *pvfs2_lookup(
         if (parent && parent->refn.handle != PVFS_HANDLE_NULL 
                 && parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
+            gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d using parent %llu\n",
+              __FILE__, __func__, __LINE__, llu(parent->refn.handle));
             new_op->upcall.req.lookup.parent_refn = parent->refn;
         }
         else
@@ -199,6 +201,8 @@ static struct dentry *pvfs2_lookup(
     if (inode && !is_bad_inode(inode))
     {
         struct dentry *res;
+        gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
+            __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count));
 
         /* update dentry/inode pair into dcache */
         dentry->d_op = &pvfs2_dentry_operations;
@@ -219,6 +223,8 @@ static struct dentry *pvfs2_lookup(
     }
     else if (inode && is_bad_inode(inode))
     {
+        gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found bad inode [%lu] with count [%d]. Returning error [%d]", 
+            __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count), ret);
         ret = -EACCES;
         found_pvfs2_inode = PVFS2_I(inode);
         /* look for an error code, possibly set by pvfs2_read_inode(),
@@ -237,7 +243,7 @@ static struct dentry *pvfs2_lookup(
      * from pvfs2_iget was null...just return EACCESS
      */
     op_release(new_op);
-    gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES\n");
+    gossip_debug(GOSSIP_NAME_DEBUG, "Returning -EACCES for NULL inode\n");
     return ERR_PTR(-EACCES);
 }
 

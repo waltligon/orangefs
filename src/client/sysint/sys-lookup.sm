@@ -9,8 +9,6 @@
  *
  *  PVFS2 system interface routines for dereferencing path strings.
  */
- 
- /* TODO:  Figure out how to clear getattr when looping */
 
 #include <string.h>
 #include <assert.h>
@@ -470,6 +468,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
     void *user_ptr)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -501,7 +500,8 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p->u.lookup.lookup_resp = resp;
     sm_p->u.lookup.follow_link = follow_link;
     sm_p->u.lookup.current_context = 0;
-    sm_p->u.lookup.context_count = 0;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent.handle);
 
     ret = initialize_context(&sm_p->u.lookup,
                              relative_pathname, parent);
@@ -510,7 +510,9 @@ PVFS_error PVFS_isys_ref_lookup(
         gossip_err("%s: failed to init context (path = %s)\n",
                    __func__, relative_pathname);
 
-        PINT_release_credential(sm_p->newcred_p);
+        PINT_cleanup_credential(sm_p->newcred_p);
+        free(sm_p->newcred_p);
+        sm_p->newcred_p = NULL;
         PINT_smcb_free(smcb);
         return ret;
     }
@@ -530,7 +532,8 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_object_ref parent,
     const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
-    int32_t follow_link)
+    int32_t follow_link,
+    PVFS_hint hints)
 {
     PVFS_error ret, error;
     PVFS_sys_op_id op_id;
@@ -539,7 +542,7 @@ PVFS_error PVFS_sys_ref_lookup(
 
     ret = PVFS_isys_ref_lookup(
         fs_id, relative_pathname, parent, credential, resp,
-        follow_link, &op_id, resp);
+        follow_link, &op_id, hints, resp);
 
     if (ret)
     {
@@ -571,7 +574,8 @@ PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
     const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
-    int32_t follow_link)
+    int32_t follow_link,
+    PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_object_ref parent;
@@ -606,7 +610,7 @@ PVFS_error PVFS_sys_lookup(
             */
             char *path = ((name[0] == '/') ? &name[1] : name);
             ret = PVFS_sys_ref_lookup(
-                fs_id, path, parent, credential, resp, follow_link);
+                fs_id, path, parent, credential, resp, follow_link, hints);
         }
     }
     return ret;
@@ -724,7 +728,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
         seg_to_lookup,
         cur_seg->seg_starting_refn.fs_id,
         cur_seg->seg_starting_refn.handle,
-        PVFS_ATTR_COMMON_ALL);
+        PVFS_ATTR_COMMON_ALL,
+        sm_p->hints);
 
     gossip_debug(
         GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %llu\n",

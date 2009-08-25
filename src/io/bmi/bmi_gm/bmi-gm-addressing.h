@@ -32,7 +32,7 @@ struct gm_addr
     struct qlist_head gm_addr_list;
     unsigned int node_id;
     unsigned int port_id;
-    PVFS_BMI_addr_t bmi_addr;
+    BMI_addr_t bmi_addr;
     op_list_p send_queue;
     op_list_p handshake_queue;
 };

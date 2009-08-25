@@ -80,58 +80,6 @@ void dbpf_collection_deregister(struct dbpf_collection *entry)
     }
 }
 
-void dbpf_collection_clear_registered(void)
-{
-    int ret = -TROVE_EINVAL;
-    struct dbpf_collection *ptr = root_coll_p, *free_ptr = NULL;
-
-    while (ptr != NULL)
-    {
-	free_ptr = ptr;
-	ptr = ptr->next_p;
-
-        if ((ret = free_ptr->coll_attr_db->sync(
-                 free_ptr->coll_attr_db, 0)) != 0)
-        {
-            gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
-        }
-
-        if ((ret = db_close(free_ptr->coll_attr_db)) != 0) 
-        {
-            gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
-        }
-
-        if ((ret = free_ptr->ds_db->sync(free_ptr->ds_db, 0)) != 0)
-        {
-            gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
-        }
-
-        if ((ret = db_close(free_ptr->ds_db)) != 0) 
-        {
-            gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
-        }
-
-        if ((ret = free_ptr->keyval_db->sync(free_ptr->keyval_db, 0)) != 0)
-        {
-            gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
-        }
-
-        if ((ret = db_close(free_ptr->keyval_db)) != 0) 
-        {
-            gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
-        }
-
-
-        dbpf_putdb_env(free_ptr->coll_env, free_ptr->path_name);
-	free(free_ptr->name);
-        free(free_ptr->path_name);
-        PINT_dbpf_keyval_pcache_finalize(free_ptr->pcache);
-
-	free(free_ptr);
-    }
-    root_coll_p = NULL;
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4

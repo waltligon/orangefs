@@ -717,18 +717,6 @@ then
   exit $OCF_ERR_ARGS
 fi
 
-OP=$1
-
-# These operations do not require instance parameters
-case $OP in
-  meta-data)		meta_data
-			exit $OCF_SUCCESS
-			;;
-  usage)		usage
-			exit $OCF_SUCCESS
-			;;
-esac
-
 if 
   [ -z "$OCF_RESKEY_fsname" ]
 then
@@ -753,6 +741,18 @@ if [ ! -z "$OCF_RESKEY_options" ]; then
 fi
 fsname=$OCF_RESKEY_fsname
 conf_dir=$OCF_RESKEY_conf_dir
+
+OP=$1
+
+# These operations do not require instance parameters
+case $OP in
+  meta-data)		meta_data
+			exit $OCF_SUCCESS
+			;;
+  usage)		usage
+			exit $OCF_SUCCESS
+			;;
+esac
 
 blockdevice=no
 case $DEVICE in

@@ -12,6 +12,12 @@
 #ifndef __PVFS2_H
 #define __PVFS2_H
 
+#ifndef PVFS2_VERSION_MAJOR
+#define PVFS2_VERSION_MAJOR 2
+#define PVFS2_VERSION_MINOR 8
+#define PVFS2_VERSION_SUB   1
+#endif
+
 #include "pvfs2-types.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-debug.h"

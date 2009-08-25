@@ -10,6 +10,8 @@
  * will all get new fds that are closed on put
  */
 
+#define XOPEN_SOURCE 500
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -18,6 +20,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
+#include <string.h>
 #include <db.h>
 
 #include "trove.h"
@@ -38,9 +41,31 @@ struct open_cache_entry
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     int fd;
+    enum open_cache_open_type type;
 
     struct qlist_head queue_link;
 };
+
+struct unlink_context
+{
+    pthread_t       thread_id;
+    pthread_mutex_t mutex;
+    pthread_cond_t  data_available;
+    struct qlist_head global_list; 
+};
+
+struct file_struct
+{
+    struct qlist_head list_link;   
+    char *pathname;
+};
+
+static struct unlink_context dbpf_unlink_context;
+static void* unlink_bstream(void *context);
+static int fast_unlink(
+    const char *pathname, 
+    TROVE_coll_id coll_id, 
+    TROVE_handle handle);
 
 /* "used_list" is for active objects (ref_ct > 0) */
 static QLIST_HEAD(used_list);
@@ -61,6 +86,10 @@ static int open_fd(
     TROVE_handle handle,
     enum open_cache_open_type type);
 
+static void close_fd(
+    int fd, 
+    enum open_cache_open_type type);
+
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
     const char * list_name,
@@ -69,7 +98,7 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
 
 void dbpf_open_cache_initialize(void)
 {
-    int i = 0;
+    int i = 0, ret = 0;
 
     gen_mutex_lock(&cache_mutex);
 
@@ -88,6 +117,17 @@ void dbpf_open_cache_initialize(void)
     }
 
     gen_mutex_unlock(&cache_mutex);
+
+    /* Initialize and create the worker thread for threaded deletes */
+    INIT_QLIST_HEAD(&dbpf_unlink_context.global_list);
+    pthread_mutex_init(&dbpf_unlink_context.mutex, NULL);
+    pthread_cond_init(&dbpf_unlink_context.data_available, NULL);
+    ret = pthread_create(&dbpf_unlink_context.thread_id, NULL, unlink_bstream, (void*)&dbpf_unlink_context);
+    if(ret)
+    {
+        gossip_err("dbpf_open_cache_initialize: failed [%d]\n", ret);
+        return;
+    }
 }
 
 static void dbpf_open_cache_entries_finalize(
@@ -104,6 +144,8 @@ void dbpf_open_cache_finalize(void)
     dbpf_open_cache_entries_finalize(&free_list);
 
     gen_mutex_unlock(&cache_mutex);
+
+    pthread_cancel(dbpf_unlink_context.thread_id);
 }
 
 /**
@@ -159,8 +201,10 @@ int dbpf_open_cache_get(
 		gen_mutex_unlock(&cache_mutex);
 		return ret;
 	    }
+            tmp_entry->type = type;
 	}
         out_ref->fd = tmp_entry->fd;
+        out_ref->type = type;
 
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
@@ -207,7 +251,7 @@ int dbpf_open_cache_get(
 
 	if (tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->fd);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
     }
@@ -230,6 +274,8 @@ int dbpf_open_cache_get(
             gen_mutex_unlock(&cache_mutex);
             return ret;
         }
+        tmp_entry->type = type;
+        out_ref->type = type;
         out_ref->fd = tmp_entry->fd;
 
 	out_ref->internal = tmp_entry;
@@ -256,6 +302,7 @@ int dbpf_open_cache_get(
         gen_mutex_unlock(&cache_mutex);
         return ret;
     }
+    out_ref->type = type;
 
     out_ref->internal = NULL;
     gen_mutex_unlock(&cache_mutex);
@@ -304,7 +351,7 @@ void dbpf_open_cache_put(
 	/* this wasn't cached; go ahead and close up */
 	if(in_ref->fd > -1)
 	{
-	    DBPF_CLOSE(in_ref->fd);
+            close_fd(in_ref->fd, in_ref->type);
 	    in_ref->fd = -1;
 	}
     }
@@ -321,8 +368,8 @@ int dbpf_open_cache_remove(
     int found = 0;
     char filename[PATH_MAX];
     int ret = -1;
-    struct qlist_head* scratch;
     int tmp_error = 0;
+    struct qlist_head* scratch;
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache_remove: called\n");
@@ -366,7 +413,7 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: unused entry.\n");
 	if (tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->fd);
+            close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
 	qlist_add(&tmp_entry->queue_link, &free_list);
@@ -382,14 +429,12 @@ int dbpf_open_cache_remove(
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id, llu(handle));
 
-    ret = DBPF_UNLINK(filename);
+    ret = fast_unlink(filename, coll_id, handle);
+
     if ((ret != 0) && (errno != ENOENT))
     {
-	tmp_error = -trove_errno_to_trove_error(errno); 
+        tmp_error = -trove_errno_to_trove_error(errno); 
     }
-
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "Unlinked filename: "
-                 "(ret=%d, errno=%d)\n%s\n", ret, errno, filename);
 
     gen_mutex_unlock(&cache_mutex);
 
@@ -421,10 +466,16 @@ static int open_fd(
 
     flags = O_RDWR;
 
-    if(type == DBPF_FD_BUFFERED_WRITE)
+    if(type == DBPF_FD_BUFFERED_WRITE ||
+       type == DBPF_FD_DIRECT_WRITE)
     {
         flags |= O_CREAT;
         mode = TROVE_FD_MODE;
+    }
+
+    if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
+    {
+        flags |= O_DIRECT;
     }
 
     *fd = DBPF_OPEN(filename, flags, mode);
@@ -441,11 +492,13 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
         entry = qlist_entry(list_entry, struct open_cache_entry, queue_link);
         if(entry->fd > -1)
         {
-	    DBPF_CLOSE(entry->fd);
+            close_fd(entry->fd, entry->type);
 	    entry->fd = -1;
 	}
         qlist_del(&entry->queue_link);
     }
+    /* Cancel the deletion thread */
+    pthread_cancel(dbpf_unlink_context.thread_id);
 }
 
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
@@ -473,6 +526,108 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     }
 
     return NULL;
+}
+
+int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle)
+{
+    int ret;
+    struct file_struct *tmp_item;
+    
+    tmp_item = (struct file_struct *) malloc(sizeof(struct file_struct));
+    if(!tmp_item)
+    {
+        gossip_err("Unable to allocate memory for file_struct [%d].\n", errno);
+        return -TROVE_ENOMEM;
+    }
+    tmp_item->pathname = malloc(PATH_MAX);
+    if(!tmp_item->pathname)
+    {
+        gossip_err("Unable to allocate memory for pathname[%d].\n", errno);
+        free(tmp_item);
+        return -TROVE_ENOMEM;
+    }
+    DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname, PATH_MAX,
+                                       my_storage_p->name, 
+                                       coll_id,
+                                       llu(handle));
+    
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
+                 "Renaming [%s] to [%s] for threaded delete.\n", pathname, tmp_item->pathname);
+
+    ret = rename(pathname, tmp_item->pathname);
+    if(ret != 0)
+    {
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
+            "Warning: During unlink, the rename failed on file [%s] with errno [%d] strerr [%s].\n", 
+            pathname, errno, strerror(errno));
+        free(tmp_item->pathname);
+        free(tmp_item);
+        return ret;
+    }
+    
+    /* Add to the queue */
+    pthread_mutex_lock(&dbpf_unlink_context.mutex); 
+    qlist_add_tail(&tmp_item->list_link, &dbpf_unlink_context.global_list);
+    pthread_cond_signal(&dbpf_unlink_context.data_available);
+    pthread_mutex_unlock(&dbpf_unlink_context.mutex); 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
+        "Added [%s] to the queue.\n", tmp_item->pathname);
+    
+    return(0);
+}
+
+static void* unlink_bstream(void *context)
+{
+    struct unlink_context *loc_context = (struct unlink_context *) context;
+    int ret;
+    time_t start_time;
+    struct qlist_head *tmp_item;
+    struct file_struct *tmp_st;
+  
+    while(1)
+    {
+        pthread_mutex_lock(&loc_context->mutex);
+        /* If there is no work to do, go into a condition wait */
+        if(qlist_empty(&loc_context->global_list))
+        {
+            pthread_cond_wait(&loc_context->data_available, &loc_context->mutex);
+        }
+        
+        if(!qlist_empty(&loc_context->global_list))
+        {
+            tmp_item = loc_context->global_list.next;
+            qlist_del(tmp_item);
+            pthread_mutex_unlock(&loc_context->mutex);
+        }
+        else /* Condition triggered without items in qlist */
+        {
+            pthread_mutex_unlock(&loc_context->mutex);
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
+                "Unlink condition triggered when qlist empty\n");
+            continue; /* Enter while loop again */
+        }
+    
+        tmp_st = qlist_entry(tmp_item, struct file_struct, list_link);
+        time(&start_time);
+        ret = DBPF_UNLINK(tmp_st->pathname);
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
+            "Unlinked filename: (ret=%d, errno=%d, elapsed-time=%ld(secs) )\n%s\n", 
+            ret, errno, (time(NULL) - start_time), tmp_st->pathname);
+        free(tmp_st->pathname);
+        free(tmp_st);
+    }
+
+    pthread_exit(&loc_context->thread_id);
+    return NULL;
+}
+
+static void close_fd(
+    int fd, 
+    enum open_cache_open_type type)
+{
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+        "dbpf_open_cache closing fd %d of type %d\n", fd, type);
+    DBPF_CLOSE(fd);
 }
 
 /*

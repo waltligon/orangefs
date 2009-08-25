@@ -28,10 +28,15 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 #include "pint-util.h"
+#include "pint-event.h"
 
 PINT_smcb *g_smcb = NULL; 
 
 extern job_context_id pint_client_sm_context;
+
+PINT_event_id PINT_client_sys_event_id;
+
+int pint_client_pid;
 
 typedef enum
 {
@@ -46,7 +51,8 @@ typedef enum
     CLIENT_CONFIG_MGR_INIT = (1 << 7),
     CLIENT_REQ_SCHED_INIT  = (1 << 8),
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
-    CLIENT_DIST_INIT       = (1 << 10)
+    CLIENT_DIST_INIT       = (1 << 10),
+    CLIENT_SECURITY_INIT   = (1 << 11)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -69,6 +75,9 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     PINT_client_status_flag client_status_flag = CLIENT_NO_INIT;
     PINT_smcb *smcb = NULL;
     uint64_t debug_mask = 0;
+    char *event_mask = NULL;
+
+    pint_client_pid = getpid();
 
     gossip_enable_stderr();
 
@@ -82,6 +91,27 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (debug_file)
     {
         gossip_enable_file(debug_file, "w");
+    }
+
+    ret = PINT_event_init(PINT_EVENT_TRACE_TAU);
+
+/*  ignore error *
+ *  if (ret < 0)
+    {
+        gossip_err("Error initializing event interface.\n");
+        return (ret);
+    } */
+
+
+    /**
+     * (ClientID, Rank, RequestID, Handle, Sys)
+     */
+    PINT_event_define_event(NULL, "sys", "%d%d%d%llu%d", "", &PINT_client_sys_event_id);
+
+    event_mask = getenv("PVFS2_EVENTMASK");
+    if (event_mask)
+    {
+        PINT_event_enable(event_mask);
     }
 
     ret = id_gen_safe_initialize();
@@ -98,6 +128,14 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         gossip_lerr("Error initializing distributions.\n");
         goto error_exit;
     }
+
+    ret = PINT_client_security_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing security\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_SECURITY_INIT;
     
     /* initlialize the protocol encoder */
     ret = PINT_encode_initialize();
@@ -217,9 +255,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     /* keep track of this pointer for freeing on finalize */
     g_smcb = smcb;
 
-    PINT_util_digest_init();
-
-   return 0;
+    return 0;
 
   error_exit:
 
@@ -273,6 +309,11 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (client_status_flag & CLIENT_ENCODER_INIT)
     {
         PINT_encode_finalize();
+    }
+
+    if (client_status_flag & CLIENT_SECURITY_INIT)
+    {
+        PINT_client_security_finalize();
     }
 
     if (client_status_flag & CLIENT_DIST_INIT)

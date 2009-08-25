@@ -36,6 +36,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
     int ret, i;
     pthread_t *tids;
     pthread_attr_t attr;
+    pthread_t master_tid;
 
     tids = (pthread_t *)malloc(sizeof(pthread_t) * nent);
     if(!tids)
@@ -95,7 +96,19 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
         }
 
         /* create thread to perform I/O and trigger callback */
-        ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
+        if(mode == LIO_NOWAIT && i == (nent - 1))
+        {
+            /* note: in this case don't store the master's tid in the array;
+             * some thread implementations may allow the the
+             * alt_lio_thread() to complete (and try to free the array)
+             * before pthread_create() finishes execution here.
+             */
+            ret = pthread_create(&master_tid, &attr, alt_lio_thread, tmp_item);
+        }
+        else
+        {
+            ret = pthread_create(&tids[i], &attr, alt_lio_thread, tmp_item);
+        }
         if(ret != 0)
         {
             int j = 0;
@@ -270,68 +283,72 @@ static void* alt_lio_thread(void* foo)
 
 static int alt_aio_bstream_read_list(TROVE_coll_id coll_id,
                                      TROVE_handle handle,
-                                     char **mem_offset_array, 
+                                     char **mem_offset_array,
                                      TROVE_size *mem_size_array,
                                      int mem_count,
-                                     TROVE_offset *stream_offset_array, 
+                                     TROVE_offset *stream_offset_array,
                                      TROVE_size *stream_size_array,
                                      int stream_count,
                                      TROVE_size *out_size_p,
-                                     TROVE_ds_flags flags, 
+                                     TROVE_ds_flags flags,
                                      TROVE_vtag_s *vtag,
                                      void *user_ptr,
                                      TROVE_context_id context_id,
-                                     TROVE_op_id *out_op_id_p)
+                                     TROVE_op_id *out_op_id_p,
+                                     PVFS_hint  hints)
 {
     return dbpf_bstream_rw_list(coll_id,
                                 handle,
-                                mem_offset_array, 
+                                mem_offset_array,
                                 mem_size_array,
                                 mem_count,
-                                stream_offset_array, 
+                                stream_offset_array,
                                 stream_size_array,
                                 stream_count,
                                 out_size_p,
-                                flags, 
+                                flags,
                                 vtag,
                                 user_ptr,
                                 context_id,
                                 out_op_id_p,
                                 LIO_READ,
-                                &alt_aio_ops);
+                                &alt_aio_ops,
+                                hints);
 }
 
 static int alt_aio_bstream_write_list(TROVE_coll_id coll_id,
                                       TROVE_handle handle,
-                                      char **mem_offset_array, 
+                                      char **mem_offset_array,
                                       TROVE_size *mem_size_array,
                                       int mem_count,
-                                      TROVE_offset *stream_offset_array, 
+                                      TROVE_offset *stream_offset_array,
                                       TROVE_size *stream_size_array,
                                       int stream_count,
                                       TROVE_size *out_size_p,
-                                      TROVE_ds_flags flags, 
+                                      TROVE_ds_flags flags,
                                       TROVE_vtag_s *vtag,
                                       void *user_ptr,
                                       TROVE_context_id context_id,
-                                      TROVE_op_id *out_op_id_p)
+                                      TROVE_op_id *out_op_id_p,
+                                      PVFS_hint  hints)
 {
     return dbpf_bstream_rw_list(coll_id,
                                 handle,
-                                mem_offset_array, 
+                                mem_offset_array,
                                 mem_size_array,
                                 mem_count,
-                                stream_offset_array, 
+                                stream_offset_array,
                                 stream_size_array,
                                 stream_count,
                                 out_size_p,
-                                flags, 
+                                flags,
                                 vtag,
                                 user_ptr,
                                 context_id,
                                 out_op_id_p,
                                 LIO_WRITE,
-                                &alt_aio_ops);
+                                &alt_aio_ops,
+                                hints);
 }
 
 static struct dbpf_aio_ops alt_aio_ops =

@@ -17,6 +17,7 @@
 #include "pint-perf-counter.h"
 #include "check.h"
 
+/* nlmills: TODO: fix comment */
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
  * steps that are common to many server operations.
@@ -142,7 +143,7 @@ static PINT_sm_action prelude_getattr_if_needed(
 
     ret = job_trove_dspace_getattr(
         s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
-        0, js_p, &tmp_id, server_job_context);
+        0, js_p, &tmp_id, server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -161,6 +162,61 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = &s_op->attr;
 
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "Received capability with: \n"
+                 "issuer: %s\n"
+                 "fsid: %u\n"
+                 "sig_size: %u\n"
+                 "signature: %p\n"
+                 "timeout: %d\n"
+                 "op_mask: %x\n"
+                 "num_handles: %u\n"
+                 "handle_array: %p\n",
+                 s_op->req->capability.issuer,
+                 s_op->req->capability.fsid,
+                 s_op->req->capability.sig_size,
+                 s_op->req->capability.signature,
+                 (int)s_op->req->capability.timeout,
+                 s_op->req->capability.op_mask,
+                 s_op->req->capability.num_handles,
+                 s_op->req->capability.handle_array
+                 );
+
+    /* nlmills: TODO: find a more secure way to verify credential */
+    if (s_op->op == PVFS_SERV_CREATE)
+    {
+        ret = PINT_verify_credential(&s_op->req->u.create.credential);
+    }
+    else if (s_op->op == PVFS_SERV_MKDIR)
+    {
+        ret = PINT_verify_credential(&s_op->req->u.mkdir.credential);
+    }
+    else if (s_op->op == PVFS_SERV_GETATTR)
+    {
+        ret = PINT_verify_credential(&s_op->req->u.getattr.credential);
+    }
+    else if (s_op->op == PVFS_SERV_SETATTR)
+    {
+        ret = PINT_verify_credential(&s_op->req->u.setattr.credential);
+    }
+    else if (s_op->op == PVFS_SERV_UNSTUFF)
+    {
+        ret = PINT_verify_credential(&s_op->req->u.unstuff.credential);
+    }
+    else
+    {
+        /* pass through all ops that don't take a credential */
+        ret = 1;
+    }
+
+    if (!ret)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "Credential failed verification.\n");
+        /* nlmills: TODO: find a better error code */
+        js_p->error_code = -PVFS_EAGAIN;
+        return SM_ACTION_COMPLETE;
+    }
+    
     ret = PINT_verify_capability(&s_op->req->capability);
     if (ret)
     {
@@ -168,8 +224,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
     else
     {
-        /* TODO: find a better way to the client 'try again' */
-        ret = -PVFS_EAGAIN;
+        /* nlmills: TODO: find a better way to the client 'try again' */
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability failed verification.\n");
+        js_p->error_code = -PVFS_EAGAIN;
+        return SM_ACTION_COMPLETE;
     }
 
     js_p->error_code = ret;

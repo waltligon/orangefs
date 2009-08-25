@@ -168,7 +168,11 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         new_op->attempts = 0;
         gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
-        pvfs2_gen_credentials(new_op->upcall.credentials);
+#ifdef HAVE_CURRENT_FSUID
+        new_op->upcall.uid = current_fsuid();
+#else
+        new_op->upcall.uid = current->fsuid;
+#endif
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
@@ -196,7 +200,7 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
-    else
+    else 
     {
         gossip_err("NULL pointer in op_release\n");
     }
@@ -204,7 +208,9 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 
 
 static void dev_req_cache_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
@@ -252,7 +258,7 @@ void *dev_req_alloc(void)
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (buffer == NULL)
     {
-        gossip_err("Failed to allocate from dev_req_cache\n");
+        gossip_err("Failed to allocate from dev_req_cache\n"); 
     }
     return buffer;
 }
@@ -263,7 +269,7 @@ void dev_req_release(void *buffer)
     {
         kmem_cache_free(dev_req_cache, buffer);
     }
-    else
+    else 
     {
         gossip_err("NULL pointer passed to dev_req_release\n");
     }
@@ -271,7 +277,9 @@ void dev_req_release(void *buffer)
 }
 
 static void pvfs2_inode_cache_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
@@ -369,7 +377,7 @@ pvfs2_inode_t* pvfs2_inode_alloc(void)
     */
     pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
                                    PVFS2_CACHE_ALLOC_FLAGS);
-    if (pvfs2_inode == NULL)
+    if (pvfs2_inode == NULL) 
     {
         gossip_err("Failed to allocate pvfs2_inode\n");
     }
@@ -395,7 +403,9 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 static void kiocb_ctor(
-#ifdef HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM
+#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
+    void *req
+#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
     struct kmem_cache *cachep,
     void *req
 #else
@@ -455,7 +465,7 @@ void kiocb_release(pvfs2_kiocb *x)
     {
         kmem_cache_free(pvfs2_kiocb_cache, x);
     }
-    else
+    else 
     {
         gossip_err("kiocb_release: kmem_cache_free NULL pointer!\n");
     }

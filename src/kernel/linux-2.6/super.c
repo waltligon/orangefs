@@ -168,11 +168,17 @@ static int parse_mount_options(
                                 "ignoring %s\n", options[i]);
                 }
 #else
-                /* in the 2.6 kernel, we don't pass device name through this
-                 * path; we must have gotten an unsupported option.
+                /* filter out NULL option strings (older 2.6 kernels may leave 
+                 * these after parsing out standard options like noatime) 
                  */
-                gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
-                return(-EINVAL);
+                if(options[i][0] != '\0')
+                {
+                    /* in the 2.6 kernel, we don't pass device name through this
+                     * path; we must have gotten an unsupported option.
+                     */
+                    gossip_err("Error: mount option [%s] is not supported.\n", options[i]);
+                    return(-EINVAL);
+                }
 #endif
             }
         }
@@ -248,6 +254,8 @@ void pvfs2_read_inode(
     if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
+        gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
 }
@@ -290,6 +298,8 @@ void pvfs2_read_inode(
 #endif
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
+            gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+                __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
             pvfs2_make_bad_inode(inode);
         }
         else {
@@ -300,8 +310,9 @@ void pvfs2_read_inode(
     }
     else
     {
-        gossip_err("Could not allocate pvfs2_inode from "
-                    "pvfs2_inode_cache\n");
+        gossip_err("%s:%s:%d Could not allocate pvfs2_inode from pvfs2_inode_cache."
+            "calling make bad inode - [%p] (inode = %llu | ct = %d)\n",
+            __FILE__, __func__, __LINE__, pvfs2_inode, llu(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
 }
@@ -320,6 +331,7 @@ static void pvfs2_clear_inode(struct inode *inode)
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
+#ifdef HAVE_PUT_INODE
 /* called when the VFS removes this inode from the inode cache */
 static void pvfs2_put_inode(
     struct inode *inode)
@@ -349,6 +361,7 @@ static void pvfs2_put_inode(
 #endif
     }
 }
+#endif /* HAVE_PUT_INODE */
 
 #ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
 static int pvfs2_statfs_lite(
@@ -852,14 +865,18 @@ struct super_operations pvfs2_s_ops =
     clear_inode: pvfs2_clear_inode,
     put_inode: pvfs2_put_inode,
 #else
+#ifdef HAVE_DROP_INODE
     .drop_inode = generic_delete_inode,
+#endif
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
 #ifdef HAVE_READ_INODE
     .read_inode = pvfs2_read_inode,
 #endif
     .dirty_inode = pvfs2_dirty_inode,
+#ifdef HAVE_PUT_INODE
     .put_inode = pvfs2_put_inode,
+#endif
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount,
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
@@ -962,7 +979,7 @@ struct super_block* pvfs2_get_sb(
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
-    sb->s_maxbytes = MAX_LFS_FILESIZE;
+    sb->s_maxbytes = (unsigned long long) 1 << 63;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
@@ -1050,6 +1067,8 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
                 refn.handle, refn.fs_id);
 
    inode = pvfs2_iget(sb, &refn);
+
+#ifdef HAVE_D_ALLOC_ANON
    if (inode == NULL)
    {
       return ERR_PTR(-ESTALE);
@@ -1059,12 +1078,19 @@ pvfs2_fh_to_dentry(struct super_block *sb, struct fid *fid,
       return (void *) inode;
    }
    dentry = d_alloc_anon(inode);
-
    if (dentry == NULL)
    {
       iput(inode);
       return ERR_PTR(-ENOMEM);
    }
+#else
+   dentry = d_obtain_alias(inode);
+   if(dentry == NULL)
+   {
+       return ERR_PTR(-ENOMEM);
+   }
+#endif
+
    dentry->d_op = &pvfs2_dentry_operations;
    return dentry;
 }
@@ -1187,7 +1213,7 @@ int pvfs2_fill_sb(
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
-    sb->s_maxbytes = MAX_LFS_FILESIZE;
+    sb->s_maxbytes = (unsigned long long) 1 << 63;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
@@ -1301,6 +1327,13 @@ struct super_block *pvfs2_get_sb(
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
+            /* Older 2.6 kernels pass in NOATIME flag here.  Capture it 
+             * if present.
+             */
+            if(flags & MS_NOATIME)
+            {
+                sb->s_flags |= MS_NOATIME;
+            }
             /* on successful mount, store the devname and data used */
             strncpy(PVFS2_SB(sb)->devname, devname,
                     PVFS_MAX_SERVER_ADDR_LEN);
@@ -1415,9 +1448,6 @@ void pvfs2_kill_sb(
 
         /* free the pvfs2 superblock private data */
         kfree(PVFS2_SB(sb));
-#else
-        sb->u.generic_sbp = NULL;
-#endif
         {
             int count1, count2;
             count1 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_alloc_count));
@@ -1433,6 +1463,9 @@ void pvfs2_kill_sb(
                         count1, count2);
             }
         }
+#else
+        sb->u.generic_sbp = NULL;
+#endif
     }
     else
     {
