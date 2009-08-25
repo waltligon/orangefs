@@ -97,8 +97,13 @@ static PINT_sm_action getpath_setup_resp(
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
 
     s_op->u.getpath.count = s_op->req->u.getpath.count;
-    s_op->u.getpath.dirent = s_op->req->u.getpath.dirent;
-
+    s_op->u.getpath.dirent_p = s_op->req->u.getpath.dirent;
+    if( (s_op->u.getpath.handle_p = calloc( s_op->req->u.getpath.count, 
+                                            sizeof(PVFS_handle))) == 0 )
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
     s_op->resp.u.getpath.count = s_op->req->u.getpath.count;
 
     if( (s_op->resp.u.getpath.dirent = calloc( s_op->req->u.getpath.count, 
@@ -126,8 +131,9 @@ static PINT_sm_action getpath_read_path(
 
     ret = job_trove_keyval_read_value_path(
         s_op->req->u.getpath.fs_id,
-        &(s_op->u.getpath.count),
-        s_op->u.getpath.dirent,
+        s_op->u.getpath.count,
+        s_op->u.getpath.dirent_p,
+        s_op->u.getpath.handle_p,
         0,
         NULL,
         smcb,
@@ -138,7 +144,7 @@ static PINT_sm_action getpath_read_path(
 
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_read_value: exit\n");
-*/
+
     return ret;
 }
 

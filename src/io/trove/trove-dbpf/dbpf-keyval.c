@@ -152,10 +152,6 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
 static int dbpf_result_iterate_selector(char *a, char *b, 
                                         uint32_t query);
 
-static int dbpf_build_path_of_handle(DBC *dbc_p, char *path, 
-                                     TROVE_coll_id coll_id, 
-                                     TROVE_handle handle);
-
 static int dbpf_keyval_read(TROVE_coll_id coll_id,
                             TROVE_handle handle,
                             TROVE_keyval_s *key_p,
@@ -327,8 +323,9 @@ return_error:
 }
 
 static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
-                            uint32_t *count_p,
+                            uint32_t count,
                             PVFS_dirent *dirent_p,
+                            TROVE_handle *handle_p,
                             TROVE_ds_flags flags,
                             TROVE_vtag_s *vtag,
                             void *user_ptr,
@@ -376,7 +373,8 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
 
     /* initialize the op-specific members */
     op_p->u.v_path.dirent_p = dirent_p;
-    op_p->u.v_path.next_handle = 0;
+    op_p->u.v_path.count = count;
+    op_p->u.v_path.handle_p = handle_p;
     op_p->hints = hints;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
@@ -386,7 +384,7 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 {
-    int ret = 0, path_len=0;
+    int ret = 0, path_len=0, i=0;
     TROVE_handle k_handle=0, v_handle=0, root_handle;
     DBT key, data, pkey;
     DBC *dbc_p=NULL;
@@ -397,7 +395,6 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
     memset(&data, 0, sizeof(data));
     memset(&pkey, 0, sizeof(pkey));
     memset(&key_entry, 0, sizeof(key_entry));
-    memcpy(&k_handle, op_p->u.v_path.next_handle, sizeof(TROVE_handle));
 
     /* get root handle of collection */
     PINT_cached_config_get_root_handle(op_p->coll_p->coll_id, &root_handle); 
@@ -412,72 +409,78 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
     pkey.size = pkey.ulen = sizeof( struct dbpf_keyval_db_entry );
     key.flags = data.flags = pkey.flags = DB_DBT_USERMEM;
 
-    ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
-    while( ret == 0 )
+    for(i=0; i < op_p->u.v_path.count; i++ )
     {
-        /* item was found, move 'parent' key to key for next query */
-        memcpy(key.data, &(key_entry.handle), sizeof(TROVE_handle));
-        memcpy(op_p->u.v_path.next_handle, &(key_entry.handle), 
-            sizeof(TROVE_handle));
-
-        key.ulen = key.size = (sizeof(TROVE_handle));
-
-        /* put path associated with parent into path */
-        if( strncmp("de", key_entry.key, 3) != 0 )
+        memcpy( key.data, &(op_p->u.v_path.handle_p[i]), sizeof(TROVE_handle));
+        ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
+        while( ret == 0 )
         {
-            /* existing path resides in op_p->u.v_path.dirent */
-            path_len = strlen(op_p->u.v_path.dirent_p->d_name) + 
-                strlen(key_entry.key) + 2;
-            if( (tmp_path = calloc( path_len, 1)) == 0 )
+            /* item was found, move 'parent' key to key for next query */
+            memcpy(key.data, &(key_entry.handle), sizeof(TROVE_handle));
+            memcpy( &(op_p->u.v_path.handle_p[i]), &(key_entry.handle), 
+                sizeof(TROVE_handle));
+    
+            key.ulen = key.size = (sizeof(TROVE_handle));
+    
+            /* put path associated with parent into path */
+            if( strncmp("de", key_entry.key, 3) != 0 )
             {
-                ret = -TROVE_ENOMEM;
-                return ret;
+                /* existing path resides in op_p->u.v_path.dirent */
+                path_len = strlen(op_p->u.v_path.dirent_p[i].d_name) + 
+                    strlen(key_entry.key) + 2;
+                if( (tmp_path = calloc( path_len, 1)) == 0 )
+                {
+                    ret = -TROVE_ENOMEM;
+                    return ret;
+                }
+    
+                /* copy / and key, prefix to existing path */
+                strncpy( tmp_path, "/", 1 );
+                strncpy( (tmp_path+sizeof(char)), key_entry.key,
+                    strlen(key_entry.key));
+                strncpy( (tmp_path+strlen(key_entry.key)+1), 
+                    op_p->u.v_path.dirent_p[i].d_name, 
+                    strlen(op_p->u.v_path.dirent_p[i].d_name));
+    
+                /* reset strin in d_name, copy built string over */
+                memset(op_p->u.v_path.dirent_p[i].d_name, 0, path_len+1);
+                strncpy(op_p->u.v_path.dirent_p[i].d_name, tmp_path, 
+                    path_len+1);
+                free(tmp_path);
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                             "[DBPF KEYVAL]: Path (%s), next handle (%llu)\n",
+                             op_p->u.v_path.dirent_p[i].d_name,
+                             llu(op_p->u.v_path.handle_p[i]) );
             }
-
-            /* copy / and key, prefix to existing path */
-            strncpy( tmp_path, "/", 1 );
-            strncpy( (tmp_path+sizeof(char)), key_entry.key,
-                strlen(key_entry.key));
-            strncpy( (tmp_path+strlen(key_entry.key)+1), 
-                op_p->u.v_path.dirent_p->d_name, 
-                strlen(op_p->u.v_path.dirent_p->d_name));
-
-            /* reset strin in d_name, copy built string over */
-            memset(op_p->u.v_path.dirent_p->d_name, 0, path_len+1);
-            strncpy(op_p->u.v_path.dirent_p->d_name, tmp_path, path_len+1);
-            free(tmp_path);
-            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "[DBPF KEYVAL]: Path now (%s), next handle (%llu)\n",
-                         op_p->u.v_path.dirent_p->d_name,
-                         llu(*op_p->u.v_path.next_handle) );
-        }
-
-        /* if the root handle has been reached, break */
-        if( key_entry.handle == root_handle )
+    
+            /* if the root handle has been reached, break */
+            if( key_entry.handle == root_handle )
+            {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                             "[DBPF KEYVAL]: Reached root handle, built path "
+                             "(%s) for (%llu)\n", 
+                             op_p->u.v_path.dirent_p[i].d_name, 
+                             llu(op_p->u.v_path.dirent_p[i].handle));
+                break;
+            }
+        } /* end building path for local handles, reached one we didn't have */
+    
+        if( ret == DB_NOTFOUND )
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "[DBPF KEYVAL]: Reached root handle, built path (%s) "
-                         "for (%llu)\n", op_p->u.v_path.dirent_p->d_name, 
-                         llu(op_p->u.v_path.dirent_p->handle));
-            break;
+                         "[DBPF KEYVAL]: Parent of (%llu) not local. "
+                         "Path now (%s), bdb error: %s\n", 
+                         llu(op_p->u.v_path.handle_p[i]), 
+                         op_p->u.v_path.dirent_p[i].d_name, db_strerror(ret));
         }
-    }
-
-    if( ret == DB_NOTFOUND )
-    {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "[DBPF KEYVAL]: Parent of (%llu) not local. "
-                     "Path now (%s), bdb error: %s\n", 
-                     llu(*op_p->u.v_path.next_handle), 
-                     op_p->u.v_path.dirent_p->d_name, db_strerror(ret));
-    }
-    else
-    {
-        ret = -dbpf_db_error_to_trove_error(ret);
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "[DBPF KEYVAL]: Error looking up handle: %s\n",
-                     db_strerror(ret));
-        return ret;
+        else
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "[DBPF KEYVAL]: Error looking up handle: %s\n",
+                         db_strerror(ret));
+            return ret;
+        }
     }
     return 1;
 }
@@ -2804,95 +2807,6 @@ static int dbpf_result_iterate_selector(char *a, char *b,
         }
     }
     return 1;
-}
-
-static int dbpf_build_path_of_handle(DBC *dbc_p, 
-    char *path, 
-    TROVE_coll_id coll_id, 
-    TROVE_handle handle)
-{
-    char *tmp_path = NULL;
-    int ret = 0, path_len = 0;
-    DBT key, data, pkey;
-    TROVE_handle root_h=0, value_h=0, key_h=0;
-    struct dbpf_keyval_db_entry key_entry;
-
-    PINT_cached_config_get_root_handle(coll_id, &root_h); 
-    key_h = handle;
-
-    memset(&key, 0, sizeof(DBT));
-    memset(&data, 0, sizeof(DBT));
-    memset(&pkey, 0, sizeof(DBT));
-    memset(&key_entry, 0, sizeof( struct dbpf_keyval_db_entry ));
-
-    pkey.data = &(key_entry);
-    pkey.ulen = pkey.size = sizeof( struct dbpf_keyval_db_entry );
-
-    key.data = &(key_h);
-    key.ulen = key.size  = sizeof(TROVE_handle);
-
-    data.data = &(value_h);
-    data.ulen = data.size = sizeof(TROVE_handle);
-
-    data.flags = key.flags = pkey.flags = DB_DBT_USERMEM;
-
-    while( ret == 0 )
-    {
-        ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
-        if( ret == 0 )
-        {
-            memcpy(key.data, &(key_entry.handle), sizeof(TROVE_handle));
-            key.ulen = key.size = (sizeof(TROVE_handle));
-
-            if( strncmp("de", key_entry.key, 3) != 0 )
-            {
-                /* set next query for handle just looked up */
-                path_len = strlen(path) + strlen(key_entry.key) + 2;
-                tmp_path = malloc( path_len );
-                if( tmp_path == 0 )
-                {
-                    ret = -TROVE_ENOMEM;
-                    return ret;
-                }
-                memset(tmp_path, 0, path_len);
-
-                /* copy / and key, prefix to existing path */
-                strncpy( tmp_path, "/", 2 );
-                strncpy( (tmp_path+sizeof(char)), key_entry.key,
-                    strlen(key_entry.key)+1);
-                strncpy( (tmp_path+strlen(key_entry.key)+1), path, 
-                    strlen(path));
-
-                memset(path, 0, path_len+1);
-                strncpy(path, tmp_path, path_len+1);
-                free(tmp_path);
-            }
-
-            /* if the root handle has been reached, break */
-            if( key_entry.handle == root_h )
-            {
-                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                             "[DBPF KEYVAL]: Built path (%s) for (%llu)\n",
-                             path, llu(handle));
-                break;
-            }
-        }
-        else if( ret == DB_NOTFOUND )
-        {
-            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "[DBPF KEYVAL]: Parent of (%llu) not local, "
-                         "adding it to list of unknowns Built (%s), "
-                         "bdb error: %s\n",
-                         llu( key_entry.handle), path, db_strerror(ret));
-            break;
-        }
-        else
-        {
-            ret = -dbpf_db_error_to_trove_error(ret);
-            return ret;
-        }
-    }
-    return 0;
 }
 
  /* constructs secondary key for keyval_secondary db. the value of the

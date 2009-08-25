@@ -400,8 +400,9 @@ struct dbpf_keyval_iterate_keys_op
 
 struct dbpf_keyval_read_value_path_op
 {
+    uint32_t count;
     PVFS_dirent *dirent_p;
-    PVFS_handle *next_handle;
+    PVFS_handle *handle_p;
     /* vtag? */
 };
 

@@ -132,8 +132,9 @@ struct TROVE_keyval_ops
 
    int (*keyval_read_value_path)(
                                TROVE_coll_id coll_id,
-                               uint32_t *count,
+                               uint32_t count,
                                PVFS_dirent *dirent_p,
+                               TROVE_handle *handle_p,
                                TROVE_ds_flags flags,
                                TROVE_vtag_s* vtag,
                                void* user_ptr,

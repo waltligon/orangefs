@@ -550,9 +550,9 @@ struct PINT_server_getvalue_op
 struct PINT_server_getpath_op
 {
     uint32_t count;
-    PVFS_dirent *dirent;
+    PVFS_dirent *dirent_p;
+    PVFS_handle *handle_p;
     PVFS_handle root_handle;
-    PVFS_handle lookup_handle;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */
