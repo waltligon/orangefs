@@ -550,8 +550,11 @@ struct PINT_server_getvalue_op
 struct PINT_server_getpath_op
 {
     uint32_t count;
+    uint32_t remote_count;
     PVFS_dirent *dirent_p;
     PVFS_handle *handle_p;
+    PVFS_dirent *remote_dirent_p;
+    PVFS_BMI_addr_t *remote_addr;
     PVFS_handle root_handle;
 };
 

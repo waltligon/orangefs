@@ -1918,7 +1918,7 @@ do {                                                    \
     (__req).hints = (__hints);                          \
     (__req).u.getpath.fs_id = (__fsid);                 \
     (__req).u.getpath.count = (__count);                \
-    (__req).u.getdir.dirent = (__dirent);               \
+    (__req).u.getpath.dirent = (__dirent);               \
 } while (0);
 
 struct PVFS_servresp_getpath

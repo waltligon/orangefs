@@ -24,6 +24,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-perf-counter.h"
+#include "pint-cached-config.h"
 #include "dbpf-keyval.h"
 
 %%
@@ -86,7 +87,7 @@ machine pvfs2_get_path_sm
 static PINT_sm_action getpath_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret=0, i=0;
+    int ret=0;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     js_p->error_code = 0;
@@ -96,6 +97,8 @@ static PINT_sm_action getpath_setup_resp(
                              &(s_op->scheduled_id), server_job_context);
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
 
+    PINT_cached_config_get_root_handle(s_op->req->u.getpath.fs_id, 
+        &(s_op->u.getpath.root_handle));
     s_op->u.getpath.count = s_op->req->u.getpath.count;
     s_op->u.getpath.dirent_p = s_op->req->u.getpath.dirent;
     if( (s_op->u.getpath.handle_p = calloc( s_op->req->u.getpath.count, 
@@ -151,8 +154,89 @@ static PINT_sm_action getpath_read_path(
 static PINT_sm_action getpath_get_parents(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
- //   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *get_parent_s_op = PINT_sm_frame(smcb, 
+        PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret=0, handles_left=0, i=0, j=0, meta_serv_num=0;
 
+
+    PINT_cached_config_get_server_name(server_name, 1024, handle_array[i], 
+        s_op->req->u.getpath.fs_id);
+
+    /* iterate over handles, any that are done do not need to go on */
+    for( i = 0; i < s_op->u.getpath.count; i++ )
+    {
+        if( s_op->u.getpath.handle_p[i] != s_op->u.getpath.root_handle )
+        {
+            handles_left++;
+        }
+    }
+    s_op->u.getpath.remote_count = handles_left;
+  
+    if( (s_op->u.getpath.remote_dirent_p = calloc( handles_left, 
+        sizeof(PVFS_dirent))) == 0 )
+    {
+        gossip_err("get_path: failed to allocate remote_dirent_p\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    for( i=0, j=0; i < s_op->u.getpath.count; i++ )
+    {
+        if( s_op->u.getpath.handle_p[i] != s_op->u.getpath.root_handle )
+        {
+            memcpy( &(s_op->u.getpath.remote_dirent_p[j++]), 
+                &(s_op->u.getpath.dirent_p[i]), sizeof(PVFS_dirent));
+        }
+    
+    }
+    /* should have copied same number of items as we counted */
+    assert(j == s_op->u.getpath.remote_count);
+
+    PINT_cached_config_get_num_meta( s_op->target_fs_id, &(meta_serv_num) );
+    if( (s_op->u.getpath.remote_addr = calloc(meta_serv_num, 
+                                              sizeof(PVFS_BMI_addr_t))) == 0 )
+    {
+        gossip_err("get_path: failed to allocate remote_dirent_p\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* msgpair array the size of all metadata servers */
+    ret = PINT_cached_config_get_server_array( s_op->req->u.getpath.fs_id,
+        PINT_SERVER_TYPE_META, s_op->u.getpath.remote_addr, &(meta_serv_num));
+
+    ret = PINT_msgpairarray_init(&get_parent_s_op->msgarray_op, meta_serv_num);
+    if (ret)
+    {
+        gossip_err("get_path: failed to allocate msgarray\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* for each meta server, setup the message with the remaining handles */
+    foreach_msgpair( &s_op->msgarray_op, msg_p, i )
+    {
+        PINT_SERVREQ_GETPATH_FILL(
+            msg_p->req,
+            s_op->req->credentials,
+            s_op->target_fs_id,
+            s_op->u.getpath.remote_count,
+            s_op->u.getpath.remote_dirent_p,
+            NULL);
+
+            msg_p->fs_id = s_op->req->u.getpath.fs_id;
+            msg_p->handle = s_op->u.getpath.root_handle;
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = NULL;
+            memcpy( &(msg_p->svr_addr), &(s_op->u.getpath.remote_addr[i]), 
+                sizeof(PVFS_BMI_addr_t));
+            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: setting msg %d to "
+                         "%llu\n", i, llu(s_op->u.getpath.remote_addr[i]));
+    }
+
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
@@ -172,9 +256,12 @@ static PINT_sm_action getpath_check_resp(
 static PINT_sm_action getpath_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-  //  struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* free(s_op->u.getpath.buffer); */
+    free(s_op->u.getpath.remote_dirent_p); 
+    free(s_op->u.getpath.remote_addr); 
+    free(s_op->u.getpath.handle_p); 
+    free(s_op->resp.u.getpath.dirent); 
     
     return(server_state_machine_complete(smcb));
 }
