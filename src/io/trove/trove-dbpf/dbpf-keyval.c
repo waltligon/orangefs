@@ -368,7 +368,7 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
-                     *handle_p, 
+                     handle_p[0], 
                      PINT_HINT_GET_OP_ID(hints));
 
     /* initialize the op-specific members */
@@ -400,21 +400,32 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
     PINT_cached_config_get_root_handle(op_p->coll_p->coll_id, &root_handle); 
 
     key.data = &(k_handle);
-    key.ulen = key.size = sizeof(k_handle);
+    key.ulen = key.size = sizeof(TROVE_handle);
 
     data.data = &(v_handle);
-    data.size = data.ulen = sizeof(v_handle);
+    data.size = data.ulen = sizeof(TROVE_handle);
 
     pkey.data = &key_entry;
     pkey.size = pkey.ulen = sizeof( struct dbpf_keyval_db_entry );
+
     key.flags = data.flags = pkey.flags = DB_DBT_USERMEM;
+
+
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                 "[DBPF KEYVAL]: Completed key/val/pkey initialization\n");
 
     for(i=0; i < op_p->u.v_path.count; i++ )
     {
+        op_p->u.v_path.handle_p[i] = op_p->u.v_path.dirent_p[i].handle;
         memcpy( key.data, &(op_p->u.v_path.handle_p[i]), sizeof(TROVE_handle));
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                     "[DBPF KEYVAL]: After memcpy to key.data\n");
         ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
         while( ret == 0 )
         {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                         "[DBPF KEYVAL]: Iter %d, looking up %llu\n",
+                         i, llu( key_entry.handle ));
             /* item was found, move 'parent' key to key for next query */
             memcpy(key.data, &(key_entry.handle), sizeof(TROVE_handle));
             memcpy( &(op_p->u.v_path.handle_p[i]), &(key_entry.handle), 
@@ -537,7 +548,7 @@ static int dbpf_keyval_read_value_query(TROVE_coll_id coll_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
-                     dirent->handle, 
+                     dirent_array[0].handle, 
                      PINT_HINT_GET_OP_ID(hints));
 
     /* initialize the op-specific members */
@@ -2823,7 +2834,7 @@ int PINT_trove_dbpf_keyval_secondary_callback(
 
     /* for attributes prefixed with user create a secondary key of the form
      * <attribute><value> */
-    if( ( ( pkey->size-sizeof(PVFS_handle)) > strlen("user.")) && 
+    if( ( ( pkey->size - sizeof(PVFS_handle)) > strlen("user.")) && 
           ( memcmp(k->key, "user.", 5) == 0 ) )
     {
         /* size of new key is length of the attribute plus length of value */
@@ -2873,6 +2884,10 @@ int PINT_trove_dbpf_keyval_secondary_callback(
     }
     else
     {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                     "[DBPF KEYVAL]: SKIPPING SECONDARY INDEX OF "
+                     "(%llu)(%s)->(%s)\n", k->handle, k->key, 
+                     (char *)pdata->data );
         return DB_DONOTINDEX;
     }
 
@@ -2983,7 +2998,7 @@ int PINT_trove_dbpf_keyval_secondary_compare(
             if( strncmp(b->data, "user.", 5) == 0 )
             {
                 gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                             "[KEYVAL]: comparing two user. strings: [%s]:[%s] "
+                             "[KEYVAL]: comparing two strings: [%s]:[%s] "
                              "strcmp says: %d\n", (char *)a->data, 
                              (char *)b->data, strcmp(a->data, b->data));
                 return strcoll(a->data, b->data); /* lexical comparison */

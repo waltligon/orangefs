@@ -24,12 +24,17 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-perf-counter.h"
+#include "pint-cached-config.h"
 #include "dbpf-keyval.h"
 
 #define FAILED_PERMS    100
 #define EMPTY_RESULT    101
 #define TARGET_ASSIGNED 102
 #define MORE_TARGETS    103
+#define GET_PATHS       104
+
+static int path_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
 %%
 
 machine pvfs2_get_value_sm
@@ -66,14 +71,27 @@ machine pvfs2_get_value_sm
         run getvalue_check_resp;
         FAILED_PERMS => remove_result;
         MORE_TARGETS => assign_target;
-        default => final_response;
+        default => setup_get_paths;
     }
 
     state remove_result
     {
       run getvalue_remove_result;
       MORE_TARGETS => assign_target;
-      default => final_response;
+      default => setup_get_paths;
+    }
+
+    state setup_get_paths
+    {
+        run getvalue_setup_get_paths;
+        GET_PATHS => call_msgpairarray;
+        default => final_response;
+    }
+
+    state call_msgpairarray
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => final_response;
     }
 
     state final_response
@@ -294,6 +312,7 @@ static PINT_sm_action getvalue_remove_result(
                  "[DBPF KEYVAL]: remove_result enter target_i: %u, "
                  "count: %u\n", s_op->u.getvalue.target_i,
                  s_op->u.getvalue.count);
+
     /* squish result array (key, val, dirent) to remove result with failed
      * permission check. key, val, dirent are whole array malloc'd,
      * buffers for key and val are one large malloc too so no leaks with
@@ -304,10 +323,12 @@ static PINT_sm_action getvalue_remove_result(
                      "\t[GETVALUE]: i: %d, replacing %llu(%s|%s) with "
                      "%llu(%s|%s)\n", i, 
                      llu(s_op->resp.u.getvalue.dirent[i-1].handle),
-                     (char *)(s_op->resp.u.getvalue.key[i-1].buffer+sizeof(PVFS_handle)),
+                     (char *)(s_op->resp.u.getvalue.key[i-1].buffer + 
+                        sizeof(PVFS_handle)),
                      (char *)s_op->resp.u.getvalue.val[i-1].buffer,
                      llu(s_op->resp.u.getvalue.dirent[i].handle),
-                     (char *)(s_op->resp.u.getvalue.key[i].buffer+sizeof(PVFS_handle)),
+                     (char *)(s_op->resp.u.getvalue.key[i].buffer + 
+                        sizeof(PVFS_handle)),
                      (char *)s_op->resp.u.getvalue.val[i].buffer);
         memcpy( &(s_op->resp.u.getvalue.key[i-1]), 
                 &(s_op->resp.u.getvalue.key[i]), sizeof(PVFS_ds_keyval) );
@@ -358,6 +379,86 @@ static PINT_sm_action getvalue_remove_result(
     return SM_ACTION_COMPLETE;
 }
 
+/*
+ * getvalue_setup_resp()
+ * Set up the response - allocate needed resources
+ */
+static PINT_sm_action getvalue_setup_get_paths(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret=0, i=0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_credentials creds;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: setup_get_paths: enter\n");
+    js_p->error_code = GET_PATHS;
+
+    /* if the query doesn't want paths, save the effort */
+    if( PVFS_KEYVAL_QUERY_UNMASK_PATHS(s_op->req->u.getvalue.query_type) == 
+        PVFS_KEYVAL_RESULT_NO_PATHS )
+    {
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    if( (s_op->u.getvalue.unknown_handle = calloc( s_op->resp.u.getvalue.count,
+                                                  sizeof(TROVE_handle) )) == 0)
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    if( (s_op->u.getvalue.unknown_dirent = calloc( s_op->resp.u.getvalue.count,
+                                                  sizeof(PVFS_dirent) )) == 0 )
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* move results into memory for get-path call */
+    for( i=0; i < s_op->resp.u.getvalue.count; i++ )
+    {
+        s_op->u.getvalue.unknown_handle[i] = 
+            s_op->resp.u.getvalue.dirent[i].handle;
+        memcpy( &(s_op->u.getvalue.unknown_dirent[i]),
+                &(s_op->resp.u.getvalue.dirent[i]), sizeof(PVFS_dirent) );
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: Setting %d to handle "
+                     "%llu\n", i, llu(s_op->u.getvalue.unknown_handle[i]) );
+    }
+
+    /* prepare messages */
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+
+    s_op->msgarray_op.params.job_timeout = user_opts->client_job_bmi_timeout;
+    s_op->msgarray_op.params.retry_delay = user_opts->client_retry_delay_ms;
+    s_op->msgarray_op.params.retry_limit = user_opts->client_retry_limit;
+    s_op->msgarray_op.params.quiet_flag = 1;
+
+    msg_p->fs_id = s_op->target_fs_id;
+    msg_p->handle = s_op->u.getvalue.unknown_handle[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = path_comp_fn;
+
+    /* send initial request to meta server of handle */
+    ret = PINT_cached_config_map_to_server( &msg_p->svr_addr, msg_p->handle,
+                                             msg_p->fs_id );
+    PINT_util_gen_credentials(&creds);
+    PINT_SERVREQ_GETPATH_FILL( msg_p->req,
+                               creds,
+                               s_op->target_fs_id,
+                               s_op->resp.u.getvalue.count,
+                               s_op->u.getvalue.unknown_dirent,
+                               NULL);
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: setup_get_paths: exit\n");
+    return SM_ACTION_COMPLETE;
+}
+
+
 /* getvalue_cleanup()
  * free resources alloc'd by state machine
  */
@@ -367,11 +468,53 @@ static PINT_sm_action getvalue_cleanup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     free(s_op->u.getvalue.buffer);
+    if( s_op->u.getvalue.unknown_handle )
+        free(s_op->u.getvalue.unknown_handle);
+    if( s_op->u.getvalue.unknown_dirent )
+        free(s_op->u.getvalue.unknown_dirent);
     free(s_op->resp.u.getvalue.dirent);
     free(s_op->resp.u.getvalue.key);
     free(s_op->resp.u.getvalue.val);
     return(server_state_machine_complete(smcb));
 }
+
+
+/* path_comp_fn()
+ *
+ * msgpair completion function to handle processing batch create response i
+ * from another server
+ */
+static int path_comp_fn(void *v_p,
+                        struct PVFS_server_resp *resp_p,
+                        int index)
+{
+    //PINT_smcb *smcb = v_p;
+    //struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i;
+                
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: enter\n");
+
+    assert(resp_p->op == PVFS_SERV_GETPATH);
+
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: GETPATH returned "
+                     "error: %d=n", resp_p->status);
+        return resp_p->status;
+    }
+
+    for(i=0; i < resp_p->u.getpath.count; i++ )
+    {
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]:  handle/path %d: "
+                     "(%llu):(%s)\n", i, 
+                     llu(resp_p->u.getpath.dirent[i].handle),
+                     resp_p->u.getpath.dirent[i].d_name); 
+    
+    }
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: exit\n");
+    return 0;
+}
+
 
 PINT_GET_OBJECT_REF_DEFINE(getvalue);
 
