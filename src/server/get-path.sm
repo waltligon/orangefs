@@ -27,6 +27,7 @@
 #include "pint-cached-config.h"
 #include "dbpf-keyval.h"
 
+#define NO_REMOTE 100
 %%
 
 machine pvfs2_get_path_sm
@@ -55,10 +56,17 @@ machine pvfs2_get_path_sm
     state get_parents
     {
         run getpath_get_parents;
-        success => check_resp;
+        NO_REMOTE => check_resp;
+        success => call_msgpairarray;
         default => final_response;
     }
 
+    state call_msgpairarray
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => check_resp;
+        default => final_response;
+    }
     state check_resp
     {
         run getpath_check_resp;
@@ -87,7 +95,7 @@ machine pvfs2_get_path_sm
 static PINT_sm_action getpath_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret=0, i=0;
+    int ret=0, i=0, meta_serv_num=0;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
@@ -125,6 +133,35 @@ static PINT_sm_action getpath_setup_resp(
         return SM_ACTION_COMPLETE;
     }
 
+    /* allocate a per meta server dirent list */
+    PINT_cached_config_get_num_meta( s_op->target_fs_id, &(meta_serv_num) );
+    s_op->u.getpath.meta_num = meta_serv_num;
+
+    if( (s_op->u.getpath.remote_dirent = calloc( meta_serv_num, 
+        sizeof(PVFS_dirent *))) == 0 )
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    for( i = 0; i < meta_serv_num; i ++ )
+    {
+        if( (s_op->u.getpath.remote_dirent[i] = calloc( s_op->u.getpath.count,
+             sizeof(PVFS_dirent))) == 0 )
+        {
+            js_p->error_code = -TROVE_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    /* allocate a per meta server remote_count array */
+    if( (s_op->u.getpath.remote_count = calloc( meta_serv_num, 
+        sizeof(uint32_t))) == 0 )
+    {
+        js_p->error_code = -TROVE_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     gossip_debug(GOSSIP_GETPATH_DEBUG,
                  "[GETPATH]: getpath: count: %u, dirent_p: %p, handle_p: %p\n",
                  s_op->req->u.getpath.count, s_op->u.getpath.dirent_p, 
@@ -133,7 +170,7 @@ static PINT_sm_action getpath_setup_resp(
     for( i=0; i <  s_op->req->u.getpath.count; i++ )
     {
         gossip_debug(GOSSIP_GETPATH_DEBUG,
-                     "[GETPATH]: getpath [%d]:[%llu]\n", 
+                     "[GETPATH]: getpath request [%d]:[%llu]\n", 
                      i, llu(s_op->req->u.getpath.dirent[i].handle));
     }
 
@@ -180,47 +217,37 @@ static PINT_sm_action getpath_read_path(
 static PINT_sm_action getpath_get_parents(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret=0, i=0, j=0, k=0, meta_serv_num=0, no_remote=0, idx=0;
+    PVFS_credentials creds;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *get_parent_s_op = PINT_sm_frame(smcb, 
         PINT_FRAME_CURRENT);
-    struct server_configuration_s *server_config = get_server_config_struct();
-    PINT_sm_msgpair_state *msg_p = NULL;
-    int ret=0, i=0, j=0, meta_serv_num=0;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_get_parents: enter\n");
 
-    /* iterate over handles, any that are done do not need to go on */
-    s_op->u.getpath.remote_count = 0;
+    /* iterate handles, any at root do not need to go on, count 'em */
     for( i = 0; i < s_op->u.getpath.count; i++ )
     {
         if( s_op->u.getpath.handle_p[i] != s_op->u.getpath.root_handle )
         {
-            s_op->u.getpath.remote_count++;
+            no_remote++;
         }
     }
-  
-    if( (s_op->u.getpath.remote_dirent_p = calloc( s_op->u.getpath.remote_count,
-        sizeof(PVFS_dirent))) == 0 )
+
+    if( no_remote == 0 )
     {
-        gossip_err("get_path: failed to allocate remote_dirent_p\n");
-        js_p->error_code = -PVFS_ENOMEM;
+        js_p->error_code = NO_REMOTE;
         return SM_ACTION_COMPLETE;
     }
-    assert(  s_op->u.getpath.remote_count <= s_op->u.getpath.count );
 
-    for( i=0, j=0; i < s_op->u.getpath.count; i++ )
-    {
-        if( s_op->u.getpath.handle_p[i] != s_op->u.getpath.root_handle )
-        {
-            memcpy( &(s_op->u.getpath.remote_dirent_p[j++]), 
-                &(s_op->u.getpath.dirent_p[i]), sizeof(PVFS_dirent));
-        }
-    
-    }
-    /* should have copied same number of items as we counted */
-    assert(j == s_op->u.getpath.remote_count);
+    /* if the handle_p handle is same as dirent_p handle, no progress was
+     * made locally to find it's parent handle, handle must go to all meta
+     * servers. otherwise, look it up where the next handle is owned */
 
+    /* get number of meta servers to size our calloc */
     PINT_cached_config_get_num_meta( s_op->target_fs_id, &(meta_serv_num) );
     if( (s_op->u.getpath.remote_addr = calloc(meta_serv_num, 
                                               sizeof(PVFS_BMI_addr_t))) == 0 )
@@ -230,15 +257,53 @@ static PINT_sm_action getpath_get_parents(
         return SM_ACTION_COMPLETE;
     }
 
-    /* msgpair array the size of all metadata servers */
+    /* get the addresses of the meta servers to send to */
     ret = PINT_cached_config_get_server_array( s_op->req->u.getpath.fs_id,
         PINT_SERVER_TYPE_META, s_op->u.getpath.remote_addr, &(meta_serv_num));
 
-    /* remove this host from the array  if it exists */
+    /* iterate over handles needing attention and add to appropriate meta
+     * servers list(s) */
+    for( i=0; i < s_op->u.getpath.count; i++ )
+    {
+        if( s_op->u.getpath.handle_p[i] != s_op->u.getpath.root_handle )
+        {
+            gossip_debug(GOSSIP_GETPATH_DEBUG,
+                         "[GETPATH]: remote dirent entry [%s]:[%llu] "
+                         "needing handle [%llu]\n", 
+                         s_op->u.getpath.dirent_p[i].d_name, 
+                         s_op->u.getpath.dirent_p[i].handle,
+                         s_op->u.getpath.handle_p[i]);
+
+            for( k = 0; k < meta_serv_num; k++ )
+            {
+                idx = s_op->u.getpath.remote_count[k];
+
+                /* copy dirent to meta server's next free spot */
+                memcpy( &(s_op->u.getpath.remote_dirent[k][idx]),
+                        &(s_op->u.getpath.dirent_p[i]),
+                        sizeof(PVFS_dirent) );
+
+                s_op->u.getpath.remote_dirent[k][idx].handle = 
+                    s_op->u.getpath.handle_p[i];
+                s_op->u.getpath.remote_count[k]++;
+            }
+            gossip_debug(GOSSIP_GETPATH_DEBUG,
+                         "[GETPATH]: Added handle (%llu) to "
+                         "all meta data servers for (%llu)\n",
+                         llu(s_op->u.getpath.handle_p[i].handle),
+                         llu(s_op->u.getpath.dirent_p[i].handle));
+        }
+    }
+
+    /* all handles needing path resolution now reside in each metadata's server
+     * getpath.remote_dirent array. The number per metadata server is in
+     * getpath.remote_count. */
+
+    /* remove current host from array */
     for( i = 0, j=0; i < meta_serv_num; i++ )
     {
         BMI_addr_t h;
-        ret = BMI_addr_lookup( &h, server_config->host_id );
+        ret = BMI_addr_lookup( &h, user_opts->host_id );
         if( ret != 0 )
         {
             gossip_err("get_path: failed to lookup address\n");
@@ -246,21 +311,31 @@ static PINT_sm_action getpath_get_parents(
             return SM_ACTION_COMPLETE;
         }
 
-        /* if BMI addr is not local, copy it (if skipped an index, move it) */
         if( (memcmp(&h, &(s_op->u.getpath.remote_addr[i]), sizeof(BMI_addr_t)) 
             != 0) && (j<i) )
         {
-            memcpy( &(s_op->u.getpath.remote_addr[j++]), 
+            PVFS_dirent *tmp=NULL;
+            memcpy( &(s_op->u.getpath.remote_addr[j]), 
                 &(s_op->u.getpath.remote_addr[i]), sizeof(BMI_addr_t));
+            tmp = s_op->u.getpath.remote_dirent[j];
+            s_op->u.getpath.remote_dirent[j] = s_op->u.getpath.remote_dirent[i];
+            s_op->u.getpath.remote_dirent[i] = tmp;
+            j++;
+            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: Adding host "
+                         "[%llu] to meta list\n", 
+                         llu(s_op->u.getpath.remote_addr[i]) );
         }
         else
         {
             gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: Skipping item "
-                         "%s [%llu] from meta list\n", server_config->host_id,
+                         "%s [%llu] from meta list\n", user_opts->host_id,
                          llu(s_op->u.getpath.remote_addr[i]) );
         }
     }
     assert( (j <= meta_serv_num) );
+   
+    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: Sending request to %d "
+                 "hosts instead of %d\n", j, meta_serv_num);
     meta_serv_num = j;
 
     if( (s_op->u.getpath.remote_addr = realloc(s_op->u.getpath.remote_addr,
@@ -283,24 +358,35 @@ static PINT_sm_action getpath_get_parents(
     /* for each meta server, setup the message with the remaining handles */
     foreach_msgpair( &s_op->msgarray_op, msg_p, i )
     {
+
+        s_op->msgarray_op.params.job_timeout = 
+            user_opts->client_job_bmi_timeout;
+        s_op->msgarray_op.params.retry_delay = user_opts->client_retry_delay_ms;
+        s_op->msgarray_op.params.retry_limit = user_opts->client_retry_limit;
+        s_op->msgarray_op.params.quiet_flag = 1;
+
+        PINT_util_gen_credentials(&creds);
         PINT_SERVREQ_GETPATH_FILL(
             msg_p->req,
             s_op->req->credentials,
             s_op->target_fs_id,
-            s_op->u.getpath.remote_count,
-            s_op->u.getpath.remote_dirent_p,
+            s_op->u.getpath.remote_count[i],
+            s_op->u.getpath.remote_dirent[i],
             NULL);
 
-            msg_p->fs_id = s_op->req->u.getpath.fs_id;
-            msg_p->handle = s_op->u.getpath.root_handle;
-            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-            msg_p->comp_fn = NULL;
-            memcpy( &(msg_p->svr_addr), &(s_op->u.getpath.remote_addr[i]), 
-                sizeof(PVFS_BMI_addr_t));
-            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: setting msg %d to "
-                         "%llu\n", i, llu(s_op->u.getpath.remote_addr[i]));
+        msg_p->fs_id = s_op->req->u.getpath.fs_id;
+        msg_p->handle = s_op->u.getpath.root_handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = NULL;
+        memcpy( &(msg_p->svr_addr), &(s_op->u.getpath.remote_addr[i]), 
+            sizeof(PVFS_BMI_addr_t));
+        gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: setting msg %d to "
+                     "%llu with %u handles\n", i, 
+                     llu(s_op->u.getpath.remote_addr[i]), 
+                     s_op->u.getpath.remote_count[i]);
     }
 
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_get_parents: exit\n");
 
@@ -312,10 +398,22 @@ static PINT_sm_action getpath_get_parents(
 static PINT_sm_action getpath_check_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-  //  struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i=0, j=0;
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_check_resp: enter\n");
+
+
+    for( i=0; i < s_op->u.getpath.meta_num; i++ )
+    {
+        gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: meta %d\n", i);
+        for( j=0; j < s_op->u.getpath.remote_count[i]; j++ )
+        {
+            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]:\t (%s)(%llu)\n",
+                         s_op->u.getpath.remote_dirent[i][j].d_name,
+                         s_op->u.getpath.remote_dirent[i][j].handle);
+        }
+    }
 
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_check_resp: exit\n");
@@ -329,12 +427,19 @@ static PINT_sm_action getpath_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
+    int i = 0;
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_cleanup: enter\n");
 
-    free(s_op->u.getpath.remote_dirent_p); 
+    for( i=0; i < s_op->u.getpath.meta_num; i++ )
+    {
+        if( s_op->u.getpath.remote_dirent[i] )
+            free( s_op->u.getpath.remote_dirent[i] );
+    }
+
+    free(s_op->u.getpath.remote_dirent); 
     free(s_op->u.getpath.remote_addr); 
+    free(s_op->u.getpath.remote_count); 
     free(s_op->u.getpath.handle_p); 
     free(s_op->resp.u.getpath.dirent); 
     
