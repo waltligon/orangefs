@@ -405,6 +405,7 @@ struct PINT_server_fsck_op
     int                  parallel_sm;
     int                  handle_count;
     PVFS_error          *error_array;
+    PVFS_error          *status_array;
     PVFS_handle          handle;
     PVFS_handle         *handle_array;
     PVFS_handle         *dfile_array;

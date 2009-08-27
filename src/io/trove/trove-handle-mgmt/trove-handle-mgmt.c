@@ -120,17 +120,42 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                             "Error: handle %llu is invalid "
                             "(out of bounds)\n", llu(handles[i]));
                         return -1;
+                        /*
+                        ret = trove_dspace_remove(coll_id,
+                                  handles[i], TROVE_SYNC, NULL, context_id,
+                                  &op_id, PVFS_HINT_NULL);
+                        if (ret < 0)
+                        {
+                            gossip_err("trove_dspace_remove: failed: %d\n",
+                                ret);
+                        }
+                        while(ret == 0)
+                        {
+                            ret = trove_dspace_test(coll_id,op_id,context_id,
+                                        &op_count,NULL,NULL,&state,
+                                        TROVE_DEFAULT_TEST_TIMEOUT);
+                            if (ret < 0) {
+                                gossip_err("trove_dspace_test: failed: %d\n",
+                                    ret);
+                            }
+                            if ((ret == 1) && (state != 0)) {
+                                gossip_err("trove_dspace_remove: failed: ret=%d\n", state);
+                            }
+                        }
+                        */
                     }
-
-		    /* remove handle from trove-handle-mgmt */
-		    ret = trove_handle_remove(ledger, handles[i]);
-		    if (ret != 0)
+                    else
                     {
-			gossip_debug(
-                            GOSSIP_TROVE_DEBUG, "could not remove "
-                            "handle %llu\n", llu(handles[i]));
-			break;
-		    }
+		        /* remove handle from trove-handle-mgmt */
+		        ret = trove_handle_remove(ledger, handles[i]);
+		        if (ret != 0)
+                        {
+			    gossip_debug(
+                                GOSSIP_TROVE_DEBUG, "could not remove "
+                                "handle %llu\n", llu(handles[i]));
+			    break;
+		        }
+                    }
                 }
                 ret = ((i == count) ? 0 : -1);
             }

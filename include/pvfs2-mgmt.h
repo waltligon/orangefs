@@ -138,8 +138,8 @@ typedef enum PVFS_mgmt_fsck_op_e
 typedef enum PVFS_mgmt_fsck_state_e
 {
     FSCK_IDLE   = 1,
-    FSCK_IP     = 2,
-    FSCK_CANCEL = 3 
+    FSCK_IP,
+    FSCK_CANCEL
 } PVFS_mgmt_fsck_state;
 #define encode_PVFS_mgmt_fsck_state encode_enum
 #define decode_PVFS_mgmt_fsck_state decode_enum
@@ -147,10 +147,11 @@ typedef enum PVFS_mgmt_fsck_state_e
 typedef enum PVFS_mgmt_fsck_phase_e
 {
     FSCK_ERROR         = 0,
-    FSCK_COMPLETE      = 1,
-    FSCK_PHASE_REPAIR  = 2,
-    FSCK_PHASE_ORPHAN  = 3,
-    FSCK_PHASE_BSTREAM = 4,
+    FSCK_PHASE_CHECK,
+    FSCK_PHASE_ORPHAN,
+    FSCK_PHASE_BSTREAM,
+    FSCK_PHASE_REPAIR,
+    FSCK_COMPLETE,
 } PVFS_mgmt_fsck_phase;
 #define encode_PVFS_mgmt_fsck_phase encode_enum
 #define decode_PVFS_mgmt_fsck_phase decode_enum
@@ -158,8 +159,8 @@ typedef enum PVFS_mgmt_fsck_phase_e
 typedef enum PVFS_fsck_op_e
 {
     FSCK_OP_MOVE   = 1,
-    FSCK_OP_DELETE = 2,
-    FSCK_OP_CREATE = 3
+    FSCK_OP_DELETE,
+    FSCK_OP_CREATE
 } PVFS_fsck_op;
 #define encode_PVFS_fsck_op encode_enum
 #define decode_PVFS_fsck_op decode_enum

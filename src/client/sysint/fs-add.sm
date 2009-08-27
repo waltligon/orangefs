@@ -610,6 +610,8 @@ static PINT_sm_action fs_add_final_cleanup(
         PINT_config_release(sm_p->u.get_config.config);
         free(sm_p->u.get_config.config);
     }
+    if (js_p->error_code == SKIP_INTEGRITY_CHECK)
+        js_p->error_code = 0;
     sm_p->error_code = js_p->error_code;
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
