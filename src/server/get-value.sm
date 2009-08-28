@@ -148,32 +148,25 @@ static PINT_sm_action getvalue_setup_resp(
     s_op->resp.u.getvalue.match_count = 0;
 
     if( (s_op->resp.u.getvalue.dirent = 
-        malloc( s_op->u.getvalue.original_count * sizeof(PVFS_dirent)) ) == 0 ) 
+        calloc( s_op->u.getvalue.original_count, sizeof(PVFS_dirent)) ) == 0 ) 
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->resp.u.getvalue.dirent, 0, s_op->u.getvalue.original_count * 
-      sizeof(PVFS_dirent));
 
     if( (s_op->resp.u.getvalue.key = 
-        malloc(s_op->u.getvalue.original_count*sizeof(PVFS_ds_keyval)) ) == 0 ) 
+        calloc(s_op->u.getvalue.original_count, sizeof(PVFS_ds_keyval)) ) == 0 )
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->resp.u.getvalue.key, 0, s_op->u.getvalue.original_count * 
-      sizeof(PVFS_ds_keyval));
 
     if( (s_op->resp.u.getvalue.val = 
-        malloc(s_op->u.getvalue.original_count*sizeof(PVFS_ds_keyval)) ) == 0 ) 
+        calloc(s_op->u.getvalue.original_count, sizeof(PVFS_ds_keyval)) ) == 0 ) 
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(s_op->resp.u.getvalue.val, 0, s_op->u.getvalue.original_count * 
-      sizeof(PVFS_ds_keyval));
-
 
     /* point individual keyval buffers into s_op->u big buffer */
     for( i = 0; i < s_op->u.getvalue.original_count; i++ )
@@ -448,6 +441,7 @@ static PINT_sm_action getvalue_setup_get_paths(
     PINT_SERVREQ_GETPATH_FILL( msg_p->req,
                                creds,
                                s_op->target_fs_id,
+                               0,
                                s_op->resp.u.getvalue.count,
                                s_op->u.getvalue.unknown_dirent,
                                NULL);
@@ -499,7 +493,7 @@ static int path_comp_fn(void *v_p,
     if (resp_p->status != 0)
     {
         gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: GETPATH returned "
-                     "error: %d=n", resp_p->status);
+                     "error: %d\n", resp_p->status);
         return resp_p->status;
     }
 

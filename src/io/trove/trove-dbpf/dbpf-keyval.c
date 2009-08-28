@@ -426,14 +426,28 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 
     for(i=0; i < op_p->u.v_path.count; i++ )
     {
-        op_p->u.v_path.handle_p[i] = op_p->u.v_path.dirent_p[i].handle;
-        memcpy( key.data, &(op_p->u.v_path.dirent_p[i].handle), 
+        if( op_p->u.v_path.handle_p[i] == 0 )
+        {
+            op_p->u.v_path.handle_p[i] = op_p->u.v_path.dirent_p[i].handle;
+        }
+
+        if( op_p->u.v_path.handle_p[i] == root_handle )
+        {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
+                         "[DBPF_KEYVAL]: Handle for (%llu) already at root "
+                         "(%llu)\n", op_p->u.v_path.dirent_p[i].handle,
+                         op_p->u.v_path.handle_p[i]);
+            break;
+        }
+
+        memcpy( key.data, &(op_p->u.v_path.handle_p[i]), 
             sizeof(TROVE_handle));
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
-                     "[DBPF KEYVAL]: Starting lookup of path at handle "
-                     "(%llu)\n",
-                     op_p->u.v_path.dirent_p[i].handle);
+                     "[DBPF KEYVAL]: Starting lookup of path for handle "
+                     "(%llu) at (%llu)\n",
+                     llu(op_p->u.v_path.dirent_p[i].handle), 
+                     llu(op_p->u.v_path.handle_p[i]));
 
         ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
         while( ret == 0 )
@@ -505,7 +519,7 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
                          llu(op_p->u.v_path.handle_p[i]), 
                          op_p->u.v_path.dirent_p[i].d_name);
         }
-        else
+        else if (key_entry.handle != root_handle)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
