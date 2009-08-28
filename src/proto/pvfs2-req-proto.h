@@ -1893,13 +1893,15 @@ struct PVFS_servreq_getpath
 {
     PVFS_fs_id  fs_id;                          /* file system */
     PVFS_handle handle;                         /* handle */
+    uint32_t    depth;
     uint32_t    count;                          /* number of handles */
     PVFS_dirent *dirent;                        /* directory entry*/
 };
-endecode_fields_2a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_getpath,
     PVFS_fs_id, fs_id,
     PVFS_handle, handle,
+    uint32_t, depth,
     uint32_t, count,
     PVFS_dirent, dirent);
 #define extra_size_PVFS_servreq_getpath \
@@ -1908,6 +1910,7 @@ endecode_fields_2a_struct(
 #define PINT_SERVREQ_GETPATH_FILL(__req,                \
                                   __creds,              \
                                   __fsid,               \
+                                  __depth,              \
                                   __count,              \
                                   __dirent,             \
                                   __hints)              \
@@ -1917,6 +1920,7 @@ do {                                                    \
     (__req).credentials = (__creds);                    \
     (__req).hints = (__hints);                          \
     (__req).u.getpath.fs_id = (__fsid);                 \
+    (__req).u.getpath.depth = (__depth);                \
     (__req).u.getpath.count = (__count);                \
     (__req).u.getpath.dirent = (__dirent);               \
 } while (0);
