@@ -554,6 +554,7 @@ struct PINT_server_getpath_op
     uint32_t count;
     uint32_t meta_num;
     uint32_t *remote_count;
+    uint32_t *remote_to_local;
     PVFS_dirent *dirent_p;
     PVFS_handle *handle_p;
     PVFS_dirent **remote_dirent;
