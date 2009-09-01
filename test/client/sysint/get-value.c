@@ -220,13 +220,17 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
                 {
                     lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
                              strlen(opt->pvfs_root) + 1;
-                    printf("\t %d,%d: lpath_len (%d)\n", i, j, lpath_len);
-                    local_path = malloc(lpath_len);
+                    if( ( local_path = realloc(local_path, lpath_len) ) == 0 )
+                    {   
+                        printf("malloc error\n");
+                        return -1;
+                    }
+
                     memset(local_path, 0, lpath_len);
-                    strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));
-                    strncpy( local_path+strlen(opt->pvfs_root ), 
+                    strncpy(local_path, opt->pvfs_root, strlen(opt->pvfs_root));
+                    strncpy(local_path+strlen(opt->pvfs_root ), 
                           resp_getvalue[i].dirent[j].d_name, 
-                             strlen(resp_getvalue[i].dirent[j].d_name) );
+                          strlen(resp_getvalue[i].dirent[j].d_name) );
                
                     key_entry = resp_getvalue[i].key[j].buffer;
                     printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
