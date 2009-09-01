@@ -68,77 +68,80 @@ extern "C" {
 #define DBPF_BSTREAM_GET_BUCKET(__handle)                                \
 ((__handle) % DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)          \
-do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
+#define DBPF_GET_DATA_DIRNAME(__buf, __path_max, __base)                 \
+do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
+
+#define DBPF_GET_META_DIRNAME(__buf, __path_max, __base)                 \
+do { snprintf(__buf, __path_max, "/%s", __base); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
-#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __stoname)         \
+#define DBPF_GET_STO_ATTRIB_DBNAME(__buf, __path_max, __base)            \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __stoname, STO_ATTRIB_DBNAME);   \
+  snprintf(__buf, __path_max, "/%s/%s", __base, STO_ATTRIB_DBNAME);      \
 } while (0)
 
 #define COLLECTIONS_DBNAME "collections.db"
-#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __stoname)        \
+#define DBPF_GET_COLLECTIONS_DBNAME(__buf, __path_max, __base)           \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%s", __stoname, COLLECTIONS_DBNAME);  \
+  snprintf(__buf, __path_max, "/%s/%s", __base, COLLECTIONS_DBNAME);     \
 } while (0)
 
-#define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __stoname, __collid)    \
+#define DBPF_GET_COLL_DIRNAME(__buf, __path_max, __base, __collid)       \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x", __stoname, __collid);          \
+  snprintf(__buf, __path_max, "/%s/%08x", __base, __collid);             \
 } while (0)
 
 #define COLL_ATTRIB_DBNAME "collection_attributes.db"
-#define DBPF_GET_COLL_ATTRIB_DBNAME(__buf,__path_max,__stoname,__collid) \
+#define DBPF_GET_COLL_ATTRIB_DBNAME(__buf,__path_max,__base,__collid)    \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
            COLL_ATTRIB_DBNAME);                                          \
 } while (0)
 
 #define DS_ATTRIB_DBNAME "dataspace_attributes.db"
-#define DBPF_GET_DS_ATTRIB_DBNAME(__buf,__path_max,__stoname,__collid)   \
+#define DBPF_GET_DS_ATTRIB_DBNAME(__buf,__path_max,__base,__collid)      \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
            DS_ATTRIB_DBNAME);                                            \
 } while (0)
 
 #define BSTREAM_DIRNAME "bstreams"
-#define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __stoname, __collid) \
+#define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __base, __collid)    \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
            BSTREAM_DIRNAME);                                             \
 } while (0)
 
 #define STRANDED_BSTREAM_DIRNAME "stranded-bstreams"
 #define DBPF_GET_STRANDED_BSTREAM_DIRNAME(                       \
-        __buf, __path_max, __stoname, __collid)                  \
+        __buf, __path_max, __base, __collid)                     \
     do {                                                         \
         snprintf(__buf, __path_max, "/%s/%08x/%s",               \
-                 __stoname, __collid, STRANDED_BSTREAM_DIRNAME); \
+                 __base, __collid, STRANDED_BSTREAM_DIRNAME);    \
     } while(0)
 
-/* arguments are: buf, path_max, stoname, collid, handle */
-#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle)  \
+/* arguments are: buf, path_max, base, collid, handle */
+#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __base, __cid, __handle)     \
 do {                                                                      \
   snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                \
-           __stoname, __cid, BSTREAM_DIRNAME,                             \
+           __base, __cid, BSTREAM_DIRNAME,                                \
            llu(DBPF_BSTREAM_GET_BUCKET(__handle)), llu(__handle));        \
 } while (0)
 
-/* arguments are: buf, path_max, stoname, collid, handle */
+/* arguments are: buf, path_max, base, collid, handle */
 #define DBPF_GET_STRANDED_BSTREAM_FILENAME(                  \
-        __b, __pm, __stoname, __cid, __handle)               \
+        __b, __pm, __base, __cid, __handle)                  \
     do {                                                     \
         snprintf(__b, __pm, "/%s/%08x/%s/%08llx.bstream",    \
-                 __stoname, __cid, STRANDED_BSTREAM_DIRNAME, \
+                 __base, __cid, STRANDED_BSTREAM_DIRNAME,    \
                  llu(__handle));                             \
     } while(0)
 
-/* arguments are: buf, path_max, stoname, collid */
+/* arguments are: buf, path_max, base, collid */
 #define KEYVAL_DBNAME "keyval.db"
-#define DBPF_GET_KEYVAL_DBNAME(__buf,__path_max,__stoname,__collid)      \
+#define DBPF_GET_KEYVAL_DBNAME(__buf,__path_max,__base,__collid)         \
 do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __base, __collid,           \
            KEYVAL_DBNAME);                                               \
 } while (0)
 
@@ -197,7 +200,8 @@ struct dbpf_storage
 {
     TROVE_ds_flags flags;
     int refct;
-    char *name;
+    char *data_path;   /* path to data storage directory */
+    char *meta_path;   /* path to metadata storage directory */
     DB *sto_attr_db;
     DB *coll_db;
 };
@@ -206,7 +210,8 @@ struct dbpf_collection
 {
     int refct;
     char *name;
-    char *path_name;
+    char *data_path;  /* path to data collection directory */
+    char *meta_path;  /* path to metadata collection directory */
     DB *coll_attr_db;
     DB *ds_db;
     DB *keyval_db;
@@ -689,13 +694,15 @@ extern int db_close(DB *db_p);
 int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p);
 
 struct dbpf_storage *dbpf_storage_lookup(
-    char *stoname, int *error_p, TROVE_ds_flags flags);
+    char *data_path, char *meta_path, int *error_p, TROVE_ds_flags flags);
 
-int dbpf_storage_create(char *stoname,
+int dbpf_storage_create(char *data_path,
+			char *meta_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p);
 
-int dbpf_storage_remove(char *stoname,
+int dbpf_storage_remove(char *data_path,
+			char *meta_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p);
 

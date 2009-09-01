@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     strcpy(path_to_file, argv[optind+1]);
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;

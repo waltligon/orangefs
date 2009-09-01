@@ -71,14 +71,14 @@ int main(int argc, char **argv)
 
     /* try to initialize; fails if storage space isn't there? */
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "warning: initialize failed.  trying to create storage space.\n");
 
 	/* create the storage space */
 	/* Q: what good is the op_id here if we have to match on coll_id in test fn? */
 	ret = trove_storage_create(
-            TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
+            TROVE_METHOD_DBPF, storage_space, storage_space, NULL, &op_id);
 	if (ret < 0) {
 	    fprintf(stderr, "storage create failed.\n");
 	    return -1;
@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 
 	/* second try at initialize, in case it failed first try. */
 	ret = trove_initialize(
-            TROVE_METHOD_DBPF, NULL, storage_space, 0);
+            TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
 	if (ret < 0) {
 	    fprintf(stderr, "initialized failed second time.\n");
 	    return -1;

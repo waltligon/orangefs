@@ -109,7 +109,7 @@
 	memcpy(*(pptr)+4, *pbuf, len+1); \
 	*(pptr) += roundup8(4 + len + 1); \
     } else { \
-        *(u_int32_t *) (*(pptr)+4) = 0; \
+	*(u_int32_t *) *(pptr) = 0; \
 	*(pptr) += 8; \
     } \
 } while (0)

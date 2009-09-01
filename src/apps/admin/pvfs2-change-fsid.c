@@ -38,7 +38,8 @@ typedef struct
     char db_path[PATH_MAX];
     char fs_conf[PATH_MAX];
     char fs_name[PATH_MAX];
-    char storage_path[PATH_MAX];
+    char data_storage_path[PATH_MAX];
+    char meta_storage_path[PATH_MAX];
     int32_t old_fsid;
     int32_t new_fsid;
     char old_fsid_hex[9];
@@ -313,23 +314,37 @@ int get_old_fsid_from_conf(void)
 int move_hex_dir(void)
 {
     FILE * fptr = NULL;
-    char command[PATH_MAX];
-    char output[PATH_MAX];
+    char datacommand[PATH_MAX];
+    char metacommand[PATH_MAX];
+    char dataoutput[PATH_MAX];
+    char metaoutput[PATH_MAX];
     struct stat buf;
-    char path[PATH_MAX];
-    char new_path[PATH_MAX];
+    char datapath[PATH_MAX];
+    char new_datapath[PATH_MAX];
+    char metapath[PATH_MAX];
+    char new_metapath[PATH_MAX];
     int ret = 0;
     
-    memset(path,0,sizeof(path));
-    sprintf(path,"%s/%s", opts.storage_path, opts.old_fsid_hex);
+    memset(datapath, 0, sizeof(datapath));
+    memset(metapath, 0, sizeof(metapath));
+    sprintf(datapath, "%s%s", opts.data_storage_path, opts.old_fsid_hex);
+    sprintf(metapath, "%s/%s", opts.meta_storage_path, opts.old_fsid_hex);
 
-    /* See if directory exists */
-    ret = stat(path, &buf);
+    /* See if each directory exists */
+    ret = stat(datapath, &buf);
     if(ret)
     {
         fprintf(stderr,
-                "Error checking for directory's existance. [%s]\n",
-                path);
+                "Error checking for data directory's existance. [%s]\n",
+                datapath);
+        return -1;
+    }
+    ret = stat(metapath, &buf);
+    if(ret)
+    {
+        fprintf(stderr,
+                "Error checking for meta directory's existance. [%s]\n",
+                metapath);
         return -1;
     }
 
@@ -340,31 +355,53 @@ int move_hex_dir(void)
         return 0;
     }
     
-    memset(command,0,sizeof(command));
-    memset(output,0,sizeof(output));
-    memset(new_path,0,sizeof(new_path));
+	memset(datacommand, 0, sizeof(datacommand));
+	memset(metacommand, 0, sizeof(metacommand));
+	memset(dataoutput, 0, sizeof(dataoutput));
+	memset(metaoutput, 0, sizeof(metaoutput));
+	memset(new_datapath, 0, sizeof(new_datapath));
+    memset(new_metapath, 0, sizeof(new_metapath));
 
-    /* Move the directory */
-    sprintf(new_path, "%s/%s", opts.storage_path, opts.new_fsid_hex);
-    sprintf(command, "mv %s %s", path, new_path);
+    /* Move the directories */
+	sprintf(new_datapath, "%s/%s", opts.data_storage_path, opts.new_fsid_hex);
+	sprintf(new_metapath, "%s%s", opts.meta_storage_path, opts.new_fsid_hex);
+	sprintf(datacommand, "mv %s %s", datapath, new_datapath);
+	sprintf(metacommand, "mv %s %s", metapath, new_metapath);
 
-    fptr = popen(command, "r");
+	/* move the data dir */
+    fptr = popen(datacommand, "r");
     if(fptr == NULL)
     {
         fprintf(stderr,"Error opening pipe. errno=%d",errno);
         exit(-1);
     }
-    ret = fscanf(fptr, "%s", output);
-    if(ret && strncmp(output,"",PATH_MAX))
+    ret = fscanf(fptr, "%s", dataoutput);
+    if(ret && strncmp(dataoutput,"",PATH_MAX))
     {
-        printf("mv from [%s] to [%s] failed.\n", path, new_path);
+        printf("mv from [%s] to [%s] failed.\n", datapath, new_datapath);
+        return -1;
+    }
+    pclose(fptr);
+
+	/* move the meta dir */
+	fptr = popen(metacommand, "r");
+    if(fptr == NULL)
+    {
+        fprintf(stderr,"Error opening pipe. errno=%d",errno);
+        exit(-1);
+    }
+    ret = fscanf(fptr, "%s", metaoutput);
+    if(ret && strncmp(metaoutput,"",PATH_MAX))
+    {
+        printf("mv from [%s] to [%s] failed.\n", metapath, new_metapath);
         return -1;
     }
     pclose(fptr);
 
     if(opts.verbose)
     {
-        printf("Successful dir move from [%s] to [%s]\n", path, new_path);
+        printf("Successful data dir move from [%s] to [%s]\n", datapath, new_datapath);
+		printf("Successful meta dir move from [%s] to [%s]\n", metapath, new_metapath);
     }
 
     return 0;
@@ -516,7 +553,8 @@ int process_args(int argc, char ** argv)
         {"fsname",1,0,0},
         {"dbpath",1,0,0},
         {"fsconf",1,0,0},
-        {"storage",1,0,0},
+        {"datastorage",1,0,0},
+	{"metastorage",1,0,0},
         {"view",0,0,0},
         {0,0,0,0}
     };
@@ -561,11 +599,15 @@ int process_args(int argc, char ** argv)
                 strncpy(opts.fs_conf, optarg, PATH_MAX);
                 break;
 
-            case 7: /* storage */
-                strncpy(opts.storage_path, optarg, PATH_MAX);
+            case 7: /* data storage */
+                strncpy(opts.data_storage_path, optarg, PATH_MAX);
                 break;
 
-            case 8: /* view */
+	    	case 8: /* meta storage */
+				strncpy(opts.meta_storage_path, optarg, PATH_MAX);
+				break;
+
+            case 9: /* view */
                 opts.view_only = 1;
                 break;
 
@@ -592,10 +634,18 @@ int process_args(int argc, char ** argv)
         return(-1);
     }
 
-    /* storage_path must be set */
-    if(!strncmp(opts.storage_path,"",PATH_MAX))
+    /* data storage_path must be set */
+    if(!strncmp(opts.data_storage_path,"",PATH_MAX))
     {
-        fprintf(stderr,"Error: --storage option must be given.\n");
+        fprintf(stderr,"Error: --datastorage option must be given.\n");
+        print_help(argv[0]);
+        return(-1);
+    }
+
+    /* meta storage_path must be set */
+    if(!strncmp(opts.meta_storage_path,"",PATH_MAX))
+    {
+        fprintf(stderr,"Error: --metastorage option must be given.\n");
         print_help(argv[0]);
         return(-1);
     }
@@ -612,8 +662,10 @@ void print_help(char * progname)
             "The current file system ID.\n");
     fprintf(stderr,"  --fsconf=</path/to/pvfs2-fs.conf>     "
             "Fs config file for the the file system being modified.\n");
-    fprintf(stderr,"  --storage=</path/to/pvfs2-storage-space>     "
-            "Local storage space for the the file system being modified.\n");
+    fprintf(stderr,"  --datastorage=</path/to/pvfs2-data-storage-space>     "
+            "Local data storage space for the the file system being modified.\n");
+    fprintf(stderr,"  --metastorage=</path/to/pvfs2-meta-storage-space>     "
+            "Local meta storage space for the the file system being modified.\n");
     fprintf(stderr, "\n");
     fprintf(stderr,"The following arguments are optional:\n");
     fprintf(stderr,"--------------\n");

@@ -78,7 +78,7 @@ int main(int argc, char **argv)
     gossip_set_debug_mask(1, GOSSIP_TROVE_DEBUG);
 
     ret = trove_initialize(
-	TROVE_METHOD_DBPF, NULL, storage_space, 0);
+	TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
         fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
         return -1;

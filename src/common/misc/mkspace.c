@@ -111,7 +111,8 @@ static void get_handle_extent_from_ranges(
 }
 
 int pvfs2_mkspace(
-    char *storage_space,
+    char *data_path,
+    char *meta_path,
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
@@ -134,7 +135,8 @@ int pvfs2_mkspace(
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
 
-    mkspace_print(verbose,"Storage space: %s\n",storage_space);
+    mkspace_print(verbose,"Data storage space     : %s\n",data_path);
+    mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
     mkspace_print(verbose,"Root Handle  : %llu\n",llu(root_handle));
@@ -159,16 +161,17 @@ int pvfs2_mkspace(
         */
         ret = trove_initialize(TROVE_METHOD_DBPF, 
 			       NULL, 
-			       storage_space, 
+			       data_path,
+			       meta_path,
 			       0);
         if (ret > -1)
         {
-            gossip_err("error: storage space %s already "
-                       "exists; aborting!\n",storage_space);
+            gossip_err("error: storage space %s or %s already "
+                       "exists; aborting!\n",data_path,meta_path);
             return -1;
         }
 
-        ret = trove_storage_create(TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
+        ret = trove_storage_create(TROVE_METHOD_DBPF, data_path, meta_path, NULL, &op_id);
         if (ret != 1)
         {
             gossip_err("error: storage create failed; aborting!\n");
@@ -179,15 +182,17 @@ int pvfs2_mkspace(
     /* now that the storage space exists, initialize trove properly */
     ret = trove_initialize(
 	TROVE_METHOD_DBPF, NULL, 
-	storage_space, 0);
+	data_path, meta_path, 0);
     if (ret < 0)
     {
 	gossip_err("error: trove initialize failed; aborting!\n");
 	return -1;
     }
 
-    mkspace_print(verbose,"info: created storage space '%s'.\n",
-                  storage_space);
+    mkspace_print(verbose,"info: created data storage space '%s'.\n",
+                  data_path);
+    mkspace_print(verbose,"info: created metadata storage space '%s'.\n",
+                  meta_path);
 
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(
@@ -636,7 +641,8 @@ int pvfs2_mkspace(
 }
 
 int pvfs2_rmspace(
-    char *storage_space,
+    char *data_path,
+    char *meta_path,
     char *collection,
     TROVE_coll_id coll_id,
     int remove_collection_only,
@@ -651,11 +657,11 @@ int pvfs2_rmspace(
     {
         ret = trove_initialize(
 	    TROVE_METHOD_DBPF, NULL,
-	    storage_space, 0);
+	    data_path, meta_path, 0);
         if (ret == -1)
         {
-            gossip_err("error: storage space %s does not "
-                       "exist; aborting!\n", storage_space);
+            gossip_err("error: storage space %s or %s does not "
+                       "exist; aborting!\n", data_path, meta_path);
             return -1;
         }
         trove_is_initialized = 1;
@@ -673,8 +679,8 @@ int pvfs2_rmspace(
 
     if (!remove_collection_only)
     {
-        ret = trove_storage_remove(
-	    TROVE_METHOD_DBPF, storage_space, NULL, &op_id);
+        ret = trove_storage_remove(TROVE_METHOD_DBPF, data_path, meta_path, 
+				   NULL, &op_id);
 	/*
 	 * it is a bit weird to do a trove_finaliz() prior to blowing away
 	 * the storage space, but this allows the __db files of the DB env
@@ -682,8 +688,8 @@ int pvfs2_rmspace(
 	 */
 	trove_finalize(TROVE_METHOD_DBPF);
         mkspace_print(
-            verbose, "PVFS2 Storage Space %s removed %s\n",
-            storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
+            verbose, "PVFS2 Storage Space %s and %s removed %s\n",
+            data_path, meta_path, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
                             "successfully" : "with errors"));
 
         trove_is_initialized = 0;
