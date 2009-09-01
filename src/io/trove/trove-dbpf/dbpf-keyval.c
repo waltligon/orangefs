@@ -412,7 +412,8 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
-                 "[DBPF KEYVAL]: Completed key/val/pkey initialization\n");
+                 "[DBPF KEYVAL]: Completed key/val/pkey initialization, "
+                 "looking up %d handles\n", op_p->u.v_path.count);
 
     if( (op_p->coll_p->keyval_secondary_db->cursor(
          op_p->coll_p->keyval_secondary_db, NULL, &dbc_p, 0)) != 0 )
@@ -437,7 +438,7 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
                          "[DBPF_KEYVAL]: Handle for (%llu) already at root "
                          "(%llu)\n", op_p->u.v_path.dirent_p[i].handle,
                          op_p->u.v_path.handle_p[i]);
-            break;
+            continue;
         }
 
         memcpy( key.data, &(op_p->u.v_path.handle_p[i]), 

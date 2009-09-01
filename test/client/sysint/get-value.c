@@ -127,6 +127,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     ret = PINT_cached_config_count_servers( obj.fs_id,
         PINT_SERVER_TYPE_META, &(srv_count) );
+    srv_count = 1;
     if( srv_count < 1 )
     {
         gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
@@ -219,6 +220,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
                 {
                     lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
                              strlen(opt->pvfs_root) + 1;
+                    printf("\t %d,%d: lpath_len (%d)\n", i, j, lpath_len);
                     local_path = malloc(lpath_len);
                     memset(local_path, 0, lpath_len);
                     strncpy( local_path, opt->pvfs_root, strlen(opt->pvfs_root ));

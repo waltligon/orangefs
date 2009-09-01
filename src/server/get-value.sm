@@ -482,8 +482,8 @@ static int path_comp_fn(void *v_p,
                         struct PVFS_server_resp *resp_p,
                         int index)
 {
-    //PINT_smcb *smcb = v_p;
-    //struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_smcb *smcb = v_p;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     int i;
                 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: enter\n");
@@ -503,7 +503,8 @@ static int path_comp_fn(void *v_p,
                      "(%llu):(%s)\n", i, 
                      llu(resp_p->u.getpath.dirent[i].handle),
                      resp_p->u.getpath.dirent[i].d_name); 
-    
+        memcpy(s_op->resp.u.getvalue.dirent[i].d_name,
+               resp_p->u.getpath.dirent[i].d_name, PVFS_NAME_MAX + 1);
     }
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: exit\n");
     return 0;
