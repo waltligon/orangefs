@@ -333,7 +333,7 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
                             TROVE_op_id *out_op_id_p,
                             PVFS_hint  hints)
 {
-    int ret;
+    int ret, i;
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_op op;
     struct dbpf_op *op_p;
@@ -377,6 +377,14 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
     op_p->u.v_path.handle_p = handle_p;
     op_p->hints = hints;
 
+    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: We just got passed:\n");
+
+    for( i=0; i < op_p->u.v_path.count; i++ )
+    {
+        gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: d_name (%s)\n",
+                     dirent_p[i].d_name);
+    }
+
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p,
                                  event_type, event_id);
 }
@@ -410,7 +418,6 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 
     key.flags = data.flags = pkey.flags = DB_DBT_USERMEM;
 
-
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                  "[DBPF KEYVAL]: Completed key/val/pkey initialization, "
                  "looking up %d handles\n", op_p->u.v_path.count);
@@ -425,7 +432,7 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
         return ret;
     }
 
-    for(i=0; i < op_p->u.v_path.count; i++ )
+    for( i=0; i < op_p->u.v_path.count; i++ )
     {
         if( op_p->u.v_path.handle_p[i] == 0 )
         {
@@ -450,6 +457,10 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
                      llu(op_p->u.v_path.dirent_p[i].handle), 
                      llu(op_p->u.v_path.handle_p[i]));
 
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "[DBPF KEYVAL]: Inital path of handle (%llu): (%s)\n",
+                     llu(op_p->u.v_path.handle_p[i]),
+                     op_p->u.v_path.dirent_p[i].d_name);
         ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
         while( ret == 0 )
         {
@@ -463,32 +474,32 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
             memcpy( &(op_p->u.v_path.handle_p[i]), &(key_entry.handle), 
                 sizeof(TROVE_handle));
     
-            key.ulen = key.size = (sizeof(TROVE_handle));
+            key.ulen = key.size = sizeof(TROVE_handle);
     
             /* put path associated with parent into path if not a de */
             if( strncmp("de", key_entry.key, 3) != 0 )
             {
                 /* existing path resides in op_p->u.v_path.dirent */
                 path_len = strlen(op_p->u.v_path.dirent_p[i].d_name) + 
-                    strlen(key_entry.key) + 2;
-                if( (tmp_path = calloc( path_len, 1)) == 0 )
+                    (pkey.size - sizeof(TROVE_handle)) + 1;
+                if( (tmp_path = calloc( path_len, sizeof(char))) == 0 )
                 {
                     ret = -TROVE_ENOMEM;
                     goto return_error;
                 }
-    
+
                 /* copy / and key, prefix to existing path */
                 strncpy( tmp_path, "/", 1 );
-                strncpy( (tmp_path+sizeof(char)), key_entry.key,
-                    strlen(key_entry.key));
-                strncpy( (tmp_path+strlen(key_entry.key)+1), 
+                memcpy( tmp_path+sizeof(char), key_entry.key,
+                    (pkey.size - sizeof(TROVE_handle)));
+                memcpy( tmp_path+(pkey.size-sizeof(TROVE_handle)), 
                     op_p->u.v_path.dirent_p[i].d_name, 
                     strlen(op_p->u.v_path.dirent_p[i].d_name));
     
-                /* reset strin in d_name, copy built string over */
+                /* reset string in d_name, copy over tmp_path */
                 memset(op_p->u.v_path.dirent_p[i].d_name, 0, PVFS_NAME_MAX+1);
                 strncpy(op_p->u.v_path.dirent_p[i].d_name, tmp_path, 
-                    path_len+1);
+                    path_len);
                 free(tmp_path);
             }
 

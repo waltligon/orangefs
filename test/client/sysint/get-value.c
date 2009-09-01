@@ -97,11 +97,11 @@ int main(int argc, char **argv)
 
     PVFS_util_gen_credentials(&credentials);
     ret = pvfs2_getval( ref, user_opts, &credentials);
-
-    if (ret != 0) 
-        return ret;
-    
     PVFS_sys_finalize();
+    free(user_opts->pvfs_root);
+    free(user_opts->key.buffer);
+    free(user_opts->val.buffer);
+    free(user_opts);
     return(ret);
 }
 
@@ -127,7 +127,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     ret = PINT_cached_config_count_servers( obj.fs_id,
         PINT_SERVER_TYPE_META, &(srv_count) );
-    srv_count = 1;
+
     if( srv_count < 1 )
     {
         gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
@@ -136,7 +136,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     printf("Number of servers: %d\n", srv_count);
 
-    if( (token = malloc(srv_count * sizeof(PVFS_ds_position)) ) == 0 )
+    if( (token = calloc(srv_count, sizeof(PVFS_ds_position)) ) == 0 )
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: malloc failure for "
                      " token\n");
@@ -158,6 +158,10 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     for( i = 0; i < srv_count; i++ )
     {
+        resp_getvalue[i].token = 0;
+        resp_getvalue[i].count = 0;
+        resp_getvalue[i].match_count = 0;
+
         if( (resp_getvalue[i].key = 
              (PVFS_ds_keyval *)calloc(opt->count, sizeof(PVFS_ds_keyval)))==0 )
         {
@@ -181,25 +185,37 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
         for( j = 0; j < opt->count; j++ )
         {
-            resp_getvalue[i].key[j].buffer = malloc( KEYBUFSZ + 1);
-            resp_getvalue[i].val[j].buffer = malloc( VALBUFSZ + 1);
-            memset( resp_getvalue[i].key[j].buffer, 0, KEYBUFSZ+1 );
-            memset( resp_getvalue[i].val[j].buffer, 0, VALBUFSZ+1 );
-
-            resp_getvalue[i].key[j].buffer_sz = KEYBUFSZ + 1;
-            resp_getvalue[i].val[j].buffer_sz = VALBUFSZ + 1;
+            resp_getvalue[i].key[j].buffer = calloc( 1, KEYBUFSZ);
+            resp_getvalue[i].val[j].buffer = calloc( 1, VALBUFSZ);
+            resp_getvalue[i].key[j].buffer_sz = KEYBUFSZ;
+            resp_getvalue[i].val[j].buffer_sz = VALBUFSZ;
         }
     }
 
     printf("Asking for %u records\n", opt->count );
 
-    while( ! all_end )
+    while( all_end < srv_count)
     {
-        ret = PVFS_sys_getvalue(obj, token, creds,  &(opt->key), &(opt->val), 
+        all_end = 0;
+        /* zero appropriate fields between iterations */
+        for( i=0; i < srv_count; i++ )
+        {
+            for( j=0; j < opt->count; j++ )
+            {
+                memset(resp_getvalue[i].key[j].buffer, 0, KEYBUFSZ);
+                memset(resp_getvalue[i].val[j].buffer, 0, VALBUFSZ);
+                memset(&(resp_getvalue[i].dirent[j]), 0, sizeof(PVFS_dirent));
+            }
+        }
+
+        ret += PVFS_sys_getvalue(obj, token, creds,  &(opt->key), &(opt->val), 
             opt->query, opt->count, resp_getvalue, NULL);
 
-        printf("Call returned, query matched records: %d \n", 
-            resp_getvalue[i].match_count);
+        for( i=0; i < srv_count; i++ )
+        {
+            printf("Call returned, meta server %d says the  query "
+                   "matched %d records\n", i, resp_getvalue[i].match_count);
+        }
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_getvalue", ret);
@@ -211,8 +227,8 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
             for( i = 0; i < srv_count; i++ )
             {
                 token[i] = resp_getvalue[i].token;
-                printf("\tResp %d returned %d records\n", i, 
-                    resp_getvalue[i].count);
+                printf("Meta (%d) returned %d records, token (%llu)\n", i, 
+                    resp_getvalue[i].count, llu(resp_getvalue[i].token));
 
                 /* have to prepend local mount point to path returned
                  * from server */
@@ -220,13 +236,13 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
                 {
                     lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
                              strlen(opt->pvfs_root) + 1;
-                    if( ( local_path = realloc(local_path, lpath_len) ) == 0 )
+                    if( ( local_path = realloc(local_path, lpath_len+1) ) == 0 )
                     {   
                         printf("malloc error\n");
                         return -1;
                     }
 
-                    memset(local_path, 0, lpath_len);
+                    memset(local_path, 0, lpath_len+1);
                     strncpy(local_path, opt->pvfs_root, strlen(opt->pvfs_root));
                     strncpy(local_path+strlen(opt->pvfs_root ), 
                           resp_getvalue[i].dirent[j].d_name, 
@@ -238,10 +254,28 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
                         token[i], key_entry->key, 
                         (char *)resp_getvalue[i].val[j].buffer);
                 }
-                all_end = (token[i] == PVFS_ITERATE_END)? 1 : 0;
+                all_end += (token[i] == PVFS_ITERATE_END)? 1 : 0;
             }
         }
     }
+
+    for( i=0; i < srv_count; i++ )
+    {
+
+        for( j=0; j < opt->count; j++ )
+        {
+            free(resp_getvalue[i].key[j].buffer);
+            free(resp_getvalue[i].val[j].buffer);
+        }
+
+        free(resp_getvalue[i].key);
+        free(resp_getvalue[i].val);
+        free(resp_getvalue[i].dirent);
+    }
+
+    free(local_path);
+    free(resp_getvalue);
+    free(token);
 
     return 0;
 }

@@ -125,8 +125,6 @@ static PINT_sm_action getpath_setup_resp(
     gossip_debug(GOSSIP_GETPATH_DEBUG, 
                  "[GETPATH]: getpath_setup_resp: enter\n");
 
-    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: getpath_setup_resp: "
-                 "base: %d, count: %d\n", smcb->base_frame, smcb->frame_count);
     js_p->error_code = 0;
     ret = job_req_sched_post(s_op->op, s_op->target_fs_id, s_op->target_handle,
                              s_op->access_type, s_op->sched_policy,
@@ -145,6 +143,13 @@ static PINT_sm_action getpath_setup_resp(
     s_op->u.getpath.count = s_op->req->u.getpath.count;
     s_op->resp.u.getpath.count = s_op->req->u.getpath.count;
     s_op->u.getpath.dirent_p = s_op->req->u.getpath.dirent;
+
+    for(i=0; i < s_op->req->u.getpath.count; i++ )
+    {
+        gossip_debug(GOSSIP_GETPATH_DEBUG,
+                     "[GETPATH]: from the req I get d_name: %i (%s)\n",
+                     i, s_op->req->u.getpath.dirent[i].d_name);
+    }
     if( (s_op->u.getpath.handle_p = calloc( s_op->req->u.getpath.count, 
                                             sizeof(PVFS_handle))) == 0 )
     {
@@ -561,11 +566,15 @@ static PINT_sm_action getpath_cleanup(
     {
         if( s_op->u.getpath.remote_dirent[i] )
             free( s_op->u.getpath.remote_dirent[i] );
+        if( s_op->u.getpath.remote_to_local[i] )
+            free( s_op->u.getpath.remote_to_local[i] );
     }
 
     free(s_op->u.getpath.remote_dirent); 
+    free(s_op->u.getpath.remote_to_local);
     free(s_op->u.getpath.remote_addr); 
     free(s_op->u.getpath.remote_count); 
+
     free(s_op->u.getpath.handle_p); 
     free(s_op->resp.u.getpath.dirent); 
     
@@ -587,9 +596,7 @@ static int remote_resp_comp_fn( void *v_p,
                             
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETPATH]: remote_resp_comp_fn: "
                  "enter: index %d\n", index);
-
-    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETPATH]: remote_resp_comp_fn: "
-                 "resp->op: %d\n", resp_p->op );
+    
     assert(resp_p->op == PVFS_SERV_GETPATH);
     if (resp_p->status != 0)
     {
@@ -599,8 +606,6 @@ static int remote_resp_comp_fn( void *v_p,
         return resp_p->status;
     }
 
-    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETPATH]: remote_resp_comp_fn: "
-                 "before iteration with count: %d\n", resp_p->u.getpath.count);
     for( i=0; i < resp_p->u.getpath.count; i++ )
     {
         /* local_i maps the result back to the index in the dirent_p array
@@ -618,19 +623,20 @@ static int remote_resp_comp_fn( void *v_p,
             s_op->u.getpath.remote_dirent[index][i].handle )
         {
             gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: remote_resp_comp_fn:"
-                         " meta [%d][%d] local_i[%d]\n", index, i, local_i);
-
-            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: remote_resp_comp_fn:"
                          "\tOld path: (%s), New path: (%s)\n",
                         s_op->u.getpath.dirent_p[local_i].d_name,
                         resp_p->u.getpath.dirent[i].d_name);
 
+            /*
             gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: remote_resp_comp_fn:"
                          "\tInitial handle (%llu), Handle needed (%llu), "
                          "Next handle (%llu)\n\n", 
                          llu(s_op->u.getpath.dirent_p[local_i].handle),
                          llu(s_op->u.getpath.remote_dirent[index][i].handle),
                          llu(resp_p->u.getpath.dirent[i].handle));
+            */
+            memset( s_op->u.getpath.dirent_p[local_i].d_name, 0, 
+                    PVFS_NAME_MAX+1 );
             memcpy( s_op->u.getpath.dirent_p[local_i].d_name,
                     resp_p->u.getpath.dirent[i].d_name, PVFS_NAME_MAX+1);
             s_op->u.getpath.handle_p[local_i] =

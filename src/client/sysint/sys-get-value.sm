@@ -270,6 +270,7 @@ static PINT_sm_action get_value_cleanup(
                  "[GETVALUE]: get_value_cleanup enter\n");
 
     sm_p->error_code  = js_p->error_code;
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     free( sm_p->u.getvalue.server_addresses );
     PINT_SET_OP_COMPLETE;
@@ -314,22 +315,25 @@ static int get_value_comp_fn(
         gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: j: %d\n", j);
 
         /* attribute key */
-        sm_p->u.getvalue.resp_p[i].key[j].buffer_sz = 
         sm_p->u.getvalue.resp_p[i].key[j].read_sz = 
             resp_p->u.getvalue.key[j].buffer_sz;
 
+        memset(sm_p->u.getvalue.resp_p[i].key[j].buffer, 0,
+               sm_p->u.getvalue.resp_p[i].key[j].buffer_sz);
+
         memcpy(sm_p->u.getvalue.resp_p[i].key[j].buffer, 
             resp_p->u.getvalue.key[j].buffer, 
-            sm_p->u.getvalue.resp_p[i].key[j].buffer_sz );
+            resp_p->u.getvalue.key[j].buffer_sz);
 
         /* value datum */
-        sm_p->u.getvalue.resp_p[i].val[j].buffer_sz = 
         sm_p->u.getvalue.resp_p[i].val[j].read_sz = 
             resp_p->u.getvalue.val[j].buffer_sz;
 
+        memset(sm_p->u.getvalue.resp_p[i].val[j].buffer, 0,
+               sm_p->u.getvalue.resp_p[i].val[j].buffer_sz);
         memcpy(sm_p->u.getvalue.resp_p[i].val[j].buffer, 
             resp_p->u.getvalue.val[j].buffer, 
-            sm_p->u.getvalue.resp_p[i].val[j].buffer_sz );
+            resp_p->u.getvalue.val[j].buffer_sz );
 
         /* dirent information for the key */
         memcpy(&(sm_p->u.getvalue.resp_p[i].dirent[j]), 
