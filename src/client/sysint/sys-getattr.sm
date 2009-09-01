@@ -39,6 +39,8 @@
  * we grab these sizes.
  */
 
+static struct profiler getattr_prof;
+
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -422,9 +424,6 @@ static PINT_sm_action getattr_acache_lookup(
              * isn't and it hasn't been cached, then we need to
              * get that first.
              */
-            PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-                &sm_p->getattr.size_array,
-                sm_p->getattr.attr.u.meta.dfile_count);
 
             js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
@@ -607,9 +606,6 @@ static int getattr_object_getattr_comp_fn(
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
                      */
-                    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-                        &sm_p->getattr.size_array,
-                        attr->u.meta.dfile_count);
                     return GETATTR_NEED_DATAFILE_SIZES;
                 }
             }
@@ -677,6 +673,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+START_PROFILER(getattr_prof);
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
             msg_p->req,
             *sm_p->cred_p,
@@ -718,10 +715,10 @@ static int getattr_datafile_getattr_comp_fn(
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "datafile_getattr: size of datafile %d is %lld\n",
-                 index, lld(resp_p->u.getattr.attr.u.data.size));
+                 index, lld(resp_p->u.tree_get_file_size.size));
 
-    sm_p->getattr.size_array[index] =
-        resp_p->u.getattr.attr.u.data.size;
+    sm_p->getattr.size =
+        resp_p->u.tree_get_file_size.size;
 
     return 0;
 }
@@ -739,6 +736,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+FINISH_PROFILER("getattr", getattr_prof, 1);
     if(js_p->error_code == 0)
     {
         PINT_msgpairarray_destroy(&sm_p->msgarray_op);
@@ -770,17 +768,6 @@ static PINT_sm_action getattr_acache_insert(
             }
             else
             {
-                /* compute size as requested */
-                assert(sm_p->getattr.attr.u.meta.dist);
-                assert(sm_p->getattr.attr.u.meta.dist->methods &&
-                       sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
-                
-                sm_p->getattr.size =
-                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
-                    sm_p->getattr.attr.u.meta.dist->params,
-                    sm_p->getattr.attr.u.meta.dfile_count,
-                    sm_p->getattr.size_array);
-
                 tmp_size = &sm_p->getattr.size;
                 gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated unstuffed logical size of %lld\n", lld(*tmp_size));
             }
@@ -805,8 +792,6 @@ static PINT_sm_action getattr_cleanup(
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
     sm_p->error_code = js_p->error_code;
-
-    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
 
     return SM_ACTION_COMPLETE;
 }

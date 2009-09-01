@@ -553,6 +553,7 @@ struct PINT_server_unstuff_op
 
 struct PINT_server_tree_communicate_op
 {
+    int num_partitions;
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
     int handle_array_local_count;
@@ -703,6 +704,7 @@ extern struct PINT_state_machine_s pvfs2_mirror_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;

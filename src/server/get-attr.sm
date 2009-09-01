@@ -167,13 +167,19 @@ nested machine pvfs2_get_attr_work_sm
     }
 }
 
-machine pvfs2_get_attr_sm
+nested machine pvfs2_get_attr_with_prelude_sm
 {
+    state init
+    {
+        run getattr_with_prelude_init;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
         success => setup_op;
-        default => final_response;
+        default => return;
     }
 
     state setup_op
@@ -185,6 +191,15 @@ machine pvfs2_get_attr_sm
     state do_work
     {
         jump pvfs2_get_attr_work_sm;
+        default => return;
+    }
+}
+
+machine pvfs2_get_attr_sm
+{
+    state work
+    {
+        jump pvfs2_get_attr_with_prelude_sm;
         default => final_response;
     }
 
@@ -977,6 +992,13 @@ static PINT_sm_action getattr_cleanup(
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
+}
+
+static PINT_sm_action getattr_with_prelude_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action getattr_setup_op(
