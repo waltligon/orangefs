@@ -200,9 +200,9 @@ static struct dentry *pvfs2_lookup(
     inode = pvfs2_iget(sb, &new_op->downcall.resp.lookup.refn);
     if (inode && !is_bad_inode(inode))
     {
-        struct dentry *res;
         gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
             __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count));
+        struct dentry *res;
 
         /* update dentry/inode pair into dcache */
         dentry->d_op = &pvfs2_dentry_operations;

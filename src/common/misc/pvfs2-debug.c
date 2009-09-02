@@ -116,6 +116,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "fsck", GOSSIP_FSCK_DEBUG },
     /* Debug the bstream code */
     { "bstream", GOSSIP_BSTREAM_DEBUG },
+    /* Debug mirroring operations */
+    { "mirror",GOSSIP_MIRROR_DEBUG },
     /* Debug trove in direct io mode */
     {"directio", GOSSIP_DIRECTIO_DEBUG},
     /* Everything except the periodic events.  Useful for debugging */

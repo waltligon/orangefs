@@ -85,7 +85,8 @@ int main(int argc, char **argv)
 			       0 /* flags */,
 			       NULL,
                                trove_context,
-			       &op_id);
+			       &op_id,
+                               NULL);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -122,7 +123,8 @@ int main(int argc, char **argv)
 				      NULL,
 				      NULL, 
                                       trove_context,
-				      &op_id);
+				      &op_id,
+                                      NULL);
 	if (it_ret == -1) return -1;
 
 	while (it_ret == 0) it_ret = trove_dspace_test(
@@ -141,24 +143,22 @@ int main(int argc, char **argv)
 					  0 /* flags */,
 					  NULL,
                                           trove_context,
-					  &op_id);
+					  &op_id,
+                                          NULL);
 	    if (ga_ret == -1) return -1;
 	    count = 1;
 	    while (ga_ret == 0) ga_ret = trove_dspace_test(
                 coll_id, op_id, trove_context, &count, NULL, NULL, &state,
                 TROVE_DEFAULT_TEST_TIMEOUT);
 
-	    printf("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d)\n",
+	    printf("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d)\n",
 		   path_name,
 		   (char *) key[i].buffer,
 		   llu(*(TROVE_handle *) val[i].buffer),
 		   (int) ds_attr.uid,
 		   (int) ds_attr.gid,
 		   ds_attr.mode,
-		   ds_attr.type,
-		   (int) ds_attr.b_size);
-	    
-
+		   ds_attr.type);
 	}
     }
 

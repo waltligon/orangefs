@@ -327,7 +327,7 @@ static void usage(int argc, char** argv)
     fprintf(stderr, "Where ARGS is one or more of"
 	"\n-s <strip_size>\t\t\tsize of access to PVFS2 volume"
 	"\n-n <num_datafiles>\t\tnumber of PVFS2 datafiles to use"
-	"\n-b <buffer_size>\t\thow much data to read/write at once"
+	"\n-b <buffer_size in bytes>\thow much data to read/write at once"
 	"\n-t\t\t\t\tprint some timing information"
 	"\n-v\t\t\t\tprint version number and exit\n");
     return;

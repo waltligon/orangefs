@@ -7,6 +7,8 @@ TESTSRC += \
 	$(DIR)/test-bmi-server.c \
 	$(DIR)/test-bmi-server-eagerbug.c \
 	$(DIR)/test-bmi-server-list.c \
+        $(DIR)/test-bmi-s2s-a.c \
+        $(DIR)/test-bmi-s2s-b.c \
 	$(DIR)/pingpong.c
 
 # need math lib for sqrt

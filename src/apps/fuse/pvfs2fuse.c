@@ -9,13 +9,13 @@
  *   Author: John A. Chandy
  *           Sumit Narayan
  *
- *   $Date: 2009-08-25 17:55:50 $
- *   $Revision: 1.3.28.1 $
+ *   $Date: 2009-09-02 20:15:54 $
+ *   $Revision: 1.3.28.2 $
  *
  *   Documentation: http://www.engr.uconn.edu/~sun03001/docs/pvfs2fuse-rpt.pdf
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.3.28.1 2009-08-25 17:55:50 nlmills Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.3.28.2 2009-09-02 20:15:54 nlmills Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
@@ -1047,7 +1047,7 @@ static int pvfs2fuse_opt_proc(void *data, const char *arg, int key,
                      if(!arg)
                      {
                          fprintf(stderr, "PVFS2FUSE requires mountpoint as argument\n");
-                         abort()
+                         abort();
                      }
 
             pvfs2fuse.mntpoint = strdup(arg);

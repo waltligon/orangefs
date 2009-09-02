@@ -37,10 +37,17 @@ MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 
 TESTNAME="`hostname -s`-nightly"
 
+# before starting any client apps, we need to deal with the possiblity that we
+# might have built with shared libraries
+export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain stan"
 
+#
+# Detect basic heap corruption
+#
+export MALLOC_CHECK_=2
 
 # takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
@@ -95,7 +102,7 @@ teardown_vfs() {
 setup_vfs() {
 	sudo dmesg -c >/dev/null
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
 		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
 		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
@@ -193,7 +200,7 @@ run_parts() {
 		if [ -x $f ] ; then 
 			echo -n "====== running $f ..."
 			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
-			if [ $? == 0 ] ; then 
+			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
