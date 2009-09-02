@@ -1897,11 +1897,12 @@ struct PVFS_servreq_getpath
     uint32_t    count;                          /* number of handles */
     PVFS_dirent *dirent;                        /* directory entry*/
 };
-endecode_fields_3a_struct(
+endecode_fields_4a_struct(
     PVFS_servreq_getpath,
     PVFS_fs_id, fs_id,
     PVFS_handle, handle,
     uint32_t, depth,
+    skip4,,
     uint32_t, count,
     PVFS_dirent, dirent);
 #define extra_size_PVFS_servreq_getpath \

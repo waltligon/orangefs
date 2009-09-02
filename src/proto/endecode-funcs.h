@@ -128,7 +128,10 @@
 #define encode_here_string(pptr,pbuf) encode_string(pptr,pbuf)
 #define decode_here_string(pptr,pbuf) do { \
     u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr)); \
-    memcpy(pbuf, *(pptr) + 4, len + 1); \
+    if( len ) \
+        memcpy(pbuf, *(pptr) + 4, len + 1); \
+    else \
+        memcpy(pbuf, *(pptr), len + 1); \
     *(pptr) += roundup8(4 + len + 1); \
 } while (0)
 

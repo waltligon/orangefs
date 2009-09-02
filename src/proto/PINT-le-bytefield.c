@@ -269,14 +269,12 @@ static void lebf_initialize(void)
                 req.u.getvalue.val.buffer_sz = 0;
                 req.u.getvalue.count = 0;
                 resp.u.getvalue.count = 0;
-                resp.u.getvalue.match_count = 0;
-                resp.u.getvalue.token = 0;
                 reqsize = extra_size_PVFS_servreq_getvalue;
                 respsize = extra_size_PVFS_servresp_getvalue;
                 break;
             case PVFS_SERV_GETPATH:
                 req.u.getpath.count = 0;
-                resp.u.getvalue.count = 0;
+                resp.u.getpath.count = 0;
                 reqsize = extra_size_PVFS_servreq_getpath;
                 respsize = extra_size_PVFS_servresp_getpath;
                 break;
@@ -480,6 +478,16 @@ static int lebf_encode_req(
 	gossip_err("%s: op %d needed %lld bytes but alloced only %d\n",
 	  __func__, req->op, lld(target_msg->total_size),
 	  max_size_array[req->op].req);
+    }
+
+    if(req->op == PVFS_SERV_GETPATH)
+    {
+        int i = 0;
+        for( i=0; i < req->u.getpath.count; i++ )
+        {
+            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: encoding %d: "
+                         "(%s)\n", i, req->u.getpath.dirent[i].d_name);
+        }
     }
 
   out:
@@ -686,6 +694,16 @@ static int lebf_decode_req(
 	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
                     __func__, req->op, (long)(ptr - (char *) input_buffer), input_size);
 	ret = -PVFS_EPROTO;
+    }
+
+    if(req->op == PVFS_SERV_GETPATH)
+    {
+        int i = 0;
+        for( i=0; i < req->u.getpath.count; i++ )
+        {
+            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: decoding req %d: "
+                         "(%s)\n", i, req->u.getpath.dirent[i].d_name);
+        }
     }
 
   out:

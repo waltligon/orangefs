@@ -312,17 +312,6 @@ static PINT_sm_action getvalue_remove_result(
      * memory copies. this is not cheap but the best I could figur' */
     for( i = (s_op->u.getvalue.target_i+1); i < s_op->u.getvalue.count; i++)
     {
-        gossip_debug(GOSSIP_GETVALUE_DEBUG,
-                     "\t[GETVALUE]: i: %d, replacing %llu(%s|%s) with "
-                     "%llu(%s|%s)\n", i, 
-                     llu(s_op->resp.u.getvalue.dirent[i-1].handle),
-                     (char *)(s_op->resp.u.getvalue.key[i-1].buffer + 
-                        sizeof(PVFS_handle)),
-                     (char *)s_op->resp.u.getvalue.val[i-1].buffer,
-                     llu(s_op->resp.u.getvalue.dirent[i].handle),
-                     (char *)(s_op->resp.u.getvalue.key[i].buffer + 
-                        sizeof(PVFS_handle)),
-                     (char *)s_op->resp.u.getvalue.val[i].buffer);
         memcpy( &(s_op->resp.u.getvalue.key[i-1]), 
                 &(s_op->resp.u.getvalue.key[i]), sizeof(PVFS_ds_keyval) );
         memcpy( &(s_op->resp.u.getvalue.val[i-1]), 
@@ -423,8 +412,6 @@ static PINT_sm_action getvalue_setup_get_paths(
             s_op->resp.u.getvalue.dirent[i].handle;
         s_op->u.getvalue.unknown_dirent[i].handle =
             s_op->resp.u.getvalue.dirent[i].handle;
-        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: Setting %d to handle "
-                     "%llu\n", i, llu(s_op->u.getvalue.unknown_handle[i]) );
     }
 
     /* prepare messages */
@@ -452,12 +439,6 @@ static PINT_sm_action getvalue_setup_get_paths(
                                s_op->resp.u.getvalue.count,
                                s_op->u.getvalue.unknown_dirent,
                                NULL);
-    for(i=0; i < s_op->resp.u.getvalue.count; i++)
-    {
-        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: dirent %d's "
-                     "path after fill is (%s)\n", i, 
-                     s_op->u.getvalue.unknown_dirent[i].d_name);
-    }
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: setup_get_paths: exit\n");
