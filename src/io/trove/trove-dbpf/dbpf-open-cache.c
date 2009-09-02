@@ -427,7 +427,7 @@ int dbpf_open_cache_remove(
     tmp_error = 0;
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-                              my_storage_p->data_path, coll_id, llu(handle));
+                              my_storage_p->name, coll_id, llu(handle));
 
     ret = fast_unlink(filename, coll_id, handle);
 
@@ -459,7 +459,7 @@ static int open_fd(
                  llu(handle));
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-			      my_storage_p->data_path, coll_id, llu(handle));
+			      my_storage_p->name, coll_id, llu(handle));
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache open_fd: filename: %s\n", filename);
@@ -547,7 +547,7 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
         return -TROVE_ENOMEM;
     }
     DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname, PATH_MAX,
-                                       my_storage_p->data_path, 
+                                       my_storage_p->name, 
                                        coll_id,
                                        llu(handle));
     

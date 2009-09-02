@@ -42,10 +42,8 @@ int main(int argc, char **argv)
 
     fprintf(stderr,"Server ID                : %s\n",
             serverconfig.host_id);
-    fprintf(stderr,"Data Storage Space            : %s\n",
-            serverconfig.data_path);
-    fprintf(stderr,"Meta Storage Space            : %s\n",
-            serverconfig.meta_path);
+    fprintf(stderr,"Storage Space            : %s\n",
+            serverconfig.storage_path);
     fprintf(stderr,"FS Config File Name      : %s (%d bytes)\n",
             serverconfig.fs_config_filename,
             (int)serverconfig.fs_config_buflen);

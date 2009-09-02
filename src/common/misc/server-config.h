@@ -145,8 +145,7 @@ typedef struct server_configuration_s
     int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
-    char *data_path;                /* path to data storage directory */
-    char *meta_path;                /* path to metadata storage directory */
+    char *storage_path;
     char *fs_config_filename;       /* the fs.conf file name            */
     size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */

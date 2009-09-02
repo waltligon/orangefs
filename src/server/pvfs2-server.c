@@ -787,16 +787,15 @@ static int server_initialize_subsystems(
     ret = trove_initialize(
         server_config.trove_method, 
         trove_coll_to_method_callback,
-        server_config.data_path,
-		server_config.meta_path,
+        server_config.storage_path,
         init_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
 
         gossip_err("\n***********************************************\n");
-        gossip_err("Invalid Storage Space: %s or %s\n\n",
-                   server_config.data_path, server_config.meta_path);
+        gossip_err("Invalid Storage Space: %s\n\n",
+                   server_config.storage_path);
         gossip_err("Storage initialization failed.  The most "
                    "common reason\nfor this is that the storage space "
                    "has not yet been\ncreated or is located on a "
@@ -1088,9 +1087,7 @@ static int server_initialize_subsystems(
     /*
      * Migrate database if needed
      */
-    ret = trove_migrate(server_config.trove_method,
-			server_config.data_path,
-			server_config.meta_path);
+    ret = trove_migrate(server_config.trove_method,server_config.storage_path);
     if (ret < 0)
     {
         gossip_err("trove_migrate failed: ret=%d\n", ret);

@@ -2115,7 +2115,7 @@ static int dbpf_dspace_create_store_handle(
      * possible if the db gets out of sync with the rest of the collection
      * somehow
      */
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->data_path,
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
                               coll_p->coll_id, llu(new_handle));
     ret = access(filename, F_OK);
     if(ret == 0)
@@ -2128,7 +2128,7 @@ static int dbpf_dspace_create_store_handle(
                    filename);
         
         DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
-                                           my_storage_p->data_path, 
+                                           my_storage_p->name, 
                                            coll_p->coll_id,
                                            llu(new_handle));
         /* an old file exists.  Move it to the stranded subdirectory */

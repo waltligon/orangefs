@@ -23,8 +23,7 @@
 /* declare the strnlen prototype */
 size_t strnlen(const char *s, size_t limit);
 
-static char data_path[PATH_MAX] = "/tmp/pvfs2-test-space";
-static char meta_path[PATH_MAX] = "/tmp/pvfs2-test-space";
+static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char collection[PATH_MAX];
 static int verbose = 0, got_collection = 0, print_keyvals = 0, got_dspace_handle = 0;
 TROVE_handle dspace_handle;
@@ -72,7 +71,7 @@ int main(int argc, char **argv)
 
     /* initialize trove, verifying storage space exists */
     ret = trove_initialize(
-      TROVE_METHOD_DBPF, NULL, data_path, meta_path, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0) 
     {
 	fprintf(stderr,
@@ -82,9 +81,9 @@ int main(int argc, char **argv)
     }
 
     if (verbose) fprintf(stderr,
-			 "%s: info: initialized with storage spaces '%s' and '%s'.\n",
+			 "%s: info: initialized with storage space '%s'.\n",
 			 argv[0],
-			 data_path, meta_path);
+			 storage_space);
 
     /* if no collection was specified, simply print out the collections and exit */
     if (!got_collection) {
@@ -165,19 +164,17 @@ int main(int argc, char **argv)
     /* print basic stats on collection */
     if (no_root_handle) {
 	fprintf(stdout,
-		"Storage space %s and %s, collection %s (coll_id = %d, "
+		"Storage space %s, collection %s (coll_id = %d, "
                 "*** no root_handle found ***):\n",
-		data_path,
-		meta_path,
+		storage_space,
 		collection,
 		coll_id);
     }
     else {
 	fprintf(stdout,
-		"Storage space %s and %s, collection %s (coll_id = %d, "
+		"Storage space %s, collection %s (coll_id = %d, "
                 "root_handle = 0x%08llx):\n",
-		data_path,
-		meta_path,
+		storage_space,
 		collection,
 		coll_id,
 		llu(root_handle));
@@ -203,13 +200,11 @@ static int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:m:c:d:kvh")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:d:kvh")) != EOF) {
 	switch (c) {
 	    case 's':
-		strncpy(data_path, optarg, PATH_MAX);
+		strncpy(storage_space, optarg, PATH_MAX);
 		break;
-            case 'm':
-		strncpy(meta_path, optarg, PATH_MAX);
 	    case 'c': /* collection */
 		got_collection = 1;
 		strncpy(collection, optarg, PATH_MAX);
@@ -229,7 +224,7 @@ static int parse_args(int argc, char **argv)
 		fprintf(stderr, "%s: error: unrecognized option '%c'.\n", argv[0], c);
 	    case 'h':
 		fprintf(stderr,
-			"usage: pvfs2-showcoll [-s data_storage_space] [-m metadata storage space] [-c collection_name] [-d dspace_handle] [-v] [-k] [-h]\n");
+			"usage: pvfs2-showcoll [-s storage_space] [-c collection_name] [-d dspace_handle] [-v] [-k] [-h]\n");
 		fprintf(stderr, "\tdefault storage space is '/tmp/pvfs2-test-space'.\n");
 		fprintf(stderr, "\t'-v' turns on verbose output.\n");
 		fprintf(stderr, "\t'-k' prints data in keyval spaces.\n");
@@ -503,8 +498,7 @@ static int print_collections(void)
     count = 1;
     pos = TROVE_ITERATE_START;
 
-    fprintf(stdout, "Storage space %s and %s collections:\n",
-	    data_path, meta_path);
+    fprintf(stdout, "Storage space %s collections:\n", storage_space);
 
     while (count > 0) {
 	ret = trove_collection_iterate(TROVE_METHOD_DBPF,

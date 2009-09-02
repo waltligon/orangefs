@@ -99,14 +99,12 @@ enum
 int trove_initialize(
     TROVE_method_id method_id,
     TROVE_method_callback method_callback,
-    char *data_path,
-    char *meta_path,
+    char *stoname,
     TROVE_ds_flags flags);
 
 int trove_finalize(TROVE_method_id method_id);
 
-int trove_migrate(TROVE_method_id method_id, const char* data_path,
-		  const char* meta_path);
+int trove_migrate(TROVE_method_id method_id, const char* stoname);
 
 int trove_open_context(
     TROVE_coll_id coll_id,
@@ -122,19 +120,18 @@ int trove_collection_clear(
 
 int trove_storage_create(
     TROVE_method_id method_id,
-    char *data_path,
-    char *meta_path,
+    char *stoname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
 int trove_storage_remove(
     TROVE_method_id method_id,
-    char *data_path,
-    char *meta_path,
+    char *stoname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_create(
+/* char *stoname, */
     char *collname,
     TROVE_coll_id new_coll_id,
     void *user_ptr,
@@ -142,12 +139,14 @@ int trove_collection_create(
 
 int trove_collection_remove(
     TROVE_method_id method_id,
+/* char *stoname, */
     char *collname,
     void *user_ptr,
     TROVE_op_id *out_op_id_p);
 
 int trove_collection_lookup(
     TROVE_method_id method_id,
+/* char *stoname, */
     char *collname,
     TROVE_coll_id *out_coll_id_p,
     void *user_ptr,

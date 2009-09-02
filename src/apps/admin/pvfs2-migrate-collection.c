@@ -62,9 +62,9 @@ int verbose = 0;
 static void print_help(char *progname);
 static int parse_args(int argc, char **argv, options_t *opts);
 static int src_get_version(
-    char* meta_storage_space, TROVE_coll_id coll_id, char* coll_name,
+    char* storage_space, TROVE_coll_id coll_id, char* coll_name,
     char* ver_string, int ver_string_max);
-static int remove_collection_entry(char* meta_storage_space, char* collname);
+static int remove_collection_entry(char* storage_space, char* collname);
 
 int migrate_collection(void * config, void * sconfig);
 void fs_config_dummy_free(void *);
@@ -72,10 +72,10 @@ int recursive_rmdir(char* dir);
 
 /* functions specific to reading 0.0.1 collections */
 static int src_get_version_0_0_1(
-    char* meta_storage_space, TROVE_coll_id coll_id, 
+    char* storage_space, TROVE_coll_id coll_id, 
     char* ver_string, int ver_string_max);
 static int translate_0_0_1(
-    char* data_storage_space, char* meta_storage_space, char* old_coll_path, 
+    char* storage_space, char* old_coll_path, 
     char* coll_name, TROVE_coll_id coll_id);
 static int translate_coll_eattr_0_0_1(
     char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
@@ -87,7 +87,7 @@ static int translate_keyvals_0_0_1(
     char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
     TROVE_context_id trove_context);
 static int translate_bstreams_0_0_1(
-    char* data_storage_space, char* old_coll_path, 
+    char* storage_space, char* old_coll_path, 
     TROVE_coll_id coll_id, char* coll_name,
     TROVE_context_id trove_context);
 static int translate_keyval_db_0_0_1(
@@ -232,15 +232,10 @@ int migrate_collection(void * config, void * sconfig)
     struct server_configuration_s * server_config =
         (struct server_configuration_s *) sconfig;
 
-    if(server_config->meta_path == NULL)
-    {
-	server_config->meta_path = server_config->data_path;
-    }
-
     memset(version, 0, 256);
     /* find version of source storage space */
     ret = src_get_version(
-        server_config->meta_path, 
+        server_config->storage_path, 
         fs_config->coll_id, 
         fs_config->file_system_name,
         version, 254);
@@ -257,7 +252,7 @@ int migrate_collection(void * config, void * sconfig)
     if(strncmp(version, "0.0.1", 5) == 0)
     {
         sprintf(old_coll_path, "%s/%08x-old-%s",
-                server_config->meta_path, 
+                server_config->storage_path, 
                 fs_config->coll_id, version);
 
         ret = access(old_coll_path, F_OK);
@@ -296,9 +291,7 @@ int migrate_collection(void * config, void * sconfig)
         }
 
         ret = translate_0_0_1(
-            server_config->data_path, 
-	    server_config->meta_path,
-	    old_coll_path, 
+            server_config->storage_path, old_coll_path, 
             fs_config->file_system_name, 
             fs_config->coll_id);
         if(ret < 0)
@@ -333,8 +326,7 @@ int migrate_collection(void * config, void * sconfig)
              * of creating it, but we don't know what the version
              * is anymore
              */
-            DIR * data_storage_dir;
-	    DIR * meta_storage_dir;
+            DIR * storage_dir;
             struct dirent * next_dirent;
             char collname[PATH_MAX];
             int collname_length;
@@ -342,15 +334,15 @@ int migrate_collection(void * config, void * sconfig)
 
             collname_length = sprintf(collname, "%08x-old", fs_config->coll_id);
 
-            data_storage_dir = opendir(server_config->data_path);
-            if(!data_storage_dir)
+            storage_dir = opendir(server_config->storage_path);
+            if(!storage_dir)
             {
-                fprintf(stderr, "Error: failed to open data directory: %s\n",
-                        server_config->data_path);
+                fprintf(stderr, "Error: failed to open directory: %s\n",
+                        server_config->storage_path);
                 return -1;
             }
 
-            while((next_dirent = readdir(data_storage_dir)) != NULL)
+            while((next_dirent = readdir(storage_dir)) != NULL)
             {
                 int d_namelen = strlen(next_dirent->d_name);
                 if(collname_length < d_namelen &&
@@ -359,7 +351,7 @@ int migrate_collection(void * config, void * sconfig)
                     char old_coll_path[PATH_MAX];
 
                     sprintf(old_coll_path, "%s/%s",
-                            server_config->data_path, next_dirent->d_name);
+                            server_config->storage_path, next_dirent->d_name);
 
                     /* found an old version, delete it */
                     if(verbose) 
@@ -372,54 +364,12 @@ int migrate_collection(void * config, void * sconfig)
                             stderr, 
                             "Error: failed to remove old collection at: %s\n",
                             old_coll_path);
-                        closedir(data_storage_dir);
+                        closedir(storage_dir);
                         return -1;
                     }
                     removed_olddirs = 1;
                 }
             }
-
-	    /* if the meta and data paths are the same, don't try to remove twice */
-	    if (strcmp(server_config->data_path, server_config->meta_path))
-	    {
-	    	meta_storage_dir = opendir(server_config->meta_path);
-	    	if(!meta_storage_dir)
-            	{
-                    fprintf(stderr, "Error: failed to open meta directory: %s\n",
-                        server_config->meta_path);
-                    return -1;
-                }
-
-	        while((next_dirent = readdir(meta_storage_dir)) != NULL)
-                {
-                    int d_namelen = strlen(next_dirent->d_name);
-                    if(collname_length < d_namelen &&
-                       strncmp(next_dirent->d_name, collname, collname_length) == 0)
-                    { 
-                        char old_coll_path[PATH_MAX];
-
-                        sprintf(old_coll_path, "%s/%s",
-                                server_config->meta_path, next_dirent->d_name);
-
-                         /* found an old version, delete it */
-                        if(verbose) 
-                            printf("VERBOSE Removing old collection at: %s\n",
-                                   old_coll_path);
-                        ret = recursive_rmdir(old_coll_path);
-                        if(ret < 0)
-                        {
-                            fprintf(
-                                stderr, 
-                                "Error: failed to remove old collection at: %s\n",
-                                old_coll_path);
-                            closedir(meta_storage_dir);
-                            return -1;
-                        }
-                        removed_olddirs = 1;
-                    }
-                }
-		closedir(meta_storage_dir);
-	    }
 
             if(removed_olddirs == 0)
             {
@@ -428,7 +378,7 @@ int migrate_collection(void * config, void * sconfig)
                        fs_config->file_system_name);
             }
 
-            closedir(data_storage_dir);
+            closedir(storage_dir);
         }
         else
         {
@@ -575,7 +525,7 @@ static void print_help(
  * \return 0 on succes, -1 on failure
  */
 static int src_get_version(
-    char* meta_storage_space,       /**< path to storage space */
+    char* storage_space,       /**< path to storage space */
     TROVE_coll_id coll_id,     /**< collection id */
     char* coll_name,           /**< collection name */
     char* ver_string,          /**< version in string format */
@@ -585,14 +535,14 @@ static int src_get_version(
 
 
     ret = src_get_version_0_0_1(
-        meta_storage_space, coll_id, ver_string, ver_string_max);
+        storage_space, coll_id, ver_string, ver_string_max);
 
     if(ret != 0)
     {
         fprintf(stderr, 
                 "Error: all known collection version checks "
                 "failed for \ncollection %s (%08x) in storage space %s\n", 
-                coll_name, coll_id, meta_storage_space);
+                coll_name, coll_id, storage_space);
     }
 
     return(ret);
@@ -604,7 +554,7 @@ static int src_get_version(
  * \return 0 on succes, -1 on failure
  */
 static int src_get_version_0_0_1(
-    char* meta_storage_space,   /**< path to storage space */
+    char* storage_space,   /**< path to storage space */
     TROVE_coll_id coll_id, /**< collection id */
     char* ver_string,      /**< version in string format */
     int ver_string_max)    /**< maximum size of version string */
@@ -615,7 +565,7 @@ static int src_get_version_0_0_1(
     DBT key, data;
 
     sprintf(coll_db, "%s/%08x/collection_attributes.db", 
-            meta_storage_space, coll_id);
+            storage_space, coll_id);
 
     /* try to find a collections db */
     ret = access(coll_db, F_OK);
@@ -678,8 +628,7 @@ static int src_get_version_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_0_0_1(
-    char* data_storage_space,   /**< path to data storage space */
-    char* meta_storage_space, /**< path to metadata storage space */
+    char* storage_space,   /**< path to storage space */
     char* old_coll_path,   /**< path to old collection */
     char* coll_name,       /**< collection name */
     TROVE_coll_id coll_id) /**< collection id in string format */
@@ -694,7 +643,7 @@ static int translate_0_0_1(
     char current_path[PATH_MAX];
 
     /* rename old collection */
-    snprintf(current_path, PATH_MAX, "%s/%08x", meta_storage_space, coll_id);
+    snprintf(current_path, PATH_MAX, "%s/%08x", storage_space, coll_id);
 
     if(access(current_path, F_OK) != 0)
     {
@@ -713,7 +662,7 @@ static int translate_0_0_1(
         return(-1);
     }
 
-    ret = remove_collection_entry(meta_storage_space, coll_name);
+    ret = remove_collection_entry(storage_space, coll_name);
     if(ret < 0)
     {
         fprintf(stderr, "Error: failed to remove collection entry: %s\n",
@@ -728,8 +677,7 @@ static int translate_0_0_1(
     if(verbose) 
         printf("VERBOSE Creating temporary collection to migrate to.\n");
     ret = pvfs2_mkspace(
-        data_storage_space,
-	meta_storage_space,
+        storage_space, 
         coll_name,
         coll_id, 
         TROVE_HANDLE_NULL,
@@ -750,18 +698,18 @@ static int translate_0_0_1(
     {
         PVFS_perror("PINT_dist_initialize", ret);
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
 
     /* initialize trove and lookup collection */
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, data_storage_space, meta_storage_space,0);
+        TROVE_METHOD_DBPF, NULL, storage_space, 0);
     if (ret < 0)
     {
         PVFS_perror("trove_initialize", ret);
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
     ret = trove_collection_lookup(
@@ -770,7 +718,7 @@ static int translate_0_0_1(
     {   
         fprintf(stderr, "Error: failed to lookup new collection.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return -1; 
     }   
 
@@ -788,7 +736,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate collection extended attributes.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
 
@@ -799,7 +747,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate dspace attributes.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
 
@@ -810,7 +758,7 @@ static int translate_0_0_1(
     {
         fprintf(stderr, "Error: failed to migrate keyvals.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
 
@@ -821,12 +769,12 @@ static int translate_0_0_1(
 
     /* convert bstreams */
     ret = translate_bstreams_0_0_1(
-        data_storage_space, old_coll_path, coll_id, coll_name, trove_context);
+        storage_space, old_coll_path, coll_id, coll_name, trove_context);
     if(ret < 0)
     {
         fprintf(stderr, "Error: failed to migrate bstreams.\n");
         if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(data_storage_space, meta_storage_space, coll_name, coll_id, 1, 0);
+        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
         return(-1);
     }
 
@@ -845,7 +793,7 @@ static int translate_0_0_1(
     return(0);
 }
 
-static int remove_collection_entry(char* meta_storage_space, char* collname)
+static int remove_collection_entry(char* storage_space, char* collname)
 {
     char collections_db[PATH_MAX];
     DB * dbp;
@@ -853,7 +801,7 @@ static int remove_collection_entry(char* meta_storage_space, char* collname)
     int ret = 0;
     TROVE_coll_id coll_id;
 
-    sprintf(collections_db, "%s/collections.db", meta_storage_space);
+    sprintf(collections_db, "%s/collections.db", storage_space);
 
     ret = access(collections_db, F_OK);
     if(ret == -1 && errno == ENOENT)
@@ -1544,7 +1492,7 @@ static int translate_keyval_db_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_bstreams_0_0_1(
-    char* data_storage_space,            /**< path to trove storage space */
+    char* storage_space,            /**< path to trove storage space */
     char* old_coll_path,            /**< path to old collection */
     TROVE_coll_id coll_id,          /**< collection id */
     char* new_name,                 /**< name of collection */
@@ -1581,7 +1529,7 @@ static int translate_bstreams_0_0_1(
                 snprintf(bstream_file, PATH_MAX, "%s/bstreams/%.8d/%s",
                     old_coll_path, i, tmp_ent->d_name);
                 snprintf(new_bstream_file, PATH_MAX, "%s/%08x/bstreams/%.8d/%s",
-                    data_storage_space, coll_id, i, tmp_ent->d_name);
+                    storage_space, coll_id, i, tmp_ent->d_name);
                 /* hard link to new location */
                 ret = link(bstream_file, new_bstream_file);
                 if(ret != 0)
