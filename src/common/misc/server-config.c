@@ -34,7 +34,8 @@
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_logstamp);
-static DOTCONF_CB(get_storage_space);
+static DOTCONF_CB(get_data_path);
+static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
 #ifdef USE_TRUSTED
@@ -550,17 +551,30 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
 
-    /* Specifies the local path for the pvfs2 server to use as storage space.
-     * This option specifies the default path for all servers and will appear
-     * in the Defaults context.
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for data files. This option specifies the default path for all servers 
+     * and will appear in the Defaults context.
      *
      * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
      * basis. Look at the "Option" tag for more details
      * Example:
      *
-     * StorageSpace /tmp/pvfs.storage
+     * DataStorageSpace /tmp/pvfs-data.storage
      */
-    {"StorageSpace",ARG_STR, get_storage_space,NULL,
+    {"DataStorageSpace",ARG_STR, get_data_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for metadata files. This option specifies the default path for all 
+     * servers and will appear in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * MetadataStorageSpace /tmp/pvfs-meta.storage
+     */
+    {"MetadataStorageSpace",ARG_STR, get_meta_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
      /* Current implementations of TCP on most systems use a window
@@ -1048,10 +1062,17 @@ int PINT_parse_config(
         config_s->host_id = strdup(halias->bmi_address);
     }
 
-    if (server_alias_name && !config_s->storage_path)
+    if (server_alias_name && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
-                   "No storage path specified for alias %s.\n", server_alias_name);
+                   "No data storage path specified for alias %s.\n", server_alias_name);
+        return 1;
+    }
+
+    if (server_alias_name && !config_s->meta_path)
+    {
+        gossip_err("Configuration file error. "
+                   "No metadata storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
@@ -1135,7 +1156,7 @@ DOTCONF_CB(get_logstamp)
 }
 
 
-DOTCONF_CB(get_storage_space)
+DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -1144,11 +1165,29 @@ DOTCONF_CB(get_storage_space)
     {
         return NULL;
     }
-    if (config_s->storage_path)
+    if (config_s->data_path)
     {
-        free(config_s->storage_path);
+        free(config_s->data_path);
     }
-    config_s->storage_path =
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_meta_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->meta_path)
+    {
+        free(config_s->meta_path);
+    }
+    config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -2837,10 +2876,16 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->host_id = NULL;
         }
 
-        if (config_s->storage_path)
+	if (config_s->data_path)
         {
-            free(config_s->storage_path);
-            config_s->storage_path = NULL;
+            free(config_s->data_path);
+            config_s->data_path = NULL;
+        }
+
+        if (config_s->meta_path)
+        {
+            free(config_s->meta_path);
+            config_s->meta_path = NULL;
         }
 
         if (config_s->fs_config_filename)
@@ -4340,7 +4385,7 @@ int PINT_config_pvfs2_mkspace(
                  "storage space"));
 
             ret = pvfs2_mkspace(
-                config->storage_path, cur_fs->file_system_name,
+                config->data_path, config->meta_path, cur_fs->file_system_name,
                 cur_fs->coll_id, root_handle, cur_meta_handle_range,
                 cur_data_handle_range, create_collection_only, 1);
 
@@ -4395,7 +4440,8 @@ int PINT_config_pvfs2_rmspace(
                 GOSSIP_SERVER_DEBUG,"Removing existing PVFS2 %s\n",
                 (remove_collection_only ? "collection" :
                  "storage space"));
-            ret = pvfs2_rmspace(config->storage_path,
+            ret = pvfs2_rmspace(config->data_path,
+				config->meta_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,

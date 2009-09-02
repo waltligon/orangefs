@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = trove_initialize(
-	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", 0);
+	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", "/tmp/pvfs2-test-space", 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "trove_initialize failure.\n");

@@ -71,7 +71,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	TROVE_keyval_s key, val;
 
     ret = trove_initialize(
-	TROVE_METHOD_DBPF, NULL, storage_space, 0);
+	TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
         fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
         return -1;

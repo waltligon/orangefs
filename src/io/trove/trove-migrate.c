@@ -42,7 +42,9 @@ op=%lld context=%lld count=%d state=%d\n",                      \
 /*
  * Prototypes
  */
-static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,const char* stoname);
+static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
+				     const char* data_path,
+				     const char* meta_path);
 
 /*
  * Migration Table
@@ -54,7 +56,9 @@ struct migration_s
     int major;
     int minor;
     int incremental;
-    int (*migrate)(TROVE_coll_id coll_id, const char* stoname);
+    int (*migrate)(TROVE_coll_id coll_id,
+		 const char* data_path,
+		 const char* meta_path);
 };
 
 struct migration_s migration_table[] =
@@ -243,12 +247,14 @@ static double wtime(void)
 /*
  * trove_migrate
  *   method_id - method used to for trove access
- *   stoname   - path to storage
+ *   data_path - path to data storage
+ *   meta_path - path to metadata storage
  *
  * Iterate over all collections and migrate each one.
  * \return 0 on success, non-zero on failure
  */
-int trove_migrate (TROVE_method_id method_id, const char* stoname)
+int trove_migrate (TROVE_method_id method_id, const char* data_path,
+		   const char* meta_path)
 {
     TROVE_ds_position pos;
     TROVE_coll_id     coll_id;
@@ -322,13 +328,14 @@ ret=%d method=%d pos=%lld name=%p coll=%d count=%d op=%lld\n",
                                migrate_p->major,
                                migrate_p->minor,
                                migrate_p->incremental);
-                    ret = migrate_p->migrate(coll_id, stoname);
+                    ret = migrate_p->migrate(coll_id, data_path, meta_path);
                     if (ret < 0)
                     {
                         gossip_err("migrate failed: \
-ret=%d coll=%d stoname=%s major=%d minor=%d incremental=%d\n",
-                                   ret, coll_id, stoname, migrate_p->major,
-                                   migrate_p->minor, migrate_p->incremental);
+ret=%d coll=%d metadir=%s datadir=%s major=%d minor=%d incremental=%d\n",
+                                   ret, coll_id, meta_path, data_path,
+				   migrate_p->major, migrate_p->minor, 
+				   migrate_p->incremental);
                         goto complete;
                     }
                     gossip_err("Trove Migration Complete: Ver=%d.%d.%d\n",
@@ -378,14 +385,17 @@ complete:
 
 /*
  * migrate_collection_0_1_3
- *   coll_id - collection id
- *   stoname - path to storage
+ *   coll_id   - collection id
+ *   data_path - path to data storage
+ *   meta_path - path to metadata storage
  *
  * For each datafile handle, check the file length and update the
  * b_size attribute.
  * \return 0 on success, non-zero on failure
  */
-static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, const char* stoname)
+static int migrate_collection_0_1_3 (TROVE_coll_id coll_id, 
+				     const char* data_path,
+				     const char* meta_path)
 {
     TROVE_context_id  context_id = PVFS_CONTEXT_NULL;
     TROVE_ds_position pos;
@@ -549,7 +559,7 @@ coll=%d context=%lld handle=%llu state=%d\n",
 
                 DBPF_GET_BSTREAM_FILENAME(filename,
                                           PATH_MAX,
-                                          stoname,
+                                          data_path,
                                           coll_id,
                                           llu(handles[i]));
                 ret = stat(filename, &stat_data);
