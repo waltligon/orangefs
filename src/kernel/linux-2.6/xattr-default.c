@@ -29,7 +29,8 @@ int pvfs2_xattr_set_default(struct inode *inode,
     if (!S_ISREG(inode->i_mode) &&
        (!S_ISDIR(inode->i_mode) || inode->i_mode & S_ISVTX))
     {
-        gossip_err("pvfs2_xattr_set_default: Returning EPERM for inode %p.\n", inode);
+        gossip_err("pvfs2_xattr_set_default: Returning EPERM for inode %p.\n"
+                  ,inode);
         return -EPERM;
     }
     gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_setxattr_default %s\n", name);

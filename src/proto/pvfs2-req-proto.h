@@ -122,6 +122,7 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DFILE_COUNT        1024
 #define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \
 ((dfile_count > 0) && (dfile_count < PVFS_REQ_LIMIT_DFILE_COUNT))
+#define PVFS_REQ_LIMIT_MIRROR_DFILE_COUNT 1024
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT        512
 /* max number of perf metrics returned by mgmt perf mon op */
@@ -149,7 +150,7 @@ enum PVFS_server_op
 /* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 113
+#define PVFS_REQ_LIMIT_LISTATTR 60
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,

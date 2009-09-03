@@ -573,7 +573,16 @@ static int getattr_object_getattr_comp_fn(
                 assert(attr->mask & PVFS_ATTR_META_DIST);
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
             }
-
+            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
+                PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+                    assert(attr->u.meta.mirror_dfile_array &&
+                          (attr->u.meta.mirror_copies_count > 0));
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: Mirror handles and "
+                                                  "copy count retrieved.\n"
+                                                 ,__func__);
+            }
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
             {
@@ -600,7 +609,8 @@ static int getattr_object_getattr_comp_fn(
                          * getattr requests
                          */
                         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "getattr_object_getattr_comp_fn: detected stuffed file.\n");
+                            "getattr_object_getattr_comp_fn: "
+                            "detected stuffed file.\n");
                         return(0);
                     }
                     /* if caller asked for the size, then we need
@@ -780,7 +790,8 @@ static PINT_sm_action getattr_acache_insert(
                 /* stuffed file case */
                 sm_p->getattr.size = sm_p->getattr.attr.u.meta.stuffed_size;
                 tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated stuffed logical size of %lld\n", lld(*tmp_size));
+                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert "
+                  "calculated stuffed logical size of %lld\n", lld(*tmp_size));
             }
             else
             {
@@ -880,12 +891,17 @@ static PINT_sm_action getattr_set_sys_response(
        {
            sysresp->attr.dfile_count = attr->u.meta.dfile_count;
        }
+       if (sm_p->getattr.req_attrmask & PVFS_ATTR_META_MIRROR_DFILES)
+       {
+         sysresp->attr.mirror_copies_count = attr->u.meta.mirror_copies_count;
+       }
     }
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "dfile_count: %d\n", 
             attr->u.dir.hint.dfile_count);
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_len = %d, dist_params_len = %d\n",
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_len = %d, "
+            "dist_params_len = %d\n",
             attr->u.dir.hint.dist_name_len, attr->u.dir.hint.dist_params_len);
         sysresp->attr.dfile_count = attr->u.dir.hint.dfile_count;
         /* 
@@ -902,7 +918,8 @@ static PINT_sm_action getattr_set_sys_response(
                 PINT_SET_OP_COMPLETE;
                 return SM_ACTION_TERMINATE;
             }
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_hint: %s\n", sysresp->attr.dist_name);
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_hint: %s\n"
+                                            , sysresp->attr.dist_name);
         }
         if (attr->u.dir.hint.dist_params_len > 0 &&
             (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_HINT))
@@ -916,7 +933,8 @@ static PINT_sm_action getattr_set_sys_response(
                 PINT_SET_OP_COMPLETE;
                 return SM_ACTION_TERMINATE;
             }
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_params: %s\n", sysresp->attr.dist_params);
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "dist_name_params: %s\n"
+                                            , sysresp->attr.dist_params);
         }
     }
 

@@ -145,6 +145,7 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
+
 typedef struct PINT_client_io_ctx
 {
     /* the index of the current context (in the context array) */
@@ -155,6 +156,16 @@ typedef struct PINT_client_io_ctx
 
     /* the data handle we're responsible for doing I/O on */
     PVFS_handle data_handle;
+
+    /* first level index into mirror_dfile_array. second level is         */
+    /* the server_nr. mirror_dfile_array[current_copies_count][server_nr] */
+    uint32_t current_copies_count;
+
+    /* increment after one set of mirrors have been tried. */
+    uint32_t local_retry_count;
+
+    /* should we retry the original or not? */
+    uint32_t retry_original;
 
     job_id_t flow_job_id;
     job_status_s flow_status;
@@ -382,6 +393,8 @@ struct PINT_server_fetch_config_sm_state
     int32_t *fs_config_buf_size;
 };
 
+
+
 /* flag to disable cached lookup during getattr nested sm */
 #define PINT_SM_GETATTR_BYPASS_CACHE 1
 
@@ -525,6 +538,7 @@ typedef struct PINT_client_sm
 
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
+
 
     PVFS_credentials *cred_p;
     union

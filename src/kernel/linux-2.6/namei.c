@@ -70,6 +70,7 @@ static struct dentry *pvfs2_lookup(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
+    struct dentry *res = NULL;
 
     /*
       in theory we could skip a lookup here (if the intent is to
@@ -202,7 +203,6 @@ static struct dentry *pvfs2_lookup(
     {
         gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
             __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count));
-        struct dentry *res;
 
         /* update dentry/inode pair into dcache */
         dentry->d_op = &pvfs2_dentry_operations;

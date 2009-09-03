@@ -170,7 +170,7 @@ int main(int argc, char **argv)
                    ,SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
             PVFS_metafile_hint *hint = 
                             (PVFS_metafile_hint *) user_opts->val[0].buffer;
-            printf("Metafile hints");
+            printf("Metafile hints (0x%08x)",(unsigned int)hint->flags);
             if (hint->flags & PVFS_IMMUTABLE_FL) {
                 printf(" :immutable file ");
             }
@@ -179,6 +179,9 @@ int main(int argc, char **argv)
             }
             if (hint->flags & PVFS_NOATIME_FL) {
                 printf(" :Atime updates disabled");
+            }
+            if (hint->flags & PVFS_MIRROR_FL) {
+		printf("  :Mirroring is enabled");
             }
             printf("\n");
         } else if ( strncmp(user_opts->key[0].buffer
@@ -267,8 +270,6 @@ static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p)
             return -1;
         memcpy(val_p->buffer, &hint, sizeof(hint));
         val_p->buffer_sz = sizeof(hint);
-        gossip_err("From xattr, My key value is %llu.\n",
-                 llu(hint.flags));
     } else if (strncmp(key_p->buffer,"user.pvfs2.mirror.mode"
                                     ,sizeof("user.pvfs2.mirror.mode")) == 0)
     {
@@ -677,7 +678,11 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
         obj->u.pvfs2.perms = resp_getattr.attr.perms;
         memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr,
                sizeof(PVFS_sys_attr));
-        obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        /* we should not modify the returned mask, so we know which data fields
+         * in the attribute structure are valid.  I don't see any reason why
+         * it is being reset here.
+        */
+        //obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         obj->u.pvfs2.ref = ref;
     }
     return 0;

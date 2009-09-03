@@ -1593,7 +1593,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
 
     if (sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
-        attrmask |= PVFS_ATTR_META_DFILES;
+        attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_MIRROR_DFILES);
+    }
+    if (sys_attrmask & PVFS_ATTR_SYS_MIRROR_COPIES_COUNT)
+    {
+        attrmask |= PVFS_ATTR_META_MIRROR_DFILES;
     }
 
     if (sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
@@ -1691,6 +1695,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_META_DFILES)
     {
         sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    }
+    if (obj_mask & PVFS_ATTR_META_MIRROR_DFILES)
+    {
+        sys_mask |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
     }
     if (obj_mask & PVFS_ATTR_META_DIST)
     {
