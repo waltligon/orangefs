@@ -383,12 +383,6 @@ static PINT_sm_action getpath_find_incomplete_paths(
                     s_op->u.getpath.handle_p[i];
                 s_op->u.getpath.remote_count[j]++;
             }
-            gossip_debug(GOSSIP_GETPATH_DEBUG,
-                         "[GETPATH]: Added handle (%llu)(%s) to "
-                         "all meta data servers for (%llu)\n",
-                         llu(s_op->u.getpath.handle_p[i]),
-                         s_op->u.getpath.dirent_p[i].d_name,
-                         llu(s_op->u.getpath.dirent_p[i].handle));
         }
     }
 

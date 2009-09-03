@@ -480,16 +480,6 @@ static int lebf_encode_req(
 	  max_size_array[req->op].req);
     }
 
-    if(req->op == PVFS_SERV_GETPATH)
-    {
-        int i = 0;
-        for( i=0; i < req->u.getpath.count; i++ )
-        {
-            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: encoding %d: "
-                         "(%s)\n", i, req->u.getpath.dirent[i].d_name);
-        }
-    }
-
   out:
     return ret;
 }
@@ -694,16 +684,6 @@ static int lebf_decode_req(
 	gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
                     __func__, req->op, (long)(ptr - (char *) input_buffer), input_size);
 	ret = -PVFS_EPROTO;
-    }
-
-    if(req->op == PVFS_SERV_GETPATH)
-    {
-        int i = 0;
-        for( i=0; i < req->u.getpath.count; i++ )
-        {
-            gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: decoding req %d: "
-                         "(%s)\n", i, req->u.getpath.dirent[i].d_name);
-        }
     }
 
   out:
