@@ -1,1659 +1,365 @@
-/*
- * (C) 2001 Clemson University and The University of Chicago
- *
- * See COPYING in top-level directory.
- */
-
-#include <unistd.h>
 #include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include <time.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <assert.h>
 #include <getopt.h>
+#include <libgen.h>
+#include <string.h>
+#include <time.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
-#include "pvfs2-fsck.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-fsck.h"
 #include "pint-cached-config.h"
 
-#define HANDLE_BATCH 1000
-
-#ifndef PVFS2_VERSION
-#define PVFS2_VERSION "Unknown"
-#endif
-
-struct options
+static const char * state2str (int state)
 {
-    char *mnt_point;
-    int mnt_point_set;
-    int verbose;
-    int destructive;
-};
-struct options *fsck_opts = NULL;
-
-/* lost+found reference */
-PVFS_object_ref laf_ref;
-
-static void handlelist_remove_handle_no_idx(struct handlelist *hl,
-				     PVFS_handle handle);
-
-int main(int argc, char **argv)
-{
-    int ret = -1, in_admin_mode = 0;
-    PVFS_fs_id cur_fs;
-    char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
-    int server_count;
-    PVFS_BMI_addr_t *addr_array = NULL;
-    struct handlelist *hl_all, *hl_unrefd, *hl_notree;
-    struct PVFS_mgmt_setparam_value param_value;
-
-    fsck_opts = parse_args(argc, argv);
-    if (!fsck_opts)
+    const char * ptr;
+    switch (state)
     {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
-	usage(argc, argv);
-	return -1;
+    case FSCK_IDLE:   ptr = "idle       "; break;
+    case FSCK_IP:     ptr = "in-progress"; break;
+    case FSCK_CANCEL: ptr = "cancelled  "; break;
+    default:          ptr = "unknown    "; break;
+    }
+    return ptr;
+}
+
+static const char * phase2str (int phase)
+{
+    const char * ptr;
+    switch (phase)
+    {
+    case FSCK_PHASE_CHECK:     ptr = "check    "; break;
+    case FSCK_PHASE_PRECREATE: ptr = "precreate"; break;
+    case FSCK_PHASE_BSTREAM:   ptr = "bstream  "; break;
+    case FSCK_PHASE_ORPHAN:    ptr = "orphan   "; break;
+    case FSCK_PHASE_REPAIR:    ptr = "repair   "; break;
+    case FSCK_COMPLETE:        ptr = "complete "; break;
+    default:                   ptr = "unknown  "; break;
+    }
+    return ptr;
+}
+
+static const char * op2str (int op)
+{
+    const char * ptr;
+    switch (op)
+    {
+    case FSCK_OP_MOVE:    ptr = "move   "; break;
+    case FSCK_OP_DELETE:  ptr = "delete "; break;
+    case FSCK_OP_CREATE:  ptr = "create "; break;
+    case FSCK_OP_BCREATE: ptr = "bcreate"; break;
+    default: ptr = "unknown"; break;
+    }
+    return ptr;
+}
+
+static char posbuf[32];
+static const char * pos2str (PVFS_ds_position pos)
+{
+    const char * ptr;
+    switch (pos)
+    {
+    case PVFS_ITERATE_START: ptr = "start"; break;
+    case PVFS_ITERATE_END:   ptr = "end  "; break;
+    default:
+        sprintf(posbuf, "%llu", llu(pos));
+        ptr = posbuf;
+        break;
+    }
+    return ptr;
+}
+
+/* stores program arguments */
+struct program_options fsck_options = { 0, EOF };
+
+/* Program Arguments */
+struct option long_options[] =
+{
+    {"start",  0, &fsck_options.cmd, OPT_START},
+    {"cancel", 0, &fsck_options.cmd, OPT_CANCEL},
+    {"report", 0, &fsck_options.cmd, OPT_REPORT},
+    {"repair", 0, &fsck_options.cmd, OPT_REPAIR},
+    {"fsid",   1, NULL,              OPT_FSID}
+};
+
+static int parse_options (int argc, char **argv)
+{
+    int long_index = 0;
+    int o;
+
+    while((o = getopt_long(argc, argv, "", long_options, &long_index)) != EOF)
+    {
+        switch(o)
+        {
+        default:
+            return 1;
+        case 0:
+            break;
+        case OPT_FSID:
+            fsck_options.fsid = strtoull(optarg, NULL, 0);
+            break;
+        }
     }
 
+    if ((fsck_options.fsid == 0) || (fsck_options.cmd == EOF)) return 1;
+    return 0;
+}
+
+static int fsck_start (
+    PVFS_credentials *cred_p,
+    PVFS_fs_id        fsid,
+    int               server_count,
+    PVFS_BMI_addr_t  *server_addr)
+{
+    struct PVFS_mgmt_setparam_value param_value;
+    PVFS_mgmt_fsck_resp *resp_array;
+    PVFS_ds_position position;
+    PVFS_error ret;
+    uint64_t log_count;
+    int64_t uid;
+    int i;
+    int fault;
+
+    uid = time(NULL);
+
+    param_value.type    = PVFS_MGMT_PARAM_TYPE_UINT64;
+    param_value.u.value = PVFS_SERVER_ADMIN_MODE;
+
+    (void) PVFS_mgmt_setparam_all(fsid, cred_p, PVFS_SERV_PARAM_MODE,
+               &param_value, NULL, NULL);
+
+    resp_array = malloc(server_count*sizeof(*resp_array)); 
+    assert(resp_array);
+
+    fault = 0;
+
+    for (i=0; i<server_count; i++)
+    {
+        memset(&resp_array[i], 0, sizeof(*resp_array));
+
+        position  = PVFS_ITERATE_START;
+        log_count = 0;
+        resp_array[i].log  = NULL;
+
+        ret = PVFS_mgmt_fsck(fsid, cred_p, &(server_addr[i]),
+                  FSCK_START, uid, &position, &log_count, &(resp_array[i]),
+                  PVFS_HINT_NULL);
+        if (ret != 0)
+        {
+            fault = 1;
+            PVFS_perror("PVFS_mgmt_fsck", ret);
+        }
+    }
+
+    free(resp_array);
+    return fault;
+}
+
+static int fsck_cancel (
+    PVFS_credentials *cred_p,
+    PVFS_fs_id        fsid,
+    int               server_count,
+    PVFS_BMI_addr_t  *server_addr)
+{
+    PVFS_mgmt_fsck_resp *resp_array;
+    PVFS_ds_position position;
+    PVFS_error ret;
+    uint64_t log_count;
+    int64_t uid = 0;
+    int fault;
+    int i;
+
+    resp_array = malloc(server_count*sizeof(*resp_array)); 
+    assert(resp_array);
+
+    fault = 0;
+
+    for (i=0; i<server_count; i++)
+    {
+        memset(&resp_array[i], 0, sizeof(*resp_array));
+
+        log_count = 0;
+        position  = PVFS_ITERATE_START;
+
+        ret = PVFS_mgmt_fsck(fsid, cred_p, &(server_addr[i]),
+                  FSCK_STOP, uid, &position, &log_count, &resp_array[i],
+                  PVFS_HINT_NULL);
+        if (ret < 0)
+        {
+            fault = 1;
+            PVFS_perror("PVFS_mgmt_fsck", ret);
+        }
+    }
+
+    for (i=0; i<server_count; i++)
+    {
+        if (resp_array[i].state != FSCK_CANCEL)
+        {
+            fprintf(stderr, "server: %d not cancelled : %s\n",
+                i, state2str(resp_array[i].state));
+            fault = 1;
+        }
+    }
+
+    free(resp_array);
+    return fault;
+}
+
+static int fsck_report (
+    PVFS_credentials *cred_p,
+    PVFS_fs_id        fsid,
+    int               server_count,
+    PVFS_BMI_addr_t  *server_addr)
+{
+    PVFS_mgmt_fsck_resp resp;
+    PVFS_ds_position position;
+    PVFS_error ret;
+    uint64_t log_count;
+    int64_t uid = 0;
+    int i,j;
+    int header;
+    char  server_name[128];
+
+    for (i=0; i<server_count; i++)
+    {
+        memset(&resp, 0, sizeof(resp));
+        position  = PVFS_ITERATE_START;
+        log_count = NUM_REPAIRS_PER_REQUEST;
+        resp.log  = malloc(log_count*sizeof(PVFS_mgmt_fsck_repair));
+        header = 1;
+
+        while (position != PVFS_ITERATE_END)
+        {
+            ret = PVFS_mgmt_fsck(
+                      fsid,
+                      cred_p,
+                      &(server_addr[i]),
+                      FSCK_REPORT,
+                      uid,
+                      &position,
+                      &log_count,
+                      &resp,
+                      PVFS_HINT_NULL);
+            if (ret != 0)
+            {
+                PVFS_perror("PVFS_mgmt_fsck", ret);
+            }
+            else
+            {
+                if (header)
+                {
+                    (void) PINT_cached_config_get_server_name_from_addr(
+                        fsck_options.fsid, server_addr[i],
+                        sizeof(server_name), server_name);
+                    printf ("server:%s\n", server_name);
+                    printf ("  state     : %s\n", state2str(resp.state));
+                    printf ("  phase     : %s\n", phase2str(resp.phase));
+                    printf ("  position  : %s\n", pos2str(position));
+                    printf ("  repairs   : %llu\n", llu(log_count));
+                    header = 0;
+                }
+                for (j=0; j<log_count; j++)
+                {
+                    printf ("      parent: %llu\n",
+                        llu(resp.log[j].parent));
+                    printf ("        operation: %s\n",
+                        op2str(resp.log[j].operation));
+                    printf ("        child :    %llu\n",
+                        llu(resp.log[j].child));
+                }
+            }
+        }
+
+        free(resp.log);
+    }
+
+    return ret;
+}
+
+static void usage (char *prog_name)
+{
+    fprintf(stderr,
+        "usage: %s --[start|cancel|report|repair] --fsid=FSID\n",
+        prog_name);
+    return;
+}
+
+int main (int argc, char **argv)
+{
+    PVFS_credentials creds;
+    PVFS_BMI_addr_t *server_addrs;
+    int              server_count;
+    int              ret;
+
+    ret = parse_options(argc, argv);
+    if (ret != 0)
+    {
+        usage(basename(argv[0]));
+        return 1;
+    }
+    
     ret = PVFS_util_init_defaults();
     if (ret != 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return -1;
-    }
-
-    /* translate local path into pvfs2 relative path */
-    ret = PVFS_util_resolve(fsck_opts->mnt_point,
-			    &cur_fs,
-			    pvfs_path,
-			    PVFS_NAME_MAX);
-    if (ret != 0)
-    {
-	PVFS_perror("PVFS_util_resolve", ret);
-	return -1;
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return ret;
     }
 
     PVFS_util_gen_credentials(&creds);
 
-    printf("# Current FSID is %u.\n", cur_fs);
-
-    /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-	&server_count);
+    server_count = 0;
+    ret = PVFS_mgmt_count_servers(
+              fsck_options.fsid,
+              &creds,
+              PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+              &server_count);
     if (ret != 0)
     {
-	PVFS_perror("PVFS_mgmt_count_servers", ret);
-	return -1;
+        PVFS_perror("PVFS_mgmt_count_servers", ret);
+        return ret;
     }
 
-    /* build a list of servers to talk to */
-    addr_array = (PVFS_BMI_addr_t *)
-	malloc(server_count * sizeof(PVFS_BMI_addr_t));
-    if (addr_array == NULL)
-    {
-	perror("malloc");
-	return -1;
-    }
-    ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds, 
-				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-				     addr_array,
-				     &server_count);
-    if (ret != 0)
-    {
-	PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	return -1;
-    }
-
-    /* create /lost+found, if it isn't there already */
-    ret = create_lost_and_found(cur_fs,
-				&creds);
-    if (ret != 0) {
-	if (ret == -PVFS_EAGAIN) {
-	    printf("Failed to create lost+found: likely the system is "
-		   "already in admin mode.  Use pvfs2-set-mode to change "
-		   "back to normal mode prior to running pvfs2-fsck.\n");
-	}
-	return -1;
-    }
-
-    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-    param_value.u.value = PVFS_SERVER_ADMIN_MODE;
-    /* put the servers into administrative mode */
-    ret = PVFS_mgmt_setparam_list(cur_fs,
-				  &creds,
-				  PVFS_SERV_PARAM_MODE,
-				  &param_value,
-				  addr_array,
-				  server_count,
-				  NULL, /* detailed errors */
-                                  NULL);
-    if (ret != 0)
-    {
-	PVFS_perror("PVFS_mgmt_setparam_list", ret);
-	ret = -1;
-	goto exit_now;
-    }
-    
-    in_admin_mode = 1;
-
-    hl_all = build_handlelist(cur_fs, addr_array, server_count, &creds);
-    if (hl_all == NULL) {
-	ret = -1;
-	goto exit_now;
-    }
-
-    /* first pass traverses the directory tree:
-     * - cleans up any direntries that refer to missing objects
-     * - verifies that files in the tree have all their datafiles 
-     *   (or repairs if possible)
-     * - verifies that all directories have their dirdata
-     *   (or repairs if possible)
-     */
-    printf("# first pass: traversing directory tree.\n");
-    traverse_directory_tree(cur_fs,
-			    hl_all,
-			    addr_array,
-			    server_count,
-			    &creds);
-
-    /* second pass examines handles not in the directory tree:
-     * - finds orphaned "sub trees" and keeps references to head
-     *   - verifies files in the sub tree have all datafiles
-     *     (or repairs if possible)
-     *   - verifies all sub tree directories have their dirdata
-     *     (or repairs if possible)
-     * - builds list of metafile, dirdata, and datafiles not referenced
-     *   in some sub tree to be processed later
-     */
-    printf("# second pass: finding orphaned sub trees.\n");
-    hl_notree = find_sub_trees(cur_fs,
-			       hl_all,
-			       addr_array,
-			       &creds);
-
-    handlelist_finalize(&hl_all);
-
-    param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-    param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-
-    /* drop out of admin mode now that we've traversed the dir tree */
-    PVFS_mgmt_setparam_list(cur_fs,
-			    &creds,
-			    PVFS_SERV_PARAM_MODE,
-			    &param_value,
-			    addr_array,
-			    server_count,
-			    NULL, NULL);
-    in_admin_mode = 0;
-
-    /* third pass moves salvagable objects into lost+found:
-     * - moves sub trees into lost+found
-     * - verifies that orphaned files have all their datafiles
-     *   (or repairs if possible)
-     *   - if orphaned file is salvagable, moves into lost+found
-     * - builds list of remaining dirdata and datafiles not
-     *   referenced in sub tree or orphaned file
-     */
-    printf("# third pass: moving orphaned sub trees and files to lost+found.\n");
-    hl_unrefd = fill_lost_and_found(cur_fs,
-				    hl_notree,
-				    addr_array,
-				    &creds);
-    handlelist_finalize(&hl_notree);
-
-    /* fourth pass removes orphaned dirdata and datafiles
-     * left from the previous passes.
-     */
-    printf("# fourth pass: removing unreferenced objects.\n");
-    cull_leftovers(cur_fs, hl_unrefd, addr_array, &creds);
-    handlelist_finalize(&hl_unrefd);
-
- exit_now:
-    if (in_admin_mode) {
-
-        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-
-	/* get us out of admin mode */
-	PVFS_mgmt_setparam_list(cur_fs,
-				&creds,
-				PVFS_SERV_PARAM_MODE,
-                                &param_value,
-				addr_array,
-				server_count,
-				NULL, NULL);
-    }
-    
-    PVFS_sys_finalize();
-
-    if (addr_array != NULL) free(addr_array);
-    if (fsck_opts != NULL)   free(fsck_opts);
-
-    return(ret);
-}
-
-struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
-				    PVFS_BMI_addr_t *addr_array,
-				    int server_count,
-				    PVFS_credentials *creds)
-{
-    int ret, i, more_flag;
-    unsigned long j;
-    PVFS_handle **handle_matrix;
-    int  *hcount_array;
-    unsigned long *handle_count_array;
-    unsigned long *total_count_array;
-    PVFS_ds_position *position_array;
-    struct PVFS_mgmt_server_stat *stat_array;
-    struct handlelist *hl;
-    struct PVFS_mgmt_setparam_value param_value;
-
-    /* find out how many handles are in use on each */
-    stat_array = (struct PVFS_mgmt_server_stat *)
-	malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
-    if (stat_array == NULL)
-    {
-        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-	PVFS_mgmt_setparam_list(cur_fs,
-				creds,
-				PVFS_SERV_PARAM_MODE,
-				&param_value,
-				addr_array,
-				server_count,
-				NULL, NULL);
-	return NULL;
-    }
-
-    ret = PVFS_mgmt_statfs_list(cur_fs,
-				creds,
-				stat_array,
-				addr_array,
-				server_count,
-				NULL /* details */
-                , NULL);
-    if (ret != 0)
-    {
-        param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-        param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-
-	PVFS_perror("PVFS_mgmt_statfs_list", ret);
-	PVFS_mgmt_setparam_list(cur_fs,
-				creds,
-				PVFS_SERV_PARAM_MODE,
-                                &param_value,
-				addr_array,
-				server_count,
-				NULL, NULL);
-	return NULL;
-    }
-
-    /* allocate a 2 dimensional array for handles from mgmt fn. */
-    handle_matrix = (PVFS_handle **) calloc(server_count, sizeof(PVFS_handle));
-    if (handle_matrix == NULL)
-    {
-	perror("malloc");
-	return NULL;
-    }
-    for (i=0; i < server_count; i++)
-    {
-	handle_matrix[i] = (PVFS_handle *) calloc(HANDLE_BATCH, sizeof(PVFS_handle));
-	if (handle_matrix[i] == NULL)
-	{
-	    perror("malloc");
-	    return NULL;
-	}
-    }
-
-    /* allocate some arrays to keep up with state */
-    handle_count_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
-    if (handle_count_array == NULL)
-    {
-	perror("malloc");
-	return NULL;
-    }
-    position_array = (PVFS_ds_position *) calloc(server_count, sizeof(PVFS_ds_position));
-    if (position_array == NULL)
-    {
-	perror("malloc");
-	return NULL;
-    }
-    /* total_count_array */
-    total_count_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
-    if (total_count_array == NULL)
+    server_addrs = malloc(server_count*sizeof(PVFS_BMI_addr_t));
+    if (!server_addrs)
     {
         perror("malloc");
-        return NULL;
-    }
-    /* hcount array */
-    hcount_array = (int *) calloc(server_count, sizeof(int));
-    if (hcount_array == NULL)
-    {
-        perror("malloc:");
-        return NULL;
+        return 1;
     }
 
-    for (i=0; i < server_count; i++) {
-	handle_count_array[i] = stat_array[i].handles_total_count -
-	    stat_array[i].handles_available_count;
-        total_count_array[i] = 0;
-    }
-
-
-    hl = handlelist_initialize(handle_count_array, server_count);
-
-    for (i=0; i < server_count; i++)
-    {
-	hcount_array[i] = HANDLE_BATCH;
-	position_array[i] = PVFS_ITERATE_START;
-    }
-
-    /* iterate until we have retrieved all handles */
-    more_flag = 1;
-    while (more_flag)
-    {
-	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
-					     creds,
-					     handle_matrix,
-					     hcount_array,
-					     position_array,
-					     addr_array,
-					     server_count,
-                                             0,
-					     NULL /* details */,
-                                             NULL /* hints */);
-	if (ret < 0)
-	{
-            param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-            param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-
-	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
-	    PVFS_mgmt_setparam_list(cur_fs,
-				    creds,
-				    PVFS_SERV_PARAM_MODE,
-                                    &param_value,
-				    addr_array,
-				    server_count,
-				    NULL, NULL);
-	    return NULL;
-	}
-
-	for (i=0; i < server_count; i++)
-	{
-            total_count_array[i] += hcount_array[i];
-	    for (j=0; j < hcount_array[i]; j++)
-	    {
-                PVFS_BMI_addr_t tmp_addr;
-		/* verify that handles are
-		 * within valid ranges for the given server here.
-		 */
-                ret = PINT_cached_config_map_to_server(&tmp_addr, handle_matrix[i][j], cur_fs);
-                if (ret || tmp_addr != addr_array[i])
-                {
-                    fprintf(stderr, "Ugh! handle does not seem to be owned by the server!\n");
-                    return NULL;
-                }
-	    }
-
-	    handlelist_add_handles(hl,
-				   handle_matrix[i],
-				   hcount_array[i],
-				   i);
-	}
-
-	/* find out if any servers have more handles to dump */
-	more_flag = 0;
-	for (i=0; i < server_count; i++)
-	{
-	    if (position_array[i] != PVFS_ITERATE_END)
-	    {
-		more_flag = 1;
-		break;
-	    }
-	}
-    }
-
-    for (i = 0; i < server_count; i++)
-    {
-        unsigned long used_handles = handle_count_array[i];
-        if (total_count_array[i] != used_handles)
-        {
-            fprintf(stderr, "Ugh! Server %d, Received %ld total handles instead of %ld\n",
-                    i, total_count_array[i], used_handles);
-            return NULL;
-        }
-    }
-
-    handlelist_finished_adding_handles(hl); /* sanity check */
-
-    /* now look for reserved handles */
-    for (i=0; i < server_count; i++)
-    {
-	hcount_array[i] = HANDLE_BATCH;
-	position_array[i] = PVFS_ITERATE_START;
-    }
-
-    more_flag = 1;
-    while (more_flag)
-    {
-	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
-					     creds,
-					     handle_matrix,
-					     hcount_array,
-					     position_array,
-					     addr_array,
-					     server_count,
-                                             PVFS_MGMT_RESERVED,
-					     NULL /* details */,
-                                             NULL /* hints */);
-	if (ret < 0)
-	{
-	    PVFS_perror("PVFS_mgmt_iterate_handles_list", ret);
-            param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-            param_value.u.value = PVFS_SERVER_NORMAL_MODE;
-	    PVFS_mgmt_setparam_list(cur_fs,
-				    creds,
-				    PVFS_SERV_PARAM_MODE,
-				    &param_value,
-				    addr_array,
-				    server_count,
-				    NULL,
-				    NULL);
-	    return NULL;
-	}
-
-	for (i=0; i < server_count; i++)
-	{
-            /* remove any reserved handles from the handlelist.  These will
-             * not show up in normal objects when we walk the file system
-             * tree.
-             */
-	    for (j=0; j < hcount_array[i]; j++)
-	    {
-                /* we don't know the server index.  Reserved handles can be
-                 * reported by any server; not just the server that actually
-                 * owns that handle.
-                 */
-	        handlelist_remove_handle_no_idx(hl,
-				   handle_matrix[i][j]);
-            }
-	}
-
-	/* find out if any servers have more handles to dump */
-	more_flag = 0;
-	for (i=0; i < server_count; i++)
-	{
-	    if (position_array[i] != PVFS_ITERATE_END)
-	    {
-		more_flag = 1;
-                hcount_array[i] = HANDLE_BATCH;
-	    }
-	}
-    }
-
-    for (i = 0; i < server_count; i++)
-    {
-	free(handle_matrix[i]);
-    }
-
-    free(handle_matrix);
-    free(handle_count_array);
-    free(hcount_array);
-    free(total_count_array);
-    free(position_array);
-
-    free(stat_array);
-    stat_array = NULL;
-
-    return hl;
-}
-
-int traverse_directory_tree(PVFS_fs_id cur_fs,
-			    struct handlelist *hl,
-			    PVFS_BMI_addr_t *addr_array,
-			    int server_count,
-			    PVFS_credentials *creds)
-{
-    int ret, server_idx = 0;
-    PVFS_sysresp_lookup lookup_resp;
-    PVFS_sysresp_getattr getattr_resp;
-    PVFS_object_ref pref;
-
-    ret = PVFS_sys_lookup(cur_fs,
-			  "/",
-			  creds,
-			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-    assert(ret == 0);
-
-    pref = lookup_resp.ref;
-
-    PVFS_sys_getattr(pref,
-		     PVFS_ATTR_SYS_ALL_NOHINT,
-		     creds,
-		     &getattr_resp, NULL);
-
-    assert(getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY);
-
-    ret = handlelist_find_handle(hl, pref.handle, &server_idx);
-    assert(ret == 0);
-
-    handlelist_remove_handle(hl, pref.handle, server_idx);
-
-    ret = match_dirdata(hl,
-			NULL /* optional second handle list */,
-			pref,
-			creds);
-    if (ret != 0) {
-	assert(0);
-    }
-
-    descend(cur_fs, hl, NULL, pref, creds);
-
-    return 0;
-}
-
-int match_dirdata(struct handlelist *hl,
-		  struct handlelist *alt_hl,
-		  PVFS_object_ref dir_ref,
-		  PVFS_credentials *creds)
-{
-    int ret, idx;
-    PVFS_handle dirdata_handle;
-
-    printf("# looking for dirdata match to %llu.\n",
-	   llu(dir_ref.handle));
-
-    ret = PVFS_mgmt_get_dirdata_handle(dir_ref,
-				       &dirdata_handle,
-				       creds, NULL);
+    ret = PVFS_mgmt_get_server_array(
+              fsck_options.fsid,
+              &creds,
+              PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+              server_addrs,
+              &server_count);
     if (ret != 0)
     {
-        PVFS_perror("match_dirdata", ret);
-	return -1;
+        PVFS_perror("PVFS_mgmt_get_server_array", ret);
+        return ret;
     }
 
-    printf("# mgmt_get_dirdata returned %llu.\n", llu(dirdata_handle));
 
-    if (handlelist_find_handle(hl, dirdata_handle, &idx) == 0)
+    switch (fsck_options.cmd)
     {
-	handlelist_remove_handle(hl, dirdata_handle, idx);
-	return 0;
-    }
-    if (alt_hl && handlelist_find_handle(alt_hl, dirdata_handle, &idx) == 0)
-    {
-	handlelist_remove_handle(alt_hl, dirdata_handle, idx);
-	return 0;
-    }
-
-    return -1;
-}
-
-int descend(PVFS_fs_id cur_fs,
-	    struct handlelist *hl,
-	    struct handlelist *alt_hl,
-	    PVFS_object_ref dir_ref,
-	    PVFS_credentials *creds)
-{
-    int i, count;
-    PVFS_ds_position token; 
-    PVFS_sysresp_readdir readdir_resp;
-    PVFS_sysresp_getattr getattr_resp;
-    PVFS_object_ref entry_ref = {0, 0};
-
-    count = 64;
-
-    token = 0;
-    do {
-        memset(&readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
-        PVFS_sys_readdir(dir_ref,
-                         (!token ? PVFS_READDIR_START : token),
-                         count,
-                         creds,
-                         &readdir_resp, NULL);
-
-        for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
-        {
-            int server_idx = 0, ret, in_main_list = 0, in_alt_list = 0;
-            char *cur_file;
-            PVFS_handle cur_handle;
-
-            cur_handle = readdir_resp.dirent_array[i].handle;
-            cur_file   = readdir_resp.dirent_array[i].d_name;
-
-            entry_ref.handle = cur_handle;
-            entry_ref.fs_id  = cur_fs;
-
-            if (handlelist_find_handle(hl, cur_handle, &server_idx) == 0)
-            {
-                in_main_list = 1;
-            }
-            if (!in_main_list &&
-                alt_hl &&
-                handlelist_find_handle(alt_hl,
-                                       cur_handle,
-                                       &server_idx) == 0)
-            {
-                in_alt_list = 1;
-            }
-            if (!in_main_list && !in_alt_list) {
-                ret = remove_directory_entry(dir_ref,
-                                             entry_ref,
-                                             cur_file,
-                                             creds);
-                assert(ret == 0);
-
-                continue;
-            }
-
-            ret = PVFS_sys_getattr(entry_ref,
-                                   PVFS_ATTR_SYS_ALL_NOHINT,
-                                   creds,
-                                   &getattr_resp, NULL);
-            if (ret != 0) {
-                ret = remove_directory_entry(dir_ref,
-                                             entry_ref,
-                                             cur_file,
-                                             creds);
-                assert(ret == 0);
-                /* handle removed from list below */
-            }
-            else
-            {
-                switch (getattr_resp.attr.objtype)
-                {
-                    case PVFS_TYPE_METAFILE:
-                        if (verify_datafiles(cur_fs,
-                                             hl,
-                                             alt_hl,
-                                             entry_ref,
-                                             getattr_resp.attr.dfile_count,
-                                             creds) < 0)
-                        {
-                            /* not recoverable; remove */
-                            printf("* File %s (%llu) is not recoverable.\n",
-                                   cur_file,
-                                   llu(cur_handle));
-
-                            /* verify_datafiles() removed the datafiles */
-                            ret = remove_object(entry_ref,
-                                                getattr_resp.attr.objtype,
-                                                creds);
-                            assert(ret == 0);
-
-                            ret = remove_directory_entry(dir_ref,
-                                                         entry_ref,
-                                                         cur_file,
-                                                         creds);
-                            assert(ret == 0);
-                        }
-                        
-                        break;
-                    case PVFS_TYPE_DIRECTORY:
-                        ret = match_dirdata(hl,
-                                            alt_hl,
-                                            entry_ref,
-                                            creds);
-                        if (ret != 0)
-                        {
-                            printf("* Directory %s (%llu) is missing DirData.\n",
-                                   cur_file,
-                                   llu(cur_handle));
-
-                            ret = remove_object(entry_ref,
-                                                getattr_resp.attr.objtype,
-                                                creds);
-                            assert(ret == 0);
-
-                            ret = remove_directory_entry(dir_ref,
-                                                         entry_ref,
-                                                         cur_file,
-                                                         creds);
-                            break;
-                        }
-
-                        if (in_main_list) {
-                            ret = descend(cur_fs,
-                                          hl,
-                                          alt_hl,
-                                          entry_ref,
-                                          creds);
-                            assert(ret == 0);
-                        }
-                        break;
-                    case PVFS_TYPE_SYMLINK:
-                        /* nothing to do */
-                        break;
-                    default:
-                        /* whatever this is, blow it away now. */
-                        ret = remove_object(entry_ref,
-                                            getattr_resp.attr.objtype,
-                                            creds);
-                        assert(ret == 0);
-                        
-                        ret = remove_directory_entry(dir_ref,
-                                                     entry_ref,
-                                                     cur_file,
-                                                     creds);
-                        assert(ret == 0);
-                        break;
-                }
-            }
-
-            /* remove from appropriate handle list */
-            if (in_alt_list) {
-                handlelist_remove_handle(alt_hl, cur_handle, server_idx);
-            }
-            else if (in_main_list) {
-                handlelist_remove_handle(hl, cur_handle, server_idx);
-            }
-        }
-        token = readdir_resp.token;
-        if (readdir_resp.pvfs_dirent_outcount)
-        {
-            free(readdir_resp.dirent_array);
-            readdir_resp.dirent_array = NULL;
-        }
-    } while (readdir_resp.pvfs_dirent_outcount == count);
-
-    if (readdir_resp.pvfs_dirent_outcount)
-    {
-        free(readdir_resp.dirent_array);
-        readdir_resp.dirent_array = NULL;
-    }
-    return 0;
-}
-
-/* verify_datafiles()
- *
- * Discovers the datafile handles for a given metafile,
- * verifies that they exist, and removes them from the handlelist.
- *
- * TODO: RENAME AS I FIGURE OUT WHAT EXACTLY I WANT THIS TO DO?
- */
-int verify_datafiles(PVFS_fs_id cur_fs,
-		     struct handlelist *hl,
-		     struct handlelist *alt_hl,
-		     PVFS_object_ref mf_ref,
-		     int df_count,
-		     PVFS_credentials *creds)
-{
-    int ret, i, server_idx = 0, error = 0;
-    PVFS_handle *df_handles;
-
-    df_handles = (PVFS_handle *) malloc(df_count * sizeof(PVFS_handle));
-    if (df_handles == NULL)
-    {
-	assert(0);
-    }
-    ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count, NULL);
-    if (ret != 0)
-    {
-	/* what does this mean? */
-	assert(0);
+    case OPT_START:
+        ret = fsck_start(&creds,fsck_options.fsid,server_count,server_addrs);
+        break;
+    case OPT_CANCEL:
+        ret = fsck_cancel(&creds,fsck_options.fsid,server_count,server_addrs);
+        break; 
+    case OPT_REPORT:
+        ret = fsck_report(&creds,fsck_options.fsid,server_count,server_addrs);
+        break;
+    case OPT_REPAIR:
+        ret = 1;
+        break;
     }
 
-    for (i = 0; i < df_count; i++)
-    {
-	int in_main_list = 0, in_alt_list = 0;
+    PVFS_sys_finalize();
 
-	if (handlelist_find_handle(hl, df_handles[i], &server_idx) == 0)
-	{
-	    in_main_list = 1;
-	}
-	else if (alt_hl &&
-		 (handlelist_find_handle(alt_hl,
-					 df_handles[i],
-					 &server_idx) == 0))
-	{
-	    in_alt_list = 1;
-	}
-
-	if ((!in_main_list) && (!in_alt_list))
-	{
-	    printf("# datafile handle %llu missing from list\n",
-		   llu(df_handles[i]));
-	    /* if possible, rebuild the datafile. */
-	    /* otherwise delete datafiles, return error to get 
-	     * handle and dirent removed.
-	     */
-	    df_handles[i] = PVFS_HANDLE_NULL;
-	    error++;
-	}
-
-    }
-
-    for (i = 0; i < df_count; i++)
-    {
-	if (df_handles[i] != PVFS_HANDLE_NULL) {
-	    /* TODO: THIS IS A HACK; NEED BETTER WAY TO REMOVE FROM
-	     * ONE OF TWO LISTS...
-	     */
-
-	    if (handlelist_find_handle(hl, df_handles[i], &server_idx) == 0)
-	    {
-		handlelist_remove_handle(hl,
-					 df_handles[i],
-					 server_idx);
-	    }
-	    else {
-		handlelist_remove_handle(alt_hl,
-					 df_handles[i],
-					 server_idx);
-	    }
-	}
-    }
-
-    free(df_handles);
-    return (error) ? -1 : 0;
-}
-
-struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
-				  struct handlelist *hl_all,
-				  PVFS_BMI_addr_t *addr_array,
-				  PVFS_credentials *creds)
-{
-    int ret;
-    int server_idx;
-    PVFS_handle handle;
-    struct handlelist *alt_hl;
-
-    /* TODO: DON'T DIRECTLY USE THESE MEMBERS... */
-    alt_hl = handlelist_initialize(hl_all->size_array,
-				   hl_all->server_ct);
-
-    /* make a pass working on directories first */
-    /* Q: do we want to try to figure out who the root of the tree
-     *    really is?  that could be tricky.  we could build this though.
-     */
-    while (handlelist_return_handle(hl_all,
-				    &handle,
-				    &server_idx) == 0)
-    {
-	PVFS_object_ref handle_ref;
-	PVFS_sysresp_getattr getattr_resp;
-
-	handle_ref.handle = handle;
-	handle_ref.fs_id  = cur_fs;
-
-	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
-			       &getattr_resp, NULL);
-	if (ret) {
-	    /* remove anything we can't get attributes on */
-	    ret = remove_object(handle_ref,
-				0,
-				creds);
-	    continue;
-	}
-
-	switch (getattr_resp.attr.objtype)
-	{
-	    case PVFS_TYPE_METAFILE:
-		/* just hold onto this for now */
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_DIRECTORY:
-		/* add to directory list */
-		printf("# looking for dirdata match to %llu.\n", llu(handle));
-
-		descend(cur_fs,
-			hl_all,
-			alt_hl,
-			handle_ref,
-			creds);
-
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_DATAFILE:
-		/* save for later */
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_DIRDATA:
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_SYMLINK:
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    default:
-		ret = remove_object(handle_ref,
-				    getattr_resp.attr.objtype,
-				    creds);
-		assert(ret == 0);
-		break;
-	}
-
-    }
-
-    return alt_hl;
-}
-
-
-struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
-				       struct handlelist *hl_all,
-				       PVFS_BMI_addr_t *addr_array,
-				       PVFS_credentials *creds)
-{
-    int ret;
-    int server_idx;
-    PVFS_handle handle;
-    struct handlelist *alt_hl;
-    static char filename[64] = "lostfile.";
-    static char dirname[64] = "lostdir.";
-
-    /* TODO: DON'T DIRECTLY USE THESE MEMBERS... */
-    alt_hl = handlelist_initialize(hl_all->size_array,
-				   hl_all->server_ct);
-
-    /* recall that return_handle removes from list */
-    while (handlelist_return_handle(hl_all,
-				    &handle,
-				    &server_idx) == 0)
-    {
-	PVFS_object_ref handle_ref;
-	PVFS_sysresp_getattr getattr_resp;
-
-	handle_ref.handle = handle;
-	handle_ref.fs_id  = cur_fs;
-
-	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
-			       &getattr_resp, NULL);
-	if (ret) {
-	    printf("warning: problem calling getattr on %llu; assuming datafile for now.\n",
-		   llu(handle));
-	    getattr_resp.attr.objtype = PVFS_TYPE_DATAFILE;
-	}
-
-	switch (getattr_resp.attr.objtype)
-	{
-	    case PVFS_TYPE_METAFILE:
-		printf("# trying to salvage %s %lld.\n",
-		       get_type_str(getattr_resp.attr.objtype),
-		       llu(handle));
-		if (verify_datafiles(cur_fs,
-				     hl_all,
-				     alt_hl,
-				     handle_ref, 
-				     getattr_resp.attr.dfile_count,
-				     creds) != 0)
-		{
-		    ret = remove_object(handle_ref,
-					getattr_resp.attr.objtype,
-					creds);
-		    assert(ret == 0);
-		}
-		else
-		{
-		    sprintf(filename + 9, "%llu", llu(handle));
-		    ret = create_dirent(laf_ref,
-					filename,
-					handle,
-					creds);
-                    assert(ret == 0);
-		}
-		break;
-	    case PVFS_TYPE_DIRECTORY:
-                /* assumption: we will often suceed in creating a new entry,
-                 * but if the file system is messed up we may not be able to
-                 * find dirdata, so match_dirdata before create_dirent */
-		if (match_dirdata(hl_all,
-				    alt_hl,
-				    handle_ref,
-				    creds)  != 0)
-                {
-                    ret = remove_object(handle_ref, 
-                            getattr_resp.attr.objtype,
-                            creds);
-                    assert(ret == 0);
-                }
-
-		sprintf(dirname + 8, "%llu", llu(handle));
-		ret = create_dirent(laf_ref,
-				    dirname,
-				    handle,
-				    creds);
-                if (ret != 0)
-                {
-                    ret = remove_object(handle_ref,
-                            getattr_resp.attr.objtype,
-                            creds);
-                }
-
-		break;
-	    case PVFS_TYPE_DATAFILE:
-#if 0
-		printf("# saving %llu (datafile) for later.\n", llu(handle));
-#endif
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_DIRDATA:
-#if 0
-		printf("# saving %llu (dirdata) for later.\n", llu(handle));
-#endif
-		handlelist_add_handle(alt_hl, handle, server_idx);
-		break;
-	    case PVFS_TYPE_SYMLINK:
-	    default:
-		/* delete on handle -- unknown type */
-		printf("* delete handle %llu (unknown type).\n",
-		       llu(handle));
-		break;
-	}
-
-    }
-
-    return alt_hl;
-}
-
-void cull_leftovers(PVFS_fs_id cur_fs,
-		    struct handlelist *hl_all,
-		    PVFS_BMI_addr_t *addr_array,
-		    PVFS_credentials *creds)
-{
-    int ret;
-    int server_idx;
-    PVFS_handle handle;
-
-    /* recall that return_handle removes from list */
-    while (handlelist_return_handle(hl_all,
-				    &handle,
-				    &server_idx) == 0)
-    {
-	PVFS_object_ref handle_ref;
-	PVFS_sysresp_getattr getattr_resp;
-
-	handle_ref.handle = handle;
-	handle_ref.fs_id  = cur_fs;
-
-	ret = PVFS_sys_getattr(handle_ref,
-			       PVFS_ATTR_SYS_ALL_NOHINT,
-			       creds,
-			       &getattr_resp, NULL);
-	if (ret) {
-	    printf("warning: problem calling getattr on %llu\n",
-		   llu(handle));
-	    getattr_resp.attr.objtype = 0;
-	}
-
-	/* metafile and directory handles should have been removed
-	 * in the previous pass.
-	 */
-	assert(getattr_resp.attr.objtype != PVFS_TYPE_METAFILE);
-	assert(getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY);
-
-	ret = remove_object(handle_ref,
-			    getattr_resp.attr.objtype,
-			    creds);
-	assert(ret == 0);
-    }
-}
-
-/********************************************/
-
-int create_lost_and_found(PVFS_fs_id cur_fs,
-			  PVFS_credentials *creds)
-{
-    int ret;
-    PVFS_object_ref root_ref;
-    PVFS_sys_attr attr;
-    PVFS_sysresp_lookup lookup_resp;
-    PVFS_sysresp_mkdir mkdir_resp;
-
-    /* if it's already there, don't bother */
-    ret = PVFS_sys_lookup(cur_fs,
-			  "/lost+found",
-			  creds,
-			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-    if (ret == 0) {
-	laf_ref = lookup_resp.ref;
-	return 0;
-    }
-
-    attr.owner = creds->uid;
-    attr.owner = creds->uid;
-    attr.group = creds->gid;
-    attr.perms = PVFS_util_translate_mode(0755, 0);
-    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-
-    ret = PVFS_sys_lookup(cur_fs,
-			  "/",
-			  creds,
-			  &lookup_resp,
-			  PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
-    assert(ret == 0);
-
-    root_ref = lookup_resp.ref;
-
-    printf("* %s creating lost+found to hold orphans.\n",
-	   fsck_opts->destructive ? "" : "not");
-
-    if (fsck_opts->destructive) {
-	ret = PVFS_sys_mkdir("lost+found",
-			     root_ref,
-			     attr,
-			     creds,
-			     &mkdir_resp, NULL);
-	if (ret == 0) {
-	    laf_ref = mkdir_resp.ref;
-	}
-    }
-    else {
-	ret = 0;
-    }
-		   
-    return ret;
-}
-
-int create_dirent(PVFS_object_ref dir_ref,
-		  char *name,
-		  PVFS_handle handle,
-		  PVFS_credentials *creds)
-{
-    int ret;
-
-    printf("* %s creating new reference to %s (%llu) in %llu.\n",
-	   fsck_opts->destructive ? "" : "not",
-	   name,
-	   llu(handle),
-	   llu(dir_ref.handle));
-
-    if (fsck_opts->destructive) {
-	ret = PVFS_mgmt_create_dirent(dir_ref,
-				      name,
-				      handle,
-				      creds, NULL);
-	if (ret != 0) {
-	    PVFS_perror("PVFS_mgmt_create_dirent", ret);
-	}
-    }
-    else {
-	ret = 0;
-    }
+    if (server_addrs) free(server_addrs);
 
     return ret;
 }
-
-int remove_directory_entry(PVFS_object_ref dir_ref,
-			   PVFS_object_ref entry_ref,
-			   char *name,
-			   PVFS_credentials *creds)
-{
-    int ret;
-
-    printf("* %s deleting directory entry for missing object %s (%llu) from dir %llu.\n",
-	   fsck_opts->destructive ? "" : "not",
-	   name,
-	   llu(entry_ref.handle),
-	   llu(dir_ref.handle));
-
-    if (fsck_opts->destructive) {
-	ret = PVFS_mgmt_remove_dirent(dir_ref,
-				      name,
-				      creds, NULL);
-	if (ret != 0) {
-	    PVFS_perror("PVFS_mgmt_remove_dirent", ret);
-	}
-    }
-    else {
-	ret = 0;
-    }
-    assert(ret == 0);
-    return 0;
-}
-
-int remove_object(PVFS_object_ref obj_ref,
-		  PVFS_ds_type obj_type,
-		  PVFS_credentials *creds)
-{
-    int ret;
-
-    printf("* %s removing %s %llu.\n",
-	   fsck_opts->destructive ? "" : "not",
-	   get_type_str(obj_type),
-	   llu(obj_ref.handle));
-
-    if (fsck_opts->destructive) {
-	ret = PVFS_mgmt_remove_object(obj_ref,
-				      creds, NULL);
-	if (ret != 0) {
-	    PVFS_perror("PVFS_mgmt_remove_object", ret);
-	}
-    }
-    else {
-	ret = 0;
-    }
-
-    assert(ret == 0);
-
-    return 0;
-}
-
-/********************************************/
-
-/* handlelist_initialize()
- *
- * handle_counts - array of counts per server
- * server_count  - number of servers
- */
-static struct handlelist *handlelist_initialize(unsigned long *handle_counts,
-						int server_count)
-{
-    int i;
-    struct handlelist *hl;
-
-    do {
-        hl = (struct handlelist *) calloc(1, sizeof(struct handlelist));
-        if (hl == NULL)
-            goto err;
-
-        hl->server_ct = server_count;
-        hl->list_array = (PVFS_handle **) calloc(server_count, sizeof(PVFS_handle *));
-        if (hl->list_array == NULL)
-        {
-            free(hl);
-            goto err;
-        }
-        hl->size_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
-        if (hl->size_array == NULL)
-        {
-            free(hl->list_array);
-            free(hl);
-            goto err;
-        }
-        hl->used_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
-        if (hl->used_array == NULL)
-        {
-            free(hl->size_array);
-            free(hl->list_array);
-            free(hl);
-            goto err;
-        }
-        for (i = 0; i < server_count; i++) 
-        {
-            hl->list_array[i] = (PVFS_handle *) calloc(handle_counts[i], sizeof(PVFS_handle));
-            if (hl->list_array[i] == NULL)
-                break;
-            hl->size_array[i] = handle_counts[i];
-            hl->used_array[i] = 0;
-        }
-        if (i != server_count)
-        {
-            int j;
-            for (j = 0; j < i; j++) {
-                free(hl->list_array[j]);
-            }
-            goto err;
-        }
-        return hl;
-    } while (0);
-err:
-    return NULL;
-}
-
-/* handlelist_add_handles()
- *
- * Adds an array of new handle values to the list of handles for
- * a particular server.
- */
-static void handlelist_add_handles(struct handlelist *hl,
-				   PVFS_handle *handles,
-				   unsigned long handle_count,
-				   int server_idx)
-{
-    unsigned long i, start_off;
-
-    start_off = hl->used_array[server_idx];
-
-    if ((hl->size_array[server_idx] - start_off) < handle_count)
-    {
-        fprintf(stderr, "server %d, exceeding number of handles it declared (%ld), currently (%ld)\n",
-                server_idx, hl->size_array[server_idx], (start_off + handle_count));
-	assert(0);
-    }
-
-    for (i = 0; i < handle_count; i++) {
-	hl->list_array[server_idx][start_off + i] = handles[i];
-    }
-
-    hl->used_array[server_idx] += handle_count;
-
-}
-
-static void handlelist_add_handle(struct handlelist *hl,
-				  PVFS_handle handle,
-				  int server_idx)
-{
-    unsigned long start_off;
-
-    start_off = hl->used_array[server_idx];
-
-    if ((hl->size_array[server_idx] - start_off) < 1)
-    {
-        fprintf(stderr, "server %d, exceeding number of handles it declared (%ld), currently (%ld)\n",
-                server_idx, hl->size_array[server_idx], (start_off + 1));
-	assert(0);
-    }
-
-    hl->list_array[server_idx][start_off] = handle;
-    hl->used_array[server_idx]++;
-}
-
-static void handlelist_finished_adding_handles(struct handlelist *hl)
-{
-    int i;
-    
-    for (i = 0; i < hl->server_ct; i++) {
-	if (hl->used_array[i] != hl->size_array[i]) {
-	    printf("warning: only found %ld of %ld handles for server %d.\n",
-		   hl->used_array[i],
-		   hl->size_array[i],
-		   i);
-	}
-    }
-}
-
-/* handlelist_find_handle()
- *
- * Looks to see if a particular {handle, server} pair exists in the
- * handlelist for some server_idx.  Returns 0 on success (presence),
- * -1 on failure (absence).  On success also fills in server_idx.
- */
-static int handlelist_find_handle(struct handlelist *hl,
-				  PVFS_handle handle,
-				  int *server_idx_p)
-{
-    int i;
-
-    for (i = 0; i < hl->server_ct; i++) {
-	int j;
-
-	for (j = 0; j < hl->used_array[i]; j++) {
-	    if (hl->list_array[i][j] == handle) {
-		*server_idx_p = i;
-		return 0;
-	    }
-	}
-    }
-
-    return -1;
-}
-
-/* handlelist_remove_handle_no_idx()
- *
- * same as handlelist_remove_handle(), but will search for the correct
- * server index
- */
-/* TODO: we could speed this up by resolving which server the handle
- * belongs to using the cached_config api
- */
-static void handlelist_remove_handle_no_idx(struct handlelist *hl,
-				     PVFS_handle handle)
-{
-    unsigned long i;
-    int server_idx = 0;
-    int found = 0;
-
-    for(server_idx = 0; server_idx<hl->server_ct; server_idx++)
-    {
-        for (i = 0; i < hl->used_array[server_idx]; i++)
-        {
-            if (hl->list_array[server_idx][i] == handle)
-            {
-                if (i < (hl->used_array[server_idx] - 1))
-                {
-                    /* move last entry to this position before decrement */
-                    hl->list_array[server_idx][i] =
-                        hl->list_array[server_idx][hl->used_array[server_idx]-1];
-                    
-                }
-                hl->used_array[server_idx]--;
-                found = 1;
-                break;
-            }
-        }
-        if(found)
-        {
-            break;
-        }
-    }
-
-    if (!found) {
-	printf("! problem removing %llu.\n", llu(handle));
-    }
-}
-
-static void handlelist_remove_handle(struct handlelist *hl,
-				     PVFS_handle handle,
-				     int server_idx)
-{
-    unsigned long i;
-
-    assert(server_idx < hl->server_ct);
-
-    for (i = 0; i < hl->used_array[server_idx]; i++)
-    {
-	if (hl->list_array[server_idx][i] == handle)
-	{
-	    if (i < (hl->used_array[server_idx] - 1))
-	    {
-		/* move last entry to this position before decrement */
-		hl->list_array[server_idx][i] =
-		    hl->list_array[server_idx][hl->used_array[server_idx]-1];
-		
-	    }
-	    hl->used_array[server_idx]--;
-	    break;
-	}
-    }
-
-    if (i > hl->used_array[server_idx]) {
-	printf("! problem removing %llu/%d.\n", llu(handle), server_idx);
-    }
-
-    assert(i <= hl->used_array[server_idx]); /* <= because of decrement! */
-}
-
-/* handlelist_return_handle()
- *
- * Places some handle still in the handlelist in the location pointed
- * to by handle_p, removing it from the list.
- *
- * Returns 0 on success, -1 on failure (out of handles).
- */
-static int handlelist_return_handle(struct handlelist *hl,
-				    PVFS_handle *handle_p,
-				    int *server_idx_p)
-{
-    int i;
-
-    for (i = 0; i < hl->server_ct; i++)
-    {
-	if (hl->used_array[i] > 0) {
-	    *handle_p = hl->list_array[i][hl->used_array[i]-1];
-	    hl->used_array[i]--;
-	    *server_idx_p = i;
-	    return 0;
-	}
-    }
-    return -1;
-}
-
-static void handlelist_finalize(struct handlelist **hlp)
-{
-    int i;
-    struct handlelist *hl = *hlp;
-
-    for (i=0; i < hl->server_ct; i++)
-    {
-	free(hl->list_array[i]);
-    }
-
-    free(hl->list_array);
-    free(hl->size_array);
-    free(hl->used_array);
-
-    free(hl);
-
-    *hlp = NULL;
-
-    return;
-}
-
-#if 0
-static void handlelist_print(struct handlelist *hl)
-{
-    unsigned long i;
-
-    /* NOTE: REALLY ONLY PRINTS FOR ONE SERVER RIGHT NOW */
-    for (i=0; i < hl->used_array[0]; i++) {
-	printf("%llu ", llu(hl->list_array[0][i]));
-    }
-    printf("\n");
-}
-#endif
-
-
-/**********************************************/
-
-static struct options *parse_args(int argc, char *argv[])
-{
-    int one_opt = 0, len = 0, ret = -1;
-    struct options *opts = NULL;
-
-    /* create storage for the command line options */
-    opts = (struct options *) malloc(sizeof(struct options));
-    if (opts == NULL)
-    {
-	return NULL;
-    }
-    memset(opts, 0, sizeof(struct options));
-
-    /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, "apynvVm:")) != EOF){
-	switch(one_opt)
-        {
-	    case 'a':
-	    case 'p':
-	    case 'y':
-		opts->destructive = 1;
-		break;
-	    case 'n':
-		opts->destructive = 0;
-		break;
-            case 'V':
-                printf("%s\n", PVFS2_VERSION);
-                exit(0);
-            case 'v':
-		opts->verbose++;
-		break;
-	    case 'm':
-		len = strlen(optarg)+1;
-		opts->mnt_point = (char *) malloc(len + 1);
-		if (opts->mnt_point == NULL)
-		{
-		    free(opts);
-		    return NULL;
-		}
-		memset(opts->mnt_point, 0, len+1);
-		ret = sscanf(optarg, "%s", opts->mnt_point);
-		if (ret < 1)
-		{
-		    free(opts);
-		    return NULL;
-		}
-		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
-		 * function expects some trailing segments or at least
-		 * a slash off of the mount point
-		 */
-		strcat(opts->mnt_point, "/");
-		opts->mnt_point_set = 1;
-		break;
-	    case '?':
-		usage(argc, argv);
-		exit(EXIT_FAILURE);
-	}
-    }
-
-    if(!opts->mnt_point_set)
-    {
-	free(opts);
-	return NULL;
-    }
-
-    return opts;
-}
-
-
-static void usage(int argc, char** argv)
-{
-    fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-vV] [-m fs_mount_point]\n",
-	argv[0]);
-    fprintf(stderr, "Display information about contents of file system.\n");
-    fprintf(stderr, "  -V              print version and exit\n");
-    fprintf(stderr, "  -v              verbose operation\n");
-    fprintf(stderr, "  -n              answer \"no\" to all questions\n");
-    fprintf(stderr, "  -y              answer \"yes\" to all questions\n");
-    fprintf(stderr, "  -p              automatically repair with no questions\n");
-    fprintf(stderr, "  -a              equivalent to \"-p\"\n");
-
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
-	argv[0]);
-    return;
-}
-
-static char *get_type_str(int type)
-{
-    char *ret = "Unknown Type";
-    static char *type_strs[] =
-    {
-        "None", "Metafile", "Datafile",
-        "Directory", "Symlink", "DirData"
-    };
-
-    switch(type)
-    {
-        case PVFS_TYPE_NONE:
-            ret = type_strs[0];
-            break;
-        case PVFS_TYPE_METAFILE:
-            ret = type_strs[1];
-            break;
-        case PVFS_TYPE_DATAFILE:
-            ret = type_strs[2];
-            break;
-        case PVFS_TYPE_DIRECTORY:
-            ret = type_strs[3];
-            break;
-        case PVFS_TYPE_SYMLINK:
-            ret = type_strs[4];
-            break;
-        case PVFS_TYPE_DIRDATA:
-            ret = type_strs[5];
-            break;
-    }
-    return ret;
-}
-
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 expandtab
- */

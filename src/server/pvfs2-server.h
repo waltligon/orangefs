@@ -404,6 +404,7 @@ struct PINT_server_fsck_op
     PVFS_BMI_addr_t      server_addr;
     int                  parallel_sm;
     int                  handle_count;
+    int                  dirent_count;
     PVFS_error          *error_array;
     PVFS_error          *status_array;
     PVFS_handle          handle;

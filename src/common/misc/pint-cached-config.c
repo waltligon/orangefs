@@ -1787,6 +1787,49 @@ static int load_handle_lookup_table(
     return(0);
 }
 
+int PINT_cached_config_get_server_name_from_addr(
+    PVFS_fs_id fsid,
+    PVFS_BMI_addr_t addr,
+    int max_len,
+    char *server_name)
+{
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    int ret;
+    int i;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+        return -PVFS_EINVAL;
+    }
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    ret = cache_server_array(fsid);
+    if (ret < 0)
+    {
+        return ret;
+    }
+
+    for (i=0; i<cur_config_cache->server_count; i++)
+    {
+        if (cur_config_cache->server_array[i].addr == addr)
+        {
+            strncpy(server_name,
+                    cur_config_cache->server_array[i].addr_string,
+                    max_len);
+            break;
+        }
+    }
+
+    return 0;
+}
+
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -84,6 +84,8 @@
 #define NUM_DFILES_REQ_KEYSTR   "nd\0"
 #define NUM_DFILES_REQ_KEYLEN   3
 
+#define TROVE_FSCK_KEYSTR "trove-control-key\0"
+
 /* Optional xattrs have "user.pvfs2." as a prefix */
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
 #define SPECIAL_DIST_NAME_KEYLEN         21

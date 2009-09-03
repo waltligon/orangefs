@@ -148,6 +148,7 @@ typedef enum PVFS_mgmt_fsck_phase_e
 {
     FSCK_ERROR         = 0,
     FSCK_PHASE_CHECK,
+    FSCK_PHASE_PRECREATE,
     FSCK_PHASE_ORPHAN,
     FSCK_PHASE_BSTREAM,
     FSCK_PHASE_REPAIR,
@@ -160,7 +161,8 @@ typedef enum PVFS_fsck_op_e
 {
     FSCK_OP_MOVE   = 1,
     FSCK_OP_DELETE,
-    FSCK_OP_CREATE
+    FSCK_OP_CREATE,
+    FSCK_OP_BCREATE,
 } PVFS_fsck_op;
 #define encode_PVFS_fsck_op encode_enum
 #define decode_PVFS_fsck_op decode_enum

@@ -71,6 +71,9 @@ struct PVFS_ds_dirdata_attr_s
  * for 32 and 64 bit users. Consequently, this means we would require a
  * migrate utility that will convert from one to the other by reading from
  * the dspace and writing it out to the new dspace.
+ *
+ * maintenance:
+ *   DS_MAINT_FSCK - used while fsck is running
  */
 struct PVFS_ds_attributes_s
 {
@@ -80,7 +83,7 @@ struct PVFS_ds_attributes_s
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
-    int32_t   __pad1;
+    int32_t   maintenance;
 
     PVFS_time ctime;
     PVFS_time mtime;
@@ -94,6 +97,11 @@ struct PVFS_ds_attributes_s
     } u;
 } ;
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
+
+/*
+ * PVFS_ds_attributes.maintenance Bits
+ */
+#define DS_MAINT_FSCK  (1<<0)
 
 #define PVFS_ds_init_time(__dsa)                        \
 do {                                                    \
