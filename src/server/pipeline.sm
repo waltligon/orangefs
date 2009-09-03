@@ -32,8 +32,12 @@
 #define DO_ALLREDUCE 104
 #define DO_KMEANS 105
 
-#define NUM_COORDS 10 /* FIXME: should come from client */
-#define TOT_OBJS 1000000 /* FIXME: should come from client */
+/* FIXME: These should come from client */
+#define NUM_CLUSTERS 20
+//#define NUM_COORDS 10 /* out10 */
+//#define TOT_OBJS 1000000 /* out10 */
+#define NUM_COORDS 18 /* edge17695.bin */ 
+#define TOT_OBJS 17695 /* edge17695.bin */
 
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -837,7 +841,7 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i, j;
     struct PINT_server_op *kmeans_op;
-    int numClusters = 20; /* FIXME: should come from client? */
+    int numClusters = NUM_CLUSTERS; /* FIXME: should come from client? */
     int numCoords = NUM_COORDS; /* FIXME: should come from client? */
 
     kmeans_op = malloc(sizeof(*kmeans_op));
@@ -921,6 +925,7 @@ static PINT_sm_action cleanup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js
     int remaining;
     PVFS_error tmp_err;
     struct PINT_server_op *kmeans_op;
+    int i, j;
 
     kmeans_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
             &remaining);
@@ -928,6 +933,17 @@ static PINT_sm_action cleanup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js
 		 "pipeline: nested sm (kmeans) returned error code: %d\n", tmp_err);
     //memcpy(s_op->u.pipeline.buffer, kmeans_op->u.kmeans.send_buf, FIXME);
     //free(kmeans_op->u.kmeans.clusters[0]);
+#if 0
+    /* print out the result: clusters[][] */
+    for (i=0; i<kmeans_op->u.kmeans.numClusters; i++) 
+	for (j=0; j<kmeans_op->u.kmeans.numCoords; j++) 
+	    gossip_debug(GOSSIP_IO_DEBUG, "clusters[%d][%d]=%f\n", i, j,
+			 kmeans_op->u.kmeans.clusters[i][j]);
+
+    /* print out the membership of each object */
+    for (j=0; j<kmeans_op->u.kmeans.numObjs; j++)
+	gossip_debug(GOSSIP_IO_DEBUG, "%d: %d\n", j, kmeans_op->u.kmeans.membership[j]);
+#endif 
     free(kmeans_op->u.kmeans.clusters);
     free(kmeans_op);
 

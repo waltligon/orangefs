@@ -83,6 +83,7 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
+BUILD_CUDA = @BUILD_CUDA@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -172,13 +173,16 @@ endif
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@
+NVCC = @BUILD_CU@ # sson
 LD = @CC@
 BUILD_CC = @BUILD_CC@
+BUILD_CU = @BUILD_CU@ # sson
 BUILD_LD = @BUILD_CC@
 BUILD_CFLAGS = @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
+CUFLAGS = --compiler-options -fno-strict-aliasing -I/home/sson/NVIDIA_CUDA_SDK/common/inc
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += -lm @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -189,7 +193,7 @@ PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
-DEPLIBS := @LIBS@
+DEPLIBS := @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -311,7 +315,7 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
+SERVERLIBS = -lpvfs2-server @LIBS@ -lcudart @DB_LIB@ -lpthread 
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -415,7 +419,9 @@ endif
 
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
-CFLAGS += $(GCC_CFLAGS)
+ifndef BUILD_CUDA # sson
+CFLAGS += $(GCC_CFLAGS) 
+endif # sson
 endif
 ifdef INTELC
 CFLAGS += $(INTEL_CFLAGS)
@@ -558,6 +564,7 @@ ifdef BUILD_SERVER
     # SERVERDEPENDS is a list of dependency files for the server
     SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
     # SERVERBINOBJS is a list of objects not in SERVEROBJS to put into the server
+    CUDAOBJS := $(patsubst %.cu,%.o, $(filter %.cu,$(CUDASRC))) # sson
     SERVERBINOBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERBINSRC)))
     SERVERBINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERBINSRC)))
 endif
@@ -690,7 +697,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # SHORT_NAME and the object
 
 # rule for building the pvfs2 server
-$(SERVER): $(SERVERBINOBJS) lib/libpvfs2-server.a 
+$(SERVER): $(SERVERBINOBJS) $(CUDAOBJS) lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
@@ -791,6 +798,12 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 %.o: %.c
 	$(Q) "  CC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
+# sson
+# default rule for building CUDA objects 
+%.o: %.cu
+	$(Q) "  NVCC		$@"
+	$(E)$(NVCC) $(CUFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects 
 %.po: %.c
@@ -917,7 +930,7 @@ clean::
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
-		$(STATECOMP) $(STATECOMPOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(CUDAOBJS) \
 		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE

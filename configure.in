@@ -19,8 +19,8 @@ CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
 PVFS2_VERSION_SUB=1
-#PVFS2_PRE=""
-PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_PRE=""
+#PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -67,6 +67,12 @@ if test "x$GCC" = "x"; then
 	AC_MSG_ERROR(no)
 fi
 
+# sson
+AC_MSG_CHECKING([for required nvcc])
+if test "x$NVCC" = "x"; then
+	AC_MSG_ERROR(no)
+fi
+
 CFLAGS=$USR_CFLAGS
 
 AC_PROG_CPP
@@ -74,7 +80,6 @@ AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
-
 
 AC_MSG_CHECKING([for required Math::BigInt perl module])
 perl -e "use Math::BigInt" 2>&1 > /dev/null
@@ -86,13 +91,16 @@ fi
 
 if test $host != $build; then
 	AC_CHECK_PROGS(BUILD_CC, gcc cc)
+	AC_CHECK_PROGS(BUILD_NVCC, nvcc) # sson
 else
 	BUILD_CC=$CC
+	BUILD_CU=$NVCC # sson
 	BUILD_CFLAGS=$BUILD_CFLAGS
 	BUILD_LDFLAGS=$BUILD_LDFLAGS
 fi
 
 AC_SUBST(BUILD_CC)
+AC_SUBST(BUILD_CU) # sson
 AC_SUBST(BUILD_CFLAGS)
 AC_SUBST(BUILD_LDFLAGS)
 
@@ -174,8 +182,10 @@ else
     BUILD_SERVER=""
 fi],
     BUILD_SERVER=1
+    BUILD_CUDA=1 # sson
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
+AC_SUBST(BUILD_CUDA) # sson
 
 AC_ARG_WITH(openssl,
 	[  --with-openssl=<dir>    Build with openssl (default=/usr)

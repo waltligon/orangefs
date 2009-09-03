@@ -1,4 +1,5 @@
 BUILD_SERVER = @BUILD_SERVER@
+BUILD_CUDA = @BUILD_CUDA@ # sson
 PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
 
 ifdef BUILD_SERVER
@@ -51,13 +52,26 @@ ifdef BUILD_SERVER
 
 	# c files that should be added to server library
 	SERVERSRC += \
-		$(SERVER_SMCGEN)
+		$(SERVER_SMCGEN) \
 
 	# server only file
 	SERVERSRC += $(DIR)/check.c
 
+ifdef BUILD_CUDA
+	CUDASRC := \
+		$(DIR)/singleGPU.cu \
+		$(DIR)/kernel_updateClusterCentres.cu \
+		$(DIR)/kernel_computeError.cu \
+		$(DIR)/kernel_countClusterPoints.cu \
+		$(DIR)/kernel_computeDist.cu \
+		$(DIR)/gpu_computeDist.cu \
+		$(DIR)/gpu_computeError.cu \
+		$(DIR)/gpu_countClusterPoints.cu \
+		$(DIR)/gpu_updateClusterCentres.cu
+endif
+
 	# track generate .c files to remove during dist clean, etc. 
-		SMCGEN += $(SERVER_SMCGEN)
+	SMCGEN += $(SERVER_SMCGEN)
 
 	# server code that will be linked manually, not included in library
 	SERVERBINSRC += \
