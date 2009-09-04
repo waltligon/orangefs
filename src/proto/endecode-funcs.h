@@ -95,7 +95,7 @@
 	*(pptr) += roundup8(4 + len + 1); \
 	memset(*(pptr)-pad, 0, pad); \
     } else { \
-	*(u_int32_t *) *(pptr) = 0; \
+	*(u_int32_t *) (*(pptr)+4) = 0; \
 	*(pptr) += 8; \
     } \
 } while (0)
