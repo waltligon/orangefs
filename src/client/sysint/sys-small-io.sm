@@ -32,6 +32,10 @@ static int small_io_completion_fn(void * user_args,
                                   struct PVFS_server_resp * resp_p,
                                   int index);
 
+enum {
+  MIRROR_RETRY = 132
+};
+
 %%
 
 nested machine pvfs2_client_small_io_sm
@@ -46,7 +50,14 @@ nested machine pvfs2_client_small_io_sm
     state xfer_msgpairs
     {
         jump pvfs2_msgpairarray_sm;
-        default => cleanup;
+        default => check_for_retries;
+    }
+
+    state check_for_retries
+    {
+        run small_io_check_for_retries;
+        MIRROR_RETRY => xfer_msgpairs;
+        default => cleanup;  /*no mirroring or done*/ 
     }
 
     state cleanup 
@@ -77,19 +88,32 @@ static PINT_sm_action small_io_setup_msgpairs(
     PVFS_handle datafile_handle;
     int regions = 0;
     PINT_sm_msgpair_state *msg_p;
+    uint32_t server_nr;
 
     js_p->error_code = 0;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    /* initialize msgarray */
+    /* initialize msgarray. one msgpair for each handle with data. */
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.io.datafile_count);
     if(ret < 0)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    /*initialize small_io_ctx array.  one context for each handle in the file.*/
+    sm_p->u.io.small_io_ctx = malloc(attr->u.meta.dfile_count *
+                                     sizeof(*sm_p->u.io.small_io_ctx));
+    if (!sm_p->u.io.small_io_ctx)
+    {
+        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(sm_p->u.io.small_io_ctx,0,sizeof(*sm_p->u.io.small_io_ctx));
+
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
@@ -124,7 +148,7 @@ static PINT_sm_action small_io_setup_msgpairs(
                                          sm_p->u.io.file_req_offset + 
                                          result.bytemax);
 
-/*change this*/ file_data.server_nr = sm_p->u.io.datafile_index_array[i]; 
+            file_data.server_nr = sm_p->u.io.datafile_index_array[i]; 
 
             result.segs = 0;
             result.bytes = 0;
@@ -162,7 +186,7 @@ static PINT_sm_action small_io_setup_msgpairs(
             sm_p->object_ref.fs_id,
             datafile_handle,
             sm_p->u.io.io_type,
-            sm_p->u.io.datafile_index_array[i], /*change this*/
+            sm_p->u.io.datafile_index_array[i], 
             attr->u.meta.dfile_count,
             attr->u.meta.dist,
             sm_p->u.io.file_req,
@@ -173,7 +197,20 @@ static PINT_sm_action small_io_setup_msgpairs(
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->object_ref.handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;  /*change this*/
+
+        /*if we are processing a read request and the source file has mirrored
+         *handles, then bypass msgpairarray's retry mechanism.  SMALL-IO will
+         *prepare another set of msgpairs using the mirrors and then retry.
+        */
+        if (sm_p->u.io.io_type == PVFS_IO_READ &&
+            attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        {
+            msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;  
+        }
+        else
+        {
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        }
         msg_p->comp_fn = small_io_completion_fn;
 
         ret = PINT_cached_config_map_to_server(
@@ -185,6 +222,10 @@ static PINT_sm_action small_io_setup_msgpairs(
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
         }
+
+        /*store the original datahandle for later use.*/
+        server_nr = msg_p->req.u.small_io.server_nr;
+        sm_p->u.io.small_io_ctx[server_nr].original_datahandle = msg_p->handle;
     }
 
     js_p->error_code = 0;
@@ -205,6 +246,9 @@ static int small_io_completion_fn(void * user_args,
 {
     struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_sm_msgpair_state *msg_p = &(sm_p->msgarray_op.msgarray[index]);
+    PINT_client_small_io_ctx *ctx = 
+         &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
     int ret = 0;
 
     assert(resp_p->op == PVFS_SERV_SMALL_IO);
@@ -308,27 +352,185 @@ static int small_io_completion_fn(void * user_args,
         }
     } /*if PVFS_IO_READ*/
 
-    /* 
-    PINT_sm_msgarray_op *msgarray_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgpair);
-    for (i=0; i<sm_p->u.io.datafile_count; i++)
-    {
-        if (sm_p->u.io.datafile_index_array[i] == 
-            msg_p->req.u.small_io.server_nr)
-        {
-            sm_p->u.io.dfile_size_array[i] =
-            resp_p->u.small_io.bstream_size;
-            break;
-        }
-    }
-    */
-
     sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;
 
     sm_p->u.io.total_size += resp_p->u.small_io.result_size;
+
+    /* Let's SMALL-IO know that the msg completed. */
+    ctx->msg_completed = 1;
  
     return 0;
 }
+
+
+static int small_io_check_for_retries( struct PINT_smcb *smcb
+                                     , job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s..\n",__func__);
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta = &(attr->u.meta);
+    PINT_client_small_io_ctx *ctx = NULL;
+    PINT_sm_msgpair_state *msgarray = sm_p->msgarray_op.msgarray;
+    PINT_sm_msgpair_state *msg = NULL;
+
+    uint32_t retry_msg_count = 0;
+    uint32_t index = 0;
+    uint32_t copies = 0;
+    uint32_t server_nr = 0;
+    int i   = 0;
+    int ret = 0;
+
+    /*if we are processing a write request, then msgpairarray handles retries.
+     *if we are processing a read and the source file is mirrored, then
+     *SMALL-IO handles the retries.
+    */
+    if (sm_p->u.io.io_type == PVFS_IO_WRITE ||
+        ((attr->mask & PVFS_ATTR_META_MIRROR_DFILES) != 
+          PVFS_ATTR_META_MIRROR_DFILES))
+    {
+       return SM_ACTION_COMPLETE;
+    }
+
+    /* Do any messages need to be retried? */
+    for (i=0; i<sm_p->msgarray_op.count; i++)
+    {
+        server_nr = msgarray[i].req.u.small_io.server_nr;
+        ctx = &sm_p->u.io.small_io_ctx[server_nr];
+        if (ctx->msg_completed)
+            continue;
+        retry_msg_count++;
+    }
+
+    /* no retries needed */
+    if (!retry_msg_count)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* do we have any retries available? */
+    if (sm_p->u.io.retry_count >= sm_p->msgarray_op.params.retry_limit)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* okay. let's setup new msgpairs to retry. we will modify the incomplete 
+     * msg pairs stored in msgarray and then copy them into a new msgarray 
+     * before calling msgpairarray.sm.
+    */
+    for (i=0; i<sm_p->msgarray_op.count; i++)
+    {
+        msg = &msgarray[i];
+        server_nr = msg->req.u.small_io.server_nr;
+        ctx = &sm_p->u.io.small_io_ctx[server_nr];
+     
+        /* don't process completed messages */
+        if (ctx->msg_completed)
+           continue;
+
+        /* for incomplete messages, cleanup memory, if necessary */
+        if (msg->encoded_req.buffer_list[0])
+        {
+            PINT_encode_release(&msg->encoded_req,PINT_ENCODE_REQ);
+        }
+        if (msg->encoded_resp_p)
+        {
+            BMI_memfree(msg->svr_addr
+                       ,msg->encoded_resp_p
+                       ,msg->max_resp_sz
+                       ,BMI_RECV);
+        }
+        
+        /* Use the original datahandle? */
+        if (ctx->retry_original)
+        {
+            ctx->retry_original = 0;
+            msg->handle                = ctx->original_datahandle;
+            msg->req.u.small_io.handle = ctx->original_datahandle;
+            msg->svr_addr = 0;
+            ret = PINT_cached_config_map_to_server(&msg->svr_addr
+                                                  ,msg->handle
+                                                  ,msg->fs_id);
+            if (ret)
+            {
+               gossip_lerr("Unable to determine the server address "
+                           "for this handle (%llu)"
+                           ,llu(msg->handle));
+               js_p->error_code = ret;
+               return SM_ACTION_COMPLETE;
+            }
+            continue;
+        }/*end retry_original*/
+
+        /* get next mirrored handle.  note:  if a mirrored handle is zero, then
+         * this means that the creation of this mirrored object failed for its
+         * particular server.  if so, then get the next valid handle.  as a 
+         * last resort, retry the original handle.
+        */
+        copies = ctx->current_copies_count;
+        for (;copies < meta->mirror_copies_count; copies++)
+        {
+            index = (copies*meta->dfile_count) + server_nr;
+            if (meta->mirror_dfile_array[index] != 0)
+            {  /* we have found a valid mirrored handle */
+               msg->handle = meta->mirror_dfile_array[index];
+               break;
+            }
+        }
+
+        /* if we haven't found a valid mirrored handle, retry the original
+         * datahandle.
+        */
+        if ( copies == meta->mirror_copies_count )
+        {
+           msg->handle = ctx->original_datahandle;
+           ctx->retry_original = 0;
+           ctx->current_copies_count = 0;
+           sm_p->u.io.retry_count++;
+           msg->req.u.small_io.handle = ctx->original_datahandle;
+           msg->svr_addr = 0;
+           ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                               ,msg->handle
+                                               ,msg->fs_id);
+           if (ret)
+           {
+              gossip_lerr("Unable to determine the server address "
+                          "for this handle (%llu)"
+                          ,llu(msg->handle));
+              js_p->error_code = ret;
+              return SM_ACTION_COMPLETE;
+           }
+           continue;
+        }/*end if we have to use the original*/
+
+        /* Otherwise, use the discovered mirrored handle */
+        msg->req.u.small_io.handle = msg->handle;
+        msg->svr_addr = 0;
+        if (ret)
+        {
+           gossip_lerr("Unable to determine the server address "
+                       "for this handle (%llu)"
+                       ,llu(msg->handle));
+           js_p->error_code = ret;
+           return SM_ACTION_COMPLETE;
+        }
+
+        /* and setup for the next retry event */
+        ctx->current_copies_count++;
+        if (ctx->current_copies_count == meta->mirror_copies_count)
+        {
+           ctx->current_copies_count = 0;
+           ctx->retry_original = 1;
+           sm_p->u.io.retry_count++;
+        }
+    }/*end for each msgpair*/
+    
+
+    js_p->error_code=MIRROR_RETRY;
+    return SM_ACTION_COMPLETE;
+}/*end small_io_check_for_retries*/
+
+
 
 static int small_io_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)

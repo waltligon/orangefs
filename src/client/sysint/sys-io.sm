@@ -9,7 +9,6 @@
  *
  *  PVFS2 system interface routines for reading and writing files.
  */
-//testing cvs
 
 #include <string.h>
 #include <assert.h>
