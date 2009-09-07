@@ -211,6 +211,7 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    const char *parent_attr =  SPECIAL_PARENT_KEYSTR;
 
     if (js_p->error_code)
     {
@@ -224,11 +225,31 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
                  llu(s_op->u.mkdir.dirent_handle));
 
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    /* ADD PARENT HERE */
+    if( (s_op->key_a = calloc(2, sizeof(PVFS_ds_keyval))) == 0 )
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
 
-    s_op->val.buffer = &s_op->u.mkdir.dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    if( (s_op->val_a = calloc(2, sizeof(PVFS_ds_keyval))) == 0 )
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    s_op->val_a[0].buffer = &s_op->u.mkdir.dirent_handle;
+    s_op->val_a[0].buffer_sz = sizeof(PVFS_handle);
+
+    /* parent of dirent keyval */
+    s_op->key_a[1].buffer = (void *)parent_attr;
+    s_op->key_a[1].buffer_sz = SPECIAL_PARENT_KEYLEN;
+    s_op->val_a[1].buffer = &(s_op->req->u.mkdir.parent_handle);
+    s_op->val_a[1].buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
         GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%llu) "
@@ -238,10 +259,10 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     /* we don't sync here since we're going to anyway in the following
      * operation (setting the dirent count).
      */
-    ret = job_trove_keyval_write(
+    ret = job_trove_keyval_write_list(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
-        &s_op->key, &s_op->val, 
-        0,
+        s_op->key_a, s_op->val_a, 
+        2, 0,
         NULL, smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
@@ -273,6 +294,16 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if( s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+    if( s_op->val_a )
+    {
+        free(s_op->val_a);
+    }
     return(server_state_machine_complete(smcb));
 }
 

@@ -372,6 +372,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
         sm_p->u.mkdir.sys_attr,
+        sm_p->object_ref.handle,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;

@@ -27,7 +27,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 2
+#define PVFS2_PROTO_MINOR 3
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -162,17 +162,18 @@ struct PVFS_servreq_create
 {
     PVFS_fs_id fs_id;
     PVFS_object_attr attr;
-
+    PVFS_handle meta_parent;
     int32_t num_dfiles_req;
     /* NOTE: leave layout as final field so that we can deal with encoding
      * errors */
     PVFS_sys_layout layout;
 };
-endecode_fields_5_struct(
+endecode_fields_6_struct(
     PVFS_servreq_create,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_object_attr, attr,
+    PVFS_handle, meta_parent,
     int32_t, num_dfiles_req,
     PVFS_sys_layout, layout)
 
@@ -183,6 +184,7 @@ endecode_fields_5_struct(
                                  __creds,                                  \
                                  __fsid,                                   \
                                  __attr,                                   \
+                                 __meta_parent,                            \
                                  __num_dfiles_req,                         \
                                  __layout,                                 \
                                  __hints)                                  \
@@ -193,6 +195,7 @@ do {                                                                       \
     (__req).credentials = (__creds);                                       \
     (__req).hints = (__hints);                                             \
     (__req).u.create.fs_id = (__fsid);                                     \
+    (__req).u.create.meta_parent = (__meta_parent);                        \
     (__req).u.create.num_dfiles_req = (__num_dfiles_req);                  \
     (__attr).objtype = PVFS_TYPE_METAFILE;                                 \
     mask = (__attr).mask;                                                  \
@@ -648,6 +651,7 @@ struct PVFS_servreq_mkdir
 {
     PVFS_fs_id fs_id;      /* file system */
     PVFS_object_attr attr; /* initial attributes */
+    PVFS_handle parent_handle; /* handle of parent dirent */
 
     /*
       an array of handle extents that we use to suggest to
@@ -657,11 +661,12 @@ struct PVFS_servreq_mkdir
     */
     PVFS_handle_extent_array handle_extent_array;
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_object_attr, attr,
+    PVFS_handle, parent_handle,
     PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
@@ -671,6 +676,7 @@ endecode_fields_4_struct(
                                 __fs_id,               \
                                 __ext_array,           \
                                 __attr,                \
+                                __parent_handle,       \
                                 __hints)               \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
@@ -685,6 +691,7 @@ do {                                                   \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\
+    (__req).u.mkdir.parent_handle = __parent_handle;    \
 } while (0)
 
 struct PVFS_servresp_mkdir

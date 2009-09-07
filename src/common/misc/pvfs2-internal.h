@@ -96,6 +96,10 @@
 #define SPECIAL_MIRROR_PARAMS_KEYSTR	"mirror\0"
 #define SPECIAL_MIRROR_PARAMS_KEYLEN	18
 
+/* system xattrs*/ 
+#define SPECIAL_PARENT_KEYSTR           "system.pvfs2.parent\0"
+#define SPECIAL_PARENT_KEYLEN           20
+
 #define IO_MAX_REGIONS 64
 
 #endif /* PVFS2_INTERNAL_H */

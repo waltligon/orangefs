@@ -442,6 +442,7 @@ static PINT_sm_action create_create_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.create.attr,
+        sm_p->object_ref.handle,
         sm_p->u.create.num_data_files,
         sm_p->u.create.layout,
         sm_p->hints);
