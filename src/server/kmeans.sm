@@ -27,9 +27,12 @@
 #include "trove.h"
 #include "kmeans.h"
 
-//#include <cuda.h>
-//#include <cuda_runtime.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
+extern void initGPU (float* objects, int numDataPoints,
+		     int numDimensions, int numClusters);
+extern void freeGPU (void);
 extern void singleGPU (float* objects, int numDataPoints, 
 		       int numDimensions, float* clusters, 
 		       int numClusters, int* membership, 
@@ -304,12 +307,13 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
     free(bcast_op->u.bcast.send_buf);
     free(bcast_op->u.bcast.recv_buf);
     free(bcast_op);
-#if 0
+
+#if USE_GPU
     /* initialize GPU device and allocate memory on it */
     if(device_initialized == 0) {
 	/* initDevice(argc, argv, numObjs, numCoords, numClusters) */
-	initDevice(0, NULL, s_op->u.kmeans.numObjs, 
-		   s_op->u.kmeans.numCoords, s_op->u.kmeans.numClusters); 
+	initGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
+		s_op->u.kmeans.numCoords, s_op->u.kmeans.numClusters);
 	/* FIXME: I don't know why this is called twice */
 	device_initialized = 1;
     }
@@ -634,7 +638,9 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     else {
 	js_p->error_code = 0;
-	//freeData();
+#if USE_GUP
+	freeGPU();
+#endif
     }
     
     return SM_ACTION_COMPLETE;

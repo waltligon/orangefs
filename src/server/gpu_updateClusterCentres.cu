@@ -22,8 +22,8 @@ void gpuUpdateClusterCentres(
   int num_blocks_y	= numDimensions;
 
   /* Kernel Execution Parameters */
-  dim3 grid_cluster(num_blocks_x, num_blocks_y);
-  dim3 block_cluster(num_threads, 1, 1);
+  dim3 grid_cluster(num_blocks_x, num_blocks_y); /* (128, 18) */
+  dim3 block_cluster(num_threads, 1, 1); /* (128, 1, 1) */
   unsigned int sharedMem_cluster = sizeof(float) * numClusters * num_threads;
 
   /* During reduction each x-block takes a cluster and each y-block takes a dimension */
@@ -33,16 +33,16 @@ void gpuUpdateClusterCentres(
 
   unsigned int sharedMem_clusterReduce = sizeof(float) * num_threads;
 
-  fprintf(stderr, "Update Cluster Centres ... [START]\n");
-  fprintf(stderr, "	[INFO] GRID Config Cluster	: (%d, %d)\n", num_blocks_x, num_blocks_y);
-  fprintf(stderr, "	[INFO] BLOCK Config Cluster	:	(%d, 1, 1)\n", num_threads);
-  fprintf(stderr, "	[INFO] GRID Config Cluster Reduce	: (%d, %d)\n", numClusters, numDimensions);
-  fprintf(stderr, "	[INFO] BLOCK Config Cluster Reduce:	(%d, 1, 1)\n", num_threads);
+  //fprintf(stderr, "Update Cluster Centres ... [START]\n");
+  //fprintf(stderr, "	[INFO] GRID Config Cluster	: (%d, %d)\n", num_blocks_x, num_blocks_y);
+  //fprintf(stderr, "	[INFO] BLOCK Config Cluster	:	(%d, 1, 1)\n", num_threads);
+  //fprintf(stderr, "	[INFO] GRID Config Cluster Reduce	: (%d, %d)\n", numClusters, numDimensions);
+  //fprintf(stderr, "	[INFO] BLOCK Config Cluster Reduce:	(%d, 1, 1)\n", num_threads);
 
   /**/
   // Get an array with size num_blocks_x * numClusters * numDimensions
   float* d_clusterCentresSum = NULL;
-  float* h_clusterCentresSum = malloc(sizeof(float)*numClusters*numDimensions);
+  float* h_clusterCentresSum = (float *)malloc(sizeof(float)*num_blocks_x*numClusters*numDimensions);
   cudaMalloc( (void**) &d_clusterCentresSum, sizeof(float) * num_blocks_x * numClusters * numDimensions);
 
   /* Kernel Invokation */

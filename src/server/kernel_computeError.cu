@@ -6,11 +6,11 @@ __global__ void kernelError(
 			    int* d_newMembership,
 			    int* d_oldMembership,
 			    int numDataPoints,
-			    int* d_patialError
+			    float* d_partialError
 			    )
 {
   /* Shared Memory size = blockSize */
-  extern __shared__ int s_partialError[];
+  extern __shared__ float s_partialError[];
 
   /* Threads IDs*/
   unsigned int tidx = threadIdx.x;
@@ -57,18 +57,18 @@ __global__ void kernelError(
 
   /* Write the results to a remperoray array for further reduction */
   if(tidx == 0){
-    d_patialError[block_col] = s_partialError[0];
+    d_partialError[block_col] = s_partialError[0];
   }
 }
 
 template <unsigned int blockSize>
 __global__ void kernelErrorReduce(
-				  int* d_patialError,
+				  float* d_partialError,
 				  int numPartialErrorPoints,
-				  int* d_error
+				  float* d_error
 				  )
 {
-  extern __shared__ int s_error[];
+  extern __shared__ float s_error[];
 
   /* Thread IDs*/
   unsigned int tidx = threadIdx.x;
@@ -78,7 +78,7 @@ __global__ void kernelErrorReduce(
 
   /* Copy data to the shared memory */
   for(unsigned int i = tidx; i < numPartialErrorPoints; i += blockSize)
-    s_error[tidx] += d_patialError[i];
+    s_error[tidx] += d_partialError[i];
 
   __syncthreads();
 

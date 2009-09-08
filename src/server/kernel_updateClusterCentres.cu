@@ -38,7 +38,7 @@ __global__ void kernelCluster(
 
   /* Analyse each cluster at a time */
   // [MODIFY] You can analyse all the clusters at the same time too 
-  for(unsigned int cluster = 0; cluster < numClusters; cluster++){
+  for(unsigned int cluster = 0; cluster < numClusters; cluster++) {
     __syncthreads();
 
     // Get thread gets each data point
@@ -88,7 +88,7 @@ __global__ void kernelCluster(
       if(blockSize >= 8) s_clusterCentres[base_index + tidx] += s_clusterCentres[base_index + tidx + 4];
       if(blockSize >= 4) s_clusterCentres[base_index + tidx] += s_clusterCentres[base_index + tidx + 2];
       if(blockSize >= 2) s_clusterCentres[base_index + tidx] += s_clusterCentres[base_index + tidx + 1];
-    }//End if tidx<32
+    } //End if tidx<32
 
     // Commit the cluster centres, you still have lots of data to add as you are not adding across blocks, just within blocks
     if(tidx == 0){
@@ -168,7 +168,7 @@ __global__ void kernelClusterReduce(
   // Commit the cluster assignments
   // [FIX!!!] Remember we are still not dividing the summation with the number of clusters
   if(tidx == 0)
-    d_clusterCentresReduced[(gridDim.y * block_col) + block_row] = s_clusterCentres[0]/d_clusterHistogram[block_col];
+    d_clusterCentresReduced[(gridDim.y * block_col) + block_row] = s_clusterCentres[0];///d_clusterHistogram[block_col];
 
 }
 

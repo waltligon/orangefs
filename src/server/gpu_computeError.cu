@@ -30,10 +30,10 @@ void gpuComputeError(int* d_newMembership,
   //printf("	[INFO] GRID Config Error Reduce	: (1, 1)\n");
   //printf("	[INFO] BLOCK Config Error Reduce:	(%d, 1, 1)\n", num_threads);
 
-  int* d_error = NULL;
-  int* d_partialError = NULL;
-  cudaMalloc( (void**) &d_error, sizeof(int) );
-  cudaMalloc( (void**) &d_partialError, sizeof(int) * num_blocks_x);
+  float* d_error = NULL;
+  float* d_partialError = NULL;
+  cudaMalloc( (void**) &d_error, sizeof(float) );
+  cudaMalloc( (void**) &d_partialError, sizeof(float) * num_blocks_x);
 
   /* Kernel Execution */
   switch(num_threads)
@@ -85,7 +85,7 @@ void gpuComputeError(int* d_newMembership,
 
     }
 
-  cudaMemcpy( error, d_error, sizeof(int), cudaMemcpyDeviceToHost);
+  cudaMemcpy(error, d_error, sizeof(float), cudaMemcpyDeviceToHost);
 				
   //printf("Error Computation ... [DONE]\n");
 }
