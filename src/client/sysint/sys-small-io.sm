@@ -57,7 +57,7 @@ nested machine pvfs2_client_small_io_sm
     {
         run small_io_check_for_retries;
         MIRROR_RETRY => xfer_msgpairs;
-        default => cleanup;  /*no mirroring or done*/ 
+        default => cleanup;  /*no mirroring, done, or out of retries*/ 
     }
 
     state cleanup 
@@ -367,18 +367,23 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
                                      , job_status_s *js_p)
 {
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s..\n",__func__);
+
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_object_attr *attr = &(sm_p->getattr.attr);
     PVFS_metafile_attr *meta = &(attr->u.meta);
     PINT_client_small_io_ctx *ctx = NULL;
-    PINT_sm_msgpair_state *msgarray = sm_p->msgarray_op.msgarray;
+    PINT_sm_msgarray_op *mop = &sm_p->msgarray_op;
+    PINT_sm_msgpair_state *msgarray = mop->msgarray;
     PINT_sm_msgpair_state *msg = NULL;
+    PINT_sm_msgpair_state *new_msg = NULL;
+    PINT_sm_msgarray_op new_mop = {{0},0,0,{0}};
 
     uint32_t retry_msg_count = 0;
     uint32_t index = 0;
     uint32_t copies = 0;
     uint32_t server_nr = 0;
     int i   = 0;
+    int j   = 0;
     int ret = 0;
 
     /*if we are processing a write request, then msgpairarray handles retries.
@@ -393,13 +398,12 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
     }
 
     /* Do any messages need to be retried? */
-    for (i=0; i<sm_p->msgarray_op.count; i++)
+    for (i=0; i<mop->count; i++)
     {
         server_nr = msgarray[i].req.u.small_io.server_nr;
         ctx = &sm_p->u.io.small_io_ctx[server_nr];
-        if (ctx->msg_completed)
-            continue;
-        retry_msg_count++;
+        if (!ctx->msg_completed)
+            retry_msg_count++;
     }
 
     /* no retries needed */
@@ -409,7 +413,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
     }
 
     /* do we have any retries available? */
-    if (sm_p->u.io.retry_count >= sm_p->msgarray_op.params.retry_limit)
+    if (sm_p->u.io.retry_count >= mop->params.retry_limit)
     {
         return SM_ACTION_COMPLETE;
     }
@@ -418,7 +422,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
      * msg pairs stored in msgarray and then copy them into a new msgarray 
      * before calling msgpairarray.sm.
     */
-    for (i=0; i<sm_p->msgarray_op.count; i++)
+    for (i=0; i<mop->count; i++)
     {
         msg = &msgarray[i];
         server_nr = msg->req.u.small_io.server_nr;
@@ -441,7 +445,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
                        ,BMI_RECV);
         }
         
-        /* Use the original datahandle? */
+        /* Should we use the original datahandle? */
         if (ctx->retry_original)
         {
             ctx->retry_original = 0;
@@ -506,6 +510,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         /* Otherwise, use the discovered mirrored handle */
         msg->req.u.small_io.handle = msg->handle;
         msg->svr_addr = 0;
+        ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                            ,msg->handle
+                                            ,msg->fs_id);
         if (ret)
         {
            gossip_lerr("Unable to determine the server address "
@@ -524,8 +531,51 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
            sm_p->u.io.retry_count++;
         }
     }/*end for each msgpair*/
-    
 
+    /* Now, create a new msgpair array and populate from the above modified
+     * messages.
+    */
+    ret = PINT_msgpairarray_init(&new_mop,retry_msg_count);
+    if (ret)
+    {
+        gossip_lerr("Unable to initialize msgarray_op:new_op\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* populate the new msgarray with the modified messages */
+    for (i=0, j=0; i<mop->count && j<new_mop.count; i++)
+    {
+        msg = &msgarray[i];
+        server_nr = msg->req.u.small_io.server_nr;
+        ctx = &sm_p->u.io.small_io_ctx[server_nr];
+     
+        /* don't populate with completed messages */
+        if (ctx->msg_completed)
+           continue;
+
+        new_msg = &new_mop.msgarray[j];
+        j++;
+
+        new_msg->fs_id       = msg->fs_id;
+        new_msg->handle      = msg->handle;
+        new_msg->comp_fn     = msg->comp_fn;
+        new_msg->svr_addr    = msg->svr_addr;
+        new_msg->req         = msg->req;
+        new_msg->enc_type    = msg->enc_type;
+        new_msg->max_resp_sz = msg->max_resp_sz;
+    }/*end for*/
+
+    /* Destroy the old msgarray and substitute with the new. Params are left
+     * in tact.
+    */
+    PINT_msgpairarray_destroy(mop);
+    mop->count    = new_mop.count;
+    mop->msgarray = new_mop.msgarray;
+    mop->msgpair  = new_mop.msgpair;
+
+    /* Push the msgarray_op and jump to msgpairarray.sm */
+    PINT_sm_push_frame(smcb,0,mop);
     js_p->error_code=MIRROR_RETRY;
     return SM_ACTION_COMPLETE;
 }/*end small_io_check_for_retries*/
