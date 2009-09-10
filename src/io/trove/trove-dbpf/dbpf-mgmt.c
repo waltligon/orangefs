@@ -1078,7 +1078,7 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->data_path, new_coll_id);
     ret = mkdir(path_name, 0755);
-    if (ret != 0)
+    if (ret != 0 && strcmp(sto_p->data_path, sto_p->meta_path))
     {
         gossip_err("mkdir failed on data collection directory %s\n", 
 		   path_name);
@@ -1087,7 +1087,7 @@ int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->meta_path, new_coll_id);
     ret = mkdir(path_name, 0755);
-    if (ret != 0)
+    if (ret != 0 && strcmp(sto_p->data_path, sto_p->meta_path))
     {
 	gossip_err("mkdir failed on metadata collection directory %s\n",
 		   path_name);
