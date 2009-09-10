@@ -622,7 +622,8 @@ static PINT_sm_action write_keyvals(
         }
     }
 
-    /* start with 2 keyvals: the distribution and the datafile handles */
+    /* start with 3 keyvals: the distribution and the datafile handles 
+     * and the parent pointer. this is cleaned up by dspace_remove_keyval. */
     int keyval_count = 3;
 
     if(s_op->resp.u.create.stuffed)

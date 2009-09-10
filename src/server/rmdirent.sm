@@ -178,6 +178,8 @@ static int rmdirent_remove_directory_entry(
     return ret;
 }
 
+
+
 static PINT_sm_action rmdirent_check_for_req_dir_update(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {

@@ -544,7 +544,7 @@ struct PINT_server_getvalue_op
     uint32_t match_count;
     uint32_t count;
     uint32_t original_count;
-    uint32_t target_i;
+    uint32_t target_index;
     TROVE_handle *unknown_handle;
     PVFS_dirent *unknown_dirent;
 };

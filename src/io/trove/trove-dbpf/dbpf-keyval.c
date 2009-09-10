@@ -387,34 +387,22 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
     int ret = 0, path_len=0, i=0;
     TROVE_handle k_handle=0, v_handle=0, root_handle=0;
     DBT key, data, pkey;
-    DBC *dbc_p=NULL;
+    DBC *dbc_s=NULL;
     struct dbpf_keyval_db_entry key_entry;
     char * tmp_path=NULL;
 
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    memset(&pkey, 0, sizeof(pkey));
-    memset(&key_entry, 0, sizeof(key_entry));
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                 "dbpf_keyval_read_value_path: enter, count: %d\n",
+                 op_p->u.v_path.count);
 
     /* get root handle of collection */
     PINT_cached_config_get_root_handle(op_p->coll_p->coll_id, &root_handle); 
 
-    key.data = &(k_handle);
-    key.ulen = key.size = sizeof(TROVE_handle);
-
-    data.data = &(v_handle);
-    data.size = data.ulen = sizeof(TROVE_handle);
-
-    pkey.data = &key_entry;
-    pkey.size = pkey.ulen = sizeof( struct dbpf_keyval_db_entry );
-
-    key.flags = data.flags = pkey.flags = DB_DBT_USERMEM;
-
     if( (op_p->coll_p->keyval_secondary_db->cursor(
-         op_p->coll_p->keyval_secondary_db, NULL, &dbc_p, 0)) != 0 )
+         op_p->coll_p->keyval_secondary_db, NULL, &dbc_s, 0)) != 0 )
     {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "[DBPF KEYVAL]: Error getting cursor for "
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                     "dbpf_keyval_read_value_path: Error getting cursor for "
                      "keyval_secondary: %s\n", db_strerror(ret));
         ret = -TROVE_EFAULT;
         return ret;
@@ -422,6 +410,30 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 
     for( i=0; i < op_p->u.v_path.count; i++ )
     {
+        /* initialize keys */
+        memset(&key, 0, sizeof(DBT));
+        memset(&data, 0, sizeof(DBT));
+        memset(&pkey, 0, sizeof(DBT));
+        memset(&key_entry, 0, sizeof(struct dbpf_keyval_db_entry));
+
+        key.data = &(k_handle);
+        key.ulen = key.size = sizeof(TROVE_handle);
+
+        data.data = &(v_handle);
+        data.size = data.ulen = sizeof(TROVE_handle);
+
+        pkey.data = &key_entry;
+        pkey.size = pkey.ulen = sizeof( struct dbpf_keyval_db_entry );
+
+        key.flags = data.flags = pkey.flags = DB_DBT_USERMEM;
+
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                     "dbpf_keyval_read_value_path: looking up path for "
+                     "dirent: (%llu)(%s), handle: (%llu)\n",
+                     llu(op_p->u.v_path.dirent_p[i].handle),
+                     op_p->u.v_path.dirent_p[i].d_name,
+                     llu(op_p->u.v_path.handle_p[i]));
+        /* if handle pointer is empty, set it to the requested handle */
         if( op_p->u.v_path.handle_p[i] == 0 )
         {
             op_p->u.v_path.handle_p[i] = op_p->u.v_path.dirent_p[i].handle;
@@ -429,20 +441,25 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
 
         if( op_p->u.v_path.handle_p[i] == root_handle )
         {
-            continue;
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                         "dbpf_keyval_read_value_path: already at root handle, "
+                         "continuing\n");
+            continue; /* all done */
         }
 
         memcpy( key.data, &(op_p->u.v_path.handle_p[i]), 
             sizeof(TROVE_handle));
 
-        ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
+        ret = dbc_s->c_pget(dbc_s, &key, &pkey, &data, DB_SET);
         while( ret == 0 )
         {
             /* item was found, move 'parent' key to key for next query */
-            memcpy(key.data, &(key_entry.handle), sizeof(TROVE_handle));
+            memcpy( key.data, &(key_entry.handle), sizeof(TROVE_handle));
+            memcpy( &(op_p->u.v_path.dirent_p[i].handle), &(key_entry.handle), 
+                sizeof(TROVE_handle));
             memcpy( &(op_p->u.v_path.handle_p[i]), &(key_entry.handle), 
                 sizeof(TROVE_handle));
-    
+   
             key.ulen = key.size = sizeof(TROVE_handle);
     
             /* put path associated with parent into path if not a de */
@@ -479,22 +496,68 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
             }
 
             memset(&key_entry, 0, sizeof(key_entry));
-            ret = dbc_p->c_pget(dbc_p, &key, &pkey, &data, DB_SET);
+            ret = dbc_s->c_pget(dbc_s, &key, &pkey, &data, DB_SET);
         } /* end building path for local handles, reached one we didn't have */
     
         if ( (ret != DB_NOTFOUND) && (key_entry.handle != root_handle) )
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "[DBPF KEYVAL]: Error looking up handle: %s\n",
-                         db_strerror(ret));
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                         "dbpf_keyval_read_value_path: Error looking up "
+                         "handle: %s\n", db_strerror(ret));
             goto return_error;
         }
+
+        /* the lookup has gone as far as it can, we need to lookup
+         * the parent attribute to set the next handle in the query
+         * if we aren't at the root right now! */
+        if( key_entry.handle != root_handle )
+        {
+            memset(&key_entry, 0, sizeof(key_entry));
+            pkey.size = pkey.ulen = sizeof(TROVE_handle) + 
+                SPECIAL_PARENT_KEYLEN;
+
+            key_entry.handle = op_p->u.v_path.handle_p[i];
+            strncpy(key_entry.key, SPECIAL_PARENT_KEYSTR, 
+                SPECIAL_PARENT_KEYLEN );
+
+            /* the parent key is held in the keyval database with 
+             * <handle>system.pvfs2.parent -> parent handle. 
+             * look it up, store in handle_p */
+            ret = op_p->coll_p->keyval_db->get( op_p->coll_p->keyval_db, NULL, 
+                &pkey, &data, 0);
+
+            if( ret != 0 )
+            {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                             "dbpf_keyval_read_value_path: Error looking up "
+                             "parent (%llu): %s\n", op_p->u.v_path.handle_p[i], 
+                             db_strerror(ret));
+                ret = -dbpf_db_error_to_trove_error(ret);
+            }
+            else
+            {
+                op_p->u.v_path.handle_p[i] = *(TROVE_handle *)data.data;
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                             "dbpf_keyval_read_value_path: parent of (%llu) is "
+                             "(%llu)\n", llu(key_entry.handle), 
+                             llu(op_p->u.v_path.handle_p[i]));
+            }
+        } //for
+
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                     "dbpf_keyval_read_value_path: returning dirent_p[%d]: "
+                     "(%llu)(%s), handle_p[%d]: (%llu)\n",
+                     i, llu(op_p->u.v_path.dirent_p[i].handle),
+                     op_p->u.v_path.dirent_p[i].d_name,
+                     i, llu(op_p->u.v_path.handle_p[i]));
     }
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                 "dbpf_keyval_read_value_path: exit\n");
     return 1;
 
 return_error:
-    dbc_p->c_close(dbc_p);
+    dbc_s->c_close(dbc_s);
     return ret;
 }
 
@@ -688,7 +751,8 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
 
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "[DBPF KEYVAL]: Doing pget with key: %s/(%d)(%d), "
+                 "[DBPF KEYVAL]: dbpf_keyval_read_value: "
+                 "pget: key: %s/(%d)(%d), "
                  "pkey (%d)(%d), (%d)(%d), initial position: %llu on db"
                  "%s\n", 
                  (char *)key.data, key.ulen, key.size, pkey.ulen, pkey.size,
@@ -730,10 +794,14 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
     ret = query_p->c_pget(query_p, &key, &pkey, &data, cursor_flags);
     if( ret == DB_NOTFOUND )  /* no records matching request */
     {
+        /* not an error, just set counts and leave. we're done regardless
+         * of what the token is */
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: dbpf_keyval_"
                      "read_value: No matching keys found in secondary index\n");
         (*op_p->u.v_query.position_p) = TROVE_ITERATE_END;
-        ret = -dbpf_db_error_to_trove_error(ret);
+        ret = 1;
+        (*op_p->u.v_query.count) = 0;
+        (*op_p->u.v_query.match_count) = 0;
         goto return_error;
     }
 
@@ -788,7 +856,7 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
 
     /* cursor is now in position to return requested number of records */
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "[DBPF KEYVAL]: dbpf_keyval_read_value: Cursor at key "
+                 "[DBPF KEYVAL]: dbpf_keyval_read_value: cursor starting at "
                  "%llu/%s -> %s\n", llu(key_entry.handle), key_entry.key, 
                  (char *)data.data);
 
@@ -822,8 +890,8 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
                 key_entry.handle;
     
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
-                 "[DBPF KEYVAL]: dbpf_keyval_read_value: storing "
-                 "count: %u, handle: %llu, key: %s, value: %s\n",
+                 "[DBPF KEYVAL]: dbpf_keyval_read_value: match "
+                 "(%u): (%llu) k/v: (%s)/(%s)\n",
                  (*op_p->u.v_query.count), 
                  llu(op_p->u.v_query.dirent_array[
                     (*op_p->u.v_query.count)].handle),
@@ -2854,8 +2922,16 @@ int PINT_trove_dbpf_keyval_secondary_callback(
         /* copy value directly after key */
         memcpy((key_data + strlen(k->key)), pdata->data, pdata->size);
         skey->ulen = skey->size = strlen(k->key) + pdata->size;
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                     "PINT_trove_dbpf_keyval_secondary_callback "
+                     "adding secondary key (%s) (%d)\n", (char *)key_data, 
+                     skey->ulen);
     }
-    else if((pdata->size == sizeof(TROVE_handle)) && (strcmp("dh", k->key)!=0))
+    else if((pdata->size == sizeof(TROVE_handle)) && 
+            (strcmp("dh", k->key)!=0) &&
+            ! (pkey->size>=sizeof(TROVE_handle)+SPECIAL_PARENT_KEYLEN &&
+              strncmp(k->key, SPECIAL_PARENT_KEYSTR, SPECIAL_PARENT_KEYLEN)==0)
+           )
     {
         /* for items with a value size of 8 and attribute not "dh" 
          * (an initial pass at only adding<dir handle><filename> -> <handle> )
@@ -2870,6 +2946,11 @@ int PINT_trove_dbpf_keyval_secondary_callback(
         memset(key_data, 0, (pdata->size));
         memcpy(key_data, pdata->data, pdata->size );
         skey->ulen = skey->size = pdata->size;
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                     "PINT_trove_dbpf_keyval_secondary_callback "
+                     "adding secondary key (%llu) (%d) for (%llu)(%s) pkey\n", 
+                     llu(*(uint64_t *)key_data), skey->ulen, llu(k->handle),
+                     k->key);
     }
     else
     {

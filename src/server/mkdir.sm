@@ -225,7 +225,6 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
                  llu(s_op->u.mkdir.dirent_handle));
 
-    /* ADD PARENT HERE */
     if( (s_op->key_a = calloc(2, sizeof(PVFS_ds_keyval))) == 0 )
     {
         js_p->error_code = -PVFS_ENOMEM;

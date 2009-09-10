@@ -63,12 +63,12 @@ machine pvfs2_get_value_sm
     state perms
     {
         jump pvfs2_prelude_attr_sm;
-        default => check_resp;
+        default => check_perm_resp;
     }
 
-    state check_resp
+    state check_perm_resp
     {
-        run getvalue_check_resp;
+        run getvalue_check_perm_resp;
         FAILED_PERMS => remove_result;
         MORE_TARGETS => assign_target;
         default => setup_get_paths;
@@ -140,7 +140,7 @@ static PINT_sm_action getvalue_setup_resp(
     s_op->u.getvalue.count = s_op->req->u.getvalue.count;
     s_op->u.getvalue.original_count = s_op->req->u.getvalue.count;
     s_op->u.getvalue.match_count = 0;
-    s_op->u.getvalue.target_i = 0;
+    s_op->u.getvalue.target_index = 0;
 
     /* initialize response structs and buffers */
     s_op->resp.u.getvalue.token = TROVE_ITERATE_END;
@@ -183,7 +183,7 @@ static PINT_sm_action getvalue_setup_resp(
 }
 
 /*
- *
+ * keyval call to handle query 
  */
 static PINT_sm_action getvalue_read_value(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -226,6 +226,10 @@ static PINT_sm_action getvalue_read_value(
     return ret;
 }
 
+/*
+ * getvalue_assign_target
+ * assign a single handle to s_op->targets so permissions can be checked 
+ */
 static PINT_sm_action getvalue_assign_target(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -250,25 +254,21 @@ static PINT_sm_action getvalue_assign_target(
         return SM_ACTION_COMPLETE;
     }
 
-    assert( s_op->u.getvalue.target_i < s_op->u.getvalue.count );
-    gossip_debug(GOSSIP_GETVALUE_DEBUG,
-                 "[GETVALUE]: assign_target: target_i: %d, count: %d, "
-                 "token: %llu\n",
-                 s_op->u.getvalue.target_i, s_op->u.getvalue.count,
-                 s_op->resp.u.getvalue.token);
+    assert( s_op->u.getvalue.target_index < s_op->u.getvalue.count );
 
     s_op->target_handle = 
-        s_op->resp.u.getvalue.dirent[ s_op->u.getvalue.target_i ].handle;
+        s_op->resp.u.getvalue.dirent[ s_op->u.getvalue.target_index ].handle;
     s_op->target_fs_id = s_op->req->u.getvalue.fs_id;
 
     js_p->error_code = TARGET_ASSIGNED;
     return SM_ACTION_COMPLETE;
 }
 
-
-/* getvalue_check_resp()
+/* 
+ * getvalue_check_perm_resp()
+ * look at error_code from permission check, set error_code appropriately
  */
-static PINT_sm_action getvalue_check_resp(
+static PINT_sm_action getvalue_check_perm_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -283,7 +283,7 @@ static PINT_sm_action getvalue_check_resp(
     else
     {
         /* if next result is, change error code to say so */
-        if( ++s_op->u.getvalue.target_i < s_op->u.getvalue.count )
+        if( ++s_op->u.getvalue.target_index < s_op->u.getvalue.count )
         {
             js_p->error_code = MORE_TARGETS;
         }
@@ -295,6 +295,11 @@ static PINT_sm_action getvalue_check_resp(
     return SM_ACTION_COMPLETE;
 }
 
+/*
+ * getvalue_remove_result
+ * remove a record, for permission check failure, from the result set shifting
+ * pointers and counters as needed
+ */
 static PINT_sm_action getvalue_remove_result(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -302,15 +307,17 @@ static PINT_sm_action getvalue_remove_result(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "[DBPF KEYVAL]: remove_result enter target_i: %u, "
-                 "count: %u\n", s_op->u.getvalue.target_i,
+                 "[DBPF KEYVAL]: remove_result enter target_index: %u, "
+                 "count: %u\n", s_op->u.getvalue.target_index,
                  s_op->u.getvalue.count);
+
+    js_p->error_code = 0;
 
     /* squish result array (key, val, dirent) to remove result with failed
      * permission check. key, val, dirent are whole array malloc'd,
      * buffers for key and val are one large malloc too so no leaks with
      * memory copies. this is not cheap but the best I could figur' */
-    for( i = (s_op->u.getvalue.target_i+1); i < s_op->u.getvalue.count; i++)
+    for( i = (s_op->u.getvalue.target_index+1); i < s_op->u.getvalue.count; i++)
     {
         memcpy( &(s_op->resp.u.getvalue.key[i-1]), 
                 &(s_op->resp.u.getvalue.key[i]), sizeof(PVFS_ds_keyval) );
@@ -335,8 +342,9 @@ static PINT_sm_action getvalue_remove_result(
         s_op->u.getvalue.match_count--;
     }
 
-    if( s_op->u.getvalue.count == 1 )
-    {   /* removing last record */
+    /* removing last record, set token appropriately, don't let count < 0 */
+    if( s_op->u.getvalue.count <= 1 )
+    { 
         s_op->u.getvalue.count = 0;
         s_op->resp.u.getvalue.token = TROVE_ITERATE_END;
     }
@@ -345,25 +353,26 @@ static PINT_sm_action getvalue_remove_result(
         s_op->u.getvalue.count--;
     }
 
-    js_p->error_code = 0;
-    if( s_op->u.getvalue.target_i < s_op->u.getvalue.count )
+    /* more work to do, tell the state machine */
+    if( s_op->u.getvalue.target_index < s_op->u.getvalue.count )
     {
         js_p->error_code = MORE_TARGETS;
     }
 
+    /* update the response here in the the event we're all done */
     s_op->resp.u.getvalue.count = s_op->u.getvalue.count;
     s_op->resp.u.getvalue.match_count = s_op->u.getvalue.match_count;
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG,
-                 "[GETVALUE]: remove_result exit, target_i: %d, "
-                 "count: %d\n", s_op->u.getvalue.target_i,
+                 "[GETVALUE]: remove_result exit, target_index: %d, "
+                 "count: %d\n", s_op->u.getvalue.target_index,
                  s_op->resp.u.getvalue.count);
     return SM_ACTION_COMPLETE;
 }
 
 /*
  * getvalue_setup_resp()
- * Set up the response - allocate needed resources
+ * Set up the request to get path for the handle - allocate needed resources
  */
 static PINT_sm_action getvalue_setup_get_paths(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -372,17 +381,9 @@ static PINT_sm_action getvalue_setup_get_paths(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_credentials creds;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: setup_get_paths: enter\n");
     js_p->error_code = GET_PATHS;
-
-    /* zero out path informatin in dirent entries, it seems to pickup cruft
-     * along the way for some reason */
-    for( i=0; i < s_op->resp.u.getvalue.count; i++ )
-    {
-        memset(s_op->resp.u.getvalue.dirent[i].d_name, 0, PVFS_NAME_MAX+1);
-    }
 
     /* if the query doesn't want paths, save the effort */
     if( PVFS_KEYVAL_QUERY_UNMASK_PATHS(s_op->req->u.getvalue.query_type) == 
@@ -391,7 +392,8 @@ static PINT_sm_action getvalue_setup_get_paths(
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
-    
+   
+    /* allocate memory specific to getting path information */
     if( (s_op->u.getvalue.unknown_handle = calloc( s_op->resp.u.getvalue.count,
                                                   sizeof(TROVE_handle) )) == 0)
     {
@@ -405,7 +407,7 @@ static PINT_sm_action getvalue_setup_get_paths(
         return SM_ACTION_COMPLETE;
     }
 
-    /* move results into memory for get-path call */
+    /* assign handle information for get-path call */
     for( i=0; i < s_op->resp.u.getvalue.count; i++ )
     {
         s_op->u.getvalue.unknown_handle[i] = 
@@ -418,17 +420,15 @@ static PINT_sm_action getvalue_setup_get_paths(
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
 
-    s_op->msgarray_op.params.job_timeout = user_opts->client_job_bmi_timeout;
-    s_op->msgarray_op.params.retry_delay = user_opts->client_retry_delay_ms;
-    s_op->msgarray_op.params.retry_limit = user_opts->client_retry_limit;
-    s_op->msgarray_op.params.quiet_flag = 1;
+    PINT_serv_init_msgarray_params(s_op, s_op->target_fs_id);
 
     msg_p->fs_id = s_op->target_fs_id;
     msg_p->handle = s_op->u.getvalue.unknown_handle[0];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = path_comp_fn;
 
-    /* send initial request to meta server of handle */
+    /* send initial request to meta server of handle, just pick handle owner of
+     * handle 0. */
     ret = PINT_cached_config_map_to_server( &msg_p->svr_addr, msg_p->handle,
                                              msg_p->fs_id );
     PINT_util_gen_credentials(&creds);
@@ -492,8 +492,8 @@ static int path_comp_fn(void *v_p,
 
     for(i=0; i < resp_p->u.getpath.count; i++ )
     {
-        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]:  handle/path %d: "
-                     "(%llu):(%s)\n", i, 
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path response: "
+                     "handle/path %d: (%llu):(%s)\n", i, 
                      llu(resp_p->u.getpath.dirent[i].handle),
                      resp_p->u.getpath.dirent[i].d_name); 
         memcpy(s_op->resp.u.getvalue.dirent[i].d_name,
@@ -502,7 +502,6 @@ static int path_comp_fn(void *v_p,
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: exit\n");
     return 0;
 }
-
 
 PINT_GET_OBJECT_REF_DEFINE(getvalue);
 

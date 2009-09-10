@@ -133,7 +133,6 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
         gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
                    ret, srv_count);
     }
-
     printf("Number of servers: %d\n", srv_count);
 
     if( (token = calloc(srv_count, sizeof(PVFS_ds_position)) ) == 0 )
@@ -194,6 +193,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     printf("Asking for %u records\n", opt->count );
 
+    all_end = 0;
     while( all_end < srv_count)
     {
         all_end = 0;
@@ -216,52 +216,44 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
             printf("Call returned, meta server %d says the  query "
                    "matched %d records\n", i, resp_getvalue[i].match_count);
         }
-        if (ret < 0)
+
+        all_end = 0;
+        for( i = 0; i < srv_count; i++ )
         {
-            PVFS_perror("PVFS_sys_getvalue", ret);
-            return -1;
-        }
-        else
-        {
-            all_end = 0;
-            for( i = 0; i < srv_count; i++ )
-            {
-                token[i] = resp_getvalue[i].token;
-                printf("Meta (%d) returned %d records, token (%llu)\n", i, 
+            token[i] = resp_getvalue[i].token;
+            printf("Meta (%d) returned %d records, token (%llu)\n", i, 
                     resp_getvalue[i].count, llu(resp_getvalue[i].token));
 
-                /* have to prepend local mount point to path returned
-                 * from server */
-                for( j = 0; j < resp_getvalue[i].count; j++ )
-                {
-                    lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
-                             strlen(opt->pvfs_root) + 1;
-                    if( ( local_path = realloc(local_path, lpath_len+1) ) == 0 )
-                    {   
-                        printf("malloc error\n");
-                        return -1;
-                    }
-
-                    memset(local_path, 0, lpath_len+1);
-                    strncpy(local_path, opt->pvfs_root, strlen(opt->pvfs_root));
-                    strncpy(local_path+strlen(opt->pvfs_root ), 
-                          resp_getvalue[i].dirent[j].d_name, 
-                          strlen(resp_getvalue[i].dirent[j].d_name) );
-               
-                    key_entry = resp_getvalue[i].key[j].buffer;
-                    printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
-                        local_path, llu(key_entry->handle), 
-                        token[i], key_entry->key, 
-                        (char *)resp_getvalue[i].val[j].buffer);
+             /* have to prepend local mount point to path returned
+             * from server */
+            for( j = 0; j < resp_getvalue[i].count; j++ )
+            {
+                lpath_len = strlen(resp_getvalue[i].dirent[j].d_name) +
+                         strlen(opt->pvfs_root) + 1;
+                if( ( local_path = realloc(local_path, lpath_len+1) ) == 0 )
+                {   
+                    printf("malloc error\n");
+                    return -1;
                 }
-                all_end += (token[i] == PVFS_ITERATE_END)? 1 : 0;
+
+                memset(local_path, 0, lpath_len+1);
+                strncpy(local_path, opt->pvfs_root, strlen(opt->pvfs_root));
+                strncpy(local_path+strlen(opt->pvfs_root ), 
+                      resp_getvalue[i].dirent[j].d_name, 
+                      strlen(resp_getvalue[i].dirent[j].d_name) );
+           
+                key_entry = resp_getvalue[i].key[j].buffer;
+                printf("\t%s (handle: %llu) (next token: %llu) (%s->%s) \n",
+                    local_path, llu(key_entry->handle), 
+                    token[i], key_entry->key, 
+                    (char *)resp_getvalue[i].val[j].buffer);
             }
+            all_end += (token[i] == PVFS_ITERATE_END)? 1 : 0;
         }
     }
 
     for( i=0; i < srv_count; i++ )
     {
-
         for( j=0; j < opt->count; j++ )
         {
             free(resp_getvalue[i].key[j].buffer);
@@ -288,7 +280,7 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
  */
 static struct opts* parse_args(int argc, char* argv[])
 {
-    char flags[] = "ck:v:n:q:";
+    char flags[] = "cpk:v:n:q:";
     int one_opt = 0;
 
     struct opts* tmp_opts = NULL;
@@ -326,6 +318,9 @@ static struct opts* parse_args(int argc, char* argv[])
                 break;
             case 'n':
                 tmp_opts->count = atoi( optarg );
+                break;
+            case 'p':
+                tmp_opts->query |= PVFS_KEYVAL_RESULT_NO_PATHS;
                 break;
             case 'q':
                 if( strncmp( "LT", optarg, 2) == 0 )
@@ -381,7 +376,9 @@ static struct opts* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, 
-        "Usage: %s -k <key> -v <val> -n <num> [-c] -q [LT|LE|EQ|GE|GT|NT|PEQ] <pvfs fs root>\n", 
+        "Usage: %s -k <key> -v <val> -n <num> [-c] [-p] -q [LT|LE|EQ|GE|GT|NT|"
+        "PEQ] <pvfs fs root>\n\n\t c - disable case sensitivity in queries\n\t"
+        "p - disable path resolution after completing query\n", 
         argv[0]);
     return;
 }
