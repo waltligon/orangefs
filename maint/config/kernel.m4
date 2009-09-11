@@ -907,21 +907,42 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
-	dnl old linux kernels do not have class_create and related functions
-        dnl
-        dnl check for class_device_destroy() to weed out RHEL4 kernels that
-        dnl have some class functions but not others
-	AC_MSG_CHECKING(if kernel has device classes)
+        CLASS_SUPPORT=0
+
+        dnl check for either device_destroy or class_device_destroy
+	AC_MSG_CHECKING(for device_destroy)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/device.h>
 	], [
-	    class_device_destroy(NULL, "pvfs2")
+            dev_t tmp_dev;
+	    device_destroy(NULL, tmp_dev);
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes),
+        CLASS_SUPPORT=1
+	AC_DEFINE(HAVE_KERNEL_DEVICE_DESTROY, 1, Define if kernel has device_destroy),
 	AC_MSG_RESULT(no)
 	)
+
+	AC_MSG_CHECKING(for class_device_destroy)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/device.h>
+	], [
+	    class_device_destroy(NULL, "pvfs2");
+	],
+	AC_MSG_RESULT(yes)
+        CLASS_SUPPORT=1
+	AC_DEFINE(HAVE_KERNEL_CLASS_DEVICE_DESTROY, 1, Define if kernel has class_device_destroy),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl assume that class support is missing or incomplete if we have
+        dnl neither device_destory or class_device_destroy.
+        dnl   This means you, RHEL4!
+        if test "x$CLASS_SUPPORT" = "x1" ; then
+            AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes)
+        fi
 
 	dnl 2.6.23 removed the destructor parameter from kmem_cache_create
 	AC_MSG_CHECKING(for destructor param to kmem_cache_create)
