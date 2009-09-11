@@ -195,8 +195,8 @@ static PINT_sm_action small_io_setup_msgpairs(
             PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
             sm_p->hints);
 
-        msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->object_ref.handle;
+        msg_p->fs_id  = sm_p->object_ref.fs_id;
+        msg_p->handle = datafile_handle;
 
         /*if we are processing a read request and the source file has mirrored
          *handles, then bypass msgpairarray's retry mechanism.  SMALL-IO will
@@ -218,7 +218,7 @@ static PINT_sm_action small_io_setup_msgpairs(
             sm_p->object_ref.fs_id);
         if(ret < 0)
         {
-            gossip_err("Failed to map meta server address\n");
+            gossip_lerr("Failed to map data server address\n");
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
         }
@@ -246,9 +246,13 @@ static int small_io_completion_fn(void * user_args,
 {
     struct PINT_smcb *smcb = (struct PINT_smcb *)user_args;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-    PINT_sm_msgpair_state *msg_p = &(sm_p->msgarray_op.msgarray[index]);
+    PINT_sm_msgarray_op   *mop   = &(sm_p->msgarray_op);
+    PINT_sm_msgpair_state *msg_p = &(mop->msgarray[index]);
     PINT_client_small_io_ctx *ctx = 
          &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
+    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta = &(attr->u.meta);
+
     int ret = 0;
 
     assert(resp_p->op == PVFS_SERV_SMALL_IO);
@@ -358,7 +362,26 @@ static int small_io_completion_fn(void * user_args,
 
     /* Let's SMALL-IO know that the msg completed. */
     ctx->msg_completed = 1;
- 
+
+    /* To test fail-over with small-io, uncomment the following code.  This
+     * will force each primary handle to have each of its mirrored handles
+     * tried on a READ io.  If you are testing a file with many primary
+     * handles and/or many copies and don't want to wade through such a large
+     * test, then don't set the retry-limit.  By default, it is normally set
+     * at 5.  You can tweak this value in the pvfs2-fs.conf file, if you
+     * want.
+    */
+    if (   (sm_p->u.io.io_type == PVFS_IO_READ) 
+        && (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) 
+                               == PVFS_ATTR_META_MIRROR_DFILES
+        && (sm_p->u.io.retry_count < mop->params.retry_limit))
+    {
+       mop->params.retry_limit = meta->dfile_count *
+                                 meta->mirror_copies_count;
+       ctx->msg_completed = 0;
+    } 
+
+
     return 0;
 }
 
@@ -377,6 +400,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
     PINT_sm_msgpair_state *msg = NULL;
     PINT_sm_msgpair_state *new_msg = NULL;
     PINT_sm_msgarray_op new_mop = {{0},0,0,{0}};
+    char *enc_req_bytes = NULL;
 
     uint32_t retry_msg_count = 0;
     uint32_t index = 0;
@@ -384,6 +408,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
     uint32_t server_nr = 0;
     int i   = 0;
     int j   = 0;
+    int k   = 0;
     int ret = 0;
 
     /*if we are processing a write request, then msgpairarray handles retries.
@@ -433,10 +458,16 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
            continue;
 
         /* for incomplete messages, cleanup memory, if necessary */
-        if (msg->encoded_req.buffer_list[0])
+        enc_req_bytes = (char *)&(msg->encoded_req);
+        for (k=0; k<sizeof(msg->encoded_req); k++)
         {
-            PINT_encode_release(&msg->encoded_req,PINT_ENCODE_REQ);
-        }
+           if (enc_req_bytes[k] != '\0')
+           {
+              PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
+              break;
+           }
+        }/*end for*/
+
         if (msg->encoded_resp_p)
         {
             BMI_memfree(msg->svr_addr
@@ -563,7 +594,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         new_msg->svr_addr    = msg->svr_addr;
         new_msg->req         = msg->req;
         new_msg->enc_type    = msg->enc_type;
-        new_msg->max_resp_sz = msg->max_resp_sz;
+        new_msg->retry_flag  = msg->retry_flag;
     }/*end for*/
 
     /* Destroy the old msgarray and substitute with the new. Params are left

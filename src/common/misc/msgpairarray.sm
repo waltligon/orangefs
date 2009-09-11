@@ -599,6 +599,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             return SM_ACTION_COMPLETE;
         }
 
+        memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
 
