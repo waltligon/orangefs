@@ -34,7 +34,7 @@ __global__ void kernelCluster(
   // Initialize s_clusterCentres to 0
   // 0 - (blockSize-1) is cluster 0, blockSize to (2*blockSize-1) is cluster 1 and so on
   //[FIX] Does this lead to memory conflicts!!!
-  for(unsigned int i = 0; i < numClusters; i++) s_clusterCentres[(blockSize * i) + tidx] = 0;
+  for(unsigned int i = 0; i < numClusters; i++) s_clusterCentres[(blockSize * i) + tidx] = 0.0f;
 
   /* Analyse each cluster at a time */
   // [MODIFY] You can analyse all the clusters at the same time too 
@@ -133,7 +133,7 @@ __global__ void kernelClusterReduce(
   unsigned int end	= base + ((block_col + 1) * pitch_clusterPoints);
 
   /* Initialize the shared memory to 0 */
-  s_clusterCentres[tidx] = 0;
+  s_clusterCentres[tidx] = 0.0f;
 
   for(unsigned int cp = start; cp < end; cp += blockSize){
     s_clusterCentres[tidx] += d_clusterCentresSum[cp];

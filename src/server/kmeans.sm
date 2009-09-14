@@ -369,7 +369,7 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 #endif
 	}
     }
-#endif
+#endif /* USE_GPU */
 
 #if DEBUG
     for(i=0; i<s_op->u.kmeans.numClusters; i++)

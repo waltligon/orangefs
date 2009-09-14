@@ -27,9 +27,11 @@ void gpuComputeDistance(
   dim3 block(num_threads, 1, 1);
   unsigned int sharedMem = sizeof(float) * numClusters * numDimensions;
 
+#if DEBUG
   fprintf(stderr, "Distance Computation ... [START]\n");
   fprintf(stderr, "	[INFO] GRID Config	: (%d, 1)\n", num_blocks_x);
   fprintf(stderr, "	[INFO] BLOCK Config	: (%d, 1, 1)\n", num_threads);
+#endif
 
   /* Instantiate the kernels */
   switch(num_threads){
@@ -70,7 +72,4 @@ void gpuComputeDistance(
     break;
 
   }
-				
-  printf("Distance Computation ... [DONE]");
-
 }

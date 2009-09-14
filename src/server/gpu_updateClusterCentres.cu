@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-//#include <cutil.h>
+#include <cutil.h>
 #include "kernel_updateClusterCentres.cu"
 
 #include "gpu_device.cuh"
@@ -33,17 +33,20 @@ void gpuUpdateClusterCentres(
 
   unsigned int sharedMem_clusterReduce = sizeof(float) * num_threads;
 
-  //fprintf(stderr, "Update Cluster Centres ... [START]\n");
-  //fprintf(stderr, "	[INFO] GRID Config Cluster	: (%d, %d)\n", num_blocks_x, num_blocks_y);
-  //fprintf(stderr, "	[INFO] BLOCK Config Cluster	:	(%d, 1, 1)\n", num_threads);
-  //fprintf(stderr, "	[INFO] GRID Config Cluster Reduce	: (%d, %d)\n", numClusters, numDimensions);
-  //fprintf(stderr, "	[INFO] BLOCK Config Cluster Reduce:	(%d, 1, 1)\n", num_threads);
+#if DEBUG
+  fprintf(stderr, "Update Cluster Centres ... [START]\n");
+  fprintf(stderr, "	[INFO] GRID Config Cluster	: (%d, %d)\n", num_blocks_x, num_blocks_y);
+  fprintf(stderr, "	[INFO] BLOCK Config Cluster	:	(%d, 1, 1)\n", num_threads);
+  fprintf(stderr, "	[INFO] GRID Config Cluster Reduce	: (%d, %d)\n", numClusters, numDimensions);
+  fprintf(stderr, "	[INFO] BLOCK Config Cluster Reduce:	(%d, 1, 1)\n", num_threads);
+#endif
 
   /**/
   // Get an array with size num_blocks_x * numClusters * numDimensions
   float* d_clusterCentresSum = NULL;
   float* h_clusterCentresSum = (float *)malloc(sizeof(float)*num_blocks_x*numClusters*numDimensions);
-  cudaMalloc( (void**) &d_clusterCentresSum, sizeof(float) * num_blocks_x * numClusters * numDimensions);
+  cudaMalloc( (void**) &d_clusterCentresSum, sizeof(float)*num_blocks_x*numClusters*numDimensions );
+  cudaMemset(d_clusterCentresSum, 0.0f, sizeof(float)*num_blocks_x*numClusters*numDimensions);
 
   /* Kernel Invokation */
   switch(num_threads){
@@ -93,18 +96,14 @@ void gpuUpdateClusterCentres(
     break;
 
   }
-				
+
+#if DEBUG				
   float* test_out = (float*)malloc(sizeof(float) * num_blocks_x * numClusters * numDimensions);
   cudaMemcpy(test_out, d_clusterCentresSum, sizeof(float) * num_blocks_x * numClusters * numDimensions, cudaMemcpyDeviceToHost);
-
-  //int* test_new = (int*)malloc(sizeof(int) * numDataPoints);
-  //CUDA_SAFE_CALL( cudaMemcpy(test_new, d_membership, sizeof(int) * numDataPoints, cudaMemcpyDeviceToHost) );
 
   fprintf(stderr, "Test Out : ");
   for(int i = 0; i < numDimensions; i++) fprintf(stderr, "%f, ", test_out[i]);
   fprintf(stderr, "\n");
-  ////for(int i = 0; i < numDataPoints; i++) printf("%d\n", test_new[i]);
-			
-  //printf("Update Cluster Centres ... [DONE]\n");
+#endif	
 
 }
