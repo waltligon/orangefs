@@ -936,6 +936,7 @@ static PINT_sm_action fsck_sm_vnr_phase_1(
     s_op->u.fsck.handle_count = js_p->count;
     s_op->u.fsck.position     = js_p->position;
 
+    s_op->u.fsck.parallel_sm = 0;
     for (i=0; i<s_op->u.fsck.handle_count; i++)
     {
         p_op = malloc(sizeof(*p_op));
@@ -1540,6 +1541,14 @@ static PINT_sm_action fsck_sm_phase_1_prepare_msgpair(
                 return SM_ACTION_COMPLETE;
             }
 
+            fsck_p->msgarray_op.params.job_timeout =
+                config->client_job_bmi_timeout;
+            fsck_p->msgarray_op.params.retry_delay =
+                config->client_retry_delay_ms;
+            fsck_p->msgarray_op.params.retry_limit =
+                config->client_retry_limit;
+            fsck_p->msgarray_op.params.quiet_flag = 1;
+
             foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
             {
                 assert(msg_p);
@@ -1594,6 +1603,14 @@ static PINT_sm_action fsck_sm_phase_1_prepare_msgpair(
                     return SM_ACTION_COMPLETE;
                 }
 
+                fsck_p->msgarray_op.params.job_timeout =
+                    config->client_job_bmi_timeout;
+                fsck_p->msgarray_op.params.retry_delay =
+                    config->client_retry_delay_ms;
+                fsck_p->msgarray_op.params.retry_limit =
+                    config->client_retry_limit;
+                fsck_p->msgarray_op.params.quiet_flag = 1;
+
                 foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
                 {
                     assert(msg_p);
@@ -1642,6 +1659,14 @@ static PINT_sm_action fsck_sm_phase_1_prepare_msgpair(
                 js_p->error_code = ret;
                 return SM_ACTION_COMPLETE;
             }
+
+            fsck_p->msgarray_op.params.job_timeout =
+                config->client_job_bmi_timeout;
+            fsck_p->msgarray_op.params.retry_delay =
+                config->client_retry_delay_ms;
+            fsck_p->msgarray_op.params.retry_limit =
+                config->client_retry_limit;
+            fsck_p->msgarray_op.params.quiet_flag = 1;
 
             foreach_msgpair(&fsck_p->msgarray_op, msg_p, index)
             {
@@ -1872,6 +1897,7 @@ static PINT_sm_action fsck_sm_phase_2_prepare_msgpair(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p;
     struct PINT_server_fsck_op *fsck_p = &s_op->u.fsck;
+    server_configuration_s *config;
     PVFS_credentials creds;
     PINT_sm_action ret;
 
@@ -1879,12 +1905,22 @@ static PINT_sm_action fsck_sm_phase_2_prepare_msgpair(
 
     s_op->u.fsck.status_array = malloc(1*sizeof(PVFS_error));
 
+    config = get_server_config_struct();
+
     ret = PINT_msgpairarray_init(&fsck_p->msgarray_op, 1);
     if (ret != 0)
     {
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    fsck_p->msgarray_op.params.job_timeout =
+        config->client_job_bmi_timeout;
+    fsck_p->msgarray_op.params.retry_delay =
+        config->client_retry_delay_ms;
+    fsck_p->msgarray_op.params.retry_limit =
+        config->client_retry_limit;
+    fsck_p->msgarray_op.params.quiet_flag = 1;
 
     msg_p = &fsck_p->msgarray_op.msgarray[0];
 

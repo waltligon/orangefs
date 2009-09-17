@@ -215,7 +215,7 @@ static int fsck_report (
 {
     PVFS_mgmt_fsck_resp resp;
     PVFS_ds_position position;
-    PVFS_error ret;
+    PVFS_error ret = 0;
     uint64_t log_count;
     int64_t uid = 0;
     int i,j;
