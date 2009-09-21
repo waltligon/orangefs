@@ -257,6 +257,7 @@ static int fsck_report (
                     printf ("  state     : %s\n", state2str(resp.state));
                     printf ("  phase     : %s\n", phase2str(resp.phase));
                     printf ("  position  : %s\n", pos2str(position));
+                    printf ("  time      : %lf\n", resp.time);
                     printf ("  repairs   : %llu\n", llu(log_count));
                     header = 0;
                 }

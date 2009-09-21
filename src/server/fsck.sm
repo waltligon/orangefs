@@ -47,6 +47,10 @@ typedef struct fsck_control_s
     int              phase;
     int              uid;
     char             logpath[PATH_MAX];
+    struct timeval   stime;
+    struct timeval   etime;
+    uint64_t         ttime_s;
+    uint64_t         ttime_us;
 } fsck_control;
 
 /*
@@ -687,6 +691,8 @@ static PINT_sm_action fsck_sm_report(
     s_op->resp.u.mgmt_fsck.phase    = ctrl.phase;
     s_op->resp.u.mgmt_fsck.position = pos;
     s_op->resp.u.mgmt_fsck.count    = cnt; 
+    s_op->resp.u.mgmt_fsck.time_s   = ctrl.ttime_s;
+    s_op->resp.u.mgmt_fsck.time_us  = ctrl.ttime_us;
 
     js_p->error_code = 0;
 
@@ -849,6 +855,14 @@ static PINT_sm_action fsck_sm_vnr_init(
         js_p->error_code = -PVFS_EINVAL;
         gossip_err("fsck_get_control: r=%d\n", r);
         return SM_ACTION_COMPLETE;
+    }
+
+    (void) gettimeofday(&ctrl.stime, NULL);
+
+    r = fsck_put_control(s_op->target_fs_id, &ctrl);
+    if (r != 1)
+    {
+        gossip_err("%s: fsck_put_control failed\n", __func__);
     }
 
     s_op->u.fsck.position     = ctrl.position;
@@ -1359,6 +1373,11 @@ static PINT_sm_action fsck_sm_vnr_complete(
 
     ctrl.state = FSCK_IDLE;
     ctrl.phase = FSCK_COMPLETE;
+
+    (void) gettimeofday(&ctrl.etime, NULL);
+    ctrl.ttime_s  = (ctrl.etime.tv_sec - ctrl.stime.tv_sec);
+    ctrl.ttime_us = (ctrl.etime.tv_usec - ctrl.stime.tv_usec);
+    gossip_err("%s: s:%ld e:%ld\n", __func__, ctrl.stime.tv_sec, ctrl.etime.tv_sec);
 
     r = fsck_put_control(s_op->target_fs_id, &ctrl);
     if (r != 1)

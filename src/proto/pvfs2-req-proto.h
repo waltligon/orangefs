@@ -1476,10 +1476,12 @@ struct PVFS_servresp_mgmt_fsck
     PVFS_mgmt_fsck_phase  phase;
     PVFS_ds_position      position;
     PVFS_handle_extent_array remote_handles;
+    uint64_t              time_s;
+    uint64_t              time_us;
     uint64_t              count;
     PVFS_mgmt_fsck_repair *log;
 };
-endecode_fields_6a_struct(
+endecode_fields_8a_struct(
     PVFS_servresp_mgmt_fsck,
     PVFS_mgmt_fsck_state,    state,
     skip4,,
@@ -1487,6 +1489,8 @@ endecode_fields_6a_struct(
     skip4,,
     PVFS_ds_position,        position,
     PVFS_handle_extent_array, remote_handles,
+    uint64_t,                time_s,
+    uint64_t,                time_us,
     uint64_t,                count,
     PVFS_mgmt_fsck_repair_s, log
 );

@@ -185,6 +185,7 @@ typedef struct PVFS_mgmt_fsck_resp_s
 {
     PVFS_mgmt_fsck_state  state;
     PVFS_mgmt_fsck_phase  phase;
+    double                time;
     PVFS_mgmt_fsck_repair *log;
 } PVFS_mgmt_fsck_resp;
 

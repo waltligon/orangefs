@@ -213,6 +213,8 @@ static int mgmt_fsck_comp_fn(
     {
         sm_p->u.mgmt_fsck.resp->state = resp_p->u.mgmt_fsck.state;
         sm_p->u.mgmt_fsck.resp->phase = resp_p->u.mgmt_fsck.phase;
+        sm_p->u.mgmt_fsck.resp->time  = (double)resp_p->u.mgmt_fsck.time_s +
+            (double)resp_p->u.mgmt_fsck.time_us/1e6;
         *sm_p->u.mgmt_fsck.position   = resp_p->u.mgmt_fsck.position;
         *sm_p->u.mgmt_fsck.count      = resp_p->u.mgmt_fsck.count;
         if (resp_p->u.mgmt_fsck.count > 0)
