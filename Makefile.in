@@ -10,7 +10,6 @@
 # docsclean      cleans up documentation files
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
-# usertools	 builds user tools
 # kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
@@ -641,7 +640,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE)
 endif
 
 # target for building admin tools
