@@ -32,15 +32,14 @@
 #define DO_ALLREDUCE 104
 #define DO_KMEANS 105
 
-/* FIXME: These should come from client */
-#define NUM_CLUSTERS 20
-//#define NUM_COORDS 10 /* out10 */
-//#define TOT_OBJS 1000000 /* out10 */
-#define NUM_COORDS 18 /* edge17695.bin */ 
-#define TOT_OBJS 17695 /* edge17695.bin */
-
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+int use_gpu; /* for kmeans only */
+int NUM_OBJS; /* for kmeans only */
+int NUM_COORDS; /* for kmeans only */
+int NUM_CLUSTERS; /* for kmeans only */
+#define TMP_BUF_SIZ 128
 
 %%
 
@@ -351,7 +350,20 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     case ((int)0x4c00040a): /* MPI_FLOAT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used)/((*PVFS_FLOAT).ub);
 	if(s_op->u.pipeline.op == 0x5800000f) { /* KMEANS */
-	    int cunit = ((*PVFS_FLOAT).ub)*NUM_COORDS;
+	    char *tmpbuf = malloc(TMP_BUF_SIZ);
+	    int cunit, length;
+	    char *tok;
+
+	    memcpy(tmpbuf, PINT_hint_get_value_by_name(s_op->u.pipeline.hints, "kmeans", &length), TMP_BUF_SIZ);
+	    gossip_debug(GOSSIP_IO_DEBUG, "kmeans=%s\n", tmpbuf);
+	    tok = strtok(tmpbuf, ":");
+	    tok = strtok(NULL, ":");
+	    tok = strtok(NULL, ":");
+	    NUM_COORDS = atoi(tok);
+
+	    free(tmpbuf);
+	    
+	    cunit = ((*PVFS_FLOAT).ub)*NUM_COORDS;
 	    PVFS_size new_size, left_adj_sz, right_adj_sz;
 	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_FLOAT).ub)/NUM_COORDS;
 	    int is_last_stripe = ((s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))?1:0);
@@ -646,6 +658,7 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 	case ((int)0x4c00040a): /* MPI_FLOAT */
 	    {
+		/* FIXME: about NUM_COORDS */
 		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/NUM_COORDS;
 		float *a = (float*)s_op->u.pipeline.buffer;
 
@@ -841,8 +854,10 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i, j;
     struct PINT_server_op *kmeans_op;
-    int numClusters = NUM_CLUSTERS; /* FIXME: should come from client? */
-    int numCoords = NUM_COORDS; /* FIXME: should come from client? */
+    int numClusters;
+    int numCoords;
+    char *tmpbuf, *tok;
+    int length;
 
     kmeans_op = malloc(sizeof(*kmeans_op));
     memset(kmeans_op, 0, sizeof(*kmeans_op));
@@ -853,13 +868,30 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     kmeans_op->u.kmeans.fs_id = s_op->u.pipeline.fs_id;
     kmeans_op->u.kmeans.allreduce_step = 0;
 
-    kmeans_op->u.kmeans.numClusters = numClusters;
-    kmeans_op->u.kmeans.numCoords = numCoords;
-
     kmeans_op->u.kmeans.threshold = 0.001; /* FIXME */
-    kmeans_op->u.kmeans.totalNumObjs = TOT_OBJS; /* FIXME: should be obtained from allreduce(numObjs, SUM) */
+
+    tmpbuf = malloc(TMP_BUF_SIZ);
+
+    memcpy(tmpbuf, PINT_hint_get_value_by_name(s_op->u.pipeline.hints, "kmeans", &length), TMP_BUF_SIZ);
+    gossip_debug(GOSSIP_IO_DEBUG, "kmeans=%s\n", tmpbuf);
+    tok = strtok(tmpbuf, ":");
+    kmeans_op->u.kmeans.use_gpu = atoi(tok);
+    tok = strtok(NULL, ":");
+    kmeans_op->u.kmeans.totalNumObjs = atoi(tok);
+    tok = strtok(NULL, ":");
+    kmeans_op->u.kmeans.numCoords = atoi(tok);
+    numCoords = kmeans_op->u.kmeans.numCoords;
+    tok = strtok(NULL, ":");
+    kmeans_op->u.kmeans.numClusters = atoi(tok);
+    numClusters = kmeans_op->u.kmeans.numClusters;
+
+    free(tmpbuf);
+
     kmeans_op->u.kmeans.numObjs = s_op->u.pipeline.new_buffer_used/sizeof(float)/numCoords;
+    gossip_debug(GOSSIP_IO_DEBUG, "totalNumObjs=%d\n", kmeans_op->u.kmeans.totalNumObjs);
     gossip_debug(GOSSIP_IO_DEBUG, "numObjs=%d\n", kmeans_op->u.kmeans.numObjs);
+    gossip_debug(GOSSIP_IO_DEBUG, "numCoords=%d, numClusters=%d\n", 
+		 numCoords, numClusters);
 
     /* allocate space for data points */
     kmeans_op->u.kmeans.objects = (float**)malloc((kmeans_op->u.kmeans.numObjs) * sizeof(float*));

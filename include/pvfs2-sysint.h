@@ -475,7 +475,7 @@ PVFS_error PVFS_sys_io(
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
 
 /* sson: x7 (datatype), x8 (op), z is hint */
-#define PVFS_sys_read_ex(x1,x2,x3,x4,x5,x6,x7,x8,y,z)   \
+#define PVFS_sys_read_ex(x1,x2,x3,x4,x5,x6,x7,x8,y,z)		\
     PVFS_sys_io_ex(x1,x2,x3,x4,x5,x6,x7,x8,y,PVFS_IO_READ,z) /* sson */
 
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \

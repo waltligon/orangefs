@@ -454,6 +454,8 @@ struct PINT_server_kmeans_op
     int dfile_count;
     PVFS_fs_id fs_id;
 
+    int use_gpu;
+
     int loop;
     int numClusters;
     int numCoords;

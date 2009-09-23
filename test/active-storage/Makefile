@@ -16,9 +16,9 @@ simple1_unaligned.o: simple1_unaligned.c
 simple1_unaligned: simple1_unaligned.o
 	$(MPICC) $(CFLAGS) -o simple1_unaligned simple1_unaligned.o -lm
 test_kmeans.o: test_kmeans.c
-	$(MPICC) -c test_kmeans.c
+	$(MPICC) -c test_kmeans.c -g
 test_kmeans: test_kmeans.o
-	$(MPICC) $(CFLAGS) -o test_kmeans test_kmeans.o -lm
+	$(MPICC) $(CFLAGS) -o test_kmeans test_kmeans.o -lm -g
 simple2.o: simple2.c
 	$(MPICC) -c simple2.c
 simple2: simple2.o

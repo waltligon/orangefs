@@ -46,7 +46,6 @@ extern void singleGPU (float* objects, int numDataPoints,
 #define SKIP_ALLREDUCE 305
 
 #define DEBUG 0
-#define USE_GPU 1
 
 int device_initialized=0;
 #define MAX_ITERATIONS 500
@@ -308,16 +307,16 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
     free(bcast_op->u.bcast.recv_buf);
     free(bcast_op);
 
-#if USE_GPU
-    /* initialize GPU device and allocate memory on it */
-    if(device_initialized == 0) {
-	/* initDevice(argc, argv, numObjs, numCoords, numClusters) */
-	initGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
-		s_op->u.kmeans.numCoords, s_op->u.kmeans.numClusters);
-	/* FIXME: I don't know why this is called twice */
-	device_initialized = 1;
+    if(s_op->u.kmeans.use_gpu == 1) {
+	/* initialize GPU device and allocate memory on it */
+	if(device_initialized == 0) {
+	    /* initDevice(argc, argv, numObjs, numCoords, numClusters) */
+	    initGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
+		    s_op->u.kmeans.numCoords, s_op->u.kmeans.numClusters);
+	    /* FIXME: I don't know why this is called twice */
+	    device_initialized = 1;
+	}
     }
-#endif
     return SM_ACTION_COMPLETE;
 }
 
@@ -330,46 +329,47 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
     s_op->u.kmeans.delta = 0.0;
 
-#if USE_GPU
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: before calling singleGPU\n", __func__);
+    if(s_op->u.kmeans.use_gpu == 1) {
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: before calling singleGPU\n", __func__);
 
-    singleGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
-	      s_op->u.kmeans.numCoords, s_op->u.kmeans.clusters[0],
-	      s_op->u.kmeans.numClusters, s_op->u.kmeans.membership,
-	      s_op->u.kmeans.newClusterSize,
-	      s_op->u.kmeans.newClusters[0], &s_op->u.kmeans.delta);
-
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: after calling singleGPU\n", __func__);
-#else
-    for(i=0; i<s_op->u.kmeans.numObjs; i++) {
-	/* find the array index of nestest cluster center */
-	index = find_nearest_cluster(s_op->u.kmeans.numClusters, 
-				     s_op->u.kmeans.numCoords, 
-				     s_op->u.kmeans.objects[i],
-				     s_op->u.kmeans.clusters);
-
-	/* NOTE: following will generate lots of messages */
-	/* gossip_debug(GOSSIP_IO_DEBUG, "i=%d: index=%d\n", i, index); */
-
-	/* if membership changes, increase delta by 1 */
-	if (s_op->u.kmeans.membership[i] != index) 
-	    s_op->u.kmeans.delta += 1.0;
-
-	/* assign the membership to object i */
-	s_op->u.kmeans.membership[i] = index;
-      
-	/* update new cluster centers : sum of objects located within */
-	s_op->u.kmeans.newClusterSize[index]++;
-	for (j=0; j<s_op->u.kmeans.numCoords; j++) {
-	  s_op->u.kmeans.newClusters[index][j] += s_op->u.kmeans.objects[i][j];
+	singleGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
+		  s_op->u.kmeans.numCoords, s_op->u.kmeans.clusters[0],
+		  s_op->u.kmeans.numClusters, s_op->u.kmeans.membership,
+		  s_op->u.kmeans.newClusterSize,
+		  s_op->u.kmeans.newClusters[0], &s_op->u.kmeans.delta);
+	
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: after calling singleGPU\n", __func__);
+    }
+    else {
+	for(i=0; i<s_op->u.kmeans.numObjs; i++) {
+	    /* find the array index of nestest cluster center */
+	    index = find_nearest_cluster(s_op->u.kmeans.numClusters, 
+					 s_op->u.kmeans.numCoords, 
+					 s_op->u.kmeans.objects[i],
+					 s_op->u.kmeans.clusters);
+	    
+	    /* NOTE: following will generate lots of messages */
+	    /* gossip_debug(GOSSIP_IO_DEBUG, "i=%d: index=%d\n", i, index); */
+	    
+	    /* if membership changes, increase delta by 1 */
+	    if (s_op->u.kmeans.membership[i] != index) 
+		s_op->u.kmeans.delta += 1.0;
+	    
+	    /* assign the membership to object i */
+	    s_op->u.kmeans.membership[i] = index;
+	    
+	    /* update new cluster centers : sum of objects located within */
+	    s_op->u.kmeans.newClusterSize[index]++;
+	    for (j=0; j<s_op->u.kmeans.numCoords; j++) {
+		s_op->u.kmeans.newClusters[index][j] += s_op->u.kmeans.objects[i][j];
 #if DEBUG
-	  gossip_debug(GOSSIP_IO_DEBUG, 
-		       "newCluster[%d][%d] = objects[%d][%d] = %lf\n",
-		       index, j, i, j, s_op->u.kmeans.objects[i][j]);
+		gossip_debug(GOSSIP_IO_DEBUG, 
+			     "newCluster[%d][%d] = objects[%d][%d] = %lf\n",
+			     index, j, i, j, s_op->u.kmeans.objects[i][j]);
 #endif
+	    }
 	}
     }
-#endif /* USE_GPU */
 
 #if DEBUG
     for(i=0; i<s_op->u.kmeans.numClusters; i++)
@@ -638,9 +638,24 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     else {
 	js_p->error_code = 0;
-#if USE_GUP
-	freeGPU();
-#endif
+
+	if(s_op->u.kmeans.use_gpu == 1)
+	    freeGPU();
+#if DEBUG
+	/* print out the final result */
+	for (i=0; i<s_op->u.kmeans.numObjs; i++) 
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: membership[%d]=%d\n",
+			 __func__, i, s_op->u.kmeans.membership[i]);
+	for (i=0; i<s_op->u.kmeans.numClusters; i++)
+	    for(j=0; j<s_op->u.kmeans.numCoords; j++)
+		gossip_debug(GOSSIP_IO_DEBUG, "%s: clusters[%d][%d]=%lf\n",
+			     __func__, i, j, s_op->u.kmeans.newClusters[i][j]);
+
+	for (i=0; i<s_op->u.kmeans.numClusters; i++)
+	    gossip_debug(GOSSIP_IO_DEBUG, "%s: clusterSize[%d]=%d\n",
+			 __func__, i, s_op->u.kmeans.newClusters[i]);
+#endif	
+
     }
     
     return SM_ACTION_COMPLETE;
