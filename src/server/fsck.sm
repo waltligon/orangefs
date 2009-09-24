@@ -31,7 +31,8 @@ enum
     FSCK_SM_ACTION_EMPTY,
     FSCK_SM_ACTION_REPAIR,
     FSCK_SM_ACTION_RETRY,
-    FSCK_SM_ACTION_COMPLETE
+    FSCK_SM_ACTION_COMPLETE,
+    FSCK_SM_ACTION_CONTINUE
 };
 
 /*
@@ -141,6 +142,7 @@ nested machine pvfs2_fsck_phase_1_sm
     state phase_1_result
     {
         run fsck_sm_phase_1_result;
+        FSCK_SM_ACTION_CONTINUE => phase_1_lookup;
         default => phase_1_clear_flag;
     }
 
@@ -1607,7 +1609,6 @@ static PINT_sm_action fsck_sm_phase_1_prepare_msgpair(
             ret = SM_ACTION_COMPLETE;
             break;
         case PVFS_TYPE_DIRDATA:
-            assert(js_p->position == PVFS_ITERATE_END);
 
             fsck_p->dirent_count = js_p->count;
             js_p->error_code = 0;
@@ -1742,13 +1743,14 @@ static PINT_sm_action fsck_sm_phase_1_result(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_fsck_op *fsck_p = &s_op->u.fsck;
+    PINT_sm_action ret = SM_ACTION_COMPLETE;
     int fault = 0;
     int i;
 
     if ((js_p->error_code != 0) &&
         (js_p->error_code != FSCK_SM_ACTION_COMPLETE))
     {
-        return SM_ACTION_COMPLETE;
+        return ret;
     }
 
     /* decide if we need to repair */
@@ -1809,6 +1811,10 @@ static PINT_sm_action fsck_sm_phase_1_result(
             if (s_op->key_a) free(s_op->key_a);    
             if (s_op->val_a) free(s_op->val_a);
             if (s_op->u.fsck.dirent_array) free(s_op->u.fsck.dirent_array);
+            if (js_p->position != PVFS_ITERATE_END)
+            {
+                ret = FSCK_SM_ACTION_CONTINUE;
+            }
             break;
         case PVFS_TYPE_DATAFILE: 
         {
@@ -1843,7 +1849,7 @@ static PINT_sm_action fsck_sm_phase_1_result(
  
     if (s_op->u.fsck.status_array) free(s_op->u.fsck.status_array);
 
-    return SM_ACTION_COMPLETE;
+    return ret;
 }
 
 static PINT_sm_action fsck_sm_phase_1_clear_flag(
