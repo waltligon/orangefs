@@ -1407,6 +1407,9 @@ static PINT_sm_action fsck_sm_phase_1_init(
     PINT_sm_action ret;
     job_id_t tmp_id;
 
+    /* initialize count to start for use with DIRDATA objects */
+    js_p->position = PVFS_ITERATE_START;
+
     ret = job_trove_dspace_getattr(
         s_op->target_fs_id, s_op->target_handle, smcb, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context, s_op->req->hints);
@@ -1419,7 +1422,7 @@ static PINT_sm_action fsck_sm_phase_1_lookup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_action ret;
-    PVFS_ds_position token = PVFS_ITERATE_START;
+    //PVFS_ds_position token = PVFS_ITERATE_START;
     job_id_t j_id;
     int dirdata_count;
     int i;
@@ -1492,7 +1495,7 @@ static PINT_sm_action fsck_sm_phase_1_lookup(
             ret = job_trove_keyval_iterate(
                       s_op->target_fs_id,
                       s_op->target_handle,
-                      token,
+                      js_p->position,
                       s_op->key_a,
                       s_op->val_a,
                       dirdata_count,
@@ -1813,7 +1816,7 @@ static PINT_sm_action fsck_sm_phase_1_result(
             if (s_op->u.fsck.dirent_array) free(s_op->u.fsck.dirent_array);
             if (js_p->position != PVFS_ITERATE_END)
             {
-                ret = FSCK_SM_ACTION_CONTINUE;
+                js_p->error_code = FSCK_SM_ACTION_CONTINUE;
             }
             break;
         case PVFS_TYPE_DATAFILE: 
