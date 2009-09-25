@@ -412,6 +412,7 @@ struct PINT_server_fsck_op
     PVFS_handle         *dfile_array;
     PVFS_dirent         *dirent_array;
     PVFS_handle          dirdata_handle;
+    PVFS_ds_position     dirdata_position;
     PVFS_handle_extent_array remote_handles;
     PVFS_handle          extent_handle;
     int                  extent_index;
