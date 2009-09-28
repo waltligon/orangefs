@@ -1570,6 +1570,7 @@ out:
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG,
@@ -1603,13 +1604,15 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
         PVFS_BYTE, &vfs_request->file_req);
     assert(ret == 0);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req, 0,
         vfs_request->io_tmp_buf, vfs_request->mem_req,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {
