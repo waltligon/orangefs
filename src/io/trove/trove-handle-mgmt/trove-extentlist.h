@@ -96,6 +96,9 @@ int extentlist_set_purgatory(struct timeval *timeout);
 int extentlist_addextent(
     struct TROVE_handle_extentlist *elist,
     TROVE_handle first, TROVE_handle last);
+int extentlist_pop(struct TROVE_handle_extentlist *elist,
+                   struct TROVE_handle_extent *extent);
+
 
 /*
  * Local variables:

@@ -605,6 +605,42 @@ int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
     return 0;
 }
 
+/* extentlist_pop
+ *
+ * remove a TROVE_handle_extent from the list and return it.
+ * 
+ * return 0 if successful, copies data into extent.
+ * returns -1 if empty or failed, extent unmodified.
+ */
+int extentlist_pop(struct TROVE_handle_extentlist *elist,
+                   struct TROVE_handle_extent *extent)
+{
+    struct TROVE_handle_extent **e = NULL;
+    struct TROVE_handle_extent *ext = NULL;
+
+    e = avlgethighest(elist->index);
+    if (e == NULL)
+    {
+        return -1;
+    }
+
+    ext = *e;
+    extent->first = ext->first;
+    extent->last  = ext->last;
+
+    if (avlremove(&(elist->index), ext->first) == 0)
+    {
+        gossip_err("avlremove failed");
+        return -1;
+    }
+    else
+    {
+        elist->num_extents--;
+    }
+
+    return 0;
+}
+
 /* avltree_extent_search()
  *
  * finds an extent containing the given handle.

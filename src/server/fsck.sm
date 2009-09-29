@@ -230,6 +230,7 @@ nested machine pvfs2_fsck_phase_2_sm
     state phase_2_cleanup
     {
         run fsck_sm_phase_2_pjmp_cleanup;
+        FSCK_SM_ACTION_CONTINUE => phase_2_prepare_msgpair;
         default => return;
     }
 }
@@ -713,7 +714,7 @@ static PINT_sm_action fsck_sm_remote_handles(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     fsck_control ctrl;
     PVFS_ds_position pos;
-    PVFS_ds_position i;
+    PVFS_ds_position i,j;
     int r;
 
     r = fsck_get_control(s_op->target_fs_id, &ctrl);
@@ -762,9 +763,24 @@ static PINT_sm_action fsck_sm_remote_handles(
     gossip_debug(GOSSIP_FSCK_DEBUG,
         "%s: num=%llu\n", __func__, llu(parent_list.num_extents));
 
-    extentlist_load(&parent_list, &s_op->resp.u.mgmt_fsck.remote_handles);
+    for (j=0;
+         ((i<parent_list.num_extents) && (j<PVFS_REQ_LIMIT_MAX_EXTENTS));
+         j++,i++)
+    {
+        struct TROVE_handle_extent extent;
 
-    if (pos >= parent_list.num_extents)
+        r = extentlist_pop(&parent_list, &extent);
+        if (r == 0)
+        {
+            s_op->resp.u.mgmt_fsck.remote_handles.extent_array[j].first =
+                extent.first;
+            s_op->resp.u.mgmt_fsck.remote_handles.extent_array[j].last =
+                extent.last;
+        }
+    }
+    s_op->resp.u.mgmt_fsck.remote_handles.extent_count = j-1;
+
+    if (i >= parent_list.num_extents)
     {
         pos = PVFS_ITERATE_END;
     }
@@ -1389,8 +1405,16 @@ static PINT_sm_action fsck_sm_vnr_complete(
         return SM_ACTION_COMPLETE;
     }
 
-    if (s_op->u.fsck.handle_array) free(s_op->u.fsck.handle_array);
-    if (s_op->u.fsck.error_array) free(s_op->u.fsck.error_array);
+    if (s_op->u.fsck.handle_array)
+    {
+        free(s_op->u.fsck.handle_array);
+        s_op->u.fsck.handle_array = NULL;
+    }
+    if (s_op->u.fsck.error_array)
+    {
+        free(s_op->u.fsck.error_array);
+        s_op->u.fsck.error_array = NULL;
+    }
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -1782,7 +1806,11 @@ static PINT_sm_action fsck_sm_phase_1_result(
                                 FSCK_OP_MOVE,
                                 s_op->target_handle);
             }
-            if (s_op->u.fsck.dfile_array) free(s_op->u.fsck.dfile_array);
+            if (s_op->u.fsck.dfile_array)
+            {
+                free(s_op->u.fsck.dfile_array);
+                s_op->u.fsck.dfile_array = NULL;
+            }
             break;
         case PVFS_TYPE_DIRECTORY:
             if (fsck_p->status_array[0] == -PVFS_ENOENT)
@@ -1811,9 +1839,21 @@ static PINT_sm_action fsck_sm_phase_1_result(
                                fsck_p->error_array[i]);
                 }
             }
-            if (s_op->key_a) free(s_op->key_a);    
-            if (s_op->val_a) free(s_op->val_a);
-            if (s_op->u.fsck.dirent_array) free(s_op->u.fsck.dirent_array);
+            if (s_op->key_a)
+            {
+                free(s_op->key_a);
+                s_op->key_a = NULL;
+            }
+            if (s_op->val_a)
+            {
+                free(s_op->val_a);
+                s_op->val_a = NULL;
+            }
+            if (s_op->u.fsck.dirent_array)
+            {
+                free(s_op->u.fsck.dirent_array);
+                s_op->u.fsck.dirent_array = NULL;
+            }
             if (fsck_p->dirdata_position != PVFS_ITERATE_END)
             {
                 js_p->error_code = FSCK_SM_ACTION_CONTINUE;
@@ -1850,7 +1890,11 @@ static PINT_sm_action fsck_sm_phase_1_result(
             break;
     }
  
-    if (s_op->u.fsck.status_array) free(s_op->u.fsck.status_array);
+    if (s_op->u.fsck.status_array)
+    {
+        free(s_op->u.fsck.status_array);
+        s_op->u.fsck.status_array = NULL;
+    }
 
     return ret;
 }
@@ -2068,7 +2112,16 @@ static PINT_sm_action fsck_sm_phase_2_pjmp_cleanup(
         free(p_op);
     }
 
-    if (s_op->u.fsck.status_array) free(s_op->u.fsck.status_array);
+    if (s_op->u.fsck.status_array)
+    {
+        free(s_op->u.fsck.status_array);
+        s_op->u.fsck.status_array = NULL;
+    }
+
+    if (s_op->u.fsck.position != PVFS_ITERATE_END)
+    {
+        js_p->error_code = FSCK_SM_ACTION_CONTINUE;
+    }
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -2087,6 +2140,7 @@ static PINT_sm_action fsck_sm_phase_2_callback(
     {
         s_op->u.fsck.remote_handles.extent_count =
             resp_p->u.mgmt_fsck.remote_handles.extent_count;
+        s_op->u.fsck.position = resp_p->u.mgmt_fsck.position;
         memcpy(s_op->u.fsck.remote_handles.extent_array,
            resp_p->u.mgmt_fsck.remote_handles.extent_array,
            sizeof(PVFS_handle_extent)*
