@@ -1393,8 +1393,16 @@ static PINT_sm_action fsck_sm_vnr_complete(
     ctrl.phase = FSCK_COMPLETE;
 
     (void) gettimeofday(&ctrl.etime, NULL);
-    ctrl.ttime_s  = (ctrl.etime.tv_sec - ctrl.stime.tv_sec);
-    ctrl.ttime_us = (ctrl.etime.tv_usec - ctrl.stime.tv_usec);
+    if (ctrl.stime.tv_usec > ctrl.etime.tv_usec)
+    {
+        ctrl.ttime_us = (1000000 + ctrl.etime.tv_usec - ctrl.stime.tv_usec);
+        ctrl.ttime_s  = (ctrl.etime.tv_sec - ctrl.stime.tv_sec) - 1;
+    }
+    else
+    {
+        ctrl.ttime_us = (ctrl.etime.tv_usec - ctrl.stime.tv_usec);
+        ctrl.ttime_s  = (ctrl.etime.tv_sec - ctrl.stime.tv_sec);
+    }
     gossip_err("%s: s:%ld e:%ld\n", __func__, ctrl.stime.tv_sec, ctrl.etime.tv_sec);
 
     r = fsck_put_control(s_op->target_fs_id, &ctrl);
@@ -1958,6 +1966,7 @@ static PINT_sm_action fsck_sm_phase_2_init(
     s_op->u.fsck.position = PVFS_ITERATE_START;
     s_op->u.fsck.remote_handles.extent_array =
         malloc(sizeof(PVFS_handle_extent)*PVFS_REQ_LIMIT_MAX_EXTENTS);
+    s_op->u.fsck.status_array = NULL;
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
@@ -1975,7 +1984,10 @@ static PINT_sm_action fsck_sm_phase_2_prepare_msgpair(
 
     PINT_util_gen_credentials(&creds);
 
-    s_op->u.fsck.status_array = malloc(1*sizeof(PVFS_error));
+    if (!s_op->u.fsck.status_array)
+    {
+        s_op->u.fsck.status_array = malloc(1*sizeof(PVFS_error));
+    }
 
     config = get_server_config_struct();
 
