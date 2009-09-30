@@ -2108,6 +2108,7 @@ static int BMI_ib_finalize(void)
 const struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
+    .flags = 0,
     .initialize = BMI_ib_initialize,
     .finalize = BMI_ib_finalize,
     .set_info = BMI_ib_set_info,
