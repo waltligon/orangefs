@@ -124,6 +124,7 @@ static struct {
     int iters_polled;  /* how many iterations since this method was polled */
     int iters_active;  /* how many iterations since this method had action */
     int plan;
+    int flags;
 } *method_usage = NULL;
 static const int usage_iters_starvation = 100000;
 static const int usage_iters_active = 10000;
@@ -864,7 +865,8 @@ construct_poll_plan(int nmeth, int *idle_time_ms)
         ++method_usage[i].iters_polled;
         ++method_usage[i].iters_active;
         method_usage[i].plan = 0;
-        if (method_usage[i].iters_active <= usage_iters_active) {
+        if ((method_usage[i].iters_active <= usage_iters_active) &&
+            (!(method_usage[i].flags & BMI_METHOD_FLAG_NO_POLLING))){
             /* recently busy, poll */
 	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling active meth %d: %d / %d\n", __func__, i,
@@ -2021,6 +2023,7 @@ activate_method(const char *name, const char *listen_addr, int flags)
         free(x);
     }
     memset(&method_usage[active_method_count], 0, sizeof(*method_usage));
+    method_usage[active_method_count].flags = meth->flags;
 
     ++active_method_count;
 

@@ -131,6 +131,7 @@ char BMI_gm_method_name[] = "bmi_gm";
 /* exported method interface */
 const struct bmi_method_ops bmi_gm_ops = {
     .method_name = BMI_gm_method_name,
+    .flags = 0,
     .initialize = BMI_gm_initialize,
     .finalize = BMI_gm_finalize,
     .set_info = BMI_gm_set_info,

@@ -61,12 +61,16 @@ struct bmi_method_unexpected_info
     bmi_msg_tag_t tag;
 };
 
+/* flags that can be set per method to affect behavior */
+#define BMI_METHOD_FLAG_NO_POLLING 1
+
 /* This is the table of interface functions that must be provided by BMI
  * methods.
  */
 struct bmi_method_ops
 {
     const char *method_name;
+    int flags;
     int (*initialize) (bmi_method_addr_p, int, int);
     int (*finalize) (void);
     int (*set_info) (int, void *);

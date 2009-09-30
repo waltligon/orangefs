@@ -3159,6 +3159,7 @@ BMI_mx_rev_lookup(struct bmi_method_addr *meth)
 const struct bmi_method_ops bmi_mx_ops = 
 {
     .method_name               = "bmi_mx",
+    .flags = 0,
     .initialize                = BMI_mx_initialize,
     .finalize                  = BMI_mx_finalize,
     .set_info                  = BMI_mx_set_info,

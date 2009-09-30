@@ -2264,6 +2264,7 @@ static int bmip_query_addr_range(struct bmi_method_addr *mop __unused,
 const struct bmi_method_ops bmi_portals_ops =
 {
     .method_name = "bmi_portals",
+    .flags = 0,
     .initialize = bmip_initialize,
     .finalize = bmip_finalize,
     .set_info = bmip_set_info,
