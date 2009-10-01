@@ -41,6 +41,10 @@ int main(int argc, char **argv)
     job_context_id context;
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
+    PVFS_offset boffsets;
+    PVFS_size bsizes;
+    PVFS_size out;
+    PVFS_size bufsize = BUF_SIZE;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -291,8 +295,8 @@ int main(int argc, char **argv)
 	}
 
 	/* write the buffer out into the bytestream space */
-	ret = job_trove_bstream_write_at(coll_id, file_handle, 0,
-		buffer1, BUF_SIZE, 0, NULL, NULL, 0, &job_stat, &foo_id,
+	ret = job_trove_bstream_write_list(coll_id, file_handle,
+		&buffer1, &bufsize, 1, &boffsets, &bsizes, 1, &out, 0, NULL, NULL, 0, &job_stat, &foo_id,
 		context, NULL);
 	if(ret < 0)
 	{
@@ -315,8 +319,8 @@ int main(int argc, char **argv)
 	}
 
 	/* read the buffer out into the bytestream space */
-	ret = job_trove_bstream_read_at(coll_id, file_handle, 0,
-		buffer2, BUF_SIZE, 0, NULL, NULL, 0, &job_stat, &foo_id,
+	ret = job_trove_bstream_read_list(coll_id, file_handle,
+		&buffer2, &bufsize, 1, &boffsets, &bsizes, 1, &out, 0, NULL, NULL, 0, &job_stat, &foo_id,
 		context, NULL);
 	if(ret < 0)
 	{
