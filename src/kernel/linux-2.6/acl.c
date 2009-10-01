@@ -31,6 +31,7 @@
 #include <linux/xattr_acl.h>
 #endif
 #include "bmi-byteswap.h"
+#include <linux/fs_struct.h>
 
 /*
  * Encoding and Decoding the extended attributes so that we can
