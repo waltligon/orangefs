@@ -27,9 +27,6 @@ static int server_parse_config(
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static int server_fetch_config_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
-
 %%
 
 nested machine pvfs2_server_get_config_nested_sm
@@ -73,28 +70,6 @@ machine pvfs2_server_get_config_sm
     {
         run server_get_config_parent_cleanup;
         default => terminate;
-    }
-}
-
-nested machine pvfs2_server_fetch_config_nested_sm
-{
-    state fetch_setup_msgpair
-    {
-        run server_fetch_config_setup_msgpair;
-        success => fetch_xfer_msgpair;
-        default => fetch_cleanup;
-    }
-
-    state fetch_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        default => fetch_cleanup;
-    }
-
-    state fetch_cleanup
-    {
-        run server_fetch_config_cleanup;
-        default => return;
     }
 }
 
@@ -379,73 +354,6 @@ static int server_get_config_comp_fn(
 	sm_p->u.get_config.fs_config_buf = 
 		strdup(resp_p->u.getconfig.fs_config_buf);
 	sm_p->u.get_config.fs_config_buf_size = 
-		resp_p->u.getconfig.fs_config_buf_size;
-    }
-
-    /* if this is the last response, check all of the status values
-     * and return error code if any requests failed
-     */
-    if (i == (sm_p->msgarray_op.count -1))
-    {
-        return PINT_msgarray_status(&sm_p->msgarray_op);
-    }
-    return 0;
-}
-
-static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
-                                           job_status_s *js_p)
-{
-    int i;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"fetch_config state: server_fetch_config_setup_msgpair\n");
-
-    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-    {
-        sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
-        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
-
-        msg_p->fs_id = PVFS_FS_ID_NULL;
-        msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = server_fetch_config_comp_fn;
-        msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
-    }
-
-    js_p->error_code = 0;
-
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action server_fetch_config_cleanup(struct PINT_smcb *smcb,
-                                    job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-    /* preserve js_p->error_code */
-
-    return SM_ACTION_COMPLETE;
-}
-
-static int server_fetch_config_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-    /* if this particular request was successful, then store the server
-     * response and let the caller sort it out */
-
-    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
-    {
-	sm_p->fetch_config.fs_config_bufs[i] = 
-		strdup(resp_p->u.getconfig.fs_config_buf);
-	sm_p->fetch_config.fs_config_buf_size[i] = 
 		resp_p->u.getconfig.fs_config_buf_size;
     }
 
