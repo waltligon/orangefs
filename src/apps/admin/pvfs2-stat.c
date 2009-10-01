@@ -472,6 +472,13 @@ void print_stats(const PVFS_object_ref * ref,
    {
       fprintf(stdout, "  datafiles     : %d\n", attr->dfile_count);
    }
+
+   if( (attr->mask & PVFS_ATTR_SYS_BLKSIZE) &&
+       (attr->objtype == PVFS_TYPE_METAFILE))
+   {
+      fprintf(stdout, "  blksize       : %lld\n", lld(attr->blksize));
+   }
+
    /* dirent_count is only valid on directories */
    if( (attr->mask & PVFS_ATTR_SYS_DIRENT_COUNT) &&
        (attr->objtype == PVFS_TYPE_DIRECTORY))
