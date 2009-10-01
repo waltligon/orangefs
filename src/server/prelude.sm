@@ -601,7 +601,16 @@ static PINT_sm_action prelude_check_acls(
     obj_attr = s_op->target_object_attr;
     assert(obj_attr);
 
-    /* anything non-zero we treat as a real error */
+    /* if we didn't find the acl attributes, then just treat it as a
+     * permission denied case.
+     */
+    if (js_p->error_code == -TROVE_ENOENT)
+    {
+        js_p->error_code = -PVFS_EACCES;
+        goto cleanup;
+    }
+
+    /* anything else non-zero we treat as a real error */
     if (js_p->error_code)
     {
         goto cleanup;
