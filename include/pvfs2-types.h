@@ -103,8 +103,9 @@ enum PVFS_encoding_type
 {
     ENCODING_DIRECT = 1,
     ENCODING_LE_BFIELD = 2,
-    ENCODING_XDR = 3,
+    ENCODING_XDR = 3
 };
+
 /* these values must correspond to the defined encoding types above */
 #define ENCODING_INVALID_MIN                    0
 #define ENCODING_INVALID_MAX                    4
