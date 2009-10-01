@@ -658,7 +658,7 @@ static size_t direct_read(int fd,
 
     PINT_mem_aligned_free(aligned_buf);
 
-    return read_size;
+    return ret;
 }
 
 static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
