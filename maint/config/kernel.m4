@@ -1156,6 +1156,25 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         AC_MSG_RESULT(no)
         )
 
+        dnl newer 2.6 kernels (2.6.29-ish) use current_fsuid() macro instead
+        dnl of accessing task struct fields directly
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for current_fsuid)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/sched.h>
+                #include <linux/cred.h>
+        ], [
+                int uid = current_fsuid();
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_CURRENT_FSUID, 1, [Define if cred.h contains current_fsuid]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
+
 	CFLAGS=$oldcflags
 
 ])

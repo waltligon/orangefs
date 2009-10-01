@@ -19,8 +19,13 @@ int pvfs2_gen_credentials(
     if (credentials)
     {
         memset(credentials, 0, sizeof(PVFS_credentials));
+#ifdef HAVE_CURRENT_FSUID
+        credentials->uid = current_fsuid();
+        credentials->gid = current_fsgid();
+#else
         credentials->uid = current->fsuid;
         credentials->gid = current->fsgid;
+#endif
 
         ret = 0;
     }
@@ -749,6 +754,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
+    int fsuid, fsgid;
 
     if (name == NULL || (size > 0 && buffer == NULL))
     {
@@ -763,8 +769,16 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
+#ifdef HAVE_CURRENT_FSUID
+        fsuid = current_fsuid();
+        fsgid = current_fsgid();
+#else
+        fsuid = current->fsuid;
+        fsgid = current->fsgid;
+#endif
+
         gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %llu, name %s (uid %o, gid %o)\n", 
-                llu(get_handle_from_ino(inode)), name, current->fsuid, current->fsgid);
+                llu(get_handle_from_ino(inode)), name, fsuid, fsgid);
         pvfs2_inode = PVFS2_I(inode);
         /* obtain the xattr semaphore */
         down_read(&pvfs2_inode->xattr_sem);

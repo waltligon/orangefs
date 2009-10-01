@@ -409,6 +409,11 @@ pvfs2_xattr_set_acl(struct inode *inode, int type, const void *value,
 {
     struct posix_acl *acl;
     int error;
+#ifdef HAVE_CURRENT_FSUID
+    int fsuid = current_fsuid();
+#else
+    int fsuid = current->fsuid;
+#endif
 
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_xattr_set_acl called with size %ld\n",
             (long)size);
@@ -420,11 +425,11 @@ pvfs2_xattr_set_acl(struct inode *inode, int type, const void *value,
         return -EOPNOTSUPP;
     }
     /* Are we capable of setting acls on a file for which we should not be? */
-    if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
+    if ((fsuid != inode->i_uid) && !capable(CAP_FOWNER))
     {
         gossip_err("pvfs2_xattr_set_acl: operation not permitted "
                 "(current->fsuid %d), (inode->owner %d)\n", 
-                current->fsuid, inode->i_uid);
+                fsuid, inode->i_uid);
         return -EPERM;
     }
     if (value) 
@@ -677,6 +682,12 @@ int pvfs2_permission(struct inode *inode, int mask)
 int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
 #endif
 {
+#ifdef HAVE_CURRENT_FSUID
+    int fsuid = current_fsuid();
+#else
+    int fsuid = current->fsuid;
+#endif
+
 #ifdef HAVE_GENERIC_PERMISSION
     int ret;
 
@@ -688,7 +699,7 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
                 "inode->i_uid = %d, inode->i_gid = %d "
                 "in_group_p = %d "
                 "(ret = %d)\n",
-                llu(get_handle_from_ino(inode)), mask, inode->i_mode, current->fsuid, 
+                llu(get_handle_from_ino(inode)), mask, inode->i_mode, fsuid, 
                 inode->i_uid, inode->i_gid, 
                 in_group_p(inode->i_gid),
                 ret);
@@ -713,7 +724,7 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
             "mode = %o current->fsuid = %d "
             "inode->i_uid = %d, inode->i_gid = %d"
             "in_group_p = %d\n", 
-            llu(get_handle_from_ino(inode)), mask, mode, current->fsuid,
+            llu(get_handle_from_ino(inode)), mask, mode, fsuid,
             inode->i_uid, inode->i_gid,
             in_group_p(inode->i_gid));
 
@@ -731,7 +742,7 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
         gossip_err("pvfs2_permission: cannot write to an immutable file!\n");
         return -EACCES;
     }
-    if (current->fsuid == inode->i_uid) 
+    if (fsuid == inode->i_uid) 
     {
         mode >>= 6;
     }
