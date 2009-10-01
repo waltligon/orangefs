@@ -21,6 +21,23 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl for a different architecture
 	if test -n "${ARCH}" ; then
 		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
+        else
+            SUBARCH=`uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
+            -e s/arm.*/arm/ -e s/sa110/arm/ \
+            -e s/s390x/s390/ -e s/parisc64/parisc/ \
+            -e s/ppc.*/powerpc/ -e s/mips.*/mips/ \
+            -e s/sh.*/sh/`
+            if test "x$SUBARCH" = "xi386"; then
+                ARCH=x86    
+            elif test "x$SUBARCH" = xx86_64"; then
+                ARCH=x86    
+            elif test "x$SUBARCH" = xsparc64"; then
+                ARCH=sparc    
+            else
+                ARCH=$SUBARCH
+            fi
+
+            CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
 	fi
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
