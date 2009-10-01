@@ -9,13 +9,13 @@
  *   Author: John A. Chandy
  *           Sumit Narayan
  *
- *   $Date: 2009-03-06 13:54:32 $
- *   $Revision: 1.3 $
+ *   $Date: 2009-10-01 15:12:59 $
+ *   $Revision: 1.4 $
  *
  *   Documentation: http://www.engr.uconn.edu/~sun03001/docs/pvfs2fuse-rpt.pdf
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.3 2009-03-06 13:54:32 slang Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.4 2009-10-01 15:12:59 slang Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
@@ -244,9 +244,6 @@ static int pvfs_fuse_getattr(const char *path, struct stat *stbuf)
 {
    int			ret;
    pvfs_fuse_handle_t	pfh;
-
-/* sumit */
-   system("echo 1 >> /tmp/abc");
 
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_NO_FOLLOW );
    if ( ret < 0 )
@@ -645,12 +642,6 @@ static int pvfs_fuse_write(const char *path, const char *buf, size_t size,
    if (ret == 0) 
    {
 	  PVFS_Request_free(&mem_req);
-/* sumit */
-   ret = PVFS_sys_flush(pfh->ref, &pfh->creds);
-
-   if(ret < 0)
-	  return PVFS_ERROR_TO_ERRNO_N(ret);
-/* end sumit */
 	  return(resp_io.total_completed);
    }
    else
@@ -715,20 +706,6 @@ static int pvfs_fuse_fsync(const char *path, int isdatasync,
    (void) path;
    (void) isdatasync;
    (void) fi;
-
-/* sumit */
-   int ret;
-   pvfs_fuse_handle_t pfh;
-
-   ret = lookup(path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW);
-   if(ret < 0)
-	  return PVFS_ERROR_TO_ERRNO_N(ret);
-
-   ret = PVFS_sys_flush(pfh.ref, &pfh.creds);
-
-   if(ret < 0)
-	  return PVFS_ERROR_TO_ERRNO_N(ret);
-/* end sumit */
 
    return 0;
 }
