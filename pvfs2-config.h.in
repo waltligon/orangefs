@@ -180,14 +180,8 @@
 /* Define if kernel has i_size_write */
 #undef HAVE_I_SIZE_WRITE
 
-/* Define if kernel has class_device_destroy */
-#undef HAVE_KERNEL_CLASS_DEVICE_DESTROY
-
 /* Define if kernel has device classes */
 #undef HAVE_KERNEL_DEVICE_CLASSES
-
-/* Define if kernel has device_destroy */
-#undef HAVE_KERNEL_DEVICE_DESTROY
 
 /* Define if kernel kmem_cache_create constructor has newer-style
    one-parameter form */
