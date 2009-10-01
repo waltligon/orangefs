@@ -461,26 +461,9 @@ static PINT_sm_action prelude_perm_check(
 	    }
             else /* setattr, seteattr, seteattr_list */
             {
-                /*
-                  NOTE: on other file systems, setattr doesn't
-                  seem to require read permissions by the user, group
-                  OR other, so long as the user or group matches (or
-                  is root)
-                */
-                if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
-                     ((s_op->attr.owner == 0) ||
-                      (s_op->attr.owner == translated_uid))) ||
-                    (((s_op->attr.mask & PVFS_ATTR_COMMON_GID) &&
-                      ((s_op->attr.group == 0) ||
-                       (s_op->attr.group == translated_gid)))) ||
-                    (translated_uid == 0))
-                {
-                    js_p->error_code = 0;
-                }
-                else
-                {
-                    js_p->error_code = -PVFS_EACCES;
-                }
+                js_p->error_code = PINT_check_mode(
+                    &(s_op->attr), translated_uid,
+                    translated_gid, PINT_ACCESS_WRITABLE);
             }
             break;
         case PINT_SERVER_CHECK_NONE:
