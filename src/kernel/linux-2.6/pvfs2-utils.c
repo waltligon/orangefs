@@ -265,7 +265,7 @@ int copy_attributes_to_inode(
         {
             /* special case: mark the root inode as sticky */
             inode->i_mode |= S_ISVTX;
-            gossip_debug(GOSSIP_ACL_DEBUG, "Marking inode %llu as sticky\n", 
+            gossip_debug(GOSSIP_UTILS_DEBUG, "Marking inode %llu as sticky\n", 
                     llu(get_handle_from_ino(inode)));
         }
 
@@ -443,6 +443,7 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
         pvfs2_inode = PVFS2_I(inode);
         if (!pvfs2_inode)
         {
+            gossip_debug(GOSSIP_UTILS_DEBUG, "%s:%s:%d failed to resolve to pvfs2_inode\n", __FILE__, __func__, __LINE__);
             return ret;
         }
 
@@ -588,7 +589,7 @@ int pvfs2_inode_setattr(
             new_op, "pvfs2_inode_setattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_inode_setattr: returning %d\n", ret);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_setattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -1227,7 +1228,7 @@ static inline struct inode *pvfs2_create_file(
         new_op, "pvfs2_create_file", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_ACL_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
@@ -1252,14 +1253,14 @@ static inline struct inode *pvfs2_create_file(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Regular File) %llu -> %s\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Regular File) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
         *error_code = ret;
 
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_create_file: failed with error code %d\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: failed with error code %d\n",
                     *error_code);
     }
 
@@ -1339,7 +1340,7 @@ static inline struct inode *pvfs2_create_dir(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Directory) %llu -> %s\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Directory) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
@@ -1435,7 +1436,7 @@ static inline struct inode *pvfs2_create_symlink(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_ACL_DEBUG, "Inode (Symlink) %llu -> %s\n",
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Symlink) %llu -> %s\n",
                 llu(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else

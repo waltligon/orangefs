@@ -79,6 +79,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         strncpy(new_op->upcall.req.lookup.d_name,
                 dentry->d_name.name, PVFS2_NAME_LEN);
 
+        gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d interrupt flag [%d]\n", 
+            __FILE__, __func__, __LINE__, get_interruptible_flag(parent_inode));
+
         ret = service_operation(
             new_op, "pvfs2_lookup", 
             get_interruptible_flag(parent_inode));
@@ -88,12 +91,28 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         {
             gossip_debug(
                 GOSSIP_DCACHE_DEBUG,
-                "%s: lookup failure or no match.\n", __func__);
+                "%s:%s:%d lookup failure |%s| or no match |%s|.\n", 
+                __FILE__, __func__, __LINE__,
+                (new_op->downcall.status != 0) ? "true" : "false",
+                (!match_handle(new_op->downcall.resp.lookup.refn.handle, inode)) ? "true" : "false");
             op_release(new_op);
+
+            /* Avoid calling make_bad_inode() in this situation.  On 2.4
+             * (RHEL3) kernels, it can cause bogus permission denied errors
+             * on path elements after interrupt signals.  On later 2.6
+             * kernels this causes a kernel oops rather than a permission
+             * error.
+             */
+#if 0
             /* mark the inode as bad so that d_delete will be aggressive
              * about dropping the dentry
              */
             pvfs2_make_bad_inode(inode);
+#endif
+            gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d setting revalidate_failed = 1\n", __FILE__, __func__, __LINE__);
+            /* set a flag that we can detect later in d_delete() */
+            PVFS2_I(inode)->revalidate_failed = 1;
+
             goto invalid_exit;
         }
 
@@ -111,11 +130,12 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
                  __func__, inode, llu(get_handle_from_ino(inode)));
     ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
     gossip_debug(GOSSIP_DCACHE_DEBUG,
-                 "%s: getattr %s (ret = %d), returning %s for dentry\n",
+                 "%s: getattr %s (ret = %d), returning %s for dentry i_count=%d\n",
                  __func__,
                  (ret == 0 ? "succeeded" : "failed"),
                  ret,
-                 (ret == 0 ? "valid" : "INVALID"));
+                 (ret == 0 ? "valid" : "INVALID"),
+                 atomic_read(&inode->i_count));
     if(ret != 0)
     {
         goto invalid_exit;
@@ -132,7 +152,10 @@ static int pvfs2_d_delete (struct dentry * dentry)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: called on dentry %p.\n", __func__, dentry);
+#if 0
     if(dentry->d_inode && is_bad_inode(dentry->d_inode))
+#endif
+    if(dentry->d_inode && PVFS2_I(dentry->d_inode)->revalidate_failed == 1)
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG,
                      "%s: returning 1 (bad inode).\n", __func__);
