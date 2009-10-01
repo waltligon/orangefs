@@ -2805,6 +2805,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                         peer = ctx->mxc_peer;
                         qlist_del_init(&ctx->mxc_list);
                         result = 1;
+                        status = ctx->mxc_mxstat;
                 }
                 gen_mutex_unlock(&bmi_mx->bmx_unex_txs_lock);
 
@@ -2816,6 +2817,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
                                 bmx_deq_pending_ctx(ctx);
                                 peer = ctx->mxc_peer;
                                 if (ctx->mxc_type == BMX_REQ_RX) {
+                                        ctx->mxc_mxstat = status;
                                         /* queue until testunexpected is called */
                                         bmx_q_unex_ctx(ctx);
                                         result = 0;
@@ -2919,6 +2921,7 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                 peer = rx->mxc_peer;
                 qlist_del_init(&rx->mxc_list);
                 result = 1;
+                status = rx->mxc_mxstat;
         }
         gen_mutex_unlock(&bmi_mx->bmx_unex_rxs_lock);
 
@@ -2930,6 +2933,7 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
                         bmx_deq_pending_ctx(rx);
                         peer = rx->mxc_peer;
                         if (rx->mxc_type == BMX_REQ_TX) {
+                                rx->mxc_mxstat = status;
                                 bmx_q_unex_ctx(rx);
                                 result = 0;
                                 again = 1;
