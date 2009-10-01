@@ -609,8 +609,22 @@ int pvfs2_flush_inode(struct inode *inode)
      */
     struct iattr wbattr;
     int ret;
+    int mtime_flag, ctime_flag, atime_flag, mode_flag;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     memset(&wbattr, 0, sizeof(wbattr));
+
+    /* check inode flags up front, and clear them if they are set.  This
+     * will prevent multiple processes from all trying to flush the same
+     * inode if they call close() simultaneously
+     */
+    mtime_flag = MtimeFlag(pvfs2_inode);
+    ClearMtimeFlag(pvfs2_inode);
+    ctime_flag = CtimeFlag(pvfs2_inode);
+    ClearCtimeFlag(pvfs2_inode);
+    atime_flag = AtimeFlag(pvfs2_inode);
+    ClearAtimeFlag(pvfs2_inode);
+    mode_flag = ModeFlag(pvfs2_inode);
+    ClearModeFlag(pvfs2_inode);
 
     /*  -- Lazy atime,mtime and ctime update --
      * Note: all times are dictated by server in the new scheme 
@@ -619,9 +633,9 @@ int pvfs2_flush_inode(struct inode *inode)
      * Also mode updates are being handled now..
      */
 
-    if (MtimeFlag(pvfs2_inode))
+    if (mtime_flag)
         wbattr.ia_valid |= ATTR_MTIME;
-    if (CtimeFlag(pvfs2_inode))
+    if (ctime_flag)
         wbattr.ia_valid |= ATTR_CTIME;
     /*
      * We do not need to honor atime flushes if
@@ -632,11 +646,11 @@ int pvfs2_flush_inode(struct inode *inode)
 
     if (!((inode->i_flags & S_NOATIME)
             || (inode->i_sb->s_flags & MS_NOATIME)
-            || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && AtimeFlag(pvfs2_inode))
+            || ((inode->i_sb->s_flags & MS_NODIRATIME) && S_ISDIR(inode->i_mode))) && atime_flag)
     {
         wbattr.ia_valid |= ATTR_ATIME;
     }
-    if (ModeFlag(pvfs2_inode)) 
+    if (mode_flag) 
     {
         wbattr.ia_mode = inode->i_mode;
         wbattr.ia_valid |= ATTR_MODE;
