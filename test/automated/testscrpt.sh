@@ -41,6 +41,10 @@ TESTNAME="`hostname -s`-nightly"
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain stan"
 
+#
+# Detect basic heap corruption
+#
+export MALLOC_CHECK_=2
 
 # takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
@@ -193,7 +197,7 @@ run_parts() {
 		if [ -x $f ] ; then 
 			echo -n "====== running $f ..."
 			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
-			if [ $? == 0 ] ; then 
+			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
