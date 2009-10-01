@@ -74,7 +74,7 @@ endecode_fields_11_struct(
     int32_t, dspace_queue,
     int32_t, keyval_queue,
     int32_t, reqsched,
-    skip4,)
+    skip4,);
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info
@@ -93,7 +93,7 @@ endecode_fields_7_struct(
   PVFS_ds_type, type,
   skip4,,
   PVFS_size, b_size,
-  PVFS_handle, dirdata_handle)
+  PVFS_handle, dirdata_handle);
 
 /* individual datapoint from event monitoring */
 struct PVFS_mgmt_event
@@ -115,7 +115,7 @@ endecode_fields_8_struct(
     int32_t, flags,
     int32_t, tv_sec,
     int32_t, tv_usec,
-    skip4,)
+    skip4,);
 
 /* values which may be or'd together in the flags field above */
 enum
