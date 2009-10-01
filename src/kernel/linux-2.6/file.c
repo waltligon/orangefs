@@ -423,7 +423,7 @@ static int copy_from_pagecache(struct rw_options *rw,
     return 0;
 }
 
-#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
+#endif /* #ifndef PVFS2_LINUX_KERNEL_2_4 */
 
 /*
  * Post and wait for the I/O upcall to finish
@@ -1181,7 +1181,7 @@ cleanup:
     cleanup_cache_pages(rw.dest.pages.nr_pages, &rw, err);
     return err == 0 ? total_actual_io : err;
 }
-#endif //#ifndef PVFS2_LINUX_KERNEL_2_4
+#endif /* #ifndef PVFS2_LINUX_KERNEL_2_4 */
 
 /*
  * Common entry point for read/write/readv/writev
