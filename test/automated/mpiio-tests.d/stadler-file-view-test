@@ -8,7 +8,7 @@
 
 FILE_VIEW_TEST=${CLUSTER_DIR}/file_view_test
 
-${CLUSTER_DIR}/mpich2/bin/mpicxx ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.cpp -o $FILE_VIEW_TEST
+${CLUSTER_DIR}/mpich2/bin/mpicxx ${PVFS2_DEST}/${TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.cpp -o $FILE_VIEW_TEST
 
 if [ $? -eq 1 ] ; then
 	exit 1
@@ -34,5 +34,5 @@ if [ -f $PAV_CONFIG ] ; then
 	cat fileview.o$job_id
 
 	# need to know if we failed or not
-	grep -q "`cat ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.std`" fileview.o$job_id 
+	grep -q "`cat ${PVFS2_DEST}/${TAG}/test/automated/mpiio-tests.d/stadler-file-view-test.std`" fileview.o$job_id 
 fi

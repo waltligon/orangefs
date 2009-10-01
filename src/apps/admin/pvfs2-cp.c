@@ -609,8 +609,8 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	{
 	    if (ret == 0)
 	    {
-		fprintf(stderr, "Target file %s already exists\n", entry_name);
-		return (-1);
+                obj->u.pvfs2.ref = resp_lookup.ref;
+		return 0;
 	    } 
 	    else 
 	    {

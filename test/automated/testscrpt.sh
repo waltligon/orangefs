@@ -11,6 +11,83 @@
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
+export PVFS2_ENDPOINT="tcp://`hostname -s`:3399/pvfs2-fs"
+
+# need to make this a command line arugment:
+export CVS_TAG="${CVS_TAG:-HEAD}"
+
+export TAG=pvfs2-${CVS_TAG}
+
+show_usage() {
+        echo ""
+        echo "Usage: testscrpt.sh [-h] [-b] [-s] [-v] [-k] [-t <tag>] [-p <pvfs dest>] \\"
+        echo "                    [-m <pvfs mountpoint>] [-e <pvfs endpoint>]"
+        echo ""
+        echo "Options:"
+        echo "  -h                This help text"
+        echo "  -b                Don't checkout/build PVFS (already built)"
+        echo "  -s                Don't setup PVFS servers (already setup)"
+        echo "  -v                Run VFS tests"
+        echo "  -k                Skip building/running MPI-IO tests"
+        echo "  -t <tag>          Use the specified tag instead of \"$TAG\""
+        echo "  -p <pvfs dest>    Use the specified PVFS destination"
+        echo "  -m <pvfs mnt>     Use the specified PVFS mountpoint"
+        echo "  -e <pvfs ep>      Use the specified PVFS endpoint"
+        echo "                    instead of: $PVFS2_ENDPOINT"
+        echo ""
+}
+
+prebuilt_opt=
+presetup_opt=
+vfs_opt=
+skipmpi_opt=
+tag_opt=
+pvfsdest_opt=
+pvfsmnt_opt=
+pvfsep_op=
+
+while getopts ":bsvhkt:p:m:e:" opt; do
+
+        case $opt in
+          b)
+                prebuilt_opt=1
+                ;;
+          s)
+                presetup_opt=1
+                ;;
+          v)
+                vfs_opt=1
+                ;;
+          k)
+                skipmpi_opt=1
+                ;;
+          h)
+                show_usage
+                exit 1
+                ;;
+          t)
+                tag_opt=$OPTARG
+                ;;
+          p)
+                pvfsdest_opt=$OPTARG
+                ;;
+          m)
+                pvfsmnt_opt=$OPTARG
+                ;;
+          e)
+                pvfsep_opt=$OPTARG
+                ;;
+          \?)
+                echo "Invalid option: -$OPTARG, use -h for help." >&2
+                exit 1
+                ;;
+          :)
+                echo "Option -$OPTARG requires an argument, use -h for help." >&2
+                exit 1
+                ;;
+        esac
+done
+
 
 # look for a 'nightly-test.cfg' in the same directory as this script
 if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
@@ -18,16 +95,26 @@ if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then
 fi
 
 
-# need to make this a command line arugment:
-export CVS_TAG="${CVS_TAG:-HEAD}"
+# use specified tag if given
+if test -n "$tag_opt"; then
+        export TAG=$tag_opt
+fi
+
+if test -n "$pvfsdest_opt"; then
+        export PVFS2_DEST=$pvfsdest_opt
+fi
+
+if test -n "$pvfsmnt_opt"; then
+        export PVFS2_MOUNTPOINT=$pvfsmnt_opt
+fi
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
-VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
-MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
-REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+SYSINT_SCRIPTS=${PVFS2_DEST}/${TAG}/test/automated/sysint-tests.d
+VFS_SCRIPTS=${PVFS2_DEST}/${TAG}/test/automated/vfs-tests.d
+MPIIO_DRIVER=${PVFS2_DEST}/${TAG}/test/automated/testscrpt-mpi.sh
+REPORT_LOG=${PVFS2_DEST}/alltests-${TAG}.log
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -39,7 +126,7 @@ TESTNAME="`hostname -s`-nightly"
 
 # before starting any client apps, we need to deal with the possiblity that we
 # might have built with shared libraries
-export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
+export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-${TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain stan"
@@ -70,7 +157,7 @@ pull_and_build_pvfs2 () {
 
 pull_and_build_mpich2 () {
 	# just to make debugging less painful
-	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
+	[ -n "${SKIP_BUILDING_MPICH2}" || -n "$skipmpi_opt" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	rm -rf mpich2-latest.tar.gz
@@ -82,9 +169,9 @@ pull_and_build_mpich2 () {
 	cd build
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
-		--with-pvfs2=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG} \
+		--with-pvfs2=${PVFS2_DEST}/INSTALL-${TAG} \
 		--enable-g=dbg --without-mpe \
-		--disable-f77 >mpich2config-${CVS_TAG}.log &&\
+		--disable-f77 >mpich2config-${TAG}.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
@@ -101,34 +188,34 @@ teardown_vfs() {
 
 setup_vfs() {
 	sudo dmesg -c >/dev/null
-	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
-		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
-		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
-	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
-	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-${TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
+	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-${TAG}/sbin/pvfs2-client \
+		-p ${PVFS2_DEST}/INSTALL-${TAG}/sbin/pvfs2-client-core \
+		-L ${PVFS2_DEST}/pvfs2-client-${TAG}.log
+	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-${TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${TAG}.log
+	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-${TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${TAG}.log &
+	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${TAG}.log
+	sudo mount -t pvfs2 ${PVFS2_ENDPOINT} ${PVFS2_MOUNTPOINT}
 }
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
 	rm -f fs.conf 
-	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
+	INSTALL-${TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
-		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
-		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
+		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${TAG} \
+		--logfile=${PVFS2_DEST}/pvfs2-server-${TAG}.log --quiet
 	# clean up any artifacts from earlier runs
-	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
-	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
-	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${TAG}*
+	rm -f ${PVFS2_DEST}/pvfs2-server-${TAG}.log* 
+	failure_logs="${PVFS2_DEST}/pvfs2-server-${TAG}.log* $failure_logs"
 	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		INSTALL-${TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid \
 			-f fs.conf -a $alias
-		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
+		INSTALL-${TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid  \
 			fs.conf $server_conf -a $alias
 	done
@@ -161,27 +248,27 @@ teardown_pvfs2() {
 
 buildfail() {
 	echo "Failure in build process"
-	cat ${PVFS2_DEST}/configure-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-extracted-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-install-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-${CVS_TAG}.log \
-		${PVFS2_DEST}/make-test-${CVS_TAG}.log | \
-		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
+	cat ${PVFS2_DEST}/configure-${TAG}.log \
+		${PVFS2_DEST}/make-extracted-${TAG}.log \
+		${PVFS2_DEST}/make-install-${TAG}.log \
+		${PVFS2_DEST}/make-${TAG}.log \
+		${PVFS2_DEST}/make-test-${TAG}.log | \
+		${TINDERSCRIPT} ${TESTNAME}-${TAG} build_failed $STARTTIME 
 	exit 1
 }
 
 setupfail() {
 	echo "Failure in setup"
 	dmesg > ${PVFS2_DEST}/dmesg
-	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
-		${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* | \
-		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
+	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-client-${TAG}.log \
+		${PVFS2_DEST}/pvfs2-server-${TAG}.log* | \
+		${TINDERSCRIPT}  ${TESTNAME}-${TAG} test_failed $STARTTIME 
 	exit 1
 }
 
 tinder_report() {
 	eval cat $REPORT_LOG $failure_logs |\
-		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} $1 $STARTTIME \
+		${TINDERSCRIPT} ${TESTNAME}-${TAG} $1 $STARTTIME \
 		"$nr_failed of $(( $nr_failed + $nr_passed)) failed"
 }
 
@@ -199,13 +286,13 @@ run_parts() {
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
 			echo -n "====== running $f ..."
-			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
+			./$f > ${PVFS2_DEST}/${f}-${TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
 				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
-				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${CVS_TAG}.log"
+				failure_logs="$failure_logs ${PVFS2_DEST}/${f}-${TAG}.log"
 				echo "FAILED"
 			fi
 		fi
@@ -217,7 +304,7 @@ run_parts() {
 ###
 
 # show that we're doing something
-${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
+${TINDERSCRIPT} ${TESTNAME}-${TAG} building $STARTTIME </dev/null
 
 # will we be able to do VFS-related tests?
 do_vfs=0
@@ -228,15 +315,23 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
+if test -n "$vfs_opt"; then
+        do_vfs=1
+fi
+
 failure_logs=""   # a space-delimited list of logs that failed
 # compile and install
-pull_and_build_pvfs2  $CVS_TAG || buildfail
+if test -z "$prebuilt_opt"; then
+        pull_and_build_pvfs2  $TAG || buildfail
+fi
 
-teardown_pvfs2 && setup_pvfs2 
+if test -z "$presetup_opt"; then
+        teardown_pvfs2 && setup_pvfs2
 
-if [ $? != 0 ] ; then
-	echo "setup failed"
-	setupfail
+        if [ $? != 0 ] ; then
+        	echo "setup failed"
+        	setupfail
+        fi
 fi
 
 if [ $do_vfs -eq 1 ] ; then 
@@ -277,7 +372,7 @@ if [ $? -eq 0 ] ; then
 	# go through the hassle of downloading/building mpich2 only if we are
 	# actually going to use it
 	pull_and_build_mpich2 || buildfail
-	. $MPIIO_DRIVER
+	[ -z "$skipmpi_opt ] && $MPIIO_DRIVER
 fi
 
 # restore file descriptors and close temporary fds
