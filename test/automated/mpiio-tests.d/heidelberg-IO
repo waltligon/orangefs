@@ -8,7 +8,7 @@
 
 IO_TEST=${CLUSTER_DIR}/heidelberg-io
 
-${CLUSTER_DIR}/mpich2/bin/mpicc ${PVFS2_DEST}/${TAG}/test/automated/mpiio-tests.d/heidelberg-IO.c -o $IO_TEST
+${CLUSTER_DIR}/mpich2/bin/mpicc ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/mpiio-tests.d/heidelberg-IO.c -o $IO_TEST
 
 if [ $? -eq 1 ] ; then
 	exit 1
