@@ -24,10 +24,10 @@
 #include "check.h"
 
 static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
+static int pw_buf_size = 1024;     /* 1K */
+static int max_usr_groups = 65536; /* 64K */
 static char* check_group_pw_buffer = NULL;
-static long check_group_pw_buffer_size = 0;
-static char* check_group_gr_buffer = NULL;
-static long check_group_gr_buffer_size = 0;
+static gid_t* usr_groups = NULL;
 static int PINT_check_group(uid_t uid, gid_t gid);
 
 /* PINT_check_mode()
@@ -199,10 +199,9 @@ static int PINT_check_group(uid_t uid, gid_t gid)
 {
     struct passwd pwd;
     struct passwd* pwd_p = NULL;
-    struct group grp;
-    struct group* grp_p = NULL;
     int i = 0;
     int ret = -1;
+    int num_usr_groups = max_usr_groups;
 
     /* Explanation: 
      *
@@ -221,29 +220,37 @@ static int PINT_check_group(uid_t uid, gid_t gid)
 
     if(!check_group_pw_buffer)
     {
-        /* need to create a buffer for pw and grp entries */
+        /* need to create a buffer for pw and grp entries  */
+#if 0
+	/* The sysconf calls don't give a good buffer size back in every 
+         * situation. It doesn't appear to know enough info on LDAP accounts 
+         * to pick a good buffersize
+         */
+         
+
 #if defined(_SC_GETGR_R_SIZE_MAX) && defined(_SC_GETPW_R_SIZE_MAX)
         /* newish posix systems can tell us what the max buffer size is */
-        check_group_gr_buffer_size = sysconf(_SC_GETGR_R_SIZE_MAX);
         check_group_pw_buffer_size = sysconf(_SC_GETPW_R_SIZE_MAX);
 #else
         /* fall back for older systems */
         check_group_pw_buffer_size = 1024;
-        check_group_gr_buffer_size = 1024;
 #endif
-        check_group_pw_buffer = (char*)malloc(check_group_pw_buffer_size);
-        check_group_gr_buffer = (char*)malloc(check_group_gr_buffer_size);
-        if(!check_group_pw_buffer || !check_group_gr_buffer)
+
+#endif /* 0 */
+
+        check_group_pw_buffer = (char*)malloc(pw_buf_size);
+        usr_groups = (gid_t *)malloc(max_usr_groups * sizeof(gid_t));
+        if(!check_group_pw_buffer || !usr_groups)
         {
             if(check_group_pw_buffer)
             {
                 free(check_group_pw_buffer);
                 check_group_pw_buffer = NULL;
             }
-            if(check_group_gr_buffer)
+            if(usr_groups)
             {
-                free(check_group_gr_buffer);
-                check_group_gr_buffer = NULL;
+                free(usr_groups);
+                usr_groups = NULL;
             }
             gen_mutex_unlock(&check_group_mutex);
             return(-PVFS_ENOMEM);
@@ -251,12 +258,13 @@ static int PINT_check_group(uid_t uid, gid_t gid)
     }
 
     /* get user information */
-    ret = getpwuid_r(uid, &pwd, check_group_pw_buffer,
-        check_group_pw_buffer_size,
-        &pwd_p);
+    ret = getpwuid_r(uid, &pwd, check_group_pw_buffer, pw_buf_size, &pwd_p);
     if(ret != 0 || pwd_p == NULL)
     {
         gen_mutex_unlock(&check_group_mutex);
+	gossip_err("Get user info for (uid=%d) failed."
+                   "errno [%d] error_msg [%s]\n",
+		   uid, ret, strerror(ret));
         return(-PVFS_EINVAL);
     }
 
@@ -267,27 +275,20 @@ static int PINT_check_group(uid_t uid, gid_t gid)
         return 0;
     }
 
-    /* get other group information */
-    ret = getgrgid_r(gid, &grp, check_group_gr_buffer,
-        check_group_gr_buffer_size,
-        &grp_p);
-    if(ret != 0)
+    /* get the groups this member is part of */
+    ret = getgrouplist(pwd.pw_name, pwd.pw_gid, usr_groups, &num_usr_groups);
+    if(ret == -1)
     {
-        gen_mutex_unlock(&check_group_mutex);
+	gen_mutex_unlock(&check_group_mutex);
+	gossip_err("Get groups for (uid=%d) failed. Requested up to [%d] groups"
+                   "and found [%d]\n",
+		   uid, max_usr_groups, num_usr_groups);
         return(-PVFS_EINVAL);
     }
 
-    if(grp_p == NULL)
-    { 
-	gen_mutex_unlock(&check_group_mutex);
-	gossip_err("User (uid=%d) isn't in group %d on storage node.\n",
-		   uid, gid);
-        return(-PVFS_EACCES);
-    }
-
-    for(i = 0; grp.gr_mem[i] != NULL; i++)
+    for(i = 0; i < num_usr_groups; i++)
     {
-        if(0 == strcmp(pwd.pw_name, grp.gr_mem[i]) )
+        if( usr_groups[i] == gid) 
         {
             gen_mutex_unlock(&check_group_mutex);
             return 0;
