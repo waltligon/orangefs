@@ -112,6 +112,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d setting revalidate_failed = 1\n", __FILE__, __func__, __LINE__);
             /* set a flag that we can detect later in d_delete() */
             PVFS2_I(inode)->revalidate_failed = 1;
+            d_drop(dentry);
 
             goto invalid_exit;
         }
