@@ -469,6 +469,8 @@ static void print_help(char *progname)
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
+    printf("--desc-count=VALUE            overrides the default # of kernel buffer descriptors\n");
+    printf("--desc-size=VALUE             overrides the default size of each kernel buffer descriptor\n");
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--events=EVENTS               enable tracing of certain EVENTS\n");
