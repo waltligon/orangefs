@@ -20,7 +20,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
 	if test -n "${ARCH}" ; then
-		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include"
+		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
 	fi
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
