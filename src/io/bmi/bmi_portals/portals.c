@@ -31,6 +31,7 @@
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t */
 #include <src/common/misc/pvfs2-internal.h>  /* lld */
 #include <src/common/id-generator/id-generator.h>
+#include "pint-hint.h"
 
 #ifdef HAVE_VALGRIND_H
 #include <memcheck.h>
@@ -1178,7 +1179,8 @@ static int bmip_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_m
 			       bmi_size_t total_size,
 			       enum bmi_buffer_type buffer_flag __unused,
 			       bmi_msg_tag_t tag, void *user_ptr,
-			       bmi_context_id context_id)
+			       bmi_context_id context_id,
+                               PVFS_hint hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
 		     total_size, tag, user_ptr, context_id, 0);
@@ -1193,7 +1195,8 @@ static int bmip_post_sendunexpected_list(bmi_op_id_t *id,
 					 bmi_msg_tag_t tag, 
                                          uint8_t class,
                                          void *user_ptr,
-					 bmi_context_id context_id)
+					 bmi_context_id context_id, 
+                                         PVFS_hint hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
 		     total_size, tag, user_ptr, context_id, 1);
@@ -1493,7 +1496,8 @@ static int bmip_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_m
 			       bmi_size_t *tot_actual_len __unused,
 			       enum bmi_buffer_type buffer_flag __unused,
 			       bmi_msg_tag_t tag, void *user_ptr,
-			       bmi_context_id context_id)
+			       bmi_context_id context_id, PVFS_hint hints
+                               __unused)
 {
     return post_recv(id, remote_map, list_count, buffers, sizes,
 		     tot_expected_len, tag, user_ptr, context_id);
