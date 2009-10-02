@@ -332,6 +332,9 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	msg_header_init(&mh_eager.c, c, sq->is_unexpected
 	                ? MSG_EAGER_SENDUNEXPECTED : MSG_EAGER_SEND);
 	mh_eager.bmi_tag = sq->bmi_tag;
+        mh_eager.class = 0;
+        if(sq->is_unexpected)
+            mh_eager.class += sq->class;
 	encode_msg_header_eager_t(&ptr, &mh_eager);
 
 	memcpy_from_buflist(&sq->buflist,
@@ -808,7 +811,7 @@ static int
 post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
           int numbufs, const void *const *buffers, const bmi_size_t *sizes,
           bmi_size_t total_size, bmi_msg_tag_t tag, void *user_ptr,
-          bmi_context_id context_id, int is_unexpected)
+          bmi_context_id context_id, int is_unexpected, uint8_t class)
 {
     struct ib_work *sq;
     struct method_op *mop;
@@ -826,6 +829,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     sq = bmi_ib_malloc(sizeof(*sq));
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
+    sq->class = class;
 
     debug(2, "%s: sq %p len %lld peer %s", __func__, sq, (long long) total_size,
           ibmap->c->peername);
@@ -899,7 +903,7 @@ BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-                     total_size, tag, user_ptr, context_id, 0);
+                     total_size, tag, user_ptr, context_id, 0, 0);
 }
 
 static int
@@ -915,7 +919,7 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
                                 PVFS_hint hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-                     total_size, tag, user_ptr, context_id, 1);
+                     total_size, tag, user_ptr, context_id, 1, class);
 }
 
 /*
@@ -1360,6 +1364,8 @@ restart:
 	    ib_connection_t *c = rq->c;
 
 	    decode_msg_header_eager_t(&ptr, &mh_eager);
+            if(mh_eager.class != class)
+                continue;
 
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
