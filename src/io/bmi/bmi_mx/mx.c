@@ -1409,9 +1409,11 @@ BMI_mx_unexpected_free(void *buf)
 }
 
 static void
-bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag)
+bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag,
+    uint8_t* class)
 {
         *type   = (uint8_t)  (match >> BMX_MSG_SHIFT);
+        *class  = (uint8_t)  (match >> BMX_CLASS_SHIFT);
         *id     = (uint32_t) ((match >> BMX_ID_SHIFT) & BMX_MAX_PEER_ID); /* 20 bits */
         *tag    = (uint32_t) (match & BMX_MAX_TAG); /* 32 bits */
         return;
@@ -1423,6 +1425,7 @@ bmx_create_match(struct bmx_ctx *ctx)
         int             connect = 0;
         uint64_t        type    = (uint64_t) ctx->mxc_msg_type;
         uint64_t        id      = 0ULL;
+        uint64_t        class   = 0ULL;
         uint64_t        tag     = (uint64_t) ((uint32_t) ctx->mxc_tag);
 
         if (ctx->mxc_msg_type == BMX_MSG_CONN_REQ || 
@@ -1448,7 +1451,9 @@ bmx_create_match(struct bmx_ctx *ctx)
                 exit(1);
         }
 
-        ctx->mxc_match = (type << BMX_MSG_SHIFT) | (id << BMX_ID_SHIFT) | tag;
+        class += ctx->mxc_class;
+        ctx->mxc_match = (type << BMX_MSG_SHIFT) | (id << BMX_ID_SHIFT) |
+            tag | (class << BMX_CLASS_SHIFT);
 
         return;
 }
@@ -1561,8 +1566,8 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, const void *const *buffers, 
                      const bmi_size_t *sizes, bmi_size_t total_size, 
                      bmi_msg_tag_t tag, void *user_ptr,
-                     bmi_context_id context_id, int is_unexpected,
-                     PVFS_hint hints)
+                     bmi_context_id context_id, uint8_t class, 
+                     int is_unexpected, PVFS_hint hints)
 {
         struct bmx_ctx          *tx     = NULL;
         struct method_op        *mop    = NULL;
@@ -1649,6 +1654,7 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 
         tx->mxc_tag = tag;
         tx->mxc_peer = peer;
+        tx->mxc_class = class;
         if (!is_unexpected) {
                 tx->mxc_msg_type = BMX_MSG_EXPECTED;
         } else {
@@ -1696,8 +1702,8 @@ BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id, 0,
-                                    hints);
+                                    total_size, tag, user_ptr, context_id,
+                                    0, 0, hints);
 
         BMX_EXIT;
 
@@ -1716,8 +1722,8 @@ BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
         BMX_ENTER;
 
         return bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id, 1,
-                                    hints);
+                                    total_size, tag, user_ptr, context_id,
+                                    class, 1, hints);
 
         BMX_EXIT;
 
@@ -1961,11 +1967,12 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         struct bmx_peer *peer   = NULL;
         void            *peerp  = (void *) &peer;
         mx_return_t     mxret   = MX_SUCCESS;
+        uint8_t         class = 0;
 
         BMX_ENTER;
 
         if (id == 0 && tag == 0 && type == 0) {
-                bmx_parse_match(match, &type, &id, &tag);
+                bmx_parse_match(match, &type, &id, &tag, &class);
         }
 
 #if BMX_LOGGING
@@ -2030,13 +2037,14 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
         int                     ret     = MX_RECV_CONTINUE;
         struct bmx_ctx          *rx     = NULL;
         uint8_t                 type    = 0;
+        uint8_t                 class   = 0;
         uint32_t                id      = 0;
         uint32_t                tag     = 0;
         struct bmx_peer         *peer   = NULL;
         void                    *peerp  = &peer;
         mx_return_t             mxret   = MX_SUCCESS;
 
-        bmx_parse_match(match_value, &type, &id, &tag);
+        bmx_parse_match(match_value, &type, &id, &tag, &class);
 
         switch (type) {
         case BMX_MSG_CONN_REQ:
@@ -2262,6 +2270,7 @@ bmx_handle_conn_req(void)
                 mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
                 if (result) {
                         uint8_t                 type    = 0;
+                        uint8_t                 class   = 0;
                         uint32_t                id      = 0;
                         uint32_t                sid     = 0;
                         uint32_t                version = 0;
@@ -2290,7 +2299,8 @@ bmx_handle_conn_req(void)
                                 bmx_put_idle_rx(rx);
                                 continue;
                         }
-                        bmx_parse_match(rx->mxc_match, &type, &id, &version);
+                        bmx_parse_match(rx->mxc_match, &type, &id, &version,
+                            &class);
                         if (version != BMX_VERSION) {
                                 /* TODO send error conn_ack */
                                 debug(BMX_DB_WARN, "version mismatch with peer "
@@ -2834,6 +2844,7 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         struct bmx_peer *peer           = NULL;
         list_t          *unex_rxs       = &bmi_mx->bmx_unex_rxs;
         int             again           = 1;
+        uint64_t        class_match     = 0;
 
         if (count++ % 1000 == 0) {
                 BMX_ENTER;
@@ -2841,6 +2852,10 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         }
 
         bmx_connection_handlers();
+
+        /* must match the correct class as well */
+        class_match += class;
+        match |= (class_match << BMX_CLASS_SHIFT);
 
         /* if the unexpected handler cannot get a rx, it does not post a receive.
          * probe for unexpected and post a rx. */
