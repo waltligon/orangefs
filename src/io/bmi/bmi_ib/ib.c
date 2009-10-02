@@ -22,6 +22,7 @@
 #include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
 #include <src/common/misc/pvfs2-internal.h>
+#include "pint-hint.h"
 
 #ifdef HAVE_VALGRIND_H
 #include <memcheck.h>
@@ -894,7 +895,8 @@ static int
 BMI_ib_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                  const void *buffer, bmi_size_t total_size,
                  enum bmi_buffer_type buffer_flag __unused,
-                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id
+                 context_id, PVFS_hint hints __unused)
 {
     return post_send(id, remote_map, 0, &buffer, &total_size,
                      total_size, tag, user_ptr, context_id, 0);
@@ -904,7 +906,8 @@ static int
 BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   const void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
-  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
+  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id, PVFS_hint
+  hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
                      total_size, tag, user_ptr, context_id, 0);
@@ -915,7 +918,8 @@ BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                            const void *buffer, bmi_size_t total_size,
                            enum bmi_buffer_type buffer_flag __unused,
                            bmi_msg_tag_t tag, void *user_ptr,
-			   bmi_context_id context_id)
+			   bmi_context_id context_id, PVFS_hint hints
+                           __unused)
 {
     return post_send(id, remote_map, 0, &buffer, &total_size,
                      total_size, tag, user_ptr, context_id, 1);
@@ -928,7 +932,8 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
                                 bmi_size_t total_size,
 				enum bmi_buffer_type buffer_flag __unused,
                                 bmi_msg_tag_t tag, void *user_ptr,
-				bmi_context_id context_id)
+				bmi_context_id context_id, PVFS_hint hints
+                                __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
                      total_size, tag, user_ptr, context_id, 1);
@@ -1065,7 +1070,7 @@ static int
 BMI_ib_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
   enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
-  bmi_context_id context_id)
+  bmi_context_id context_id, PVFS_hint hints __unused)
 {
     return post_recv(id, remote_map, 0, &buffer, &expected_len,
                      expected_len, tag, user_ptr, context_id);
@@ -1076,7 +1081,7 @@ BMI_ib_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t tot_expected_len, bmi_size_t *tot_actual_len __unused,
   enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
-  bmi_context_id context_id)
+  bmi_context_id context_id, PVFS_hint hints __unused)
 {
     return post_recv(id, remote_map, list_count, buffers, sizes,
                      tot_expected_len, tag, user_ptr, context_id);
