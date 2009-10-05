@@ -234,6 +234,7 @@ struct ctrl_immed
 {
     bmi_msg_tag_t msg_tag;	/* message tag */
     int32_t actual_size;
+    uint8_t class;
 };
 struct ctrl_put
 {
@@ -356,7 +357,8 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 static int immed_unexp_recv_handler(bmi_size_t size,
 				    bmi_msg_tag_t msg_tag,
 				    bmi_method_addr_p map,
-				    void *buffer);
+				    void *buffer,
+                                    uint8_t class);
 static int immed_recv_handler(bmi_size_t actual_size,
 			      bmi_msg_tag_t msg_tag,
 			      bmi_method_addr_p map,
@@ -1038,6 +1040,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     new_ctrl_msg->magic_nr = BMI_MAGIC_NR;
     new_ctrl_msg->u.immed.actual_size = total_size;
     new_ctrl_msg->u.immed.msg_tag = tag;
+    new_ctrl_msg->u.immed.class = class;
     ret = gm_post_send_build_op(id, dest, new_buffer, total_size,
 					tag,
 					GM_MODE_UNEXP,
@@ -1556,41 +1559,30 @@ int BMI_gm_testunexpected(int incount,
 {
     int ret = -1;
     method_op_p query_op = NULL;
+    struct op_list_search_key key;
+
+    memset(&key, 0, sizeof(struct op_list_search_key));
+    key.class = class;
+    key.class_yes = 1;
 
     *outcount = 0;
 
     gen_mutex_lock(&interface_mutex);
 
-    while ((*outcount < incount) &&
-	   (query_op =
-	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    if(op_list_empty(op_list_array[IND_COMPLETE_RECV_UNEXP]))
     {
-	info[*outcount].error_code = query_op->error_code;
-	info[*outcount].addr = query_op->addr;
-	info[*outcount].buffer = query_op->buffer;
-	info[*outcount].size = query_op->actual_size;
-	info[*outcount].tag = query_op->msg_tag;
-	op_list_remove(query_op);
-	dealloc_gm_method_op(query_op);
-	(*outcount)++;
-    }
-    if(*outcount)
-    {
-        gen_mutex_unlock(&interface_mutex);
-        return(0);
-    }
-
-    /* do some ``real work'' here */
-    ret = gm_do_work(max_idle_time_ms*1000);
-    if (ret < 0)
-    {
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
+        /* nothing ready yet, do some work */
+        ret = gm_do_work(max_idle_time_ms*1000);
+        if (ret < 0)
+        {
+            gen_mutex_unlock(&interface_mutex);
+            return (ret);
+        }
     }
 
     while ((*outcount < incount) &&
 	   (query_op =
-	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+	    op_list_search(op_list_array[IND_COMPLETE_RECV_UNEXP], &key)))
     {
 	info[*outcount].error_code = query_op->error_code;
 	info[*outcount].addr = query_op->addr;
@@ -2511,7 +2503,8 @@ void alarm_callback(void *context)
 static int immed_unexp_recv_handler(bmi_size_t size,
 				    bmi_msg_tag_t msg_tag,
 				    bmi_method_addr_p map,
-				    void *buffer)
+				    void *buffer,
+                                    uint8_t class)
 {
     method_op_p new_method_op = NULL;
     struct gm_op *gm_op_data = NULL;
@@ -2530,6 +2523,7 @@ static int immed_unexp_recv_handler(bmi_size_t size,
     new_method_op->error_code = 0;
     new_method_op->mode = GM_MODE_UNEXP;
     new_method_op->buffer = buffer;
+    new_method_op->class = class;
     gm_op_data = new_method_op->method_data;
 
     op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP], new_method_op);
@@ -2799,7 +2793,8 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 				      GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 	    ret =
 		immed_unexp_recv_handler(ctrl_copy.u.immed.actual_size, 
-		    ctrl_copy.u.immed.msg_tag, map, tmp_buffer);
+		    ctrl_copy.u.immed.msg_tag, map, tmp_buffer,
+                    ctrl_copy.u.immed.class);
 	    break;
 	default:
 	    /* TODO: handle this better */
