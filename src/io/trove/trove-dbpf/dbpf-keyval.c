@@ -538,12 +538,8 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
             else
             {
                 op_p->u.v_path.handle_p[i] = *(TROVE_handle *)data.data;
-                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
-                             "dbpf_keyval_read_value_path: parent of (%llu) is "
-                             "(%llu)\n", llu(key_entry.handle), 
-                             llu(op_p->u.v_path.handle_p[i]));
             }
-        } //for
+        }
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
                      "dbpf_keyval_read_value_path: returning dirent_p[%d]: "
@@ -551,7 +547,7 @@ static int dbpf_keyval_read_value_path_op_svc(struct dbpf_op *op_p)
                      i, llu(op_p->u.v_path.dirent_p[i].handle),
                      op_p->u.v_path.dirent_p[i].d_name,
                      i, llu(op_p->u.v_path.handle_p[i]));
-    }
+    } //for
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
                  "dbpf_keyval_read_value_path: exit\n");
     return 1;
@@ -566,11 +562,8 @@ static int dbpf_keyval_read_value_query(TROVE_coll_id coll_id,
                             uint32_t type,
                             TROVE_keyval_s *key_p,
                             TROVE_keyval_s *val_p,
-                            PVFS_dirent *dirent_array,
-                            TROVE_keyval_s *key_array,
-                            TROVE_keyval_s *val_array,
+                            PVFS_handle *handle_p,
                             uint32_t *count,
-                            uint32_t *match_count,
                             TROVE_ds_flags flags,
                             TROVE_vtag_s *vtag,
                             void *user_ptr,
@@ -596,7 +589,7 @@ static int dbpf_keyval_read_value_query(TROVE_coll_id coll_id,
         &op, &q_op_p,
         KEYVAL_READ_VALUE,
         coll_p,
-        dirent_array[0].handle, // at least initial element will have a handle
+        handle_p[0], // at least initial element will have a handle
         dbpf_keyval_read_value_query_op_svc,
         flags,
         NULL,
@@ -619,11 +612,8 @@ static int dbpf_keyval_read_value_query(TROVE_coll_id coll_id,
     /* initialize the op-specific members */
     op_p->u.v_query.key = key_p;
     op_p->u.v_query.val = val_p;
-    op_p->u.v_query.dirent_array = dirent_array;
-    op_p->u.v_query.key_array = key_array;
-    op_p->u.v_query.val_array = val_array;
+    op_p->u.v_query.handle_p = handle_p;
     op_p->u.v_query.count = count;
-    op_p->u.v_query.match_count = match_count;
     op_p->u.v_query.position_p = position_p;
     op_p->u.v_query.query_type = type;
     op_p->hints = hints;
@@ -641,7 +631,6 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
     TROVE_ds_position local_p = TROVE_ITERATE_START;
     DBT key, data, pkey;
     DBC *dbc_p=NULL, *dbcn_p=NULL, *query_p=NULL;
-    db_recno_t recno;
 
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
@@ -718,7 +707,6 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
     /* store requested count number */
     record_count = (*op_p->u.v_query.count);
     (*op_p->u.v_query.count) = 0; 
-    (*op_p->u.v_query.match_count) = 0; 
 
     /* duplicates in secondary index require use of cursor */
     if( (op_p->coll_p->keyval_secondary_db->cursor(
@@ -801,23 +789,7 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
         (*op_p->u.v_query.position_p) = TROVE_ITERATE_END;
         ret = 1;
         (*op_p->u.v_query.count) = 0;
-        (*op_p->u.v_query.match_count) = 0;
         goto return_error;
-    }
-
-    /* get number of data items the cursor refers to */
-    if( (ret = query_p->c_count(query_p, &recno, 0)) != 0 )
-    {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: dbpf_keyval_"
-                     "read_value: Error getting count of matches: %s\n",
-                     db_strerror(ret) );
-    }
-    else
-    {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: dbpf_keyval_"
-                     "read_value: match count: %u\n",
-                     recno );
-        *op_p->u.v_query.match_count = recno;
     }
 
     if(  (*op_p->u.v_query.position_p) != TROVE_ITERATE_START )
@@ -828,12 +800,7 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
             ret = query_p->c_pget(query_p, &key, &pkey, &data, get_flags);
             if( ret == DB_NOTFOUND )
             {
-                memset( op_p->u.v_query.key_array[i].buffer, 0, pkey.size);
-                op_p->u.v_query.key_array[i].buffer_sz = 0;
-                memset( op_p->u.v_query.val_array[i].buffer, 0, data.size);
-                op_p->u.v_query.val_array[i].buffer_sz = 0;
-                memset( &(op_p->u.v_query.dirent_array[i]), 0, 
-                    sizeof( PVFS_dirent ) );
+                op_p->u.v_query.handle_p[i] = 0;
                 gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                              "[DBPF KEYVAL]: dbpf_keyval_read_value: can't "
                              "iterate to requested position (%llu)\n",
@@ -878,28 +845,14 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
 
         if( ret == 0 ) /* should include record in return set */
         {
-            memcpy(op_p->u.v_query.key_array[(*op_p->u.v_query.count)].buffer, 
-                pkey.data, pkey.size);
-            op_p->u.v_query.key_array[(*op_p->u.v_query.count)].read_sz = 
-                pkey.size;
-            memcpy(op_p->u.v_query.val_array[(*op_p->u.v_query.count)].buffer, 
-                data.data, data.size);
-            op_p->u.v_query.val_array[(*op_p->u.v_query.count)].read_sz = 
-                data.size;
-            op_p->u.v_query.dirent_array[(*op_p->u.v_query.count)].handle = 
+            op_p->u.v_query.handle_p[(*op_p->u.v_query.count)] = 
                 key_entry.handle;
     
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                  "[DBPF KEYVAL]: dbpf_keyval_read_value: match "
-                 "(%u): (%llu) k/v: (%s)/(%s)\n",
+                 "(%u): (%llu)\n",
                  (*op_p->u.v_query.count), 
-                 llu(op_p->u.v_query.dirent_array[
-                    (*op_p->u.v_query.count)].handle),
-                 (char *) (op_p->u.v_query.key_array[
-                    (*op_p->u.v_query.count)].buffer+sizeof(PVFS_handle)),
-                 (char *)op_p->u.v_query.val_array[
-                    (*op_p->u.v_query.count)].buffer);
-
+                 llu(op_p->u.v_query.handle_p[(*op_p->u.v_query.count)]));
             (*op_p->u.v_query.count)++;
         }
         else if( ret == -1 ) /* end of what we need to add */

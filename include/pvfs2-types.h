@@ -863,15 +863,40 @@ enum PVFS_io_type
  */
 #define PVFS_MGMT_RESERVED 1
 
-/* PVFS keyval query operation types used in both system and server interfaces
+
+/* 
+ * PVFS keyval struct for defining a query 
  */
-#define PVFS_KEYVAL_QUERY_LT                    0
-#define PVFS_KEYVAL_QUERY_LE                    1
+typedef struct 
+{
+    PVFS_ds_position token;
+    uint32_t oper;
+    PVFS_ds_keyval query;
+    uint32_t count;
+    PVFS_handle *match;
+} PVFS_keyval_query;
+endecode_fields_3a(
+    PVFS_keyval_query,
+    PVFS_ds_position, token,
+    uint32_t, oper,
+    PVFS_ds_keyval, query,
+    uint32_t, count,
+    PVFS_handle, match);
+
+/* 
+ * PVFS keyval query operation types used in get-value system and server calls
+ */
+#define PVFS_KEYVAL_QUERY_NOOP                  0
+#define PVFS_KEYVAL_QUERY_LT                    1
+#define PVFS_KEYVAL_QUERY_LE                    2
 #define PVFS_KEYVAL_QUERY_EQ                    2
 #define PVFS_KEYVAL_QUERY_GE                    3
-#define PVFS_KEYVAL_QUERY_GT                    4 
-#define PVFS_KEYVAL_QUERY_NT                    5
-#define PVFS_KEYVAL_QUERY_PEQ                   6
+#define PVFS_KEYVAL_QUERY_GT                    5 
+#define PVFS_KEYVAL_QUERY_NT                    6
+#define PVFS_KEYVAL_QUERY_PEQ                   7
+#define PVFS_KEYVAL_QUERY_AND                   8
+#define PVFS_KEYVAL_QUERY_OR                    9
+#define PVFS_KEYVAL_QUERY_SENTINEL                    10
 #define PVFS_KEYVAL_QUERY_NORM                  (1 << 30)
 #define PVFS_KEYVAL_RESULT_NO_PATHS             (1 << 31)
 

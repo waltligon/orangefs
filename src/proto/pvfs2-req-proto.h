@@ -152,6 +152,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 113
+/* max number of query components se in a request */
+#define PVFS_REQ_LIMIT_KEYVAL_QUERY 32
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -1823,39 +1825,30 @@ endecode_fields_2a_struct(
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
 /* getvalue **************************************************/
-/* - list handles with value */
-
+/* - query keyval for handles matching key/value */
 struct PVFS_servreq_getvalue
 {
-    PVFS_handle handle;                       /* handle */
     PVFS_fs_id  fs_id;                        /* file system */
-    uint32_t query_type;                      /* type of query to perform  */
-    uint32_t count;                           /* number of records to return */
-    PVFS_ds_position token;                   /* offset */
-    PVFS_ds_keyval key;                       /* attribute */
-    PVFS_ds_keyval val;                       /* (optional) value */
+    PVFS_handle handle;                       /* handle */
+    uint32_t count;                           /* number of query components */
+    PVFS_keyval_query *query_p;               /* query */
 };
-endecode_fields_7_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_getvalue,
-    PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    uint32_t, query_type,
+    PVFS_handle, handle,
+    skip4,,
     uint32_t, count,
-    PVFS_ds_position, token,
-    PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val);
+    PVFS_keyval_query, query_p);
 #define extra_size_PVFS_servreq_getvalue \
-    (PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN)
+    (PVFS_REQ_LIMIT_KEYVAL_QUERY * sizeof(PVFS_keyval_query))
 
 #define PINT_SERVREQ_GETVALUE_FILL(__req,                \
                                   __creds,               \
                                   __fsid,                \
-                                  __query_type,          \
-                                  __count,               \
                                   __handle,              \
-                                  __token,               \
-                                  __key,                 \
-                                  __val,                 \
+                                  __count,               \
+                                  __query_p,             \
                                   __hints)               \
 do {                                                     \
     memset(&(__req), 0, sizeof(__req));                  \
@@ -1863,37 +1856,30 @@ do {                                                     \
     (__req).credentials = (__creds);                     \
     (__req).hints = (__hints);                           \
     (__req).u.getvalue.fs_id = (__fsid);                 \
-    (__req).u.getvalue.query_type = (__query_type);       \
-    (__req).u.getvalue.count = (__count);  \
     (__req).u.getvalue.handle = (__handle);              \
-    (__req).u.getvalue.token = (__token);                \
-    (__req).u.getvalue.key.buffer_sz = (__key).buffer_sz;\
-    (__req).u.getvalue.key.buffer = (__key).buffer;      \
-    (__req).u.getvalue.val.buffer_sz = (__val).buffer_sz;\
-    (__req).u.getvalue.val.buffer = (__val).buffer;      \
+    (__req).u.getvalue.query_p = (__query_p);            \
+    (__req).u.getvalue.count = (__count);                \
 } while (0);
 
 struct PVFS_servresp_getvalue
 {
-    PVFS_ds_position token;     /* new offset in query */
-    uint32_t count;             /* number of items returned in response */
-    uint32_t match_count;       /* number of items (estimate) matching query */
-    PVFS_dirent *dirent;         /* array with handle info */
-    PVFS_ds_keyval *key;         /* key returned */
-    PVFS_ds_keyval *val;         /* key returned */
+    int32_t query_count;
+    PVFS_keyval_query *query_p;   /* query with match filled */
+    int32_t dirent_count;
+    PVFS_dirent *dirent_p;        /* array with handle info */
 };
-endecode_fields_3aaa_struct(
+endecode_fields_1a_1a_struct(
     PVFS_servresp_getvalue,
-    PVFS_ds_position, token,
-    uint32_t, match_count,
     skip4,,
-    uint32_t, count,
-    PVFS_dirent, dirent,
-    PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val);
+    uint32_t, query_count,
+    PVFS_keyval_query, query_p,
+    skip4,,
+    uint32_t, dirent_count,
+    PVFS_dirent, dirent_p)
 #define extra_size_PVFS_servresp_getvalue \
-    ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN + sizeof(PVFS_dirent)) * \
-      PVFS_REQ_LIMIT_KEYVAL_LIST)
+    (PVFS_REQ_LIMIT_KEYVAL_QUERY * sizeof( PVFS_keyval_query )) + \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof( PVFS_handle ) ) + \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof( PVFS_dirent ) )
 
 /* getpath **************************************************/
 struct PVFS_servreq_getpath

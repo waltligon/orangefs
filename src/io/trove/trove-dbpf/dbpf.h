@@ -410,11 +410,8 @@ struct dbpf_keyval_read_value_query_op
 {
     PVFS_ds_keyval *key;
     PVFS_ds_keyval *val;
-    PVFS_dirent *dirent_array;
-    PVFS_ds_keyval *key_array;
-    PVFS_ds_keyval *val_array;
+    PVFS_handle *handle_p;
     uint32_t *count;
-    uint32_t *match_count;
     TROVE_ds_position *position_p;
     uint32_t query_type;
     /* vtag? */
@@ -799,6 +796,13 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                              void *user_ptr,
                              TROVE_context_id context_id,
                              TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_metadata_dump(TROVE_coll_id collid,
+                                  TROVE_handle handle,
+                                  TROVE_ds_flags flags,
+                                  void *user_ptr,
+                                  TROVE_context_id context_id,
+                                  TROVE_op_id *out_op_id_p);
 
 int dbpf_finalize(void);
 

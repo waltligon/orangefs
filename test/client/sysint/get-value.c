@@ -193,7 +193,6 @@ static int pvfs2_getval(PVFS_object_ref obj, struct opts *opt,
 
     printf("Asking for %u records\n", opt->count );
 
-    all_end = 0;
     while( all_end < srv_count)
     {
         all_end = 0;

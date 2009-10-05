@@ -540,11 +540,7 @@ struct PINT_server_listattr_op
 
 struct PINT_server_getvalue_op
 {
-    void *buffer;
-    uint32_t match_count;
-    uint32_t count;
-    uint32_t original_count;
-    uint32_t target_index;
+    PVFS_keyval_query *current_query;
     TROVE_handle *unknown_handle;
     PVFS_dirent *unknown_dirent;
 };

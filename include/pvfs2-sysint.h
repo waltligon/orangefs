@@ -222,12 +222,10 @@ typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
 /** Holds results of a getvalue operation (keys and dirent of handles). */
 struct PVFS_sysresp_getvalue_s
 {
-    PVFS_ds_position token;
-    uint32_t         count;
-    uint32_t         match_count;
-    PVFS_ds_keyval   *key;
-    PVFS_ds_keyval   *val;
-    PVFS_dirent      *dirent;
+    uint32_t            query_count;
+    PVFS_keyval_query   *query_p;
+    uint32_t            dirent_count;
+    PVFS_dirent         *dirent_p;
 };
 typedef struct PVFS_sysresp_getvalue_s PVFS_sysresp_getvalue;
 
@@ -653,26 +651,20 @@ PVFS_error PVFS_sys_listeattr(
 
 PVFS_error PVFS_isys_getvalue(
     PVFS_object_ref ref,
-    PVFS_ds_position *token,
     const PVFS_credentials *credentials,
-    PVFS_ds_keyval *key_p,
-    PVFS_ds_keyval *val_p,
-    uint32_t query_type,
-    uint32_t count,
-    PVFS_sysresp_getvalue *resp,
+    uint32_t query_count,
+    PVFS_keyval_query *query_p,
+    PVFS_sysresp_getvalue *resp_p,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr);
 
 PVFS_error PVFS_sys_getvalue(
     PVFS_object_ref ref,
-    PVFS_ds_position *token,
     const PVFS_credentials *credentials,
-    PVFS_ds_keyval *key,
-    PVFS_ds_keyval *val,
-    uint32_t query_type,
-    uint32_t count,
-    PVFS_sysresp_getvalue *resp,
+    uint32_t query_count,
+    PVFS_keyval_query *query_p,
+    PVFS_sysresp_getvalue *resp_p,
     PVFS_hint hints);
 
 PVFS_error PVFS_sys_set_info(

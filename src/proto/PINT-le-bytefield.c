@@ -265,10 +265,6 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
             case PVFS_SERV_GETVALUE:
-                req.u.getvalue.key.buffer_sz = 0;
-                req.u.getvalue.val.buffer_sz = 0;
-                req.u.getvalue.count = 0;
-                resp.u.getvalue.count = 0;
                 reqsize = extra_size_PVFS_servreq_getvalue;
                 respsize = extra_size_PVFS_servresp_getvalue;
                 break;
@@ -995,12 +991,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.listeattr.key);
                     break;
                 case PVFS_SERV_GETVALUE:
-                    if( resp->u.getvalue.key)
-                        decode_free(resp->u.getvalue.key);
-                    if( resp->u.getvalue.val)
-                        decode_free(resp->u.getvalue.val);
-                    if( resp->u.getvalue.dirent)
-                        decode_free(resp->u.getvalue.dirent);
+                    if( resp->u.getvalue.dirent_p)
+                        decode_free(resp->u.getvalue.dirent_p);
                     break;
                 case PVFS_SERV_GETPATH:
                     if( resp->u.getpath.dirent)

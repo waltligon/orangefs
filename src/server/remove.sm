@@ -112,6 +112,7 @@ nested machine pvfs2_remove_work_sm
         success => remove_dspace;
         default => return;
     }
+
 }
 
 machine pvfs2_remove_sm
@@ -234,7 +235,7 @@ static PINT_sm_action remove_read_dirdata_handle(
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dirdata handle (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->u.remove.fs_id, llu(s_op->u.remove.dirdata_handle),
+		 s_op->u.remove.fs_id, llu(s_op->u.remove.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
