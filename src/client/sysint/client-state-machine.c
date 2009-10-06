@@ -315,6 +315,7 @@ int client_state_machine_terminate(
     PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
 
     PVFS_hint_free(sm_p->hints);
+    sm_p->hints = NULL;
 
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
