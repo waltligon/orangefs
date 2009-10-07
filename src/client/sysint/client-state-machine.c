@@ -312,20 +312,27 @@ int client_state_machine_terminate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
 
-    PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
-
-    PVFS_hint_free(sm_p->hints);
-    sm_p->hints = NULL;
-
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
             (cancelled_io_jobs_are_pending(smcb))) &&
         !PINT_smcb_immediate_completion(smcb))
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_state_machine_terminate smcb %p completing\n",smcb);
+
+        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+        PVFS_hint_free(sm_p->hints);
+        sm_p->hints = NULL;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "add smcb %p to completion list\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_state_machine_terminate smcb %p waiting for cancelled jobs\n",smcb);
     }
     return SM_ACTION_TERMINATE;
 }
