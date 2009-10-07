@@ -49,6 +49,8 @@ extern struct PINT_server_req_params pvfs2_stuffed_create_params;
 extern struct PINT_server_req_params pvfs2_precreate_pool_refiller_params;
 extern struct PINT_server_req_params pvfs2_mirror_params;
 extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
+extern struct PINT_server_req_params pvfs2_tree_remove_params;
+extern struct PINT_server_req_params pvfs2_tree_get_file_size_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -94,6 +96,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
     /* 39 */ {PVFS_SERV_MIRROR, &pvfs2_mirror_params},
     /* 40 */ {PVFS_SERV_IMM_COPIES, &pvfs2_create_immutable_copies_params},
+    /* 41 */ {PVFS_SERV_TREE_REMOVE, &pvfs2_tree_remove_params},
+    /* 42 */ {PVFS_SERV_TREE_GET_FILE_SIZE, &pvfs2_tree_get_file_size_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

@@ -871,6 +871,38 @@ enum PVFS_io_type
  */
 #define PVFS_MGMT_RESERVED 1
 
+/*
+ * Structure and macros for timing things for profile-like output.
+ *
+ */
+struct profiler
+{
+    struct  timeval  start;
+    struct  timeval  finish;
+    uint64_t  save_timing;
+};
+
+#define INIT_PROFILER(prof_struct) prof_struct.cumulative_diff = 0;
+
+#define START_PROFILER(prof_struct) \
+    gettimeofday(&prof_struct.start, NULL);
+
+#define FINISH_PROFILER(label, prof_struct, print_timing) \
+{ \
+    double t_start, t_finish; \
+    gettimeofday(&prof_struct.finish, NULL); \
+    t_start = prof_struct.start.tv_sec + (prof_struct.start.tv_usec/1000000.0); \
+    t_finish = prof_struct.finish.tv_sec + (prof_struct.finish.tv_usec/1000000.0); \
+    prof_struct.save_timing = t_finish - t_start * 1000000.0; \
+    if (print_timing) { \
+      gossip_err("PROFILING %s: %f\n", label, t_finish - t_start); \
+    } \
+}
+
+#define PRINT_PROFILER(label, prof_struct) \
+      gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
+
+
 #endif /* __PVFS2_TYPES_H */
 
 /*
