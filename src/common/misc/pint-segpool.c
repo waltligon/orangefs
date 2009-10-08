@@ -334,20 +334,6 @@ int PINT_segpool_take_segments(PINT_segpool_handle_t h,
     return ret;
 }
 
-int segpool_done(PINT_segpool_handle_t h)
-{
-#if 0
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: \n", __func__);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: type_offset=%d\n", __func__, 
-		 h->file_req_state->type_offset);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: final_offset=%d\n", __func__, 
-		 h->file_req_state->final_offset);
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: eof_flag=%d\n", __func__, 
-		 h->file_req_state->eof_flag);
-#endif
-    return ((h->file_req_state->type_offset >= h->file_req_state->final_offset) || (h->file_req_state->eof_flag));
-}
-
 #include "pint-dist-utils.h"
 #if TEST
 /**

@@ -205,7 +205,7 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 
     /* immediate return */
     if(ret == 1) {
-	js_p->error_code = 1;
+	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
 
@@ -306,12 +306,12 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     
     /* immediate return */
     if(ret == 1) {
-	js_p->error_code = ret;
+	js_p->error_code = 0;
 	return SM_ACTION_COMPLETE;
     }
 	
     if(ret == 0) {
-	js_p->error_code = ret;
+	js_p->error_code = 0;
 	return SM_ACTION_DEFERRED;
     }
 
@@ -997,7 +997,7 @@ static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *
 
     /* FIMXE: do we really need this lock? */
     gen_mutex_lock(&parent_s_op->u.io.mutex);
-    //parent_s_op->u.io.total_transferred += js_p->actual_size;
+    /* update the total_transferred */
     parent_s_op->u.io.total_transferred += s_op->u.pipeline.buffer_used;
     gen_mutex_unlock(&parent_s_op->u.io.mutex);
     
@@ -1005,26 +1005,7 @@ static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *
 		 lld(parent_s_op->u.io.total_transferred));
     gossip_debug(GOSSIP_IO_DEBUG, "%s: actual_size=%lld\n", __func__,
 		 lld(js_p->actual_size));
-#if 0
-    /* FIXME: */
-    /* unless the second condition is set, the server starts
-       a new read request that is already done, and falls into
-       infinite trove_read->bmi_send->check_done loop */
-    if(!segpool_done(h) && s_op->u.pipeline.segs != 0) {
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: !DONE\n", __func__);
-	js_p->error_code = 0;
-    }
-    else {
-#if 0
-	if(s_op->u.pipeline.op == (0x5800000f)) { /* KMEANS */
-	    memcpy(parent_s_op->u.io.tmp_buffer, 
-		   s_op->u.pipeline.buffer, sizeof(double));
-	}
-#endif
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: DONE\n", __func__);
-	js_p->error_code = 0;
-    }
-#endif
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
