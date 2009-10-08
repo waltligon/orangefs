@@ -217,6 +217,7 @@ static PINT_sm_action start_pipelining_sm(
     {
         /* pick up any buffer settings overrides from fs conf */
         s_op->u.io.buffer_size = fs_config->fp_buffer_size;
+	gossip_debug(GOSSIP_IO_DEBUG, "buffer_size=%ld\n", fs_config->fp_buffer_size);
         //s_op->u.io.num_of_buffers = fs_config->fp_buffers_per_flow;
 	s_op->u.io.num_of_buffers = NUM_OF_PARALLEL_SMS; /* FIXME */
     }
@@ -267,7 +268,7 @@ static PINT_sm_action start_pipelining_sm(
     PINT_segpool_unit_id id[s_op->u.io.num_of_buffers];
 
     PINT_dist_lookup(s_op->u.io.file_data.dist);
-    ret = PINT_segpool_init(s_op->u.io.mem_req,
+    ret = PINT_segpool_init(NULL, /* s_op->u.io.mem_req, */
 			    s_op->u.io.file_req,
 			    s_op->u.io.file_data.fsize,
 			    s_op->u.io.file_req_offset,

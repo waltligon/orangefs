@@ -26,7 +26,7 @@
 #include "pint-util.h"
 #include "pint-cached-config.h"
 
-#define LOOP 101
+#define DONE 101
 #define UNALIGNED 102
 #define DO_COMP 103
 #define DO_ALLREDUCE 104
@@ -48,6 +48,7 @@ nested machine pvfs2_pipeline_sm
     state fetch
     {
         run fetch_data;
+	DONE => return;
         success => dispatch;
     }
 
@@ -105,8 +106,8 @@ nested machine pvfs2_pipeline_sm
     state check_pipeline
     {
         run check_pipeline_done;
-        LOOP => fetch;
-	success => return;
+	success => fetch;
+        default => return;
     }
 }
 
@@ -149,7 +150,7 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 
     if(count == 0) {
-	js_p->error_code = 0;
+	js_p->error_code = DONE;
 	//gossip_debug(GOSSIP_IO_DEBUG, "%s: count==0?\n", __func__);
 	return SM_ACTION_COMPLETE;
     }
@@ -159,8 +160,7 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.pipeline.sizes = sizes;
     s_op->u.pipeline.segs = count;
 
-    if(s_op->u.pipeline.io_type == PVFS_IO_READ) {
-	
+    if(s_op->u.pipeline.io_type == PVFS_IO_READ) {	
 	ret = job_trove_bstream_read_list
 	    (s_op->u.pipeline.fs_id,
 	     s_op->u.pipeline.handle,
@@ -226,7 +226,7 @@ static PINT_sm_action fetch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
+    int ret, i;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
@@ -239,6 +239,11 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_IO_DEBUG, "%s: %s: buffer_used=%lld\n", __func__,
 		 (s_op->u.pipeline.io_type==PVFS_IO_READ?"READ":"WRITE"),
 		 lld(s_op->u.pipeline.buffer_used));
+    for(i=0; i<s_op->u.pipeline.segs; i++) {
+	gossip_debug(GOSSIP_IO_DEBUG, "offsets[%d]=%lld, sizes[%d]=%lld\n",
+		     i, lld(s_op->u.pipeline.offsets[i]), i, 
+		     lld(s_op->u.pipeline.sizes[i]));
+    }
 #if 0
     gossip_debug(GOSSIP_IO_DEBUG, "%s: buffer[0]=%s\n", __func__,
 		 (char *)s_op->u.pipeline.buffer);
@@ -276,7 +281,7 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 	     s_op->u.pipeline.handle,
 	     (char **)&s_op->u.pipeline.buffer,
 	     (TROVE_size *)&js_p->actual_size,
-	     1,
+	     1, /* mem_count */
 	     s_op->u.pipeline.offsets,
 	     s_op->u.pipeline.sizes,
 	     s_op->u.pipeline.segs,
@@ -284,7 +289,7 @@ static PINT_sm_action dispatch_data(struct PINT_smcb *smcb, job_status_s *js_p)
 	     s_op->u.pipeline.trove_sync_flag,
 	     NULL,
 	     smcb,
-	     0,
+	     0, /* status_user_tag */
 	     js_p,
 	     &tmp_id,
 	     server_job_context,
@@ -1000,14 +1005,14 @@ static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *
 		 lld(parent_s_op->u.io.total_transferred));
     gossip_debug(GOSSIP_IO_DEBUG, "%s: actual_size=%lld\n", __func__,
 		 lld(js_p->actual_size));
-
+#if 0
     /* FIXME: */
     /* unless the second condition is set, the server starts
        a new read request that is already done, and falls into
        infinite trove_read->bmi_send->check_done loop */
     if(!segpool_done(h) && s_op->u.pipeline.segs != 0) {
-	gossip_debug(GOSSIP_IO_DEBUG, "%s: LOOP\n", __func__);
-	js_p->error_code = LOOP;
+	gossip_debug(GOSSIP_IO_DEBUG, "%s: !DONE\n", __func__);
+	js_p->error_code = 0;
     }
     else {
 #if 0
@@ -1017,8 +1022,10 @@ static PINT_sm_action check_pipeline_done(struct PINT_smcb *smcb, job_status_s *
 	}
 #endif
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: DONE\n", __func__);
+	js_p->error_code = 0;
     }
-    
+#endif
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
