@@ -568,10 +568,13 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
     /* Add to the queue */
     pthread_mutex_lock(&dbpf_unlink_context.mutex); 
     qlist_add_tail(&tmp_item->list_link, &dbpf_unlink_context.global_list);
-    pthread_cond_signal(&dbpf_unlink_context.data_available);
-    pthread_mutex_unlock(&dbpf_unlink_context.mutex); 
+    /* Moved gossip_debug BEFORE pthread_cond_signal; otherwise, tmp_item->pathname caused a seg fault 
+     * if the unlink signal processed BEFORE the debug statement.
+    */
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
         "Added [%s] to the queue.\n", tmp_item->pathname);
+    pthread_cond_signal(&dbpf_unlink_context.data_available);
+    pthread_mutex_unlock(&dbpf_unlink_context.mutex); 
     
     return(0);
 }
