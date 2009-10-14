@@ -237,13 +237,23 @@ error_in_cleanup:
             dbpf_queued_op_complete(cur_op, OP_COMPLETED);
         }
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %s)\n", 
-                     list_proc_state_strings[
-                     op_p->u.b_rw_list.list_proc_state]);
+        /* if sync is not required, then dbpf_queued_op_complete executes and will issue a cond_signal. if
+         * the signal'd thread executes before the following gossip_debug statement, then cur_op is un-
+         * defined, causing the gossip_debug statement to seg fault.  So, we check for existence first!
+        */
+        if (cur_op)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
+                         "(state is %s)\n", 
+                         list_proc_state_strings[
+                         op_p->u.b_rw_list.list_proc_state]);
+        } 
+        else 
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,"*** starting delayed ops if any. (cur_op undefined).\n");
+        }
 
         start_delayed_ops_if_any(1);
-
     }
     else
     {
