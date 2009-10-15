@@ -11,8 +11,17 @@ static void usage(char *argv0) {
   char *help =
     "Usage: %s [switches] -i filename\n"
     "       -i filename    : file containing data to be clustered\n"
-    "       -g : use generated file\n";
+    "       -g : use generated file\n"
+    "       -s size : file size to generate in MB\n"
+    "       -x : test active storage module\n";
   fprintf(stderr, help, argv0);
+}
+
+void sample_error(int error, char *string)
+{
+  fprintf(stderr, "Error %d in %s\n", error, string);
+  MPI_Finalize();
+  exit(-1);
 }
 
 int main( int argc, char *argv[] )
@@ -23,24 +32,28 @@ int main( int argc, char *argv[] )
   int is_output_timing=0, is_print_usage = 0;
   int _debug, use_gen_file = 0, use_actsto = 0;
 
+  MPI_Offset disp, offset, file_size;
+  MPI_Datatype etype, ftype, buftype;
+
   int errs = 0;
   int size, rank, i, count;
   char *fname = NULL;
-  float *buf;
+  double *buf;
   MPI_File fh;
   MPI_Comm comm;
   MPI_Status status;
-  int nitem = 0;
-  double stime, etime, iotime, comptime;
- 
+  int64_t nitem = 0;
+  int fsize = 0, type_size;
+  double stime, etime, iotime, comptime, elapsed_time;
+
   MPI_Init( &argc, &argv );
  
   comm = MPI_COMM_WORLD;
 
   MPI_Comm_size( comm, &size );
   MPI_Comm_rank( comm, &rank );
-
-  while ( (opt=getopt(argc,argv,"i:n:godhx"))!= EOF) {
+ 
+  while ( (opt=getopt(argc,argv,"i:s:godhx"))!= EOF) {
     switch (opt) {
     case 'i': fname = optarg;
       break;
@@ -52,8 +65,19 @@ int main( int argc, char *argv[] )
       break;
     case 'h': is_print_usage = 1;
       break;
-    case 'n': nitem = atoi(optarg);
-      printf("nitem = %d\n", nitem);
+    case 's': fsize = atoi(optarg);
+      if (rank ==0) printf("fsize = %d (MB)\n", fsize);
+      if (fsize == 0)
+	nitem = 0;
+      else {
+	MPI_Type_size(MPI_DOUBLE, &type_size);
+	nitem = fsize*1024; 
+	nitem = nitem*1024;
+	nitem = nitem/type_size;
+	//printf("nitem=%lld\n", nitem);
+	nitem = nitem/size;
+      }
+      if (rank == 0) printf("nitem = %d\n", nitem);
       break;
     case 'x': use_actsto = 1;
       break;
@@ -72,14 +96,26 @@ int main( int argc, char *argv[] )
   srand(time(NULL));
 
   if(use_gen_file == 1) {
-    float max, min, sum=0.0;
-    int t;
+    double max, min, sum=0.0;
+    int t, result;
 
     MPI_File_open( comm, fname, MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
-    buf = (float *)malloc( nitem * sizeof(float) );
+
+    /* Set the file view which tiles the file type MPI_DOUBLE, starting 
+       at displacement 0.
+    */
+    disp = rank*nitem*type_size;
+    etype = MPI_DOUBLE;
+    ftype = MPI_DOUBLE;
+    result = MPI_File_set_view(fh, disp, etype, ftype, "native", MPI_INFO_NULL);
+
+    if(result != MPI_SUCCESS) 
+      sample_error(result, "MPI_File_set_view");
+
+    buf = (double *)malloc( nitem * sizeof(double) );
 
     buf[0] = rand()%4096;
-    printf("%lf\n", buf[0]);
+    if(rank==0) printf("%lf\n", buf[0]);
     max = min = sum = buf[0];
 
     for(i=1; i<nitem; i++) {
@@ -88,23 +124,30 @@ int main( int argc, char *argv[] )
       if (t<min) min = t;
       sum += t;
       buf[i] = t;
-      if (i<10) printf("%lf\n", buf[i]);
+      if (i<10 && rank == 0) printf("%lf\n", buf[i]);
     }
     
-    printf("sizeof(MPI_FLOAT)=%d\n", sizeof(MPI_FLOAT));
-    printf ("max=%lf, min=%lf, sum=%lf\n", max, min, sum);
-
-    /* Write to file */
-    MPI_File_write( fh, buf, nitem, MPI_FLOAT, &status );
-
-    MPI_Get_count( &status, MPI_INT, &count );
-    printf("count=%d\n", count);
-    if (count != nitem) {
-      //errs++;
-      fprintf( stderr, "Wrong count (%d) on write\n", count );
-      fflush(stderr);
+    if(rank == 0) {
+      printf("MPI_Type_size(MPI_DOUBLE)=%d\n", type_size);
+      printf ("max=%lf, min=%lf, sum=%lf\n", max, min, sum);
     }
 
+    /* Write to file */
+    //offset = rank * nitem * type_size;
+    //printf("%d: offset=%d\n", rank, offset);
+    MPI_File_write_all( fh, buf, nitem, MPI_DOUBLE, &status );
+
+    MPI_Get_count( &status, MPI_DOUBLE, &count );
+    //printf("count=%d\n", count);
+    if (count != nitem) {
+      fprintf( stderr, "%d: Wrong count (%d) on write\n", rank, count );
+      fflush(stderr);
+      /* exit */
+      MPI_Finalize();
+      exit(1);
+    }
+
+    if(rank == 0) printf("File is written\n\n");
     MPI_File_close(&fh);
   }
   
@@ -112,48 +155,63 @@ int main( int argc, char *argv[] )
   /* Read nothing (check status) */
   memset( &status, 0xff, sizeof(MPI_Status) );
 
-  float *tmp = (float *)malloc( nitem * sizeof(float) );
+  double *tmp = (double *)malloc( nitem * sizeof(double) );
 
   stime = MPI_Wtime();
-  MPI_File_read(fh, tmp, nitem, MPI_FLOAT, &status);
+  MPI_File_read_at(fh, offset, tmp, nitem, MPI_DOUBLE, &status);
   etime = MPI_Wtime();
   iotime = etime - stime;
-  printf("I/O time = %10.4f sec\n", iotime);
-
+ 
   stime = MPI_Wtime();
-  float sum = 0.0;
+  double sum = 0.0;
   for(i=0; i<nitem; i++) {
       sum += tmp[i];
   }
   etime = MPI_Wtime();
 
   comptime = etime - stime;
-  printf("Computation time = %10.4f sec\n", comptime);
-
-  MPI_File_close(&fh);
-#if 0  
-  MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
-
-  MPI_File_read_ex( fh, tmp, nitem, MPI_FLOAT, MPI_MAX, &status );
-
-  printf ("max=%lf\n", tmp[0]);
-
-  MPI_File_close(&fh);
+  elapsed_time = comptime + iotime;
+  if(rank == 0) 
+    printf("<<Result (SUM) with normal read>>\n"
+	   "Computation time = %10.4f sec\n"
+	   "I/O time         = %10.4f sec\n"
+	   "total time       = %10.4f sec\n\n", comptime, iotime, elapsed_time);
   
-  MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
-
-  MPI_File_read_ex( fh, tmp, nitem, MPI_FLOAT, MPI_MIN, &status );
-
-  printf ("min=%lf\n", tmp[0]); 
-
   MPI_File_close(&fh);
-  
-  MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
 
-  MPI_File_read_ex( fh, tmp, nitem, MPI_FLOAT, MPI_SUM, &status );
+  if(use_actsto == 1) {
+    /* MPI_MAX */
+    MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
 
-  printf ("sum=%lf\n", tmp[0]); 
-#endif
+    stime = MPI_Wtime();
+    MPI_File_read_at_ex( fh, offset, tmp, nitem, MPI_DOUBLE, MPI_MAX, &status );
+    etime = MPI_Wtime();
+    elapsed_time = etime-stime;
+    printf ("<<Result with active storage>>\n"
+	    "max=%lf (in %10.4f sec)\n", tmp[0], elapsed_time);
+    
+    MPI_File_close(&fh);
+    
+    /* MPI_MIN */
+    MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+    
+    stime = MPI_Wtime();
+    MPI_File_read_at_ex( fh, offset, tmp, nitem, MPI_DOUBLE, MPI_MIN, &status );
+    etime = MPI_Wtime();
+    elapsed_time = etime - stime;
+    printf ("min=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
+    
+    MPI_File_close(&fh);
+    
+    /* MPI_SUM */
+    MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+    
+    stime = MPI_Wtime();
+    MPI_File_read_at_ex( fh, offset, tmp, nitem, MPI_DOUBLE, MPI_SUM, &status );
+    etime = MPI_Wtime();
+    elapsed_time = etime - stime;
+    printf ("sum=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
+  }
   free( buf );
   free( tmp );
   MPI_File_close( &fh );

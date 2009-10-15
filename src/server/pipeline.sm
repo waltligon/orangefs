@@ -31,13 +31,15 @@
 #define DO_COMP 103
 #define DO_ALLREDUCE 104
 #define DO_KMEANS 105
+#define DO_VOLREN 106 /* volume rendering */
+#define DO_FASTBIT 107 /* FastBit */
 
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 int use_gpu; /* for kmeans only */
 int NUM_OBJS; /* for kmeans only */
-int NUM_COORDS; /* for kmeans only */
+int NUM_COORDS = 1; /* for kmeans only */
 int NUM_CLUSTERS; /* for kmeans only */
 #define TMP_BUF_SIZ 128
 
@@ -565,7 +567,8 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     if(s_op->u.pipeline.buffer) {
 	PVFS_size i;
 	gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-		     "%s: buffer_used=%lld, op=0x%x, datatype=0x%x, actual_size=%lld\n", 
+		     "%s: buffer_used=%lld, op=0x%x, "
+		     "datatype=0x%x, actual_size=%lld\n", 
 		     __func__, lld(s_op->u.pipeline.buffer_used), 
 		     s_op->u.pipeline.op, 
 		     s_op->u.pipeline.datatype,
@@ -663,8 +666,10 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 	case ((int)0x4c00040a): /* MPI_FLOAT */
 	    {
-		/* FIXME: about NUM_COORDS */
+		/* NUM_COORDS is used only when kmeans, 
+		   otherwise it is set to default 0 */
 		PVFS_size count = s_op->u.pipeline.new_buffer_used/((*PVFS_FLOAT).ub)/NUM_COORDS;
+
 		float *a = (float*)s_op->u.pipeline.buffer;
 
 		gossip_debug(GOSSIP_IO_DEBUG, "%s: count=%ld\n", __func__, count);

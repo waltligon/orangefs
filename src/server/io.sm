@@ -21,8 +21,7 @@
 #include "pvfs2-internal.h"
 #include "pint-segpool.h"
 
-#define NUM_OF_PARALLEL_SMS 1
-//#define BUFFER_SIZE (256*1024) /* 256KB */
+#define NUM_OF_PARALLEL_SMS 8
 #define BUFFER_SIZE (1024*1024) /* 1MB */
 
 %%
