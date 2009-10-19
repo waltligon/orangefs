@@ -683,7 +683,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-START_PROFILER(getattr_prof);
+//START_PROFILER(getattr_prof);
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
             msg_p->req,
             *sm_p->cred_p,
@@ -746,7 +746,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-FINISH_PROFILER("getattr", getattr_prof, 1);
+//FINISH_PROFILER("getattr", getattr_prof, 1);
     if(js_p->error_code == 0)
     {
         PINT_msgpairarray_destroy(&sm_p->msgarray_op);
