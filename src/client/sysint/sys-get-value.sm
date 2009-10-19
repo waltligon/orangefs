@@ -108,10 +108,9 @@ PVFS_error PVFS_isys_getvalue(
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "[GETVALUE]: PVFS_isys_getvalue: sm_p->u.getvalue: "
-                 "query_count: %d, query_p: %p, resp_p: %p\n", 
-                 sm_p->u.getvalue.query_count, sm_p->u.getvalue.query_p, 
-                 sm_p->u.getvalue.resp_p);
+                 "[GETVALUE]: PVFS_isys_getvalue: query_count: %d, "
+                 "query_p: %p, resp_p: %p\n", sm_p->u.getvalue.query_count, 
+                 sm_p->u.getvalue.query_p, sm_p->u.getvalue.resp_p);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: PVFS_isys_getvalue: exit\n");
 
@@ -134,13 +133,13 @@ PVFS_error PVFS_sys_getvalue(
 
     if( resp_p == NULL )
     {
-        PVFS_perror_gossip("[GETVALUE]: resp_p is null\n", -EINVAL);
+        PVFS_perror_gossip("[GETVALUE]: resp_p is null", -EINVAL);
         return -EINVAL;
     }
 
     if( query_p == NULL )
     {
-        PVFS_perror_gossip("[GETVALUE]: query_p is null\n", -EINVAL);
+        PVFS_perror_gossip("[GETVALUE]: query_p is null", -EINVAL);
         return -EINVAL;
     }
 
@@ -148,8 +147,8 @@ PVFS_error PVFS_sys_getvalue(
     if( PVFS_KEYVAL_QUERY_NOOP == 
         PVFS_KEYVAL_QUERY_UNMASK_QUERY(query_p[0].oper))
     {
-        PVFS_perror_gossip("[GETVALUE]: invalid operation in query_p\n", 
-            -EINVAL);
+        PVFS_perror_gossip("[GETVALUE]: invalid query operation at root node "
+                           "of query_p", -EINVAL);
         return -EINVAL;
     }
 

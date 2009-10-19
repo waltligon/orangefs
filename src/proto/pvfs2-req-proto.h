@@ -1841,7 +1841,9 @@ endecode_fields_3a_struct(
     uint32_t, count,
     PVFS_keyval_query, query_p);
 #define extra_size_PVFS_servreq_getvalue \
-    (PVFS_REQ_LIMIT_KEYVAL_QUERY * sizeof(PVFS_keyval_query))
+    (PVFS_REQ_LIMIT_KEYVAL_QUERY * \
+        ( sizeof(PVFS_keyval_query)  + PVFS_REQ_LIMIT_KEY_LEN \
+         + ( sizeof(PVFS_handle) * PVFS_REQ_LIMIT_HANDLES_COUNT)) )
 
 #define PINT_SERVREQ_GETVALUE_FILL(__req,                \
                                   __creds,               \

@@ -377,7 +377,7 @@ int trove_keyval_read_value_path(
            hints);
 }
 
-/** Initiate read of a single keyword/value pair based on <attr><value>. 
+/** Initiate read of keyword/value pairs based on <attr><value>. 
  * The secondary keyval index is used to perform this lookup.
  */
 int trove_keyval_read_value_query(

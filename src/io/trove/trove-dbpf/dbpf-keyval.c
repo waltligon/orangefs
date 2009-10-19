@@ -579,6 +579,9 @@ static int dbpf_keyval_read_value_query(TROVE_coll_id coll_id,
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "[KEYVAL]: start of read_value_query\n");
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
@@ -741,7 +744,7 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "[DBPF KEYVAL]: dbpf_keyval_read_value: "
                  "pget: key: %s/(%d)(%d), "
-                 "pkey (%d)(%d), (%d)(%d), initial position: %llu on db"
+                 "pkey (%d)(%d), (%d)(%d), initial position: %llu on db "
                  "%s\n", 
                  (char *)key.data, key.ulen, key.size, pkey.ulen, pkey.size,
                  data.ulen, data.size, llu(*op_p->u.v_query.position_p),

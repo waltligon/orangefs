@@ -146,7 +146,6 @@ static PINT_sm_action getpath_setup_resp(
     s_op->resp.u.getpath.count = s_op->req->u.getpath.count;
     s_op->target_fs_id = s_op->req->u.getpath.fs_id;
 
-
     for( i=0; i < s_op->u.getpath.count; i++ )
     {
         gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: getpath_setup_resp: "
@@ -368,10 +367,15 @@ static PINT_sm_action getpath_prepare_remote_work(
     /* iterate over handles, adding those that need work to appropriate meta
      * servers list. we now can actually tell what who owns the next
      * server. */
-    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: prepare_remote_work: "
-                 "Begin assigning handles to meta server requests\n");
+    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: getpath_prepare_remote_work"
+                 ": Begin assigning handles to meta server requests\n");
     for( i=0; i < s_op->u.getpath.count; i++ )
     {
+        gossip_debug(GOSSIP_GETPATH_DEBUG, 
+                     "[GETPATH]: getpath_prepare_remote_work: index %d, "
+                     "with handle (%llu)\n", i, 
+                     s_op->u.getpath.dirent_p[i].handle);
+
         /* only add item if still needs handle lookups */
         if( s_op->u.getpath.dirent_p[i].handle != s_op->u.getpath.root_handle )
         {
@@ -388,17 +392,23 @@ static PINT_sm_action getpath_prepare_remote_work(
              * that don't have handles and won't have a msgpair. */
             for( j=0; j < s_op->u.getpath.meta_num; j++ )
             {
+                gossip_debug(GOSSIP_GETPATH_DEBUG, "want: %llu, "
+                             "j: %d, remote_addr: %llu\n", 
+                             llu(meta_addr), j, 
+                             llu(s_op->u.getpath.remote_addr[j]));
                 if( s_op->u.getpath.remote_addr[j] == meta_addr )
                 {
                     break;
                 }
             }
 
+            assert( j < s_op->u.getpath.meta_num );
+
             /* index to store next dirent in the per-meta server list of */
             index = s_op->u.getpath.remote_count[j];
 
             gossip_debug(GOSSIP_GETPATH_DEBUG,
-                         "[GETPATH]: prepare_remote_work: targeting "
+                         "[GETPATH]: getpath_prepare_remote_work: targeting "
                          "handle (%llu) to addr (%lld), index (%d) for lookup "
                          "of (%llu)/(%s), in remote_dirent[%d][%d]\n", 
                          llu(s_op->u.getpath.handle_p[i]),
@@ -407,21 +417,37 @@ static PINT_sm_action getpath_prepare_remote_work(
                          s_op->u.getpath.dirent_p[i].d_name,
                          j, index);
 
+            gossip_debug(GOSSIP_GETPATH_DEBUG,
+                         "[GETPATH]: getpath_prepare_remote_work: "
+                         "dirent_p: %p, dirent.handle: %llu, "
+                         "remote_dirent: %p, remote_dirent[%d]: %p\n",
+                         s_op->u.getpath.dirent_p,
+                         llu(s_op->u.getpath.dirent_p[i].handle),
+                         s_op->u.getpath.remote_dirent,
+                         j,
+                         s_op->u.getpath.remote_dirent[j]);
             /* copy dirent from state machine to spot in meta server's array of
             * handles to query */
             memcpy( &(s_op->u.getpath.remote_dirent[j][index]),
                     &(s_op->u.getpath.dirent_p[i]),
                     sizeof(PVFS_dirent) );
+            gossip_debug(GOSSIP_GETPATH_DEBUG,
+                         "[GETPATH]: getpath_prepare_remote_work: after dirent "
+                         "copy\n");
 
             /* store mapping of the dirent's index in the state machine's 
              * dirent_p array to the request to the meta server. */
             s_op->u.getpath.remote_to_local[j][index] = i;
             s_op->u.getpath.remote_count[j]++;
         }
+
         /* else no-op, handle already at root */
+        gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: "
+                     "getpath_prepare_remote_work: finished assigning %d, "
+                     "handle (%llu)\n", i, s_op->u.getpath.dirent_p[i].handle);
     }
-    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: prepare_remote_work: "
-                 "End assigning handles to meta server requests\n");
+    gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: getpath_prepare_remote_work"
+                 ": End assigning handles to meta server requests\n");
 
 
     /* count the number of meta servers that have > 0 handles to query 
@@ -727,6 +753,13 @@ static int remove_bmi_from_array( BMI_addr_t *addr, int count,
         gossip_err("get_path: failed to allocate remote_addr\n");
         return -PVFS_ENOMEM;
     }
+
+    for( i=0; i < count; i++ )
+    {
+        gossip_debug(GOSSIP_GETPATH_DEBUG, "[GETPATH]: remove address: %d, "
+                     "%llu\n", i, addr[i]);
+    }
+                 
 
     return 0;
 }

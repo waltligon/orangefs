@@ -540,6 +540,9 @@ struct PINT_server_listattr_op
 
 struct PINT_server_getvalue_op
 {
+    uint32_t query_index;
+    uint32_t handle_index;
+    uint32_t unknown_count;
     PVFS_keyval_query *current_query;
     TROVE_handle *unknown_handle;
     PVFS_dirent *unknown_dirent;

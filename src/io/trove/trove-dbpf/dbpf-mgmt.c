@@ -2059,40 +2059,6 @@ int dbpf_collection_lookup(char *collname,
     return 1;
 }
 
-
-int dbpf_collection_metadata_dump(TROVE_coll_id collid,
-                                  TROVE_handle handle,
-                                  TROVE_ds_flags flags,
-                                  void *user_ptr,
-                                  TROVE_context_id context_id,
-                                  TROVE_op_id *out_op_id_p)
-{
-
-    int ret = -TROVE_EINVAL;
-    struct dbpf_storage *sto_p = NULL;
-    struct dbpf_collection *coll_p = NULL;
-
-    sto_p = my_storage_p;
-    if (sto_p == NULL)
-    {
-        return ret;
-    }
-    coll_p = dbpf_collection_find_registered(collid);
-    if (coll_p == NULL)
-    {
-        return ret;
-    }
-
-    /* do a close, verify, open per DB * */
-    if (ret != 0)
-    {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_collection_metadata_dump: %s\n",
-                     db_strerror(ret));
-        return -dbpf_db_error_to_trove_error(ret);
-    }
-    return 1;
-}
-
 /* dbpf_storage_lookup()
  *
  * Internal function.
