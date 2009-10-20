@@ -775,11 +775,22 @@ static int dbpf_keyval_read_value_query_op_svc(struct dbpf_op *op_p)
         cursor_flags = DB_FIRST;
         get_flags = DB_NEXT;
     }
-    else
+    else if( (PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_query.query_type) ==
+                PVFS_KEYVAL_QUERY_EQ) )
     {
         cursor_flags = DB_SET; 
         get_flags = DB_NEXT_DUP;
     }
+    else
+    {
+        ret = -PVFS_EINVAL;
+        goto return_error;
+    }
+
+
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "[DBPF KEYVAL]: "
+                 "dbpf_keyval_read_value_query_op_svc: query: %u\n",
+                 PVFS_KEYVAL_QUERY_UNMASK_QUERY(op_p->u.v_query.query_type));
 
     /* do initial query to determine if any records exist */
     ret = query_p->c_pget(query_p, &key, &pkey, &data, cursor_flags);

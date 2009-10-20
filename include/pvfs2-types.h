@@ -889,8 +889,8 @@ endecode_fields_3a(
 #define PVFS_KEYVAL_QUERY_NOOP                  0
 #define PVFS_KEYVAL_QUERY_LT                    1
 #define PVFS_KEYVAL_QUERY_LE                    2
-#define PVFS_KEYVAL_QUERY_EQ                    2
-#define PVFS_KEYVAL_QUERY_GE                    3
+#define PVFS_KEYVAL_QUERY_EQ                    3
+#define PVFS_KEYVAL_QUERY_GE                    4
 #define PVFS_KEYVAL_QUERY_GT                    5 
 #define PVFS_KEYVAL_QUERY_NT                    6
 #define PVFS_KEYVAL_QUERY_PEQ                   7

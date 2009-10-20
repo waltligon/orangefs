@@ -38,7 +38,7 @@ struct getvalue
     char *pvfs_root;
     PVFS_ds_keyval key;
     PVFS_ds_keyval val;
-    PVFS_keyval_query *query_p;
+    PVFS_keyval_query **query_p;
     PVFS_object_ref obj;
     PVFS_sysresp_getvalue *resp_p;
 };
@@ -49,7 +49,7 @@ struct dbpf_keyval_db_entry
     char key[PVFS_NAME_MAX];
 };
 
-static int pvfs2_setup_query(struct getvalue *state);
+static int pvfs2_parse_query(struct getvalue *state);
 static int pvfs2_setup_msg(struct getvalue *state);
 static int pvfs2_send_msg(struct getvalue *state);
 static int pvfs2_cleanup(struct getvalue *state);
@@ -60,7 +60,7 @@ static struct getvalue* parse_args(int argc, char* argv[]);
 
 int main(int argc, char **argv)
 {
-    int ret =0;
+    int ret =0, i=0, done=0;
     struct getvalue *state;
 
     /* look at command line arguments */
@@ -99,49 +99,81 @@ int main(int argc, char **argv)
         state->pvfs_root, (char *)state->key.buffer, 
         (char *)state->val.buffer, state->obj.fs_id, llu(state->obj.handle));
 
-    ret = pvfs2_setup_query( state );
-    ret = pvfs2_setup_msg( state );
+    ret = PINT_cached_config_count_servers( state->obj.fs_id,
+        PINT_SERVER_TYPE_META, &(state->meta_count) );
+    if( state->meta_count < 1 )
+    {
+        gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
+                   ret, state->meta_count);
+        return ret;
+    }
 
+    ret = pvfs2_parse_query( state );
+    ret = pvfs2_setup_msg( state );
     printf("resp_p: %p, query_p: %p\n", state->resp_p, state->query_p);
 
-    ret = pvfs2_send_msg( state );
+    while( done != state->meta_count)
+    {
+        done = 0;
+        ret = pvfs2_send_msg( state );
+
+        /* check if done */
+        for(i=0; i < state->meta_count; i++)
+        {
+            if( state->query_p[i][0].token == PVFS_ITERATE_END )
+                done++;
+        }
+    }
+
     ret = pvfs2_cleanup( state );
 
     PVFS_sys_finalize();
     return ret;
 }
 
-static int pvfs2_setup_query(struct getvalue *state)
+static int pvfs2_parse_query(struct getvalue *state)
 {
-    uint32_t i=0;
+    int ret = 0;
+    uint32_t i=0, j=0;
 
     /* handle simple query to start */
     state->query_count = 3;
 
-    if( (state->query_p = 
-        calloc( state->query_count, sizeof(PVFS_keyval_query))) == 0 )
+    /* allocate and setup query structures, one per meta server query */
+    if((state->query_p = calloc(state->meta_count, sizeof(PVFS_keyval_query *)))
+        == 0 )
     {
         PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
         return PVFS_ENOMEM;
     }
-
-    for( i=0; i < state->query_count; i++ )
+  
+    for( i=0; i < state->meta_count; i++ )
     {
-        setup_query_struct(&(state->query_p[i]), state->count);
+        if((state->query_p[i] = calloc(state->query_count, 
+            sizeof(PVFS_keyval_query))) == 0 )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return PVFS_ENOMEM;
+        }
+
+        for( j=0; j < state->query_count; j++ )
+        {
+            setup_query_struct(&(state->query_p[i][j]), state->count);
+        }
+
+        state->query_p[i][0].oper = state->query_type;
+        state->query_p[i][1].oper = PVFS_KEYVAL_QUERY_NOOP;
+        state->query_p[i][2].oper = PVFS_KEYVAL_QUERY_NOOP;
+
+        /* copy values from cli into query structs */
+        memcpy( state->query_p[i][1].query.buffer, state->key.buffer,
+            state->key.buffer_sz);
+        memcpy( state->query_p[i][2].query.buffer, state->val.buffer,
+            state->val.buffer_sz);
+        state->query_p[i][1].query.buffer_sz = state->key.buffer_sz;
+        state->query_p[i][2].query.buffer_sz = state->val.buffer_sz;
     }
-
-    state->query_p[0].oper = state->query_type;
-    state->query_p[1].oper = PVFS_KEYVAL_QUERY_NOOP;
-    state->query_p[2].oper = PVFS_KEYVAL_QUERY_NOOP;
-
-    memcpy( state->query_p[1].query.buffer, state->key.buffer,
-             state->key.buffer_sz);
-    memcpy( state->query_p[2].query.buffer, state->val.buffer,
-             state->val.buffer_sz);
-    state->query_p[1].query.buffer_sz = state->key.buffer_sz;
-    state->query_p[2].query.buffer_sz = state->val.buffer_sz;
-
-    return 0;
+    return ret;
 }
 
 /* pvfs2_setup_msg()
@@ -149,15 +181,6 @@ static int pvfs2_setup_query(struct getvalue *state)
 static int pvfs2_setup_msg(struct getvalue *state)
 {
     int ret = 0, i = 0, j = 0;
-    ret = PINT_cached_config_count_servers( state->obj.fs_id,
-        PINT_SERVER_TYPE_META, &(state->meta_count) );
-
-    if( state->meta_count < 1 )
-    {
-        gossip_err("Number of meta servers incorect. ret=%d, count=%d\n",
-                   ret, state->meta_count);
-        return -1;
-    }
 
     printf("Number of metadata servers: %d\n", state->meta_count);
     if( (state->resp_p = calloc(state->meta_count, 
@@ -170,11 +193,8 @@ static int pvfs2_setup_msg(struct getvalue *state)
     /* setup response struct for each server */
     for( i=0; i < state->meta_count; i++ )
     {
-        printf("i: %d, resp_p: %p\n", i, &(state->resp_p[i]));
-    
         state->resp_p[i].query_count = 0;
         state->resp_p[i].dirent_count = 0;
-
         if( (state->resp_p[i].dirent_p = 
             calloc(state->count, sizeof(PVFS_dirent))) == 0 )
         {
@@ -191,119 +211,148 @@ static int pvfs2_setup_msg(struct getvalue *state)
         
         for( j=0; j < state->query_count; j++ )
         {
-            setup_query_struct(&(state->resp_p[i].query_p[j]), state->count);
+            ret = setup_query_struct( &(state->resp_p[i].query_p[j]), 
+                state->count);
+            if( ret != 0 )
+            {
+                PVFS_perror("PVFS_sys_getvalue", PVFS_EINVAL);
+                return -PVFS_EINVAL;
+            }
         }
     }
-    return 0;
+    return ret;
 }
 
 static int pvfs2_send_msg(struct getvalue *state)
 {
-    int ret=0, done=0, lpath_len=0, i=0, j=0;
+    int ret=0, i=0, j=0, len=0;
+    char *local_path=NULL;
     PVFS_credentials creds;
-    char *local_path = NULL;
 
     PVFS_util_gen_credentials(&creds);
 
     printf("Asking for %u records from %d servers\n", state->count, 
         state->meta_count );
-    while( done < state->meta_count)
-    {
-        done = 0;
 
-        /* zero appropriate fields between iterations */
-        for( i=0; i < state->meta_count; i++ )
+    /* zero response structures but keep memory allocations 
+     * zero query handle arrays, the rest stays for possible next query */
+    for( i=0; i < state->meta_count; i++ )
+    {
+        for( j=0; j < state->query_count; j++ )
         {
-            for( j=0; j < state->query_count; j++ )
+            if(state->resp_p[i].query_p[j].match)
             {
-                if(state->resp_p[i].query_p[j].match)
-                {
-                    PVFS_handle *temp = state->resp_p[i].query_p[j].match;
-                    memset(temp, 0, state->count * sizeof(PVFS_handle));
-                    memset(&(state->resp_p[i].query_p[j]), 0, 
-                        sizeof(PVFS_keyval_query));
-                    state->resp_p[i].query_p[j].match = temp;
-                }
+                memset(state->resp_p[i].query_p[j].match, 0, 
+                    (state->count * sizeof(PVFS_handle)));
             }
+
+            if( state->resp_p[i].query_p[j].query.buffer )
+            {
+                memset(state->resp_p[i].query_p[j].query.buffer, 0, VALBUFSZ);
+                state->resp_p[i].query_p[j].query.buffer_sz = VALBUFSZ;
+                state->resp_p[i].query_p[j].query.read_sz = 0;
+            }
+            state->resp_p[i].query_p[j].token = 0;
+            state->resp_p[i].query_p[j].oper = 0;
+            state->resp_p[i].query_p[j].count = 0;
+
+            if( state->query_p[i][j].match )
+            {
+                memset(state->query_p[i][j].match, 0, state->count); 
+            }
+        }
+        state->resp_p[i].query_count = 0;
+
+        if( state->resp_p[i].dirent_p )
+        {
             memset(state->resp_p[i].dirent_p, 0, 
                 (state->count * sizeof(PVFS_dirent)));
         }
+        state->resp_p[i].dirent_count = 0;
+    }
 
-        ret = PVFS_sys_getvalue(state->obj, &creds, state->query_count, 
-                                 state->query_p, state->resp_p, NULL);
-
-        if( ret != 0 )
+    ret = PVFS_sys_getvalue(state->obj, &creds, state->query_count, 
+                            state->meta_count, state->query_p, state->resp_p, 
+                            NULL);
+    for(i=0; i < state->meta_count; i++ )
+    {
+        if( state->query_p[i][0].token == PVFS_ITERATE_END )
         {
-            printf("Error code return: %d\n", ret);
-            return ret;
+            continue;
         }
 
-        for( i = 0; i < state->meta_count; i++ )
+        printf("Meta (%d) returned %d records, token (%llu), "
+               "dirent count: %u\n", i, state->resp_p[i].query_p[0].count, 
+                llu(state->resp_p[i].query_p[0].token),
+                state->resp_p[i].dirent_count);
+
+        for( j=0; j < state->resp_p[i].query_p[0].count; j++ )
         {
-            printf("Meta (%d) returned %d records, token (%llu), "
-                   "dirent count: %u\n", i, state->resp_p[i].query_p[0].count, 
-                    llu(state->resp_p[i].query_p[0].token),
-                    state->resp_p[i].dirent_count);
+            printf("\tHandle: %llu\n", 
+                state->resp_p[i].query_p[0].match[j]);
+        }
 
-            for( j=0; j < state->resp_p[i].query_p[0].count; j++ )
-            {
-
-                printf("\tHandle: %llu\n", 
-                    state->resp_p[i].query_p[0].match[j]);
+        /* have to prepend local mount point to path returned
+         * from server */
+        for( j = 0; j < state->resp_p[i].dirent_count; j++ )
+        {
+            len = strlen(state->resp_p[i].dirent_p[j].d_name) +
+                     strlen(state->pvfs_root) + 1;
+            if( ( local_path = realloc(local_path, len+1) ) == 0 )
+            {   
+                printf("malloc error\n");
+                return -1;
             }
 
-             /* have to prepend local mount point to path returned
-             * from server */
-            for( j = 0; j < state->resp_p[i].dirent_count; j++ )
-            {
-                lpath_len = strlen(state->resp_p[i].dirent_p[j].d_name) +
-                         strlen(state->pvfs_root) + 1;
-                if( ( local_path = realloc(local_path, lpath_len+1) ) == 0 )
-                {   
-                    printf("malloc error\n");
-                    return -1;
-                }
+            memset(local_path, 0, len+1);
+            strncpy(local_path, state->pvfs_root, strlen(state->pvfs_root));
+            strncpy(local_path+strlen(state->pvfs_root ), 
+                  state->resp_p[i].dirent_p[j].d_name, 
+                  strlen(state->resp_p[i].dirent_p[j].d_name) );
+       
+            printf("\t%s (handle: %llu) (next token: %llu)\n",
+                local_path, llu(state->resp_p[i].dirent_p[j].handle),
+                llu(state->resp_p[i].query_p[0].token));
+        }
 
-                memset(local_path, 0, lpath_len+1);
-                strncpy(local_path, state->pvfs_root, strlen(state->pvfs_root));
-                strncpy(local_path+strlen(state->pvfs_root ), 
-                      state->resp_p[i].dirent_p[j].d_name, 
-                      strlen(state->resp_p[i].dirent_p[j].d_name) );
-           
-                printf("\t%s (handle: %llu) (next token: %llu)\n",
-                    local_path, llu(state->resp_p[i].dirent_p[j].handle),
-                    llu(state->resp_p[i].query_p[0].token));
+        for(j=0; j < state->query_count; j++ )
+        {
+            /* if query has reached end, it won't be updated in the
+             * response struct (since it was already done */
+            if( state->query_p[i][j].token != PVFS_ITERATE_END )
+            {
+                state->query_p[i][j].token = state->resp_p[i].query_p[j].token; 
             }
-            done += (state->resp_p[i].query_p[0].token == PVFS_ITERATE_END)?1:0;
         }
     }
-    free(local_path);
+    if( ret != 0 )
+    {
+        printf("Error code return: %d\n", ret);
+        return ret;
+    }
+
+    if(local_path)
+        free(local_path);
+
     return 0;
 }
-
 
 /* cleanup */
 static int pvfs2_cleanup(struct getvalue *state)
 {
     int i=0, j=0;
-    /* free, free, free */
-    for( i=0; i < state->meta_count; i++ )
+
+    for( i=0; i< state->meta_count; i++ )
     {
-        /*
         for( j=0; j < state->query_count; j++ )
         {
-            if( state->resp_p[i].query_p[j].match )
-                free(state->resp_p[i].query_p[j].match);
-            if( state->resp_p[i].query_p[j].query.buffer )
-                free(state->resp_p[i].query_p[j].query.buffer);
+            free( state->query_p[i][j].query.buffer );
+            free( state->query_p[i][j].match );
         }
-        free(state->resp_p[i].query_p);
-        free(state->resp_p[i].dirent_p);
-        */
+        free(state->query_p[i]);
     }
 
     free(state->query_p);
-    //free(state->resp_p);
     free(state->pvfs_root);
     free(state->key.buffer);
     free(state->val.buffer);
@@ -409,23 +458,30 @@ static struct getvalue* parse_args(int argc, char* argv[])
 
 static int setup_query_struct(PVFS_keyval_query *q, uint32_t c)
 {
-
     q->token = PVFS_ITERATE_START;
     q->oper = 0;
 
-    if( (q->query.buffer = calloc(1, VALBUFSZ)) == 0 )
+    if( ! q->query.buffer )
     {
-        PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
-        return -PVFS_ENOMEM;
+        if( (q->query.buffer = calloc(VALBUFSZ, sizeof(char))) == 0 )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return -PVFS_ENOMEM;
+        }
+        q->query.buffer_sz = VALBUFSZ;
     }
-    q->query.buffer_sz = VALBUFSZ;
 
     q->count = c;
-    if( (q > 0) && ((q->match = calloc(c, sizeof(PVFS_handle))) == 0) )
+
+    if( ! q->match )
     {
-        PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
-        return -PVFS_ENOMEM;
+        if( (q > 0) && ((q->match = calloc(c, sizeof(PVFS_handle))) == 0) )
+        {
+            PVFS_perror("PVFS_sys_getvalue", PVFS_ENOMEM);
+            return -PVFS_ENOMEM;
+        }
     }
+
     return 0;
 }
 

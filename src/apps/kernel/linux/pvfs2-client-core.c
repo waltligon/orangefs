@@ -3374,6 +3374,7 @@ int main(int argc, char **argv)
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
+
     gossip_err("PVFS Client Daemon Started.  Version %s\n", PVFS2_VERSION);
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,  "***********************"
                  "****************************\n");

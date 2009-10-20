@@ -470,10 +470,11 @@ struct PINT_client_listeattr_sm
 struct PINT_client_getvalue_sm
 {
     PVFS_ds_position *pos_token;            /* input */
-    PVFS_keyval_query *query_p;             /* input */
-    uint32_t query_count;                    /* input */
+    PVFS_keyval_query **query_p;            /* input */
+    uint32_t query_count;                   /* input */
     int32_t server_count;                   /* internal */
     PVFS_BMI_addr_t *server_addresses;      /* internal */
+    int32_t *map;                           /* internal */
     PVFS_sysresp_getvalue *resp_p;          /* output */
 };
 

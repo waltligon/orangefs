@@ -28,7 +28,7 @@
 #include "dbpf-keyval.h"
 
 #define FAILED_PERMS    100
-#define EMPTY_RESULT    101
+#define END_OF_HANDLES  101
 #define TARGET_ASSIGNED 102
 #define MORE_TARGETS    103
 #define GET_PATHS       104
@@ -73,6 +73,7 @@ machine pvfs2_get_value_sm
     {
         run getvalue_assign_target;
         TARGET_ASSIGNED => perms;
+        END_OF_HANDLES => setup_get_paths;
         success => setup_get_paths;
         default => final_response;
     }
@@ -145,6 +146,7 @@ static PINT_sm_action getvalue_setup_resp(
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG,
                  "[GETVALUE]: count: %u\n", s_op->req->u.getvalue.count);
+
     s_op->resp.u.getvalue.query_count = s_op->req->u.getvalue.count;
     /* copy query_p array over to resp struct */
     s_op->resp.u.getvalue.query_p = calloc( s_op->req->u.getvalue.count, 
@@ -166,6 +168,10 @@ static PINT_sm_action getvalue_setup_resp(
         }
     }
 
+    /* dirent array is allocated in setup_get_paths so it's only allocated
+     * if needed and only for the total number of handles we are looking up */
+
+    s_op->resp.u.getvalue.dirent_count = 0;
 
     if( (s_op->key.buffer = calloc( DBPF_MAX_KEY_LENGTH, sizeof(char) ))==0 )
     {
@@ -279,7 +285,6 @@ static PINT_sm_action getvalue_parse_query(
     {
         js_p->error_code = MORE_QUERIES;
         return SM_ACTION_COMPLETE;
-    
     }
 
     /* assert that children exist */
@@ -360,18 +365,37 @@ static PINT_sm_action getvalue_assign_target(
     qindex = s_op->u.getvalue.query_index;
     hindex = s_op->u.getvalue.handle_index;
 
-    /* reset index into match if all handles in that query have been done */
-    if( s_op->resp.u.getvalue.query_p[qindex].count > hindex )
+    while( qindex < s_op->resp.u.getvalue.query_count )
     {
-        hindex = 0;
-        qindex++;
+        if( hindex >= s_op->resp.u.getvalue.query_p[qindex].count )
+        {
+            hindex = 0;
+            qindex++;
+        }
+        else if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(
+            s_op->resp.u.getvalue.query_p[qindex].oper) ==
+            PVFS_KEYVAL_QUERY_NOOP )
+        {
+            qindex++;
+        }
+        else
+        {
+            break;
+        }
     }
-  
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG,
+                 "[GETVALUE]: getvalue_assign_target: "
+                 "query_p[%u].count: [%u], hindex [%u], qindex [%u]\n", 
+                 qindex, s_op->resp.u.getvalue.query_p[qindex].count,
+                 hindex, qindex);
+
     /* all done once we've gone through all query structs */
     if( qindex >= s_op->resp.u.getvalue.query_count )
     {
         s_op->u.getvalue.query_index = qindex;
         s_op->u.getvalue.handle_index = hindex;
+        js_p->error_code = END_OF_HANDLES;
         return SM_ACTION_COMPLETE;
     }
 
@@ -530,11 +554,23 @@ static PINT_sm_action getvalue_setup_get_paths(
         }
     }
 
-
-    s_op->resp.u.getvalue.dirent_count = s_op->u.getvalue.unknown_count;
     if( s_op->u.getvalue.unknown_count == 0 )
     {
         js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: getvalue_setup_get_paths: "
+                 "allocating room for %u dirents\n", 
+                 s_op->u.getvalue.unknown_count);
+    /* allocate dirent array for pathing based on total count of handle */
+    if( (s_op->resp.u.getvalue.dirent_p = calloc(
+        s_op->u.getvalue.unknown_count, sizeof(PVFS_dirent))) == 0 )
+    {
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: malloc for "
+                     "dirent failed for %u handles\n",
+                      s_op->u.getvalue.unknown_count);
+        js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
@@ -576,7 +612,6 @@ static PINT_sm_action getvalue_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    uint32_t i = 0;
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG,
                  "[GETVALUE]: getvalue_cleanup: enter\n");
@@ -589,13 +624,13 @@ static PINT_sm_action getvalue_cleanup(
     }
 
     free(s_op->resp.u.getvalue.query_p);
+    if( s_op->resp.u.getvalue.dirent_p )
+        free(s_op->resp.u.getvalue.dirent_p);
 */
     if( s_op->u.getvalue.unknown_handle )
         free(s_op->u.getvalue.unknown_handle);
     if( s_op->u.getvalue.unknown_dirent )
         free(s_op->u.getvalue.unknown_dirent);
-    if( s_op->resp.u.getvalue.dirent_p )
-        free(s_op->resp.u.getvalue.dirent_p);
    
     free(s_op->key.buffer);
     free(s_op->val.buffer);
@@ -631,17 +666,30 @@ static int path_comp_fn(void *v_p,
         return resp_p->status;
     }
 
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: get_path "
+                 " must return with the same number dirents as we queried: "
+                 " unknown (%u), resp count (%u)\n",
+                 s_op->u.getvalue.unknown_count, resp_p->u.getpath.count);
+    assert( s_op->u.getvalue.unknown_count == resp_p->u.getpath.count);
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: handling "
+                 "%u entries, current entries: %u\n", resp_p->u.getpath.count,
+                 s_op->resp.u.getvalue.dirent_count);
     for(i=0; i < resp_p->u.getpath.count; i++ )
     {
-        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path response: "
-                     "handle/path %d: (%llu):(%s)\n", i, 
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: "
+                     "path response: handle/path %d: (%llu):(%s)\n", i, 
                      llu(resp_p->u.getpath.dirent[i].handle),
                      resp_p->u.getpath.dirent[i].d_name); 
-        memcpy(s_op->resp.u.getvalue.dirent_p[i].d_name,
+        memcpy(s_op->resp.u.getvalue.dirent_p [i].d_name,
                resp_p->u.getpath.dirent[i].d_name, PVFS_NAME_MAX + 1);
+        s_op->resp.u.getvalue.dirent_p[i].handle = 
+            s_op->u.getvalue.unknown_handle[i];
+        s_op->resp.u.getvalue.dirent_count++;
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: "
+                     "copied to s_op->resp.u.getvalue.dirent_p[%d]\n", 
+                     s_op->resp.u.getvalue.dirent_count-1);
     }
-
-    s_op->resp.u.getvalue.dirent_count += resp_p->u.getpath.count;
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: path_comp_fn: exit\n");
     return 0;

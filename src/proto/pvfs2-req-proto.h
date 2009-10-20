@@ -1865,9 +1865,9 @@ do {                                                     \
 
 struct PVFS_servresp_getvalue
 {
-    int32_t query_count;
+    uint32_t query_count;
     PVFS_keyval_query *query_p;   /* query with match filled */
-    int32_t dirent_count;
+    uint32_t dirent_count;
     PVFS_dirent *dirent_p;        /* array with handle info */
 };
 endecode_fields_1a_1a_struct(
@@ -1878,24 +1878,24 @@ endecode_fields_1a_1a_struct(
     skip4,,
     uint32_t, dirent_count,
     PVFS_dirent, dirent_p)
-#define extra_size_PVFS_servresp_getvalue \
-    (PVFS_REQ_LIMIT_KEYVAL_QUERY * sizeof( PVFS_keyval_query )) + \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof( PVFS_handle ) ) + \
+#define extra_size_PVFS_servresp_getvalue                       \
+    (PVFS_REQ_LIMIT_KEYVAL_QUERY *                              \
+        sizeof( PVFS_keyval_query ) + PVFS_REQ_LIMIT_KEY_LEN) + \
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof( PVFS_handle ) ) +   \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof( PVFS_dirent ) )
 
 /* getpath **************************************************/
 struct PVFS_servreq_getpath
 {
     PVFS_fs_id  fs_id;                          /* file system */
-    PVFS_handle handle;                         /* handle */
+    PVFS_handle handle;
     uint32_t    depth;
     uint32_t    count;                          /* number of handles */
     PVFS_dirent *dirent;                        /* directory entry*/
 };
-endecode_fields_4a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_getpath,
     PVFS_fs_id, fs_id,
-    PVFS_handle, handle,
     uint32_t, depth,
     skip4,,
     uint32_t, count,
@@ -1924,7 +1924,7 @@ do {                                                    \
 struct PVFS_servresp_getpath
 {
     uint32_t count;             /* number of items returned in response */
-    PVFS_dirent *dirent;         /* array with handle info */
+    PVFS_dirent *dirent;        /* array with handle info */
 };
 endecode_fields_1a_struct(
     PVFS_servresp_getpath,

@@ -653,7 +653,8 @@ PVFS_error PVFS_isys_getvalue(
     PVFS_object_ref ref,
     const PVFS_credentials *credentials,
     uint32_t query_count,
-    PVFS_keyval_query *query_p,
+    uint32_t server_count,
+    PVFS_keyval_query **query_p,
     PVFS_sysresp_getvalue *resp_p,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -663,7 +664,8 @@ PVFS_error PVFS_sys_getvalue(
     PVFS_object_ref ref,
     const PVFS_credentials *credentials,
     uint32_t query_count,
-    PVFS_keyval_query *query_p,
+    uint32_t server_count,
+    PVFS_keyval_query **query_p,
     PVFS_sysresp_getvalue *resp_p,
     PVFS_hint hints);
 
