@@ -9,6 +9,10 @@ simple.o: simple.c
 	$(MPICC) -c -O2 simple.c
 simple: simple.o
 	$(MPICC) $(CFLAGS) -o simple simple.o
+test_grep.o: test_grep.c
+	$(MPICC) -c -O2 test_grep.c
+test_grep: test_grep.o
+	$(MPICC) $(CFLAGS) -o test_grep test_grep.o
 simple1.o: simple1.c
 	$(MPICC) -c simple1.c
 simple1: simple1.o
@@ -40,3 +44,4 @@ vector1: vector1.o
 
 clean:
 	rm -f *.o *~ simple simple1 simple2 simple3 vector vector1 simple1_unaligned test_kmeans
+	rm -f test_grep
