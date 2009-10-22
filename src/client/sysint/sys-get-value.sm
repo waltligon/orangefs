@@ -259,7 +259,7 @@ static PINT_sm_action getvalue_setup_metaservers(
         sizeof(int32_t))) == 0)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: "
-                     "getvalue_get_metaservers: "malloc for map failed\n");
+                     "getvalue_get_metaservers: malloc for map failed\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -348,7 +348,7 @@ static PINT_sm_action getvalue_setup_msgpair(
     js_p->error_code = 0;
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: getvalue_setup_msgpair: 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: getvalue_setup_msgpair: "
                  "exit\n");
 
     return SM_ACTION_COMPLETE;

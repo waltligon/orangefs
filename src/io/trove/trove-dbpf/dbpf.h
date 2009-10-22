@@ -411,6 +411,7 @@ struct dbpf_keyval_read_value_query_op
     PVFS_ds_keyval *key;
     PVFS_ds_keyval *val;
     PVFS_handle *handle_p;
+    PVFS_handle *unique_p;
     uint32_t *count;
     TROVE_ds_position *position_p;
     uint32_t query_type;

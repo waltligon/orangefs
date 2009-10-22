@@ -137,7 +137,7 @@ static int pvfs2_parse_query(struct getvalue *state)
     uint32_t i=0, j=0;
 
     /* handle simple query to start */
-    state->query_count = 3;
+    state->query_count = 7;
 
     /* allocate and setup query structures, one per meta server query */
     if((state->query_p = calloc(state->meta_count, sizeof(PVFS_keyval_query *)))
@@ -158,20 +158,34 @@ static int pvfs2_parse_query(struct getvalue *state)
 
         for( j=0; j < state->query_count; j++ )
         {
-            setup_query_struct(&(state->query_p[i][j]), state->count);
+            if( j == 0 )
+            {
+                setup_query_struct(&(state->query_p[i][j]), 2 * state->count);
+            }
+            else
+            {
+                setup_query_struct(&(state->query_p[i][j]), state->count);
+            }
         }
 
-        state->query_p[i][0].oper = state->query_type;
-        state->query_p[i][1].oper = PVFS_KEYVAL_QUERY_NOOP;
-        state->query_p[i][2].oper = PVFS_KEYVAL_QUERY_NOOP;
+        state->query_p[i][0].oper = PVFS_KEYVAL_QUERY_OR;
+        state->query_p[i][1].oper = PVFS_KEYVAL_QUERY_EQ;
+        state->query_p[i][2].oper = PVFS_KEYVAL_QUERY_EQ;
+        state->query_p[i][3].oper = PVFS_KEYVAL_QUERY_NOOP;
+        state->query_p[i][4].oper = PVFS_KEYVAL_QUERY_NOOP;
+        state->query_p[i][5].oper = PVFS_KEYVAL_QUERY_NOOP;
+        state->query_p[i][6].oper = PVFS_KEYVAL_QUERY_NOOP;
 
         /* copy values from cli into query structs */
-        memcpy( state->query_p[i][1].query.buffer, state->key.buffer,
-            state->key.buffer_sz);
-        memcpy( state->query_p[i][2].query.buffer, state->val.buffer,
-            state->val.buffer_sz);
-        state->query_p[i][1].query.buffer_sz = state->key.buffer_sz;
-        state->query_p[i][2].query.buffer_sz = state->val.buffer_sz;
+        memcpy( state->query_p[i][3].query.buffer, "user.key0", 10 );
+        memcpy( state->query_p[i][4].query.buffer, "1", 2);
+        state->query_p[i][3].query.buffer_sz = 10;
+        state->query_p[i][4].query.buffer_sz = 2;
+
+        memcpy( state->query_p[i][5].query.buffer, "user.key3", 10 );
+        memcpy( state->query_p[i][6].query.buffer, "5", 2);
+        state->query_p[i][5].query.buffer_sz = 10;
+        state->query_p[i][6].query.buffer_sz = 2;
     }
     return ret;
 }
@@ -322,6 +336,15 @@ static int pvfs2_send_msg(struct getvalue *state)
             if( state->query_p[i][j].token != PVFS_ITERATE_END )
             {
                 state->query_p[i][j].token = state->resp_p[i].query_p[j].token; 
+            }
+
+            if( state->query_p[i][j].token == 0 )
+            {
+                if( state->query_p[i][(j*2) + 1].token == PVFS_ITERATE_END &&
+                    state->query_p[i][(j*2) + 2].token == PVFS_ITERATE_END )
+                {
+                    state->query_p[i][j].token = PVFS_ITERATE_END;
+                }
             }
         }
     }

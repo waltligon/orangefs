@@ -30,9 +30,9 @@
 #define FAILED_PERMS    100
 #define END_OF_HANDLES  101
 #define TARGET_ASSIGNED 102
-#define MORE_TARGETS    103
-#define GET_PATHS       104
-#define MORE_QUERIES    105
+#define GET_PATHS       103
+#define DBPF_QUERY    104
+#define SET_QUERY     105
 
 /* if counts and tokens are equal we haven't worked it */
 static inline int handled_query(PVFS_keyval_query o, PVFS_keyval_query q) 
@@ -58,7 +58,15 @@ machine pvfs2_get_value_sm
     {
         run getvalue_parse_query;
         success => assign_target;
-        MORE_QUERIES => read_value;
+        DBPF_QUERY => read_value;
+        SET_QUERY => set_operation;
+        default => final_response;
+    }
+
+    state set_operation
+    {
+        run getvalue_set_operation;
+        success => parse_query;
         default => final_response;
     }
 
@@ -278,12 +286,12 @@ static PINT_sm_action getvalue_parse_query(
     memset( s_op->key.buffer, 0, DBPF_MAX_KEY_LENGTH );
     memset( s_op->val.buffer, 0, DBPF_MAX_KEY_LENGTH );
 
-    /*TODO if 
-      set operation bail without copying operands since they are the kids */
-    if( (s_op->u.getvalue.current_query->oper == PVFS_KEYVAL_QUERY_AND) ||
-        (s_op->u.getvalue.current_query->oper == PVFS_KEYVAL_QUERY_OR) )
+    if((PVFS_KEYVAL_QUERY_UNMASK_QUERY(s_op->u.getvalue.current_query->oper) == 
+        PVFS_KEYVAL_QUERY_AND) ||
+       (PVFS_KEYVAL_QUERY_UNMASK_QUERY(s_op->u.getvalue.current_query->oper) == 
+        PVFS_KEYVAL_QUERY_OR) )
     {
-        js_p->error_code = MORE_QUERIES;
+        js_p->error_code = SET_QUERY;
         return SM_ACTION_COMPLETE;
     }
 
@@ -303,10 +311,121 @@ static PINT_sm_action getvalue_parse_query(
     s_op->val.buffer_sz = 
         s_op->req->u.getvalue.query_p[ (2*i)+2 ].query.buffer_sz;
     
-    js_p->error_code = MORE_QUERIES;
+    js_p->error_code = DBPF_QUERY;
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG,
                  "[GETVALUE]: getvalue_parse_query: exit\n");
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action getvalue_set_operation(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_keyval_query *l=NULL, *r=NULL;
+    uint32_t i=0, j=0, match_index=0;
+
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, 
+                 "[GETVALUE]: getvalue_set_operation: enter\n");
+
+    for( i = 0; i < s_op->req->u.getvalue.count; i++ )
+    {
+        if( s_op->u.getvalue.current_query == 
+            &(s_op->resp.u.getvalue.query_p[i]) )
+        {
+            gossip_debug(GOSSIP_GETVALUE_DEBUG,
+                         "[GETVALUE]: getvalue_set_operation: set operation "
+                         "query at index %d\n", i);
+            break;
+        }
+    }
+
+    l = &(s_op->resp.u.getvalue.query_p[(2*i)+1]);
+    assert(l);
+    r = &(s_op->resp.u.getvalue.query_p[(2*i)+2]);
+    assert(r);
+
+    if( l->token == PVFS_ITERATE_START || r->token == PVFS_ITERATE_START )
+    {
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, 
+                 "[GETVALUE]: getvalue_set_operation: left or right operand "
+                 "of set operation not completed (position at START)\n");
+        js_p->error_code = -1;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if( l->count + r->count >= s_op->u.getvalue.current_query->count )
+    {
+        gossip_debug(GOSSIP_GETVALUE_DEBUG, 
+                     "[GETVALUE]: getvalue_set_operation: the left operand "
+                     "allows %u matches, the right operand allows %u matches "
+                     "but the parent only allows %u matches. We don't handle "
+                     "that. Try again, increasing the parent's count.",
+                     l->count, r->count, s_op->u.getvalue.current_query->count);
+        js_p->error_code = PVFS_EINVAL;
+        s_op->u.getvalue.current_query->count = 0;
+        s_op->u.getvalue.current_query->token = PVFS_ITERATE_START;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if( PVFS_KEYVAL_QUERY_UNMASK_QUERY(s_op->u.getvalue.current_query->oper) ==
+        PVFS_KEYVAL_QUERY_OR )
+    {
+        for(i=0; i < l->count; i++ )
+        {
+            s_op->u.getvalue.current_query->match[ match_index++ ] =
+                l->match[i];
+        }
+        for(i=0; i < r->count; i++ )
+        {
+            for(j=0; j < match_index; j++ )
+            {
+                /* if copied item on left side, don't copy it here */
+                if( r->match[i] == 
+                    s_op->u.getvalue.current_query->match[match_index] )
+                {
+                    break;
+                }
+            }
+    
+            /* if iterated through left side without duplicate, add it */
+            if( j == match_index )
+            {
+                s_op->u.getvalue.current_query->match[ match_index++ ] =
+                    r->match[i];
+            }
+        }
+    }
+
+    else if(PVFS_KEYVAL_QUERY_UNMASK_QUERY(s_op->u.getvalue.current_query->oper)
+        == PVFS_KEYVAL_QUERY_AND )
+    {
+        for( i=0; i < l->count; i++ )
+        {
+            for( j=0; j < r->count; j++ )
+            {
+                if( l->match[i] == r->match[j] )
+                {
+                    s_op->u.getvalue.current_query->match[ match_index++ ] =
+                        r->match[j];
+                }
+
+            }
+        }
+    }
+
+    s_op->u.getvalue.current_query->count = match_index;
+    /* make sure we set the token to 0 (not meaningful) */
+    js_p->position = 0;
+    gossip_debug(GOSSIP_GETVALUE_DEBUG,
+                 "[GETVALUE]: getvalue_set_operation: copied (%u) handles to "
+                 "result, set token to %llu\n", 
+                 s_op->u.getvalue.current_query->count,
+                 llu(s_op->u.getvalue.current_query->token));
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, 
+                 "[GETVALUE]: getvalue_set_operation: exit\n");
     return SM_ACTION_COMPLETE;
 }
 
@@ -483,86 +602,41 @@ static PINT_sm_action getvalue_remove_result(
 static PINT_sm_action getvalue_setup_get_paths(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret=0, i=0;
-    uint32_t orig_count=0, j=0;
+    int ret=0;
+    uint32_t i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_credentials creds;
+
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    
+    uint32_t path = PVFS_KEYVAL_QUERY_UNMASK_PATHS(
+        s_op->resp.u.getvalue.query_p[0].oper);
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, 
                  "[GETVALUE]: getvalue_setup_get_paths: enter\n");
     js_p->error_code = GET_PATHS;
 
-    /* iterate over each query object to see 
-     * 1) total handle count
-     * 2) which queries want paths returned 
-     */
-
-    s_op->u.getvalue.unknown_count = 0;
-    s_op->u.getvalue.unknown_dirent = NULL;
-    s_op->u.getvalue.unknown_handle = NULL;
-
-    for(i=0; i < s_op->resp.u.getvalue.query_count; i++ )
-    {
-        uint32_t oper = PVFS_KEYVAL_QUERY_UNMASK_QUERY(
-            s_op->resp.u.getvalue.query_p[i].oper);
-        uint32_t path = PVFS_KEYVAL_QUERY_UNMASK_PATHS(
-            s_op->resp.u.getvalue.query_p[i].oper);
-
-        if( (oper != PVFS_KEYVAL_QUERY_NOOP) && 
-            (path != PVFS_KEYVAL_RESULT_NO_PATHS) && 
-            (s_op->resp.u.getvalue.query_p[i].count > 0) )
-        {
-            orig_count = s_op->u.getvalue.unknown_count;
-            s_op->u.getvalue.unknown_count += 
-                s_op->resp.u.getvalue.query_p[i].count;
-
-            if( (s_op->u.getvalue.unknown_dirent = realloc(
-                  s_op->u.getvalue.unknown_dirent, 
-                  s_op->u.getvalue.unknown_count * sizeof(PVFS_dirent))) == 0 )
-            {
-                js_p->error_code = -TROVE_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }  
-
-            /* initialize only the new memory */
-            memset(s_op->u.getvalue.unknown_dirent + 
-                   (orig_count * sizeof(PVFS_dirent)), 0,  
-                   s_op->resp.u.getvalue.query_p[i].count*sizeof(PVFS_dirent));
-                   
-            if( (s_op->u.getvalue.unknown_handle = realloc(
-                  s_op->u.getvalue.unknown_handle, 
-                  s_op->u.getvalue.unknown_count * sizeof(PVFS_handle))) == 0 )
-            {
-                js_p->error_code = -TROVE_ENOMEM;
-                return SM_ACTION_COMPLETE;
-            }
-
-            /* initialize only the new memory */
-            memset(s_op->u.getvalue.unknown_handle + 
-                   (orig_count * sizeof(PVFS_handle)), 0,  
-                   s_op->resp.u.getvalue.query_p[i].count*sizeof(PVFS_handle));
-
-            for(j=orig_count; j < s_op->u.getvalue.unknown_count; j++ )
-            {
-                uint32_t local_index = j - orig_count;
-                s_op->u.getvalue.unknown_handle[j] =
-                    s_op->resp.u.getvalue.query_p[i].match[local_index];
-                s_op->u.getvalue.unknown_dirent[j].handle =
-                    s_op->resp.u.getvalue.query_p[i].match[local_index];
-            }
-        }
-    }
-
-    if( s_op->u.getvalue.unknown_count == 0 )
+    s_op->u.getvalue.unknown_count = s_op->resp.u.getvalue.query_p[0].count;
+    if( s_op->u.getvalue.unknown_count == 0 ) /* no results */
     {
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: getvalue_setup_get_paths: "
-                 "allocating room for %u dirents\n", 
-                 s_op->u.getvalue.unknown_count);
+    if((s_op->u.getvalue.unknown_dirent = calloc(s_op->u.getvalue.unknown_count,
+        sizeof(PVFS_dirent))) == 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    if((s_op->u.getvalue.unknown_handle = calloc(s_op->u.getvalue.unknown_count,
+        sizeof(PVFS_handle))) == 0)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* allocate dirent array for pathing based on total count of handle */
     if( (s_op->resp.u.getvalue.dirent_p = calloc(
         s_op->u.getvalue.unknown_count, sizeof(PVFS_dirent))) == 0 )
@@ -573,6 +647,21 @@ static PINT_sm_action getvalue_setup_get_paths(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    if( path != PVFS_KEYVAL_RESULT_NO_PATHS )
+    {
+        for(i=0; i < s_op->u.getvalue.unknown_count; i++ )
+        {
+            s_op->u.getvalue.unknown_handle[i] =
+                s_op->resp.u.getvalue.query_p[0].match[i];
+            s_op->u.getvalue.unknown_dirent[i].handle =
+                s_op->resp.u.getvalue.query_p[0].match[i];
+         }
+    }
+
+    gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: getvalue_setup_get_paths: "
+                 "allocating room for %u dirents\n", 
+                 s_op->u.getvalue.unknown_count);
 
     /* prepare messages */
     PINT_msgpair_init(&s_op->msgarray_op);
@@ -585,8 +674,8 @@ static PINT_sm_action getvalue_setup_get_paths(
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = path_comp_fn;
 
-    /* send initial request to meta server of handle, just pick handle owner of
-     * handle 0. */
+    /* send initial request to meta server of handle, just pick handle of
+     * handle[0]. */
     ret = PINT_cached_config_map_to_server( &msg_p->svr_addr, msg_p->handle,
                                              msg_p->fs_id );
     PINT_util_gen_credentials(&creds);
