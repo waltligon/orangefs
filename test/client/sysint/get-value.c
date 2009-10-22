@@ -370,12 +370,17 @@ static int pvfs2_cleanup(struct getvalue *state)
         for( j=0; j < state->query_count; j++ )
         {
             free( state->query_p[i][j].query.buffer );
+            free( state->resp_p[i].query_p[j].query.buffer );
             free( state->query_p[i][j].match );
+            free( state->resp_p[i].query_p[j].match );
         }
         free(state->query_p[i]);
+        free(state->resp_p[i].query_p);
+        free(state->resp_p[i].dirent_p);
     }
 
     free(state->query_p);
+    free(state->resp_p);
     free(state->pvfs_root);
     free(state->key.buffer);
     free(state->val.buffer);

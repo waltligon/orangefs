@@ -365,6 +365,7 @@ static PINT_sm_action getvalue_cleanup(
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     free( sm_p->u.getvalue.server_addresses );
+    free( sm_p->u.getvalue.map );
     PINT_SET_OP_COMPLETE;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "[GETVALUE]: getvalue_cleanup: exit\n"); 

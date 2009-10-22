@@ -880,6 +880,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.geteattr.valsz);
                 break;
 
+            case PVFS_SERV_GETVALUE:
+                decode_free(req->u.getvalue.query_p);
+                break;
+
             case PVFS_SERV_GETPATH:
                 decode_free(req->u.getpath.dirent);
                 break;
@@ -909,7 +913,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
             case PVFS_SERV_IMM_COPIES:
-            case PVFS_SERV_GETVALUE:
               /*nothing to free*/
                   break;
 	    case PVFS_SERV_INVALID:
@@ -991,9 +994,20 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.listeattr.key);
                     break;
                 case PVFS_SERV_GETVALUE:
-                    if( resp->u.getvalue.dirent_p)
-                        decode_free(resp->u.getvalue.dirent_p);
-                    break;
+                    {
+                        int i;
+                        for(i=0; i < resp->u.getvalue.query_count; i++ )
+                        {
+                            decode_free(resp->u.getvalue.query_p[i].query.
+                                buffer);
+                            decode_free(resp->u.getvalue.query_p[i].match);
+                        }
+                        decode_free(resp->u.getvalue.query_p);
+
+                        if( resp->u.getvalue.dirent_p)
+                            decode_free(resp->u.getvalue.dirent_p);
+                        break;
+                    }
                 case PVFS_SERV_GETPATH:
                     if( resp->u.getpath.dirent)
                         decode_free(resp->u.getpath.dirent);
