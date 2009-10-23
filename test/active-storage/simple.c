@@ -101,10 +101,8 @@ int main( int argc, char *argv[] )
 
     MPI_File_open( comm, fname, MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
 
-    /* Set the file view which tiles the file type MPI_DOUBLE, starting 
-       at displacement 0.
-    */
-    disp = rank*nitem*type_size;
+    /* Set the file view */
+    disp = rank * nitem * type_size;;
     etype = MPI_DOUBLE;
     ftype = MPI_DOUBLE;
     result = MPI_File_set_view(fh, disp, etype, ftype, "native", MPI_INFO_NULL);
@@ -133,8 +131,6 @@ int main( int argc, char *argv[] )
     }
 
     /* Write to file */
-    //offset = rank * nitem * type_size;
-    //printf("%d: offset=%d\n", rank, offset);
     MPI_File_write_all( fh, buf, nitem, MPI_DOUBLE, &status );
 
     MPI_Get_count( &status, MPI_DOUBLE, &count );
@@ -156,6 +152,7 @@ int main( int argc, char *argv[] )
   memset( &status, 0xff, sizeof(MPI_Status) );
 
   double *tmp = (double *)malloc( nitem * sizeof(double) );
+  offset = rank * nitem * type_size;
 
   stime = MPI_Wtime();
   MPI_File_read_at(fh, offset, tmp, nitem, MPI_DOUBLE, &status);
@@ -211,10 +208,11 @@ int main( int argc, char *argv[] )
     etime = MPI_Wtime();
     elapsed_time = etime - stime;
     printf ("sum=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
+    
+    MPI_File_close( &fh );
   }
   free( buf );
   free( tmp );
-  MPI_File_close( &fh );
  
   MPI_Finalize();
   return errs;

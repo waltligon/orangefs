@@ -38,7 +38,7 @@ int main( int argc, char *argv[] )
   MPI_Datatype etype, ftype, buftype;
 
   int errs = 0;
-  int size, rank, i, count;
+  int nprocs, rank, i, count;
   char *fname = NULL;
   MPI_File fh;
   MPI_Comm comm;
@@ -52,7 +52,7 @@ int main( int argc, char *argv[] )
  
   comm = MPI_COMM_WORLD;
 
-  MPI_Comm_size( comm, &size );
+  MPI_Comm_size( comm, &nprocs );
   MPI_Comm_rank( comm, &rank );
  
   while ( (opt=getopt(argc,argv,"i:s:r:p:godhx"))!= EOF) {
@@ -80,7 +80,7 @@ int main( int argc, char *argv[] )
 	nitem = fsize*1024; 
 	nitem = nitem*1024;
 	nitem = nitem/type_size;
-	nitem = nitem/size;
+	nitem = nitem/nprocs;
       }
       break;
     case 'x': use_actsto = 1;
@@ -113,10 +113,8 @@ int main( int argc, char *argv[] )
   offset = rank * nitem * type_size;
   printf("%d: offset=%d\n", rank, offset);
 
-  /* Set the file view which tiles the file type MPI_CHAR, starting 
-       at displacement 0.
-  */
-  disp = rank*nitem*type_size;
+  /* Set the file view */
+  disp = offset;
   etype = MPI_CHAR;
   ftype = MPI_CHAR;
   int result;
@@ -126,7 +124,7 @@ int main( int argc, char *argv[] )
     sample_error(result, "MPI_File_set_view");
 
   stime = MPI_Wtime();
-  MPI_File_read_at(fh, offset, buf, nitem, MPI_CHAR, &status);
+  MPI_File_read_all(fh, buf, nitem, MPI_CHAR, &status);
   etime = MPI_Wtime();
   iotime = etime - stime;
  
@@ -139,6 +137,7 @@ int main( int argc, char *argv[] )
     strncpy(myString, tmp, rsize);
     if(strstr(myString, search_string)) {
       printf("Found by rank(%d): %s\n", rank, myString);
+      fflush(stdout);
     }
     tmp += rsize;
   }
@@ -148,7 +147,7 @@ int main( int argc, char *argv[] )
   elapsed_time = comptime + iotime;
   if(rank == 0) 
     printf("<<Result (grep) with normal read>>\n"
-	   "Grep time = %10.4f sec\n"
+	   "Grep time        = %10.4f sec\n"
 	   "I/O time         = %10.4f sec\n"
 	   "total time       = %10.4f sec\n\n", comptime, iotime, elapsed_time);
   
@@ -169,8 +168,6 @@ int main( int argc, char *argv[] )
   }
 
   free( buf );
-  MPI_File_close( &fh );
- 
   MPI_Finalize();
-  return errs;
+  return 0;
 }
