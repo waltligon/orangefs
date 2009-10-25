@@ -529,6 +529,9 @@ static PINT_sm_action io_send_completion_ack(
 
     if(s_op->req->u.io.io_type == PVFS_IO_READ) { /* AS */
 	switch(s_op->req->u.io.datatype) {
+        case (int)0x4c000101: /* MPI_CHAR */
+            s_op->encoded.total_size = sizeof(char); /* FIXME */
+            break;
 	case (int)0x4c000405: /* MPI_INT */
 	    s_op->encoded.total_size = sizeof(int); /* FIXME */
 	    break;
@@ -554,6 +557,17 @@ static PINT_sm_action io_send_completion_ack(
 	    s_op->u.io.total_transferred;
 	gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%lld\n", lld(s_op->u.io.total_transferred)); /* AS */
 	switch(s_op->req->u.io.datatype) {
+        case (int)0x4c000101: /* MPI_CHAR */
+        {
+            int *tmp;
+            tmp = s_op->u.io.tmp_buffer;
+            gossip_debug(GOSSIP_IO_DEBUG, "io_send_completion_ack(), result (CHAR) to send=%d, s_op->resp.u.read_completion.total_completed=%lld\n", *tmp, lld(s_op->resp.u.read_completion.total_completed));
+            s_op->resp.u.read_completion.result.buffer_sz = sizeof(char);
+            s_op->resp.u.read_completion.result.buffer = malloc(sizeof(char));
+            memset(s_op->resp.u.read_completion.result.buffer, 0, sizeof(char));
+            s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
+            break;
+        }
 	case (int)0x4c000405: /* MPI_INT */
 	    {
 		int *tmp;

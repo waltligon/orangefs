@@ -37,7 +37,8 @@
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
-int use_gpu; /* for kmeans only */
+int use_gpu; /* 1: GPU, default: 0 */
+
 int NUM_OBJS; /* for kmeans only */
 int NUM_COORDS = 1; /* for kmeans only */
 int NUM_CLUSTERS; /* for kmeans only */
@@ -337,6 +338,76 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_IO_DEBUG, "loff=%lld, file_req_offset=%lld\n", lld(loff), lld(file_req_offset));
 
     switch(s_op->u.pipeline.datatype) {
+    case ((int)0x4c000101): /* MPI_CHAR */
+        count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
+			    file_req_offset)/((*PVFS_CHAR).ub);
+        if(s_op->u.pipeline.op == 0x58000020) { /* GREP */
+            char *tmpbuf = malloc(TMP_BUF_SIZ);
+	    int cunit, length, rsize;
+	    char *tok;
+
+	    memcpy(tmpbuf, PINT_hint_get_value_by_name(s_op->u.pipeline.hints, "grep", &length), TMP_BUF_SIZ);
+	    gossip_debug(GOSSIP_IO_DEBUG, "grep=%s\n", tmpbuf);
+	    tok = strtok(tmpbuf, ":"); /* use_gpu */
+            s_op->u.pipeline.use_gpu = atoi(tok);
+	    tok = strtok(NULL, ":"); /* rsize */
+            s_op->u.pipeline.rsize = atoi(tok);
+            rsize = s_op->u.pipeline.rsize;
+	    tok = strtok(NULL, ":"); /* pattern */
+            strcpy(s_op->u.pipeline.pattern, tok);
+
+            gossip_debug(GOSSIP_IO_DEBUG, "(parsed)grep=%d:%d:%s\n",
+                         s_op->u.pipeline.use_gpu,
+                         s_op->u.pipeline.rsize,
+                         s_op->u.pipeline.pattern);
+	    free(tmpbuf);
+
+            cunit = ((*PVFS_CHAR).ub)*rsize;
+            PVFS_size new_size, left_adj_sz, right_adj_sz;
+	    float ctmp = ((float)(s_op->u.pipeline.buffer_used-file_req_offset))/((*PVFS_CHAR).ub)/rsize;
+	    int is_last_stripe = ((s_op->u.pipeline.dfile_index == (s_op->u.pipeline.dfile_count-1))?1:0);
+
+	    gossip_debug(GOSSIP_IO_DEBUG, "ctmp=%f\n", ctmp);
+
+	    /* last stripe? */
+	    if(is_last_stripe && (s_op->u.pipeline.dfile_index != 0))
+		count = floor(ctmp);
+	    else
+		count = ceil(ctmp);
+
+	    new_size = count*cunit;
+            s_op->u.pipeline.new_buffer_used = new_size;
+	    s_op->u.pipeline.buffer = realloc(s_op->u.pipeline.buffer, max(new_size, s_op->u.pipeline.buffer_used));
+	    left_adj_sz = (loff - file_req_offset)%cunit;
+	    right_adj_sz = (loff+s_op->u.pipeline.buffer_used-file_req_offset)%cunit;
+	    s_op->u.pipeline.left_adj_sz = ((left_adj_sz==0)?0:(cunit-left_adj_sz));
+	    s_op->u.pipeline.right_adj_sz = right_adj_sz;
+	    s_op->u.pipeline.unaligned_sz = ((right_adj_sz==0)?0:(cunit-right_adj_sz));
+	    s_op->u.pipeline.tmp_buf = malloc(s_op->u.pipeline.unaligned_sz);
+	    
+	    gossip_debug(GOSSIP_IO_DEBUG, "CHAR: count=%lld, left_adj_sz=%ld, "
+			 "right_adj_sz=%ld, unaligned_sz=%ld\n", lld(count),
+			 s_op->u.pipeline.left_adj_sz, 
+			 s_op->u.pipeline.right_adj_sz, 
+			 s_op->u.pipeline.unaligned_sz);
+	}
+        gossip_debug(GOSSIP_IO_DEBUG, "strip_size=%ld, count=%lld\n", 
+		     dparam->strip_size, lld(count));
+#if 0            
+	if (loff == strip_boundary && file_req_offset != 0) {
+	    s_op->u.pipeline.unaligned_sz = file_req_offset;
+	}
+#endif
+	if (s_op->u.pipeline.unaligned_sz != 0 && count != 0) {
+            /* if it is the last stripe, no need to bring data */
+	    /* FIXME: we assume no round-robin stripes for now, 
+	       but shound't it be more general? */
+	    if(s_op->u.pipeline.dfile_index != (s_op->u.pipeline.dfile_count-1))
+		js_p->error_code = UNALIGNED;
+	    gossip_debug(GOSSIP_IO_DEBUG, "unaligned_sz=%lld\n", 
+			 lld(s_op->u.pipeline.unaligned_sz));
+	}
+        break;
     case ((int)0x4c000405): /* MPI_INT */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
 			    file_req_offset)/((*PVFS_INT).ub);
@@ -575,6 +646,112 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		     lld(js_p->actual_size)); /* AS */
 
 	switch(s_op->u.pipeline.datatype) {
+        case ((int)0x4c000101): /* MPI_CHAR */
+        {
+            char *a = (char*)s_op->u.pipeline.buffer;
+            char result;
+            PVFS_size count = (s_op->u.pipeline.buffer_used-s_op->u.pipeline.unaligned_sz)/((*PVFS_CHAR).ub);
+            char *tmp;
+            
+            if(count == 0)
+                return SM_ACTION_COMPLETE;
+            /* data is not aligned perfectly, so adjust it */
+            if(s_op->u.pipeline.unaligned_sz != 0) {
+                memcpy(((char*)&a[count])+(((*PVFS_CHAR).ub)-s_op->u.pipeline.unaligned_sz), s_op->u.pipeline.tmp_buf, s_op->u.pipeline.unaligned_sz);
+                count++;
+            }
+            
+            if (parent_s_op->u.io.total_transferred == 0) {
+                if (parent_s_op->u.io.tmp_buffer == NULL)
+                    parent_s_op->u.io.tmp_buffer = (void *)malloc(1*sizeof(char));
+                memset(parent_s_op->u.io.tmp_buffer, 0, sizeof(char));
+                parent_s_op->u.io.count = 0;
+            }
+            tmp = parent_s_op->u.io.tmp_buffer;
+            gossip_debug(GOSSIP_IO_DEBUG, "total_transferred=%lld\n", lld(parent_s_op->u.io.total_transferred));
+            //gossip_debug(GOSSIP_IO_DEBUG, "count=%lld, tmp=%c\n", lld(count), *tmp);
+            
+            switch(s_op->u.pipeline.op) {
+            case 0x58000001: /* MAX */
+                result = *a;
+                for (i=1; i<count; i++ ) {
+                    if (a[i] > result) {
+                        result = a[i];
+                    }
+                }
+                a[0] = result;
+                if (parent_s_op->u.io.total_transferred == 0 ||
+                    result > *tmp)
+                    *tmp = result;
+                break;
+            case 0x58000002: /* MIN */
+                result = *a;
+                for (i=1; i<count; i++ ) {
+                    if (a[i] < result) {
+                        result = a[i];
+                    }
+                }
+                a[0] = result;
+                if (parent_s_op->u.io.total_transferred == 0 ||
+                    result < *tmp)
+                    *tmp = result;
+                break;
+            case 0x58000003: /* SUM */
+                result = 0;
+                for (i=0; i<count; i++ ) {
+                    if (i<10) 
+                        gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "a[%lld]=%d\n", 
+                                     lld(i), a[i]);
+                    result += a[i];
+                }
+                a[0] = result;
+                *tmp += result;
+                gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "sum=%d\n", 
+                             *tmp);
+                break;
+            case (0x5800000e): /* MEAN */
+                result = 0;
+                for (i=0; i<count; i++) {
+                    result += a[i];
+                }
+                result = result/count;
+                a[0] = result;
+		
+                if (parent_s_op->u.io.count == 0)
+                    *tmp = result;
+                else {
+                    int tmp_sum = (*tmp)*(parent_s_op->u.io.count);
+                    tmp_sum = tmp_sum + result*count;
+                    *tmp = (tmp_sum)/(parent_s_op->u.io.count+count);
+                }
+                parent_s_op->u.io.count += count;
+                gossip_debug(GOSSIP_IO_DEBUG, "mean=%d\n", *tmp);
+                break;
+            case (0x58000020): /* GREP */
+            {
+                char *tmp_buf = (char *)s_op->u.pipeline.buffer;
+                char myString[s_op->u.pipeline.rsize];
+                int nrecord = count/(s_op->u.pipeline.rsize);
+
+                for(i=0; i<nrecord; i++) {
+                    strncpy(myString, tmp_buf, s_op->u.pipeline.rsize);
+                    //gossip_debug(GOSSIP_IO_DEBUG, "%s: string=%s\n", __func__, myString);
+                    if(strstr(myString, s_op->u.pipeline.pattern)) {
+                        gossip_debug(GOSSIP_IO_DEBUG, "Found by rank(%d):"
+                                     " %s\n", s_op->u.pipeline.dfile_index, myString);
+                    }
+                    tmp_buf += s_op->u.pipeline.rsize;
+                }
+            }
+                break;
+            default:
+                break;
+            }
+            s_op->u.pipeline.buffer = (void *)a;
+            parent_s_op->u.io.tmp_buffer = (void *)tmp;
+        }
+        break;
+
 	case ((int)0x4c000405): /* MPI_INT */
 	    {
 		int *a = (int*)s_op->u.pipeline.buffer;

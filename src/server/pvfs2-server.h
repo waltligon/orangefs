@@ -384,6 +384,11 @@ struct PINT_server_pipeline_op
     /* AS: operator and data type */
     int op;
     int datatype;
+    int use_gpu; /* FIXME: kmeans.sm also has this */
+    /* This is for grep operator 
+       FIXME: find more appropriate place */
+    int rsize;
+    char pattern[128];
 
     char *buffer; 
     PVFS_size buffer_size;
