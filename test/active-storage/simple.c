@@ -30,7 +30,7 @@ int main( int argc, char *argv[] )
   extern char   *optarg;
   extern int     optind;
   int is_output_timing=0, is_print_usage = 0;
-  int _debug, use_gen_file = 0, use_actsto = 0;
+  int _debug=0, use_gen_file = 0, use_actsto = 0;
 
   MPI_Offset disp, offset, file_size;
   MPI_Datatype etype, ftype, buftype;
@@ -45,6 +45,9 @@ int main( int argc, char *argv[] )
   int64_t nitem = 0;
   int fsize = 0, type_size;
   double stime, etime, iotime, comptime, elapsed_time;
+  double max_iotime, max_comptime;
+
+  double max, min, sum=0.0, global_sum;
 
   MPI_Init( &argc, &argv );
  
@@ -96,7 +99,6 @@ int main( int argc, char *argv[] )
   srand(time(NULL));
 
   if(use_gen_file == 1) {
-    double max, min, sum=0.0;
     int t, result;
 
     MPI_File_open( comm, fname, MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
@@ -154,26 +156,45 @@ int main( int argc, char *argv[] )
   double *tmp = (double *)malloc( nitem * sizeof(double) );
   offset = rank * nitem * type_size;
 
+  /* start I/O */
   stime = MPI_Wtime();
   MPI_File_read_at(fh, offset, tmp, nitem, MPI_DOUBLE, &status);
   etime = MPI_Wtime();
+  /* end I/O */
   iotime = etime - stime;
+
+  if(_debug==1) printf("%d: iotime = %10.4f\n", rank, iotime);
+  MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
  
+  sum = 0.0; /* reset sum */
+
+  /* start computation */
   stime = MPI_Wtime();
-  double sum = 0.0;
+
   for(i=0; i<nitem; i++) {
       sum += tmp[i];
   }
+
+  MPI_Reduce(&sum, &global_sum, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
   etime = MPI_Wtime();
+  /* end computation */
 
   comptime = etime - stime;
-  elapsed_time = comptime + iotime;
-  if(rank == 0) 
-    printf("<<Result (SUM) with normal read>>\n"
-	   "Computation time = %10.4f sec\n"
-	   "I/O time         = %10.4f sec\n"
-	   "total time       = %10.4f sec\n\n", comptime, iotime, elapsed_time);
-  
+
+  if(_debug==1) printf("%d: comptime = %10.4f\n", rank, comptime);
+
+  MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+  if(rank == 0) {
+      elapsed_time = max_comptime + max_iotime;
+      printf("<<Result (SUM) with normal read>>\n"
+             "SUM              = %10.4f \n"
+             "Computation time = %10.4f sec\n"
+             "I/O time         = %10.4f sec\n"
+             "total time       = %10.4f sec\n\n", 
+             global_sum, max_comptime, max_iotime, elapsed_time);
+  }
+      
   MPI_File_close(&fh);
 
   if(use_actsto == 1) {

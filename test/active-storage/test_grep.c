@@ -48,6 +48,7 @@ int main( int argc, char *argv[] )
     int64_t nitem = 0;
     int fsize = 0, type_size, rsize = 0, nrecord = 0;
     double stime, etime, iotime, comptime, elapsed_time;
+    double max_iotime, max_comptime;
     char *search_string = NULL;
 
     MPI_Init( &argc, &argv );
@@ -129,6 +130,8 @@ int main( int argc, char *argv[] )
     MPI_File_read_all(fh, buf, nitem, MPI_CHAR, &status);
     etime = MPI_Wtime();
     iotime = etime - stime;
+
+    MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
  
     char myString[rsize];
     char *tmp = buf;
@@ -146,12 +149,16 @@ int main( int argc, char *argv[] )
     etime = MPI_Wtime();
 
     comptime = etime - stime;
-    elapsed_time = comptime + iotime;
-    if(rank == 0) 
+
+    MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if(rank == 0) {
+        elapsed_time = max_comptime + max_iotime;
         printf("<<Result (grep) with normal read>>\n"
                "Grep time        = %10.4f sec\n"
                "I/O time         = %10.4f sec\n"
                "total time       = %10.4f sec\n\n", comptime, iotime, elapsed_time);
+    }
   
     MPI_File_close(&fh);
 

@@ -628,8 +628,9 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, j;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: loop=%d\n", __func__, 
-		 s_op->u.kmeans.loop);
+    gossip_debug(GOSSIP_IO_DEBUG, "%s: loop=%d, delta=%lf, threshold=%f\n", 
+                 __func__, s_op->u.kmeans.loop,
+                 s_op->u.kmeans.delta, s_op->u.kmeans.threshold);
 
     if(s_op->u.kmeans.delta > s_op->u.kmeans.threshold && 
        s_op->u.kmeans.loop++ < MAX_ITERATIONS) {
@@ -638,7 +639,8 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     else {
 	js_p->error_code = 0;
-
+        
+        gossip_debug(GOSSIP_IO_DEBUG, "kmeans DONE!\n");
 	if(s_op->u.kmeans.use_gpu == 1)
 	    freeGPU();
 #if DEBUG

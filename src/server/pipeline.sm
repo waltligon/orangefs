@@ -1055,8 +1055,6 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     kmeans_op->u.kmeans.fs_id = s_op->u.pipeline.fs_id;
     kmeans_op->u.kmeans.allreduce_step = 0;
 
-    kmeans_op->u.kmeans.threshold = 0.001; /* FIXME */
-
     tmpbuf = malloc(TMP_BUF_SIZ);
 
     memcpy(tmpbuf, PINT_hint_get_value_by_name(s_op->u.pipeline.hints, "kmeans", &length), TMP_BUF_SIZ);
@@ -1071,6 +1069,8 @@ static PINT_sm_action setup_kmeans_fn(struct PINT_smcb *smcb, job_status_s *js_p
     tok = strtok(NULL, ":");
     kmeans_op->u.kmeans.numClusters = atoi(tok);
     numClusters = kmeans_op->u.kmeans.numClusters;
+    tok = strtok(NULL, ":");
+    kmeans_op->u.kmeans.threshold = atof(tok);
 
     free(tmpbuf);
 

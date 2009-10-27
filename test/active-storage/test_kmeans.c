@@ -32,6 +32,7 @@ int main( int argc, char *argv[] )
   MPI_Status status;
   char *filename = NULL;
   MPI_Info info;
+  float threshold;
 
   /* for KMEANS */
   int numObjs;
@@ -44,7 +45,7 @@ int main( int argc, char *argv[] )
   MPI_Comm_rank(comm, &rank);
   MPI_Comm_size(comm, &nproc);
 
-  while ( (opt=getopt(argc,argv,"i:c:odhg"))!= EOF) {
+  while ( (opt=getopt(argc,argv,"i:c:t:odhg"))!= EOF) {
     switch (opt) {
     case 'i': filename = optarg;
       break;
@@ -59,6 +60,9 @@ int main( int argc, char *argv[] )
     case 'g': use_gpu = 1;
       printf("use_gpu is set to 1\n");
       break;
+    case 't': threshold = atof(optarg);
+        printf("threshold=%f\n", threshold);
+        break;
     default: is_print_usage = 1;
       break;
     }
@@ -90,7 +94,7 @@ int main( int argc, char *argv[] )
   printf("numCoords=%d\n", numCoords);
 
   char tmp_str[80];
-  sprintf(tmp_str, "%d:%d:%d:%d", use_gpu, numObjs, numCoords, num_clusters);
+  sprintf(tmp_str, "%d:%d:%d:%d:%f", use_gpu, numObjs, numCoords, num_clusters, threshold);
   MPI_Info_set(info, "kmeans", tmp_str);
 
   MPI_File_close(&fh);
