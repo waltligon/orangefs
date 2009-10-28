@@ -333,6 +333,7 @@ return_error:
 }
 
 static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
+                            TROVE_handle handle,
                             uint32_t count,
                             PVFS_dirent *dirent_p,
                             TROVE_handle *handle_p,
@@ -361,7 +362,7 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
         &op, &q_op_p,
         KEYVAL_READ_VALUE,
         coll_p,
-        dirent_p[0].handle, 
+        handle,
         dbpf_keyval_read_value_path_op_svc,
         flags,
         NULL,
@@ -378,7 +379,7 @@ static int dbpf_keyval_read_value_path(TROVE_coll_id coll_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
-                     handle_p[0], 
+                     handle, 
                      PINT_HINT_GET_OP_ID(hints));
 
     /* initialize the op-specific members */

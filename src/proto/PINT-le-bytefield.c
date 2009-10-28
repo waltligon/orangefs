@@ -265,6 +265,9 @@ static void lebf_initialize(void)
                 respsize = extra_size_PVFS_servresp_listattr;
                 break;
             case PVFS_SERV_GETVALUE:
+                req.u.getvalue.count = 0;
+                resp.u.getvalue.query_count = 0;
+                resp.u.getvalue.dirent_count = 0;
                 reqsize = extra_size_PVFS_servreq_getvalue;
                 respsize = extra_size_PVFS_servresp_getvalue;
                 break;
@@ -497,7 +500,7 @@ static int lebf_encode_resp(
     ret = encode_common(target_msg, max_size_array[resp->op].resp);
     if (ret)
 	goto out;
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp: resp: %d\n", resp->op);
 
     /* every response has these fields */
     p = &target_msg->ptr_current;
@@ -612,7 +615,7 @@ static int lebf_decode_req(
 
     /* decode generic part of request (enough to get op number) */
     decode_PVFS_server_req(p, req);
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_req\n");
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_req: %d\n", req->op);
 
 #define CASE(tag,var) \
     case tag: decode_PVFS_servreq_##var(p, &req->u.var); break
@@ -881,7 +884,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 break;
 
             case PVFS_SERV_GETVALUE:
-                decode_free(req->u.getvalue.query_p);
+                {
+                    uint32_t i =0;
+                    for( i=0; i < req->u.getvalue.count; i++ )
+                    {
+                        decode_free(req->u.getvalue.query_p[i].match);
+                    }
+                    decode_free(req->u.getvalue.query_p);
+                }
                 break;
 
             case PVFS_SERV_GETPATH:
@@ -995,12 +1005,14 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
                 case PVFS_SERV_GETVALUE:
                     {
-                        int i;
+                        uint32_t i = 0;
                         for(i=0; i < resp->u.getvalue.query_count; i++ )
                         {
-                            decode_free(resp->u.getvalue.query_p[i].query.
-                                buffer);
-                            decode_free(resp->u.getvalue.query_p[i].match);
+                            /* query.buffer free'd elsewhere? */
+                            if( resp->u.getvalue.query_p[i].match )
+                            {
+                                decode_free(resp->u.getvalue.query_p[i].match);
+                            }
                         }
                         decode_free(resp->u.getvalue.query_p);
 

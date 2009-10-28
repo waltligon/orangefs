@@ -1836,8 +1836,8 @@ struct PVFS_servreq_getvalue
 endecode_fields_3a_struct(
     PVFS_servreq_getvalue,
     PVFS_fs_id, fs_id,
-    PVFS_handle, handle,
     skip4,,
+    PVFS_handle, handle,
     uint32_t, count,
     PVFS_keyval_query, query_p);
 #define extra_size_PVFS_servreq_getvalue \
@@ -1896,8 +1896,8 @@ struct PVFS_servreq_getpath
 endecode_fields_3a_struct(
     PVFS_servreq_getpath,
     PVFS_fs_id, fs_id,
-    uint32_t, depth,
     skip4,,
+    uint32_t, depth,
     uint32_t, count,
     PVFS_dirent, dirent);
 #define extra_size_PVFS_servreq_getpath \
@@ -1906,6 +1906,7 @@ endecode_fields_3a_struct(
 #define PINT_SERVREQ_GETPATH_FILL(__req,                \
                                   __creds,              \
                                   __fsid,               \
+                                  __handle,             \
                                   __depth,              \
                                   __count,              \
                                   __dirent,             \
@@ -1918,7 +1919,8 @@ do {                                                    \
     (__req).u.getpath.fs_id = (__fsid);                 \
     (__req).u.getpath.depth = (__depth);                \
     (__req).u.getpath.count = (__count);                \
-    (__req).u.getpath.dirent = (__dirent);               \
+    (__req).u.getpath.dirent = (__dirent);              \
+    (__req).u.getpath.handle = (__handle);              \
 } while (0);
 
 struct PVFS_servresp_getpath

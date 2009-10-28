@@ -124,10 +124,10 @@ int main(int argc, char **argv)
                 done++;
         }
     }
-
     ret = pvfs2_cleanup( state );
 
-    PVFS_sys_finalize();
+    ret = PVFS_sys_finalize();
+    printf("Finalize: %d\n", ret);
     return ret;
 }
 
@@ -169,6 +169,7 @@ static int pvfs2_parse_query(struct getvalue *state)
         }
 
         state->query_p[i][0].oper = PVFS_KEYVAL_QUERY_OR;
+        state->query_p[i][0].oper |= PVFS_KEYVAL_RESULT_NO_PATHS;
         state->query_p[i][1].oper = PVFS_KEYVAL_QUERY_EQ;
         state->query_p[i][2].oper = PVFS_KEYVAL_QUERY_EQ;
         state->query_p[i][3].oper = PVFS_KEYVAL_QUERY_NOOP;

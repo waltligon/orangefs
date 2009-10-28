@@ -346,6 +346,7 @@ int trove_keyval_read(
 
 int trove_keyval_read_value_path(
     TROVE_coll_id coll_id,
+    TROVE_handle handle,
     uint32_t count,
     PVFS_dirent *dirent_p,
     TROVE_handle *handle_p,
@@ -366,6 +367,7 @@ int trove_keyval_read_value_path(
 
     return keyval_method_table[method_id]->keyval_read_value_path(
            coll_id,
+           handle,
            count,
            dirent_p,
            handle_p,

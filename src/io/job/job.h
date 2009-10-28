@@ -319,6 +319,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 
 /* storage key/value read by value */
 int job_trove_keyval_read_value_path(PVFS_fs_id coll_id,
+                          PVFS_handle handle,
                           uint32_t count,
                           PVFS_dirent *dirent_p,
                           PVFS_handle *handle_p,

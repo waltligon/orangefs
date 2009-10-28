@@ -10,6 +10,8 @@
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#include "gossip.h"
+#include "pvfs2-debug.h"
 
 /* PINT_mem_aligned_alloc()
  *
@@ -24,6 +26,8 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
     int ret;
     void *ptr;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG, "[PINT]: PINT_mem_aligned_alloc: "
+                 "size: (%d), alignment: (%d)\n", (int)size, (int)alignment);
     ret = posix_memalign(&ptr, alignment, size);
     if(ret != 0)
     {

@@ -239,6 +239,7 @@ int job_finalize(void)
     PINT_thread_mgr_trove_stop();
 #endif
     teardown_queues();
+
     return 0;
 }
 
@@ -1921,17 +1922,18 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 }
 
 int job_trove_keyval_read_value_path(PVFS_fs_id coll_id,
-                                uint32_t count,
-                                PVFS_dirent *dirent_p,
-                                PVFS_handle *handle_p,
-                                PVFS_ds_flags flags,
-                                PVFS_vtag * vtag,
-                                void *user_ptr,
-                                job_aint status_user_tag,
-                                job_status_s * out_status_p,
-                                job_id_t * id,
-                                job_context_id context_id,
-                                PVFS_hint hints)
+                                     TROVE_handle handle,
+                                     uint32_t count,
+                                     PVFS_dirent *dirent_p,
+                                     PVFS_handle *handle_p,
+                                     PVFS_ds_flags flags,
+                                     PVFS_vtag * vtag,
+                                     void *user_ptr,
+                                     job_aint status_user_tag,
+                                     job_status_s * out_status_p,
+                                     job_id_t * id,
+                                     job_context_id context_id,
+                                     PVFS_hint hints)
 
 {
     int ret = -1;
@@ -1953,10 +1955,10 @@ int job_trove_keyval_read_value_path(PVFS_fs_id coll_id,
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_read_value_path(coll_id, count, dirent_p, handle_p,
-                                  flags, jd->u.trove.vtag, user_ptr_internal, 
-                                  global_trove_context, &(jd->u.trove.id), 
-                                  hints);
+    ret = trove_keyval_read_value_path(coll_id, handle, count, dirent_p, 
+                                       handle_p, flags, jd->u.trove.vtag, 
+                                       user_ptr_internal, global_trove_context,
+                                       &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;

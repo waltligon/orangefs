@@ -871,8 +871,8 @@ typedef struct
 {
     PVFS_ds_position token;
     uint32_t oper;
-    PVFS_ds_keyval query;
     uint32_t count;
+    PVFS_ds_keyval query;
     PVFS_handle *match;
 } PVFS_keyval_query;
 endecode_fields_3a(

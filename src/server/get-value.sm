@@ -28,7 +28,6 @@
 #include "dbpf-keyval.h"
 
 #define FAILED_PERMS    100
-#define END_OF_HANDLES  101
 #define TARGET_ASSIGNED 102
 #define GET_PATHS       103
 #define DBPF_QUERY    104
@@ -81,7 +80,6 @@ machine pvfs2_get_value_sm
     {
         run getvalue_assign_target;
         TARGET_ASSIGNED => perms;
-        END_OF_HANDLES => setup_get_paths;
         success => setup_get_paths;
         default => final_response;
     }
@@ -503,18 +501,11 @@ static PINT_sm_action getvalue_assign_target(
         }
     }
 
-    gossip_debug(GOSSIP_GETVALUE_DEBUG,
-                 "[GETVALUE]: getvalue_assign_target: "
-                 "query_p[%u].count: [%u], hindex [%u], qindex [%u]\n", 
-                 qindex, s_op->resp.u.getvalue.query_p[qindex].count,
-                 hindex, qindex);
-
     /* all done once we've gone through all query structs */
     if( qindex >= s_op->resp.u.getvalue.query_count )
     {
         s_op->u.getvalue.query_index = qindex;
         s_op->u.getvalue.handle_index = hindex;
-        js_p->error_code = END_OF_HANDLES;
         return SM_ACTION_COMPLETE;
     }
 
@@ -606,15 +597,24 @@ static PINT_sm_action getvalue_setup_get_paths(
     uint32_t i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_credentials creds;
+    PVFS_handle root_handle;
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
     uint32_t path = PVFS_KEYVAL_QUERY_UNMASK_PATHS(
         s_op->resp.u.getvalue.query_p[0].oper);
 
+    if( path == PVFS_KEYVAL_RESULT_NO_PATHS )
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
     gossip_debug(GOSSIP_GETVALUE_DEBUG, 
                  "[GETVALUE]: getvalue_setup_get_paths: enter\n");
     js_p->error_code = GET_PATHS;
+
+    PINT_cached_config_get_root_handle(s_op->target_fs_id, &(root_handle));
+    s_op->target_handle = root_handle;
 
     s_op->u.getvalue.unknown_count = s_op->resp.u.getvalue.query_p[0].count;
     if( s_op->u.getvalue.unknown_count == 0 ) /* no results */
@@ -648,15 +648,12 @@ static PINT_sm_action getvalue_setup_get_paths(
         return SM_ACTION_COMPLETE;
     }
 
-    if( path != PVFS_KEYVAL_RESULT_NO_PATHS )
+    for(i=0; i < s_op->u.getvalue.unknown_count; i++ )
     {
-        for(i=0; i < s_op->u.getvalue.unknown_count; i++ )
-        {
-            s_op->u.getvalue.unknown_handle[i] =
-                s_op->resp.u.getvalue.query_p[0].match[i];
-            s_op->u.getvalue.unknown_dirent[i].handle =
-                s_op->resp.u.getvalue.query_p[0].match[i];
-         }
+        s_op->u.getvalue.unknown_handle[i] =
+            s_op->resp.u.getvalue.query_p[0].match[i];
+        s_op->u.getvalue.unknown_dirent[i].handle =
+            s_op->resp.u.getvalue.query_p[0].match[i];
     }
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, "[GETVALUE]: getvalue_setup_get_paths: "
@@ -668,24 +665,31 @@ static PINT_sm_action getvalue_setup_get_paths(
     msg_p = &s_op->msgarray_op.msgpair;
 
     PINT_serv_init_msgarray_params(s_op, s_op->target_fs_id);
-
-    msg_p->fs_id = s_op->target_fs_id;
-    msg_p->handle = s_op->u.getvalue.unknown_handle[0];
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = path_comp_fn;
-
-    /* send initial request to meta server of handle, just pick handle of
-     * handle[0]. */
-    ret = PINT_cached_config_map_to_server( &msg_p->svr_addr, msg_p->handle,
-                                             msg_p->fs_id );
     PINT_util_gen_credentials(&creds);
     PINT_SERVREQ_GETPATH_FILL( msg_p->req,
                                creds,
                                s_op->target_fs_id,
+                               s_op->target_handle,
                                0,
                                s_op->u.getvalue.unknown_count,
                                s_op->u.getvalue.unknown_dirent,
                                NULL);
+
+    msg_p->fs_id = s_op->target_fs_id;
+    msg_p->handle = root_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = path_comp_fn;
+
+    ret = PINT_cached_config_map_to_server( &msg_p->svr_addr, msg_p->handle,
+                                             msg_p->fs_id );
+
+    if( ret )
+    {
+        gossip_err("Failed to map meta server addresses\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG, 
@@ -701,21 +705,22 @@ static PINT_sm_action getvalue_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    uint32_t i=0;
 
     gossip_debug(GOSSIP_GETVALUE_DEBUG,
                  "[GETVALUE]: getvalue_cleanup: enter\n");
-/*
+
     assert( s_op->resp.u.getvalue.query_p);
     for( i = 0; i < s_op->resp.u.getvalue.query_count; i++ )
     {
         if( s_op->resp.u.getvalue.query_p[i].match )
             free(s_op->resp.u.getvalue.query_p[i].match);
     }
-
     free(s_op->resp.u.getvalue.query_p);
+
     if( s_op->resp.u.getvalue.dirent_p )
         free(s_op->resp.u.getvalue.dirent_p);
-*/
+
     if( s_op->u.getvalue.unknown_handle )
         free(s_op->u.getvalue.unknown_handle);
     if( s_op->u.getvalue.unknown_dirent )
