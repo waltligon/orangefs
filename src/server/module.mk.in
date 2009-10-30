@@ -67,7 +67,8 @@ ifdef BUILD_CUDA
 		$(DIR)/gpu_computeDist.cu \
 		$(DIR)/gpu_computeError.cu \
 		$(DIR)/gpu_countClusterPoints.cu \
-		$(DIR)/gpu_updateClusterCentres.cu
+		$(DIR)/gpu_updateClusterCentres.cu \
+		$(DIR)/reduction.cu
 endif
 
 	# track generate .c files to remove during dist clean, etc. 

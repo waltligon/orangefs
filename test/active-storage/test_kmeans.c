@@ -13,8 +13,11 @@ int _debug;
 /* usage() */
 static void usage(char *argv0) {
   char *help =
-    "Usage: %s [switches] -i filename\n"
-    "       -i filename    : file containing data to be clustered\n";
+    "Usage: %s [switches] -i filename -c num_cluster -t threshold -g -h\n"
+    "       -i filename    : file containing data to be clustered\n"
+    "       -c num_of_cluster\n"
+    "       -g : use GPU accelerator\n"
+    "       -t threshold\n";
   fprintf(stderr, help, argv0);
 }
 
@@ -24,7 +27,7 @@ int main( int argc, char *argv[] )
   extern char   *optarg;
   extern int     optind;
   int is_output_timing, is_print_usage = 0;
-  int use_gpu = 0, num_clusters;
+  int use_gpu = 0, num_clusters = 0;
   int size, rank, i, count, err, nproc;
   double *buf;
   MPI_File fh;
@@ -32,7 +35,7 @@ int main( int argc, char *argv[] )
   MPI_Status status;
   char *filename = NULL;
   MPI_Info info;
-  float threshold;
+  float threshold = 0.0;
 
   /* for KMEANS */
   int numObjs;
@@ -68,7 +71,7 @@ int main( int argc, char *argv[] )
     }
   }
 
-  if (filename == 0 || is_print_usage == 1) {
+  if (filename == 0 || is_print_usage == 1 || num_clusters == 0 || threshold == 0.0) {
     if (rank == 0) usage(argv[0]);
     MPI_Finalize();
     exit(1);

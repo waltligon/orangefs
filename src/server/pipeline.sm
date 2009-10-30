@@ -37,7 +37,8 @@
 static int s2s_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
-int use_gpu; /* 1: GPU, default: 0 */
+/* FIXME: kmeans.sm also has similar one */
+int GPU_initialized = 0;
 
 int NUM_OBJS; /* for kmeans only */
 int NUM_COORDS = 1; /* for kmeans only */
