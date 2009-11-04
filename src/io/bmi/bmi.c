@@ -81,6 +81,9 @@ extern struct bmi_method_ops bmi_ib_ops;
 #ifdef __STATIC_METHOD_BMI_PORTALS__
 extern struct bmi_method_ops bmi_portals_ops;
 #endif
+#ifdef __STATIC_METHOD_BMI_ZOID__
+extern struct bmi_method_ops bmi_zoid_ops;
+#endif
 
 static struct bmi_method_ops *const static_methods[] = {
 #ifdef __STATIC_METHOD_BMI_TCP__
@@ -97,6 +100,9 @@ static struct bmi_method_ops *const static_methods[] = {
 #endif
 #ifdef __STATIC_METHOD_BMI_PORTALS__
     &bmi_portals_ops,
+#endif
+#ifdef __STATIC_METHOD_BMI_ZOID__
+    &bmi_zoid_ops,
 #endif
     NULL
 };
