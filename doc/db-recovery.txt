@@ -1,0 +1,97 @@
+# 2009-11-5
+# Notes on recoverying corrupted Berkeley DB files in PVFS
+====================================================================
+
+The pvfs2-server daemon uses Berkeley DB as the mechanism for storing file
+system metadata.  There are 5 database files in total that can be found in
+the following locations in the storage space:
+
+./storage_attributes.db
+./50a6d673/collection_attributes.db
+./50a6d673/dataspace_attributes.db
+./50a6d673/keyval.db
+./collections.db
+
+The dataspace_attributes.db and keyval.db are most frequently used by
+the file system.  If one of these database files is corrupted for some
+reason, then it may prevent the file system from operating correctly.
+
+One common technique for repairing a Berkeley DB database is to dump its
+contents using db_dump (possibly found in the db4-utils package) and then
+reload it into a new .db file with db_load.  However, both the keyval.db and
+dataspace_attributes.db use a custom function for sorting entries in order
+to improve PVFS performance.  db_load must therefore be modified to use the
+correct key order.
+
+Here are the steps needed to build a db_load utility that will work on the
+keyval.db file:
+
+- download the source code for Berkeley DB
+- edit db_load/db_load.c
+- find the section marked by #if 0 that indicates where to insert
+  application specific btree comparison or hash functions
+- insert the code listed at the end of this file
+- build Berkeley DB
+- rename db_load binary to db_load_pvfs_keyval to avoid confusion
+
+This example only works for the keyval.db file.  The dataspace_attributes.db
+file requires a different modification (not provided here).
+
+====================================================================
+#include <stdint.h>
+
+typedef uint64_t PVFS_handle;
+typedef PVFS_handle                TROVE_handle;
+
+#define PVFS_NAME_MAX            256
+#define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
+
+struct dbpf_keyval_db_entry
+{
+    TROVE_handle handle;
+    char key[DBPF_MAX_KEY_LENGTH];
+};
+
+#define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
+    (sizeof(TROVE_handle) + _size)
+
+#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
+    (_size - sizeof(TROVE_handle))
+
+int PINT_trove_dbpf_keyval_compare(
+    DB * dbp, const DBT * a, const DBT * b)
+{
+    const struct dbpf_keyval_db_entry * db_entry_a;
+    const struct dbpf_keyval_db_entry * db_entry_b;
+
+    db_entry_a = (const struct dbpf_keyval_db_entry *) a->data;
+    db_entry_b = (const struct dbpf_keyval_db_entry *) b->data;
+
+    if(db_entry_a->handle != db_entry_b->handle)
+    {
+        return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
+    }
+
+    if(a->size > b->size)
+    {
+        return 1;
+    }
+
+    if(a->size < b->size)
+    {
+        return -1;
+    }
+
+    /* must be equal */
+    return (memcmp(db_entry_a->key, db_entry_b->key,
+                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
+}
+
+if ((ret = dbp->set_bt_compare(dbp, PINT_trove_dbpf_keyval_compare)) != 0)
+
+        dbp->err(dbp, ret, "DB->set_bt_compare");
+        goto err;
+}
+
+====================================================================
+
