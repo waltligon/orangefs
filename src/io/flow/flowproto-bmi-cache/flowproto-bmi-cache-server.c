@@ -489,7 +489,7 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
 		flow_d->state = FLOW_COMPLETE;
 		free(flow_data);
 		flow_d->release(flow_d);
-		flow_d->callback(flow_d);
+		flow_d->callback(flow_d, 0);
 		fprintf(stderr, "bmi_cache_request_init: exit with return 1. zero request.\n");
 		return(1);
 	}
@@ -800,7 +800,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 			free(flow_data);
 			flow_d->state = FLOW_COMPLETE;
 			flow_d->release(flow_d);
-			flow_d->callback(flow_d);
+			flow_d->callback(flow_d, 0);
 			fprintf(stderr, "bmi_recv_callback_fn: request is done\n");
 			return;
 		}
