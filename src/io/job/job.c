@@ -129,7 +129,7 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
-static void flow_callback(flow_descriptor* flow_d);
+static void flow_callback(flow_descriptor* flow_d, int cancel_path);
 #ifndef __PVFS2_JOB_THREADED__
 static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
@@ -5265,7 +5265,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
  *
  * no return value
  */
-static void flow_callback(flow_descriptor* flow_d)
+static void flow_callback(flow_descriptor* flow_d, int cancel_path)
 {
     struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr;
 
@@ -5279,7 +5279,12 @@ static void flow_callback(flow_descriptor* flow_d)
     gen_mutex_unlock(&initialized_mutex);
 
     /* set job descriptor fields and put into completion queue */
-    gen_mutex_lock(&completion_mutex);
+
+    /* if this is being triggered directly from PINT_flow_cancel(), then the
+     * completion mutex is already held by the caller; skip the mutex.
+     */
+    if(!cancel_path)
+        gen_mutex_lock(&completion_mutex);
     job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                    tmp_desc);
     /* set completed flag while holding queue lock */
@@ -5293,7 +5298,8 @@ static void flow_callback(flow_descriptor* flow_d)
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
 #endif
-    gen_mutex_unlock(&completion_mutex);
+    if(!cancel_path)
+        gen_mutex_unlock(&completion_mutex);
 
     return;
 }
