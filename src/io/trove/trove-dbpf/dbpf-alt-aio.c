@@ -371,7 +371,8 @@ struct TROVE_bstream_ops alt_aio_bstream_ops =
     dbpf_bstream_validate,
     alt_aio_bstream_read_list,
     alt_aio_bstream_write_list,
-    dbpf_bstream_flush
+    dbpf_bstream_flush,
+    NULL
 };
 
 /*
