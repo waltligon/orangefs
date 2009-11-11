@@ -2354,6 +2354,7 @@ static int precreate_pool_initialize(int server_index)
         job_precreate_pool_set_index(server_index);
 
         cur_f = PINT_llist_next(cur_f);
+        free(addr_array); // local variable, malloc'd above to get BMI addrs
 
     }
 

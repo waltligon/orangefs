@@ -140,7 +140,7 @@ int dbpf_attr_cache_initialize(
 
 int dbpf_attr_cache_finalize(void)
 {
-    int ret = -1, i = 0;
+    int ret = -1, i = 0, j = 0;
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
@@ -156,6 +156,13 @@ int dbpf_attr_cache_finalize(void)
                 {
                     cache_elem = qhash_entry(
                         hash_link, dbpf_attr_cache_elem_t, hash_link);
+                    for( j = 0; j < cache_elem->num_keyval_pairs; j++ )
+                    {
+                        /* any elements still existing need their keyval pairs
+                         * data pointer free'd before the element is free'd */
+                        if( cache_elem->keyval_pairs[j].data )
+                            free(cache_elem->keyval_pairs[j].data);
+                    }
                     free(cache_elem);
                     s_current_num_cache_elems--;
                 }
