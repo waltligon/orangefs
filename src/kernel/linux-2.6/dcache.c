@@ -189,7 +189,7 @@ static int pvfs2_d_revalidate(
 {
 
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
-        (!(nd->flags & LOOKUP_CREATE)))
+        (!nd->flags & LOOKUP_CREATE))
     {
         gossip_debug(GOSSIP_DCACHE_DEBUG,
                      "\n%s: Trusting intent; skipping getattr\n", __func__);
