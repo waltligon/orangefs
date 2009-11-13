@@ -713,6 +713,17 @@ stand a good chance of running into problems.  We are unable to track every
 pre-release kernel, but do make an effort to publish necessary patches once a
 kernel is officially released. 
 
+\subsection{Does PVFS work with Open-MX?}
+\label{sec:open-mx}
+
+Yes, PVFS does work with Open-MX.  To use Open-MX, configure PVFS with
+the the same arguments that you would use for a normal MX installation:
+``--disable-bmi-tcp'' and ``--with-mx=PATH''.  In addition, however, you
+must set the ``MX\_IMM\_ACK'' environment variable to ``1'' before starting
+the pvfs2-server or pvfs2-client daemons.  This is necessary in order to
+account for differences in how MX and Open-MX handle message progression by
+default.
+
 %
 % PERFORMANCE
 %
