@@ -1,0 +1,259 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-storage.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
+#include "pvfs2-internal.h"
+
+/* this must match the number of database dbpf will attempt to dump per
+ * metadata server which is defined in /io/trove/trove-dbpf/dbpf-mgmt.c */
+#define META_DB_NUM 5
+
+%%
+
+machine pvfs2_mgmt_dump_metadata_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_dump;
+        default => final_response;
+    }
+
+    state setup_dump
+    {
+        run mgmt_dump_metadata_setup_dump;
+        success => post_job;
+        default => final_response;
+    }
+
+    state post_job
+    {
+        run mgmt_dump_metadata_post_job;
+        success => setup_resp;
+        default => final_response;
+    }
+
+    state setup_resp
+    {   
+        run mgmt_dump_metadata_setup_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_dump_metadata_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action mgmt_dump_metadata_setup_dump(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i = 0;
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_setup_dump: enter\n");
+
+    /* must be in admin mode for safety, exit if now */
+    if ( PINT_req_sched_get_mode() != PVFS_SERVER_ADMIN_MODE )
+    {
+        gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                     "mgmt_dump_metadata_setup_dump: exiting, server must "
+                     "be in admin mode to dump metadata\n");
+        js_p->error_code = -PVFS_EBUSY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* TODO: check if metadata server, if not bail */
+
+    s_op->u.mgmt_dump_metadata.count = META_DB_NUM;
+    if( (s_op->u.mgmt_dump_metadata.files = calloc(META_DB_NUM, 
+        sizeof(char *))) == 0)
+    {
+        gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                     "mgmt_dump_metadata_setup_dump: failed to calloc file "
+                     "name space\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    for( i=0; i < s_op->u.mgmt_dump_metadata.count; i++ )
+    {
+        /* setup the path for each of the backup filenames */
+        if( (s_op->u.mgmt_dump_metadata.files[i] = calloc(PATH_MAX, 
+            sizeof(char))) == 0 )
+        {
+            gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                         "mgmt_dump_metadata_setup_dump: failed to calloc file "
+                         "name space\n");
+            js_p->error_code = -PVFS_ENOMEM;
+            goto return_error;
+        }
+    }
+
+    /* setup arrays for close and open time of each of the databases */
+    if( (s_op->u.mgmt_dump_metadata.db_close_time = calloc(META_DB_NUM, 
+        sizeof(PVFS_time))) == 0)
+    {
+        gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                     "mgmt_dump_metadata_setup_dump: failed to calloc close "
+                     "time array\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        goto return_error;
+    }
+
+    if( (s_op->u.mgmt_dump_metadata.db_open_time = calloc(META_DB_NUM, 
+        sizeof(PVFS_time))) == 0)
+    {
+        gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                     "mgmt_dump_metadata_setup_dump: failed to calloc open "
+                     "time array\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        goto return_error;
+    }
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_setup_dump: exit\n");
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+
+return_error:
+    if( s_op->u.mgmt_dump_metadata.db_close_time )
+        free(s_op->u.mgmt_dump_metadata.db_close_time);
+    if( s_op->u.mgmt_dump_metadata.db_open_time )
+        free(s_op->u.mgmt_dump_metadata.db_open_time);
+
+    for( i=0; i < s_op->u.mgmt_dump_metadata.count; i++ )
+    {
+        if( s_op->u.mgmt_dump_metadata.files[i] )
+            free( s_op->u.mgmt_dump_metadata.files[i] );
+    }
+
+    if( s_op->u.mgmt_dump_metadata.files )
+        free(s_op->u.mgmt_dump_metadata.files);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_dump_metadata_post_job(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    job_id_t tmp_id;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_post_job: enter\n");
+
+    ret = job_trove_fs_dump_metadata(
+        s_op->req->u.mgmt_dump_metadata.fs_id,
+        s_op->target_handle,
+        &(s_op->u.mgmt_dump_metadata.count),
+        s_op->u.mgmt_dump_metadata.files,
+        s_op->u.mgmt_dump_metadata.db_open_time,
+        s_op->u.mgmt_dump_metadata.db_close_time,
+        0,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, s_op->req->hints);
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_post_job: exit\n");
+    return ret;
+}
+
+static PINT_sm_action mgmt_dump_metadata_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i = 0;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_setup_resp: enter\n");
+
+    /* make sure the call dumped the same number we expected */
+    assert( s_op->u.mgmt_dump_metadata.count == META_DB_NUM );
+
+    /* for now the file names and open/close times are not given back to the 
+     * client so print them here for posterity if mgmt debug is on */
+    for( i=0; i < s_op->u.mgmt_dump_metadata.count; i++ )
+    {
+        gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                     "database backup to: (%s), close: %ld, open: "
+                     "%ld\n", s_op->u.mgmt_dump_metadata.files[i],
+                    (long int)(s_op->u.mgmt_dump_metadata.db_close_time[i]),
+                    (long int)(s_op->u.mgmt_dump_metadata.db_open_time[i]));
+    }
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_setup_resp: exit\n");
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_dump_metadata_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i = 0;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_cleanup: enter\n");
+
+    for( i=0; i< s_op->u.mgmt_dump_metadata.count; i++)
+    {
+        free( s_op->u.mgmt_dump_metadata.files[i] );
+    }
+    free( s_op->u.mgmt_dump_metadata.files );
+    free( s_op->u.mgmt_dump_metadata.db_close_time );
+    free( s_op->u.mgmt_dump_metadata.db_open_time );
+
+    gossip_debug(GOSSIP_MGMT_DEBUG, "[MGMT-DUMP-META]: "
+                 "mgmt_dump_metadata_cleanup: exit\n");
+    return(server_state_machine_complete(smcb));
+}
+
+static inline int PINT_get_object_ref_mgmt_dump_metadata( 
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    /* handle needs to be null becase 1) we don't care and 2) prelude doesn't
+     * need to perform checking 
+     */
+    *fs_id = req->u.mgmt_dump_metadata.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_mgmt_dump_metadata_params =
+{
+    .string_name = "mgmt-dump-metadata",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_mgmt_dump_metadata,
+    .state_machine = &pvfs2_mgmt_dump_metadata_sm
+};
+

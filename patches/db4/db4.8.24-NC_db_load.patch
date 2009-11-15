@@ -1,0 +1,238 @@
+diff -ur db-4.8.24.NC/db_load/db_load.c db-4.8.24.NC-pvfs/db_load/db_load.c
+--- db-4.8.24.NC/db_load/db_load.c	2009-08-17 09:26:17.000000000 -0400
++++ db-4.8.24.NC-pvfs/db_load/db_load.c	2009-11-15 11:26:06.000000000 -0500
+@@ -27,10 +27,33 @@
+ 	int	version;		/* Input version. */
+ 	char	*home;			/* Env home. */
+ 	char	*passwd;		/* Env passwd. */
++	char    *pvfs_db;	       /* pvfs db to load */
+ 	int	private;		/* Private env. */
+ 	u_int32_t cache;		/* Env cache size. */
+ } LDG;
+ 
++/* duplicate necessary environment for comparison functions to work as they
++ * exist in the PVFS code base. Although the comparison functions in the code 
++ * base are documented to indicate changes made to those functions should be
++ * replicated here you may want to double check to ensure data will be 
++ * inserted correctly into the loaded files. Otherwise, strange behavior
++ * may result. 
++ * The relevant items and files are:
++ * TROVE_handle (typedef'd from PVFS_handle): include/pvfs2-types.h
++ * dbpf_keyval_db_entry: src/io/trove/trove-dbpf/dbpf-keyval.c 
++ * DBPF_KEYVAL_DB_ENTRY_SIZE: src/io/trove/trove-dbpf/dbpf-keyval.c
++ * PINT_trove_dbpf_keyval_compare: src/io/trove/trove-dbpf/dbpf-keyval.c
++ * PINT_trove_dbpf_ds_attr_compare: src/io/trove/trove-dbpf/dbpf-dspace.c
++ */
++typedef uint64_t TROVE_handle;
++struct dbpf_keyval_db_entry
++{
++    TROVE_handle handle;
++    char key[256];
++};
++#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
++    (_size - sizeof(TROVE_handle))
++
+ int	badend __P((DB_ENV *));
+ void	badnum __P((DB_ENV *));
+ int	configure __P((DB_ENV *, DB *, char **, char **, int *));
+@@ -46,6 +69,8 @@
+ int	rheader __P((DB_ENV *, DB *, DBTYPE *, char **, int *, int *));
+ int	usage __P((void));
+ int	version_check __P((void));
++int	PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
++int	PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b);
+ 
+ const char *progname;
+ 
+@@ -87,6 +112,7 @@
+ 	ldg.hdrbuf = NULL;
+ 	ldg.home = NULL;
+ 	ldg.passwd = NULL;
++	ldg.pvfs_db = NULL;
+ 
+ 	mode = NOTSET;
+ 	ldf = 0;
+@@ -108,7 +134,7 @@
+ 	 * db_load because we don't have a better place to put it, and we
+ 	 * don't want to create a new utility for just that functionality.
+ 	 */
+-	while ((ch = getopt(argc, argv, "c:f:h:nP:r:Tt:V")) != EOF)
++	while ((ch = getopt(argc, argv, "c:d:f:h:nP:r:Tt:V")) != EOF)
+ 		switch (ch) {
+ 		case 'c':
+ 			if (mode != NOTSET && mode != STANDARD_LOAD) {
+@@ -119,6 +145,21 @@
+ 
+ 			*clp++ = optarg;
+ 			break;
++		case 'd':
++			if( strcmp(optarg, "coll") == 0 ||
++			    strcmp(optarg, "collattr") == 0 ||
++			    strcmp(optarg, "dspace") == 0 ||
++			    strcmp(optarg, "keyval") == 0 ||
++			    strcmp(optarg, "sto") == 0 )
++			{
++			    ldg.pvfs_db = strdup(optarg);
++			    break;
++			}
++			else
++			{
++			    exitval = usage();
++			    goto done;
++			}
+ 		case 'f':
+ 			if (mode != NOTSET && mode != STANDARD_LOAD) {
+ 				exitval = usage();
+@@ -296,13 +337,15 @@
+ 	db_recno_t recno, datarecno;
+ 	u_int32_t put_flags;
+ 	int ascii_recno, checkprint, hexkeys, keyflag, keys, resize, ret, rval;
+-	char *subdb;
++	char *subdb, *fname, *dbname;
+ 
+ 	put_flags = LF_ISSET(LDF_NOOVERWRITE) ? DB_NOOVERWRITE : 0;
+ 	G(endodata) = 0;
+ 
+ 	dbc = NULL;
+ 	subdb = NULL;
++	fname = NULL;
++	dbname = NULL;
+ 	ctxn = txn = NULL;
+ 	memset(&key, 0, sizeof(DBT));
+ 	memset(&data, 0, sizeof(DBT));
+@@ -403,24 +446,45 @@
+ 		goto err;
+ 	}
+ 
+-#if 0
+-	Set application-specific btree comparison, compression, or hash
+-	functions here. For example:
+ 
+-	if ((ret = dbp->set_bt_compare(dbp, local_comparison_func)) != 0) {
+-		dbp->err(dbp, ret, "DB->set_bt_compare");
+-		goto err;
+-	}
+-	if ((ret = dbp->set_bt_compress(dbp, local_compress_func,
+-	    local_decompress_func)) != 0) {
+-		dbp->err(dbp, ret, "DB->set_bt_compress");
++	/* based on the type of PVFS database specified set the appropriate
++	 * comparison functions.
++	 *
++	 * Since the dumping of metadata is new functionality, and in a 
++	 * recovery scenario there are no guarantees of being able to read the 
++	 * TROVE version (and no easy way to get that information from
++	 * within this utiity), this patch to db_load only supports the
++	 * version of TROVE greater than or equal to 0.1.3 that use the 
++	 * PINT_trove_dbpf_ds_attr_compare function instead of the reverse
++	 * function used in older versions. function. We inform the user if
++	 * they are trying to load the dspace database but the key is to 
++	 * verify the data types and comparison functions before attempting to 
++	 * use the newly loaded database in PVFS2.
++	 */
++	if( strncmp( ldg->pvfs_db, "dspace", 7) == 0 )
++	{
++	    (void)fprintf(stdout, "WARNING: This utility only supports "
++			  "correctly loading dataspace_attribute "
++			  "databases with a TROVE version of 0.1.3 or greater\n"
++			  "The load will continue but verify you're TROVE "
++			  "version before opening the database from PVFS\n");
++	    if ((ret = dbp->set_bt_compare(dbp, 
++		PINT_trove_dbpf_ds_attr_compare)) != 0) 
++	    {
++	    	dbp->err(dbp, ret, "DB->set_bt_compare");
+ 		goto err;
++	    }
+ 	}
+-	if ((ret = dbp->set_h_hash(dbp, local_hash_func)) != 0) {
+-		dbp->err(dbp, ret, "DB->set_h_hash");
+-		goto err;
++
++	else if( strncmp( ldg->pvfs_db, "keyval", 7) == 0 )
++	{
++	    if ((ret = dbp->set_bt_compare(dbp, 
++		PINT_trove_dbpf_keyval_compare)) != 0)      
++	    {
++	    	    dbp->err(dbp, ret, "DB->set_bt_compare");
++		    goto err;
++	    }
+ 	}
+-#endif
+ 
+ 	/* Open the DB file. */
+ 	if ((ret = dbp->open(dbp, NULL, name, subdb, dbtype,
+@@ -595,6 +659,11 @@
+ 		free(rkey.data);
+ 	free(data.data);
+ 
++	if( dbname )
++		free(dbname);
++	if( fname )
++		free(fname);
++
+ 	return (rval);
+ }
+ 
+@@ -1368,9 +1437,10 @@
+ int
+ usage()
+ {
+-	(void)fprintf(stderr, "usage: %s %s\n\t%s\n", progname,
++	(void)fprintf(stderr, "usage: %s %s\n\t%s\n\t%s\n", progname,
+ 	    "[-nTV] [-c name=value] [-f file]",
+-    "[-h home] [-P password] [-t btree | hash | recno | queue] db_file");
++    "[-h home] [-P password] [-t btree | hash | recno | queue] ",
++    "[-d coll | collattr | dspace | keyval | sto ] db_file");
+ 	(void)fprintf(stderr, "usage: %s %s\n",
+ 	    progname, "-r lsn | fileid [-h home] [-P password] db_file");
+ 	return (EXIT_FAILURE);
+@@ -1392,3 +1462,50 @@
+ 	}
+ 	return (0);
+ }
++
++int PINT_trove_dbpf_keyval_compare(
++    DB * dbp, const DBT * a, const DBT * b)
++{
++    const struct dbpf_keyval_db_entry * db_entry_a;
++    const struct dbpf_keyval_db_entry * db_entry_b;
++
++    db_entry_a = (const struct dbpf_keyval_db_entry *) a->data;
++    db_entry_b = (const struct dbpf_keyval_db_entry *) b->data;
++    
++    if(db_entry_a->handle != db_entry_b->handle)
++    {   
++	return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
++    }
++    
++    if(a->size > b->size)
++    {
++	return 1;
++    }
++    
++    if(a->size < b->size)
++    {
++	return -1;
++    }
++    
++    /* must be equal */
++    return (memcmp(db_entry_a->key, db_entry_b->key,
++	DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
++}
++
++int PINT_trove_dbpf_ds_attr_compare(
++    DB * dbp, const DBT * a, const DBT * b)
++{
++    const TROVE_handle * handle_a;
++    const TROVE_handle * handle_b;
++    
++    handle_a = (const TROVE_handle *) a->data;
++    handle_b = (const TROVE_handle *) b->data;
++    
++    if(*handle_a == *handle_b)
++    {
++	return 0;
++    }
++    
++    return (*handle_a > *handle_b) ? -1 : 1;
++}
++    

@@ -1,0 +1,239 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for sending metadata dump requests
+ *  to metadata servers.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "bmi.h"
+
+extern job_context_id pint_client_sm_context;
+
+static int mgmt_dump_metadata_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
+%%
+
+machine pvfs2_client_mgmt_dump_metadata_sm
+{
+    state setup_msgpair
+    {
+        run mgmt_dump_metadata_setup_msgpair;
+        success => xfer_msgpair;
+        default => cleanup;
+    }
+
+    state xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_dump_metadata_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiate sending of metadata dump request to list of servers.
+ */
+PVFS_error PVFS_imgmt_dump_metadata(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int count,
+    PVFS_BMI_addr_t *addr,
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: PVFS_imgmt_dump_metadata: "
+                 "enter\n");
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_DUMP_METADATA,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (!smcb)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), 
+        &ref.handle);
+
+    /* count and the addresses are passed in to allow the client to only point
+     * to certain metadata servers if so desired */
+    sm_p->u.mgmt_dump_metadata.count = count;
+    sm_p->u.mgmt_dump_metadata.addr = addr;
+    sm_p->error_code = 0;
+    sm_p->object_ref = ref;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: PVFS_imgmt_dump_metadata: "
+                 "exit\n");
+    return PINT_client_state_machine_post( smcb,  op_id, user_ptr);
+}
+
+/** Send a metadata dump request to a list of server addresses.
+ */
+PVFS_error PVFS_mgmt_dump_metadata(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int count,
+    PVFS_BMI_addr_t *addr,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_mgmt_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: PVFS_mgmt_dump_metadata: "
+                 "enter\n");
+
+    ret = PVFS_imgmt_dump_metadata(ref, credentials, count,
+                                   addr, &op_id, hints, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_imgmt_dump_metadata call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_mgmt_wait(op_id, "dump_metadata", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
+    PINT_mgmt_release(op_id);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: PVFS_mgmt_dump_metadata: "
+                 "exit\n");
+    return error;
+}
+
+static PINT_sm_action mgmt_dump_metadata_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int i = 0, ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "[MGMT]: mgmt_dump_metadata_setup_msgpair: enter\n");
+
+    js_p->error_code = 0;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 
+        sm_p->u.mgmt_dump_metadata.count);
+    if( ret != 0 )
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    foreach_msgpair( &sm_p->msgarray_op, msg_p, i)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: "
+                     "mgmt_dump_metadata_setup:msg_pair: req: %d, fsid: %d, "
+                     "handle: %llu, addr: %lu\n", msg_p->req.op, 
+                     sm_p->object_ref.fs_id, sm_p->object_ref.handle,
+                     (long unsigned int)sm_p->u.mgmt_dump_metadata.addr[i]);
+        PINT_SERVREQ_MGMT_DUMP_METADATA_FILL(msg_p->req, 
+                                             (*sm_p->cred_p),
+                                             sm_p->object_ref.fs_id,
+                                             sm_p->object_ref.handle,
+					     sm_p->hints);
+        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->handle = sm_p->object_ref.handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        msg_p->comp_fn = mgmt_dump_metadata_comp_fn;
+        msg_p->svr_addr = sm_p->u.mgmt_dump_metadata.addr[i];
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                 "[MGMT]: mgmt_dump_metadata_setup_msgpair: exit\n");
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_dump_metadata_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: mgmt_dump_metadata_cleanup: "
+                 "enter\n");
+
+    sm_p->error_code = js_p->error_code;
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "[MGMT]: mgmt_dump_metadata_cleanup: "
+                 "exit\n");
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+static int mgmt_dump_metadata_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int ret=0;
+                        
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "[MGMT]: mgmt_dump_metadata_comp_fn enter for msgpair %d: "
+                 "enter (op: %d)\n", index, resp_p->op);
+
+    assert(resp_p->op == PVFS_SERV_MGMT_DUMP_METADATA);
+    if (sm_p->msgarray_op.msgarray[index].op_status != 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "[MGMT]: msgarray op_status not 0: %d\n",
+                     sm_p->msgarray_op.msgarray[index].op_status);
+        return sm_p->msgarray_op.msgarray[index].op_status;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "[MGMT]: mgmt_dump_metadata_comp_fn exit for msgpair %d: "
+                 "status (%d)\n", index, 
+                 sm_p->msgarray_op.msgarray[index].op_status);
+    return ret;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
