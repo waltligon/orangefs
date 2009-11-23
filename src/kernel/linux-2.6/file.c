@@ -1376,18 +1376,22 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 #ifndef PVFS2_LINUX_KERNEL_2_4
+        /* caching is not working properly. removing functionality for now.  Becky Ligon. */
+        /* caching REQUIRES the user's buffer to be a multiple of 4096; the code breaks if */
+        /* it is not!                                                                      */
+
         /* if a file is immutable, stage its I/O 
          * through the cache */
-        if (IS_IMMUTABLE(rw->inode)) {
+        //if (IS_IMMUTABLE(rw->inode)) {
             /* Stage the I/O through the kernel's pagecache */
-            ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
-        }
-        else 
+        //    ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
+        //}
+        //else 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
-        {
+        //{
             /* push the I/O directly through to storage */
-            ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
-        }
+     ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
+        //}
         if (ret < 0)
         {
             goto out;
@@ -1478,6 +1482,11 @@ ssize_t pvfs2_file_read(
     struct rw_options rw;
     struct iovec vec;
 
+    gossip_debug(GOSSIP_IO_DEBUG,"pvfs2_file_read: count=%zd \toffset=%lld\n"
+               ,count
+               ,(long long)*offset);
+
+
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READ;
@@ -1485,7 +1494,7 @@ ssize_t pvfs2_file_read(
     rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     vec.iov_base = buf;
-    vec.iov_len  = count;
+    vec.iov_len = count;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
     rw.file = file;
@@ -1493,16 +1502,8 @@ ssize_t pvfs2_file_read(
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
 
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-    }
+    rw.readahead_size = 0;
     g_pvfs2_stats.reads++;
-
 
     return do_readv_writev(&rw);
 }
@@ -2176,6 +2177,9 @@ static ssize_t pvfs2_file_readx(
     unsigned long xtnr_segs)
 {
     struct rw_options rw;
+
+    gossip_err("Executing pvfs2_file_readx.  offset:NONE \ttotal length:%zd\n"
+              ,iov_length(iov,nr_segs));
 
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
@@ -2862,6 +2866,11 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
+
+    gossip_err("Executing pvfs2_file_aio_read_iovec.  offset:%lld \ttotal length:%zd\n"
+              ,(long long)offset
+              ,iov_length(iov,nr_segs));
+
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;

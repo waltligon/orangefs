@@ -59,6 +59,8 @@ machine pvfs2_small_io_sm
 static PINT_sm_action small_io_start_job(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing small_io_start_job...\n");
+
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
@@ -179,6 +181,9 @@ static PINT_sm_action small_io_start_job(
         }
         
         s_op->u.small_io.result_bytes = result.bytes;
+
+        gossip_debug(GOSSIP_IO_DEBUG,"\tsubmitting job_trove_bstream_read_list for handle %llu\n"
+                                    ,llu(s_op->req->u.small_io.handle));
         ret = job_trove_bstream_read_list(
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,

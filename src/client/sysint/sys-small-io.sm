@@ -112,7 +112,8 @@ static PINT_sm_action small_io_setup_msgpairs(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-    memset(sm_p->u.io.small_io_ctx,0,sizeof(*sm_p->u.io.small_io_ctx));
+    memset(sm_p->u.io.small_io_ctx,0,sizeof(*sm_p->u.io.small_io_ctx) *
+                                     attr->u.meta.dfile_count);
 
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
@@ -250,8 +251,8 @@ static int small_io_completion_fn(void * user_args,
     PINT_sm_msgpair_state *msg_p = &(mop->msgarray[index]);
     PINT_client_small_io_ctx *ctx = 
          &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
-    PVFS_object_attr *attr = &(sm_p->getattr.attr);
-    PVFS_metafile_attr *meta = &(attr->u.meta);
+    //PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    //PVFS_metafile_attr *meta = &(attr->u.meta);
 
     int ret = 0;
 
@@ -371,16 +372,24 @@ static int small_io_completion_fn(void * user_args,
      * at 5.  You can tweak this value in the pvfs2-fs.conf file, if you
      * want.
     */
+
+    gossip_debug(GOSSIP_IO_DEBUG,"handle=%llu \toperation=%d \toffset=%ld "
+                                 "\taggregate_size=%ld\n"
+                                ,llu(msg_p->req.u.small_io.handle)
+                                ,msg_p->req.u.small_io.io_type
+                                ,msg_p->req.u.small_io.file_req_offset
+                                ,msg_p->req.u.small_io.aggregate_size);
+
+/*
     if (   (sm_p->u.io.io_type == PVFS_IO_READ) 
         && (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) 
                                == PVFS_ATTR_META_MIRROR_DFILES
         && (sm_p->u.io.retry_count < mop->params.retry_limit))
     {
-       mop->params.retry_limit = meta->dfile_count *
-                                 meta->mirror_copies_count;
+       mop->params.retry_limit = meta->mirror_copies_count;
        ctx->msg_completed = 0;
     } 
-
+*/
 
     return 0;
 }

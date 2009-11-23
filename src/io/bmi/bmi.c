@@ -1215,6 +1215,11 @@ void *BMI_memalloc(BMI_addr_t addr,
     /* allocate the buffer using the method's mechanism */
     new_buffer = tmp_ref->interface->memalloc(size, send_recv);
 
+    /* initialize buffer, if not NULL. */
+    if (new_buffer)
+    {
+       memset(new_buffer,0,size);
+    }
     return (new_buffer);
 }
 

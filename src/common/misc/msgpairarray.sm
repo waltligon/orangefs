@@ -308,6 +308,7 @@ static PINT_sm_action msgpairarray_post(
             if (local_enc_and_alloc)
             {
                 PINT_encode_release(&msg_p->encoded_req, PINT_ENCODE_REQ);
+                memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
                 BMI_memfree(msg_p->svr_addr,msg_p->encoded_resp_p,
                             msg_p->max_resp_sz, BMI_RECV);
                 msg_p->encoded_resp_p = NULL;
@@ -793,10 +794,13 @@ int PINT_serv_free_msgpair_resources(
     if (encoded_req_p && decoded_resp_p && svr_addr_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
+        memset(encoded_req_p,0,sizeof(*encoded_req_p));
 
         PINT_decode_release(decoded_resp_p, PINT_DECODE_RESP);
+        memset(decoded_resp_p,0,sizeof(*decoded_resp_p));
 
         BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
+        encoded_resp_p = NULL;
 
         ret = 0;
     }

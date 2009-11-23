@@ -465,27 +465,31 @@ struct PVFS_servreq_getattr
     PVFS_handle handle; /* handle of target object */
     PVFS_fs_id fs_id;   /* file system */
     uint32_t attrmask;  /* mask of desired attributes */
+    uint32_t server_nr; /* server # of handle */
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_getattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    uint32_t, attrmask)
+    uint32_t, attrmask,
+    uint32_t, server_nr)
 
-#define PINT_SERVREQ_GETATTR_FILL(__req,   \
-                                  __creds, \
-                                  __fsid,  \
-                                  __handle,\
-                                  __amask, \
-                                  __hints) \
-do {                                       \
-    memset(&(__req), 0, sizeof(__req));    \
-    (__req).op = PVFS_SERV_GETATTR;        \
-    (__req).credentials = (__creds);       \
-    (__req).hints = (__hints);             \
-    (__req).u.getattr.fs_id = (__fsid);    \
-    (__req).u.getattr.handle = (__handle); \
-    (__req).u.getattr.attrmask = (__amask);\
+#define PINT_SERVREQ_GETATTR_FILL(__req,         \
+                                  __creds,       \
+                                  __fsid,        \
+                                  __handle,      \
+                                  __amask,       \
+                                  __server_nr,   \
+                                  __hints)       \
+do {                                             \
+    memset(&(__req), 0, sizeof(__req));          \
+    (__req).op = PVFS_SERV_GETATTR;              \
+    (__req).credentials = (__creds);             \
+    (__req).hints = (__hints);                   \
+    (__req).u.getattr.fs_id = (__fsid);          \
+    (__req).u.getattr.handle = (__handle);       \
+    (__req).u.getattr.attrmask = (__amask);      \
+    (__req).u.getattr.server_nr = (__server_nr); \
 } while (0)
 
 struct PVFS_servresp_getattr
