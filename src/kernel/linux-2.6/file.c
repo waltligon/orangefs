@@ -33,6 +33,11 @@ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
 
+static ssize_t wait_for_cached_io(struct rw_options *old_rw, 
+                                  struct iovec *vec, 
+                                  int nr_segs, 
+                                  size_t total_size) __attribute__((unused));
+
 static ssize_t wait_for_direct_io(struct rw_options *rw,
                                   struct iovec *vec,
                                   unsigned long  nr_segs,
@@ -1142,7 +1147,7 @@ out:
  * Returns the actual size of completed I/O.
  */
 static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec, 
-        int nr_segs, size_t total_size)
+        int nr_segs, size_t total_size) 
 {
     ssize_t err = 0, total_actual_io = 0;
     ssize_t ret = 0;
