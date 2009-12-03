@@ -1557,6 +1557,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     ibmap->hostname = hostname;
     ibmap->port = port;
     ibmap->reconnect_flag = reconnect_flag;
+    ibmap->map_ref = 0;
 
     return map;
 }
@@ -1568,6 +1569,15 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
  * type, which is then returned.
  * XXX: I'm assuming that these actually return a _const_ pointer
  * so that I can hand back an existing map.
+ * [SLANG 12/03/09]:
+ *      In response to the const comment above: the bmi generic code
+ *      expects a new pointer every time, and calls DROP_ADDR for each
+ *      method_addr pointer (map), which goes and frees the map.  So
+ *      we need to be able to reference count when returning a map that
+ *      we got from a pre-existing connection.  Note:  there's probably
+ *      a cleaner way to do this, but we're in too deep at this point...
+ *	We are assuming that the DROP_ADDR calls will only be called from
+ *      a single thread, i.e. the reference counting is not thread-safe.
  */
 static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 {
@@ -1609,6 +1619,7 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	    ib_method_addr_t *ibmap = c->remote_map->method_data;
 	    if (ibmap->port == port && !strcmp(ibmap->hostname, hostname)) {
 	       map = c->remote_map;
+	       ibmap->map_ref++;
 	       break;
 	    }
 	}
@@ -1953,8 +1964,15 @@ static int BMI_ib_set_info(int option, void *param __unused)
     case BMI_DROP_ADDR: {
 	struct bmi_method_addr *map = param;
 	ib_method_addr_t *ibmap = map->method_data;
-	free(ibmap->hostname);
-	free(map);
+	if(ibmap->map_ref == 0)
+	{
+		free(ibmap->hostname);
+		free(map);
+        }
+        else
+	{
+		ibmap->map_ref--;
+	}
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
