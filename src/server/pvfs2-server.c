@@ -237,8 +237,6 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    free(s_server_options.server_alias);
-
     server_status_flag |= SERVER_CONFIG_INIT;
 
     if (!PINT_config_is_valid_configuration(&server_config))
@@ -1443,6 +1441,8 @@ static int server_shutdown(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "*** server shutdown in progress ***\n");
+
+    free(s_server_options.server_alias);
 
     if (status & SERVER_PRECREATE_INIT)
     {
