@@ -461,6 +461,9 @@ PVFS_error PINT_client_state_machine_release(
 
     PINT_id_gen_safe_unregister(sm_p->sys_op_id);
 
+    /* free the internal hint list */
+    PVFS_hint_free(sm_p->hints);
+
     PINT_smcb_free(smcb);
     return 0;
 }

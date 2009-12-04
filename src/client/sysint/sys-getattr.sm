@@ -1024,10 +1024,16 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+    
     if(js_p->error_code == 0)
     {
         PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     }
+
+    /* If mirroring is active, then mir_ctx_array needs to be freed. */
+    if (getattr->mir_ctx_array)
+       free(getattr->mir_ctx_array);
 
     return SM_ACTION_COMPLETE;
 }
