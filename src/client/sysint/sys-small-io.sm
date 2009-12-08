@@ -626,7 +626,14 @@ static int small_io_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    /*release the ctx array; this array is allocated whether or not the 
+     *file to read is mirrored.
+    */
+    free(sm_p->u.io.small_io_ctx);
+
     return SM_ACTION_COMPLETE;
 }
 
