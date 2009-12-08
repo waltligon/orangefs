@@ -2,6 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
+ *
  */
 
 /** \file
@@ -513,6 +514,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
                 IO_ATTR_MASKS,
+                0,
                 sm_p->hints);
     }
     else
@@ -886,8 +888,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
             PVFS_perror_gossip("Receive immediately failed",
                                msg->recv_status.error_code);
 
-            ret = msg->recv_status.error_code;
-            js_p->error_code = ret;
+            //ret = msg->recv_status.error_code;
+            js_p->error_code = IO_RETRY;
             continue;
         }
 
@@ -993,6 +995,8 @@ static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
     struct PINT_client_io_sm *io = &(sm_p->u.io);
 
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_post_msgpairs_retry...\n");
+
     /* Are we mirroring on a READ request? */
     if ( (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) &&
          io->io_type == PVFS_IO_READ )
@@ -1010,6 +1014,7 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
                                    ,job_status_s *js_p )
 {
    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
+   gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_mirror_retry...\n");
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
     PVFS_metafile_attr *meta = &(attr->u.meta);
