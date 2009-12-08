@@ -532,30 +532,6 @@ static int pvfs2_statfs(
     return ret;
 }
 
-/* pvfs2_remount_locked()
- *
- * locked wrapper around pvfs2_remount()
- */
-int pvfs2_remount_locked(
-    struct super_block *sb,
-    int *flags,
-    char *data)
-{
-    int ret;
-    
-    ret = down_interruptible(&request_semaphore);
-    if(ret < 0)
-    {
-        return(ret);
-    }
-
-    ret = pvfs2_remount(sb, flags, data);
-
-    up(&request_semaphore);
-
-    return(ret);
-}
-
 /*
   the idea here is that given a valid superblock, we're
   re-initializing the user space client with the initial mount
@@ -883,7 +859,7 @@ struct super_operations pvfs2_s_ops =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     read_inode : pvfs2_read_inode,
     statfs : pvfs2_statfs,
-    remount_fs : pvfs2_remount_locked,
+    remount_fs : pvfs2_remount,
     put_super : pvfs2_kill_sb,
     dirty_inode : pvfs2_dirty_inode,
     clear_inode: pvfs2_clear_inode,
@@ -902,7 +878,7 @@ struct super_operations pvfs2_s_ops =
     .put_inode = pvfs2_put_inode,
 #endif
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount_locked,
+    .remount_fs = pvfs2_remount,
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
     .find_inode_handle = pvfs2_sb_find_inode_handle,
 #endif
