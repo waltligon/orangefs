@@ -13,6 +13,8 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
+static void print_dentry(struct dentry *entry, int ret);
+
 /* should return 1 if dentry can still be trusted, else 0 */
 static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
@@ -236,6 +238,40 @@ struct dentry_operations pvfs2_dentry_operations =
     .d_compare = pvfs2_d_compare,
     .d_delete = pvfs2_d_delete,
 };
+
+/* print_dentry()
+ *
+ * Available for debugging purposes.  Please remove the unused attribute
+ * before invoking
+ */
+static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
+{
+  if(!entry)
+  {
+    printk("--- dentry %p: no entry, ret: %d\n", entry, ret);
+    return;
+  }
+
+  if(!entry->d_inode)
+  {
+    printk("--- dentry %p: no d_inode, ret: %d\n", entry, ret);
+    return;
+  }
+
+  if(!entry->d_parent)
+  {
+    printk("--- dentry %p: no d_parent, ret: %d\n", entry, ret);
+    return;
+  }
+
+  printk("--- dentry %p: d_count: %d, name: %s, parent: %p, parent name: %s, ret: %d\n",
+        entry,
+        atomic_read(&entry->d_count),
+        entry->d_name.name,
+        entry->d_parent,
+        entry->d_parent->d_name.name,
+        ret);
+}
 
 /*
  * Local variables:
