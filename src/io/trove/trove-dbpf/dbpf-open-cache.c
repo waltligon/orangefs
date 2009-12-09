@@ -22,6 +22,7 @@
 #include <limits.h>
 #include <string.h>
 #include <db.h>
+#include <dirent.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -628,6 +629,67 @@ static void close_fd(
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
         "dbpf_open_cache closing fd %d of type %d\n", fd, type);
     DBPF_CLOSE(fd);
+}
+
+void clear_stranded_bstreams(TROVE_coll_id coll_id)
+{
+    char path_name[PATH_MAX];
+    DIR *current_dir = NULL;
+    struct dirent *current_dirent = NULL;
+    struct stat file_info;
+    struct file_struct *tmp_item;
+
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
+                                      my_storage_p->name, coll_id);
+
+    /* remove entries in the stranded bstreams directory */
+    current_dir = opendir(path_name);
+    if(current_dir)
+    {
+        while((current_dirent = readdir(current_dir)))
+        {
+            if((strcmp(current_dirent->d_name, ".") == 0) ||
+               (strcmp(current_dirent->d_name, "..") == 0))
+            {
+                continue;
+            }
+            tmp_item = (struct file_struct *) malloc(sizeof(struct file_struct));
+            if(!tmp_item)
+            {
+                gossip_err("Unable to allocate memory for file_struct [%d].\n", errno);
+                return;
+            }
+            tmp_item->pathname = malloc(PATH_MAX);
+            if(!tmp_item->pathname)
+            {
+                gossip_err("Unable to allocate memory for pathname[%d].\n", errno);
+                free(tmp_item);
+                return;
+            }
+            snprintf(tmp_item->pathname, PATH_MAX, "%s/%s", path_name,
+                     current_dirent->d_name);
+            if(stat(tmp_item->pathname, &file_info) < 0)
+            {
+                gossip_err("error doing stat on bstream entry\n");
+                continue;
+            }
+            assert(S_ISREG(file_info.st_mode));
+            /* Add to the queue */
+
+            pthread_mutex_lock(&dbpf_unlink_context.mutex);
+            qlist_add_tail(&tmp_item->list_link, &dbpf_unlink_context.global_list);
+            pthread_cond_signal(&dbpf_unlink_context.data_available);
+            pthread_mutex_unlock(&dbpf_unlink_context.mutex);
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+              "Added [%s] to the queue.\n", tmp_item->pathname);
+        }
+        closedir(current_dir);
+    }
+    else
+    {   
+        gossip_err("Unable to open standed bstream directory [%s] to "
+          "perform initialization stranded bstream cleanup", path_name);
+    }
 }
 
 /*
