@@ -1474,6 +1474,12 @@ struct inode *pvfs2_create_entry(
 {
     if (dir && dentry && error_code)
     {
+        if(strlen(dentry->d_name.name) > (PVFS2_NAME_LEN - 1))
+        {
+            *error_code = -ENAMETOOLONG;
+            return(NULL);
+        }
+
         switch (op_type)
         {
             case PVFS2_VFS_OP_CREATE:
