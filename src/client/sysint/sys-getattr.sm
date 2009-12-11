@@ -777,13 +777,13 @@ static int getattr_datafile_getattr_comp_fn(
                  "datafile_getattr: size of datafile %d is %lld\n",
                  index, lld(resp_p->u.getattr.attr.u.data.size));
 
-    sm_p->getattr.size_array[index] =
-        resp_p->u.getattr.attr.u.data.size;
-
     /* set msg_completed for mirroring purposes */
     server_nr = msg_p->req.u.getattr.server_nr;
     ctx = &(getattr->mir_ctx_array[server_nr]);
     ctx->msg_completed = 1;
+
+    sm_p->getattr.size_array[server_nr] =
+        resp_p->u.getattr.attr.u.data.size;
 
     return 0;
 }

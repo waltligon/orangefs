@@ -251,8 +251,9 @@ static int small_io_completion_fn(void * user_args,
     PINT_sm_msgpair_state *msg_p = &(mop->msgarray[index]);
     PINT_client_small_io_ctx *ctx = 
          &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
-    //PVFS_object_attr *attr = &(sm_p->getattr.attr);
-    //PVFS_metafile_attr *meta = &(attr->u.meta);
+    uint32_t server_nr = msg_p->req.u.small_io.server_nr;
+    PVFS_object_attr *attr __attribute__((unused)) = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta __attribute__((unused)) = &(attr->u.meta);
 
     int ret = 0;
 
@@ -282,7 +283,7 @@ static int small_io_completion_fn(void * user_args,
         {
             memset(&fdata, 0, sizeof(PINT_request_file_data));
             fdata.server_ct = attr->u.meta.dfile_count;
-            fdata.server_nr = sm_p->u.io.datafile_index_array[index];
+            fdata.server_nr = server_nr;
             fdata.dist = attr->u.meta.dist;
             fdata.fsize = resp_p->u.small_io.bstream_size;
 
@@ -357,7 +358,7 @@ static int small_io_completion_fn(void * user_args,
         }
     } /*if PVFS_IO_READ*/
 
-    sm_p->u.io.dfile_size_array[index] = resp_p->u.small_io.bstream_size;
+    sm_p->u.io.dfile_size_array[server_nr] = resp_p->u.small_io.bstream_size;
 
     sm_p->u.io.total_size += resp_p->u.small_io.result_size;
 
