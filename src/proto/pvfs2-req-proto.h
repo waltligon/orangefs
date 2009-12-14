@@ -430,12 +430,14 @@ do {                                                                     \
 struct PVFS_servreq_tree_get_file_size
 {
     PVFS_fs_id  fs_id;
+    uint32_t caller_handle_index;
     uint32_t num_data_files;
     PVFS_handle *handle_array;
 };
-endecode_fields_1a_struct(
+endecode_fields_2a_struct(
     PVFS_servreq_tree_get_file_size,
     PVFS_fs_id, fs_id,
+    uint32_t, caller_handle_index,
     uint32_t, num_data_files,
     PVFS_handle, handle_array)
 #define extra_size_PVFS_servreq_tree_get_file_size \
@@ -444,6 +446,7 @@ endecode_fields_1a_struct(
 #define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                      \
                                  __creds,                                \
                                  __fsid,                                 \
+                                 __caller_handle_index,                  \
                                  __num_data_files,                       \
                                  __handle_array,                         \
                                  __hints)                                \
@@ -453,17 +456,27 @@ do {                                                                     \
     (__req).hints = (__hints);                                           \
     (__req).credentials = (__creds);                                     \
     (__req).u.tree_get_file_size.fs_id = (__fsid);                       \
+    (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index); \
     (__req).u.tree_get_file_size.num_data_files = (__num_data_files);    \
     (__req).u.tree_get_file_size.handle_array = (__handle_array);        \
 } while (0)
 
 struct PVFS_servresp_tree_get_file_size
 {
-    PVFS_size size;
+    uint32_t caller_handle_index;
+    uint32_t handle_count;
+    PVFS_error *error;
+    PVFS_size *size;
 };
-endecode_fields_1_struct(
+endecode_fields_1aa_struct(
     PVFS_servresp_tree_get_file_size,
+    uint32_t, caller_handle_index,
+    uint32_t, handle_count,
+    PVFS_error, error,
     PVFS_size, size)
+#define extra_size_PVFS_servresp_tree_get_file_size \
+  ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(uint32_t)) )
 
 /* mgmt_get_dirdata_handle */
 /* - used to retrieve the dirdata handle of the specified parent ref */

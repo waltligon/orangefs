@@ -39,7 +39,7 @@
  * we grab these sizes.
  */
 
-static struct profiler getattr_prof;
+//static struct profiler getattr_prof;
 
 extern job_context_id pint_client_sm_context;
 
@@ -688,6 +688,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
+            0,
             attr->u.meta.dfile_count,
             attr->u.meta.dfile_array,
             sm_p->hints);
@@ -728,7 +729,8 @@ static int getattr_datafile_getattr_comp_fn(
                  index, lld(resp_p->u.tree_get_file_size.size));
 
     sm_p->getattr.size =
-        resp_p->u.tree_get_file_size.size;
+        resp_p->u.tree_get_file_size.size[0];
+    sm_p->getattr.size_array = resp_p->u.tree_get_file_size.size;
 
     return 0;
 }
@@ -779,6 +781,17 @@ static PINT_sm_action getattr_acache_insert(
             }
             else
             {
+                /* compute size as requested */
+                assert(sm_p->getattr.attr.u.meta.dist);
+                assert(sm_p->getattr.attr.u.meta.dist->methods &&
+                       sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
+
+                sm_p->getattr.size =
+                    (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
+                    sm_p->getattr.attr.u.meta.dist->params,
+                    sm_p->getattr.attr.u.meta.dfile_count,
+                    sm_p->getattr.size_array);
+
                 tmp_size = &sm_p->getattr.size;
                 gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated unstuffed logical size of %lld\n", lld(*tmp_size));
             }

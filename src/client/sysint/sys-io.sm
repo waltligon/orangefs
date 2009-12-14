@@ -514,7 +514,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
                 IO_ATTR_MASKS,
-                0,
+//                0,
                 sm_p->hints);
     }
     else

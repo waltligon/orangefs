@@ -302,6 +302,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
+                        (i-1)*num_files_per_server+1,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
                         NULL);
@@ -376,7 +377,25 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb, job_statu
 
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    s_op->resp.u.tree_get_file_size.size = 0;
+    s_op->resp.u.tree_get_file_size.caller_handle_index =
+            s_op->req->u.tree_get_file_size.caller_handle_index;
+    s_op->resp.u.tree_get_file_size.handle_count =
+            s_op->req->u.tree_get_file_size.num_data_files;
+
+    /* allocate response arrays */
+    s_op->resp.u.tree_get_file_size.error = (PVFS_error *)
+        malloc(s_op->req->u.tree_get_file_size.num_data_files *
+               sizeof(PVFS_error));
+    s_op->resp.u.tree_get_file_size.size = (PVFS_size *)
+        malloc(s_op->req->u.tree_get_file_size.num_data_files *
+               sizeof(PVFS_size));
+    if (! s_op->resp.u.tree_get_file_size.error ||
+        ! s_op->resp.u.tree_get_file_size.size)
+    {
+        gossip_err("tree_get_file_size: failed to allocate arrays\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
 
     return (tree_communicate_partition_handles(smcb, js_p,
         s_op->req->u.tree_get_file_size.num_data_files,
@@ -389,23 +408,33 @@ static int tree_get_file_size_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i;
 
-    if (resp_p->status != 0)
-    {
-        return resp_p->status;
-    }
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "tree_get_file_size_comp_fn[%d]\n",index);
 
     assert(resp_p->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
+    if (resp_p->status != 0)
+    {
+        PVFS_perror_gossip("Get file size failure", resp_p->status);
+        return resp_p->status;
+    }
+
+    /* stash the sizes and error codes for each file handle */
+    for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_get_file_size_comp_fn: size of datafile %d is %lld\n",
-                 index, lld(resp_p->u.tree_get_file_size.size));
+                 index, lld(resp_p->u.tree_get_file_size.size[i]));
 
-    s_op->resp.u.tree_get_file_size.size += resp_p->u.tree_get_file_size.size;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "tree_get_file_size_comp_fn: accumulated size is %lld\n",
-                 lld(s_op->resp.u.tree_get_file_size.size));
+        s_op->resp.u.tree_get_file_size.size
+                  [resp_p->u.tree_get_file_size.caller_handle_index+i] =
+                        resp_p->u.tree_get_file_size.size[i];
+        s_op->resp.u.tree_get_file_size.error
+                  [resp_p->u.tree_get_file_size.caller_handle_index+i] =
+                        resp_p->u.tree_get_file_size.error[i];
+    }
 
     return 0;
 }
@@ -415,7 +444,7 @@ static int tree_get_file_size_work_cleanup(
 {
     /* get frame from bottom of stack */
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, task_id, error_code;
+    int i, j, task_id, error_code;
     PINT_server_op *old_frame;
 
     assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
@@ -424,18 +453,26 @@ static int tree_get_file_size_work_cleanup(
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (task_id == REMOTE_OPERATION) {
-            s_op->resp.u.tree_get_file_size.size += old_frame->resp.u.tree_get_file_size.size;
-           PINT_msgpairarray_destroy(&old_frame->msgarray_op);
+            for (j = 0; j < old_frame->resp.u.tree_get_file_size.handle_count; j++)
+            {
+                s_op->resp.u.tree_get_file_size.size
+                      [old_frame->resp.u.tree_get_file_size.caller_handle_index+j]
+                   = old_frame->resp.u.tree_get_file_size.size[j];
+                s_op->resp.u.tree_get_file_size.error
+                      [old_frame->resp.u.tree_get_file_size.caller_handle_index+j]
+                   = old_frame->resp.u.tree_get_file_size.error[j];
+                free(old_frame->resp.u.tree_get_file_size.size);
+                free(old_frame->resp.u.tree_get_file_size.error);
+                PINT_msgpairarray_destroy(&old_frame->msgarray_op);
+            }
         }
         else {
             gossip_debug(GOSSIP_SERVER_DEBUG,
                          "tree_get_file_size_work_cleanup: size of local datafile is %lld\n",
                          lld(old_frame->resp.u.getattr.attr.u.data.size));
-            s_op->resp.u.tree_get_file_size.size += old_frame->resp.u.getattr.attr.u.data.size;
+            s_op->resp.u.tree_get_file_size.size[0] = old_frame->resp.u.getattr.attr.u.data.size;
+            s_op->resp.u.tree_get_file_size.error[0] = error_code;
          }
-         gossip_debug(GOSSIP_SERVER_DEBUG,
-             "tree_get_file_size_work_cleanup: accumulated size of datafile is %lld\n",
-             lld(s_op->resp.u.tree_get_file_size.size));
         free(old_frame);
     }
 
