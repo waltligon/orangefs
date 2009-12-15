@@ -925,7 +925,6 @@ bmx_open_endpoint(mx_endpoint_t *ep, uint32_t board, uint32_t ep_id)
         param.val.context_id.bits = 4;
         param.val.context_id.shift = BMX_MSG_SHIFT;
 
-        if (board == -1) board = 0;
         mxret = mx_open_endpoint(board, ep_id, BMX_MAGIC,
                                  &param, 1, ep);
         if (mxret != MX_SUCCESS) {
@@ -2938,7 +2937,7 @@ bmx_peer_connect(struct bmx_peer *peer)
                 mx_endpoint_addr_t      epa;
 
                 ret = bmx_open_endpoint(&bmi_mx->bmx_ep,
-                                        bmi_mx->bmx_board,
+                                        MX_ANY_NIC,
                                         MX_ANY_ENDPOINT);
                 if (ret != 0) {
                         debug((BMX_DB_MX|BMX_DB_CONN), "failed to open endpoint when "
@@ -2950,6 +2949,8 @@ bmx_peer_connect(struct bmx_peer *peer)
                 /* get our nic_id and ep_id */
                 mx_decompose_endpoint_addr2(epa, &nic_id, &bmi_mx->bmx_ep_id,
                                             &bmi_mx->bmx_sid);
+                /* get our board number */
+                mx_nic_id_to_board_number(nic_id, &bmi_mx->bmx_board);
                 /* get our hostname */
                 mx_nic_id_to_hostname(nic_id, host);
                 bmi_mx->bmx_hostname = strdup(host);
