@@ -543,18 +543,63 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
-	dnl Test to see if sysctl proc handlers have a 6th argument
-	AC_MSG_CHECKING(for 6th argument to sysctl proc handlers)
-	dnl if this test passes, there is a 6th argument
+        dnl the proc handler functions have changed over the years.
+        dnl pre-2.6.8: proc_handler(ctl_table       *ctl,
+        dnl                         int             write,
+        dnl                         struct file     *filp,
+        dnl                         void            *buffer,
+        dnl                         size_t          *lenp)
+        dnl
+        dnl 2.6.8-2.6.31: proc_handler(ctl_table       *ctl,
+        dnl                            int             write,
+        dnl                            struct file     *filp,
+        dnl                            void            *buffer,
+        dnl                            size_t          *lenp,
+        dnl                            loff_t          *ppos)
+        dnl > 2.6.31: proc_handler(ctl_table       *ctl,
+        dnl                        int             write,
+        dnl                        void            *buffer,
+        dnl                        size_t          *lenp,
+        dnl                        loff_t          *ppos)
+ 
+	dnl Test to see if sysctl proc handlers have a file argument
+	AC_MSG_CHECKING(for file argument to sysctl proc handlers)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
 	    #include <linux/sysctl.h>
 	    ], [
-	    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                struct file * filp = NULL;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, filp, buffer, lenp, ppos);
 	    ],
 	    AC_MSG_RESULT(yes)
-	    AC_DEFINE(HAVE_PROC_HANDLER_SIX_ARG, 1, Define if sysctl proc handlers have 6th argument),
+	    AC_DEFINE(HAVE_PROC_HANDLER_FILE_ARG, 1, Define if sysctl proc handlers have 6th argument),
+	    AC_MSG_RESULT(no)
+	    )
+
+	AC_MSG_CHECKING(for ppos argument to sysctl proc handlers)
+	dnl if this test passes, there is a ppos argument
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    #include <linux/sysctl.h>
+	    ], [
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, buffer, lenp, ppos);
+	    ],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_PROC_HANDLER_PPOS_ARG, 1, Define if sysctl proc handlers have ppos argument),
 	    AC_MSG_RESULT(no)
 	    )
 
@@ -1170,6 +1215,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         AC_MSG_RESULT(yes)
         AC_DEFINE(HAVE_D_ALLOC_ANON, 1, [Define if dcache.h contains 
                   d_alloc_annon]),
+        AC_MSG_RESULT(no)
+        )
+
+        AC_MSG_CHECKING(for s_dirty in struct super_block)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+        ], [
+                struct super_block *s;
+                sb_has_dirty_inodes(s);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_SB_DIRTY_LIST, 1, [Define if struct super_block has s_dirty list]),
         AC_MSG_RESULT(no)
         )
 
