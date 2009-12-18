@@ -1448,10 +1448,18 @@ free_op:
 static void pvfs2_flush_sb(
         struct super_block *sb)
 {
+#ifdef HAVE_SB_DIRTY_LIST
     if (!list_empty(&sb->s_dirty))
+#else
+    if (!list_empty(&sb->s_bdi->wb.b_dirty))
+#endif
     {
         struct inode *inode = NULL;
+#ifdef HAVE_SB_DIRTY_LIST
         list_for_each_entry (inode, &sb->s_dirty, i_list)
+#else
+        list_for_each_entry (inode, &sb->s_bdi->wb.b_dirty, i_list)
+#endif
         {
             pvfs2_flush_inode(inode);
         }
