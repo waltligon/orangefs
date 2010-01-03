@@ -1353,6 +1353,8 @@ static int dbpf_bstream_get_extents(
         {
             /* consume stream region and update mem region */
             ext_size = cur_stream_size;
+	    ext_ptr = cur_mem_off;
+	    ext_off = cur_stream_off;
 
             cur_mem_size -= cur_stream_size;
             cur_mem_off  += cur_stream_size;
