@@ -857,10 +857,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
                 gen_mutex_unlock(&dbpf_update_size_lock);
                 goto cache_put;
             }
-            if(qop_p->op.flags & TROVE_SYNC)
-            {
-                sync_required = 1;
-            }
+            sync_required = 1;
         }
         gen_mutex_unlock(&dbpf_update_size_lock);
 
