@@ -44,6 +44,7 @@ static double start_tm;
 static double end_tm;
 static int64_t total_size = 0;
 int concurrent;
+int meta_sync;
 
 static TROVE_method_id trove_method_callback(TROVE_coll_id id)
 {
@@ -111,6 +112,9 @@ static int do_trove_test(char* dir)
 	return -1;
     }
 
+    trove_collection_setinfo(1, trove_context, 
+        TROVE_COLLECTION_META_SYNC_MODE, (void *)&meta_sync);
+
     cur_extent.first = cur_extent.last = 1;
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
@@ -172,7 +176,7 @@ static int do_trove_test(char* dir)
             assert(tmp_buffer->size <= tmp_buffer->size);
             ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
                 &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
-                &out_size, 0, NULL, tmp_buffer, trove_context, &op_id,
+                &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
                 NULL);
             inflight++;
 
@@ -207,16 +211,21 @@ int main(int argc, char *argv[])
     int ret;
     struct bench_op* tmp_op;
 
-    if(argc != 4)
+    if(argc != 5)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
         return(-1);
     }
 
     ret = sscanf(argv[3], "%d", &concurrent);
     if(ret != 1 || concurrent < 1)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <1|2> <workload description file> <trove dir> <concurrent ops>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
+    }
+    ret = sscanf(argv[4], "%d", &meta_sync);
+    if(ret != 1 || meta_sync > 1 || meta_sync < 0)
+    {
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
     }
 
     /* parse description of workload */
