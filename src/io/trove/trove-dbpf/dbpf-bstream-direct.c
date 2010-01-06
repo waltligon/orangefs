@@ -1064,7 +1064,7 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
                         coll_p,
                         NULL,
                         user_ptr,
-                        0,
+                        TROVE_SYNC,
                         context_id);
 
     op = &q_op_p->op.u.b_rw_list;
