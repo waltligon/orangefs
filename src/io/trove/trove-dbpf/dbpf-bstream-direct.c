@@ -857,10 +857,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
                 gen_mutex_unlock(&dbpf_update_size_lock);
                 goto cache_put;
             }
-            if(qop_p->op.flags & TROVE_SYNC)
-            {
-                sync_required = 1;
-            }
+            sync_required = 1;
         }
         gen_mutex_unlock(&dbpf_update_size_lock);
 
@@ -1067,7 +1064,7 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
                         coll_p,
                         NULL,
                         user_ptr,
-                        0,
+                        TROVE_SYNC,
                         context_id);
 
     op = &q_op_p->op.u.b_rw_list;
