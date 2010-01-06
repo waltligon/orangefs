@@ -1025,7 +1025,7 @@ struct super_block* pvfs2_get_sb(
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
-    sb->s_maxbytes = (unsigned long long) 1 << 63;
+    sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
