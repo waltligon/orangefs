@@ -1224,7 +1224,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
                 #include <linux/fs.h>
         ], [
                 struct super_block *s;
-                sb_has_dirty_inodes(s);
+                list_empty(&s->s_dirty);
         ],
         AC_MSG_RESULT(yes)
         AC_DEFINE(HAVE_SB_DIRTY_LIST, 1, [Define if struct super_block has s_dirty list]),

@@ -12738,7 +12738,7 @@ main ()
 {
 
                 struct super_block *s;
-                sb_has_dirty_inodes(s);
+                list_empty(&s->s_dirty);
 
   ;
   return 0;
