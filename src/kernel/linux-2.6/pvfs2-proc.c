@@ -32,7 +32,7 @@ struct pvfs2_param_extra
  * generic proc file handler for getting and setting various tunable
  * pvfs2-client parameters
  */
-#ifdef HAVE_PROC_HANDLER_FILE_ARG
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_param_proc_handler(
     ctl_table       *ctl,
     int             write,
@@ -40,7 +40,7 @@ static int pvfs2_param_proc_handler(
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
-#elif  HAVE_PROC_HANDLER_PPOS_ARG
+#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_param_proc_handler(
     ctl_table       *ctl,
     int             write,
@@ -77,9 +77,9 @@ static int pvfs2_param_proc_handler(
     if(write)
     {
         /* use generic proc handling function to retrive value to set */
-#ifdef HAVE_PROC_HANDLER_FILE_ARG
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
-#elif  HAVE_PROC_HANDLER_PPOS_ARG
+#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
 #else
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp);
@@ -110,9 +110,9 @@ static int pvfs2_param_proc_handler(
         /* use generic proc handling function to output value */
         val = (int)new_op->downcall.resp.param.value;
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
-#ifdef HAVE_PROC_HANDLER_FILE_ARG
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
-#elif  HAVE_PROC_HANDLER_PPOS_ARG
+#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
 #else
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp);
@@ -123,7 +123,7 @@ static int pvfs2_param_proc_handler(
     return(ret);
 }
 
-#ifdef HAVE_PROC_HANDLER_FILE_ARG
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
@@ -131,7 +131,7 @@ static int pvfs2_pc_proc_handler(
     void            *buffer,
     size_t          *lenp,
     loff_t          *ppos)
-#elif HAVE_PROC_HANDLER_PPOS_ARG
+#elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
 static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
