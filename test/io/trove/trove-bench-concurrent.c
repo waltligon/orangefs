@@ -168,16 +168,25 @@ static int do_trove_test(char* dir)
             tmp_op = qlist_entry(tmp_link, struct bench_op, 
                 list_link);
 
-            /* only writes for now */
-            assert(tmp_op->type == WRITE);
-
-            /* post operation */
             total_size += tmp_op->size;
             assert(tmp_buffer->size <= tmp_buffer->size);
-            ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
-                &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
-                &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
-                NULL);
+
+            if(tmp_op->type == WRITE)
+            {
+                /* post operation */
+                ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
+                    &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
+                    &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
+                    NULL);
+            }
+            else
+            {
+                /* post operation */
+                ret = trove_bstream_read_list(1, 1, &tmp_buffer->buffer,
+                    &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
+                    &out_size, 0, NULL, tmp_buffer, trove_context, &op_id,
+                    NULL);
+            }
             inflight++;
 
             assert(ret == 0);
@@ -252,9 +261,12 @@ int main(int argc, char *argv[])
         tmp_op = malloc(sizeof(*tmp_op));
         assert(tmp_op);
 
-        /* only writes for now */
-        assert(strcmp(op_string, "write") == 0);
-        tmp_op->type = WRITE;
+        if(strcmp(op_string, "write") == 0)
+            tmp_op->type = WRITE;
+        else if(strcmp(op_string, "read") == 0)
+            tmp_op->type = READ;
+        else
+            assert(0);
         tmp_op->offset = offset;
         tmp_op->size = size;
         qlist_add_tail(&tmp_op->list_link, &op_list);
