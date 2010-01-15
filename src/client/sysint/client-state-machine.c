@@ -483,6 +483,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
+    PINT_client_sm *sm_base_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "PINT_client_io_cancel id %lld\n",lld(id));
@@ -507,6 +508,18 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     {
 	/* op already completed; nothing to cancel. */
         return 0;
+    }
+    
+    /* We also don't cancel small I/O operations as posted by
+     * sys-small-io.sm.  Check the corresponding flag.  We have 
+     * to jump to the base frame rather than the current frame for this
+     * information because small-io may have pushed a msgpairarray.
+     */ 
+    sm_base_p = PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
+    if(sm_base_p->u.io.small_io)
+    {
+        gossip_debug(GOSSIP_CANCEL_DEBUG,  "skipping cancellation of small I/O operation.\n");
+        return(0);
     }
 
     /* if we fall to here, the I/O operation is still in flight */
