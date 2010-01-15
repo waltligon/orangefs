@@ -155,7 +155,7 @@ do {                                                           \
         }                                                      \
         else                                                   \
         {                                                      \
-            (dest)->mtime = time(NULL);                        \
+            (dest)->mtime = PINT_util_mktime_version(time(NULL)); \
         }                                                      \
     }                                                          \
     if ((src)->mask & PVFS_ATTR_COMMON_CTIME)                  \
