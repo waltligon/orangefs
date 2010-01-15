@@ -232,7 +232,6 @@ int main(int argc, char **argv)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: Server aborting.\n");
-        free(s_server_options.server_alias);
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
