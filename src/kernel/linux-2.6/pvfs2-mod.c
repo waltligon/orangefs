@@ -100,6 +100,12 @@ static int __init pvfs2_init(void)
     int ret = -1;
     gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2: pvfs2_init called with debug mask 0x%x\n", gossip_debug_mask);
 
+#ifdef HAVE_BDI_INIT
+    ret = bdi_init(&pvfs2_backing_dev_info);
+    if(ret)
+        return(ret);
+#endif
+
     if(op_timeout_secs < 0)
     {
         op_timeout_secs = 0;
@@ -170,6 +176,9 @@ cleanup_req:
 cleanup_op:
     op_cache_finalize();
 err:
+#ifdef HAVE_BDI_INIT
+    bdi_destroy(&pvfs2_backing_dev_info);
+#endif
     return ret;
 }
 
@@ -218,6 +227,10 @@ static void __exit pvfs2_exit(void)
 
     qhash_finalize(htable_ops_in_progress);
     
+#ifdef HAVE_BDI_INIT
+    bdi_destroy(&pvfs2_backing_dev_info);
+#endif
+
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 
