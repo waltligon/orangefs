@@ -1249,6 +1249,40 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         )
         CFLAGS=$tmp_cflags
 
+        dnl 2.6.32 added a mandatory name field to the bdi structure
+        AC_MSG_CHECKING(if kernel backing_dev_info struct has a name field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+	], [
+                struct backing_dev_info foo = 
+                {
+                    .name = "foo"
+                };
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_BACKING_DEV_INFO_NAME, 1, [Define if kernel backing_dev_info struct has a name field]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl some 2.6 kernels have functions to explicitly initialize bdi structs
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for bdi_init)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+        ], [
+                int ret = bdi_init(NULL);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_BDI_INIT, 1, [Define if bdi_init function is present]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
 
 	CFLAGS=$oldcflags
 
