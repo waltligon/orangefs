@@ -13,6 +13,8 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
+static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret);
+
 /* should return 1 if dentry can still be trusted, else 0 */
 static int pvfs2_d_revalidate_common(struct dentry* dentry)
 {
@@ -112,6 +114,7 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             gossip_debug(GOSSIP_DCACHE_DEBUG, "%s:%s:%d setting revalidate_failed = 1\n", __FILE__, __func__, __LINE__);
             /* set a flag that we can detect later in d_delete() */
             PVFS2_I(inode)->revalidate_failed = 1;
+            d_drop(dentry);
 
             goto invalid_exit;
         }
@@ -235,6 +238,40 @@ struct dentry_operations pvfs2_dentry_operations =
     .d_compare = pvfs2_d_compare,
     .d_delete = pvfs2_d_delete,
 };
+
+/* print_dentry()
+ *
+ * Available for debugging purposes.  Please remove the unused attribute
+ * before invoking
+ */
+static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
+{
+  if(!entry)
+  {
+    printk("--- dentry %p: no entry, ret: %d\n", entry, ret);
+    return;
+  }
+
+  if(!entry->d_inode)
+  {
+    printk("--- dentry %p: no d_inode, ret: %d\n", entry, ret);
+    return;
+  }
+
+  if(!entry->d_parent)
+  {
+    printk("--- dentry %p: no d_parent, ret: %d\n", entry, ret);
+    return;
+  }
+
+  printk("--- dentry %p: d_count: %d, name: %s, parent: %p, parent name: %s, ret: %d\n",
+        entry,
+        atomic_read(&entry->d_count),
+        entry->d_name.name,
+        entry->d_parent,
+        entry->d_parent->d_name.name,
+        ret);
+}
 
 /*
  * Local variables:

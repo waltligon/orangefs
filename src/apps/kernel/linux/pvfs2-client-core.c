@@ -1335,6 +1335,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
     int tmp_param = -1;
     int tmp_subsystem = -1;
     unsigned int tmp_perf_val;
+    uint64_t mask = 0;
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "Got a param request for op %d\n",
@@ -1395,6 +1396,20 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
             tmp_subsystem = NCACHE;
             break;
         /* These next few case statements return without falling through */
+        case PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG:
+            gossip_debug(GOSSIP_PROC_DEBUG,"Got request to SET the client debug mask...\n");
+            gossip_debug(GOSSIP_PROC_DEBUG,"s_value is %s\n",vfs_request->in_upcall.req.param.s_value);
+
+            mask=PVFS_debug_eventlog_to_mask(vfs_request->in_upcall.req.param.s_value);
+
+            ret=gossip_set_debug_mask(1,mask);
+            gossip_debug(GOSSIP_PROC_DEBUG,"Value of new debug mask is %0x.\n"
+                                          ,(unsigned int)gossip_debug_mask);
+
+            vfs_request->out_downcall.status = 0;
+            vfs_request->out_downcall.resp.param.value=mask;
+            return(0);
+
         case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
             if(vfs_request->in_upcall.req.param.type ==
                 PVFS2_PARAM_REQUEST_GET)
@@ -1570,6 +1585,7 @@ out:
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    PVFS_hint hints;
 
     gossip_debug(
         GOSSIP_MMAP_RCACHE_DEBUG,
@@ -1603,13 +1619,15 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
         PVFS_BYTE, &vfs_request->file_req);
     assert(ret == 0);
 
+    fill_hints(&hints, vfs_request);
     ret = PVFS_isys_io(
         vfs_request->in_upcall.req.io.refn, vfs_request->file_req, 0,
         vfs_request->io_tmp_buf, vfs_request->mem_req,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->op_id, hints, (void *)vfs_request);
+    vfs_request->hints = hints;
 
     if (ret < 0)
     {

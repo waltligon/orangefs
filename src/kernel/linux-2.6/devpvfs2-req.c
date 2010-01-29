@@ -12,6 +12,15 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
+#include "pint-dev.h"
+
+/* these functions are defined in pvfs2-utils.c */
+int PVFS_proc_kmod_mask_to_eventlog(uint64_t mask, char *debug_string);
+int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string);
+
+/*these variables are defined in pvfs2-proc.c*/
+extern char kernel_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
+extern char client_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
 
 /* this file implements the /dev/pvfs2-req device node */
 
@@ -697,6 +706,8 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     struct PVFS_dev_map_desc user_desc;
+    int ret;
+    dev_mask_info_t mask_info = {0};
 
     switch(command)
     {
@@ -762,8 +773,33 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             return ret;
         }
         case PVFS_DEV_DEBUG:
-            return (get_user(gossip_debug_mask, (int32_t __user *)arg) ==
-                     -EFAULT) ? -EIO : 0;
+            ret = copy_from_user(&mask_info, (void __user *)arg
+                                ,sizeof(mask_info));
+            if (ret != 0)
+               return(-EIO);
+
+            if (mask_info.mask_type == KERNEL_MASK)
+            {
+               ret = PVFS_proc_kmod_mask_to_eventlog(mask_info.mask_value
+                                                    ,kernel_debug_string);
+               gossip_debug_mask = mask_info.mask_value;
+               printk("PVFS: kernel debug mask has been modified to \"%s\" (0x%08llx)\n"
+                     ,kernel_debug_string,llu(gossip_debug_mask));
+            } 
+            else if (mask_info.mask_type == CLIENT_MASK)
+            {
+               ret = PVFS_proc_mask_to_eventlog(mask_info.mask_value
+                                               ,client_debug_string);
+               printk("PVFS: client debug mask has been modified to \"%s\" (0x%08llx)\n"
+                     ,client_debug_string,llu(mask_info.mask_value));
+            } 
+            else
+            {
+              gossip_lerr("Invalid mask type....\n");
+              return(-EINVAL);
+            }
+            
+            return(ret);
         break;
     default:
 	return -ENOIOCTLCMD;
