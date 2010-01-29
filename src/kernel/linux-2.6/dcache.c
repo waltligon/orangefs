@@ -13,7 +13,7 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
 
-static void print_dentry(struct dentry *entry, int ret);
+static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret);
 
 /* should return 1 if dentry can still be trusted, else 0 */
 static int pvfs2_d_revalidate_common(struct dentry* dentry)

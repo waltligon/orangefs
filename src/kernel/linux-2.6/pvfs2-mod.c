@@ -15,6 +15,8 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define DEBUG_HELP_STRING_SIZE 4096
+
 static int hash_func(void *key, int table_size);
 static int hash_compare(void *key, struct qhash_head *link);
 
@@ -27,6 +29,8 @@ static int hash_table_size = 509;
 int gossip_debug_mask = 0;
 int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
 int slot_timeout_secs = PVFS2_DEFAULT_SLOT_TIMEOUT_SECS;
+uint32_t DEBUG_LINE = 50;
+char debug_help_string[DEBUG_HELP_STRING_SIZE] = {0};
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
@@ -98,7 +102,56 @@ DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
 static int __init pvfs2_init(void)
 {
     int ret = -1;
+    uint32_t index = 0;
+    char client_title[] = "Client Debug Keywords:\n";
+    char kernel_title[] = "Kernel Debug Keywords:\n";
+    uint32_t i = 0;
+
     gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2: pvfs2_init called with debug mask 0x%x\n", gossip_debug_mask);
+
+    /* load debug_help_string...this string is used during the /proc/sys/pvfs2/debug-help operation */
+    if (strlen(client_title) < DEBUG_LINE)
+    {
+       memcpy(&debug_help_string[index],client_title,sizeof(client_title));
+       index += strlen(client_title);
+    }
+ 
+    for(i=0;i<num_keyword_mask_map;i++)
+    {
+       if ( (strlen(s_keyword_mask_map[i].keyword) + 2) < DEBUG_LINE)
+       {
+          debug_help_string[index] = '\t';
+          index++;
+          memcpy(&debug_help_string[index],s_keyword_mask_map[i].keyword
+                ,strlen(s_keyword_mask_map[i].keyword));
+          index += strlen(s_keyword_mask_map[i].keyword);
+          debug_help_string[index] = '\n';
+          index++;
+       }
+    }/*end for*/
+
+    if ( (strlen(kernel_title) + 1) < DEBUG_LINE)
+    {
+       debug_help_string[index] = '\n';
+       index++;
+
+       memcpy(&debug_help_string[index],kernel_title,sizeof(kernel_title));
+       index += strlen(kernel_title);
+    }/*end if*/
+
+    for(i=0;i<num_kmod_keyword_mask_map;i++)
+    {
+       if ( (strlen(s_kmod_keyword_mask_map[i].keyword) + 2) < DEBUG_LINE)
+       {
+          debug_help_string[index] = '\t';
+          index++;
+          memcpy(&debug_help_string[index],s_kmod_keyword_mask_map[i].keyword
+                ,strlen(s_kmod_keyword_mask_map[i].keyword));
+          index += strlen(s_kmod_keyword_mask_map[i].keyword);
+          debug_help_string[index] = '\n';
+          index++;
+       }
+    }/*end for*/
 
 #ifdef HAVE_BDI_INIT
     ret = bdi_init(&pvfs2_backing_dev_info);
