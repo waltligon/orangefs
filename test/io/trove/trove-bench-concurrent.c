@@ -22,6 +22,8 @@ struct bench_op
     TROVE_size size;
     enum op_type type;
     struct qlist_head list_link;
+    TROVE_keyval_s key;
+    TROVE_keyval_s value;
 };
 
 struct op_buffer
@@ -45,6 +47,8 @@ static double end_tm;
 static int64_t total_size = 0;
 int concurrent;
 int meta_sync;
+static char data_mode;
+int ops = 0;
 
 static TROVE_method_id trove_method_callback(TROVE_coll_id id)
 {
@@ -171,7 +175,7 @@ static int do_trove_test(char* dir)
             total_size += tmp_op->size;
             assert(tmp_buffer->size <= tmp_buffer->size);
 
-            if(tmp_op->type == WRITE)
+            if(tmp_op->type == WRITE && data_mode == 'd')
             {
                 /* post operation */
                 ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
@@ -179,7 +183,7 @@ static int do_trove_test(char* dir)
                     &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
                     NULL);
             }
-            else
+            else if(tmp_op->type == READ && data_mode == 'd')
             {
                 /* post operation */
                 ret = trove_bstream_read_list(1, 1, &tmp_buffer->buffer,
@@ -187,6 +191,36 @@ static int do_trove_test(char* dir)
                     &out_size, 0, NULL, tmp_buffer, trove_context, &op_id,
                     NULL);
             }
+            else if(tmp_op->type == WRITE && data_mode == 'k')
+            {
+                /* post operation */
+                tmp_op->key.buffer = &tmp_op->offset;
+                tmp_op->key.buffer_sz = sizeof(tmp_op->offset);
+                tmp_op->value.buffer = tmp_buffer->buffer;
+                tmp_op->value.buffer_sz = tmp_op->size;
+
+                ret = trove_keyval_write(1, 1, &tmp_op->key,
+                    &tmp_op->value, TROVE_SYNC, NULL, tmp_buffer,
+                    trove_context, &op_id, NULL);
+            }
+            else if(tmp_op->type == READ && data_mode == 'k')
+            {
+                /* post operation */
+                tmp_op->key.buffer = &tmp_op->offset;
+                tmp_op->key.buffer_sz = sizeof(tmp_op->offset);
+                tmp_op->value.buffer = tmp_buffer->buffer;
+                tmp_op->value.buffer_sz = tmp_op->size;
+
+                ret = trove_keyval_read(1, 1, &tmp_op->key,
+                    &tmp_op->value, 0, NULL, tmp_buffer,
+                    trove_context, &op_id, NULL);
+            }
+            else
+            {
+                assert(0);
+            }
+
+            ops++;
             inflight++;
 
             assert(ret == 0);
@@ -220,21 +254,26 @@ int main(int argc, char *argv[])
     int ret;
     struct bench_op* tmp_op;
 
-    if(argc != 5)
+    if(argc != 6)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
         return(-1);
     }
 
     ret = sscanf(argv[3], "%d", &concurrent);
     if(ret != 1 || concurrent < 1)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
     }
     ret = sscanf(argv[4], "%d", &meta_sync);
     if(ret != 1 || meta_sync > 1 || meta_sync < 0)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
+    }
+    ret = sscanf(argv[5], "%c", &data_mode);
+    if(ret != 1 || (data_mode != 'k' && data_mode != 'd'))
+    {
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
     }
 
     /* parse description of workload */
@@ -278,6 +317,7 @@ int main(int argc, char *argv[])
     printf("# Moved %lld bytes in %f seconds.\n", lld(total_size),
         (end_tm-start_tm));
     printf("%f MB/s\n", (((double)total_size)/(1024.0*1024.0))/(end_tm-start_tm));
+    printf("%f ops/s\n", ((double)ops)/(end_tm-start_tm));
 
     return 0;
 }
