@@ -241,17 +241,12 @@ error_in_cleanup:
          * the signal'd thread executes before the following gossip_debug statement, then cur_op is un-
          * defined, causing the gossip_debug statement to seg fault.  So, we check for existence first!
         */
-        if (cur_op)
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                         "(state is %s)\n", 
-                         list_proc_state_strings[
-                         op_p->u.b_rw_list.list_proc_state]);
-        } 
-        else 
-        {
-            gossip_debug(GOSSIP_TROVE_DEBUG,"*** starting delayed ops if any. (cur_op undefined).\n");
-        }
+
+        /* if the signal'd thread executes op_p can also go away
+         * causing the list_proc_state access to segfault. there isn't really
+         * much debugging information to be had by accessing cur_op or
+         * op_p, the key is that delayed ops are starting. */
+        gossip_debug(GOSSIP_TROVE_DEBUG,"*** starting delayed ops if any.\n");
 
         start_delayed_ops_if_any(1);
     }
