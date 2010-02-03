@@ -25,6 +25,10 @@
 #define NUM_OF_PARALLEL_SMS 1
 #define BUFFER_SIZE (1024*1024) /* 1MB */
 
+double bmi_time, trove_time, io_time;
+double sio, eio;
+int iotype=0; /* 1: READ, 2: WRITE */
+
 %%
 
 machine pvfs2_io_sm
@@ -179,6 +183,13 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.file_data.dist = s_op->req->u.io.io_dist;
     s_op->u.io.file_data.server_nr = s_op->req->u.io.server_nr;
     s_op->u.io.file_data.server_ct = s_op->req->u.io.server_ct;
+
+    if(iotype != s_op->req->u.io.io_type) {
+        iotype = s_op->req->u.io.io_type;
+        bmi_time = trove_time = 0.0;
+        io_time = 0.0;
+        printf("\n\n%s\n", (iotype==1)?"READ":"WRITE");
+    }
 
     /* on writes, we allow the bstream to be extended at EOF */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
@@ -361,6 +372,10 @@ static PINT_sm_action start_pipelining_sm(
 	}
     }
 
+    struct timeval tv; 
+    gettimeofday(&tv, NULL);
+    sio = tv.tv_sec+(tv.tv_usec/1000000.0);
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -376,16 +391,17 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
     for(i=0; i<s_op->u.io.parallel_sms; i++)
     {
 	pipeline_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
-					&remaining);
+                                        &remaining);
         gossip_debug(GOSSIP_SERVER_DEBUG, 
-		     "io: nested sm returned error code: %d\n", tmp_err);
+                     "io: nested sm returned error code: %d\n", tmp_err);
 	if(pipeline_op->u.pipeline.buffer) {
 	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
 		if(pipeline_op->u.pipeline.op != 0 && 
 		   pipeline_op->u.pipeline.op != (0x5800000f))
-		    memcpy(s_op->u.io.tmp_buffer, 
-			   pipeline_op->u.pipeline.buffer, 
-			   sizeof(double)); /* FIXME */
+		    if(s_op->u.io.tmp_buffer != NULL)
+                        memcpy(s_op->u.io.tmp_buffer, 
+                               pipeline_op->u.pipeline.buffer, 
+                               sizeof(double));
 		BMI_memfree(pipeline_op->u.pipeline.address, 
 			    pipeline_op->u.pipeline.buffer, 
 			    s_op->u.io.buffer_size, BMI_SEND);
@@ -403,7 +419,6 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
-					 
 /*
  * Function: io_release()
  *
@@ -435,7 +450,8 @@ static PINT_sm_action io_release(
     return ret;
 }
 
-/*
+
+/* 
  * Function: io_cleanup()
  *
  * Params:   server_op *b, 
@@ -467,8 +483,15 @@ static PINT_sm_action io_cleanup(
     if(s_op->u.io.tmp_buffer && s_op->req->u.io.op != 0)
 	free(s_op->u.io.tmp_buffer); /* FIXME */
 
-    gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME: */
+    gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME */
 
+    //printf("event_id=%d\n", s_op->event_id); // always 0
+    printf("bmi_time=%f, trove_time=%f, total=%f\n", bmi_time, trove_time, bmi_time+trove_time);
+    struct timeval tv; 
+    gettimeofday(&tv, NULL);
+    eio = tv.tv_sec+(tv.tv_usec/1000000.0);
+    io_time = eio - sio;
+    printf("io_time=%f\n", io_time);
     /* let go of our encoded response buffer, if we appear to have
      * made one
      */

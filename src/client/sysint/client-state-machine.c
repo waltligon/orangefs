@@ -449,8 +449,8 @@ PVFS_error PINT_client_state_machine_post(
                     ret);
     }
     gen_mutex_unlock(&test_mutex);
-    return js.error_code;
-}
+    return js.error_code;}
+
 
 PVFS_error PINT_client_state_machine_release(
     PINT_smcb * smcb)

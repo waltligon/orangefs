@@ -36,6 +36,7 @@ int main( int argc, char *argv[] )
   char *filename = NULL;
   MPI_Info info;
   float threshold = 0.0;
+  double stime, etime;
 
   /* for KMEANS */
   int numObjs;
@@ -117,10 +118,12 @@ int main( int argc, char *argv[] )
   for (i=1; i<numObjs; i++)
     objects[i] = objects[i-1] + (numCoords);
 
-  
+  stime = MPI_Wtime(); 
   MPI_File_read_ex(fh, objects[0], (numObjs)*(numCoords),
 		   MPI_FLOAT, MPI_KMEANS, &status);
 
+  etime = MPI_Wtime();
+  printf("%d: time =%10.4f\n", rank, etime-stime);
   //printf ("kmean=%lf\n", objects[0]); 
   
   MPI_File_close( &fh );

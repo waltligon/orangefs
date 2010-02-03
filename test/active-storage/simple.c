@@ -13,7 +13,8 @@ static void usage(char *argv0) {
     "       -i filename    : file containing data to be clustered\n"
     "       -g : use generated file\n"
     "       -s size : file size to generate in MB\n"
-    "       -x : test active storage module\n";
+    "       -x : test active storage module\n"
+    "       -t : test normal storage module\n";
   fprintf(stderr, help, argv0);
 }
 
@@ -30,7 +31,7 @@ int main( int argc, char *argv[] )
   extern char   *optarg;
   extern int     optind;
   int is_output_timing=0, is_print_usage = 0;
-  int _debug=0, use_gen_file = 0, use_actsto = 0;
+  int _debug=0, use_gen_file = 0, use_actsto = 0, use_normalsto=0;
 
   MPI_Offset disp, offset, file_size;
   MPI_Datatype etype, ftype, buftype;
@@ -56,7 +57,7 @@ int main( int argc, char *argv[] )
   MPI_Comm_size( comm, &size );
   MPI_Comm_rank( comm, &rank );
  
-  while ( (opt=getopt(argc,argv,"i:s:godhx"))!= EOF) {
+  while ( (opt=getopt(argc,argv,"i:s:godhxt"))!= EOF) {
     switch (opt) {
     case 'i': fname = optarg;
       break;
@@ -84,6 +85,8 @@ int main( int argc, char *argv[] )
       break;
     case 'x': use_actsto = 1;
       break;
+    case 't': use_normalsto = 1;
+      break;
     default: is_print_usage = 1;
       break;
     }
@@ -93,6 +96,12 @@ int main( int argc, char *argv[] )
     if (rank == 0) usage(argv[0]);
     MPI_Finalize();
     exit(1);
+  }
+  if(use_normalsto == 1 && use_actsto == 1) {
+      if(rank == 0)
+          printf("Can't test both: either normalsto or actsto\n");
+      MPI_Finalize();
+      exit(1);
   }
  
   /* initialize random seed: */
@@ -132,8 +141,13 @@ int main( int argc, char *argv[] )
       printf ("max=%lf, min=%lf, sum=%lf\n", max, min, sum);
     }
 
+    stime = MPI_Wtime();
     /* Write to file */
     MPI_File_write_all( fh, buf, nitem, MPI_DOUBLE, &status );
+    etime = MPI_Wtime();
+    iotime = etime - stime;
+      
+    printf("%d: iotime (write) = %10.4f\n", rank, iotime);
 
     MPI_Get_count( &status, MPI_DOUBLE, &count );
     //printf("count=%d\n", count);
@@ -148,56 +162,62 @@ int main( int argc, char *argv[] )
     if(rank == 0) printf("File is written\n\n");
     MPI_File_close(&fh);
   }
-  
-  MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
-  /* Read nothing (check status) */
-  memset( &status, 0xff, sizeof(MPI_Status) );
 
   double *tmp = (double *)malloc( nitem * sizeof(double) );
-  offset = rank * nitem * type_size;
 
-  /* start I/O */
-  stime = MPI_Wtime();
-  MPI_File_read_at(fh, offset, tmp, nitem, MPI_DOUBLE, &status);
-  etime = MPI_Wtime();
-  /* end I/O */
-  iotime = etime - stime;
-
-  if(_debug==1) printf("%d: iotime = %10.4f\n", rank, iotime);
-  MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
- 
-  sum = 0.0; /* reset sum */
-
-  /* start computation */
-  stime = MPI_Wtime();
-
-  for(i=0; i<nitem; i++) {
-      sum += tmp[i];
-  }
-
-  MPI_Reduce(&sum, &global_sum, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-  etime = MPI_Wtime();
-  /* end computation */
-
-  comptime = etime - stime;
-
-  if(_debug==1) printf("%d: comptime = %10.4f\n", rank, comptime);
-
-  MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-  if(rank == 0) {
-      elapsed_time = max_comptime + max_iotime;
-      printf("<<Result (SUM) with normal read>>\n"
-             "SUM              = %10.4f \n"
-             "Computation time = %10.4f sec\n"
-             "I/O time         = %10.4f sec\n"
-             "total time       = %10.4f sec\n\n", 
-             global_sum, max_comptime, max_iotime, elapsed_time);
-  }
+  if(use_normalsto == 1) {
+      MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+      /* Read nothing (check status) */
+      memset( &status, 0xff, sizeof(MPI_Status) );
       
-  MPI_File_close(&fh);
+      offset = rank * nitem * type_size;
+
+      /* start I/O */
+      stime = MPI_Wtime();
+      MPI_File_read_at(fh, offset, tmp, nitem, MPI_DOUBLE, &status);
+      etime = MPI_Wtime();
+      /* end I/O */
+      iotime = etime - stime;
+      
+      if(_debug==1) printf("%d: iotime = %10.4f\n", rank, iotime);
+      MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+      
+      sum = 0.0; /* reset sum */
+      
+      /* start computation */
+      stime = MPI_Wtime();
+      
+      for(i=0; i<nitem; i++) {
+          sum += tmp[i];
+      }
+      
+      MPI_Reduce(&sum, &global_sum, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+      etime = MPI_Wtime();
+      /* end computation */
+
+      comptime = etime - stime;
+
+      if(_debug==1) printf("%d: comptime = %10.4f\n", rank, comptime);
+      
+      MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+      if(rank == 0) {
+          elapsed_time = max_comptime + max_iotime;
+          printf("<<Result (SUM) with normal read>>\n"
+                 "SUM              = %10.4f \n"
+                 "Computation time = %10.4f sec\n"
+                 "I/O time         = %10.4f sec\n"
+                 "total time       = %10.4f sec\n\n", 
+                 global_sum, max_comptime, max_iotime, elapsed_time);
+      }
+      
+      MPI_File_close(&fh);
+  }
 
   if(use_actsto == 1) {
+      memset(&status, 0xff, sizeof(MPI_Status));
+      offset = rank * nitem * type_size;
+#if 0
     /* MPI_MAX */
     MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
 
@@ -220,7 +240,7 @@ int main( int argc, char *argv[] )
     printf ("min=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
     
     MPI_File_close(&fh);
-    
+#endif
     /* MPI_SUM */
     MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
     
@@ -228,7 +248,8 @@ int main( int argc, char *argv[] )
     MPI_File_read_at_ex( fh, offset, tmp, nitem, MPI_DOUBLE, MPI_SUM, &status );
     etime = MPI_Wtime();
     elapsed_time = etime - stime;
-    printf ("sum=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
+    printf ("<<Result with active storage>>\n"
+            "sum=%lf (in %10.4f sec)\n", tmp[0], elapsed_time); 
     
     MPI_File_close( &fh );
   }

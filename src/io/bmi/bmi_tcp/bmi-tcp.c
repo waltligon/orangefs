@@ -391,7 +391,7 @@ enum
 enum
 {
     TCP_MODE_EAGER_LIMIT = 16384,	/* 16K */
-    TCP_MODE_REND_LIMIT = 16777216*6	/* 16M */ /* sson: 96MB */
+    TCP_MODE_REND_LIMIT = 16777216*32	/* 16M */ /* sson: 96MB */
 };
 
 /* toggles cancel mode; for bmi_tcp this will result in socket being closed
@@ -1447,6 +1447,13 @@ int BMI_tcp_testcontext(int incount,
                         bmi_tcp_send_event_id : bmi_tcp_recv_event_id),
                        bmi_tcp_pid, NULL, query_op->event_id,
                        query_op->actual_size);
+#if 0
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+                printf("end(%s): %f\n", ((query_op->send_recv==BMI_SEND)?"BMI_SEND":"BMI_RECV"), t1);
+#endif
+
 
         dealloc_tcp_method_op(query_op);
         query_op = NULL;
@@ -2542,7 +2549,13 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         expected_size);
-
+#if 0
+    /* sson */
+    struct timeval tv; 
+    gettimeofday(&tv, NULL);
+    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+    printf("start(%s): %f\n", "BMI_RECV", t1);
+#endif
     tcp_addr_data = src->method_data;
 
     /* short out immediately if the address is bad and we have no way to
@@ -3957,6 +3970,14 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         total_size);
+#if 0
+    /* sson */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+    if(bmi_tracing==1) 
+        printf("start(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+#endif
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just

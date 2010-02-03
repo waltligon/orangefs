@@ -15,6 +15,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <time.h>
 
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -27,8 +28,8 @@
 #include "trove.h"
 #include "kmeans.h"
 
-#include <cuda.h>
-#include <cuda_runtime.h>
+//#include <cuda.h>
+//#include <cuda_runtime.h>
 
 extern void initGPU (float* objects, int numDataPoints,
 		     int numDimensions, int numClusters);
@@ -49,6 +50,8 @@ extern void singleGPU (float* objects, int numDataPoints,
 
 int device_initialized=0;
 #define MAX_ITERATIONS 500
+
+struct timeval td_start, td_end;
 
 %%
 
@@ -310,9 +313,15 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
     if(s_op->u.kmeans.use_gpu == 1) {
 	/* initialize GPU device and allocate memory on it */
 	if(device_initialized == 0) {
+            time_t start, end;
 	    /* initDevice(argc, argv, numObjs, numCoords, numClusters) */
+            gossip_debug(GOSSIP_IO_DEBUG, "before initGPU\n");
+            time(&start);
 	    initGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
 		    s_op->u.kmeans.numCoords, s_op->u.kmeans.numClusters);
+            time(&end);
+            gossip_debug(GOSSIP_IO_DEBUG, "after initGPU: elapsed=%lf ms\n",
+                         difftime(end, start)*1000);
 	    /* FIXME: I don't know why this is called twice */
 	    device_initialized = 1;
 	}
