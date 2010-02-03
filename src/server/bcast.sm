@@ -1,0 +1,170 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ *  PVFS2 server state machine for driving read I/O operations.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-request.h"
+#include "pint-distribution.h"
+#include "pint-request.h"
+#include "pvfs2-internal.h"
+#include "pint-cached-config.h"
+#include "trove.h"
+#include "kmeans.h"
+
+#define CONTINUE_BCAST 501
+#define BCAST_TAG 5555
+
+%%
+
+nested machine pvfs2_bcast_sm
+{
+    state bcast
+    {
+        run bcast_fn;
+        default => check_bcast;
+    }
+
+    state check_bcast
+    {
+ 	run check_bcast_done;
+	CONTINUE_BCAST => bcast;
+        default => return;
+    }
+}
+
+%%
+
+/*
+ * This bcast implements basic 
+ */
+static PINT_sm_action bcast_fn(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *user_opts = get_server_config_struct();
+    job_id_t tmp_id;
+    int ret;
+    int myRank = s_op->u.bcast.myRank, newRank;
+    PVFS_handle new_rank_handle;
+    PVFS_BMI_addr_t svr_addr;
+    PVFS_msg_tag_t session_tag = BCAST_TAG;
+
+    js_p->error_code = 0;
+
+    s_op->u.bcast.mask ^= mypower(2, s_op->u.bcast.index);
+
+    newRank = myRank^(mypower(2, s_op->u.bcast.index));
+    gossip_debug(GOSSIP_IO_DEBUG, "myRank=%d, newRank=%d, mask=0x%x\n", 
+		 myRank, newRank, s_op->u.bcast.mask);
+    new_rank_handle = s_op->u.bcast.dfile_array[newRank];
+    gossip_debug(GOSSIP_IO_DEBUG, "new_rank_handle=%llu\n", llu(new_rank_handle));
+    ret = PINT_cached_config_map_to_server(&svr_addr,
+					   new_rank_handle,
+					   s_op->u.bcast.fs_id);
+
+    if(ret < 0) {
+	gossip_err("Failed to map meta server address\n");
+	js_p->error_code = ret;
+	return SM_ACTION_COMPLETE;
+    }
+
+    if((myRank&(s_op->u.bcast.mask)) == 0) {
+	if((myRank & mypower(2, s_op->u.bcast.index)) == 0) {
+	    gossip_debug(GOSSIP_IO_DEBUG, "SEND to node %d\n", newRank);
+	    ret = job_bmi_send(svr_addr,
+			       (void*)s_op->u.bcast.send_buf,
+			       s_op->u.bcast.buf_sz,
+			       session_tag,
+			       BMI_PRE_ALLOC,
+			       0, /* 1: send_unexpected */
+			       smcb,
+			       0,
+			       js_p,
+			       &tmp_id,
+			       server_job_context,
+			       user_opts->server_job_bmi_timeout,
+			       NULL);//(PVFS_hint)parent_s_op->u.pipeline.hints);
+	    
+	    if(ret == 1) {
+		js_p->error_code = ret;
+		return SM_ACTION_COMPLETE;
+	    }
+	    
+	    if(ret == 0) {
+		js_p->error_code = ret;
+		return SM_ACTION_DEFERRED;
+	    }
+	}
+	else {
+	    /* RECV from rootRank */
+	    gossip_debug(GOSSIP_IO_DEBUG, "RECV from node %d\n", newRank);
+	    ret = job_bmi_recv(svr_addr,
+			       (void*)s_op->u.bcast.recv_buf,
+			       s_op->u.bcast.buf_sz,
+			       session_tag,
+			       BMI_PRE_ALLOC,
+			       smcb,
+			       0,
+			       js_p,
+			       &tmp_id,
+			       server_job_context,
+			       user_opts->server_job_bmi_timeout,
+			       NULL); //(PVFS_hint)parent_s_op->u.pipeline.hints);
+	    
+	    if(ret == 1) {
+		js_p->error_code = ret;
+		return SM_ACTION_COMPLETE;
+	    }
+	    
+	    if(ret == 0) {
+		js_p->error_code = ret;
+		return SM_ACTION_DEFERRED;
+	    }
+	}
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ */
+static PINT_sm_action check_bcast_done(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* not a masked node? */
+    if((s_op->u.bcast.myRank&(s_op->u.bcast.mask)) == 0) {
+	/* copy only when there's something to recv */
+	if((s_op->u.bcast.myRank & mypower(2, s_op->u.bcast.index)) != 0)
+	    memcpy(s_op->u.bcast.send_buf, s_op->u.bcast.recv_buf, s_op->u.bcast.buf_sz);
+    }
+
+    s_op->u.bcast.index--;
+
+    if(s_op->u.bcast.index >= 0)
+	js_p->error_code = CONTINUE_BCAST;
+    else
+	js_p->error_code = 0;
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
