@@ -22,6 +22,9 @@ int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string);
 extern char kernel_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
 extern char client_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
 
+/*these variables are defined in pvfs2-mod.c*/
+extern unsigned int kernel_mask_set_mod_init;
+
 /* this file implements the /dev/pvfs2-req device node */
 
 static int open_access_count = 0;
@@ -780,6 +783,14 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
 
             if (mask_info.mask_type == KERNEL_MASK)
             {
+               if ( (mask_info.mask_value == 0) && (kernel_mask_set_mod_init) )
+               {
+                   /* the kernel debug mask was set when the kernel module was loaded;
+                    * don't override it if the client-core was started without a value
+                    * for PVFS2_KMODMASK.
+                   */
+                   return(0);
+               }
                ret = PVFS_proc_kmod_mask_to_eventlog(mask_info.mask_value
                                                     ,kernel_debug_string);
                gossip_debug_mask = mask_info.mask_value;

@@ -49,7 +49,7 @@ enum gossip_logstamp
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
 #else
-extern int gossip_debug_mask;
+extern uint64_t gossip_debug_mask;
 
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
