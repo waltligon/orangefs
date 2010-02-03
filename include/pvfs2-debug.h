@@ -81,9 +81,6 @@
  GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB \
  + GOSSIP_BMI_DEBUG_MX + GOSSIP_BMI_DEBUG_PORTALS)
 
-uint64_t PVFS_debug_eventlog_to_mask(
-    const char *event_logging);
-
 const char *PVFS_debug_get_next_debug_keyword(
     int position);
 
