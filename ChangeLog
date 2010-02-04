@@ -8,13 +8,13 @@ pvfs-2.8.2
 * Support for the latest kernels, including 2.6.29 - 2.6.32.
 * Performance improvement for small, serial I/O workloads
 * Performance improvement for many (10k) close operations in parallel
-* This release includes a number of minor bug fixes, including to:
+* This release includes a number of minor bug fixes, including fixes for:
 	- trove direct I/O mode for syncing file size
 	- cancelation of I/O on timeout
 	- permission checking for truncate
-	- fix for acl checking return value (should be EACCES)
-	- fix for group permission checking
-	- fix double free in create cleanup path
+	- acl checking return value (should be EACCES)
+	- group permission checking
+	- double free in create cleanup path
 	- unstuff code path for read operations
 	- allow creating a file with just a single datafile
 	- flow deadlock occurring for large I/O
