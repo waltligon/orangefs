@@ -10,7 +10,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <stdlib.h> /* sson */
+//#include <stdlib.h> /* sson */
 
 #include "server-config.h"
 #include "pvfs2-server.h"

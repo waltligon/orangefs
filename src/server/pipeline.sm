@@ -114,7 +114,6 @@ nested machine pvfs2_pipeline_sm
     {
         run check_pipeline_done;
 	success => fetch;
-        default => return;
     }
 }
 

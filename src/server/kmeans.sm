@@ -26,10 +26,6 @@
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "trove.h"
-#include "kmeans.h"
-
-//#include <cuda.h>
-//#include <cuda_runtime.h>
 
 extern void initGPU (float* objects, int numDataPoints,
 		     int numDimensions, int numClusters);

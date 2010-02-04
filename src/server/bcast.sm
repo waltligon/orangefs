@@ -20,7 +20,6 @@
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
 #include "trove.h"
-#include "kmeans.h"
 
 #define CONTINUE_BCAST 501
 #define BCAST_TAG 5555
