@@ -640,10 +640,8 @@ static PINT_sm_action io_send_completion_ack(
         server_job_context, user_opts->server_job_bmi_timeout,
         s_op->req->hints);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: err=%d\n", __func__, err); // err = 1
-
-    js_p->error_code = err;
-    return SM_ACTION_COMPLETE;
+    /* should return a value from job_bmi_send_list call */
+    return err;
 }
 
 static enum PINT_server_req_access_type PINT_server_req_access_io(
