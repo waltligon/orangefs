@@ -237,13 +237,13 @@ error_in_cleanup:
             dbpf_queued_op_complete(cur_op, OP_COMPLETED);
         }
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %s)\n", 
-                     list_proc_state_strings[
-                     op_p->u.b_rw_list.list_proc_state]);
+        /* NOTE: we can no longer access cur_op or op_p beyond this point,
+         * as it may be destroyed by another thread on completion 
+         */
+
+        gossip_debug(GOSSIP_TROVE_DEBUG,"*** starting delayed ops if any.\n");
 
         start_delayed_ops_if_any(1);
-
     }
     else
     {
