@@ -134,19 +134,21 @@ int main( int argc, char *argv[] )
       MPI_Finalize();
       exit(1);
   }
- 
+
+  if(use_actsto == 1) {
+      if (size != 1) {
+          if(rank == 0)
+              printf("active storage should be run with only 1 process!!!\n");
+          MPI_Finalize();
+          exit(1);
+      }
+  }
+
   /* initialize random seed: */
   srand(time(NULL));
 
   if(use_gen_file == 1) {
     int t, result;
-
-    if (size != 1) {
-        if(rank == 0)
-            printf("active storage should be run with only 1 process!!!\n");
-        MPI_Finalize();
-        exit(1);
-    }
 
     MPI_File_open( comm, fname, MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
 
