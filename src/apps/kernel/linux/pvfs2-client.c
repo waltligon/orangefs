@@ -264,6 +264,13 @@ static int monitor_pvfs2_client(options_t *opts)
                     exit(1);        
                 }
 
+                /* catch special case of exiting due to inability to remount */
+                /* we want to try again in this case. */
+                if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EAGAIN)
+                {
+                    continue;
+                }
+
                 if ((opts->path[0] != '/') && (opts->path [0] != '.'))
                 {
                     printf("*** The pvfs2-client-core has exited ***\n");
