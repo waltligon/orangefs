@@ -55,8 +55,8 @@ nested machine pvfs2_pipeline_sm
     state fetch
     {
         run fetch_data;
-	DONE => return;
         success => dispatch;
+        DONE => return;
     }
 
     state dispatch
@@ -1011,8 +1011,8 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
 		    a[0] = result;
 		    *tmp += result;
-		    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "sum=%lf\n", 
-				 *tmp);
+		    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "sum=%lf, local sum=%lf\n", 
+				 *tmp, result);
 		    break;    
 		case (0x5800000e): /* MEAN */
 		    result = 0;
@@ -1059,6 +1059,9 @@ static PINT_sm_action do_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 		} /* end inner switch */
 		s_op->u.pipeline.buffer = (void *)a;
 		parent_s_op->u.io.tmp_buffer = (void *)tmp;
+                double *tmp1;
+                tmp1 = parent_s_op->u.io.tmp_buffer;
+                gossip_debug(GOSSIP_IO_DEBUG, "%s: sum=%lf\n", __func__, *tmp1);
 	    }
 	    
 	    break;

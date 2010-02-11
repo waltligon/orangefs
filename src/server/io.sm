@@ -10,7 +10,7 @@
 
 #include <string.h>
 #include <assert.h>
-//#include <stdlib.h> /* sson */
+#include <stdlib.h> /* sson */
 
 #include "server-config.h"
 #include "pvfs2-server.h"
@@ -396,12 +396,14 @@ static PINT_sm_action cleanup_pipeline_sm(struct PINT_smcb *smcb,
                      "io: nested sm returned error code: %d\n", tmp_err);
 	if(pipeline_op->u.pipeline.buffer) {
 	    if(s_op->req->u.io.io_type == PVFS_IO_READ) {
+#if 0
 		if(pipeline_op->u.pipeline.op != 0 && 
 		   pipeline_op->u.pipeline.op != (0x5800000f))
 		    if(s_op->u.io.tmp_buffer != NULL)
                         memcpy(s_op->u.io.tmp_buffer, 
                                pipeline_op->u.pipeline.buffer, 
                                sizeof(double));
+#endif
 		BMI_memfree(pipeline_op->u.pipeline.address, 
 			    pipeline_op->u.pipeline.buffer, 
 			    s_op->u.io.buffer_size, BMI_SEND);
@@ -603,7 +605,7 @@ static PINT_sm_action io_send_completion_ack(
 		s_op->resp.u.read_completion.result.buffer = s_op->u.io.tmp_buffer;
 		break;
 	    }
-	case (int)0x4c00080b:
+	case (int)0x4c00080b: /* MPI_DOUBLE */
 	    {
 		double *tmp;
 		tmp = s_op->u.io.tmp_buffer;
