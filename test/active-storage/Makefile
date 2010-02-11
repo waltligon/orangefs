@@ -1,10 +1,7 @@
 all: simple1_unaligned test_kmeans
 
-#MPICC=/home/sson/as-branch/mpich2-1.1/bin/mpicc 
-#MPICC=/home/sson/test/mpich2/bin/mpicc 
 MPICC=mpicc
 CFLAGS=-Wall -O2 
-#CFLAGS=-Wall -O2
 
 simple.o: simple.c
 	$(MPICC) -c -O2 simple.c

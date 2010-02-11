@@ -32,6 +32,7 @@ int main( int argc, char *argv[] )
   extern int     optind;
   int is_output_timing=0, is_print_usage = 0;
   int _debug=0, use_gen_file = 0, use_actsto = 0, use_normalsto=0;
+  char *token;
 
   MPI_Offset disp, offset, file_size;
   MPI_Datatype etype, ftype, buftype;
@@ -69,17 +70,42 @@ int main( int argc, char *argv[] )
       break;
     case 'h': is_print_usage = 1;
       break;
-    case 's': fsize = atoi(optarg);
-      if (rank ==0) printf("fsize = %d (MB)\n", fsize);
+    case 's': 
+        token = strtok(optarg, ":");
+        //if (rank == 0) printf("token=%s\n", token);
+        if(token == NULL) {
+            if (rank == 0) printf("1: Wrong file size format!\n");
+            MPI_Finalize();
+            exit(1);
+        }
+
+        fsize = atoi(token);
+        token = strtok(NULL, ":");
+        //if (rank == 0) printf("token=%s\n", token);
+        if(token == NULL) {
+            if (rank == 0) printf("2: Wrong file size format!\n");
+            MPI_Finalize();
+            exit(1);
+        }
+        if(*token != 'm' && *token != 'g') {
+            if (rank == 0) printf("3: Wrong file size format!\n");
+            MPI_Finalize();
+            exit(1);
+        }
+        if (rank ==0) printf("fsize = %d (%s)\n", fsize, (*token=='m'?"MB":"GB"));
       if (fsize == 0)
 	nitem = 0;
       else {
 	MPI_Type_size(MPI_DOUBLE, &type_size);
-	nitem = fsize*1024; 
-	nitem = nitem*1024;
+	nitem = fsize*1024; /* KB */
+	nitem = nitem*1024; /* MB */
+        if(*token == 'g') {
+            //if(rank == 0) printf("data in GB\n");
+            nitem = nitem*1024; /* GB */
+        }
 	nitem = nitem/type_size;
 	//printf("nitem=%lld\n", nitem);
-	nitem = nitem/size;
+	nitem = nitem/size; /* size means comm size */
       }
       if (rank == 0) printf("nitem = %d\n", nitem);
       break;
@@ -97,6 +123,11 @@ int main( int argc, char *argv[] )
     MPI_Finalize();
     exit(1);
   }
+
+  int sizeof_mpi_offset;
+  sizeof_mpi_offset = (int)(sizeof(MPI_Offset)); // 8 
+  //if (rank == 0) printf ("size_of_mpi_offset=%d\n", sizeof_mpi_offset);
+
   if(use_normalsto == 1 && use_actsto == 1) {
       if(rank == 0)
           printf("Can't test both: either normalsto or actsto\n");
@@ -113,15 +144,23 @@ int main( int argc, char *argv[] )
     MPI_File_open( comm, fname, MPI_MODE_RDWR | MPI_MODE_CREATE, MPI_INFO_NULL, &fh );
 
     /* Set the file view */
-    disp = rank * nitem * type_size;;
+    disp = rank * nitem * type_size;
+    printf("%d: disp = %lld\n", rank, disp);
     etype = MPI_DOUBLE;
     ftype = MPI_DOUBLE;
+
     result = MPI_File_set_view(fh, disp, etype, ftype, "native", MPI_INFO_NULL);
 
     if(result != MPI_SUCCESS) 
       sample_error(result, "MPI_File_set_view");
 
     buf = (double *)malloc( nitem * sizeof(double) );
+
+    if (buf == NULL) {
+        if(rank == 0) printf("malloc() failed\n");
+        MPI_Finalize();
+        exit(1);
+    }
 
     buf[0] = rand()%4096;
     if(rank==0) printf("%lf\n", buf[0]);
@@ -150,9 +189,10 @@ int main( int argc, char *argv[] )
     printf("%d: iotime (write) = %10.4f\n", rank, iotime);
 
     MPI_Get_count( &status, MPI_DOUBLE, &count );
-    //printf("count=%d\n", count);
+    //printf("count = %lld\n", count);
+
     if (count != nitem) {
-      fprintf( stderr, "%d: Wrong count (%d) on write\n", rank, count );
+      fprintf( stderr, "%d: Wrong count (%lld) on write\n", rank, count );
       fflush(stderr);
       /* exit */
       MPI_Finalize();
@@ -160,6 +200,7 @@ int main( int argc, char *argv[] )
     }
 
     if(rank == 0) printf("File is written\n\n");
+
     MPI_File_close(&fh);
   }
 
