@@ -134,7 +134,7 @@ int main( int argc, char *argv[] )
       MPI_Finalize();
       exit(1);
   }
-
+#if 0
   if(use_actsto == 1) {
       if (size != 1) {
           if(rank == 0)
@@ -143,7 +143,7 @@ int main( int argc, char *argv[] )
           exit(1);
       }
   }
-
+#endif
   /* initialize random seed: */
   srand(time(NULL));
 
@@ -208,10 +208,11 @@ int main( int argc, char *argv[] )
       exit(1);
     }
 
-    if(rank == 0) printf("File is written\n\n");
-
     MPI_File_close(&fh);
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  if(rank == 0) printf("File is written\n\n");
 
   double *tmp = (double *)malloc( nitem * sizeof(double) );
 
@@ -291,6 +292,7 @@ int main( int argc, char *argv[] )
     
     MPI_File_close(&fh);
 #endif
+
     /* MPI_SUM */
     MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
     
@@ -303,6 +305,8 @@ int main( int argc, char *argv[] )
     
     MPI_File_close( &fh );
   }
+
+  MPI_Barrier(MPI_COMM_WORLD);
   free( buf );
   free( tmp );
  

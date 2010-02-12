@@ -533,6 +533,7 @@ static PINT_sm_action check_align_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	}
 	break;
     case ((int)0x4c00080b): /* MPI_DOUBLE */
+        break; /* sson: FIXME */
 	count = (PVFS_size)(s_op->u.pipeline.buffer_used - 
 			    file_req_offset)/((*PVFS_DOUBLE).ub);
 	gossip_debug(GOSSIP_IO_DEBUG, "count=%lld\n", lld(count));
