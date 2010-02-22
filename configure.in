@@ -67,12 +67,6 @@ if test "x$GCC" = "x"; then
 	AC_MSG_ERROR(no)
 fi
 
-# sson
-AC_MSG_CHECKING([for required nvcc])
-if test "x$NVCC" = "x"; then
-	AC_MSG_ERROR(no)
-fi
-
 CFLAGS=$USR_CFLAGS
 
 AC_PROG_CPP
@@ -91,16 +85,13 @@ fi
 
 if test $host != $build; then
 	AC_CHECK_PROGS(BUILD_CC, gcc cc)
-	AC_CHECK_PROGS(BUILD_NVCC, nvcc) # sson
 else
 	BUILD_CC=$CC
-	BUILD_CU=$NVCC # sson
 	BUILD_CFLAGS=$BUILD_CFLAGS
 	BUILD_LDFLAGS=$BUILD_LDFLAGS
 fi
 
 AC_SUBST(BUILD_CC)
-AC_SUBST(BUILD_CU) # sson
 AC_SUBST(BUILD_CFLAGS)
 AC_SUBST(BUILD_LDFLAGS)
 
@@ -182,10 +173,8 @@ else
     BUILD_SERVER=""
 fi],
     BUILD_SERVER=1
-    BUILD_CUDA=1 # sson
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
-AC_SUBST(BUILD_CUDA) # sson
 
 AC_ARG_WITH(openssl,
 	[  --with-openssl=<dir>    Build with openssl (default=/usr)
@@ -935,6 +924,11 @@ dnl
 dnl Configure bmi_portals, if --with-portals or a variant given.
 dnl
 AX_PORTALS
+
+dnl
+dnl Configure cuda, if --with-cuda or a variant given.
+dnl
+AX_CUDA
 
 dnl
 dnl check if fgetxattr takes extra arguments

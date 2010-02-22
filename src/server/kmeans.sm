@@ -27,6 +27,7 @@
 #include "pint-cached-config.h"
 #include "trove.h"
 
+#ifdef BUILD_CUDA
 extern void initGPU (float* objects, int numDataPoints,
 		     int numDimensions, int numClusters);
 extern void freeGPU (void);
@@ -35,6 +36,7 @@ extern void singleGPU (float* objects, int numDataPoints,
 		       int numClusters, int* membership, 
 		       int *newClusterSize,
 		       float* newClusters, float *error);
+#endif
 
 #define CONTINUE_KMEANS 301
 #define ALLREDUCE2 302
@@ -305,7 +307,7 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
     free(bcast_op->u.bcast.send_buf);
     free(bcast_op->u.bcast.recv_buf);
     free(bcast_op);
-
+#ifdef BUILD_CUDA
     if(s_op->u.kmeans.use_gpu == 1) {
 	/* initialize GPU device and allocate memory on it */
 	if(device_initialized == 0) {
@@ -322,6 +324,7 @@ static PINT_sm_action cleanup_bcast_fn(struct PINT_smcb *smcb, job_status_s *js_
 	    device_initialized = 1;
 	}
     }
+#endif
     return SM_ACTION_COMPLETE;
 }
 
@@ -336,12 +339,13 @@ static PINT_sm_action local_comp_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 
     if(s_op->u.kmeans.use_gpu == 1) {
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: before calling singleGPU\n", __func__);
-
+#ifdef BUILD_CUDA
 	singleGPU(s_op->u.kmeans.objects[0], s_op->u.kmeans.numObjs,
 		  s_op->u.kmeans.numCoords, s_op->u.kmeans.clusters[0],
 		  s_op->u.kmeans.numClusters, s_op->u.kmeans.membership,
 		  s_op->u.kmeans.newClusterSize,
 		  s_op->u.kmeans.newClusters[0], &s_op->u.kmeans.delta);
+#endif
 	
 	gossip_debug(GOSSIP_IO_DEBUG, "%s: after calling singleGPU\n", __func__);
     }
@@ -646,8 +650,10 @@ static PINT_sm_action check_done_fn(struct PINT_smcb *smcb, job_status_s *js_p)
 	js_p->error_code = 0;
         
         gossip_debug(GOSSIP_IO_DEBUG, "kmeans DONE!\n");
+#ifdef BUILD_CUDA
 	if(s_op->u.kmeans.use_gpu == 1)
 	    freeGPU();
+#endif
 #if DEBUG
 	/* print out the final result */
 	for (i=0; i<s_op->u.kmeans.numObjs; i++) 

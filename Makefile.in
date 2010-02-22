@@ -74,6 +74,7 @@ BUILD_BMI_TCP = @BUILD_BMI_TCP@
 BUILD_BMI_ONLY = @BUILD_BMI_ONLY@
 BUILD_GM = @BUILD_GM@
 BUILD_MX = @BUILD_MX@
+BUILD_CUDA = @BUILD_CUDA@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_PORTALS = @BUILD_PORTALS@
@@ -173,16 +174,16 @@ endif
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@
-NVCC = @BUILD_CU@ # sson
+NVCC = @NVCC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
-BUILD_CU = @BUILD_CU@ # sson
+BUILD_CUDA = @BUILD_CUDA@
 BUILD_LD = @BUILD_CC@
 BUILD_CFLAGS = @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
-CUFLAGS = --compiler-options -fno-strict-aliasing -I/home/sson/NVIDIA_CUDA_SDK/common/inc
+CUDAFLAGS = --compiler-options -fno-strict-aliasing -I@CUDA_INCDIR$
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += -lm @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -363,6 +364,19 @@ ifdef BUILD_MX
     DEPLIBS += $(MXLIBS)
     LIBS_THREADED += $(MXLIBS)
     SERVERLIBS += $(MXLIBS)
+endif
+
+################################################################
+# enable CUDA if configure detected it
+
+ifdef BUILD_CUDA
+    # other settings in bmi_mx/module.mk.in
+    CFLAGS += -I$CUDA_INCDIR$
+    CUDALIBS := -L@CUDA_LIBDIR@ -lcudart -lcutil
+    LIBS += $(CUDALIBS)
+    DEPLIBS += $(CUDALIBS)
+    LIBS_THREADED += $(CUDALIBS)
+    SERVERLIBS += $(CUDALIBS)
 endif
 
 #####################################
@@ -799,11 +813,10 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  CC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
-# sson
 # default rule for building CUDA objects 
 %.o: %.cu
 	$(Q) "  NVCC		$@"
-	$(E)$(NVCC) $(CUFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(NVCC) $(CUDAFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects 
 %.po: %.c
