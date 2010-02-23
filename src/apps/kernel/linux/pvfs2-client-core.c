@@ -130,9 +130,13 @@ typedef struct
   be serviced by our regular handlers.  to do both, we use a thread
   for the blocking ioctl.
 */
+#define REMOUNT_NOTCOMPLETED    0
+#define REMOUNT_COMPLETED       1
+#define REMOUNT_FAILED          2
 static pthread_t remount_thread;
 static pthread_mutex_t remount_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int remount_complete = 0;
+static int remount_complete = REMOUNT_NOTCOMPLETED;
+
 
 /* used for generating unique dynamic mount point names */
 static int dynamic_mount_id = 1;
@@ -502,12 +506,17 @@ static void *exec_remount(void *ptr)
       will fill in our dynamic mount information by triggering mount
       upcalls for each fs mounted by the kernel at this point
      */
+
+    /* if PINT_dev_remount fails set remount_complete appropriately */
     if (PINT_dev_remount())
     {
         gossip_err("*** Failed to remount filesystems!\n");
+        remount_complete = REMOUNT_FAILED;
     }
-
-    remount_complete = 1;
+    else
+    {
+        remount_complete = REMOUNT_COMPLETED;
+    }
     pthread_mutex_unlock(&remount_mutex);
 
     return NULL;
@@ -2827,7 +2836,7 @@ static inline PVFS_error handle_unexp_vfs_request(
         goto repost_op;
     }
 
-    if (!remount_complete &&
+    if (remount_complete == REMOUNT_NOTCOMPLETED &&
         (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT))
     {
         gossip_debug(
@@ -3108,6 +3117,7 @@ static PVFS_error process_vfs_requests(void)
         for(i = 0; i < op_count; i++)
         {
             vfs_request = vfs_request_array[i];
+
             assert(vfs_request);
 /*             assert(vfs_request->op_id == op_id_array[i]); */
             if (vfs_request->num_ops == 1 &&
@@ -3253,6 +3263,29 @@ static PVFS_error process_vfs_requests(void)
             ret = repost_unexp_vfs_request(
                 vfs_request, "normal_completion");
             assert(ret == 0);
+        }
+
+        /* The status of the remount thread needs to be checked in the event 
+         * the remount fails on client-core startup. If this is the initial 
+         * startup then any mount requests will fail as expected and the 
+         * client-core will behave normally. However, if a mount was 
+         * previously successful (in a previous client-core incarnation) 
+         * client-core doesn't check if the remount succeeded before 
+         * handling the mount request and fs_add. Then any subsequent requests
+         * cause this thread spins around PINT_dev_test_unexpected.
+         *
+         * With the current structure of process_vfs_request, creating the 
+         * remount thread before entering the while loop, it seems exiting 
+         * client-core on a failed remount attempt is the most staight forward 
+         * way to handle this case. Exiting will cause the parent to kickoff 
+         * another client-core and try the remount until it succeeds.
+         */
+        if( remount_complete == REMOUNT_FAILED )
+        {
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "%s: remount not completed successfully, no longer "
+                         "handling requests.\n", __func__);
+            return -PVFS_EAGAIN; 
         }
     }
 
@@ -3564,11 +3597,11 @@ int main(int argc, char **argv)
     ret = process_vfs_requests();
     if (ret)
     {
-	gossip_err("Failed to process vfs requests!");
+	gossip_err("Failed to process vfs requests!\n");
     }
 
     /* join remount thread; should be long done by now */
-    if (remount_complete)
+    if (remount_complete == REMOUNT_COMPLETED )
     {
         pthread_join(remount_thread, NULL);
     }
@@ -3596,12 +3629,16 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "calling PVFS_sys_finalize()\n");
+    gossip_err("pvfs2-client-core shutting down.\n");
     if (PVFS_sys_finalize())
     {
-        gossip_err("Failed to finalize PVFS\n");
         return 1;
+    }
+
+    /* if failed remount tell the parent it's something we did wrong. */
+    if( remount_complete != REMOUNT_COMPLETED )
+    {
+        return(-PVFS_EAGAIN);
     }
 
     /* forward the signal on to the parent */
@@ -3610,7 +3647,6 @@ int main(int argc, char **argv)
         kill(0, s_client_signal);
     }
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s terminating\n", argv[0]);
     return 0;
 }
 
