@@ -689,6 +689,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
             0,
+            PVFS_MSGPAIR_RETRY,
             attr->u.meta.dfile_count,
             attr->u.meta.dfile_array,
             sm_p->hints);

@@ -431,13 +431,15 @@ struct PVFS_servreq_tree_get_file_size
 {
     PVFS_fs_id  fs_id;
     uint32_t caller_handle_index;
+    uint32_t retry_msgpair_leaf;
     uint32_t num_data_files;
     PVFS_handle *handle_array;
 };
-endecode_fields_2a_struct(
+endecode_fields_3a_struct(
     PVFS_servreq_tree_get_file_size,
     PVFS_fs_id, fs_id,
     uint32_t, caller_handle_index,
+    uint32_t, retry_msgpair_leaf,
     uint32_t, num_data_files,
     PVFS_handle, handle_array)
 #define extra_size_PVFS_servreq_tree_get_file_size \
@@ -447,6 +449,7 @@ endecode_fields_2a_struct(
                                  __creds,                                \
                                  __fsid,                                 \
                                  __caller_handle_index,                  \
+                                 __retry_msgpair_leaf,                   \
                                  __num_data_files,                       \
                                  __handle_array,                         \
                                  __hints)                                \
@@ -457,6 +460,7 @@ do {                                                                     \
     (__req).credentials = (__creds);                                     \
     (__req).u.tree_get_file_size.fs_id = (__fsid);                       \
     (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index); \
+    (__req).u.tree_get_file_size.retry_msgpair_leaf = (__retry_msgpair_leaf); \
     (__req).u.tree_get_file_size.num_data_files = (__num_data_files);    \
     (__req).u.tree_get_file_size.handle_array = (__handle_array);        \
 } while (0)

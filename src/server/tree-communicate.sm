@@ -189,27 +189,25 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         {
             case PVFS_SERV_TREE_REMOVE:
             {
-/* TODO: Need to pass along hints. */
                 PINT_SERVREQ_REMOVE_FILL(
                     *req,
                     s_op->req->credentials,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[0],
-                    NULL);
+                    s_op->req->hints);
 
                 break;
             }
 
             case PVFS_SERV_TREE_GET_FILE_SIZE:
             {
-/* TODO: Need to pass along hints. */
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
                     s_op->req->credentials,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[0],
                     PVFS_ATTR_DATA_SIZE,
-                    NULL);
+                    s_op->req->hints);
 
                 break;
             }
@@ -220,6 +218,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
     }
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0) {
+      uint32_t retry_msgpair_leaf = PVFS_MSGPAIR_RETRY;
+
       /* Decide how to divide the remote handles. If there are only a few (MAX_PARTITIONS or
          fewer) then go ahead and send to each remaining server individually. */
       if (s_op->u.tree_communicate.handle_array_remote_count > MAX_PARTITIONS)
@@ -231,6 +231,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                    s_op->u.tree_communicate.handle_array_remote_count) {
               num_files_per_server++;
           }
+          retry_msgpair_leaf = s_op->req->u.tree_get_file_size.retry_msgpair_leaf;
       }
       else
       {
@@ -279,14 +280,13 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             {
                 case PVFS_SERV_TREE_REMOVE:
                 {
-/* TODO: Need to pass along hints. */
                     PINT_SERVREQ_TREE_REMOVE_FILL(
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
-                        NULL);
+                        s_op->req->hints);
                     msg_p->comp_fn = NULL;
                     break;
                 }
@@ -294,15 +294,15 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 case PVFS_SERV_TREE_GET_FILE_SIZE:
                 {
 
-/* TODO: Need to pass along hints. */
                     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                         msg_p->req,
                         s_op->req->credentials,
                         fs_id,
                         (i-1)*num_files_per_server+1,
+                        retry_msgpair_leaf,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
-                        NULL);
+                        s_op->req->hints);
                     msg_p->comp_fn = tree_get_file_size_comp_fn;
                     break;
                 }
@@ -472,19 +472,26 @@ static int tree_get_file_size_work_cleanup(
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (task_id == REMOTE_OPERATION) {
-            for (j = 0; j < old_frame->resp.u.tree_get_file_size.handle_count; j++)
-            {
-                gossip_debug(GOSSIP_SERVER_DEBUG,
-                            "tree_get_file_size_work_cleanup: size of remote datafile %d is %lld\n",
-                            j, lld(old_frame->resp.u.tree_get_file_size.size[j]));
-                s_op->resp.u.tree_get_file_size.size
-                      [old_frame->resp.u.tree_get_file_size.caller_handle_index+j +
-                       s_op->u.tree_communicate.handle_array_local_count]
-                   = old_frame->resp.u.tree_get_file_size.size[j];
+            if (error_code != 0) {
                 s_op->resp.u.tree_get_file_size.error
-                      [old_frame->resp.u.tree_get_file_size.caller_handle_index+j +
-                       s_op->u.tree_communicate.handle_array_local_count]
-                   = old_frame->resp.u.tree_get_file_size.error[j];
+                        [old_frame->resp.u.tree_get_file_size.caller_handle_index]
+                     = error_code;
+            }
+            else {
+                for (j = 0; j < old_frame->resp.u.tree_get_file_size.handle_count; j++)
+                {
+                    gossip_debug(GOSSIP_SERVER_DEBUG,
+                                "tree_get_file_size_work_cleanup: size of remote datafile %d is %lld\n",
+                                j, lld(old_frame->resp.u.tree_get_file_size.size[j]));
+                    s_op->resp.u.tree_get_file_size.size
+                          [old_frame->resp.u.tree_get_file_size.caller_handle_index+j +
+                           s_op->u.tree_communicate.handle_array_local_count]
+                       = old_frame->resp.u.tree_get_file_size.size[j];
+                    s_op->resp.u.tree_get_file_size.error
+                          [old_frame->resp.u.tree_get_file_size.caller_handle_index+j +
+                           s_op->u.tree_communicate.handle_array_local_count]
+                       = old_frame->resp.u.tree_get_file_size.error[j];
+                }
             }
             free(old_frame->resp.u.tree_get_file_size.size);
             free(old_frame->resp.u.tree_get_file_size.error);
