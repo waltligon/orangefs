@@ -479,8 +479,8 @@ endecode_fields_1aa_struct(
     PVFS_error, error,
     PVFS_size, size)
 #define extra_size_PVFS_servresp_tree_get_file_size \
-  ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
-  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(uint32_t)) )
+  ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
 
 /* mgmt_get_dirdata_handle */
 /* - used to retrieve the dirdata handle of the specified parent ref */
