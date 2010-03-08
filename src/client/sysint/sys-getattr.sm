@@ -39,14 +39,15 @@
  * we grab these sizes.
  */
 
-//static struct profiler getattr_prof;
+static struct profiler getattr_prof __attribute__((unused));
 
 extern job_context_id pint_client_sm_context;
 
 enum
 {
     GETATTR_ACACHE_MISS = 1,
-    GETATTR_NEED_DATAFILE_SIZES = 2
+    GETATTR_NEED_DATAFILE_SIZES = 2,
+    GETATTR_IO_RETRY = 3
 };
 
 /* completion function prototypes */
@@ -63,19 +64,19 @@ nested machine pvfs2_client_datafile_getattr_sizes_sm
     {
         run getattr_datafile_getattr_setup_msgpairarray;
         success => datafile_getattr_xfer_msgpairarray;
-        default => datafile_getattr_failure;
+        default => datafile_getattr_cleanup;
     }
     
     state datafile_getattr_xfer_msgpairarray
     {
         jump pvfs2_msgpairarray_sm;
-        success => datafile_getattr_cleanup;
-        default => datafile_getattr_failure;
+        default => datafile_getattr_retry;
     }
 
-    state datafile_getattr_failure
+    state datafile_getattr_retry
     {
-        run getattr_datafile_getattr_failure;
+        run getattr_datafile_getattr_retry;
+        GETATTR_IO_RETRY => datafile_getattr_xfer_msgpairarray;
         default => datafile_getattr_cleanup;
     }
 
@@ -203,7 +204,8 @@ PVFS_error PVFS_isys_getattr(
     sm_p->object_ref = ref;
     sm_p->u.getattr.getattr_resp_p = resp_p;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle)
+                 ,&ref.handle);
     
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -576,11 +578,20 @@ static int getattr_object_getattr_comp_fn(
                 PVFS_ATTR_META_MIRROR_DFILES)
             {
                 if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
-                    assert(attr->u.meta.mirror_dfile_array &&
+                {    assert(attr->u.meta.mirror_dfile_array &&
                           (attr->u.meta.mirror_copies_count > 0));
-                gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: Mirror handles and "
-                                                  "copy count retrieved.\n"
-                                                 ,__func__);
+                     gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: Mirror handles and "
+                                                       "copy count retrieved.\n"
+                                                     ,__func__);
+                }
+                else
+                {
+                   gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: request attribute "
+                   "mask says to get the mirror dfiles, if they exist, \nbut "
+                   "the response attribute mask says they were not retrieved. "
+                   "This is okay.\n"
+                   ,__func__);
+                }
             }
             if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
@@ -653,9 +664,10 @@ static PINT_sm_action getattr_object_getattr_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p __attribute__((unused)) = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
-        "(%p) getattr state: getattr_object_getattr_failure\n", sm_p);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG
+                ,"(%p) getattr state: getattr_object_getattr_failure\n"
+                ,sm_p);
 
     if ((js_p->error_code != -PVFS_ENOENT) &&
         (js_p->error_code != -PVFS_EINVAL))
@@ -671,9 +683,20 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
     int ret = -PVFS_EINVAL;
+    int i = 0;
     PVFS_object_attr *attr = NULL;
-    PINT_sm_msgpair_state *msg_p;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    uint64_t mirror_retry = (sm_p->getattr.attr.mask & PVFS_ATTR_META_MIRROR_DFILES);
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing getattr_datafile_getattr_setup_msgpairarray...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"%s: Are we mirroring? %s\n",__func__
+                                    ,(mirror_retry ? "YES" : "NO")); 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"%s: attr.mask:0x%08x \tmirror_retry:0x%08x\n"
+                ,__func__
+                ,sm_p->getattr.attr.mask
+                ,(unsigned int)mirror_retry);
 
     js_p->error_code = 0;
 
@@ -683,30 +706,95 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /*initialize the size_array, which will hold the size of each datahandle*/
+    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,attr->u.meta.dfile_count);
+
+    /* initialize mir_ctx_array: one context for each handle in the file */
+    getattr->mir_ctx_array = malloc(attr->u.meta.dfile_count *
+                                    sizeof(*getattr->mir_ctx_array));
+    if (!getattr->mir_ctx_array)
+    {
+        gossip_lerr("Unable to allocate mirror context array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(getattr->mir_ctx_array,0,attr->u.meta.dfile_count * 
+                                   sizeof(*getattr->mir_ctx_array));
+    getattr->mir_ctx_count = attr->u.meta.dfile_count;
+
+    for (i=0; i<getattr->mir_ctx_count; i++)
+    {
+       getattr->mir_ctx_array[i].original_datahandle = attr->u.meta.dfile_array[i];
+       getattr->mir_ctx_array[i].original_server_nr = i;
+    }
+
+    /* allocate handle array and populate */
+    PVFS_handle *handles = malloc(sizeof(PVFS_handle) * attr->u.meta.dfile_count);
+    if (!handles)
+    {
+        gossip_lerr("Unable to allocation local handles array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(handles,0,sizeof(PVFS_handle) * attr->u.meta.dfile_count);
+    memcpy(handles,attr->u.meta.dfile_array,attr->u.meta.dfile_count *
+                                            sizeof(PVFS_handle));
+
+    /*allocate index-to-server array and populate*/
+    getattr->index_to_server = malloc(sizeof(uint32_t)*attr->u.meta.dfile_count);
+    if (!getattr->index_to_server)
+    {
+        gossip_lerr("Unable to allocate index-to-server array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(getattr->index_to_server,0,sizeof(uint32_t)*attr->u.meta.dfile_count);
+    for (i=0; i<attr->u.meta.dfile_count; i++)
+    {
+        getattr->index_to_server[i] = (uint32_t)i;
+    }
+
 //START_PROFILER(getattr_prof);
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
             0,
-            PVFS_MSGPAIR_RETRY,
             attr->u.meta.dfile_count,
-            attr->u.meta.dfile_array,
+            handles,
+            (mirror_retry ? 1 : 0),
             sm_p->hints);
 
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = attr->u.meta.dfile_array[0];
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
+    msg_p->handle = handles[0];
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
     if (ret)
     {
-        gossip_err("Failed to map data server address\n");
+        gossip_lerr("Unable to map server address for this handle(%llu) and "
+                    "filesystem(%d)\n"
+                   ,llu(msg_p->handle)
+                   ,msg_p->fs_id);
         js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
     }
+
+    PVFS_BMI_addr_t svr_addr = 0;
+
+    /* set retry flag based on mirroring option...if mirroring, we will handle
+     * retries from this machine; if not, msgpairarray will handle retries.
+    */
+    if (mirror_retry)
+    {
+        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    }
+    else
+    {
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    }
+
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
@@ -717,43 +805,309 @@ static int getattr_datafile_getattr_comp_fn(
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_sm_msgpair_state *msg = &(sm_p->msgarray_op.msgarray[index]);
+    struct PVFS_servreq_tree_get_file_size *tree = 
+                                              &(msg->req.u.tree_get_file_size);
 
-    if (resp_p->status != 0)
-    {
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+    PINT_client_getattr_mirror_ctx *ctx = NULL;
+    uint32_t server_nr = 0;
+    int i = 0;
+
+    if (resp_p->status)
+    {   /* tree request had a problem */
         return resp_p->status;
     }
 
     assert(resp_p->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "datafile_getattr: size of datafile %d is %lld\n",
-                 index, lld(resp_p->u.tree_get_file_size.size));
 
-    sm_p->getattr.size =
-        resp_p->u.tree_get_file_size.size[0];
-    sm_p->getattr.size_array = resp_p->u.tree_get_file_size.size;
+    /* if we are mirroring, then we need to check the error code returned from
+     * each server. If an error is found, mirroring will try to get the size 
+     * from a different server.  Below, we are marking which handles completed 
+     * successfully, which tells mirroring NOT to retry them.
+    */
+    if ( getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)  
+    {
+       for (i=0; i<resp_p->u.tree_get_file_size.handle_count; i++)
+       {
+          if (resp_p->u.tree_get_file_size.error[i] != 0)
+          {   /* error retrieving size for this handle..we will retry it. */
+             continue;
+          }
+          server_nr = getattr->index_to_server[i];
+          sm_p->getattr.size_array[server_nr] = resp_p->u.tree_get_file_size.size[i];
+          ctx = &(getattr->mir_ctx_array[server_nr]);
+          ctx->msg_completed = 1; 
 
-    return 0;
-}
+          /*For completed messages, update the size array with the file size
+           *just retrieved.
+          */
+          getattr->size_array[server_nr] = resp_p->u.tree_get_file_size.size[i];
+          gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: size[%d]:%lld \thandle:%llu\n"
+                                         ,__func__
+                                         ,i
+                                         ,llu(getattr->size_array[i])
+                                         ,llu(tree->handle_array[i]));
+       }/*end for*/
+    }
+    else
+    {
+     /* if we are NOT mirroring and an error is found for an individual handle, 
+      * then we must invalidate the size array and return an error code.
+     */
+       for (i=0; i<resp_p->u.tree_get_file_size.handle_count; i++)
+       {
+          gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: error[%d]:%d"
+                                               "\tsize[%d]:%d\n"
+                                           ,__func__
+                                           ,i
+                                           ,(int)resp_p->u.tree_get_file_size.error[i]
+                                           ,i
+                                           ,(int)resp_p->u.tree_get_file_size.size[i]);
 
-static PINT_sm_action getattr_datafile_getattr_failure(
+          if (resp_p->u.tree_get_file_size.error[i] != 0)
+          {
+              gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: error[%d] is %d\n"
+                                               ,__func__
+                                               ,i
+                                               ,resp_p->u.tree_get_file_size.error[i]);
+              memset(getattr->size_array,0,sizeof(*getattr->size_array));
+              return (resp_p->u.tree_get_file_size.error[i]);
+          }
+
+          getattr->size_array[i] = resp_p->u.tree_get_file_size.size[i];
+       }/*end for*/
+
+    }/*end if*/
+
+    return(0);
+}/*end getattr_datafile_getattr_comp_fn*/
+
+static PINT_sm_action getattr_datafile_getattr_retry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_client_sm *sm_p __attribute__((unused)) = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
-                 "getattr_datafile_getattr_failure\n", sm_p);
+    struct PINT_client_sm   *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta = &(attr->u.meta);
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+    PINT_client_getattr_mirror_ctx *ctx = NULL;
+    PINT_sm_msgarray_op *mop = &(sm_p->msgarray_op);
+    PINT_sm_msgpair_state *msg = &(mop->msgarray[0]);
+    char *enc_req_bytes = NULL;
+    struct PVFS_servreq_tree_get_file_size *tree = 
+                                              &(msg->req.u.tree_get_file_size);
+    uint32_t retry_msg_count = 0;
+    uint32_t index = 0;
+    uint32_t copies = 0;
+    uint32_t server_nr = 0;
+    int i   = 0;
+    int j   = 0;
+    int k   = 0;
+    int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                 "(%p) getattr state: "
+                 "getattr_datafile_getattr_retry\n", sm_p);
+
+    /*We only need to retry if we have mirrors; otherwise, msgpairarray 
+     *has already handled the retries.
+    */
+    if (!(attr->mask & PVFS_ATTR_META_MIRROR_DFILES))  
+    {  
+       /*we are NOT mirroring.*/
+       return SM_ACTION_COMPLETE;
+    }
+    
+    /* How many handles need to be retried? */
+    for (i=0; i<tree->num_data_files; i++)
+    {
+        server_nr = getattr->index_to_server[i];
+        ctx = &(getattr->mir_ctx_array[server_nr]);
+        if (ctx->msg_completed == 0)
+            retry_msg_count++;
+    }
+
+    /* no retries needed */
+    if (retry_msg_count == 0)
+    {
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* do we have any retries available? */
+    if (getattr->retry_count >= mop->params.retry_limit)
+    {
+        /* at this point, we have msgpairs that need to be retried, but we
+         * we have met our retry limit.  so, we must invalidate the size array,
+         * since we don't have all of the necessary sizes AND return an error.
+        */
+        memset(getattr->size_array,0,sizeof(*getattr->size_array) * getattr->size);
+        js_p->error_code = (js_p->error_code ? js_p->error_code : -PVFS_ETIME);
+        gossip_err("%s: Ran out of retries(%d)\n",__func__
+                                                 ,getattr->retry_count);
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*allocate temporary index-to-server array*/
+    uint32_t *tmp_server_nr = malloc(sizeof(uint32_t) * retry_msg_count);
+    if (!tmp_server_nr)
+    {
+        gossip_lerr("Unable to allocate temporary index-to-server array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(tmp_server_nr,0,sizeof(uint32_t) * retry_msg_count);
+
+    /*allocate temporary handle array*/
+    PVFS_handle *tmp_handles = malloc(sizeof(PVFS_handle) * retry_msg_count);
+    if (!tmp_handles)
+    {
+        gossip_lerr("Unable to allocate temporary handle array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(tmp_handles,0,sizeof(PVFS_handle) * retry_msg_count);
+
+    /* okay. let's setup new handles to retry. 
+    */
+    for (i=0,j=0; i<tree->num_data_files; i++)
+    {
+        server_nr = getattr->index_to_server[i];
+        ctx = &(getattr->mir_ctx_array[server_nr]);
+     
+        /* don't process completed messages */
+        if (ctx->msg_completed)
+           continue;
+
+        /* for incomplete messages, cleanup memory, if necessary */ 
+        enc_req_bytes = (char *)&(msg->encoded_req);
+        for (k=0; k<sizeof(msg->encoded_req); k++)
+        {
+           if (enc_req_bytes[k] != '\0')
+           {
+              PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
+              break;
+           }
+        }/*end for*/
+
+        if (msg->encoded_resp_p)
+        {
+            BMI_memfree(msg->svr_addr
+                       ,msg->encoded_resp_p
+                       ,msg->max_resp_sz
+                       ,BMI_RECV);
+        }
+        
+        /* Should we use the original datahandle? */
+        if (ctx->retry_original)
+        {
+            ctx->retry_original = 0;
+            tmp_handles[j]   = ctx->original_datahandle;
+            tmp_server_nr[j] = ctx->original_server_nr;
+            j++;
+            continue;
+        }/*end retry_original*/
+
+        /* otherwise, get next mirrored handle.  note:  if a mirrored handle is
+         * zero, then this means that the creation of this mirrored object 
+         * failed for its particular server.  in this case, get the next valid 
+         * handle.  as a last resort, retry the original handle.
+        */
+        copies = ctx->current_copies_count;
+        for (;copies < meta->mirror_copies_count; copies++)
+        {
+            index = (copies*meta->dfile_count) + server_nr;
+            if (meta->mirror_dfile_array[index] != 0)
+            {  /* we have found a valid mirrored handle */
+               tmp_handles[j]   = meta->mirror_dfile_array[index];
+               tmp_server_nr[j] = server_nr;
+               j++;
+               break;
+            }
+        }
+
+        /* if we haven't found a valid mirrored handle, retry the original
+         * datahandle.
+        */
+        if ( copies == meta->mirror_copies_count )
+        {
+           tmp_handles[j]   = ctx->original_datahandle;
+           tmp_server_nr[j] = ctx->original_server_nr;
+           j++;
+           ctx->retry_original = 0;
+           ctx->current_copies_count = 0;
+           getattr->retry_count++;
+           continue;
+        }/*end if we have to use the original*/
+
+        /* otherwise, setup for the next retry event */
+        ctx->current_copies_count++;
+        if (ctx->current_copies_count == meta->mirror_copies_count)
+        {
+           ctx->current_copies_count = 0;
+           ctx->retry_original = 1;
+           getattr->retry_count++;
+        }
+    }/*end for each handle in the old request*/
+
+    /*replace values in old tree request*/
+    free(tree->handle_array);
+    tree->handle_array = tmp_handles;
+    tree->num_data_files = retry_msg_count;
+    
+    /*replace values in old message request*/
+    msg->handle = tmp_handles[0];
+    msg->svr_addr=0;
+    ret = PINT_cached_config_map_to_server(&msg->svr_addr
+                                          ,msg->handle
+                                          ,msg->fs_id);
+    if (ret)
+    {
+        gossip_lerr("Unable to determine server address for handle(%llu) and "
+                    "file system(%d).\n"
+                   ,llu(msg->handle)
+                   ,msg->fs_id);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*save index-to-server array*/
+    free(getattr->index_to_server);
+    getattr->index_to_server = tmp_server_nr;
+
+    /* Push the msgarray_op and jump to msgpairarray.sm */
+    PINT_sm_push_frame(smcb,0,mop);
+    js_p->error_code=GETATTR_IO_RETRY;
+
     return SM_ACTION_COMPLETE;
-}
+} /*end datafile_getattr_retry*/
+
+
+
+
+
 
 static PINT_sm_action getattr_datafile_getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 //FINISH_PROFILER("getattr", getattr_prof, 1);
-    if(js_p->error_code == 0)
-    {
-        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-    }
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+
+    /* cleanup handle_array created for the one tree request */
+    PINT_sm_msgpair_state *msg_p = &(sm_p->msgarray_op.msgarray[0]);
+    if (msg_p->req.u.tree_get_file_size.handle_array)
+       free(msg_p->req.u.tree_get_file_size.handle_array);
+    
+    /* cleanup tree request */
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    /* cleanup memory that may have been used for mirrored retries.*/
+    if (getattr->mir_ctx_array)
+       free(getattr->mir_ctx_array);
+    if (getattr->index_to_server)
+       free(getattr->index_to_server);
+
 
     return SM_ACTION_COMPLETE;
 }
@@ -794,7 +1148,9 @@ static PINT_sm_action getattr_acache_insert(
                     sm_p->getattr.size_array);
 
                 tmp_size = &sm_p->getattr.size;
-                gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr_acache_insert calculated unstuffed logical size of %lld\n", lld(*tmp_size));
+                gossip_debug(GOSSIP_GETATTR_DEBUG,"getattr_acache_insert calculated"
+                                                  " unstuffed logical size of %lld\n"
+                                                 , lld(*tmp_size));
             }
         }
 
@@ -813,10 +1169,43 @@ static PINT_sm_action getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_getattr_state *getattr = &(sm_p->getattr);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG
+                ,"%s: js_p->error_code:%d \tgetattr->attr.mask:0x%08x\n"
+                ,__func__
+                ,js_p->error_code
+                ,getattr->attr.mask);
+
     sm_p->error_code = js_p->error_code;
+
+    /* cleanup size array; is only allocated if datafile sizes are retrieved */
+    if (getattr->size_array)
+       free(getattr->size_array);
+
+    /* cleanup getattr when an error occurs */
+    if (js_p->error_code)
+    {
+      if (getattr->attr.mask & PVFS_ATTR_META_DFILES)
+      {
+         if (getattr->attr.u.meta.dfile_array)
+            free(getattr->attr.u.meta.dfile_array);
+      }
+
+      if (getattr->attr.mask & PVFS_ATTR_META_MIRROR_DFILES)
+      {
+         if (getattr->attr.u.meta.mirror_dfile_array)
+            free(getattr->attr.u.meta.mirror_dfile_array);
+      }
+
+      if (getattr->attr.mask & PVFS_ATTR_META_DIST)
+      {
+         PINT_dist_free(getattr->attr.u.meta.dist);
+      }
+    }/*end if error*/
 
     return SM_ACTION_COMPLETE;
 }

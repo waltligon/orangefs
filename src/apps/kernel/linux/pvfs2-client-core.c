@@ -3613,6 +3613,11 @@ int main(int argc, char **argv)
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
+
+    /*release smcb associated with the acache-timer*/
+    if (static_acache_timer_sm_p->sys_op_id)
+       PINT_sys_release(static_acache_timer_sm_p->sys_op_id);
+
     if (PVFS_sys_finalize())
     {
         gossip_err("Failed to finalize PVFS\n");

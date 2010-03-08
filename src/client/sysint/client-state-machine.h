@@ -145,6 +145,34 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
+/* this structure is used to handle mirrored retries in the small-io case*/
+typedef struct PINT_client_mirror_ctx
+{
+  /*which copy of the mirrored handle are we using?*/
+  uint32_t     current_copies_count;
+
+  /*the primary datahandle*/
+  PVFS_handle  original_datahandle;
+
+  /*the server_nr for the primary datahandle*/
+  uint32_t original_server_nr;
+
+  /*do we retry the primary or use a mirrored handle?*/ 
+  PVFS_boolean retry_original;
+
+  /*did the current message for this handle complete without any errors?*/
+  PVFS_boolean msg_completed;
+
+} PINT_client_small_io_ctx;
+
+
+
+/* this structure is used to handle mirrored retries when 
+ * pvfs2_client_datafile_getattr_sizes_sm is called.
+*/
+typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
+
+
 
 typedef struct PINT_client_io_ctx
 {
@@ -219,6 +247,8 @@ struct PINT_client_io_sm
 
     PINT_client_io_ctx *contexts;
     int context_count;
+
+    PINT_client_small_io_ctx *small_io_ctx;
 
     int total_cancellations_remaining;
 
@@ -412,6 +442,13 @@ typedef struct PINT_sm_getattr_state
       attribute that can be used by calling state machines
     */
     PVFS_object_attr attr;
+
+
+    /* mirror retry information */
+    PINT_client_getattr_mirror_ctx *mir_ctx_array;
+    uint32_t mir_ctx_count;
+    uint32_t retry_count;
+    uint32_t *index_to_server;
 
     PVFS_ds_type ref_type;
 

@@ -799,8 +799,6 @@ static PINT_sm_action io_datafile_post_msgpairs(
                     goto try_next_encoding;
                 }
             }     
-            if (ret == 1)
-
             /*
               FIXME: make this a clean error transition by adjusting
               the completion count and/or (not) exiting

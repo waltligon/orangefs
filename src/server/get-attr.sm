@@ -1004,8 +1004,6 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
        {
            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tRetrieval of key(%s) failed.\n"
                                            ,(char *)s_op->key_a[i].buffer);
-           gossip_lerr("Unable to retrieve key(%s).\n"
-                      ,(char *)s_op->key_a[i].buffer);
            js_p->error_code = s_op->error_a[i];
        }
    }

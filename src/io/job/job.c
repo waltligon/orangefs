@@ -4852,6 +4852,7 @@ static void bmi_thread_mgr_unexp_handler(
     gen_mutex_unlock(&initialized_mutex);
 
     gen_mutex_lock(&bmi_unexp_mutex);
+
     /* remove the operation from the pending bmi_unexp queue */
     tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
     assert(tmp_desc != NULL);

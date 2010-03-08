@@ -130,13 +130,70 @@ int PINT_event_init(enum PINT_event_method method)
     return(0);
 }
 
+void PINT_event_free_bucket_resources(struct qhash_table *qht, unsigned long distance_from_link)
+{
+  char **name = NULL;
+  char *start_of_structure = NULL; 
+  struct qhash_head *bucket_entry = NULL;
+  struct qhash_head *bucket = NULL;
+  struct qhash_head *next = NULL;
+  int i;
+
+  for (i=0; i<qht->table_size; i++)
+  {
+     bucket = &(qht->array[i]);
+     if (bucket==bucket->next && bucket==bucket->prev)
+        continue;  //this bucket is empty
+     
+     /*for each entry, deallocate the name string and the entry structure*/
+     for (bucket_entry=bucket->next; bucket_entry != bucket; bucket_entry = next)
+     {
+         start_of_structure = (char *)((char *)bucket_entry - distance_from_link);
+         name = (char **)start_of_structure;
+         if (*name)
+         {
+            free(*name);
+            *name=NULL;
+         }
+         name=NULL;
+
+         next = bucket_entry->next;
+         free(start_of_structure);
+         start_of_structure=NULL;
+     }/*end for*/
+
+
+  } /*end for*/
+
+  return;
+}
+
+
 void PINT_event_finalize(void)
 {
-
+    unsigned long distance_from_link = 0;
 #if defined(HAVE_TAU)
     PINT_event_tau_fini();
 #endif
+    /*calculate the number of bytes from the top of a PINT_group structure to
+     *the beginning of the link member. The link member ties the group into the
+     *list of entries within one bucket of the groups table.
+    */
+    distance_from_link = (unsigned long)((&((struct PINT_group *)0)->link));
+    PINT_event_free_bucket_resources(groups_table,distance_from_link);
 
+
+
+    /*calculate the number of bytes from the top of a PINT_event structure to
+     *the beginning of the link member.  The link member ties the event into the
+     *list of entries within one bucket of the events table.
+    */
+    distance_from_link = (unsigned long)((&((struct PINT_event *)0)->link));
+    PINT_event_free_bucket_resources(events_table,distance_from_link);
+
+
+
+    /*free the buckets in the tables and the tables themselves*/
     qhash_finalize(groups_table);
     qhash_finalize(events_table);
     return;

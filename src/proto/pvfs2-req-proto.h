@@ -431,7 +431,7 @@ struct PVFS_servreq_tree_get_file_size
 {
     PVFS_fs_id  fs_id;
     uint32_t caller_handle_index;
-    uint32_t retry_msgpair_leaf;
+    uint32_t retry_msgpair_at_leaf;
     uint32_t num_data_files;
     PVFS_handle *handle_array;
 };
@@ -439,48 +439,48 @@ endecode_fields_3a_struct(
     PVFS_servreq_tree_get_file_size,
     PVFS_fs_id, fs_id,
     uint32_t, caller_handle_index,
-    uint32_t, retry_msgpair_leaf,
+    uint32_t, retry_msgpair_at_leaf,
     uint32_t, num_data_files,
     PVFS_handle, handle_array)
 #define extra_size_PVFS_servreq_tree_get_file_size \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
-#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                      \
-                                 __creds,                                \
-                                 __fsid,                                 \
-                                 __caller_handle_index,                  \
-                                 __retry_msgpair_leaf,                   \
-                                 __num_data_files,                       \
-                                 __handle_array,                         \
-                                 __hints)                                \
-do {                                                                     \
-    memset(&(__req), 0, sizeof(__req));                                  \
-    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                           \
-    (__req).hints = (__hints);                                           \
-    (__req).credentials = (__creds);                                     \
-    (__req).u.tree_get_file_size.fs_id = (__fsid);                       \
-    (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index); \
-    (__req).u.tree_get_file_size.retry_msgpair_leaf = (__retry_msgpair_leaf); \
-    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);    \
-    (__req).u.tree_get_file_size.handle_array = (__handle_array);        \
+#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                                \
+                                 __creds,                                          \
+                                 __fsid,                                           \
+                                 __caller_handle_index,                            \
+                                 __num_data_files,                                 \
+                                 __handle_array,                                   \
+                                 __retry_msgpair_at_leaf,                          \
+                                 __hints)                                          \
+do {                                                                               \
+    memset(&(__req), 0, sizeof(__req));                                            \
+    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                                     \
+    (__req).hints = (__hints);                                                     \
+    (__req).credentials = (__creds);                                               \
+    (__req).u.tree_get_file_size.fs_id = (__fsid);                                 \
+    (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index);    \
+    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);              \
+    (__req).u.tree_get_file_size.handle_array = (__handle_array);                  \
+    (__req).u.tree_get_file_size.retry_msgpair_at_leaf = (__retry_msgpair_at_leaf);\
 } while (0)
 
 struct PVFS_servresp_tree_get_file_size
 {
     uint32_t caller_handle_index;
     uint32_t handle_count;
+    PVFS_size  *size;
     PVFS_error *error;
-    PVFS_size *size;
 };
 endecode_fields_1aa_struct(
     PVFS_servresp_tree_get_file_size,
     uint32_t, caller_handle_index,
     uint32_t, handle_count,
-    PVFS_error, error,
-    PVFS_size, size)
+    PVFS_size, size,
+    PVFS_error, error)
 #define extra_size_PVFS_servresp_tree_get_file_size \
   ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
-  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
+    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )
 
 /* mgmt_get_dirdata_handle */
 /* - used to retrieve the dirdata handle of the specified parent ref */

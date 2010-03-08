@@ -42,6 +42,9 @@ int PINT_req_sched_initialize(
 int PINT_req_sched_finalize(
     void);
 
+int PINT_timer_queue_finalize(void);
+
+
 /* retrieving information about incoming requests */
 /* scheduler submission */
 int PINT_req_sched_post(enum PVFS_server_op op,
