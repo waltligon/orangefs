@@ -781,8 +781,6 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         return SM_ACTION_COMPLETE;
     }
 
-    PVFS_BMI_addr_t svr_addr = 0;
-
     /* set retry flag based on mirroring option...if mirroring, we will handle
      * retries from this machine; if not, msgpairarray will handle retries.
     */
