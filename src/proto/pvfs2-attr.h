@@ -55,8 +55,9 @@
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
 #define PVFS_ATTR_DIR_HINT                  (1 << 20)
+#define PVFS_ATTR_DIR_DIRENT_FILES         (1 << 21)
 #define PVFS_ATTR_DIR_ALL \
-(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
+(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | PVFS_ATTR_DIR_DIRENT_FILES)
 
 /* attributes that do not change once set */
 #define PVFS_STATIC_ATTR_MASK \
@@ -182,6 +183,9 @@ endecode_fields_7(PVFS_directory_hint,
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
+    /* list of files to hold directory entries */
+    PVFS_handle *dirent_file_array;
+    uint32_t dirent_file_count;
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
 };
@@ -189,14 +193,29 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_directory_attr(pptr, x) do { \
+    int dirent_files_i;\
+    encode_uint32_t(pptr, &(x)->dirent_file_count);\
+    encode_skip4(pptr,);\
+    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
+        encode_PVFS_handle(pptr, &(x)->dirent_file_array[dirent_files_i]);\
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
 #define decode_PVFS_directory_attr(pptr, x) do { \
+    int dirent_files_i;\
+    decode_uint32_t(pptr, &(x)->dirent_file_count);\
+    decode_skip4(pptr,);\
+    (x)->dirent_file_array = decode_malloc((x)->dirent_file_count \
+      * sizeof(*(x)->dirent_file_array));\
+    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
+    { \
+        decode_PVFS_handle(pptr, &(x)->dirent_file_array[dirent_files_i]);\
+    } \
     decode_PVFS_size(pptr, &(x)->dirent_count);\
     decode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
 #endif
+
 
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
@@ -260,6 +279,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
+        ((x)->mask & PVFS_ATTR_DIR_DIRENT_FILES) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -290,6 +310,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
+        ((x)->mask & PVFS_ATTR_DIR_DIRENT_FILES) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -299,7 +320,10 @@ typedef struct PVFS_object_attr PVFS_object_attr;
  * than a symlink or a metafile or a dir object 
 */
 #define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
+  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)) + \
+  PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+/*TODO: PVFS_REQ_LIMIT_HANDLES_COUNT really needs to change to something
+        indicating the max number of servers */
 
 /* room for distribution, stuffed_size, dfile array, and mirror_dfile_array */
 #define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \

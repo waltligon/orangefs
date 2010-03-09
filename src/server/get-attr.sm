@@ -412,6 +412,21 @@ static PINT_sm_action getattr_verify_attribs(
                 js_p->error_code = 0;
                 assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
             }
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_files needed.\n");
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+                resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_FILES;
+                js_p->error_code = STATE_DIR;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_files not needed.\n");
+                js_p->error_code = 0;
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+            }
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -1383,15 +1398,28 @@ static PINT_sm_action getattr_setup_resp(
     else if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
             (resp_attr->mask & PVFS_ATTR_DIR_HINT))
     {
+        uint32_t dirent_file_count_i;
+
         gossip_debug(GOSSIP_GETATTR_DEBUG, " server returning "
             "dirent_count = %llu "
+            "dirent_file_count = %d "
             "dfile_count = %d "
             "dist_name_len    = %d "
             "dist_params_len  = %d\n",
             llu(resp_attr->u.dir.dirent_count),
+            resp_attr->u.dir.dirent_file_count,
             resp_attr->u.dir.hint.dfile_count,
             resp_attr->u.dir.hint.dist_name_len,
             resp_attr->u.dir.hint.dist_params_len);
+        for (dirent_file_count_i = 0;
+             dirent_file_count_i < resp_attr->u.dir.dirent_file_count;
+             dirent_file_count_i++) {
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "    dirent_file_array[%d] = %lld\n",
+                dirent_file_count_i,
+                lld(resp_attr->u.dir.dirent_file_array[dirent_file_count_i]));
+        }
+ 
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,"@ End %s attributes: sending "
@@ -1553,6 +1581,26 @@ static PINT_sm_action getattr_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
+
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
+    {
+        /* For now there is only 1 of these for each directory. Implementation
+           of distributed directories will mean there may be multiple. */
+        s_op->resp.u.getattr.attr.u.dir.dirent_file_count = 1;
+        s_op->resp.u.getattr.attr.u.dir.dirent_file_array = 
+            (PVFS_handle *) calloc(s_op->resp.u.getattr.attr.u.dir.dirent_file_count,
+                                   sizeof(PVFS_handle));
+        if (! s_op->resp.u.getattr.attr.u.dir.dirent_file_array) {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        s_op->resp.u.getattr.attr.u.dir.dirent_file_array[0] =
+          s_op->u.getattr.dirent_handle;
+    }
+    else
+    {
+        s_op->resp.u.getattr.attr.u.dir.dirent_file_count = 0;
+    }
 
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
     {
