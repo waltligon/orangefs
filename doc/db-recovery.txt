@@ -24,19 +24,18 @@ to improve PVFS performance.  db_load must therefore be modified to use the
 correct key order.
 
 Here are the steps needed to build a db_load utility that will work on the
-keyval.db file:
+keyval.db or dataspace_attributes.db file:
 
 - download the source code for Berkeley DB
 - edit db_load/db_load.c
 - find the section marked by #if 0 that indicates where to insert
   application specific btree comparison or hash functions
-- insert the code listed at the end of this file
+- insert the code listed at the end of this file (NOTE: there is different
+  code depending on which .db file you are trying to recover)
 - build Berkeley DB
 - rename db_load binary to db_load_pvfs_keyval to avoid confusion
 
-This example only works for the keyval.db file.  The dataspace_attributes.db
-file requires a different modification (not provided here).
-
+For keyval.db:
 ====================================================================
 #include <stdint.h>
 
@@ -95,3 +94,33 @@ if ((ret = dbp->set_bt_compare(dbp, PINT_trove_dbpf_keyval_compare)) != 0)
 
 ====================================================================
 
+For dataspace_attributes.db:
+====================================================================
+
+#include <stdint.h>
+
+typedef uint64_t PVFS_handle;
+typedef PVFS_handle                TROVE_handle;
+
+int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b)
+{
+    const TROVE_handle * handle_a;
+    const TROVE_handle * handle_b;
+
+    handle_a = (const TROVE_handle *) a->data;
+    handle_b = (const TROVE_handle *) b->data;
+
+    if(*handle_a == *handle_b)
+    {
+        return 0;
+    }
+
+    return (*handle_a > *handle_b) ? -1 : 1;
+}
+
+if ((ret = dbp->set_bt_compare(dbp, PINT_trove_dbpf_ds_attr_compare)) != 0) {
+        dbp->err(dbp, ret, "DB->set_bt_compare");
+        goto err;
+}
+
+====================================================================
