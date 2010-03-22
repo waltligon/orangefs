@@ -1,0 +1,21 @@
+diff -Naupr ltp-full-20081130/testcases/kernel/syscalls/accept4/accept4_01.c ltp-full-20081130-mod/testcases/kernel/syscalls/accept4/accept4_01.c
+--- ltp-full-20081130/testcases/kernel/syscalls/accept4/accept4_01.c	2008-11-19 04:34:38.000000000 -0600
++++ ltp-full-20081130-mod/testcases/kernel/syscalls/accept4/accept4_01.c	2010-02-02 15:40:12.000000000 -0600
+@@ -147,7 +147,7 @@ setup()
+ 
+ 
+ static int
+-accept4(int fd, struct sockaddr *sockaddr, socklen_t *addrlen, int flags)
++accept4_internal(int fd, struct sockaddr *sockaddr, socklen_t *addrlen, int flags)
+ {
+ #ifdef DEBUG
+    tst_resm(TINFO, "Calling accept4(): flags = %x", flags);
+@@ -202,7 +202,7 @@ do_test(int lfd, struct sockaddr_in *con
+        die("Connect Error");
+ 
+    addrlen = sizeof(struct sockaddr_in);
+-   acceptfd = accept4(lfd, (struct sockaddr *) &claddr, &addrlen,
++   acceptfd = accept4_internal(lfd, (struct sockaddr *) &claddr, &addrlen,
+                       closeonexec_flag | nonblock_flag);
+    if (acceptfd == -1)
+        die("accept4() Error");
