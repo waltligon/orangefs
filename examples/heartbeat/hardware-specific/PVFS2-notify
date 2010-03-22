@@ -1,0 +1,260 @@
+#!/bin/sh
+#
+# Resource script for PVFS2_notify
+#
+# Provides a generic hook for sending notifications if a PVFS2 resource is
+# failed over to another node.
+#
+# Based on MailTo script by Alan Robertson <alanr@unix.sh>
+#
+# Description: Logs a message whenever a resource group starts or stops.
+#
+#	  OCF parameters are as below:
+#               OCF_RESKEY_conf_dir
+#               OCF_RESKEY_title
+#               OCF_RESKEY_firsthost
+#
+# License:  GNU General Public License (GPL)
+
+VARRUN=/var/run
+MAILTOFILE=$VARRUN/PVFS2_notify
+#######################################################################
+# Initialization:
+
+# newer versions of heartbeat have moved the ocf-shellfuncs  file
+if [ -f /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs ] ; then
+. /usr/lib/ocf/resource.d/heartbeat/.ocf-shellfuncs
+else
+. /usr/lib/heartbeat/ocf-shellfuncs
+fi
+
+#######################################################################
+
+ARGS="$0 $*"
+
+us=`uname -n`
+
+usage() {
+  echo "Usage: $0 {start|stop|status|monitor|meta-data|validate-all}"
+}
+
+meta_data() {
+	cat <<END
+<?xml version="1.0"?>
+<!DOCTYPE resource-agent SYSTEM "ra-api-1.dtd">
+<resource-agent name="PVFS2_notify">
+<version>1.0</version>
+
+<longdesc lang="en">
+This is a resource agent for PVFS2_notify. It logs or performs notification when a takeover occurs.
+</longdesc>
+<shortdesc lang="en">PVFS2_notify resource agent</shortdesc>
+
+<parameters>
+<parameter name="firsthost" unique="0">
+<longdesc lang="en">
+Original host for this resource
+</longdesc>
+<shortdesc lang="en">Original host for this resource</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="title" unique="0">
+<longdesc lang="en">
+Title/identifier for the notification.
+</longdesc>
+<shortdesc lang="en">Subject</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="conf_dir" unique="0">
+<longdesc lang="en">
+Configuration directory for file system (PVFS2)
+</longdesc>
+<shortdesc lang="en">Configuration Directory</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+<parameter name="fsname" unique="0">
+<longdesc lang="en">
+Name of file system (PVFS2)
+</longdesc>
+<shortdesc lang="en">Name of file system</shortdesc>
+<content type="string" default="" />
+</parameter>
+
+</parameters>
+
+<actions>
+<action name="start" timeout="10" />
+<action name="stop" timeout="10" />
+<action name="status" depth="0" timeout="10" interval="10" start-delay="10" />
+<action name="monitor" depth="0" timeout="10" interval="10" start-delay="10" />
+<action name="meta-data" timeout="5" />
+<action name="validate-all" timeout="5" />
+</actions>
+</resource-agent>
+END
+}
+
+MailProgram() {
+	mail -s "$1" "$email"  <<EOF
+        $Subject
+ 
+        Command line was:
+        $ARGS
+EOF
+	return $?
+}
+
+SubjectLine() {
+  case $1 in
+    ??*)	echo $1;;
+    *)		echo "Resource Group";;
+  esac
+}
+
+
+PVFS2_notifyStart() {
+	if [ -f ${conf_dir}/pvfs2-notify-quiet.flag ]
+	then
+		rm ${conf_dir}/pvfs2-notify-quiet.flag
+		touch $MAILTOFILE
+		return 0
+	fi
+
+	if [ "$us" == "$firsthost" ]
+	then 
+		Subject="`SubjectLine $title` starting at `date` on its normal compute element $us"
+	else
+		Subject="`SubjectLine $title` starting at `date` on failover compute element $us (resource normally runs on $firsthost)"
+		`/usr/bin/fs-instance-alarm.pl --fs-name $fsname --ce $firsthost --type PVFS2_HA --msg "$title from $firsthost is starting on failover ce $us"`
+	fi
+
+	#MailProgram "$Subject" $1
+	logger -t PVFS2 "$Subject"
+	
+	touch $MAILTOFILE
+	return $?
+}
+
+PVFS2_notifyStop () {
+	if [ -f ${conf_dir}/pvfs2-notify-quiet.flag ]
+	then
+		rm ${conf_dir}/pvfs2-notify-quiet.flag
+		rm -f $MAILTOFILE
+		return 0
+	fi
+
+	Subject="`SubjectLine $title` stopping at `date` on $us"
+
+	#MailProgram "$Subject" $1
+	logger -t PVFS2 "$Subject"
+	rm -f $MAILTOFILE
+	return $?
+}
+
+PVFS2_notifyStatus () {
+	ocf_log warn "Don't stat/monitor me! PVFS2_notify is a pseudo resource agent, so the status reported may be incorrect"
+
+	if [ -f $MAILTOFILE ]; then
+		echo "running"
+		return $OCF_SUCCESS
+	else
+		echo "stopped"
+		return $OCF_NOT_RUNNING
+	fi
+}
+
+PVFS2_notifyValidateAll () {
+
+# $email may be a list of mail addresses separated by "," and " " and "\t"
+# normalize it for ease of parse
+#	local local_email=`echo $email | tr ",\t" " " | tr -s " "`
+
+#	ocf_log info "[$local_email]"
+#	for item in "$local_email"
+#	do
+#	    case $item in
+#		*?@?*)
+#		;; #possible valid email address
+#		*)
+#		getent passwd $item >/dev/null
+#		if [ $? -eq 0 ]; then
+#		: OK, mail to $item@localhost.localdomain
+#		else
+#		    ocf_log err "Invalid email address [$email]"
+#		    exit $OCF_ERR_ARGS
+#		fi
+#		;;
+#	    esac
+#	done
+
+# Any title is OK
+
+	return $OCF_SUCCESS
+}
+
+# 
+# See how we were called.
+#
+#	The order in which heartbeat provides arguments to resource
+#	scripts is broken.  It should be fixed.
+#
+
+if
+  ( [ $# -ne 1 ] )
+then
+  usage
+  exit $OCF_ERR_GENERIC
+fi
+
+case $1 in
+  meta-data)		meta_data
+			exit $OCF_SUCCESS
+			;;
+	#	Not quite sure what to do with this one...
+	#	We aren't a continuously running service - so it's not clear
+	#
+  status|monitor)	PVFS2_notifyStatus
+			exit $?
+			;;
+  usage)		usage
+			exit $OCF_SUCCESS
+			;;
+  *)			;;
+esac
+
+if 
+  [ -z "$OCF_RESKEY_conf_dir" ]
+then
+  ocf_log err "PVFS2-notify must specify conf_dir!"
+#  usage
+  exit $OCF_ERR_GENERIC
+fi
+
+if 
+  [ -z "$OCF_RESKEY_fsname" ]
+then
+  ocf_log err "PVFS2-notify must specify fsname!"
+#  usage
+  exit $OCF_ERR_GENERIC
+fi
+
+conf_dir=$OCF_RESKEY_conf_dir
+fsname=$OCF_RESKEY_fsname
+title=$OCF_RESKEY_title
+firsthost=$OCF_RESKEY_firsthost
+
+case $1 in
+  start)		PVFS2_notifyStart
+			;;
+  stop)			PVFS2_notifyStop
+			;;
+  validate-all)		PVFS2_notifyValidateAll
+			;;
+  *)			usage
+			exit $OCF_ERR_UNIMPLEMENTED
+			;;
+esac
+exit $?

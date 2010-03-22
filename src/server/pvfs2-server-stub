@@ -1,0 +1,9 @@
+#!/bin/bash
+
+LD_ASSUME_KERNEL=2.2.5
+export LD_ASSUME_KERNEL
+
+SERVER_PATH=`dirname $0`
+
+$SERVER_PATH/pvfs2-server.bin $@
+

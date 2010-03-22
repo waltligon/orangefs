@@ -1,0 +1,305 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <assert.h>
+
+#include "pvfs2-server.h"
+#include "pint-perf-counter.h"
+#include "server-config.h"
+#include "pint-util.h"
+
+static int batch_create_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+%%
+
+machine pvfs2_precreate_pool_refiller_sm
+{
+        state setup
+        {
+                run setup_fn;
+                success => wait_for_threshold;
+                default => error_retry;
+        }
+
+	state wait_for_threshold 
+	{
+		run wait_for_threshold_fn;
+		success => setup_batch_create;
+		default => error_retry;
+	}
+
+	state setup_batch_create 
+	{
+		run setup_batch_create_fn;
+		success => msgpair_xfer_batch_create;
+		default => error_retry;
+	}
+
+        state msgpair_xfer_batch_create
+        {
+                jump pvfs2_msgpairarray_sm;
+                success => store_handles;
+                default => msgpair_retry;
+        }
+
+        state msgpair_retry
+        {
+                run msgpair_retry_fn;
+                default => setup_batch_create;
+        }
+
+        state store_handles
+        {
+                run store_handles_fn;
+                success => wait_for_threshold;
+                default => error_retry;
+        }
+
+        state error_retry
+        {
+                run error_fn;
+                success => setup;
+                default => terminate;
+        }
+}
+
+%%
+
+/* msgpair_retry_fn()
+ *
+ * handles anything that needs to happen between sets of msgpair retries
+ */
+static PINT_sm_action msgpair_retry_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+
+    /* signal anyone waiting on get_handles() that we are having trouble */
+    return(job_precreate_pool_fill_signal_error(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        js_p->error_code,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+/* wait_for_threshold_fn()
+ *
+ * waits until the pool count has dropped below a low threshold before
+ * proceeding
+ */
+static PINT_sm_action wait_for_threshold_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    return(job_precreate_pool_check_level(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        user_opts->precreate_low_threshold,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+ /* store_handles_fn()
+  *
+  * stores a set of precreated handles persistently within precreate pools
+  */
+static PINT_sm_action store_handles_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    return(job_precreate_pool_fill(
+        s_op->u.precreate_pool_refiller.pool_handle,
+        s_op->u.precreate_pool_refiller.fsid,
+        s_op->u.precreate_pool_refiller.precreate_handle_array,
+        user_opts->precreate_batch_size,
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context,
+        NULL));
+}
+
+
+/* setup_batch_create_fn()
+ *
+ * prepares a req/resp pair to another server to precreate a batch of
+ * handles
+ */
+static PINT_sm_action setup_batch_create_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_credentials creds;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
+        s_op->u.precreate_pool_refiller.host,
+        llu(s_op->u.precreate_pool_refiller.pool_handle));
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+
+    /* note: we are acting like a client in this case, so use client timeout
+     * and delay values
+     */
+    s_op->msgarray_op.params.job_timeout = user_opts->client_job_bmi_timeout;
+    s_op->msgarray_op.params.retry_delay = user_opts->client_retry_delay_ms;
+    s_op->msgarray_op.params.retry_limit = user_opts->client_retry_limit;
+    s_op->msgarray_op.params.quiet_flag = 1;
+
+    msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
+    PINT_util_gen_credentials(&creds);
+
+    PINT_SERVREQ_BATCH_CREATE_FILL(
+        msg_p->req,
+        creds,
+        s_op->u.precreate_pool_refiller.fsid,
+        PVFS_TYPE_DATAFILE,
+        user_opts->precreate_batch_size,
+        s_op->u.precreate_pool_refiller.data_handle_extent_array,
+        NULL);
+
+    msg_p->fs_id = s_op->u.precreate_pool_refiller.fsid;
+    msg_p->handle = s_op->u.precreate_pool_refiller.data_handle_extent_array.extent_array[0].first;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = batch_create_comp_fn;
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return(SM_ACTION_COMPLETE);
+}
+
+
+/* setup_fn()
+ *
+ * initial state to allocate memory for use through the remainder of the
+ * state machine's life
+ */
+static PINT_sm_action setup_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct server_configuration_s *user_opts = get_server_config_struct();
+        
+    s_op->u.precreate_pool_refiller.precreate_handle_array = 
+        malloc(user_opts->precreate_batch_size * sizeof(PVFS_handle));
+    if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    js_p->error_code = 0;
+    return(SM_ACTION_COMPLETE);
+}
+
+
+/* error_fn()
+ *
+ * handles error transitions
+ */
+static PINT_sm_action error_fn(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    job_id_t tmp_id;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_err("Error: precreate_pool_refiller for %s encountered error.\n",
+        s_op->u.precreate_pool_refiller.host);
+    gossip_err("Error: sleeping for 30 seconds before retrying.\n");
+        
+    if(s_op->u.precreate_pool_refiller.precreate_handle_array)
+    {
+        free(s_op->u.precreate_pool_refiller.precreate_handle_array);
+    }
+
+    return(job_req_sched_post_timer(
+        (30*1000),
+	smcb,
+	0,
+	js_p,
+	&tmp_id,
+	server_job_context));
+}
+
+
+/* batch_create_comp_fn()
+ *
+ * msgpair completion function to handle processing batch create response i
+ * from another server
+ */
+static int batch_create_comp_fn(void *v_p,
+                                 struct PVFS_server_resp *resp_p,
+                                 int index)
+{
+    PINT_smcb *smcb = v_p;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i;
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG, "batch_create_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_BATCH_CREATE);
+
+    if (resp_p->status != 0)
+    {
+        PVFS_perror_gossip("batch_create request got", resp_p->status);
+	return resp_p->status;
+    }
+
+    for(i = 0; i<resp_p->u.batch_create.handle_count; i++)
+    {
+        s_op->u.precreate_pool_refiller.precreate_handle_array[i] = 
+            resp_p->u.batch_create.handle_array[i];
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "Got batch created handle: %llu from: %s\n",
+            llu(resp_p->u.batch_create.handle_array[i]),
+            s_op->u.precreate_pool_refiller.host);
+    }
+
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_precreate_pool_refiller_params =
+{
+    .string_name = "precreate_pool_refiller",
+    .perm = PINT_SERVER_CHECK_INVALID,
+    .state_machine = &pvfs2_precreate_pool_refiller_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

@@ -1,0 +1,1632 @@
+-----------------------
+PVFS2 Release ChangeLog
+-----------------------
+
+pvfs-2.8.0
+=============
+
+* Many bug fixes.
+* Support for the latest kernel releases, including 2.6.28.
+* Support for the latest releases of Berkeley DB, including 4.7.25.
+* New Direct I/O mode for enterprise storage backends.
+* Optimizations for small file workloads, including inode-stuffing
+  and object pre-creation.
+* Improved performance for directory listing (readdir).
+* Better integration with high-availability environments.
+* New tracing component to integrated with TAU trace logs.
+* Support for creating and building BMI only packages.
+* Experimental support for a PVFS FUSE module.
+
+pvfs-2.7.1
+==============
+
+* support for the latest kernel versions
+
+* kernel module:
+   - fixes to kernel dcache revalidate for multiple clients
+   - fixes to kernel getattr update race conditions
+   - modified kernel slot timeout to be separate (and much longer) from
+     the upcall timeout
+
+* bmi-ib: fixes to infiniband double free bugs
+* bmi-tcp: fixes to eager mode for slower client platforms
+
+* fixes to state machine processing.
+* fixes for the migration utility to work with single config file.
+* memory corruption fixes.
+* improved support for multithreaded system interface usage
+
+* performance:
+    - removed unecessary locks in server metadata operations
+    - better caching of long-term attributes for IO
+    - improved pvfs2-lsplus and readdirplus() performance
+
+* configuration:
+    --enable-threaded-kmod configure time option replaces -threaded run time
+      option to pvfs2-client
+    - segfault backtraces enabled by default
+    - HA script examples updated for use with Heartbeat 2.1.2 and newer
+
+
+pvfs-2.7.0
+==============
+* ib: free cached registrations when out of space (openib only)
+
+* HEC posix extensions now supported by PVFS.
+* HEC posix extensions patches to the vfs are provided in the patches subdir.
+* Support for immutible (read-only) files set by xattr and vfs caching of
+read-only files through the vfs.
+* ib: optimistic buffer registration to avoid segmented memory registration
+* ib: redesign and streamline credit-based flow control scheme
+* ib: cache explict BMI_memalloc registrations; huge latency improvement
+* bmi: avoid gettimeofday() to determine poll vs block for multi-method
+    scenario
+* ib: rely on bmi to make poll vs block decision
+* ib: only check for new connections and async events during blocking periods
+
+* state machine changes:
+	- cleanup codegen to use structs instead of unions/arrays
+	- provide a universal smcb (state machine control block) for
+	  all state machine actions
+	- add support for concurrent state machines
+
+* portals: new BMI implementation
+* make/configure: support Cray XT3/XT4 compute node build environment
+
+* Added a RootSquashExceptions config option
+
+* support for Linux kernels 2.6.22 and 2.6.23
+
+* New layout parameter to PVFS_[i]sys_create.
+
+* Immutable file support, allowing client caching of files.
+
+* Added a new two-dimensional distribution for incast scenarios.
+
+* MX: new BMI implementation
+
+* Fixes to:
+	- servers running over an extended period of time.
+	- kernel module for simul workloads
+	- readdir handling of tokens
+	- alt aio cleanup path
+
+pvfs-2.6.3
+==============
+
+* fix to metadata coalescing that caused file corruption by writing to invalid
+file handles.  Occurs with large (>70) mpi parallel write workloads.
+* fix for race condition on metadata completion
+* fix for alt-aio with non-contig requests
+* fix to kzalloc configure checks for older kernels
+* fix to support older (0.9.6x) openssl versions
+* fix 2.4 kernel crash in lookup
+* fix cleanup of server internal state machines
+* fix remove-object to decrement dirent count
+* fix a number of error code problems in bmi and elsewhere
+* fix to prevent failures on decoding response errors from server
+* fix 2.4 mount bugs
+* fixes to acl checking, group checking, and root squash
+
+pvfs-2.6.2
+==============
+
+* fixes in trove dbpf to support latest Berkeley DB (version 4.5).
+* fix kmod compile issues with --enable-mmap-racache
+* fix for IO failures caused by invalid sizes used in file.c
+* fixes for 2.4 kernels
+
+pvfs-2.6.1
+==============
+
+* fix --enable-fast
+* fix to build for client-core-threaded (make clean and make kmod before make)
+* fix problems on ppc64 (long/int type mismatches, no _syscall, removed
+warnings)
+* fix overwrites past end of request
+* allow kernel buffer size to be tuned from pvfs2-client
+* fixups for linux kernel version 2.6.19
+	- check return type of kmem_cache_destroy
+	- combine readv/writev to aio_read/aio_write
+
+pvfs-2.6.0
+==============
+* kernel module cleanups
+* appropriate support for 64bit handles in kernel module
+* added debugs for kernel to pvfs2-debug.h
+* added offsetof macro
+* added PVFS_U_SUID (root squash)
+* pvfs-utils.h: PVFS2_translate -> PVFS_translate
+* removed function: PVFS_mgmt_toggle_admin_mode
+* changed all the PVFS_credentials params in system interfaces to const
+* added PVFS_(i)sys_readdir_plus
+* made PVFS_sysresp_readdir_s align properly for 64bit
+* PVFS_sysresp_geteattr struct: added err_array field
+* PVFS_sys_attr struct: fix alignment for dist_name and dist_params fields
+* +1 of major version: 1.3 -> 2.3
+* removed parent_*time from crdirent/rmdirent request
+* added listattr request
+* added (optional) params:
+ - TCPBindSpecific
+ - FlowBufferSizeBytes
+ - FlowBuffersPerFlow
+ - TroveAltAIOMode
+ - RootSquash
+ - ReadOnly
+ - AllSquash
+ - AnonUID
+ - AnonGID
+ - SecretKey
+* fixed setgid bug
+* root squash
+* support for getdents[64]_plus_lite
+* build w/ 2.6.18 and 2.6.19 kernels
+* added pvfs2-lsplus
+* configure arguments:
+    --with/without-openssl[=<path>]
+* alt_lio_listio impl (threaded pread/pwrite)
+* server SIGHUP handler waits for all ops completion [...]
+* migration tool fixes
+* fixes for simultaneous create/unlink hangs (reqsched and sync coalesce)
+* add connection close to bmi for resetting the socket buffer size for initial
+socket
+* atime, mtime, and ctime fixes for VFS interface
+* verify hash of config files
+    - added openssl options and checks
+* updated faq entry for heartbeat
+* config check for linux/mount.h
+* config check that statfs callback has struct dentry arg
+* LTP fixes to pass tests
+    - s/EOPNOTSUPP/EACCES/
+    - acl fixes
+* ib:
+    - check for ib reregister event
+    - close connection on cancel
+    - fix duplicate free bug during message cancel
+
+pvfs2-1.5.0
+===============
+- trove dbpf keyval changes:  The dbpf keyval implementation has been
+  changed from using individual DB objects for each handle, to one
+  DB object for all keyval entries.  This affects the storage format,
+  and requires the pvfs2-migrate-collection tool to be run on storage
+  spaces created previous to this release.
+- sync coalescing: A new syncing feature has been added to the trove layer that
+  provides better performance with metadata in high-load cases.  New options
+  were added to the server config: TroveSyncCoalesce, CoalescingHighWatermark,
+  CoalescingLowWatermark.
+- added stranded bstream checking and handling.  This is useful for correctly
+  reusing handles in failure cases.
+- consolidate I/O paths through the VFS for read,write and readv,writev.
+- added testsome, wait, and release functions to external interfaces
+- fixes to karma and performance monitoring.
+- better error handling on server and client and kernel module
+- fixes to ownership flags on root directory.  Allow chmod to work.
+- fixes for small io and non-contiguous io.
+- fixes to sys-io state machine to prevent deadlock on the server caused by
+  concurrent writes from the same client.
+- replaced keyval strings with shorter versions to save space in the keyval
+  database.
+- cleanups to the kernel module: cleanup cache subsystem structures and
+  functions.  Better error checking on to make module reloading more robust.
+- fixes for fsck and fs-dump.
+- better xattr support for 2.4 kernels
+- added support for berkeley db environments with the pvfs2 bdbs, and using
+  shared memory for db cache instead of mmapped file.
+- better support for 64bit (esp. ppc64) platforms and 32/64 bit mixed env.
+- better support for darwin (OS X)
+- added configure options: --disable-aio-callbacks,  No check for aio callback
+  support is done any longer. --enable-kernel-sendfile to configure for users 
+  that want sendfile system call support, it is now disabled by default.
+  Epoll is now the default if its available, otherwise poll is used,
+  --enable-epoll and --disable-epoll now force without checking.
+- Performance improvements for bmi_tcp: allow socket buffer size and tcp
+  window size to be changed dynamically.  Use a pipe file descriptor
+  for poll to prevent stalls.  Reorganize epoll to add and remove epoll
+  watches.
+- pvfs2-genconfig now supports --iospec and --metaspec options.  Also fixed
+  some hostname sorting and range spec bugs.
+- pvfs2-client: added --logstamp.  nonblocking statfs and mount support.
+- handle allocation wasn't resulting in a uniform distribution.  Now we
+  pick a server at random and then select the remaining handles in a
+  round-robin fashion
+- pvfs2-ping does better per-server error reporting and keeps track of errors
+  better
+- pvfs2-viewdist now fails gracefully on old systems without xattrs.  Also
+  prints out handle number and filename for each datafile
+
+pvfs2-1.4.1-pre1
+===============
+- ib: encode data structures to support heterogenous architectures
+- deal with update_atime vanishing from kernel: test for touch_atime and use
+  that if available.
+- fix configure-time kernel tests to work better with 2.6.16 kernels
+- ib: separate config options for includes and libraries, optionally
+- ib: support mellanox ibgd-1.8.2, compile quietly on x86_64
+- ib: avoid more compiler warnings
+- ib: list hcas rather than enumerating in code
+- ib: fix mosal startup for ancient libraries
+- ib: update internals documentation
+- ib: fix CTS out-of-order problem
+- ib: separate message headers to make math and debugging easier
+- ib: avoid trying to actively connect as a server
+- ib: move static variables into an allocated struct to avoid namespace
+  collisions
+- ib: generalize memcache to be used by multiple consumers, not just VAPI
+- ib: generalize bmi_ib to work with multiple verbs interfaces.  Add support
+  for OpenIB.
+
+pvfs2-1.4.0
+- add a simple sendfile callback stub
+- getattr through pvfs2-client-core now specifies exactly what it needs
+- fix case where pvfs2-fs-dump would fall into infinite loop
+- added new pvfs2-viewdist and pvfs2-perror utility
+- many zero-fill cleanups
+- SIO (small-io) optimization: piggyback small I/O requests in initial
+  communication between server and client (like MPI eager mode, but for I/O)
+- fix a truncate bug
+- pvfs2-genconfig can create config files for running several servers on one
+  machine.  useful for testing
+- better pvfs2-client and pvfs2-client-core logging
+- better interaction between pvfs2-client and pvfs2-client-core 
+- improvements to doxygen generation
+- rework the acache into generic tcache infrastructure upon which acache is
+  built
+- timeouts for kernel operations can now be adjusted via /proc/sys/pvfs2
+- cleanups for --enable-strict and building on 64-bit systems
+- update kernel interface for 2.6.15
+- assorted improvements to tests: more coverage, better reporting
+- fix several immediate completion cases: others probably remain
+- remove an extraneous call to make_bad_inode
+- better logging when msgpairarray fails
+- clean up the pvfs2-server shutdown process
+- improvements to nightly test error checking
+- fix immediate completion error with zero-byte reads and writes
+- more robust directory renaming technique
+
+pvfs2-1.3.2
+===============
+- new configure option for kernels which export internal symbols: 
+	--disable-kernel-aio
+- fix for getattr error handling
+- fix for trove printing out a resource after (sometimes) invalidating it
+
+pvfs2-1.3.1
+===============
+- ib: add memory registration caching
+- ib: add support for cancel operation
+- ib: fix minor protocol problems
+- ib: cleanup build
+- better pvfs2-client and pvfs2-client-core logging
+- --enable-fast was broken
+- fix compile error on FC3 and RHEL 2.6.9 kernels
+- async i/o support (but needs libaio and libaio-devel at this time)
+- "trusted ports"
+- --enable-strict now compiles w/ a lot fewer warnings
+- fixed timestamp problems for pvfs2 files
+- listeattr system interface function 
+- fixed bugs in timestamps
+- fixed bugs in zero-fill handling
+- no longer ship generated .c files from .sm. instead, ship the sm parser
+  (allows for easier release patching)
+- Phil Carns: server checks fs id on startup
+- Phil Carns: --num-dfiles option to pvfs2-genconfig
+- Phil Carns: fix setgid suport
+- Phil Carns: proper symlink support (created as 777, no way to change them)
+- Lots of portability fixes.  PVFS2 now builds on Darwin (userspace, no
+  kernel)
+- better tests for location of Berkely DB headers/libraries
+
+- Trach-Minh Tran <trach-minh.tran@epfl.ch> reported bug in append mode. fixed
+- 
+
+
+pvfs2-1.3.0
+===============
+- Murali Vilayannur contributed extened attribute support to the VFS interface
+- Murali and Dean Hildebrand also worked on implementing readv and writev in
+  the VFS interface
+- Phil Carns contributed logging improvements to pvfs2-client and pvfs2-server
+- Phil also contributed improvements to the request processor which should
+  help speed up some concurrent workloads.
+- Phil further contributed protocol versioning to PVFS2.  Major version
+  changes are incompatible up or down.  New clients can't talk to old servers,
+  but new servers can talk to old clients. 
+- clean up some warnings on 64 bit platforms
+- Phil contributed a pvfs2-set-sync tool 
+- lots of configure tests for various kernel versions
+- rework acache
+- memory leak in flow descriptors
+- bugfixes for noncontig requests
+- improvements to the req scheduler: more operations can occur concurently now
+- improved handling of "zero-fill" case: sparse files now treated correctly
+- further improvements to nightly testsuite
+
+
+pvfs2-1.2.0
+===============
+- make server better able to handle bogus file names (David Metheny)
+- better casts for ppc64
+- even better configure tests for various berkely db features
+- documentation updates for Fedora 4 changes
+- extended attribute support (not available through VFS yet)
+- nightly build infrastructure now mostly in place
+- --enable-strict now works again
+- new utilities: pvfs2-touch, pvfs2-stat, pvfs2-ln
+- add additional write() checks to kernel module
+- hold st_nlink field at 1: keeping a true count is quite hard to do
+  correctly in a distributed environment
+- new distribution: "varstrip"j
+- better pvfs2 kernel module debugging interface (/proc/sys/pvfs2/debug)
+- pvfs2 now supports setgid 
+- build: avoid some warnings from gcc4
+- kernel: understand new backing_dev_info format in 2.6.12
+- Added DefaultNumDFiles as filesystem config option.
+- Added num_dfiles tabfile option.  i
+  The number of dfiles is set by searching for the first given hint in this
+  order:  application hints, tabfile, server config.  The selected 
+  distribution may modify the hint if neccesary.
+- Phil Carns contributed general improvements and bug fixes for the dotconf
+  parser.
+- Added DefaultDistribution section support for server config file.  Section
+  is optional and accepts Name, Param, and Value (Param and Value may be
+  repeated multiple times in the section).
+- added 'retry' and 'timeout' config file options
+- will consult /etc/mtab as an additional source for pvfs2 tabfile entries
+
+pvfs2-1.1.0
+===============
+- network protocol: more 64-bit alignment fixes
+- build: hide karma details in its module.mk
+- build: remove duplicate commands used for QUIET_COMPILE
+- build: fix test configure library detection
+- build: simplify karma and vis some more
+- build: add tests for features of Berkeley DB 4.3.xx
+- trove: fix bugs introduced by new features of DB 4.3.xx
+- docs: added doxygen configuration file and doxygen-style docs
+  to many source files
+- pvfs2-cp: can pass strip size as a parameter (thanks David Beilloin
+  <dbeilloi@mc.com>)
+- gossip: avoid double-timestamp in debug and error messages
+- feature-test for kernel routines i_size_write, i_size_read, and parent_ino
+- recover better from server failures
+- kernel: export superblock magic number for romio autodetection
+- 64-bit: change some protocol encodings to avoid unaligned accesses, fix
+  server crash
+- documentation updates
+- Phil Carns and David Beilloin reported various memory leaks and memory
+  misuse throughout the code
+- Phil Carns and David Metheny contributed their improvment to the
+  permissions-checking routines.  Secondary groups work much better now.
+- configure-time options to select behavior needed on redhat-like environments
+- can disable server support at configure time
+- various tweaks to make cross compiling easier
+- Phil Carns contributed a new config file option (LogStamp) to select
+  timestamp format
+- By default we sync metadata (TroveSyncMeta yes) and not data (TroveSyncData
+  no).  This configuration is a good compromise between reliability and
+  performance for most workloads.
+- Joachim Worringen's noncontig benchmark turned up several bugs now addressed
+  in this release
+- bugfix where pvfs2-chmod would cause all future operations to fail
+- bugfix for 64 bit servers.  pvfs2 on opteron now passes the bonnie benchmark
+
+pvfs2-1.0.1
+===========
+- ib: add configure-time checks for mosal library variations
+- ib: flush send queue work requests periodically
+- ib: search receive queue for both eager and rts (D. Beilloin)
+- improved support for some cases of file holes (that require zero fill)
+- fixed a crash bug due to incorrect assertion regarding zero fill
+- applied annotations and cleanups to the kernel module in response to
+  using the automated correctness checker called 'sparse'
+- fixed a bug that did not properly allow storage space removals when
+  using ReiserFS as the underlying file system
+- added more redhat checks for determining if we need to patch the
+  kernel module code to work properly with particular releases
+- FAQ documentation update
+
+
+pvfs2-1.0.0
+===========
+- disabled mmap readahead cache by default; allow configure option to
+  optionally enable it
+- added support for handling several cases of file hole zero fills
+  (i.e. sparse files)
+- configured acache timeout to be 5 seconds by default through the
+  vfs; sysint was already 5 seconds
+- added karma program installation to make install target
+- redhat 9 related changes (in order to work out of the box)
+  - used some 2.6.x kernel code on redhat 9 2.4.x kernels, if detected
+  - no longer mark pages as reserved on redhat 9 2.4.x kernels, as it
+    causes an oops on their kernel (i.e. not necessary)
+  - installed a wrapper script in place of the pvfs2-server that
+    exports the LD_ASSUME_KERNEL environment variable before running
+    the server(to avoid using the redhat NPTL library which is
+    incompatible)
+  - fixed make kmod{24}_install even if there are multiple UTS_RELEASE
+    definitions in the version.h file (as there are in redhat 9)
+
+
+pvfs2-0.9.0
+===========
+- documentation updates to HA and FAQ documents
+- better balancing (randomization) of data server selection when
+  creating new files
+- clean up a few request-related 8-byte alignment issues for alpha
+- fixed an AMD64 kernel oops due to a bad cast
+- cleaned up error code types in the exposed sysint and mgmt methods
+  (using PVFS_error rather than int)
+- added a setattr debugging mask and changed most detailed setattr
+  debugging to use it
+- added a mkdir debugging mask and changed most detailed mkdir
+  debugging to use it
+- added some inlined methods in PVFS_util (as they need to be used on
+  both the server and the client) for getting the current time in
+  PVFS_time format, encoding a PVFS_time as a version (finer grained
+  than a 'normal' PVFS_time since we can use the high 32 bits), and
+  decoding the version as a PVFS_time
+- added a compatibility hack that _should_ allow no noticeable
+  breakage on existing storage space, but will eventually migrate to
+  the slightly new storage format over time
+- modified client side sys-mkdir, sys-create, and sys-symlink to
+  encode the mtime as a version when passing it to the server (so it's
+  transparent from the server perspective)
+- modified server side get-attr to decode the version read from disk
+  back into an mtime (so it's transparent from the client perspective)
+- modified mkspace method to properly version newly created root and
+  lost+found directories
+- modified the server side mkdir operation to return -PVFS_EINVAL if
+  the object attr type is not a directory object
+- vfs readdir modifications to detect directory version changes on
+  listings; default behaviour is unchanged
+- fixed bug in collection remove that didn't remove the collection
+  information from the collection db (which manifested as having a bug
+  where a collection that was once created and then removed could
+  never be created again due to a lookup succeeding before it should)
+- added documentation on how to create multiple file systems within a
+  single pvfs2 storage space
+- added documentation on return codes of the sysint methods
+- pvfs2-mkspace improvements:
+  - now requires a collection ID, storage space and a handle range
+  - fixed types used to represent actual root handle and collection id
+    to be the proper types, rather than integers
+  - remove many defaults in favor of requiring cmdline options
+  - replace atoi calls with strtou{l}l to accomodate larger values if
+    specified
+  - cosmetic output improvements
+  - fixed mkspace method to make sure that we only use handle ranges
+    that are both non-null, AND are not an empty string
+
+
+pvfs2-0.8.0
+===========
+- adjusted mask values for event logging to skip 0 mask
+- moved handle counting in statfs to server side so that it is
+  done in parallel
+- replaced uniq() subroutine in PAV to avoid recursion
+- pvfs2-statfs cleanups and cast fixing
+- pvfs2-shell-test: replaced a directory test
+- add a clientcore_timing debug mask that only logs the operation
+  timings from the pvfs2-client-core
+- added some pts debugging
+- fixed bad assumption in getattr-acache that might have looked at the
+  wrong handle/fs_id during some operations (e.g. lookup)
+- removed potential latency on system startup by trying to store temp
+  config files in /tmp/ first rather than the current dir
+- make sure that our error routines strip any known class error bits
+  instead of deciding that they're unrecognized if set
+- improved trove error handling
+- improved pvfs2-server error handling
+- fixed crash bug in our config parser that tried to strdup strings
+  that might be NULL
+- pvfs2-types.h header file simplification and cleanups
+- extended buffer size of filename for use with mkstemp as it started
+  failing on ppc with misc unexpected characters
+- addition of a simple vfs test program that creates a file with a
+  hole in it and tries to read from that hole (this demonstrates a
+  currently known bug)
+- addition of the same test program using only the system interface
+- fixed some misc memory/resource leaks
+- fixed test program ls.c and admin program pvfs2-ls.c to not issue an
+  extra call to readdir on every run by fixing a slight logic bug
+- added a directory version that is passed back from the server to the
+  client on each successful readdir call and updated the client and
+  server response structures and encoder to accomodate this
+- ncache related:
+  - increased ncache timeout from 5 seconds to 30 seconds by default,
+    but keep it disabled by default (it's still experimental)
+  - cleaned up the ncache and make it useable by the
+    lookup/remove/create/mkdir/etc calls (if enabled)
+  - added a flag to the client sysint lookup sm that records if the
+    final object resolved was a followed symlink or not (regardless of
+    if it was followed or not)
+  - extended the ncache interface (lookup/insert/remove) to have the
+    ability to have multiple entries with the same name with different
+    handles based on some other tag (e.g. resolving a symlink object,
+    rather than what it points to).  this is also not in use at the
+    moment.  for now, no symlink objects will be inserted into the
+    ncache.
+  - added more ncache debugging
+  - added a fastpath return from client sysint lookup method on ncache
+    hit
+  - updated and extended all ncache test programs to work with the
+    changed API and fixed broken tests/verified that they still work
+- kernel related:
+  - fixed all warnings generated from compiling the pvfs2 kernel
+    module under 2.6.9 kernels
+  - removed write_inode method, as it was unused and probably won't be
+    used
+  - removed unused -v command option to pvfs2-ls
+  - added command option -V (and --verbose) which can detect version
+    differences in the directory being read and will report them if
+    this switch is enabled
+  - fixed misc compilation warnings on Opteron/AMD64 machines
+  - added directory version to readdir downcall (passed from
+    pvfs2-client-core)
+  - removed include of modversions.h directly from pvfs2-kernel.h
+
+
+pvfs2-0.7.0
+===========
+- fsck: server handles bogus datafiles better
+- fsck: pvfs2-fsck is a little smarter about what it tries to salvage
+- ib: avoid unsignaled WQE pileup
+- ib: avoid polling cancelled connections (first stab toward true
+  cancel)
+- ib: spin-block in test functions for better performance
+- ib: do not "open" HCA, just grab a handle
+- ib: fix leaking connection structs (thanks to D. Beilloin)
+- ib: use faster 1k mtu
+- ib: cleanup warning texts
+- configure: add option to disable AIO threaded callbacks
+- configure: fix GM and IB to enable only when explicitly requested
+- add timestamps to gossip debugging to file and stderr (not syslog)
+- ib: initial cancel support, works for pvfs2-ls
+- add multihome support: servers can listen on multiple addresses (and
+  BMI types), clients choose the first address from tabfile that works
+- bmi: poll adaptively based on recent usage
+- added trove-dbpf support for internally limiting the number of
+  simultaneous aio operations allowed in progress; default value is 16
+- increased mmap-ra-small buf size from 4K to 16K to avoid many small
+  allocations (causes slightly larger mem footprint of client-core)
+- adjusted client sysint setattr operation to work in a write-through
+  manner with the acache (when enabled)
+- fixed client sysint setattr to invalidate the acache entry (if any)
+- changed acache lookup to return the status (to avoid another acache
+  call that will always follow a successful lookup)
+- internal acache improvements, such as removal of duplicated code
+- updated acache-torture test program to match slightly new acache
+  interface
+- make sure mmap's requesting MAP_SHARED fail (mmap2 returns -EINVAL,
+  userspace mmap returns standard MMAP_FAILED value)
+- added compile time support for measuring roughly how long it takes
+  to process particular operations issued from the vfs
+- modified PINT_sys_testsome to return immediately without calling
+  testcontext if any ops are completed and ready to be returned right
+  away
+- made statfs return load information from servers
+- gm: fixed performance bug, make sure test calls check completion
+  queue before sleeping
+- gm: implement cancel functionality and verified for common cases
+- fixed dbpf SYNC macro bugs that caused hangs on systems without aio
+  callback support
+- updated pvfs2-config tool to use LIBS variable from configure
+- removed -ldb from client side link stage
+- added --serverlibs option to pvfs2-config to determine what
+  libraries have been linked against pvfs2-server
+- updated makefile system for tests directory to use pvfs2-config and
+  deprecate use of .libs file
+- added make install target for test harness programs
+- introduced mutex locking in trove-handle-mgmt to avoid race
+  conditions that appear when statfs is called while trove operations
+  are in progress
+- added utility functions for measuring elapsed wall, system, and user
+  time between specified points in code
+- fix glaring alignment failure in PVFS_server_req
+- fixed type of readahead_size in upcall for mmap-ra-cache that caused
+  the mmap-ra-cache to not work properly on PowerPC
+- no longer look in the mmap-ra-cache for data on reads unless we're
+  sure we're doing an mmap or execution (as opposed to always)
+- removed kernel module pvfs2_link call, as it was never used
+- moved static copy_mntent method to PVFS_util_copy_mntent method
+- added error handling to PVFS_util_copy_mntent
+- renamed PVFS_sys_free_mntent to PVFS_util_free_mntent
+- fixed successful return value of PVFS_util_copy_sys_attr
+- fixed initialize-dyn test program that broken due to mntent changes
+- changed get_data_sync_mode to explicitly return TROVE_SYNC if called
+  on an unregistered fs_id
+
+
+pvfs2-0.6.5
+===========
+- broke several server state machines into multiple nested machines
+- some PAV cleanups, including support for a larger number of meta
+  servers than io servers
+- update k_size (number of keyvals) in dspace attr cache when the
+  number of keyvals on disk changes
+- replaced all vfs 64 bit operation tags to be unsigned
+- replaced pint-dev code to work with 64 bit unsigned tags
+- moved all op initialization out of the constructor and into the
+  op_alloc routine
+- fixed tag cancellation upcall/method to use a 64 bit tag, rather
+  than an unsigned long
+- added a PVFS_util method to get the current system and return it as
+  a valid PVFS_time type
+- added arguments to the crdirent/chdirent/rmdirent operations that
+  now can take optional parent atime/mtime/ctime fields
+- added support on server *dirent operations that update the parent
+  time attributes (if specified) on successful completion of the
+  *dirent operation; null/zero time fields are not modified
+- modified sys-create/sys-mkdir/sys-symlink/sys-rename/sys-remove to
+  work with the new operations properly; in general,
+  create/remove/rename operations updates the mtime and ctime of the
+  parent directory, which is now properly supported
+- moved some common server side attribute handling code into a macro
+  to make it re-useable across several server state machines
+- updated en{de}coding of modified operations
+- remove sync calls on readonly trove operations
+- added sanity check to kernel's device poll; makes sure the device is
+  opened by only one user before returning valid results
+- make the device's request list waitqueue non-exclusive, since poll
+  waits as well
+- some formatting changes on kernel error reporting
+- added mmap-ra-cache support for partial cache fills on incomplete
+  requests; misc mmap-ra-cache enhancements
+- cast setparam values to uint64_t rather than int64_t in admin utils
+- remove trove sync call on server side root handle check
+- modify server side remove state machine to check the k_size of the
+  dirdata object being removed if it's a directory to report early
+  back to the client that the directory is not empty (if it's not)
+- remove the readdir checks in the client remove path now that the
+  server-side remove can tell us directly if a directory is not empty
+- modified PVFS specific error routines to print the value of
+  unrecognized error codes if encountered
+- fixed memory leak on check_fs_id setparam
+- fixed 64bit compile warnings (AMD64/Opteron)
+- split msgpair debugging into it's own class (no longer part of
+  'client')
+- break out clientcore debugging into its own debugging mask
+- fixed trove error codes
+- give trove flush and resize operations the ability to create the
+  bstream they're working with if it doesn't exist instead of
+  returning an error
+- fixed bug in (threaded) trove that did not properly reinitialize
+  condition variables after the first finalize
+- improvements to the storage space and collection removal code
+- extensive trove cleanups and cruft removal
+- check for error codes when doing server side getattr and reading
+  metafile information; stop processing if an error is reached
+- invalidate attr cache on write_at calls (never used)
+- changed pvfs2-showcoll coll_id prints from hex to decimal
+- kernel changes:
+  - enable kernel readahead hints on mmap/execution (i.e. sequential)
+  - initialize kernel module's request_list_waitq at declaration time
+  - put large print statement into a macro for convenience
+  - make all bufmap allocations GFP_KERNEL, regardless of highmem usage
+  - use add_waitqueue_exclusive for the io_completion_waitq entries
+  - clear random readahead hint on mmap
+
+
+pvfs2-0.6.4
+===========
+- added a pvfs2-config tool to help when compiling against pvfs2
+- new PAV option (COMPUTENODES_LAST) that controls whether compute
+  nodes are chosen first or last out of the total set of nodes
+  available
+- fix locking bug introduced in 0.6.3 that shows up when trove is used
+  without aio callbacks
+- explicitly name invalid msg tag value (0)
+- modified pvfs2-ls to show the mtime (rather than atime) in long
+  listings
+- updated set-info test program to update mtime (rather than atime)
+- fixed possible flow mutex memory leak
+- changed PVFS_time from an int64_t to a uint64_t
+- fixed a pvfs2-fsck compile time warning
+- fixed bug in sys-remove that erroneously tried to back out of the
+  remove even on error codes that are acceptable to return
+- moved to fully 64 bit unsigned gossip masks (for some more possible
+  debugging levels)
+- fixed bug in shared-state-machine getattr method that could allow
+  attributes to come out of the acache with incorrect types/fields
+- fixed bug in crdirent msgpair setups for create/mkdir/symlink (used
+  incorrect handles in mappings)
+- modified mgmt setparam call to take uint64_t parameters instead of
+  int64_t
+- kernel changes:
+  - fixed bug that allowed a file removed on one client to still
+    appear on another with bad attributes
+  - fixed dentry revalidation to never return that a dentry is valid
+    if's negative
+  - fixed directory inode's mtime and ctime changes on updates
+  - fixed directory link counts for some changes
+  - simplify atime/mtime/ctime conversion to sys_attr (and vice versa)
+    to and from inode's time fields
+
+
+pvfs2-0.6.3
+===========
+- added ability to negate log categories in
+  PVFS_debug_eventlog_to_mask
+- added pvfs2-fsck
+- updated pvfs2-quickstart to better discuss client configuration
+- added optional epoll() based socket management component (enable
+  with configure option --enable-epoll on linux 2.6 systems)
+- fixed configure bug that dropped default CFLAGS in some cases
+- adjusted trove id generation to make it easier to log trove events
+- fixed Makefile.in bug that caused pvfs2-server.c dependency
+  information to be lost
+- rewrote both threaded and nonthreaded versions of all job_testXXX()
+  functions
+  - fixed condition variable usage to avoid signaling races that could
+    lead to unecessary wait times
+  - simplified code path
+  - removed superfluous calls to gettimeofday()
+- adjustment of condition variable usage in trove-dbpf to avoid races
+  similar to those found in job_testXXX()
+- applied vim formatting patch to use spaces instead of tabs
+- fixed pvfs2-server permission check to allow users of the same group
+  to have access to other group members attributes (for listing)
+- fixed incorrect/invalid error codes and error handling
+- fixed pvfs2-server crash bug due to io state machine potentially
+  freeing a reqsched id that was never posted
+- added mgmt methods PVFS_{i}mgmt_get_dirdata_handle for retrieving
+  the internal dirdata handle of a specified 'parent' object (if any)
+- fixed pvfs2-server crash bug (race) in trove that could return an
+  object on queue addition that has already been serviced
+- extended server side mkdir state machine to create the internal
+  dirdata dspace when creating the directory (rather than waiting for
+  crdirent to create it if it doesn't already exist)
+- added mgmt methods PVFS_{i}mgmt_create_dirent mgmt for creating
+  directory entries at a low level
+- fixed request scheduler's acceptance of the mgmt-remove-* operations
+  while in admin mode (since these can be used in admin mode)
+- extended mkspace (and thus pvfs2-mkspace program) to initalize a
+  lost+found directory after the root directory is made
+- kernel changes:
+  - fixed credential usage bug that resulted in (seemingly random)
+    permission problems when using the file system as multiple users
+  - fixed a bug that appeared as data corruption due to mapped memory
+    pages in use being swapped out under heavy memory load under 2.4.x
+    kernels (and containing incorrect data on future accesses)
+  - remove slab poison flag from debug allocators, as some kernels
+    complain about how it was used
+  - do not use kmap/kunmap calls if not configured for HIGHMEM, as
+    some configurations cannot resolve these symbols
+
+
+pvfs2-0.6.2
+===========
+- updated documentation for dist-simple-stripe.c and modified
+  the basic distribution to use a single data file object.
+- fixed error reporting in pvfs2-server that didn't understand pvfs2
+  specific error codes
+- extended request scheduler to allow operations to pass through
+  without being scheduled (and allow the noop operations to work like
+  this)
+- disabled the (unused) device interface on server builds, reducing
+  server run-time threads by one
+- bmi optimizations: avoid polling in test calls if operations are
+  complete, or no operations are complete but there are unexpected
+  operations ready to be serviced
+- extended the pvfs2-mkspace tool to be able to work with data and
+  meta handle ranges separately (also extended the internal interfaces
+  as necessary for this functionality)
+- fixed bug in mkspace that could create the root directory dirent
+  object in a non-meta handle range
+- added client side attribute type checking that avoids contacting
+  servers if we've determined that the operation we're about to
+  perform cannot be performed on an object of the type we were told to
+  work on.  e.g., a readdir operation will not be issued to the server
+  if the getattr reports that the object we want to readdir on is not
+  a directory.  most sysint operations now have this checking in place
+- fixed crash bug on the server crdirent operation if passed a
+  non-directory object type
+- fixed race condition triggered when pvfs2-server is getting many
+  more incoming operations than it has posted unexpected msgs for
+- increase the default number of posted unexpected msgs by the server
+- properly re-integrate and simplify the usage of the mmap-ra-cache,
+  which wasn't working properly after the pvfs2-client-core re-write
+- fixed crash bug on the server due to an unexpected error code coming
+  out of pthread_cond_timedwait inside of job test calls
+- modify configure script to append date and time information to non
+  release builds (for more fine grained version information if needed)
+- fixed acache usage in sysint create/mkdir/symlink operations
+- open-cache remove now syncs (if necessary) after the remove, rather
+  than just before
+- removed duplicate 'open_cache' debugging keyword definition
+- allowed client side logging (via PVFS2_DEBUGMASK/PVFS2_DEBUGFILE env
+  variables) to append to the specified logfile, rather than
+  truncating it if it already exists
+- fixed bug in device test method that didn't properly adjust the
+  outcount on failure; also added the number of bytes read on a failed
+  (short) read
+- started adding debugging code for printing out server side response
+  structures (only getattr is currently implemented)
+- kernel changes: added some debugging and simplified the
+  handle_io_error macro.  also added translation of non-errno pvfs2
+  error codes (should it get one) to avoid returning entirely
+  incorrect error codes in some cases; avoid allowing -PVFS_ECANCEL to
+  be passed down to the kernel code from the pvfs2-client-core.  use
+  i_size_read to update file position on opens for append.  remove old
+  code that manually updated the inode's file size on writes
+- replaced debugging mask of cancelled i/o operations from io to
+  cancel
+- simplified pvfs2-statfs by retrieving all server statistics in one
+  call, rather than separate ones for meta and data servers; also
+  fixed reporting of server duties (previously all servers were
+  reported as serving both meta and i/o data)
+- added a start banner to pvfs2-client-core if client debugging is
+  enabled.  this allows easier visual inspection of restarts in logs
+- fixed bug when copying credentials to first make sure that they're
+  valid in all sysint/mgmt calls
+- added both server and client side (mgmt) operations to remove
+  arbitrary pvfs2 objects and directory entries without prejudice
+- added a 'pvfs2-remove-object' tool that can remove pvfs2 objects and
+  directory entries (use is not generally encouraged)
+- fixed pvfs2-fs-dump crash bugs when it fails to find some objects it
+  was expecting to see
+- adjusted the time that pav allows for copying binaries out to remote
+  machines
+- fixed bug bmi_tcp potential send deadlock under heavy loads
+- added a mgmt method that allows parameter sets on single servers
+  (rather than the previous one that allowed only all servers)
+- extended pvfs2-set-debugmask program to have the ability to set the
+  debug mask on a single server (rather than all) via cmdline options
+- replaced TroveSyncMode configuration option with separate
+  TroveSyncMeta and TroveSyncData options.  the default values are yes
+  for both
+- updated pvfs2-genconfig to reflect TroveSync* config option changes
+- implemented understanding of the data sync mode option in the flow
+  interface via the setinfo method
+- modified pvfs2-server to pass data sync mode option to the flow
+  implementation via setinfo on a per fs basis
+
+
+pvfs2-0.6.1
+===========
+- misc. updates to msgpairarray and associated tools to allow for
+  server side use
+- reorganization of server request parameters so that more (but not
+  all yet) are stored in a centralized table
+- removed some deprecated test programs
+- new pint-util.[ch] to contain utility functions shared between
+  client and server
+- some refactoring of server state machines (mainly crdirent) to allow
+  for code reuse in other state machines
+- no longer need to fix up generated html by hand
+- fixed a bug that allowed an open through the vfs without the O_CREAT
+  and O_EXCL flags to return -EEXIST (should be success in that case)
+- added a file_open.c test program that tests opens in various modes
+- error code cleanups (added PVFS_EACCES mapping to EACCES; moved
+  PVFS_EDETAIL to be a non-errno error code)
+- fixed pvfs2-ls to properly convert reported file times in user's
+  configured system localtime, rather than in UTC
+- fixed the kernel module information so that modinfo doesn't report
+  many duplicate entries
+- fixed server pidfile usage (-p cmdline option)
+- fixed msgpair retries to properly delay between retry attempts
+- added trove hooks to be able to peek at handles that will be
+  allocated later
+- cleaned up the remove state machine and removed an unnecessary
+  allocation/copy
+- fixed existing acache usage in the sysint calls to be more uniform;
+  removed some overhead in the sysint
+- fixed kernel device close to be aware if mounts are still active
+- added more tests to pvfs2-shell-test that test deeply nested
+  subdirectories
+- added a method to determine the min handle recycle time across all
+  configured servers' file systems
+- changed code formatting rules to use spaces rather than tabs in vim
+- fixed bug that didn't reload the cached config information on file
+  system removal (i.e. unmounts)
+- added a cmdline argument to pvfs2-client to specify the acache
+  timeout to use at run-time (default is 0 milliseconds, which is
+  effectively disabled).  this timeout is upper bounded by the min
+  handle recycle time across all servers, and it can change
+  dynamically as new mounts come and go
+- fixed a bug that allowed servers to create internal storage objects
+  outside of the meta handle ranges in some circumstances
+- replace single element msgpair/array setup code where possible with
+  a macro
+
+
+pvfs2-0.6.0
+===========
+- removed pvfs2-import and pvfs2-export in favor of pvfs2-cp
+- added compile time option for disabling thread-safety in the client
+  library (enabled by default; --disable-thread-safety to disable)
+- improved configure summary information emitted at configure time
+- added missing non-blocking sysint declarations to sysint header
+- made sysint test and testsome() calls more useable
+- merged dev unexp polling/handling with system interface
+- added PINT_sys_dev_unexp call that allows posting unexpected device
+  messages so that they can be returned from the sysint testsome
+  method in addition to completed sysint operations
+- added a id_gen_fast_unregister macro that is a no op, to make the
+  api more consistent with the id_gen_safe_* calls
+- modified device driver to work properly in non-blocking mode from
+  userspace by implementing the character device poll method and
+  modified the pint-dev device interface to make sure it can handle
+  the pvfs2 device in a non-blocking manner; added a no immediate
+  completion option to the device interface; made test more efficient
+  by not polling if no idle time is specified; check for poll errors;
+  use proper buffer sizes for reads across the device
+- added a method to free the mapped memory region on pvfs2-client-core
+  shutdown (valgrind complained)
+- modified all job uses of the id-generator to use the safe, rather
+  than fast, methods (useful for several reasons including safe
+  cancellation of already completed operations)
+- modified the job_dev_unexp method to have (and honor) the no
+  immediate completion flag if passed (used in the pvfs2-client-core)
+- re-wrote pvfs2-client-core to use sysint non-blocking operations
+- improved human readable size reporting
+- allow human readable size reporting to optionally use si units
+- added --si option to pvfs2-ls (similar to ls's --si option)
+- added -H option to pvfs2-statfs (similar to du's -H option)
+- added a method able to cancel I/O operations in progress
+- removed kernel ability to kill device file on cancelled I/O
+- added the ability of sys-io.sm to handle run-time cancellation while
+  still transitioning properly
+- added support in the pvfs2-client for ignoring an upcall retry for
+  an op already in progress (as opposed to servicing it multiple
+  times)
+- added kernel method that allows the cancellation upcall/downcall
+  cycle to progress, ignoring the fact that a signal is pending (since
+  the only time a cancellation is issued is when there's a signal
+  pending)
+- fixed kernel oops on setattr (signal) interruption by returning a
+  valid error code in this case
+- full acache cleanup, bugfixes, and thread-safety support
+- allow the sysint post() method to complete an op if finished
+  (i.e. all states are immed. completion) by adding it to the
+  completion list (which test/testsome can retrieve)
+- removed 'cached' attribute fields from getattr_sm object
+- removed mostly duplicated code from shared-state-methods.c
+- added support (testing only) for building a threaded client library
+- gracefully terminate thread-mgr testing threads on errors (this is
+  only really useful for graceful shutdown of the threaded client
+  library)
+- added a set_info option to bmi that tells it to be more aggressive
+  when cancelling operations (bmi_tcp will now close sockets)
+- fixed kernel bugs that didn't release the bufmap indices in use on
+  some error paths (eventually caused all of them to be permanently
+  used which caused hangs on I/O)
+- extended msgpairarray code to only retry msgpairs that haven't
+  completed already
+- increased kernel module single operation timeout to be 60 seconds
+  instead of 30 seconds (note: as a side-effect this also extends the
+  amount of time you'll have to wait on interrupted operations via
+  signal for now)
+- added PVFS_strerror_r; an equivalent to strerror_r (the thread-safe
+  strerror call) that handles PVFS_error codes
+- added a simple file_write test program (tests are not in releases)
+- always delay for 1 second before spawning the pvfs2-client-core from
+  within the pvfs2-client to avoid filling dmesg with harmful looking
+  errors while restarting (and re-opening the device file)
+- new trove component called dbpf-open-cache that caches open file
+  descriptors and db references; replaces dbpf-bstream-fd-cache,
+  dbpf-dspace-db-cache, and dbpf-keyval-db-cache; fixes a few long
+  standing file size and attribute bugs
+- added a few missing admin tools to make install target
+- more attribute debugging messages or server
+- added admin utility program pvfs2-chown
+- added make lib/pvfs2-threaded.a target that can be used to build a
+  multithreaded version of the pvfs2 client library
+- thread safety for dynamic activation of bmi methods
+- fixed makefile LD selection and html docs target
+- fixed bmi deadlock that appears in multithreaded library
+- fixed responsiveness of pvfs2 kernel driver device poll
+- added new option to BMI called BMI_FORCEFUL_CANCEL_MODE to serve as
+  a hint to modules to be more aggressive when cancelling operation
+  (i.e., tell tcp to always close sockets when cancelling)
+- renamed pint-bucket component to pint-cached-config
+- enabled pint-cached-config on server side
+- unified how autogenerated .c files are tracked across client and
+  server builds
+- fixed distclean for release tarballs so that it does not destroy .c
+  files that cannot be regenerated without full cvs source
+- moved msgpairarry from client code to common code and made many
+  adjustments to enable general usage; linked into server
+- misc. msgpairarray cleanups
+- removed depricated PINT_client_bmi_cancel() function
+- updated state machine compiler to allow multiple machine definitions
+  per file
+- added new null job type that can be used to manually trigger
+  asynchronous state machine transitions
+- refactored server side functions used to start state machines that
+  are not tied to incoming requests
+- refactored server crdirent state machine using nested state machines
+  and a little bit clearer error handling
+- added job functionality to reset timeout timer on pending jobs
+- removed old "contig" encoder from source tree
+- added new "cancel" debugging mask to look at job timeout behavior
+- documentation updates: a new high availability document, faq update,
+  guide update, manpages
+- moved exported pvfs2-util string functions to private str-utils
+- added permission checking debugging mask and keyword to debug what
+  the server is doing on permission granting or failure
+- modified cosmetic output of admin tool pvfs2-set-debugmask
+- make sure pvfs2-client doesn't cause a hang on ssh logout due to
+  improperly closed fds; this was fixed in the past but unfixed to
+  report exec failures.  we can't do that anymore with this setup, so
+  we'll have to either require an absolute path to the client
+  (preferred), or scan the PATH ourself to be sure it can be found; or
+  log to a file like the server
+- added debugging regarding the handle re-use timeout
+- increased the default handle re-use timeout from 45 to 360 seconds
+- removed redefinition of the default handle timeout constant
+- change permissions to reasonable defaults on newly created
+  directories using pvfs2-mkdir
+- extended pvfs2-cp to preserve src to dest permissions where
+  applicable
+- extended pvfs2-cp to allow symlinks to be copied to and from pvfs2
+  (as the link target file, not as a link -- similar to normal 'cp')
+- extended pvfs2-cp to truncate target files if they exist
+- added a threaded vfs test program to perform heavy I/O on a single
+  file
+- fixed pvfs2-server to continue processing after recoverable
+  BMI_testcontext errors
+- added some gossip debugging along the acache code path
+- kernel bugfixes:
+  - don't attempt to shrink the sb's dcache on device close in the
+    case that the sb has not yet been filled
+  - translate error codes that occurred while waiting for the
+    downcall, rather than assuming an error came back from the
+    downcall (in the case that it didn't); fixes a possible oops on
+    invalid mounts
+  - use fully 64-bit op tags instead of relying on unreliable casts
+    and assumptions moving from kernel space to userspace; changes use
+    of an atomic_t type to a spinlock protected int64_t; works on ppc
+    without problems now
+- changed pre-posted write_ack recv posting to have an infinite
+  timeout that is reset on flow completion to avoid timeouts before
+  operation completion
+- fixed crash bugs on (unexpected) job expiration in various places
+- fixed crash bugs when an invalid (or unsupported) encoding type is
+  specified by reporting the error to the user, and the completing the
+  operation if possible by cycling through the valid encoders
+- added pvfs2tab support for the line encoding=default
+
+
+pvfs2-0.5.1
+===========
+- added a pidfile option to pvfs2-server for init script integration
+- auto-tuned BMI timeout to poll during activity, sleep a bit
+  otherwise
+- pay attention to BMI timeouts in IB layer
+- fail quitely on unrecognized BMI method types in pvfs2tab
+- disabled TCP method for IB builds
+- added pvfs2-cp, which should have all of the functionaly of
+  pvfs2-import and pvfs2-export, but none of the bugs (!)
+- bug fixed to idle detection logic in job.c (non-threaded case)
+- some tweaks to BMI timeout behavior
+- removal of some deprecated BMI code
+- bug fixed that caused problem when trying to add an invalid mount
+  entry
+- bug fixed when trying to add general dynamic mount entries
+- distribution framework cleanups
+- updated test programs and pts test harness to use new distribution
+  code
+- bug fixed that allows i/o attempts on non-datafiles to be handled
+- bug fixed that caused breakage on the verbose debugging mask
+- implemented non-blocking client library calls for all sysint and
+  most mgmt operations
+- changed all credential arguments to credential references
+- export id-generator methods for sysint users
+- removed pvfs2-threaded-client-core application from code base
+- added pvfs2-mkdir program
+- added pvfs2-cp program (soon to replace both pvfs2-import &
+  pvfs2-export)
+- added a GPL license notice in the top level files for the kernel
+  module
+- moved cached configuration information our of the configuration
+  object
+- allow server setattr operations to be performed even if write access
+  on the object being modified is not granted (fixes utime failures
+  and misc other permission problems like untarring some files)
+- kernel bugfixes:
+  - fixed an oops on cancelled object operations (file,dir,symlink)
+  - fixed kernel error codes in several places
+  - fixed a memory leak that didn't free symlink targets
+  - replaced new_inode call with iget to avoid the possibility of
+    duplicate inodes with the same number in the vfs
+  - fixed kernel create mode translation when creating new objects
+- kernel 2.4.x. support introduced (supports 2.4.19 and up)
+- allow pvfs2-client to restart on device open failure
+- updated quickstart with the following information:
+  - gcc 2.96 or above is required (as gcc 2.95 generates buggy code)
+  - how to use the kernel interface under 2.4.19 or above
+- misc cleanups, error handling, and debugging
+
+
+pvfs2-0.5.0
+===========
+- consolidate msgpair and msgpairarray implementations
+- bug fixed in "make kmod" path handling
+- added ability to build kernel module and test programs to
+  pvfs2-build.sh
+- added scripts (from Justin Luck) for nightly vfs testing
+- started nightly vfs testing (see pvfs2-testing mailing list)
+- implemented job cancel api
+- added job timeouts, and started using in both client & server
+- added ability to (manually) reconnect after transient failure in
+  bmi_tcp
+- allow queueing of receives for failed bmi_tcp addresses that may get
+  reconnected
+- removed some depricated client library code
+- started using PVFS_ECANCEL rather than PVFS_EINTR for cancelled
+  operations
+- added bmi address reference counting
+- allow server to discard anonymous bmi addresses after connection has
+  been closed (to conserve resources)
+- removed test subdirectory from distributed releases
+- cleanup of protocol version mismatch error messages, including a way
+  to propigate errors detected on server back to client
+- fixed db cursor leak in trove
+- fixed for busy spin condition in client library when retrying
+  operations
+- various cleanups to error handling in msgpairarray code
+- added some shell script testing and bonnie++ testing to automated
+  tests
+- fixed pvfs2-ls handling of large usernames
+- fixed kernel bug that allowed you to remove the module while in use
+- kernel bufmap general I/O path improvements
+- increase the default size of the server-side attribute cache
+  (configurable in pvfs2-genconfig)
+- randomize the file system IDs generated by pvfs2-genconfig
+- internal id-generator code enhancements
+- fixed a gcc compilation warning on older versions
+- added a new error code system that allows the addition of addition
+  pvfs2 specific error codes for use within the system
+- added logic to automatically retry sends and receives of network
+  operations on communication failure
+- proper unposting and cleanup of posted recvs that are no longer
+  needed
+- added high level retry logic for system operations to help tolerate
+  transient server failures
+- fixed truncate operation to properly return error code and not
+  operate on anything that's not regular file
+- added a chdirent server operation that replaces an existing dirent
+  and returns the old (useful for renames where the target exists)
+- refactored the client side remove state machine so that it can be
+  used by both the remove and rename client operations
+- general cleanups and improvements to the client side rename
+  operation
+
+
+pvfs2-0.1.3
+===========
+- added event logging to request encoder, server state machines, and
+  most job calls
+- some changes to the event logging mask system
+- some new test programs for event logging
+- fixed flow protocol handling of zero byte request processing results
+- moved pvfs2-client* to src/apps/kernel/linux-2.6
+- added an independent configure and make setup for test subdirectory
+- removed all dependencies on test subdirectory from src subdirectory
+- properly report if the pvfs2-client fails to execute the core
+  program
+- reworked the error code handling in the kernel module to better
+  match the userspace pvfs2 error codes
+- handle kernel mount attempts that fail without crashing
+- added support for the pvfs2-client-core to request that the kernel
+  module pass all of the mount information it knows about back to the
+  client so that a client restart can seamlessly pick up from where it
+  left off
+- added a client/kernel umount operation that removes dynamic mount
+  entries
+- properly report symlink types in the pvfs2-ls tool
+- fixed karma from hanging on start due to a previous api change
+- reworked the client side system interface to be able to handle
+  dealing with multiple server configuration files at once
+- kernel now supports multiple mount points from different servers
+- kernel mount option parsing improvements and error handling
+- fixed broken configure options: --enable-karma and --disable-karma
+- better error handling and synchronization in the kernel module
+- fixed a kernel crash if pvfs2-client-core was restarted while
+  another process was attempting to do I/O
+- added a mechanism for ensuring that remount operations are serviced
+  first by the pvfs2-client-core on restart, rather than failing all
+  pending operations until the mount tables are built
+- reworked the dbpf-attr-cache to use both fs_id and handle as the
+  lookup key to allow it to work properly when multiple file systems
+  are mounted
+- fixed a kernel crash bug that tried to overwrite pages at invalid
+  offsets on read error
+
+
+pvfs2-0.1.2
+===========
+- BMI IB module:
+    - fix bug resulting in mixed-up connections
+    - clean up incoming message processing
+    - refactor test and testcontext code
+    - simplify state machine
+- add shared and static libraries build options
+- honor PVFS2_DEBUGFILE environment variable in client
+- Kernel module builds:
+    - build the module with everything else, if configured
+    - clean up properly
+    - work out-of-tree
+- Build system:
+    - list explicit include directories
+    - add cflags provided by module makefile stubs
+    - install kernel module if configured
+    - simplify dependency generator script, add .po
+- BMI: initialize needed methods dynamically, not at startup
+- add ability to force use of alternative pvfs2tab file at run time
+- general cleanup of API used for system interface initialization,
+  including tabfile parsing
+- added reserved value for fsid type to indicate uninitialized value
+- BMI and flow interfaces now accept NULL list of modules to
+  initialize defaults, BMI interprets this by delaying init of modules
+  until needed, flow interface interprets by initializing all possible
+  modules
+- new api functions for resolving local file system paths
+- added ability to dynamically add and remove file systems from the
+  system interface at run time
+- fix request scheduler bug that was leading to odd behavior under
+  heavy I/O load
+- added some scripts started by Wes Emeneker to automated the steps
+  needed to download and build ROMIO with PVFS2 support
+- re-enable compilation of Jiesheng's caching flow protocol
+- added new automated nightly test scripts started by Wes Emeneker
+  into test/automated subdir
+- started running automated tests on Adenine cluster at Clemson as a
+  nightly cron job
+- isolated a request processing corner case with a test program
+- renamed PVFS_pinode_reference -> PVFS_object_ref to cleanup the
+  system interface a little further
+- added some first stubs for hooks to specify distribution parameters
+  at runtime
+- added more specific server and client side debugging keywords
+- enhanced vfs error reporting
+- client sysint cleanups and error reporting improvements
+- server operation cleanups and error reporting improvements
+- bmi error code translation hooks to work properly with pvfs2 error
+  codes
+- fixed mmap-ra-cache bug that didn't flush data at the right times
+- made the mmap readahead cache functionality a configure option
+  (enabled by default)
+- fixed vfs bug that caused multiple processes accessing the same file
+  trigger a SIGBUS on file close
+- enhanced vfs test pvfs2-shell-test.sh to test a tricky case of
+  filling and emptying the page cache repeatedly in a worst case
+  scenario
+- start client sysint thread safety by making accesses to the global
+  configuration object serialized
+- reworked the vfs statfs method to not cause overflows on some
+  kernels
+- re-introduced a client sysint lookup optimization to work with the
+  overhauled client lookup operation
+- fixed size reporting of symlinks in pvfs2-ls program
+- fixed vfs getattr calls for directories and symlinks
+- added an experimental testbed program for testing threaded client
+  sysint operations based on the pvfs2-client-core (called
+  pvfs2-threaded-client-core)
+- mostly consolidated credential generation to one place
+- modified the kernel mount and initialization to use the dynamic
+  mount system, where a server and file system name is specific on the
+  mount command line (no more hard coded coll_id and root_handle!)
+- fixed a particularly nasty vfs race bug that could crash the kernel
+  during writes
+- fixed a vfs bug that could cause a client to think a file did not
+  exist when in fact it did
+- added full support for dynamic vfs mount (which breaks the old way
+  of mounting, but is more convenient and makes more sense)
+- Better documentation for building MPICH2+ROMIO+PVFS2
+
+
+pvfs2-0.1.1
+===========
+- can now specify Trove sync behavior when setting up PVFS2 volumes w/
+  pav
+- added a new mpi-io test to exercise ROMIO's scalable operations
+- better detection of dead sockets in BMI TCP/IP module
+- fixed pvfs2tab file parsing bug
+- completely rewritten TCP/IP socket management
+- fixed potential server deadlock on shutdown bugs
+- fixed vfs bug that stalled the server on signal cancelled operations
+- enhance vfs support to ignore non-fatal signals caught while waiting
+  for a remote operation to complete
+- added support for the "intr" mount option to allow any signal to
+  interrupt remote operations (similar to the nfs option)
+- enhanced test/kernel/linux-2.6/pvfs2-shell-test.sh test script to
+  test mmap reads and allow more run-time flexibility
+
+
+pvfs2-0.1.0
+===========
+- initial support for logging traces with both MPE and Pablo libraries
+- fix some warnings on x86-64
+- work around older Berkeley-DB versions w/o support for DB_DIRTY_READ
+- implementation of cancel() in BMI, Trove, Flow, and thread mgmt
+  interfaces
+- graceful recovery from I/O errors within flows
+- updated perf interface to return metadata access statistics
+- various bmi_tcp optimizations (cut down on system calls)
+- fixes to bmi_tcp cpu utilization
+- dynamic traffic graphs added to Karma
+- improved cleanup from messaging errors in client libraries
+- added ability to report partial errors with details from mgmt
+  interface
+- revisited locking approach in jobs, flows, and bmi_gm
+- new config file option to control default Trove sync behavior
+  (metadata)
+- pvfs2-genconfig update to generate default sync'd metadata sync mode
+- added experimental metadata mode (nosync, instead of sync) for
+  allowing unsync'd operations to occur that reads from dirty memory
+  (written but non-committed data) to help enhance performance
+- graceful shutdown when server gets ctrl-c (SIGINT)
+- pvfs2-ls output and argument bugfixes and better error reporting
+- handle allocator fix to no longer return invalid handles if no valid
+  ranges have been registered
+- improved server version reporting and exit path (using --version/-v)
+- vfs kernel module warning removal (code without proper locks held)
+- fixed vfs bug that assigned incorrect link counts on new entries
+- fixed vfs bug that used uninitialized data structures when compiled
+  without kernel debugging support
+- fixed vfs bug that didn't properly initialize root inode's
+  handle/fs_id
+- fixed vfs bug that failed to adjust file position on files opened
+  for append
+- fixed vfs bug that didn't properly rebuild attributes of files that
+  could cause erroneous type changes in the vfs
+- fixed vfs bug that could not remove directories with more than 32
+  entries in them
+- fixed potential vfs race regarding op queueing with a lock
+  re-ordering
+- improved error reporting of error codes from pvfs2 through the vfs
+- improved error reporting and detection in the configuration parser
+- optimized server flush operation to only flush either metadata or
+  data, depending on the object being worked on
+- test/server/showconfig output improvements
+- properly clean up meta and data handles during sys_create if the
+  crdirent step fails
+- make pvfs2-import check if the target file exists before attempting
+  to create it
+- pvfs2-fs-dump output improvements (made more readable)
+- added test/kernel/linux-2.6/pvfs2-shell-test.sh that is useful for
+  running some simple vfs tests on a mounted pvfs2 volume
+- added configure option to allow the karma gui to not be built
+- fixed a bug that would not allow sysint initialization if the user
+  does not have write permission in the current directory
+- properly cache attributes at create and write time instead of
+  waiting until the first read is done
+
+
+pvfs2-0.0.9
+============
+- added karma administration (new gtk+ gui) for interactive monitoring
+  of pvfs2 servers (statistics and performance)
+- fix support for creating/using/removing multiple collections (file
+  systems) within a storage space
+- improved pvfs2-client backgrounding (better descriptor management)
+- pvfs2-ls improvements for handling multiple mount points specified
+  on the same command line
+- capture some more data in the mgmt server statfs object,
+  pvfs2-statfs program update
+- add kernel support for being an nfs exportable file system
+- add kernel support for being able to mount more than one pvfs2 volume
+- misc code cleanups and removals all over
+- test/client/sysint program bugfixes and cleanups
+- pvfstab parsing bugfix
+- pvfs2-ping and pvfs2-statfs support for multiple file systems
+- improved server error reporting if failure occurs before backgrounding
+- fix hang on server shutdown via signal
+- new maint script (pvfs2smdot.pl) for generating a graphical
+  representation of the state machines and transitions (dotty format)
+- updates to state machine syntax, including support for comments and
+  explicit termination of state machines
+- initial work on ability to gracefully cancel pending I/O operations
+  within the system
+- sync and truncate bug fixes
+- mpi-io-test reports variance among processes
+- fix potential bug in le-bytefield encoder
+- use correct compiler flags with Intel cc
+- fixed and enhanced the pvfs2-mkspace program for creating/removing
+  collections and storage spaces
+- adjusted all gossip masks to have a standard prefix
+
+	
+pvfs2-0.0.8
+===========
+- many alpha platform improvements, including configure check passes,
+  compilation fixes, and vfs fixes (alignment/overflow bugs)
+- pvfs2-genconfig quiet mode improvements
+- removed extraneous sample server configuration files from source
+  tree (can now be generated at compile time)
+- kernel mmap/readahead cache improvements and bug fixes
+- improved pvfs2-server signal handling, error reporting, and handling
+- added a configure/compile time option for allowing function
+  backtraces on critical errors (see ./configure --help) and backtrace
+  documentation for analyzing what they mean (see doc/coding/)
+- properly implement the rmdir operation through the kernel interface
+- improved dbpf-attr-cache error handling and serious bug fixes (race
+  condition and potential memory corruption fixes)
+- race condition fixes on the trove dbpf-thread code, job thread
+  manage, and job desc queueing code
+- a complete re-write of client side system interface lookup operation
+  that now handles path components such as '.' and '..' and allows
+  better absolute and relative recursive symlink resolution, including
+  a new client debugging keyword/level specific to the lookup
+  operation
+- added a symlink test to the pts test suite
+- added some test shell scripts to the test/client/sysint directory,
+  mostly useful for stressing the new lookup operation
+- kernel and client side i/o path improvements that now gracefully
+  handle errors such as the case of i/o happening on a file that is
+  removed by another process
+- implemented a previously unimplemented kernel method (inode:getattr)
+- pvfs2-client command line parsing bug fix (no longer crashes on
+  invalid args)
+- improvements to several test programs (in test/client/sysint)
+- removed several files and function that are no longer needed
+- on disk storage format is now versioned
+- bound acache size, while it's only holding invalid entries and
+  growing too large
+- powerpc file size listing fixed in pvfs2-ls
+- added appendices to quickstart to cover a few more scenarios
+- more sanity checks in remove path (in particular for directories)
+- reorganized thread management for kernel / userspace communication
+  used by pvfs2-client
+- some pvfs2-ls bug fixes
+
+
+pvfs2-0.0.7
+===========
+- re-worked architecture of metadata storage (generic dspace attrs are
+  used instead of a separate keyval/data pair)
+- added a server-side (trove-dbpf) attribute write-through caching
+  layer for caching generic attributes and keyval/data pairs that are
+  user configurable
+- added a readahead data cache specifically for vfs mmap-read and
+  execution, improving their performance greatly (running, editing,
+  compiling, etc on a pvfs2 volume is now much more responsive)
+- fix size reporting using 'du' through the vfs interface
+- GNU/Linux PowerPC 32bit support, including the 2.6.x kernel
+  interface
+- updated pvfs2-genconfig to account for new config file format
+- fixed an I/O bug that caused data access problems on some multiple
+  I/O server configurations
+- removed extra berkeley db error reporting since it's not integrated
+  with our gossip error reporting system.  can now be explicitly
+  enabled using a new configure option --with-berkdb-debug
+- fixes to state machine compiler to workaround hangs on some machines
+- new scripts in maint/build for building and testing PVFS2
+- better balancing (randomization) of metadata server selection when
+  creating new files and directories
+- various error msg cleanups (in several components)
+- mutex locking improvements, allowing support for NPTL thread
+  implementations and also improving performance for some operations
+- fixed a bug in client side lookup that can cause nested entries
+  across multiple meta servers to work incorrectly (does not affect
+  kernel interface)
+
+
+pvfs2-0.0.6
+===========
+- improved kernel truncate support
+- fixed kernel ioctl return values (so that 'tar -xv[z|j]f' can work
+  on pvfs2 volumes)
+- minor configuration file format changes
+- improved performance monitoring framework
+- pvfs2-vis-bw-2d tool for server throughput monitoring
+- many symbol name cleanups
+- removal of deprecated code
+- kernel inode link count fixes
+- bucketized (single indirection) 'on-disk' representation of bstream
+  and keyval files in the host storage space
+- a pvfs2_rmspace (opposite of mkspace); can be invoked by server
+  using the -r command line option
+- added kernel module highmem support
+- renamed attribute cache 'pcache' to 'acache'
+- large file support bug fixes
+- improved client sysint rename implementation (state-machine)
+- improved signal handling in pvfs2-client
+- switch to a new protocol encoder which translates requests and
+  responses into a machine-independent format, allowing
+  interoperability between 32- and 64-bit machines and little- and
+  big-endian machines.
+	
+	
+pvfs2-0.0.5
+===========
+- clean compilation on 64-bit machines
+- vfs stability improvements during I/O, including across client
+  restarts
+- statfs reporting improvements (closer to correct)
+- sysint remove method fix to properly clean up datafiles
+- partial path symlink resolution support
+- vfs symlink resolution/following support (including partial path)
+- added sysint parameter to sys_lookup that dictates if the final
+  object on lookup should be resolved if it's a symlink
+- runtime options to choose request encoder (see pvfs2tab man page)
+- new, much faster, default flow protocol
+- streamlined support for threaded and non-threaded server builds
+
+
+pvfs2-0.0.4
+===========
+- improved truncate support (pcache usage/integration)
+- kernel truncate support (improved file size reporting)
+- removed several run-time verbose (expected) warnings
+- fixed a handle rollover bug in extentlist handler
+- fixed bit-rotted non-threaded trove/job compilation
+- improved client sysint readdir implementation (state-machine)
+- improved client sysint mkdir implementation (state-machine)
+- improved client sysint setattr implementation (state-machine)
+- improved client sysint lookup implementation (state-machine)
+- symlink resolution/following support
+- multiple metadata server configurations are now supported
+- pvfs2-genconfig can now generate multiple metadata server
+  configurations
+- pav and pvfs2-genconfig now run in 'perl -w' mode w/o any warnings
+- added event logging framework, instrumented a few code paths
+- example tools to manage event log (pvfs2-set-eventmask and
+  pvfs2-event-mon-example)
+- started some example perf monitor visualization tools, src/apps/vis
+  subdir
+- new network encoding for heterogeneous systems (le-bytefield)
+- env variable to set client side debugging level
+
+	
+pvfs2-0.0.3
+===========
+- more pts tests for pvfs2 datatypes
+- ability to specify flowprotocol in pvfs2tab file per fs
+- truncate implementation
+- new flow design document
+- statfs implementation
+- rewritten mgmt interface, and several new functions
+- pvfs2-statfs admin tool
+- configurable handle timeout on server
+- fixed symbol name collisions with pvfs1
+- better sigpipe handling
+- added backtrace feature to gossip_lerr()
+- non interactive mode for pvfs2-genconfig
+- request scheduler support for timer events
+- server performance counters
+- mgmt functions and example tool (pvfs2-perf-mon-example) for
+  gathering real time performance statistics from servers
+- added CREDITS file
+- addition of PAV (PVFS auto volume) tool for automated test runs
+- kernel rename() improvements
+- import of mpi-io-test program
+- redhat style rc script for server
+- addition of administrative mode for servers 
+- pvfs2-set-mode admin tool to toggle admin mode for file system
+- mgmt API hooks necessary for fsck and dumping fs
+- beginning of pvfs2-fs-dump tool, that can show file system structure
+  and potential problems, optional dotty output
+- "make dist" build target
+- removal of depricated test programs
+- man pages for many admin tools etc.
+- new/updated quickstart, users guide, and status document, README,
+  and INSTALL
+- removal of depricated design documents
+- request scheduler support for batch/list operations
+- many many many bug fixes and code cleanups
+- vfs mmap and execution support (read-only)
+
+	
+pvfs2-0.0.2
+===========
+- server side memory leaks almost entirely eliminated                         
+- configuration file options for specifying BMI and Flow modules              
+- job level thread management optimizations                                   
+- integration of a buffer cache into tree (not yet hooked up)                 
+- support for symlinks                                                        
+- support for vfs symlinks (can exist; can't be followed)                     
+- symlink attributes are now able to be added to the pcache                   
+- BMI infiniband driver merged in
+- new pvfstab format and parsing code
+- kernel module reports big block size on stat
+- job api changes to prevent client side race conditions
+- improved I/O path attribute caching
+
+
+pvfs2-0.0.1
+==========
+- limited initial public release

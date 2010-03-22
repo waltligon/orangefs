@@ -1,0 +1,989 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * Changes by Acxiom Corporation to add extra safety checks via getattr
+ * Copyright © Acxiom Corporation, 2005.
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for renaming an object (file
+ *  or directory).
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "ncache.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    RENAME_CHDIRENT = 130,
+    RENAME_REMOVE_REQUIRED,
+    RENAME_CRDIRENT_RETRY,
+    RENAME_RMDIRENT_RETRY
+};
+
+static int rename_lookups_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int rename_crdirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int rename_rmdirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+static int rename_chdirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+%%
+
+machine pvfs2_client_rename_sm
+{
+    state init
+    {
+        run rename_init;
+        default => rename_lookups_setup_msgpair_array;
+    }
+
+    state rename_lookups_setup_msgpair_array
+    {
+        run rename_lookups_setup_msgpair_array;
+        success => rename_lookups_xfer_msgpair_array;
+        default => rename_lookups_failure;
+    }
+
+    state rename_lookups_xfer_msgpair_array
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => rename_crdirent_setup_msgpair;
+        RENAME_CHDIRENT => rename_getattr_src;
+        default => rename_lookups_failure;
+    }
+
+    state rename_getattr_src
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rename_getattr_src_interpret;
+        default => cleanup;
+    }
+
+    state rename_getattr_src_interpret
+    {
+        run rename_getattr_src_interpret;
+        default => rename_getattr_dest;
+    }
+
+    state rename_getattr_dest
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rename_chdirent_setup_msgpair;
+        default => cleanup;
+    }
+
+    state rename_lookups_failure
+    {
+        run rename_lookups_failure;
+        default => cleanup;
+    }
+
+    state rename_crdirent_setup_msgpair
+    {
+        run rename_crdirent_setup_msgpair;
+        success => rename_crdirent_xfer_msgpair;
+        default => rename_crdirent_retry_or_fail;
+    }
+
+    state rename_crdirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => rename_rmdirent_setup_msgpair;
+        default => rename_crdirent_retry_or_fail;
+    }
+
+    state rename_crdirent_retry_or_fail
+    {
+	run rename_crdirent_retry_or_fail;
+	RENAME_CRDIRENT_RETRY => rename_crdirent_timer;
+	default => cleanup;
+    }
+
+    state rename_crdirent_timer
+    {
+	run rename_generic_timer;
+	default => rename_crdirent_setup_msgpair;
+    }
+
+    state rename_rmdirent_setup_msgpair
+    {
+        run rename_rmdirent_setup_msgpair;
+        success => rename_rmdirent_xfer_msgpair;
+        default => rename_rmdirent_retry_or_fail;
+    }
+
+    state rename_rmdirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => rename_check_for_remove;
+        default => rename_rmdirent_retry_or_fail;
+    }
+
+    state rename_rmdirent_retry_or_fail
+    {
+	run rename_rmdirent_retry_or_fail;
+	RENAME_RMDIRENT_RETRY => rename_rmdirent_timer;
+	default => rename_rmdirent_failure;
+    }
+
+    state rename_rmdirent_timer
+    {
+	run rename_generic_timer;
+	default => rename_rmdirent_setup_msgpair;
+    }
+
+    state rename_rmdirent_failure
+    {
+        run rename_rmdirent_failure;
+        success => rename_rmdirent_setup_msgpair;
+	default => rename_warn_user_to_run_fsck;
+    }
+
+    state rename_check_for_remove
+    {
+        run rename_check_for_remove;
+        RENAME_REMOVE_REQUIRED => rename_do_remove;
+        default => cleanup;
+    }
+
+    state rename_do_remove
+    {
+        jump pvfs2_client_remove_helper_sm;
+        success => cleanup;
+        default => rename_warn_user_to_run_fsck;
+    }
+
+    state rename_warn_user_to_run_fsck
+    {
+        run rename_warn_user_to_run_fsck;
+        default => cleanup;
+    }
+
+    state rename_chdirent_setup_msgpair
+    {
+        run rename_chdirent_setup_msgpair;
+        success => rename_chdirent_xfer_msgpair;
+        default => rename_chdirent_failure;
+    }
+
+    state rename_chdirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => rename_rmdirent_setup_msgpair;
+        default => rename_chdirent_failure;
+    }
+
+    state rename_chdirent_failure
+    {
+        run rename_chdirent_failure;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run rename_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiate renaming of an object.
+ *
+ *  \param old_entry original name of object
+ *  \param old_parent_ref reference to original parent directory of object
+ *  \param new_entry new name for object
+ *  \param new_parent_ref reference to new parent directory for object
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+PVFS_error PVFS_isys_rename(
+    char *old_entry,
+    PVFS_object_ref old_parent_ref,
+    char *new_entry,
+    PVFS_object_ref new_parent_ref,
+    const PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_rename entered\n");
+
+    if ((old_entry == NULL) || (new_entry == NULL) ||
+        (old_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (old_parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (new_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (new_parent_ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
+    /* don't even try to rename a file to itself */
+    if ((old_parent_ref.handle == new_parent_ref.handle) &&
+        (old_parent_ref.fs_id == new_parent_ref.fs_id) &&
+        (strcmp(old_entry, new_entry) == 0))
+    {
+        return ret;
+    }
+
+    if ((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
+    {
+        return -PVFS_ENAMETOOLONG;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_SYS_RENAME,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, old_parent_ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    /*
+      this state machine has several hardcoded 2's around because
+      we're dealing with 1 'old' entry, 1 'old' handle, 1 'old' parent
+      handle, 1 'new' entry, 1 'new' handle, and 1 'new' parent
+      handle.  the index of 0 deals with the 'old'; index 1 deals with
+      the 'new'.
+
+      I've used this arguably confusing array notation so that we can
+      do old/new lookups and parent getattrs in parallel using the
+      msgarrays rather than doing a longer sequence of serial
+      msgpairs.
+    */
+    sm_p->u.rename.entries[0] = old_entry;
+    sm_p->u.rename.entries[1] = new_entry;
+    sm_p->u.rename.parent_refns[0] = old_parent_ref;
+    sm_p->u.rename.parent_refns[1] = new_parent_ref;
+    sm_p->u.rename.rmdirent_index = 0;
+    sm_p->u.rename.target_dirent_exists = 0;
+    sm_p->u.rename.stored_error_code = 0;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &old_parent_ref.handle);
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%llu,%d]\n\t"
+        "to %s (under [%llu,%d])\n", old_entry,
+        llu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
+        llu(new_parent_ref.handle), new_parent_ref.fs_id);
+
+    return PINT_client_state_machine_post(
+        smcb,  op_id, user_ptr);
+}
+
+/** Rename an object.
+ *
+ *  \param old_entry original name of object
+ *  \param old_parent_ref reference to original parent directory of object
+ *  \param new_entry new name for object
+ *  \param new_parent_ref reference to new parent directory for object
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+PVFS_error PVFS_sys_rename(
+    char *old_entry,
+    PVFS_object_ref old_parent_ref,
+    char *new_entry,
+    PVFS_object_ref new_parent_ref,
+    const PVFS_credentials *credentials,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_rename entered\n");
+
+    ret = PVFS_isys_rename(old_entry, old_parent_ref, new_entry,
+                           new_parent_ref, credentials, &op_id, hints, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_rename call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "rename", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/****************************************************************/
+
+static PINT_sm_action rename_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    assert(js_p->error_code == 0);
+
+    /* Invalidate the old entry in ncache */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[0],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    /* Invalidate the new entry in ncache in case it already exists */
+    PINT_ncache_invalidate(
+            (const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
+
+    return SM_ACTION_COMPLETE;
+}
+
+static int rename_lookups_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
+    assert((index > -1) && (index < 2));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
+                 index, resp_p->status);
+
+    /*
+     * if the index is 1, this failure just means that
+     * the target entry does not already exist, so it's
+     * expected and is not an error.
+     */
+    if(resp_p->status == -PVFS_ENOENT && index == 1)
+    {
+        /* note: don't change the actual resp structure, because the
+         * decoder counts on this to know how to release data structures
+         */
+        return 0;
+    }
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* SUCCESS! */
+
+    /*
+      stash the refns -- 'old' or 'new' based on index;
+      generally we won't be here on index == 1, since 'new'
+      may not exist
+    */
+    assert(resp_p->u.lookup_path.handle_count == 1);
+    sm_p->u.rename.refns[index].handle =
+        resp_p->u.lookup_path.handle_array[0];
+    sm_p->u.rename.refns[index].fs_id =
+        sm_p->u.rename.parent_refns[index].fs_id;
+
+    if (index == 0)
+    {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu\n",
+            llu(sm_p->u.rename.refns[index].handle));
+    }
+    else
+    {
+        assert(index == 1);
+        /*
+          flag the fact that we need to do a dirent exchange on the
+          existing dirent, rather than creating a new one.  we flag it
+          for later handling, as we know we need to do this, but want
+          the getattr to be complete first so that permissions can be
+          properly verified before changing anything
+        */
+        sm_p->u.rename.target_dirent_exists = 1;
+        /* set fs_id and handle for getattr nested sm */
+        sm_p->object_ref = sm_p->u.rename.refns[0];
+
+        if(sm_p->msgarray_op.msgarray[0].op_status == 0)
+        {
+            PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_COMMON_ALL,
+                PVFS_TYPE_NONE,
+                0);
+
+            /* if both lookups succeeded, then we need chdirent */
+            return RENAME_CHDIRENT;
+        }
+        else
+        {
+            /* if the first one failed, maintain its error code */
+            return(sm_p->msgarray_op.msgarray[0].op_status);
+        }
+    }
+    return 0;
+}
+
+static int rename_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_crdirent_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+    return resp_p->status;
+}
+
+static int rename_rmdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_RMDIRENT);
+
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    /*
+      rmdirent returns handle of removed dirent; make sure it matches
+      the handle we asked to have removed (i.e. the 'old' handle)
+    */
+    assert(sm_p->u.rename.refns[0].handle ==
+           resp_p->u.rmdirent.entry_handle);
+
+    return 0;
+}
+
+static int rename_chdirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_chdirent_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_CHDIRENT);
+
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    /*
+      here we have the 'old' dirent handle that we've just replaced
+      with the target name; store it for later removal
+    */
+    sm_p->u.rename.old_dirent_handle =
+        resp_p->u.chdirent.old_dirent_handle;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %llu\n",
+                 llu(sm_p->u.rename.old_dirent_handle));
+
+    return 0;
+}
+
+static PINT_sm_action rename_lookups_setup_msgpair_array(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL, i = 0;
+    PINT_sm_msgpair_state *msg_p;
+
+    js_p->error_code = 0;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 2);
+    if(ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* prepare to post the lookup send/recv pairs */
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "rename: posting lookup[%d] (%lld,%d)\n",
+                     i, llu(sm_p->u.rename.parent_refns[i].handle),
+                     sm_p->u.rename.parent_refns[i].fs_id);
+
+        PINT_SERVREQ_LOOKUP_PATH_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.rename.entries[i],
+            sm_p->u.rename.parent_refns[i].fs_id,
+            sm_p->u.rename.parent_refns[i].handle,
+            PVFS_ATTR_COMMON_ALL,
+            sm_p->hints);
+
+        /* fill in msgpair structure components */
+        msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
+        msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = rename_lookups_comp_fn;
+
+        ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+            break;
+        }
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_lookups_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_crdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting crdirent req\n");
+
+    assert(sm_p->msgarray_op.msgarray);
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    /*
+      hook the 'old' handle up to the new parent with the 'new_entry'
+      name -- on success we will have 2 dirents pointing to the same
+      metafile; only update the mtime and ctime, leaving atime as 0
+    */
+    PINT_SERVREQ_CRDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.rename.entries[1],
+        sm_p->u.rename.refns[0].handle,
+        sm_p->u.rename.parent_refns[1].handle,
+        sm_p->u.rename.parent_refns[1].fs_id,
+        sm_p->hints);
+
+    msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
+    msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = rename_crdirent_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_rmdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting rmdirent req\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    /*
+      in the normal case, the state machine will lead us here and we
+      need to remove the original dirent pointing to the 'old'
+      metafile in the 'old' parent directory.
+
+      However, we can also be here on rename_rmdirent_failure.  the
+      sm_p->u.rename.rmdirent_index is used to dictate which dirent to
+      remove in that case.  (0 is 'old'; 1 is 'new').
+
+      This only happens if we fail to rmdirent the 'old' parent.  In
+      that case we need to rmdirent the 'new' parent as cleanup.
+    */
+    PINT_SERVREQ_RMDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
+        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
+        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
+        sm_p->hints);
+
+    msg_p->fs_id = sm_p->u.rename.parent_refns[
+        sm_p->u.rename.rmdirent_index].fs_id;
+    msg_p->handle = sm_p->u.rename.parent_refns[
+        sm_p->u.rename.rmdirent_index].handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = rename_rmdirent_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+       js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_rmdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /*
+      in the normal case of failure (i.e. rmdirent_index == 0), we
+      need to rmdirent the previously created new dirent we've just
+      created.  the state machine already guides us back to
+      rmdirent_setup_msgpair, so all we need to is adjust the
+      rmdirent_index to point to the 'new' dirent entry.
+    */
+    if (sm_p->u.rename.rmdirent_index == 0)
+    {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "cleaning up new dirent because of "
+            "previous failure.\n");
+        sm_p->u.rename.rmdirent_index++;
+	sm_p->u.rename.stored_error_code = js_p->error_code;
+	js_p->error_code = 0;
+    }
+    else
+    {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "failed to clean up created dirent!\n");
+	/* leave error code untouched, fall to next state */
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_chdirent_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr *attr = NULL;
+
+    /* look at the result of the dest getattr and make sure everything looks
+     * ok before we continue
+     */
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+    sm_p->u.rename.types[1] = attr->objtype;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest type: %d\n", attr->objtype);
+    if(attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest dirent_count: %lld\n",
+                 lld(attr->u.dir.dirent_count));
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest attr mask: %d\n", (int)attr->mask);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest handle %llu\n", llu(sm_p->object_ref.handle));
+    }
+
+    /* if the destination is a directory, is it empty? */
+    if(attr->objtype == PVFS_TYPE_DIRECTORY && attr->u.dir.dirent_count != 0)
+    {
+        js_p->error_code = -PVFS_ENOTEMPTY;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    /* do the types match? */
+    if(sm_p->u.rename.types[0] != sm_p->u.rename.types[1])
+    {
+        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        {
+            js_p->error_code = -PVFS_EISDIR;
+            return SM_ACTION_COMPLETE;
+        }
+        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        {
+            js_p->error_code = -PVFS_ENOTDIR;
+            return SM_ACTION_COMPLETE;
+        }
+        /* TODO: what about other cases? */
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* do the fsid's match? */
+    if(sm_p->u.rename.refns[0].fs_id != sm_p->u.rename.refns[1].fs_id)
+    {
+        js_p->error_code = -PVFS_ENODEV;
+        return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting chdirent req\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    /*
+      here, we're exhanging the existing dirent under the 'new' parent
+      refn that matches the 'new entry' with the 'old' -- on success
+      we will have 2 dirents pointing to the same metafile
+    */
+    PINT_SERVREQ_CHDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.rename.parent_refns[1].fs_id,
+        sm_p->u.rename.parent_refns[1].handle,
+        sm_p->u.rename.refns[0].handle,
+        sm_p->u.rename.entries[1],
+        sm_p->hints);
+
+    msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
+    msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = rename_chdirent_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_chdirent_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_check_for_remove(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    js_p->error_code = 0;
+
+    if (sm_p->u.rename.target_dirent_exists)
+    {
+        js_p->error_code = RENAME_REMOVE_REQUIRED;
+    }
+
+    /* setup the handle to be removed */
+    sm_p->object_ref.handle = sm_p->u.rename.old_dirent_handle;
+    sm_p->object_ref.fs_id = sm_p->u.rename.parent_refns[1].fs_id;
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_warn_user_to_run_fsck(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
+               "may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    sm_p->error_code = (sm_p->u.rename.stored_error_code ?
+                        sm_p->u.rename.stored_error_code :
+                        js_p->error_code);
+
+    if(sm_p->error_code != 0)
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "rename state: updating ncache with entry [%s] "
+            "ref.handle=%llu ref.fsid=%d\n",
+            sm_p->u.rename.entries[1],
+            llu(sm_p->u.rename.refns[0].handle),
+            sm_p->u.rename.parent_refns[0].fs_id);
+
+        PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
+            (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+    }
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+static PINT_sm_action rename_generic_timer(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t tmp_id;
+
+    ret = job_req_sched_post_timer(
+	sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
+        pint_client_sm_context);
+
+    return ret;
+}
+
+static PINT_sm_action rename_crdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
+    {
+	sm_p->u.rename.retry_count++;
+	js_p->error_code = RENAME_CRDIRENT_RETRY;
+	return SM_ACTION_COMPLETE;
+    }
+
+    if ((js_p->error_code == -PVFS_EEXIST) &&
+        (sm_p->u.rename.retry_count > 0))
+    {
+	/* assume everything worked out ok and we got the right
+	 * directory entry back.  there was just a transient network
+	 * problem along the way
+	 */
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+    }
+
+    /* let other errors fall through to next state */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_rmdirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* try again (up to a point) if we get a comm. failure. */
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
+    {
+	sm_p->u.rename.retry_count++;
+	js_p->error_code = RENAME_RMDIRENT_RETRY;
+	return SM_ACTION_COMPLETE;
+    }
+
+    if ((js_p->error_code == -PVFS_ENOENT) &&
+        (sm_p->u.rename.retry_count > 0))
+    {
+	/* tricky error case.  The rmdirent failed, but it wasn't our
+	 * first try.  Assume that a previous one was successful and
+	 * we just didn't get the response.  This particular case
+	 * isn't as dangerous in rename as it is in remove.  Just let
+	 * it go without warning.
+	 */
+	js_p->error_code = 0;
+	return SM_ACTION_COMPLETE;
+    }
+
+    /* let other errors fall through to next state */
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_getattr_src_interpret(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    sm_p->u.rename.types[0] = attr->objtype;
+
+     /* setup for destination getattr */
+    sm_p->object_ref = sm_p->u.rename.refns[1];
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    /* NOTE: we ask for the dirent count on the destination.  This is
+     * important so that we can confirm that the destination is empty if it
+     * happens to be a directory rather than a file.
+     */
+    PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
+                               sm_p->object_ref,
+                               (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT),
+                               PVFS_TYPE_NONE,
+                               PINT_SM_GETATTR_BYPASS_CACHE);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

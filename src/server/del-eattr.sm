@@ -1,0 +1,219 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+
+%%
+
+machine pvfs2_del_eattr_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => verify_eattribs;
+        default => final_response;
+    }
+
+    state verify_eattribs
+    {
+        run deleattr_verify_eattribs;
+        success => delobj_eattrib;
+        default => final_response;
+    }
+
+    state delobj_eattrib
+    {
+        run deleattr_delobj_eattribs;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run deleattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * This routine really just does debugging - can print out info about
+ * the target of the operation.  There are few things to verify here
+ * be we'll try to verify what we can.  We can also disallow setting
+ * extended attributes on certain object types if we want.  We might
+ * want to prevent access to standard metadata keys.
+ */
+static PINT_sm_action deleattr_verify_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *a_p = NULL;
+
+    a_p = &s_op->attr;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_DELEATTR_DEBUG,
+                 "  ext attr delete from handle %llu refers to a %s\n\t"
+                 "[owner = %d, group = %d, perms = %o, type = %d]\n",
+                 llu(s_op->req->u.deleattr.handle),
+                 PINT_util_get_object_type(a_p->objtype),
+                 a_p->owner, a_p->group, a_p->perms, a_p->objtype);
+
+    switch (a_p->objtype)
+    {
+    case PVFS_TYPE_METAFILE :
+        if (!strncmp(s_op->req->u.deleattr.key.buffer,
+                    Trove_Common_Keys[METAFILE_HANDLES_KEY].key,
+                    s_op->req->u.deleattr.key.buffer_sz) ||
+            !strncmp(s_op->req->u.deleattr.key.buffer,
+                    Trove_Common_Keys[METAFILE_DIST_KEY].key,
+                    s_op->req->u.deleattr.key.buffer_sz))
+        {
+            /* can't set these keys with this request */
+            js_p->error_code = -PVFS_EINVAL;
+            return -PVFS_EINVAL;
+        }
+    case PVFS_TYPE_SYMLINK :
+        if (!strncmp(s_op->req->u.deleattr.key.buffer,
+                    Trove_Common_Keys[SYMLINK_TARGET_KEY].key,
+                    s_op->req->u.deleattr.key.buffer_sz))
+        {
+            /* can't set these keys with this request */
+            js_p->error_code = -PVFS_EINVAL;
+            return -PVFS_EINVAL;
+        }
+    case PVFS_TYPE_DIRECTORY :
+        if (!strncmp(s_op->req->u.deleattr.key.buffer,
+                    Trove_Common_Keys[DIR_ENT_KEY].key,
+                    s_op->req->u.deleattr.key.buffer_sz))
+        {
+            /* can't set these keys with this request */
+            js_p->error_code = -PVFS_EINVAL;
+            return -PVFS_EINVAL;
+        }
+    default :
+        /* no holds barred for other types */
+        ;
+    }
+
+    /* no one is allowed to set standard attribs with this op */
+    if (!strncmp((void *)s_op->req->u.deleattr.key.buffer,
+                (void *)&s_op->req->u.deleattr.handle,
+                sizeof(s_op->req->u.deleattr.handle)))
+    {
+        /* can't set these keys with this request */
+        js_p->error_code = -PVFS_EINVAL;
+        return -PVFS_EINVAL;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * This is where the actual extended attrib gets written.
+ * Not much to this, its pretty straight-forward.
+ */
+static PINT_sm_action deleattr_delobj_eattribs(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    job_id_t j_id;
+
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer = s_op->req->u.deleattr.key.buffer;
+    s_op->key.buffer_sz = s_op->req->u.deleattr.key.buffer_sz;
+
+    gossip_debug(
+        GOSSIP_DELEATTR_DEBUG,
+        "  writing %s [%llu,%d,len %d]\n",
+        (char *)s_op->key.buffer,
+        llu(s_op->req->u.deleattr.handle),
+        s_op->req->u.deleattr.fs_id,
+        s_op->val.buffer_sz);
+
+    gossip_debug(
+        GOSSIP_DELEATTR_DEBUG,
+        "keybuf %p keylen %d\n",
+        s_op->req->u.deleattr.key.buffer, s_op->req->u.deleattr.key.buffer_sz);
+
+    ret = job_trove_keyval_remove(
+        s_op->req->u.deleattr.fs_id,
+        s_op->req->u.deleattr.handle,
+        &(s_op->key),
+        NULL,
+        TROVE_SYNC ,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+/*
+ * Function: delattr_cleanup
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *           
+ */
+static PINT_sm_action deleattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(
+        GOSSIP_DELEATTR_DEBUG,
+        "keybuf %p keylen %d\n",
+        s_op->req->u.deleattr.key.buffer, s_op->req->u.deleattr.key.buffer_sz);
+
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(deleattr);
+
+struct PINT_server_req_params pvfs2_del_eattr_params =
+{
+    .string_name = "del_eattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_deleattr,
+    .state_machine = &pvfs2_del_eattr_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

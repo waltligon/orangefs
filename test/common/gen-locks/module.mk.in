@@ -1,0 +1,2 @@
+DIR := common/gen-locks
+

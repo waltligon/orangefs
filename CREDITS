@@ -1,0 +1,83 @@
+Active contributors
+===================
+
+Pete Wyckoff <pw@osc.edu>
+-- Infiniband support
+   little endian encoding/decoding
+   IA64/Alpha clean compilation fixes
+   extensive testing
+
+Jiesheng Wu <wujs@mcs.anl.gov>
+-- buffer cache development (in progress)
+
+Nathan Poznick <poznick@conwaycorp.net>
+-- extensive testing and suggestions (linux vfs interface)
+   various pvfs2-client related patches (noted in cvs logs)
+   authored the pvfs2-chown admin utility program
+   detailed bug reporting and analysis
+   fixed permissions on newly created dirs using pvfs2-mkdir
+   misc formatting patches
+   misc warning removals
+
+Murali Vilayannur <vilayann@mcs.anl.gov>
+-- testing and development
+   initial linux 2.4.x prototype (before 2.6.x merge)
+   initial 64-bit operation tag implementation (in kernel)
+   misc kernel code bug fixes
+
+Sven Marnach <sven@pvs.informatik.uni-heidelberg.de>
+-- fixed makefile LD selection and html docs target
+
+Philipp Sadleder <philipp@sadleder.de>
+-- reported a problem with large username handling in pvfs2-ls
+   extended pvfs2-cp to truncate target files if they exist
+-- Updated documentation for dist-simple-stripe.c and modified
+   the basic distribution to use a single data file object.
+
+David Beilloin <dbeilloi@mc.com>
+-- reported that temp configuration files on the client should be
+   created in /tmp (if possible) rather than the current directory
+   since pvfs2 programs may be run from slow file systems (such as
+   NFS)
+-- reported memory leak in pvfs2-rm admin tool
+-- contributed resource reclamation on some failure cases
+-- contributed strip size to pvfs2-cp
+
+Phil Carns and David Metheny
+- lots of cleanups to the VFS and system interfaces
+- contributed pvfs2-stat, pvfs2-ln, cleanups to pvfs2-mkdir and pvfs2-rm
+- cleanups to pvfs2-genconfig
+- config file enhancements
+- /sbin/mount.pvfs2 helper tool for 2.4 kernels
+- contributed support for /etc/mtab as an additional source for a pvfs2 tabfile
+  entry
+
+
+
+Other contributors
+==================
+
+Georg Kraml <georg@ads.tuwien.ac.at>
+-- AVL tree implementation (public domain)
+
+Lukas Schroeder's
+-- the general purpose dotconf (http://www.azzit.de/dotconf/)
+   project for configuration file parsing (LGPL)
+
+Mark Veltzer
+-- realized the single makefile approach used in pvfs2
+
+Dan Nurmi
+-- started work on the PTS back when the P stood for pvfs-1
+
+Bitstream, Inc.
+-- The fonts used in the pvfs2 visualization tools (src/apps/vis)
+   (may be redistributed subject to the license which is embedded in
+   the font files themselves)
+
+SDL project
+-- pvfs2-config borrows heavily from sdl-config
+
+Kyle Schochenmaier
+-- Ported BMI InfiniBand to OpenIB API
+

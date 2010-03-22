@@ -1,0 +1,187 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+#include "server-config.h"
+
+%%
+
+machine pvfs2_iterate_handles_sm
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => do_work;
+	}
+
+	state do_work
+	{
+		run iterate_handles_do_work;
+		default => fill_resp;
+	}
+
+	state fill_resp
+	{
+		run iterate_handles_fill_resp;
+		default => final_response;
+	}
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run iterate_handles_cleanup;
+		default => terminate;
+	}
+}
+
+%%
+
+/* iterate_handles_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action iterate_handles_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->resp.u.mgmt_iterate_handles.handle_array)
+	free(s_op->resp.u.mgmt_iterate_handles.handle_array);
+
+    return(server_state_machine_complete(smcb));
+}
+
+
+/* iterate_handles_do_work()
+ *
+ * actually performs work necessary to retrieve handles
+ */
+static PINT_sm_action iterate_handles_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t tmp_id;
+    int ret;
+
+    /* allocate memory to hold handles */
+    s_op->resp.u.mgmt_iterate_handles.handle_array
+	= (PVFS_handle*)malloc(s_op->req->u.mgmt_iterate_handles.handle_count *
+	sizeof(PVFS_handle));
+    if(!s_op->resp.u.mgmt_iterate_handles.handle_array)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+	return SM_ACTION_COMPLETE;
+    }
+    
+    s_op->resp.u.mgmt_iterate_handles.position
+	= s_op->req->u.mgmt_iterate_handles.position;
+
+    if(s_op->req->u.mgmt_iterate_handles.flags == PVFS_MGMT_RESERVED)
+    {
+        /* for now the only special case reserved handles are those that are
+         * allocated by precreate
+         */
+        ret = job_precreate_pool_iterate_handles(
+            s_op->req->u.mgmt_iterate_handles.fs_id,
+            s_op->resp.u.mgmt_iterate_handles.position,
+            s_op->resp.u.mgmt_iterate_handles.handle_array,
+            s_op->req->u.mgmt_iterate_handles.handle_count,
+            0,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &tmp_id,
+            server_job_context,
+            s_op->req->hints);
+    }
+    else if(s_op->req->u.mgmt_iterate_handles.flags == 0)
+    {
+        ret = job_trove_dspace_iterate_handles(
+            s_op->req->u.mgmt_iterate_handles.fs_id,
+            s_op->resp.u.mgmt_iterate_handles.position,
+            s_op->resp.u.mgmt_iterate_handles.handle_array,
+            s_op->req->u.mgmt_iterate_handles.handle_count,
+            0,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &tmp_id,
+            server_job_context);
+    }
+    else
+    {
+        gossip_err("Error: unsupported mgmt_iterate_handles flags: %d\n",
+            s_op->req->u.mgmt_iterate_handles.flags);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (ret < 0)
+        return ret;  /* error */
+    if (ret == 1)
+        return SM_ACTION_COMPLETE;  /* immediate */
+    return SM_ACTION_DEFERRED;
+}
+
+/* iterate_handles_fill_resp()
+ *
+ * gathers results from job status for response
+ */
+static PINT_sm_action iterate_handles_fill_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(js_p->error_code != 0)
+    {
+	/* propigate error and let final_response handle it */
+	return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.mgmt_iterate_handles.handle_count = js_p->count;
+    s_op->resp.u.mgmt_iterate_handles.position = js_p->position;
+
+    return SM_ACTION_COMPLETE;
+}
+
+static inline int PINT_get_object_ref_iterate_handles(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.mgmt_iterate_handles.fs_id;
+    *handle = PVFS_HANDLE_NULL;
+    return 0;
+}
+
+struct PINT_server_req_params pvfs2_iterate_handles_params =
+{
+    .string_name = "mgmt_iterate_handles",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .get_object_ref = PINT_get_object_ref_iterate_handles,
+    .state_machine = &pvfs2_iterate_handles_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

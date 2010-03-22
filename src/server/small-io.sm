@@ -1,0 +1,281 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ *  PVFS2 server state machine for driving I/O operations (read and write).
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-request.h"
+#include "pint-distribution.h"
+#include "pint-request.h"
+
+%%
+
+machine pvfs2_small_io_sm
+{
+    state prelude
+    {
+	jump pvfs2_prelude_sm;
+	success => start_job;
+	default => send_response;
+    }
+
+    state start_job 
+    {
+        run small_io_start_job;
+        default => check_size;
+    }
+
+    state check_size
+    {
+        run small_io_check_size;
+        default => send_response;
+    }
+
+    state send_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+	run small_io_cleanup;
+	default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action small_io_start_job(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing small_io_start_job...\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t tmp_id;
+    PINT_Request_state * file_req_state;
+    PINT_request_file_data fdata;
+    PINT_Request_result result;
+    struct filesystem_configuration_s * fs_config;
+    struct server_configuration_s * server_config;
+
+    memset(&s_op->resp.u.small_io, 0, sizeof(struct PVFS_servresp_small_io));
+
+    /* set io type in response to io type in request.  This is
+     * needed by the client so it konws how to decode the response
+     * appropriately.
+     */
+    s_op->resp.u.small_io.io_type = s_op->req->u.small_io.io_type;
+
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
+       s_op->ds_attr.u.datafile.b_size == 0)
+    {
+        /* nothing to read.  return SM_ACTION_DEFERRED */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    file_req_state = PINT_new_request_state(
+        s_op->req->u.small_io.file_req);
+    fdata.server_nr = s_op->req->u.small_io.server_nr;
+    fdata.server_ct = s_op->req->u.small_io.server_ct;
+    fdata.dist = s_op->req->u.small_io.dist;
+    result.offset_array = s_op->u.small_io.offsets;
+    result.size_array = s_op->u.small_io.sizes;
+    result.segmax = IO_MAX_REGIONS;
+    result.bytemax = s_op->req->u.small_io.aggregate_size;
+    result.bytes = 0;
+    result.segs = 0;
+
+    PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                  s_op->req->u.small_io.file_req_offset);
+    PINT_REQUEST_STATE_SET_FINAL(file_req_state,
+                                 s_op->req->u.small_io.file_req_offset +
+                                 s_op->req->u.small_io.aggregate_size);
+
+    s_op->resp.u.small_io.bstream_size = s_op->ds_attr.u.datafile.b_size;
+    fdata.fsize = s_op->ds_attr.u.datafile.b_size;
+    fdata.extend_flag = 
+        (s_op->req->u.small_io.io_type == PVFS_IO_READ) ? 0 : 1;
+
+    /* calculate the offsets and sizes in the datafile for the read or write */
+    ret = PINT_process_request(
+        file_req_state,
+        NULL,
+        &fdata,
+        &result,
+        PINT_SERVER);
+    if(ret < 0)
+    {
+        gossip_err("small_io: Failed to process file request\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+ 
+    /* figure out if the fs config has trove data sync turned on or off
+     */
+    server_config = get_server_config_struct();
+    if(!server_config)
+    {
+        gossip_err("small_io: server config is NULL!\n");
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+    
+    fs_config = PINT_config_find_fs_id(
+        server_config, s_op->req->u.small_io.fs_id);
+    if(!fs_config)
+    {
+        gossip_err("small_io: Failed to get filesystem "
+                   "config from fs_id of: %d\n",
+                   s_op->req->u.small_io.fs_id);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if(s_op->req->u.small_io.io_type == PVFS_IO_WRITE)
+    {
+        ret = job_trove_bstream_write_list(
+           s_op->req->u.small_io.fs_id,
+           s_op->req->u.small_io.handle,
+           (char **)&s_op->req->u.small_io.buffer,
+           (TROVE_size *)&s_op->req->u.small_io.total_bytes,
+           1,
+           s_op->u.small_io.offsets,
+           s_op->u.small_io.sizes,
+           result.segs,
+           &s_op->resp.u.small_io.result_size,
+           (fs_config->trove_sync_data ? TROVE_SYNC : 0),
+           NULL,
+           smcb,
+           0,
+           js_p,
+           &tmp_id,
+           server_job_context,
+           s_op->req->hints);
+        if(ret < 0)
+        {
+            gossip_err("small_io: Failed to post trove bstream write\n");
+        }
+    }
+    else
+    {
+        /* allocate space for the read in the response buffer */
+        s_op->resp.u.small_io.buffer = BMI_memalloc(
+            s_op->addr, result.bytes, BMI_SEND);
+        if(!s_op->resp.u.small_io.buffer)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        
+        s_op->u.small_io.result_bytes = result.bytes;
+
+        gossip_debug(GOSSIP_IO_DEBUG,"\tsubmitting job_trove_bstream_read_list for handle %llu\n"
+                                    ,llu(s_op->req->u.small_io.handle));
+        ret = job_trove_bstream_read_list(
+            s_op->req->u.small_io.fs_id,
+            s_op->req->u.small_io.handle,
+            (char **)&s_op->resp.u.small_io.buffer,
+            &s_op->u.small_io.result_bytes,
+            1,
+            s_op->u.small_io.offsets,
+            s_op->u.small_io.sizes,
+            result.segs,
+            &s_op->resp.u.small_io.result_size,
+            (fs_config->trove_sync_data ? TROVE_SYNC : 0),
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &tmp_id,
+            server_job_context,
+            s_op->req->hints);
+        if(ret < 0)
+        {
+            gossip_err("small-io: Failed to post trove bstream read\n");
+            js_p->error_code = ret;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    PINT_free_request_state(file_req_state);
+
+    return ret;
+}
+
+static PINT_sm_action small_io_check_size(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
+    {
+        if(s_op->resp.u.small_io.result_size !=
+           s_op->u.small_io.result_bytes)
+        {
+            /* If we get here assume aio threaded isn't supported and 
+             * so result_size won't have been set correctly.  
+             * Just set to expected value from process_request for now */
+            s_op->resp.u.small_io.result_size = s_op->u.small_io.result_bytes;
+        }
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action small_io_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
+       s_op->resp.u.small_io.buffer)
+    {
+        BMI_memfree(s_op->addr, s_op->resp.u.small_io.buffer, 
+                    s_op->req->u.small_io.total_bytes, BMI_SEND);
+    }
+
+    return server_state_machine_complete(smcb);
+}
+
+static inline enum PINT_server_req_access_type PINT_server_req_access_small_io(
+    struct PVFS_server_req *req)
+{
+    if(req->u.io.io_type == PVFS_IO_READ)
+    {
+        return PINT_SERVER_REQ_READONLY;
+    }
+    return PINT_SERVER_REQ_MODIFY;
+}
+
+PINT_GET_OBJECT_REF_DEFINE(small_io);
+
+struct PINT_server_req_params pvfs2_small_io_params =
+{
+    .string_name = "small_io",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_access_small_io,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_small_io,
+    .state_machine = &pvfs2_small_io_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

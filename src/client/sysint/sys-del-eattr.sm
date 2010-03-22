@@ -1,0 +1,231 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-util.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+static int del_eattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i);
+
+%%
+
+machine pvfs2_client_del_eattr_sm
+{
+    state setup_msgpair
+    {
+        run del_eattr_setup_msgpair;
+        success => xfer_msgpair;
+        default => cleanup;
+    }
+
+    state xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run del_eattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+PVFS_error PVFS_isys_deleattr(
+        PVFS_object_ref ref,
+        const PVFS_credentials *credentials,
+        PVFS_ds_keyval *key_p,
+        PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
+        void *user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_isys_del_eattr entered\n");
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+       (ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+	return ret;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_SYS_DELEATTR,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    sm_p->u.deleattr.key_p = key_p;
+    sm_p->error_code = 0;
+    sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    
+    return PINT_client_state_machine_post(
+            smcb,  op_id, user_ptr);
+}
+
+PVFS_error PVFS_sys_deleattr(
+        PVFS_object_ref ref,
+        const PVFS_credentials *credentials,
+        PVFS_ds_keyval *key_p, 
+        PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_deleattr entered\n");
+
+    ret = PVFS_isys_deleattr(ref, credentials,
+            key_p, &op_id, hints, NULL);
+
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_deleattr call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "deleattr", &error);
+        if (ret)
+        {
+             PVFS_perror_gossip("PVFS_sys_wait call", ret);
+             error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+static PINT_sm_action del_eattr_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"del_eattr state: del_eattr_setup_msgpair\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_DELEATTR_FILL(
+            msg_p->req,
+            (*sm_p->cred_p),
+            sm_p->object_ref.fs_id,
+            sm_p->object_ref.handle,
+            (*sm_p->u.deleattr.key_p),
+            sm_p->hints
+            );
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = del_eattr_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr,
+            msg_p->handle,
+            msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = 0;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action del_eattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"del_eattr state: del_eattr_cleanup\n");
+    sm_p->error_code  = js_p->error_code;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+static int del_eattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i)
+{
+    int j = 0;
+    int ret = 0;
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_sm_msgpair_state *msg_p;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"del_eattr completion fn: del_eattr_comp_fn\n");
+
+    /* only posted one msgpair */
+    assert(i==0);
+
+    /* no return value from del eattrib so just check status */
+
+    if (sm_p->msgarray_op.msgarray[i].op_status != 0)
+    {
+        ret = sm_p->msgarray_op.msgarray[i].op_status;
+    }
+
+    /* if this is the last response, check all of the status values
+     * and return error code if any requests failed
+     */
+    if (i == (sm_p->msgarray_op.count -1))
+    {
+        foreach_msgpair(&sm_p->msgarray_op, msg_p, j)
+        {
+            if (msg_p->op_status != 0)
+            {
+                return(msg_p->op_status);
+            }
+        }
+    }
+    return ret;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

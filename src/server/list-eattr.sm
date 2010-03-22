@@ -1,0 +1,261 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* pvfs2_list_eattr_sm
+ *
+ * This state machine handles incoming server listxattr operations.  These
+ * are the operations sent by PVFS_sys_listeattr() among others.
+ *
+ * The pvfs2_prelude_sm is responsible for reading the actual metadata
+ * to begin with, because it does this as part of the permission checking
+ * process.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-eattr.h"
+
+%%
+
+machine pvfs2_list_eattr_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_resp;
+        default => final_response;
+    }
+
+    state setup_resp
+    {
+        run listeattr_setup_resp;
+        success => list_eattrib;
+        default => final_response;
+    }
+
+    state list_eattrib
+    {
+        run listeattr_list_eattrib;
+        default => check_resp;
+    }
+
+    state check_resp
+    {
+        run listeattr_check_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run listeattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * listeattr_setup_resp()
+ * Set up the response - allocate needed resources
+ */
+static PINT_sm_action listeattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i, tsz;
+    gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr requesting %d keys\n",
+            s_op->req->u.listeattr.nkey);
+
+    js_p->error_code = 0;
+
+    s_op->resp.u.listeattr.key =
+        malloc(s_op->req->u.listeattr.nkey * sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.listeattr.key)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.listeattr.nkey = s_op->req->u.listeattr.nkey;
+    for (i = 0, tsz = 0; i < s_op->req->u.listeattr.nkey; i++)
+        tsz += s_op->req->u.listeattr.keysz[i];
+    s_op->u.eattr.buffer = malloc(tsz);
+    if (!s_op->u.eattr.buffer)
+    {
+        s_op->resp.u.listeattr.nkey = 0;
+        free (s_op->resp.u.listeattr.key);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr buffer size %d bytes\n",
+            tsz);
+    for (i = 0, tsz = 0; i < s_op->req->u.listeattr.nkey; i++)
+    {
+        s_op->resp.u.listeattr.key[i].buffer_sz =
+            s_op->req->u.listeattr.keysz[i];
+        s_op->resp.u.listeattr.key[i].buffer =
+            (char *)s_op->u.eattr.buffer + tsz;
+        tsz += s_op->req->u.listeattr.keysz[i];
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * listeattr_list_eattrib()
+ * Here is where the eattrib get listed.
+ */
+static PINT_sm_action listeattr_list_eattrib(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    js_p->error_code = 0;
+
+    ret = job_trove_keyval_iterate_keys(
+        s_op->req->u.listeattr.fs_id,
+        s_op->req->u.listeattr.handle,
+        s_op->req->u.listeattr.token,
+        s_op->resp.u.listeattr.key,
+        s_op->req->u.listeattr.nkey,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+#if 0
+static void print_string(char *buffer, size_t length)
+{
+    int i;
+    if (length == 0 || buffer == NULL)
+    {
+        return;
+    }
+    for (i = 0; i < length; i++)
+    {
+        printf("%c", buffer[i]);
+    }
+    printf("\n");
+    return;
+}
+#endif
+
+/* listeattr_check_resp()
+ *
+ * checks what attributes we found, handles errors, filters for appropriate
+ * extended attribute name spaces
+ *
+ * NOTE: all attributes should fall into one of the name spaces defined in 
+ * the PINT_eattr_namespaces array.  If we find a key that does not, then we
+ * will translate it so that it appears in the "system.pvfs2." name
+ * space on the client side.
+ */
+static PINT_sm_action listeattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int num_found = 0;
+    int i = 0;
+
+    /* Nothing was requested? then fill token to hold the max available keys */
+    if (s_op->resp.u.listeattr.nkey == 0)
+    {
+        s_op->resp.u.listeattr.token = js_p->count;
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* how many entries did we find that we can process? */
+    num_found = js_p->count;
+    if(num_found > s_op->resp.u.listeattr.nkey)
+    {
+        num_found = s_op->resp.u.listeattr.nkey;
+    }
+
+    s_op->resp.u.listeattr.token = js_p->position;
+    s_op->resp.u.listeattr.nkey = num_found;
+
+    if(num_found == 0)
+    {
+        /* there aren't any extended attr's; go ahead and return */
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* iterate through the keys that we found */
+    for(i=0; i<num_found; i++)
+    {
+        js_p->error_code = PINT_eattr_list_access(
+            &s_op->resp.u.listeattr.key[i],
+            NULL);
+        if(js_p->error_code != 0)
+        {
+            return SM_ACTION_COMPLETE;
+        }
+
+        s_op->resp.u.listeattr.key[i].buffer_sz =
+            s_op->resp.u.listeattr.key[i].read_sz;
+    }
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+/* listeattr_cleanup()
+ * free resources alloc'd by state machine
+ */
+static PINT_sm_action listeattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (s_op->resp.u.listeattr.key)
+        free(s_op->resp.u.listeattr.key);
+    if (s_op->u.eattr.buffer)
+        free(s_op->u.eattr.buffer);
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(listeattr);
+
+struct PINT_server_req_params pvfs2_list_eattr_params =
+{
+    .string_name = "listeattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_listeattr,
+    .state_machine = &pvfs2_list_eattr_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

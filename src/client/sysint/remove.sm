@@ -1,0 +1,322 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    REMOVE_MUST_REMOVE_DATAFILES = 1,
+};
+
+#define HANDLE_REMOVE_ERROR(state)                                     \
+do {                                                                   \
+    char buf[64] = {0};                                                \
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: %s\n", state);    \
+    PVFS_strerror_r(js_p->error_code, buf, 64);                        \
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "\
+               "may lead\n  to inconsistent state: %s\n", buf);        \
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n"); \
+    sm_p->u.remove.stored_error_code = js_p->error_code;               \
+    js_p->error_code = 0;                                              \
+} while(0)
+
+%%
+
+nested machine pvfs2_client_remove_helper_sm
+{
+    state getattr_init
+    {
+        run remove_getattr_init;
+        default => getattr;
+    }
+
+    state getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => getattr_analyze_results;
+        default => remove_helper_cleanup;
+    }
+
+    state getattr_analyze_results
+    {
+        run remove_getattr_analyze_results;
+        success => object_remove_setup_msgpair;
+        REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
+        default => remove_helper_cleanup;
+    }
+
+    state datafile_remove_setup_msgpair
+    {
+        run remove_datafile_remove_setup_msgpair;
+        success => datafile_remove_xfer_msgpair;
+        default => datafile_remove_failure;
+    }
+
+    state datafile_remove_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => object_remove_setup_msgpair;
+        default => datafile_remove_failure;
+    }
+
+    state datafile_remove_failure
+    {
+        run remove_datafile_remove_failure;
+        default => remove_helper_cleanup;
+    }
+    
+    state object_remove_setup_msgpair
+    {
+        run remove_object_remove_setup_msgpair;
+        success => object_remove_xfer_msgpair;
+        default => object_remove_failure;
+    }
+
+    state object_remove_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => remove_helper_cleanup;
+        default => object_remove_failure;
+    }
+
+    state object_remove_failure
+    {
+        run remove_object_remove_failure;
+        default => remove_helper_cleanup;
+    }
+
+    state remove_helper_cleanup
+    {
+        run remove_helper_cleanup;
+        default => return;
+    }
+}
+
+%%
+
+static PINT_sm_action remove_getattr_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+        PVFS_TYPE_NONE,
+        0);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_getattr_analyze_results(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    switch(attr->objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    assert(attr->mask & PVFS_ATTR_META_DFILES);
+	    assert(attr->u.meta.dfile_count > 0);
+
+	    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: must remove %d datafiles\n",
+                         __func__, attr->u.meta.dfile_count);
+
+	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
+            break;
+	case PVFS_TYPE_DIRECTORY:
+#if 0
+/* NOTE: this check is not safe because it relies on cached attributes on the
+ * parent, which may be out of date.  The server will perform this check
+ * locally when we attempt to remove the directory itself.
+ */
+            if(attr->u.dir.dirent_count != 0)
+            {
+                js_p->error_code = -PVFS_ENOTEMPTY;
+                break;
+            }
+#endif
+	case PVFS_TYPE_SYMLINK:
+            js_p->error_code = 0;
+            break;
+	case PVFS_TYPE_DATAFILE:
+	case PVFS_TYPE_DIRDATA:
+	default:
+	    gossip_err("%s: unhandled object type (%x)\n", __func__,
+                       attr->objtype);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_datafile_remove_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+   /*
+    * NOTE: it's easier to clean up from a metafile with no datafiles
+    * than the other way around!  so we remove datafiles first.
+    */
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: datafile_remove_setup_msgpair\n");
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    /* post a send/recv pair for the remove to the
+       first server in the list of datafiles */
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_TREE_REMOVE_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        attr->u.meta.dfile_count,
+        attr->u.meta.dfile_array,
+        sm_p->hints);
+    
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = attr->u.meta.dfile_array[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;     /* TODO: Do we want retry? */
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_object_remove_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: object_remove_setup_msgpair\n");
+
+    js_p->error_code = 0;
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    PINT_SERVREQ_REMOVE_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        sm_p->object_ref.handle,
+        sm_p->hints);
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+	js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_datafile_remove_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_err("Error: failed removing one or more datafiles associated with the meta handle %llu\n", llu(sm_p->object_ref.handle));
+    HANDLE_REMOVE_ERROR("datafile_remove_failure");
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_object_remove_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
+                 "object_remove_failure\n");
+    /*
+      catch and return acceptable errors here to avoid generic
+      post-remove-failure cleanup
+    */
+    if (js_p->error_code == -PVFS_ENOTEMPTY)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, " directory not empty -- "
+                     "returning error\n");
+    }
+    else
+    {
+        gossip_err("Error: failed removing handle %llu\n", llu(sm_p->object_ref.handle));
+        HANDLE_REMOVE_ERROR("object_remove_failure");
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action remove_helper_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_acache_invalidate(sm_p->object_ref);
+
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    if (js_p->error_code)
+    {
+        char buf[64] = {0};
+        PVFS_strerror_r(js_p->error_code, buf, 64);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "remove_helper_cleanup error: %s\n", buf);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

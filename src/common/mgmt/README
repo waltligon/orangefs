@@ -1,0 +1,264 @@
+
+Current event handling and thread models in PVFS consist primarily of posting
+an operation (placing it on a queue), servicing operations from the queue
+either with a separate thread or via the test interfaces (test_context primarily)
+and pushing completed operations onto completed queues (known as a 'context').
+
+Although, the model is usually the same, different components have separate
+implementations for queuing and signalling.
+
+...some bits about parallel fs servers facing unique concurrency requirements...
+
+Due to the design of PVFS, where interfaces separate different components,
+such as trove (disk), bmi (network), device, flow, etc. a single request
+steps its way through a number of different queues and completion contexts.
+In fact, in some cases, individual components have multiple queues that
+an operation must step through (dbpf for example) and requests
+are often broken down into a number of operations, each one following the
+queued/servicing/completed path.
+
+In some cases, a request's
+operation is placed on a completion context, where it must wait for a
+separate thread to pull it off the context, only to be pulled off and placed onto
+another queue as the next operation in the request,
+where it must wait to be serviced.  Queue shifting in this manner is especially
+inefficient, as adding/removing the first operation
+from the completion context requires a context switch, and adding/removing
+the second operation from the operation queue requires another context
+switch.
+
+TYPES OF THREADING MODELS:
+
+EVENT MODELS:
+
+Event models consist of placing posted operations in a queue, to be serviced
+at a later point.  Operations can be pulled from the queue by a separate
+thread or possibly multiple threads, or even the same thread that posted
+the operation (in which case, the operation gets serviced in a test function).
+
+In general event/queuing models allow for scheduling, ordering, or grouping
+operations, and so can often increase the overall throughput at the cost
+of individual operation latency.
+
+Examples include the work queue in the linux kernel, ...
+
+THREADS:
+
+Thread models allow operations to be serviced more-or-less immediately by
+either thread-creation: creating a thread that services that operation and exits,
+or thread-pooling: take an idle thread off a relatively large list of
+pre-created threads, that then services the operation and gets placed
+back on the idle list.
+
+Independent threads often perform better with workloads consisting of
+many short independent operations where the cost of queuing/dequeuing
+is high relative to the time required to service the operation.
+
+
+Requirements:
+
+* Provide a worker interface that abstracts the thread/event model from
+the caller, allowing operations to be pushed or pulled into and
+out of the worker using a single set of interfaces.
+
+* Provide a completion context interface and implementation that allows
+for both callback and queued types of completions.
+
+* Provide a generic queue implementation that abstracts list management, locking
+and signalling, as well as provides entry points for monitoring, grouping,
+and scheduling and rate limiting.
+
+* Provide basic worker implementation types, such as thread pooling,
+thread creation, and queuing with single/multiple service threads.
+
+* Eliminate unecessary context switching, locking, and synchronization
+
+TERMS:
+
+The work management interfaces can be divied up into three major components:
+
+* Completion Management.  Manage completed operations.
+* Queue Management.  Store and manage posted and running operations.
+* Thread Management.  Manages the threads that do the actual work.
+
+The first two components, completion and queuing, provide interfaces 
+to the users of the API for posting (registering) and testing for 
+completion (polling) of operations.  Thread management is used internally 
+by the other two components, and does the actual work of servicing operations.
+
+The queuing component allows different types of operations to be queued
+separately, as well as provide multiple levels of servicing for an operation
+(such as for sync-coalescing).
+
+The separation of thread management allows the queuing component to
+specify different types of threading models.  In general, the threading
+model defines the relationship between queues and threads.  For example,
+there may be one thread for all queues, one thread for each queue, or
+one thread created and destroyed for each operation.  Separation of
+thread management allows easy switching between threading models for
+performance analasis or to dynamically re-configure for different workloads.
+
+
+COMPLETION CONTEXT:
+
+The completion context component manages _completed_ operations.
+A context allows callers to group completed operations together, so
+that they can be tested (polled) for completion, or provide a callback
+for a context which gets triggered on completion of an operation associated
+with that context.  The basic interfaces into the context component are:
+
+* Open and close a context.  This allows callers to get a unique id that can
+be used to group completed operations.  Internally, any setup and teardown
+of a context happens with these calls.
+
+cid open_context(callback [optional]);
+close_context(cid);
+
+* Complete an operation.  This allows another component (usually the thread
+component) to specify completion of operations.  Based on the type of context,
+the completion of an operation calls a callback for that context, or adds
+the completed operation to a completion queue for that context (tested
+later by a test_* function), and signals a condition variable.
+
+complete(cid, op_id);
+complete_list(cid, op_id_list);
+
+* Test for completion.  These functions are called to test (poll) for completion
+of one, some or all of the operations for a given context.
+
+test_all(cid);
+test_some(cid, op_id_list);
+test(cid, op_id);
+
+QUEUE:
+
+The queue component provides management interfaces for operations which are posted or in-progress.  The basic interfaces for queueing are as follows:
+
+* Create and Destroy.  Users of the queue interface will create and
+destroy queues as necessary.  The reference to a queue returned by
+create is opaque and provides a handle for all future queue operations.
+
+* Post and cancel.  Users of the work management interface will create
+operations and service callbacks, and "post" them to the queue.
+An operation id is returned to provide management for the poster of the
+operation(s).  The operation ID 
+
+post
+cancel
+pull
+timedwait
+wait
+
+----
+
+WORKER/THREAD:
+
+The worker API provides encapsulation for managing the thread to queue mappings, provides convenience interfaces for posting operations to queues, and testing
+for completion on particular contexts, etc.  A goal of the interfaces
+is to allow multiple dynamic thread models to be configured for a worker,
+but still keep the posting interfaces as simple and generic as possible.
+
+The basic worker interfaces consist of creating a worker that
+will place completed operations in a particular completion queue.
+
+wid worker_init(contextid);
+
+With the worker created new threads can be added, with specific types and
+attributes.  Those threads return thread ids.  By default a worker has a 
+default null thread id, for operations that should be queued and only
+service within the test calls.
+
+thread_id worker_add_thread(worker_id, thread_attrs)
+
+worker_thread_set_attr(worker_id, thread_id, thread_attrs);
+
+WORKER_NULL_THREAD_ID
+
+Operations posted to that null thread id will get queued and later
+serviced in calls to test/test_context.
+
+Threads of different types can be added to the worker:
+
+* thread pool: creates a bunch of threads and returns a thread id that
+references that thread pool.  Operations posted with that thread id will
+get serviced by a thread in the pool.
+
+* thead per-op: same as the thread pool, except that threads are
+created as operations are posted.
+
+* thread queue: creates a specified set of threads for servicing queued
+operations.  Operations posted to this thread id will first get queued,
+and the worker threads will pull operations from the queue(s) and service
+them.
+
+For the null thread and any thread of the QUEUE type, operations are
+first queued and later serviced by threads.  Multiple queues can be added
+to a thread id.  A thread of the QUEUE type that doesn't have
+any queues added to it will return EINVAL if an operation is posted to it.
+
+worker_add_queue(worker_id, thread_id, qid);
+
+Once a queue is added to a thread (or the special null thread), it remains
+part of that thread.  Operations can be posted to queues, and the worker
+manages which thread services that operation.
+
+Operations can be posted to a worker with a specified worker id, and to a 
+specific queue with a queue id.
+Multiple sub-operations can be posted with multiple service functions and
+queue ids, allowing an operation to perform several actions before
+being complete, and before getting added to the completion queue for that
+worker.
+
+worker_post(worker_id, user_ptr, hint, op_count,
+	    op_fn1, op_ptr1, qid1, op_fn2, op_ptr2, qid2, ...);
+
+For example, worker_post might be called for a dspace metadata 
+create op, which then needs to do a sync of the db.  The
+post call would look like this:
+
+worker_post(wid, user_ptr, NULL, 2, 
+	    dspace_create_op_svc, &dspace_attr, dspace_queue_id,
+	    dspace_sync_coalesce, &dspace_attr, dspace_sync_queue_id);
+
+Here, the worker takes over, and completion of the entire operation
+(create and sync) is signalled through the completion context 
+(which can either be a callback or a queue).  The dspace_queue_id
+and dspace_sync_queue_id refer to queues that have already been added
+to the worker, in one of its threads.
+
+---
+
+In order to allow more dynamic queue addition/removal (this would allow
+a queue per file handle), a seperate set of interfaces is proposed.
+There needs to be a LRU cache of queues, and a way to map operations
+to queue ids.  New queue ids not in the cache need to be created and
+added to the cache, and then the operation can be pushed onto it.
+
+A queue cache is added to a particular thread id:
+
+worker_add_queue_cache(worker_id, thread_id, 
+		       op_mapper, queue_cache_attr, queue_attr);
+
+The op_mapper essentially maps operations (their hint structures actually)
+to queue ids.  New queues that are created and added to the queue cache
+inherit the queue_attr queue attributes specified.
+
+The signature for the mapper is something like:
+
+map_op_to_qid(worker, op_fn1, op_ptr1, hint, thread_id *, queue_id *)
+
+This makes the post function:
+
+worker_post(worker_id, user_ptr, hint, op_count,
+	    op_fn1, op_ptr1, op_fn2, op_ptr2, ...);
+
+worker_test_all(worker_id, count, op_ids, user_ptrs, errors, timeout)
+{
+    /* anything done yet? */
+    PINT_context_test_all(&count, ...);
+
+    if(count == 0 && get_type(worker_id) == THREAD_NONE)
+    {
+       service functions
+    }
+}

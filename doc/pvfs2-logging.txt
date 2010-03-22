@@ -1,0 +1,191 @@
+PVFS Logging
+============
+
+This document describes log files produced by PVFS and how to control
+what messages are included in them.
+
+PVFS Log Format
+---------------
+
+The log messages from all PVFS components except for the kernel module
+are in the following format: 
+
+    [<type> <timestamp>] LOG MESSAGE
+
+The type will be one of 4 different letters depending on what type of
+log message it is:
+
+    D - DEBUG 
+    E - ERROR 
+    A - ACCESS LOGGING
+    P - PERFORMANCE COUNTER 
+
+The timestamp defaults to showing the date, hour, and minute that the
+log message was generated.  The timestamp format can be modified to one
+of the following styles by using the --logstamp argument to pvfs2-client
+or the LogStamp field in the pvfs2-server config file:
+
+    datetime: (default, as described above)
+    usec: shows time with microsecond granularity (but no date)
+    none: no time stamp
+    thread: includes thread ID with each message
+
+PVFS Log Locations
+------------------
+
+The pvfs2-server daemon writes log messages to /tmp/pvfs2-server.log by
+default.  A different output file can be specified using the LogFile
+parameter in the configuration file.  The logs can also be sent to syslog
+instead by adding "LogType syslog" to the configuration file.
+
+The pvfs2-client daemon writes log messages to /tmp/pvfs2-client.log by
+default.  This can be overridden using the --logfile or --logtype command
+line arguments to pvfs2-client.
+
+The PVFS kernel module (pvfs2.ko) generates log messages to dmesg and/or
+/var/log/messages and/or /var/log/kern depending on your Linux distribution.
+
+The PVFS client library (libpvfs2) and command line utilities generate log
+messages to stderr if enabled.
+
+Logging Levels
+--------------
+
+All PVFS components log critical error messages automatically.  However, 
+you can also turn on additional logging for debugging purposes.  This is
+controlled by specifying which logging "masks" should be enabled.
+
+You can see a list of available pvfs2-server, client library, and
+pvfs2-client logging levels by running the pvfs2-set-debugmask utility
+with no arguments.
+
+You can see a list of available kernel module logging masks and client
+logging masks by running "cat /proc/sys/pvfs2/debug-help".
+
+The "verbose" mask is commonly used to turn on most of the logging
+levels that are useful for debugging problems.
+
+Changing the log mask for pvfs2-server
+--------------------------------------
+
+Use the EventLogging field in the configuration file to specify
+a comma separated list of masks to enable.  You can also use the
+pvfs2-set-debugmask command line utility to change the mask dynamically
+without restarting the server.
+
+Changing the log mask for libpvfs and command line utilities
+------------------------------------------------------------
+
+Set the PVFS2_DEBUGMASK environment variable to a comma separated list of
+client-appropriate masks prior to launching the application.
+
+
+Changing the log mask for the kernel module
+-------------------------------------------
+
+There are three ways to set the debugging level for the kernel module:
+
+1.  Set module_parm_debug_mask parameter when the kernel module is
+loaded.  
+
+2.  Set the environment variable PVFS2_KMODMASK before starting the 
+pvfs2-client.  NOTE:  the kernel module must be loaded before starting
+the client-core.
+
+3.  Write a debug string to /proc/sys/pvfs2/kernel-debug after the kernel
+module is loaded.
+
+
+Options 1 and 2 allow the kernel debug mask to be set ONLY when PVFS is started,
+while option 3 allows the kernel debug mask to be modified while PVFS is 
+running.  Thus, option 3 dynamically updates the kernel debug mask, 
+immediately turning on the debugging options specified, and REPLACES the
+existing debug mask.  Whenever you modify the kernel debug mask using
+option 3, an informational message is printed to the system log file, 
+giving both its numerical value and a comma-separated list of keywords representing
+the areas of debugging just turned on.
+
+Options 1 and 2 require the user to specify a numerical value that is
+an OR'd list of gossip debug values.  These values can be found in
+include/pvfs2-debug.h.  For example, to load the kernel module with
+"file" debugging turned on, issue the following command:
+
+insmod pvfs2.ko module_parm_debug_mask=4
+
+The 4 is the value of GOSSIP_FILE_DEBUG, and module_parm_debug_mask is the kernel
+module's input parameter for the kernel debug mask.  To turn on multiple areas,for
+example, file and dcache, set module_parm_debug_mask = (GOSSIP_FILE_DEBUG | GOSSIP_DCACHE_DEBUG) =
+(4 | 128) = 132.  Its string equivalent would be "file,dcache".
+
+An informational message is displayed in the system log whenever you load the kernel 
+module, giving you the kernel debug mask's numerical value and its string 
+equivalent.  Be aware that you can modify this value later using option 3.
+
+To set the kernel debug mask using PVFS2_KMODMASK, create a global environment 
+variable and set it equal to the desired numerical value.  When the pvfs2-client
+is started, the kernel debug mask and its string equivalent will be modified.  Note that 
+PVFS2_KMODMASK will override any value set by the kernel module load process.  Again,
+option 3 allows you to change the debug mask at any time.
+
+To set the kernel debug mask using the /proc variable, write a debug string to 
+/proc/sys/pvfs2/kernel-debug.  Example:  echo "file,dcache" > /proc/sys/pvfs2/kernel-debug.
+An informational message will be written to the system log file displaying the new
+kernel debug mask and its string equivalent.
+
+To see the kernel debug mask without looking in the system log, issue a "cat" on
+/proc/sys/pvfs2/kernel-debug and you will see the string equivalent of the kernel
+debug mask. 
+
+A helper /proc variable, /proc/sys/pvfs2/debug-help, will display a list of valid
+keywords for both the kernel and client debug masks, when you issue a "cat" on it.  These 
+keywords are used to build the string that represent the areas of debugging that you 
+want turned on.
+
+
+
+Changing the log mask for the client module
+-------------------------------------------
+
+There are three ways to set the debugging level for the pvfs2-client:
+
+1.  Set --gossip-mask=MASK_LIST on the command line when starting the client.  This
+list can be overridden by PVFS2_DEBUGMASK or by setting the /proc variable client-debug. 
+
+2.  Write a debug string to /proc/sys/pvfs2/client-debug after starting the client. This
+will override any value set by --gossip-mask on the command line and any value set by
+PVFS2_DEBUGMASK.
+
+3.  Set the environment variable PVFS2_DEBUGMASK before starting the client.  This will
+override any value set by --gossip-mask on the command line.
+
+
+Options 1 and 2 require a string of comma-separated keywords to set the client debug mask.
+For example:
+
+./pvfs2-client --gossip-mask="server,trove" -p ./pvfs2-client-core
+NOTE: after kernel module is loaded and during client startup.
+
+echo "server,trove" > /proc/sys/pvfs2/client-debug
+NOTE: after kernel module is loaded and client is started.
+
+A list of client debug keywords can be found in include/pvfs2-debug.h or by accessing
+the /proc/sys/pvfs2/debug-help variable after the kernel module is loaded. Example:
+
+cat /proc/sys/pvfs2/debug-help
+
+
+When the client starts, the client debug mask information is sent to the kernel module
+where a local version of the mask and its string equivalent is maintained.  This process
+writes an informational message to the system log file displaying the numerical value of
+the client debug mask and its string equivalent.  You can also see the mask's current string
+equivalent by issuing the following:
+
+cat /proc/sys/pvfs2/client-debug.
+
+
+Whenever you modify the client debug mask after the client has started, an informational message will
+be written to the system log file displaying the new numerical value and string equivalent.  At any
+time, once PVFS is running, you can view the client debug mask using the "cat" statement above without
+having to look in the system log file for the last modification.
+
+

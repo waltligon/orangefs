@@ -1,0 +1,29 @@
+ifdef BUILD_KARMA
+
+DIR := src/apps/karma
+
+KARMASRC += \
+    $(DIR)/color.c \
+    $(DIR)/comm.c \
+    $(DIR)/details.c \
+    $(DIR)/fsview.c \
+    $(DIR)/karma.c \
+    $(DIR)/menu.c \
+    $(DIR)/messages.c \
+    $(DIR)/prep.c \
+    $(DIR)/status.c \
+    $(DIR)/traffic.c \
+    $(DIR)/units.c
+
+KARMA := $(DIR)/karma
+
+# add GTK include dirs and libs
+MODCFLAGS_$(DIR) := @GTKCFLAGS@
+MODLDFLAGS_$(DIR) := @GTKLIBS@
+
+# gtk-2.0 has many bad prototypes
+ifdef GNUC
+MODCFLAGS_$(DIR) += -Wno-strict-prototypes
+endif
+
+endif  # BUILD_KARMA

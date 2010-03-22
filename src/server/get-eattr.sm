@@ -1,0 +1,257 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* pvfs2_get_eattr_sm
+ *
+ * This state machine handles incoming server geteattr operations.  These
+ * are the operations sent by PVFS_sys_geteattr() among others.
+ *
+ * The pvfs2_prelude_sm is responsible for reading the actual metadata
+ * to begin with, because it does this as part of the permission checking
+ * process.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-eattr.h"
+
+%%
+
+machine pvfs2_get_eattr_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_resp;
+        default => final_response;
+    }
+
+    state setup_resp
+    {
+        run geteattr_setup_resp;
+        success => read_eattrib;
+        default => final_response;
+    }
+
+    state read_eattrib
+    {
+        run geteattr_read_eattrib;
+        default => check_resp;
+    }
+
+    state check_resp
+    {
+        run geteattr_check_resp;
+        default => final_response;
+    }
+
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run geteattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * geteattr_setup_resp()
+ * Set up the response - allocate needed resources
+ */
+static PINT_sm_action geteattr_setup_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i, tsz;
+
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
+            s_op->req->u.geteattr.nkey);
+
+    js_p->error_code = 0;
+
+    /* iterate through the keys and see if they fall into valid name spaces */
+    for(i=0; i<s_op->req->u.geteattr.nkey; i++)
+    {
+        gossip_debug(GOSSIP_GETEATTR_DEBUG, "geteattr key %d : %s\n", i, 
+                (char *) s_op->req->u.geteattr.key[i].buffer);
+
+        js_p->error_code = PINT_eattr_check_access(
+            &s_op->req->u.geteattr.key[i],
+            NULL);
+        if(js_p->error_code != 0)
+        {
+            /* not prefixed: treat this as if the key does not exist */
+            js_p->error_code = -PVFS_ENOENT;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
+    s_op->resp.u.geteattr.val =
+        malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.geteattr.val)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.geteattr.err =
+        malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_error));
+    if (!s_op->resp.u.geteattr.err)
+    {
+        free(s_op->resp.u.geteattr.val);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
+    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    {
+        s_op->resp.u.geteattr.val[i].buffer = malloc(
+            s_op->req->u.geteattr.valsz[i]);
+        if (!s_op->resp.u.geteattr.val[i].buffer)
+        {
+            for(--i; i >= 0; --i)
+            {
+                free(s_op->resp.u.geteattr.val[i].buffer);
+            }
+            s_op->resp.u.geteattr.nkey = 0;
+            free (s_op->resp.u.geteattr.val);
+            free (s_op->resp.u.geteattr.err);
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        s_op->resp.u.geteattr.val[i].buffer_sz = s_op->req->u.geteattr.valsz[i];
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * geteattr_read_eattrib()
+ * Here is where the eattrib get read.  Not much to this.
+ */
+static PINT_sm_action geteattr_read_eattrib(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    js_p->error_code = 0;
+
+    ret = job_trove_keyval_read_list(
+        s_op->req->u.geteattr.fs_id,
+        s_op->req->u.geteattr.handle,
+        s_op->req->u.geteattr.key,
+        s_op->resp.u.geteattr.val,
+        s_op->resp.u.geteattr.err,
+        s_op->req->u.geteattr.nkey,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &i,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+/*
+ * geteattr_check_resp()
+ * Check the response - handle any errors
+ */
+static PINT_sm_action geteattr_check_resp(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int k;
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
+            s_op->resp.u.geteattr.nkey);
+    /* put the returned read buffer size in buffer_sz */
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"status %d error_code %d nkeys %d\n",
+            s_op->resp.status, js_p->error_code, s_op->resp.u.geteattr.nkey);
+    /* it is the only thing returned across the wire */
+    for (k = 0; k < s_op->resp.u.geteattr.nkey; k++)
+    {
+        if (js_p->error_code == 0)
+        {
+            ret = PINT_eattr_encode(
+                &s_op->req->u.geteattr.key[k],
+                &s_op->resp.u.geteattr.val[k]);
+            if(ret != 0)
+            {
+                gossip_err("%s: failed encoding extended attribute: %s\n",
+                           __func__, (char *)s_op->req->u.geteattr.key[k].buffer);
+                s_op->resp.u.geteattr.err[k] = ret;
+            }
+
+            s_op->resp.u.geteattr.val[k].buffer_sz =
+                s_op->resp.u.geteattr.val[k].read_sz;
+            gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
+                (char *) s_op->req->u.geteattr.key[k].buffer, 
+                s_op->resp.u.geteattr.val[k].buffer_sz);
+        }
+        /* in case of any errors, we initialize it to 0 */
+        else {
+            s_op->resp.u.geteattr.val[k].buffer_sz = 0;
+        }
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+/* geteattr_cleanup()
+ * free resources alloc'd by state machine
+ */
+static PINT_sm_action geteattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int i = 0;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    for(; i < s_op->resp.u.geteattr.nkey; ++i)
+    {
+        free(s_op->resp.u.geteattr.val[i].buffer);
+    }
+    if (s_op->resp.u.geteattr.val)
+        free(s_op->resp.u.geteattr.val);
+    if (s_op->resp.u.geteattr.err)
+        free(s_op->resp.u.geteattr.err);
+    return(server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(geteattr);
+
+struct PINT_server_req_params pvfs2_get_eattr_params =
+{
+    .string_name = "get_eattr",
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_geteattr,
+    .state_machine = &pvfs2_get_eattr_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

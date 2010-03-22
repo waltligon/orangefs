@@ -1,0 +1,556 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * Changes by Acxiom Corporation to add support for nonblocking fs addition
+ * Copyright © Acxiom Corporation, 2006.
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface bootstrapping routine to tell the interface
+ *  about available file systems.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#include <errno.h>
+#include <assert.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "acache.h"
+#include "ncache.h"
+#include "pint-cached-config.h"
+#include "pvfs2-sysint.h"
+#include "pvfs2-util.h"
+#include "pint-sysint-utils.h"
+#include "gen-locks.h"
+#include "PINT-reqproto-encode.h"
+#include "trove.h"
+#include "server-config-mgr.h"
+#include "client-state-machine.h"
+#include "pint-util.h"
+
+enum {
+    SKIP_INTEGRITY_CHECK = 1
+};
+
+gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
+extern job_context_id pint_client_sm_context;
+
+%%
+
+machine pvfs2_fs_add_sm
+{
+    state run_nested 
+    {
+        jump pvfs2_server_get_config_nested_sm;
+        default => parent_cleanup;
+    }
+
+    state parent_cleanup
+    {
+        run fs_add_parent_cleanup;
+        SKIP_INTEGRITY_CHECK => final_cleanup;
+        success => config_integrity_checks;
+        default => final_cleanup;
+    }
+
+    state config_integrity_checks
+    {
+        run pvfs2_server_prepare_fetch_config;
+        SKIP_INTEGRITY_CHECK => final_cleanup;
+        success => do_config_integrity_checks;
+        default => final_cleanup;
+    }
+
+    state do_config_integrity_checks
+    {
+        jump pvfs2_server_fetch_config_nested_sm;
+        default => final_cleanup;
+    }
+
+    state final_cleanup
+    {
+        run fs_add_final_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Tell the system interface about the location of a PVFS2 file system.
+ *
+ * \return 0 on success, -PVFS_error on failure.
+ */
+PVFS_error PVFS_isys_fs_add(
+    struct PVFS_sys_mntent *mntent,
+    PVFS_sys_op_id *op_id,
+    void* user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    int i;
+    struct server_configuration_s *new_server_config = NULL;
+    PVFS_BMI_addr_t test_addr;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+    PVFS_credentials creds;
+
+    PVFS_util_gen_credentials(&creds);
+
+    gen_mutex_lock(&mt_config);
+
+    /* Normally the fs_id value has not been resolved yet at this point, and
+     * will be zero.  If it is a non-zero value (and this get_config call
+     * succeeds) then it indicates someone has already added this mntent
+     * instance.  It is ok to add the same _file system_ twice, but not the
+     * same mntent instance.
+     */
+    new_server_config = PINT_server_config_mgr_get_config(mntent->fs_id);
+    if (new_server_config)
+    {
+        PINT_server_config_mgr_put_config(new_server_config);
+        PVFS_perror_gossip("Attempted duplicate mntent addition", ret);
+        gen_mutex_unlock(&mt_config);
+        return -PVFS_EEXIST;
+    }
+
+    /* make sure BMI knows how to handle this method, else fail quietly */
+    for(i = 0; i < mntent->num_pvfs_config_servers; i++)
+    {
+        ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+        if (ret == 0)
+        {
+            break;
+        }
+    }
+
+    if (i == mntent->num_pvfs_config_servers)
+    {
+        gossip_err("%s: Failed to initialize any appropriate "
+                   "BMI methods for addresses:\n", __func__);
+        for(i = 0; i < mntent->num_pvfs_config_servers; ++i)
+        {
+            gossip_err("\t%s\n", mntent->pvfs_config_servers[i]);
+        }
+        gen_mutex_unlock(&mt_config);
+        return(ret);
+    }
+    mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
+
+    PINT_smcb_alloc(&smcb, PVFS_SYS_FS_ADD,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    sm_p->u.get_config.mntent = mntent;
+    sm_p->u.get_config.config = 
+        (struct server_configuration_s *)malloc(
+        sizeof(struct server_configuration_s));
+    if (!sm_p->u.get_config.config)
+    {
+        ret = -PVFS_ENOMEM;
+        PVFS_perror_gossip("Failed to allocate configuration object", ret);
+        gen_mutex_unlock(&mt_config);
+        return(ret);
+    }
+    memset(sm_p->u.get_config.config, 0, sizeof(struct server_configuration_s));
+
+    /* NOTE: we set these fields manually here rather than use
+     * PINT_init_msgarray_params(), because we don't yet have a server
+     * configuration file to override default parameters.
+     */
+    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
+    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+
+    return PINT_client_state_machine_post(
+        smcb,  op_id, user_ptr);
+}
+
+int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
+{
+    int ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    ret = PVFS_isys_fs_add(mntent, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_fs_add call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "fs_add", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/* PVFS_sys_fs_remove()
+ *
+ * tells the system interface to dynamically "unmount" a mounted file
+ * system by removing the configuration info and reloading the cached
+ * configuration interface
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (mntent)
+    {
+        gen_mutex_lock(&mt_config);
+        ret = PVFS_util_remove_internal_mntent(mntent);
+        if (ret == 0)
+        {
+            ret = PINT_server_config_mgr_remove_config(mntent->fs_id);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("PINT_server_config_mgr_remove_config "
+                            "failed", ret);
+            }
+
+            /*
+              reload all handle mappings as well as the interface with
+              the new configuration information
+            */
+            PINT_server_config_mgr_reload_cached_config_interface();
+        }
+        gen_mutex_unlock(&mt_config);
+    }
+    return ret;
+}
+
+static PINT_sm_action pvfs2_server_prepare_fetch_config(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PVFS_fs_id fsid;
+    int count, ret;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    assert(js_p->error_code == 0);
+    fsid = sm_p->u.get_config.mntent->fs_id;
+    ret = PVFS_mgmt_count_servers(
+        fsid, sm_p->cred_p, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, &count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+        js_p->error_code = ret;
+	return SM_ACTION_COMPLETE;
+    }
+    if (count == 1)
+    {
+        js_p->error_code = SKIP_INTEGRITY_CHECK;
+	return SM_ACTION_COMPLETE;
+    }
+    sm_p->fetch_config.nservers = count;
+    sm_p->fetch_config.addr_array = (PVFS_BMI_addr_t *) malloc(count * sizeof(PVFS_BMI_addr_t));
+    if (sm_p->fetch_config.addr_array == NULL)
+    {
+	perror("malloc");
+	js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PVFS_mgmt_get_server_array(fsid, sm_p->cred_p, 
+            PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, sm_p->fetch_config.addr_array, &count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+        free(sm_p->fetch_config.addr_array);
+        sm_p->fetch_config.addr_array = NULL;
+	js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    sm_p->fetch_config.fs_config_bufs = (char **) calloc(count, sizeof(char *));
+    if (sm_p->fetch_config.fs_config_bufs == NULL)
+    {
+        fprintf(stderr, "Could not allocate fs_configs\n");
+        free(sm_p->fetch_config.addr_array);
+        sm_p->fetch_config.addr_array = NULL;
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    sm_p->fetch_config.fs_config_buf_size = (int *) calloc(count, sizeof(int));
+    if (sm_p->fetch_config.fs_config_buf_size == NULL)
+    {
+        fprintf(stderr, "Could not allocate fs_sizes\n");
+        free(sm_p->fetch_config.addr_array);
+        sm_p->fetch_config.addr_array = NULL;
+        free(sm_p->fetch_config.fs_config_bufs);
+        sm_p->fetch_config.fs_config_bufs = NULL;
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, count);
+    if (ret != 0)
+    {
+        fprintf(stderr, "Could not allocate msgarray for fetch_config\n");
+        free(sm_p->fetch_config.addr_array);
+        sm_p->fetch_config.addr_array = NULL;
+        free(sm_p->fetch_config.fs_config_bufs);
+        sm_p->fetch_config.fs_config_bufs = NULL;
+        free(sm_p->fetch_config.fs_config_buf_size);
+        sm_p->fetch_config.fs_config_buf_size = NULL;
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
+{
+    int i, count = 0;
+
+    if (!str || !hash || hash_length < 0) 
+    {
+        return;
+    }
+    for (i = 0; i < hash_length; i++) 
+    {
+        int cnt;
+        cnt = sprintf((char *)str + count, "%02x", hash[i]);
+        count += cnt;
+    }
+    return;
+}
+
+static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
+    char **sha1_fs_digests = NULL;
+    size_t digest_len;
+    PVFS_fs_id fsid;
+
+    assert(js_p->error_code == 0);
+    fsid = sm_p->u.get_config.mntent->fs_id;
+    count = sm_p->fetch_config.nservers;
+    sha1_fs_digests = (char **) calloc(count, sizeof(char *));
+    if (sha1_fs_digests == NULL)
+    {
+        ret = -PVFS_ENOMEM;
+        goto out;
+    }
+    for (i = 1; i < count; i++)
+    {
+        if (sm_p->fetch_config.fs_config_buf_size[0] != sm_p->fetch_config.fs_config_buf_size[i])
+        {
+            fs_conf_size_mismatch = 1;
+        }
+    }
+    if (fs_conf_size_mismatch)
+    {
+        gossip_err("      FS config file integrity checks failed;\n");
+        for (i = 0; i < count; i++)
+        {
+            gossip_err("     FS config file on %s -> (size) %d\n", 
+                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp),
+                   sm_p->fetch_config.fs_config_buf_size[i] - 1);
+            ret = -PVFS_EINVAL;
+        }
+        goto out;
+    }
+    for (i = 0; i < count; i++)
+    {
+        ret = PINT_util_digest_sha1(sm_p->fetch_config.fs_config_bufs[i], 
+                                    sm_p->fetch_config.fs_config_buf_size[i],
+                                    &sha1_fs_digests[i], &digest_len);
+        if (ret < 0)
+            goto out;
+    }
+    ret = 0;
+    for (i = 1; i < count; i++) 
+    {
+        if (memcmp(sha1_fs_digests[0], sha1_fs_digests[i], digest_len))
+        {
+            fs_conf_failed = 1;
+        }
+    }
+    if (fs_conf_failed)
+    {
+        gossip_err("    FS config file integrity checks failed;\n");
+        for (i = 0; i < count; i++)
+        {
+            unsigned char str[256];
+            hash2str((unsigned char *) sha1_fs_digests[i], digest_len, str);
+            gossip_err("     FS config file on %s -> (SHA1) %s\n", 
+                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p, sm_p->fetch_config.addr_array[i], &tmp), str);
+        }
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+out:
+    for (i = 0; i < count; i++)
+    {
+        if (sm_p->fetch_config.fs_config_bufs && sm_p->fetch_config.fs_config_bufs[i])
+            free(sm_p->fetch_config.fs_config_bufs[i]);
+        if (sha1_fs_digests && sha1_fs_digests[i])
+            free(sha1_fs_digests[i]);
+    }
+    free(sha1_fs_digests);
+    free(sm_p->fetch_config.addr_array);
+    sm_p->fetch_config.addr_array = NULL;
+    free(sm_p->fetch_config.fs_config_bufs);
+    sm_p->fetch_config.fs_config_bufs = NULL;
+    free(sm_p->fetch_config.fs_config_buf_size);
+    sm_p->fetch_config.fs_config_buf_size = NULL;
+    js_p->error_code = (ret == -PVFS_EOPNOTSUPP) ? 0 : ret;
+    return 1;
+}
+
+static PINT_sm_action fs_add_parent_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PVFS_BMI_addr_t addr;
+
+
+    if(js_p->error_code != 0)
+    {
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        return SM_ACTION_COMPLETE;
+    }
+
+#ifdef USE_TRUSTED
+    /* once we know about the server configuration, we need to tell BMI */
+    BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *)sm_p->u.get_config.config);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
+#endif
+    /* Set the buffer size according to configuration file */
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
+    /*
+     * Force the connection to the config server down so future transfers
+     * will get the new buffer size.
+     */
+    ret = BMI_addr_lookup(&addr,
+                          sm_p->u.get_config.mntent->the_pvfs_config_server);
+    if (ret == 0 && 
+        sm_p->u.get_config.config->tcp_buffer_size_send != 0 &&
+        sm_p->u.get_config.config->tcp_buffer_size_receive != 0)
+        BMI_set_info(addr, BMI_TCP_CLOSE_SOCKET, NULL);
+
+    /* 
+      clear out all configuration information about file systems that
+      aren't matching the one being added now.  this ensures no
+      erroneous handle mappings are added next
+    */
+    ret = PINT_config_trim_filesystems_except(
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip(
+            "PINT_config_trim_filesystems_except failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*
+      add the mntent to the internal mount tables; it's okay if it's
+      already there, as the return value will tell us and we can
+      ignore it.  in short, if the mntent was from a pvfstab file, it
+      should already exist in the tables.  in any other case, it needs
+      to be added properly.
+    */
+    ret = PVFS_util_add_dynamic_mntent(sm_p->u.get_config.mntent);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("PVFS_util_add_mnt failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* finally, try to add the new config to the server config manager */
+    ret = PINT_server_config_mgr_add_config(
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id,
+        &sm_p->u.get_config.free_config_flag);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        js_p->error_code  = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*
+      reload all handle mappings as well as the interface with the new
+      configuration information
+    */
+    PINT_server_config_mgr_reload_cached_config_interface();
+
+    gen_mutex_unlock(&mt_config);
+
+    /* If fs_add indicates a need for checking integrity of config
+       files do so, else skip 
+     */
+    js_p->error_code = (sm_p->u.get_config.mntent->integrity_check == 0)
+                        ? SKIP_INTEGRITY_CHECK : 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action fs_add_final_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (js_p->error_code == SKIP_INTEGRITY_CHECK)
+        js_p->error_code = 0;
+    else if (js_p->error_code == 0)
+    {
+        compare_hashes(sm_p, js_p);
+    }
+    if(sm_p->u.get_config.free_config_flag)
+    {
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+    }
+    sm_p->error_code = js_p->error_code;
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

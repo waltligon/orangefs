@@ -1,0 +1,74 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2-GENCONFIG 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-genconfig \- create configuration files for PVFS2 servers
+.SH SYNOPSIS
+.B pvfs2-genconfig [ --protocol 
+.I protocol_name
+.B ] [ --port 
+.I port_number
+.B ] [ --ioservers
+.I list_of_servers
+.B ] [ --metaservers 
+.I list_of_servers 
+.B ] [ --logfile     
+.I pathname
+.B ] [ --storage
+.I pathname
+.B ] [ --quiet ]
+.I <global_config_file> <local_config_file>
+
+.SH DESCRIPTION
+.B pvfs2-genconfig
+helps create the config files used by 
+.BR pvfs2-server (1).
+Users can pass any number of command line options, in which case 
+.B pvfs2-genconfig
+will not prompt and use the value of the options in the generated config file.
+Without any command line options, it will prompt the user for key information
+
+The
+.I global_config_file
+and
+.I local_config_file
+options warrant a little explanation.  
+.B pvfs2-genconfig
+will create one config file with settings applicable to every server in the
+system.  It will also create one smaller config file with settings applicable
+to the individual servers in the system.  Getting the many server-specific
+config files out to the server nodes is left as an exercise for the reader.
+
+.SH OPTIONS
+.IP --protocol
+The communication method the servers will use.  As of this writing, the only
+supported options are "gm" (for myrinet networks) and "tcp".  
+.IP --port
+The port the server will bind to.  This port should be appropriate for the
+protocol: GM ports must be in the range 0-7, for example.
+.IP --ioservers
+A comma-delimited list of servers used for datafiles.  This option can be given
+more than one time.  Each instance will append to the list of servers.
+.IP --metaservers
+A comma-delimited list of servers used for metadata.  This option can be given
+more than one time.  Each instance will append to the list of servers.  Note
+that as of pvfs-0.0.3, more than one metadata server is not supported.
+.IP --logfile
+Directory in which the server will create its logfile.
+.IP --storage
+Directory in which the server will create its storage space
+.IP --quiet
+Generate the config file w/o echoing any output to the screen.
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-ls (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

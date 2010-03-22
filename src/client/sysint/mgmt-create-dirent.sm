@@ -1,0 +1,251 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for creating directory entries
+ *  that point to specific existing objects.  These are used primarily
+ *  for file system repair purposes.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+
+static int mgmt_create_dirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
+
+%%
+
+machine pvfs2_client_mgmt_create_dirent_sm
+{
+    state init
+    {
+        run mgmt_create_dirent_init;
+        default => create_dirent_setup_msgpair;
+    }
+
+    state create_dirent_setup_msgpair
+    {
+        run mgmt_create_dirent_setup_msgpair;
+        success => create_dirent_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state create_dirent_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run mgmt_create_dirent_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiate creation of a directory entry pointing to a specific object.
+ */
+PVFS_error PVFS_imgmt_create_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_handle entry_handle,
+    PVFS_credentials *credentials,
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_imgmt_create_dirent entered\n");
+
+    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (entry_handle == PVFS_HANDLE_NULL) || !entry)
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_CREATE_DIRENT,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    sm_p->parent_ref = parent_ref;
+    sm_p->u.mgmt_create_dirent.entry = entry;
+    sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
+    PVFS_hint_copy(hints, &sm_p->hints);
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "Trying to create dirent %s under %llu,%d\n",
+        sm_p->u.mgmt_create_dirent.entry, llu(parent_ref.handle),
+        parent_ref.fs_id);
+
+    return PINT_client_state_machine_post(
+        smcb,  op_id, user_ptr);
+}
+
+/** Create a directory entry pointing to a specific object.
+ */
+PVFS_error PVFS_mgmt_create_dirent(
+    PVFS_object_ref parent_ref,
+    char *entry,
+    PVFS_handle entry_handle,
+    PVFS_credentials *credentials,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_mgmt_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_mgmt_create_dirent entered\n");
+
+    ret = PVFS_imgmt_create_dirent(
+        parent_ref, entry, entry_handle, credentials, &op_id, hints, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_imgmt_create_dirent call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_mgmt_wait(op_id, "create_dirent", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_mgmt_release(op_id);
+    return error;
+}
+
+/****************************************************************/
+
+static int mgmt_create_dirent_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_create_dirent_init called\n");
+
+    assert(js_p->error_code == 0);
+    return SM_ACTION_COMPLETE;
+}
+
+static int mgmt_create_dirent_setup_msgpair(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    js_p->error_code = 0;
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, " creating dirent entry %s with "
+        "handle %llu under parent %llu,%d\n",
+        sm_p->u.mgmt_create_dirent.entry,
+        llu(sm_p->u.mgmt_create_dirent.entry_handle),
+        llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+
+    PINT_SERVREQ_CRDIRENT_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.mgmt_create_dirent.entry,
+        sm_p->u.mgmt_create_dirent.entry_handle,
+        sm_p->parent_ref.handle,
+        sm_p->parent_ref.fs_id,
+        sm_p->hints);
+
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = mgmt_create_dirent_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map server address\n");
+	js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static int mgmt_create_dirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p __attribute__((unused)) =
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+    if (resp_p->status == 0)
+    {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG,
+            "  mgmt_create_dirent_comp_fn: dirent %s under %llu,%d "
+            "created\n", sm_p->u.mgmt_create_dirent.entry,
+            llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+    }
+    return resp_p->status;
+}
+
+static PINT_sm_action mgmt_create_dirent_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "mgmt_create_dirent_cleanup called\n");
+
+    sm_p->error_code = js_p->error_code;
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

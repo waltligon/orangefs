@@ -1,0 +1,293 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for setting the attributes of an object
+ *  (file or directory).
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+
+extern job_context_id pint_client_sm_context;
+
+static int setattr_msg_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+%%
+
+machine pvfs2_client_setattr_sm
+{
+    state init
+    {
+        run setattr_init;
+        default => setattr_msg_setup_msgpair;
+    }
+
+    state setattr_msg_setup_msgpair
+    {
+        run setattr_msg_setup_msgpair;
+        success => setattr_msg_xfer_msgpair;
+        default => cleanup;
+    }
+
+    state setattr_msg_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => cleanup;
+        default => setattr_msg_failure;
+    }
+
+    state setattr_msg_failure
+    {
+        run setattr_msg_failure;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run setattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Initiate modification of attributes of a single object.
+ */
+PVFS_error PVFS_isys_setattr(
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    const PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_setattr entered\n");
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
+    /*
+     * make sure the caller didn't set invalid mask bits.
+     * only common attributes can be set.
+     */
+    if ((attr.mask & ~PVFS_ATTR_SYS_ALL_TIMES) != 0)
+    {
+        gossip_lerr("PVFS_isys_setattr() failure: invalid attributes "
+                    "specified\n");
+        return ret;
+    }
+
+    /* make sure that the permission bits are acceptable */
+    if ((attr.mask & PVFS_ATTR_SYS_PERM) && (attr.perms & ~PVFS_PERM_VALID) != 0)
+    {
+        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported" 
+                    "permission bits\n");
+        return(-PVFS_EINVAL);
+    }
+
+    PINT_smcb_alloc(&smcb, PVFS_SYS_SETATTR,
+             sizeof(struct PINT_client_sm),
+             client_op_state_get_machine,
+             client_state_machine_terminate,
+             pint_client_sm_context);
+    if (smcb == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+
+    ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
+    if(ret < 0)
+    {
+        gossip_lerr("PVFS_isys_setattr() failure: %s\n",
+                    strerror(PVFS_get_errno_mapping(-ret)));
+        return ret;
+    } 
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %llu "
+                 "on fs %d\n", llu(ref.handle),
+                 ref.fs_id);
+
+    return PINT_client_state_machine_post(
+        smcb,  op_id, user_ptr);
+}
+
+/**  Modify the attributes of a single object.
+ */
+PVFS_error PVFS_sys_setattr(
+    PVFS_object_ref ref,
+    PVFS_sys_attr attr,
+    const PVFS_credentials *credentials,
+    PVFS_hint hints)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
+
+    ret = PVFS_isys_setattr(ref, attr, credentials, &op_id, hints, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_setattr call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PVFS_sys_wait(op_id, "setattr", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/****************************************************************/
+
+static PINT_sm_action setattr_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    assert(js_p->error_code == 0);
+    return SM_ACTION_COMPLETE;
+}
+
+static int setattr_msg_comp_fn(void *v_p,
+                               struct PVFS_server_resp *resp_p,
+                               int index)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr_msg_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_SETATTR);
+    return resp_p->status;
+}
+
+static PINT_sm_action setattr_msg_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_ds_type objtype;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
+
+    PINT_msgpair_init(&sm_p->msgarray_op);
+    msg_p = &sm_p->msgarray_op.msgpair;
+
+    objtype = ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
+         sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE);
+
+    PINT_SERVREQ_SETATTR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        sm_p->object_ref.handle,
+        objtype,
+        sm_p->u.setattr.sys_attr,
+        0,
+        sm_p->hints);
+
+    /* clients should not be able to mess with dfile and distribution
+     * information here.  Those parameters should only be set at create time.
+     * Maybe at some point we'll have a utility to adjust those attributes.  At
+     * this time if they somehow get changed we'll have garbage on disk */
+
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = setattr_msg_comp_fn;
+
+    gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "setattr attr mask sent to server: 0x%x\n",
+            (int)sm_p->u.setattr.sys_attr.mask);
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action setattr_msg_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    assert(js_p->error_code != 0);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr attr;
+
+    sm_p->error_code = js_p->error_code;
+
+    /* either update acache or invalidate depending on if we were successful
+     * or not 
+     */
+    if(sm_p->error_code == 0)
+    {
+        PINT_CONVERT_ATTR(&attr, &sm_p->u.setattr.sys_attr, 0);
+        PINT_acache_update(sm_p->object_ref, &attr, NULL);
+    }
+    else
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

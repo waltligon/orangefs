@@ -1,0 +1,124 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "pvfs2-server.h"
+#include "quicklist.h"
+
+%%
+
+machine pvfs2_unexpected_sm
+{
+	state post_unexpected
+	{
+		run unexpected_post;
+		default => map_request;
+	}
+
+	state map_request
+	{
+		run unexpected_map;
+		default => terminate;
+	}
+}
+
+%%
+
+/* unexpected_post()
+ *
+ * Post an unexpected receive
+ */
+static PINT_sm_action unexpected_post(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    struct PINT_server_op *s_op =
+            (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /*
+       TODO: Consider the optimization of enabling immediate
+       completion in this part of the code (see the mailing list
+       thread from Feb. 2003 on pvfs2-internal).
+                                                                                
+       note: unexp_bmi_buff is really a struct that describes an
+       unexpected message (it is an output parameter).
+     */
+    ret = job_bmi_unexp(&s_op->unexp_bmi_buff, smcb, 0,
+                        js_p, &s_op->unexp_id, JOB_NO_IMMED_COMPLETE,
+                        server_job_context);
+    if(ret == SM_ACTION_COMPLETE)
+    {
+        PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
+        return SM_ACTION_TERMINATE;
+    }
+    return SM_ACTION_DEFERRED;
+}
+
+/* unexpected_map()
+ *
+ * Change the state machine OP to that of the received request
+ * This instance will continue execution in another state machine
+ * Set up another unexpected receive
+ */
+static PINT_sm_action unexpected_map(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    int ret = 0;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* Remove s_op from posted_sop_list */
+    qlist_del(&s_op->next);
+    /* If op was cancelled, kill the SM */
+    if (s_op->op_cancelled)
+    {
+        return SM_ACTION_TERMINATE;
+    }
+    /* Else move it to the inprogress_sop_list */
+    qlist_add_tail(&s_op->next, &inprogress_sop_list);
+
+    /* start replacement unexpected recv */
+    ret = server_post_unexpected_recv(js_p);
+    if (ret < 0)
+    {
+        /* TODO: do something here, the return value was
+         * not being checked for failure before.  I just
+         * put something here to make it exit for the
+         * moment.  -Phil
+         */
+        gossip_lerr("Error: post unexpected failure when restarting.\n");
+    }
+
+    /* restart as new request state machine */
+    memset(js_p, 0, sizeof(job_status_s));
+    ret = server_state_machine_start(smcb, js_p);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Error: server_state_machine_start", ret);
+        /* TODO: tell BMI to drop this address? */
+        /* set return code to let this SM end
+         */
+        ret = SM_ACTION_TERMINATE;
+    }
+
+    return ret;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

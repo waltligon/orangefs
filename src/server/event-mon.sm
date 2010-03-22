@@ -1,0 +1,104 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+#include "pint-event.h"
+
+%%
+
+machine pvfs2_event_mon_sm
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		default => do_work;
+	}
+
+	state do_work
+	{
+		run event_mon_do_work;
+		default => final_response;
+	}
+
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+
+	state cleanup
+	{
+		run event_mon_cleanup;
+		default => terminate;
+	}
+}
+
+%%
+
+/* event_mon_cleanup()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action event_mon_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if(s_op->resp.u.mgmt_event_mon.event_array)
+	free(s_op->resp.u.mgmt_event_mon.event_array);
+
+    return(server_state_machine_complete(smcb));
+}
+
+/* event_mon_do_work()
+ *
+ * gathers statistics and builds response
+ */
+static PINT_sm_action event_mon_do_work(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* allocate memory to hold events */
+    s_op->resp.u.mgmt_event_mon.event_array
+	= (struct PVFS_mgmt_event*)malloc(s_op->req->u.mgmt_event_mon.event_count
+	*sizeof(struct PVFS_mgmt_event));
+    if(!s_op->resp.u.mgmt_event_mon.event_array)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+	return SM_ACTION_COMPLETE;
+    }
+
+    s_op->resp.u.mgmt_event_mon.event_count = 
+	s_op->req->u.mgmt_event_mon.event_count;
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+struct PINT_server_req_params pvfs2_event_mon_params =
+{
+    .string_name = "mgmt_event_mon",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .state_machine = &pvfs2_event_mon_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

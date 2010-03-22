@@ -1,0 +1,1038 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/i386/kernel/syscall_table.S vanilla-new/arch/i386/kernel/syscall_table.S
+--- vanilla/arch/i386/kernel/syscall_table.S	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/arch/i386/kernel/syscall_table.S	2006-04-07 10:28:39.000000000 -0500
+@@ -310,3 +310,5 @@
+ 	.long sys_pselect6
+ 	.long sys_ppoll
+ 	.long sys_unshare		/* 310 */
++	.long sys_openg
++	.long sys_openfh
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/ia64/kernel/entry.S vanilla-new/arch/ia64/kernel/entry.S
+--- vanilla/arch/ia64/kernel/entry.S	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/arch/ia64/kernel/entry.S	2006-04-07 10:28:39.000000000 -0500
+@@ -1619,5 +1619,7 @@
+ 	data8 sys_ni_syscall			// reserved for pselect
+ 	data8 sys_ni_syscall			// 1295 reserved for ppoll
+ 	data8 sys_unshare
++	data8 sys_openg
++	data8 sys_openfh
+ 
+ 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/powerpc/kernel/systbl.S vanilla-new/arch/powerpc/kernel/systbl.S
+--- vanilla/arch/powerpc/kernel/systbl.S	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/arch/powerpc/kernel/systbl.S	2006-04-07 10:28:39.000000000 -0500
+@@ -322,3 +322,5 @@
+ COMPAT_SYS(pselect6)
+ COMPAT_SYS(ppoll)
+ SYSCALL(unshare)
++SYSCALL(openg)
++SYSCALL(openfh)
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/x86_64/ia32/ia32entry.S vanilla-new/arch/x86_64/ia32/ia32entry.S
+--- vanilla/arch/x86_64/ia32/ia32entry.S	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/arch/x86_64/ia32/ia32entry.S	2006-04-07 10:28:39.000000000 -0500
+@@ -688,6 +688,8 @@
+ 	.quad sys_ni_syscall		/* pselect6 for now */
+ 	.quad sys_ni_syscall		/* ppoll for now */
+ 	.quad sys_unshare		/* 310 */
++	.quad compat_sys_openg
++	.quad compat_sys_openfh
+ ia32_syscall_end:		
+ 	.rept IA32_NR_syscalls-(ia32_syscall_end-ia32_sys_call_table)/8
+ 		.quad ni_syscall
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/compat.c vanilla-new/fs/compat.c
+--- vanilla/fs/compat.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/fs/compat.c	2006-04-07 13:39:13.000000000 -0500
+@@ -1332,6 +1332,27 @@
+ }
+ 
+ /*
++ * Exactly like fs/open.c: sys_openg(), except that it doesn't set the 
++ * O_LARGEFILE flag.
++ */
++asmlinkage long
++compat_sys_openg(const char __user *pathname, void __user *uhandle, size_t __user *uhandle_len,
++		int flags, int mode)
++{
++	return do_sys_openg(pathname, uhandle, uhandle_len, flags, mode);
++}
++
++/*
++ * Exactly like fs/open.c: sys_openg(), except that it doesn't set the 
++ * O_LARGEFILE flag.
++ */
++asmlinkage long
++compat_sys_openfh(const char __user *uhandle, int uhandle_len)
++{
++	return do_sys_openfh(uhandle, uhandle_len);
++}
++
++/*
+  * compat_count() counts the number of arguments/envelopes. It is basically
+  * a copy of count() from fs/exec.c, except that it works with 32 bit argv
+  * and envp pointers.
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/open.c vanilla-new/fs/open.c
+--- vanilla/fs/open.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/fs/open.c	2006-04-26 22:06:15.000000000 -0500
+@@ -27,9 +27,37 @@
+ #include <linux/pagemap.h>
+ #include <linux/syscalls.h>
+ #include <linux/rcupdate.h>
++#include <linux/scatterlist.h>
++#include <linux/crypto.h>
++#include <linux/types.h>
+ 
+ #include <asm/unistd.h>
+ 
++void get_filesystem(struct file_system_type *fs);
++void put_filesystem(struct file_system_type *fs);
++struct file_system_type *get_fs_type(const char *name);
++
++int vfs_statfs_lite(struct super_block *sb, struct kstatfs *buf, int statfs_mask)
++{
++	int retval = -ENODEV;
++
++	if (sb) {
++		retval = -ENOSYS;
++		if (sb->s_op->statfs_lite) {
++			memset(buf, 0, sizeof(*buf));
++			retval = security_sb_statfs(sb);
++			if (retval)
++				return retval;
++			retval = sb->s_op->statfs_lite(sb, buf, statfs_mask);
++			if (retval == 0 && buf->f_frsize == 0 && (statfs_mask & STATFS_M_FRSIZE) != 0)
++				buf->f_frsize = buf->f_bsize;
++		}
++	}
++	return retval;
++}
++
++EXPORT_SYMBOL(vfs_statfs_lite);
++
+ int vfs_statfs(struct super_block *sb, struct kstatfs *buf)
+ {
+ 	int retval = -ENODEV;
+@@ -1100,6 +1128,638 @@
+ }
+ EXPORT_SYMBOL_GPL(sys_openat);
+ 
++static unsigned int diff(struct timeval *end, struct timeval *begin)
++{
++    if (end->tv_usec < begin->tv_usec) {
++        end->tv_usec += 1000000; end->tv_sec--;
++    }
++    end->tv_sec  -= begin->tv_sec;
++    end->tv_usec -= begin->tv_usec;
++    return ((end->tv_sec * 1000000) + (end->tv_usec));
++}
++
++/*
++ * Compute a simple crc checksum
++ */
++static inline __u32 simple_crc_csum(struct file_handle *fhandle)
++{
++	struct file_handle_generic *fhg;
++	__le32 *u;
++	__u8 *c;
++	__u32 i, j;
++	
++	fhg = &fhandle->fh_generic;
++	/* upto and not including the fhg_crc_csum field */
++	for (i = 0, u = (__le32 *) fhg; u < (__le32 *)(&fhg->fhg_crc_csum); ++u)
++		i += le32_to_cpup(u);
++	/* and over the entire fh_private buffer */
++	c = (__u8 *) fhandle->fh_private;
++	for (j = 0; j < fhandle->fh_private_length; ++j) 
++		i += *(c + j);
++	return i;
++}
++
++/*
++ * Compute and return a crc32c checksum using the crypto subsystem
++ * API
++ */
++static __u32 compute_crc32_csum(struct file_handle *fhandle)
++{
++#define MAX_SG_LIST 8
++	__u32 csum;
++	__u32 i;
++	struct crypto_tfm *tfm;
++	struct scatterlist sg[MAX_SG_LIST];
++	struct timeval begin, end;
++
++	do_gettimeofday(&begin);
++	if (crypto_alg_available("crc32c", 0) == 0) {
++		csum = simple_crc_csum(fhandle);
++		do_gettimeofday(&end);
++		printk(KERN_DEBUG "compute_crc32_csum[simple]: took %d usecs\n", diff(&end, &begin));
++		goto out;
++	}
++
++	tfm = crypto_alloc_tfm("crc32c", 0);
++	if (tfm == NULL) {
++		csum = simple_crc_csum(fhandle);
++		goto out;
++	}
++
++	crypto_digest_init(tfm);
++
++	i = 0;
++	sg_set_buf(&sg[i++], &fhandle->fh_generic, 
++			offsetof(struct file_handle_generic, fhg_crc_csum));
++	sg_set_buf(&sg[i++], fhandle->fh_private, fhandle->fh_private_length);
++
++	crypto_digest_update(tfm, sg, i);
++	crypto_digest_final(tfm, (__u8*)&csum);
++	crypto_free_tfm(tfm);
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "compute_crc32_csum[tfm]: took %d usecs\n", diff(&end, &begin));
++out:
++	return csum;
++#undef MAX_SG_LIST
++}
++
++/* 
++ * Store a crc32 check sum into the handle buffer
++ * NOTE: We expect fhandle->fh_private and fhandle->fh_private_length
++ * to be initialized prior to this call!
++ */
++static inline void store_crc32_csum(struct file_handle *fhandle)
++{
++	/* Compute the CRC checksum over the handle buffer */
++	__u32 csum = compute_crc32_csum(fhandle);
++	/* Set the CRC checksum into the handle buffer */
++	set_fh_field(&fhandle->fh_generic, crc_csum, csum);
++	return;
++}
++
++/* 
++ * Verifies if a file handle's structure's check sum
++ * matches with what user-space indicates.
++ * This should catch most of the simple buffer handle corruption
++ * cases (but not the maliciously crafted ones!) for which
++ * we have the keyed SHA1 (HMAC-SHA1) algorithm verification.
++ * NOTE: We expect fhandle->fh_private and fhandle->fh_private_length
++ * to be initialized prior to this call!
++ * Returns 1 in case verification was successful and 0
++ * otherwise.
++ */
++static inline int verify_crc32_csum(struct file_handle *fhandle)
++{
++	__u32 csum, crc_csum;
++
++	/* Compute the CRC checksum over the handle buffer */
++	csum = compute_crc32_csum(fhandle);
++	/* Retrieve the CRC checksum from the handle buffer */
++	get_fh_field(&fhandle->fh_generic, crc_csum, crc_csum);
++	return (crc_csum == csum);
++}
++
++/* 
++ * Compute a hmac-sha1 crypto check sum using a specified
++ * key and store it in the buffer pointed to by result.
++ * NOTE: We assume that fhandle->fh_private and
++ * fhandle->fh_private_length are initialized prior to this call.
++ * Returns 0 in case SHA1/HMAC-SHA1 was not built-in/compiled
++ * for the kernel
++ * Else returns length of the digest generated.
++ */
++static unsigned int compute_hmac_sha1_csum(struct file_handle *fhandle, 
++		char *key, int keylen, char *result)
++{
++#define MAX_SG_LIST 8
++	__u32 i;
++	struct crypto_tfm *tfm;
++	struct scatterlist sg[MAX_SG_LIST];
++	unsigned int ret;
++	struct timeval begin, end;
++ 
++	do_gettimeofday(&begin);
++
++	/* SHA1 is not available */
++	if (crypto_alg_available("sha1", 0) == 0)
++		return 0;
++
++	tfm = crypto_alloc_tfm("sha1", 0);
++	if (tfm == NULL)
++		return 0;
++
++	i = 0;
++	sg_set_buf(&sg[i++], &fhandle->fh_generic, 
++			offsetof(struct file_handle_generic, fhg_hmac_sha1));
++	sg_set_buf(&sg[i++], fhandle->fh_private, fhandle->fh_private_length);
++
++	crypto_hmac(tfm, key, &keylen, sg, i, result);
++	ret = crypto_tfm_alg_digestsize(tfm);
++	crypto_free_tfm(tfm);
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "compute_hmac_sha1_csum: took %d usecs\n", diff(&end, &begin));
++	return ret;
++#undef MAX_SG_LIST
++}
++
++/*
++ * Store a hmac-sha1 crypto check sum into the handle
++ * buffer.
++ */
++static inline void store_hmac_csum(struct file_handle *fhandle,
++		char *key, int keylen)
++{
++	compute_hmac_sha1_csum(fhandle, key, keylen,
++			fhandle->fh_generic.fhg_hmac_sha1);
++	return;
++}
++
++/*
++ * Verifies if a file handle buffer's computed hmac-sha1 crypto
++ * check sum matches with whatever the user-space buffer claims
++ * Returns 1 in case verification was succesful and 0
++ * otherwise
++ */
++static int verify_hmac_csum(struct file_handle *fhandle, char *key, int keylen)
++{
++	__u8 result[24];
++	unsigned int result_len;
++
++	result_len = compute_hmac_sha1_csum(fhandle, key, keylen, result);
++	/* Crypto is not supported. deny verification */
++	if (result_len == 0) 
++		return 0;
++
++	/* Check if user has tampered with the buffer */
++	if (memcmp(fhandle->fh_generic.fhg_hmac_sha1, result, result_len) == 0)
++		return 1;
++	return 0;
++}
++
++/*
++ * Copy the constructed file handle to a user-specified buffer.
++ * NOTE: We assume that fhandle->fh_private and
++ * fhandle->fh_private_length have been initialized
++ * prior to this routine
++ */
++static int copy_handle(const void __user *uaddr, struct file_handle *fhandle)
++{
++	char __user *ptr = (char __user *) uaddr;
++	struct timeval begin, end;
++ 
++	do_gettimeofday(&begin);
++
++	/* Copy the VFS generic part of the handle */
++	if (copy_to_user(ptr, &fhandle->fh_generic, 
++				sizeof(struct file_handle_generic)))
++		return -EFAULT;
++
++	/* Advance the user-buffer pointer */
++	ptr += sizeof(struct file_handle_generic);
++	/* Copy the FS specific part of the handle */
++	if (copy_to_user(ptr, fhandle->fh_private, fhandle->fh_private_length))
++		return -EFAULT;
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "copy_handle: took %d usecs\n", diff(&end, &begin));
++	return 0;
++}
++
++/*
++ * Copy a user-specified handle buffer to a temporary
++ * kernel buffer.
++ */
++static void* move_handle_to_kernel(const void __user *uaddr, 
++		size_t ulen, void *kaddr)
++{
++	if (uaddr != NULL) {
++		if (copy_from_user(kaddr, uaddr, ulen))
++			return ERR_PTR(-EFAULT);
++	}
++	return kaddr;
++}
++
++/*
++ * Copy a specified size user-space handle buffer to a temporary
++ * kernel buffer and return a pointer to the kernel buffer.
++ * Encodes error in return pointer in case 
++ * operation failed for some reason.
++ */
++static void *gethandle(const void __user *uhandle, size_t uhandle_len)
++{
++	void *tmp = NULL, *result = ERR_PTR(-EINVAL);
++	struct timeval begin, end;
++ 
++	do_gettimeofday(&begin);
++
++	do {
++		if (uhandle_len <= 0 || uhandle_len > MAX_HANDLE_LEN) 
++			break;
++		result = ERR_PTR(-ENOMEM);
++		tmp = kmalloc(uhandle_len, GFP_KERNEL);
++		if (tmp == NULL) 
++			break;
++		result = move_handle_to_kernel(uhandle, uhandle_len, tmp);
++	} while (0);
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "gethandle: took %d usecs\n", diff(&end, &begin));
++	return result;
++}
++/*
++ * Frees memory allocated to a temporary kernel space buffer
++ * used for staging the handle copy from user-space.
++ */
++static void puthandle(void *handle)
++{
++	if (handle)
++		kfree(handle);
++	return;
++}
++
++/*
++ * Wrapper routine to obtain any FS specific keys that can be used
++ * for the HMAC-SHA1 calculation to make the handle returned
++ * by openg() tamper-proof or atleast tamper-detectable.
++ *	We dont use any keys in case FS does not provide one!
++ */
++static void get_fs_key(struct super_block *sb, char **ppkey, int *keylen)
++{
++	struct timeval begin, end;
++
++	*ppkey = NULL;
++	*keylen = 0;
++	do_gettimeofday(&begin);
++	/* underlying fs wishes to provide a key */
++	if (sb && sb->s_op && sb->s_op->get_fs_key)
++		sb->s_op->get_fs_key(sb, ppkey, keylen);
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "get_fs_key: took %d usecs\n", diff(&end, &begin));
++	return;
++}
++
++/*
++ * Free the memory allocated to fhandle->fh_private.
++ * This is done by either calling the provided destructor
++ * function if any (supplied by fill_handle callback of FS).
++ * or by calling kfree(). We expect FS to either use kmalloc()
++ * or supply a dtor function so that fh_private can be properly
++ * deallocated.
++ */
++static void drop_file_handle_private(struct file_handle *fhandle)
++{
++	if (!fhandle || !fhandle->fh_private)
++		return;
++	if (fhandle->fh_private_dtor) 
++		fhandle->fh_private_dtor(fhandle->fh_private);
++	else 
++		kfree(fhandle->fh_private);
++	fhandle->fh_private = NULL;
++	return;
++}
++
++/*
++ * Associate and establish a file handle to a struct file mapping.
++ * NOTE: Linux VFS is inherently based off a dentry cache model
++ * and since we dont have any pathnames/filenames we need to create a anon.
++ * dentry to represent files opened using this system call.
++ */
++static struct file *do_fh_open(const void *handle, size_t handle_len)
++{
++	struct file *filp = NULL;
++	struct super_block *sb;
++	struct inode *inode = NULL;
++	struct file_handle fhandle;
++	size_t min_len = sizeof(struct file_handle_generic);
++	char *key = NULL;
++	int   keylen = 0;
++	struct timeval begin, end;
++	
++	/* Do some sanity checks on the handle lengths and handle buffer */
++	if (handle_len <= min_len)
++		return ERR_PTR(-EINVAL);
++
++	memcpy(&fhandle.fh_generic, handle, min_len);
++	/* set the fields of the file handle prior to verification */
++	fhandle.fh_private = (char *) handle + min_len;
++	fhandle.fh_private_length = (handle_len - min_len);
++	fhandle.fh_private_dtor = NULL;
++	/* verify crc32 checksum on the handle buffer */
++	if (!verify_crc32_csum(&fhandle))
++		return ERR_PTR(-EACCES);
++
++	/*
++	 * Verification of HMAC SHA1 csum on the handle buffer cannot be 
++	 * done at this point  since we don't know which file
++	 * system/superblock it belongs to.
++	 */
++
++	/* Locate and get an active reference to a 
++	 * super-block that matches a given handle 
++	 */
++	do_gettimeofday(&begin);
++	sb = get_sb_handle(&fhandle);
++	/* could not find any valid FS that owns this handle */
++	if (!sb)
++		return ERR_PTR(-EINVAL);
++
++	do_gettimeofday(&end);
++	printk(KERN_DEBUG "get_sb_handle: took %d usecs\n", diff(&end, &begin));
++	/* FS has not implemented a routine to query inode based on handle */
++	if (!sb->s_op || !sb->s_op->find_inode_handle) {
++		filp = ERR_PTR(-EOPNOTSUPP);
++		goto out;
++	}
++	/* Check if underlying FS wishes to use a key */
++	get_fs_key(sb, &key, &keylen);
++	/* and verify the authenticity of the handle buffer */
++	if (verify_hmac_csum(&fhandle, key, keylen) == 0) {
++		/* Permission denied */
++		filp = ERR_PTR(-EACCES);
++		goto out;
++	}
++	do_gettimeofday(&begin);
++	/* find an inode or allocate/lookup an inode based on the handle */
++	inode = sb->s_op->find_inode_handle(sb, &fhandle);
++	if (!IS_ERR(inode)) {
++		struct dentry *anon_dentry;
++		int flags = 0;
++
++		do_gettimeofday(&end);
++		printk(KERN_DEBUG "s_op->find_inode_handle: took %d usecs\n", diff(&end, &begin));
++
++		get_fh_field(&fhandle.fh_generic, flags, flags);
++		/* 
++		 * Associate a anonymous dentry to this inode in case there is none.
++		 * d_prune_aliases() will take care of freeeing all these dentries
++		 * which is called when the last reference to iput() calls
++		 * put_inode() which in turn calls the above function.
++		 */
++		do_gettimeofday(&begin);
++		anon_dentry = d_alloc_anon(inode);
++		if (anon_dentry == NULL) {
++			filp = ERR_PTR(-ENOMEM);
++			goto drop_inode;
++		}
++		/* and setup file and inode mapping */
++		filp = get_empty_filp();
++		if (filp == NULL) {
++			filp = ERR_PTR(-ENFILE);
++			goto drop_dentry;
++		}
++		filp = __dentry_open(anon_dentry, NULL, flags, filp, NULL);
++		if (IS_ERR(filp)) {
++			/* in case of error __dentry_open drops the anon_dentry */
++			goto drop_inode;
++	drop_dentry:
++			dput(anon_dentry);
++	drop_inode:
++			iput(inode);
++		}
++		else {
++			do_gettimeofday(&end);
++			printk(KERN_DEBUG "d_alloc_anon + misc.: took %d usecs\n", diff(&end, &begin));
++		}
++	}
++	else {
++		/* in case of error */
++		filp = ERR_PTR(PTR_ERR(inode));
++	}
++out:
++	/* drop our active reference to sb */
++	drop_super(sb);
++	return filp;
++}
++
++long do_sys_openfh(const void __user *uhandle, size_t handle_len)
++{
++	void *tmp = gethandle(uhandle, handle_len);
++	int fd = PTR_ERR(tmp);
++
++	if (!IS_ERR(tmp)) {
++		struct timeval begin, end;
++
++		do_gettimeofday(&begin);
++		fd = get_unused_fd();
++		do_gettimeofday(&end);
++		printk(KERN_DEBUG "get_unused_fd: took %d usecs\n", diff(&end, &begin));
++		if (fd >= 0) {
++			struct file *f;
++
++			do_gettimeofday(&begin);
++			f = do_fh_open(tmp, handle_len);
++			if (IS_ERR(f)) {
++				put_unused_fd(fd);
++				fd = PTR_ERR(f);
++			} else {
++				do_gettimeofday(&end);
++				printk(KERN_DEBUG "do_fh_open: took %d usecs\n", diff(&end, &begin));
++				do_gettimeofday(&begin);
++				/* this file descriptor needs to be closed on exec */
++				set_close_on_exec(fd, 1);
++				fd_install(fd, f);
++				do_gettimeofday(&end);
++				printk(KERN_DEBUG "set_close, fd_install: took %d usecs\n", diff(&end, &begin));
++			}
++		}
++		puthandle(tmp);
++	}
++	return fd;
++}
++
++asmlinkage long sys_openfh(const void __user *uhandle, size_t handle_len)
++{
++	return do_sys_openfh(uhandle, handle_len);
++}
++
++EXPORT_SYMBOL_GPL(sys_openfh);
++
++long do_sys_openg(const char __user *pathname, void __user *uhandle,
++		size_t __user *uhandle_len, int flags, int mode)
++{
++	char *tmp = getname(pathname);
++	long err = PTR_ERR(tmp);
++
++	if (!IS_ERR(tmp)) 
++	{
++		struct file *f = NULL;
++		size_t handle_len = 0;
++		size_t min_len = sizeof(struct file_handle_generic);
++		struct file_handle fhandle;
++		struct timeval begin, end;
++
++		memset(&fhandle, 0, sizeof(fhandle));
++		if (get_user(handle_len, uhandle_len)) {
++			err = -EFAULT;
++			goto drop_name;
++		}
++		/* discard bogus values */
++		if (handle_len < 0)
++		{
++			err = -EINVAL;
++			goto drop_name;
++		}
++		/* or definitely insufficient buffer length */
++		else if (handle_len > 0 && 
++				handle_len < min_len)
++		{
++			err = -ERANGE;
++			goto drop_name;
++		}
++		err = 0;
++		do_gettimeofday(&begin);
++		/* Try to open the file now */
++		f = do_filp_open(AT_FDCWD, tmp, flags, mode);
++		if (IS_ERR(f)) {
++			/* File does not exist */
++			err = PTR_ERR(f);
++			goto drop_name;
++		}
++		else {
++			/* Is this even possible? */
++			if (!f->f_dentry || !f->f_dentry->d_inode)
++			{
++				err = -EINVAL;
++				goto drop_filp;
++			}
++			/* Diallow anything but regular files */
++			if (!S_ISREG(f->f_dentry->d_inode->i_mode)) {
++				err = -EACCES;
++				goto drop_filp;
++			}
++			else {
++				/* Does FS define callback for openg? */
++				if (!f->f_dentry->d_inode->i_op->fill_handle) {
++					/* not supported */
++					err = -EOPNOTSUPP;
++					goto drop_filp;
++				}
++				else {
++					do_gettimeofday(&end);
++					printk(KERN_DEBUG "do_filp_open: took %d usecs\n", diff(&end, &begin));
++					fhandle.fh_private = NULL;
++					fhandle.fh_private_length = 
++						handle_len ? (handle_len - min_len)	: 0;
++					fhandle.fh_private_dtor = NULL;
++					/* 
++					 * if handle_len == 0, 
++					 * FS is expected to give us the handle length it needs. 
++					 */
++					do_gettimeofday(&begin);
++					err = f->f_dentry->d_inode->i_op->fill_handle(
++								f->f_dentry->d_inode, &fhandle);
++					if (err)
++						goto drop_filp;
++
++					/* make sure that FS does not set it to an invalid length */
++					if (fhandle.fh_private_length <= 0) {
++						err = -EINVAL;
++						goto drop_private;
++					}
++					
++					/* try to copy the handle if requested */
++					if (handle_len > 0) {
++						__u32 magic, fsid;
++						struct kstatfs st;
++						char *key = NULL;
++						int  keylen = 0, statfs_mask = STATFS_M_TYPE | STATFS_M_FSID;
++						/*
++						 * Check if fhandle.fh_private was not set.
++						 */
++						if (fhandle.fh_private == NULL) {
++							err = -EINVAL;
++							goto drop_filp;
++						}
++						do_gettimeofday(&end);
++						printk(KERN_DEBUG "fill_handle: took %d usecs\n", diff(&end, &begin));
++						/*
++						 * Check if the underlying FS wishes to supply a key for 
++						 * the message authentication code.
++						 * If it does not or in case of errors, we use a NULL key
++						 * for the MAC
++						 */
++						get_fs_key(f->f_dentry->d_inode->i_sb, &key, &keylen);
++						/* 
++						 * Currently, we issue a statfs on the superblock to figure
++						 * out the magic number and fsid for the file system.
++						 * But this might translate to many network messages for many
++						 * distributed/parallel file systems. Therefore, we need a 
++						 * sb->statfs_lite() callback mechanism to get only those
++						 * fields that don't require a network message.
++						 * If FS does not support the callback, fallback to using statfs.
++						 */
++						do_gettimeofday(&begin);
++						if ((err = vfs_statfs_lite(f->f_dentry->d_inode->i_sb, &st, statfs_mask)) < 0) {
++							//err = vfs_statfs(f->f_dentry->d_inode->i_sb, &st);
++							//if (err) 
++								goto drop_private;
++						}
++						do_gettimeofday(&end);
++						printk(KERN_DEBUG "statfs_lite: took %d usecs\n", diff(&end, &begin));
++						magic = st.f_type;
++						memcpy(&fsid, &st.f_fsid, sizeof(__u32));
++						/* set magic number, fsid, flags */
++						set_fh_field(&fhandle.fh_generic, magic, magic);
++						set_fh_field(&fhandle.fh_generic, fsid,  fsid);
++						set_fh_field(&fhandle.fh_generic, flags, flags);
++
++						do_gettimeofday(&begin);
++						/* Compute and store crc check sum */
++						store_crc32_csum(&fhandle);
++						/* Compute and store HMAC-SHA1 crypto check sum */
++						store_hmac_csum(&fhandle, key, keylen);
++						/* copy opaque handle to user buffer */
++						err = copy_handle(uhandle, &fhandle);
++						if (err)
++							goto drop_private;
++						do_gettimeofday(&end);
++						printk(KERN_DEBUG "(crc, hmac, copy_handle): took %d usecs\n", diff(&end, &begin));
++					}
++					/* update the handle length reported to user-space */
++					handle_len = fhandle.fh_private_length + min_len;
++					/* and copy the new length to user space */
++					err = put_user(handle_len, uhandle_len);
++			drop_private:
++					drop_file_handle_private(&fhandle);
++				}
++			}
++drop_filp:
++			filp_close(f, NULL);
++		}
++drop_name:
++		putname(tmp);
++	}
++	return err;
++}
++
++asmlinkage long sys_openg(const char __user *pathname, void __user *uhandle, 
++		size_t __user *uhandle_len, int flags, int mode)
++{
++	if (force_o_largefile())
++		flags |= O_LARGEFILE;
++	return do_sys_openg(pathname, uhandle, uhandle_len, flags, mode);
++}
++
++EXPORT_SYMBOL_GPL(sys_openg);
++
+ #ifndef __alpha__
+ 
+ /*
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/super.c vanilla-new/fs/super.c
+--- vanilla/fs/super.c	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/fs/super.c	2006-04-26 22:06:36.000000000 -0500
+@@ -799,6 +799,58 @@
+ 
+ EXPORT_SYMBOL(get_sb_single);
+ 
++struct super_block *get_sb_handle(const struct file_handle *fhandle)
++{
++	/* walk through the list of superblocks */
++	struct super_block *sb;
++
++	spin_lock(&sb_lock);
++	list_for_each_entry (sb, &super_blocks, s_list) {
++		struct kstatfs st;
++
++		sb->s_count++;
++		spin_unlock(&sb_lock);
++		down_read(&sb->s_umount);
++		if (sb->s_root)
++		{
++			int err, statfs_mask = STATFS_M_TYPE | STATFS_M_FSID;
++			/* 
++			 * Currently, we issue a statfs on the superblock to figure
++			 * out the type and fsid for the file system.
++			 * But this might translate to network messages for many
++			 * distributed/parallel file systems. Therefore, we need a 
++			 * statfs_lite() callback mechanism to get only those
++			 * fields that don't require a network message. We fall back to a
++			 * regular statfs in case the file system does not support a statfs_lite()
++			 * callback.
++			 */
++			if ((err = vfs_statfs_lite(sb, &st, statfs_mask)) < 0) {
++				//err = vfs_statfs(sb, &st);
++			}
++			
++			if (err == 0) {
++				__u32 fsid, magic; 
++
++				get_fh_field(&fhandle->fh_generic, fsid, fsid);
++				get_fh_field(&fhandle->fh_generic, magic, magic);
++				/* check if magic numbers and fsid matches */
++				if (st.f_type == magic
++						&& memcmp(&st.f_fsid, &fsid, sizeof(__u32)) == 0)
++				{
++					return sb;
++				}
++			}
++		}
++		drop_super(sb);
++		spin_lock(&sb_lock);
++	}
++	spin_unlock(&sb_lock);
++	/* This function will not create a new superblock! */
++	return NULL;
++}
++
++EXPORT_SYMBOL_GPL(get_sb_handle);
++
+ struct vfsmount *
+ do_kern_mount(const char *fstype, int flags, const char *name, void *data)
+ {
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/unistd.h vanilla-new/include/asm-i386/unistd.h
+--- vanilla/include/asm-i386/unistd.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-i386/unistd.h	2006-04-07 10:28:39.000000000 -0500
+@@ -316,8 +316,10 @@
+ #define __NR_pselect6		308
+ #define __NR_ppoll		309
+ #define __NR_unshare		310
++#define __NR_openg      311
++#define __NR_openfh     312
+ 
+-#define NR_syscalls 311
++#define NR_syscalls 313
+ 
+ /*
+  * user-visible error numbers are in the range -1 - -128: see
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-ia64/unistd.h vanilla-new/include/asm-ia64/unistd.h
+--- vanilla/include/asm-ia64/unistd.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-ia64/unistd.h	2006-04-07 10:28:39.000000000 -0500
+@@ -285,12 +285,14 @@
+ #define __NR_faccessat			1293
+ /* 1294, 1295 reserved for pselect/ppoll */
+ #define __NR_unshare			1296
++#define __NR_openg         1297
++#define __NR_openfh        1298
+ 
+ #ifdef __KERNEL__
+ 
+ #include <linux/config.h>
+ 
+-#define NR_syscalls			273 /* length of syscall table */
++#define NR_syscalls			275 /* length of syscall table */
+ 
+ #define __ARCH_WANT_SYS_RT_SIGACTION
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-powerpc/unistd.h vanilla-new/include/asm-powerpc/unistd.h
+--- vanilla/include/asm-powerpc/unistd.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-powerpc/unistd.h	2006-04-07 10:28:39.000000000 -0500
+@@ -301,8 +301,10 @@
+ #define __NR_pselect6		280
+ #define __NR_ppoll		281
+ #define __NR_unshare		282
++#define __NR_openg		283
++#define __NR_openfh		284
+ 
+-#define __NR_syscalls		283
++#define __NR_syscalls		285
+ 
+ #ifdef __KERNEL__
+ #define __NR__exit __NR_exit
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/unistd.h vanilla-new/include/asm-x86_64/unistd.h
+--- vanilla/include/asm-x86_64/unistd.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/asm-x86_64/unistd.h	2006-04-07 10:28:39.000000000 -0500
+@@ -605,8 +605,12 @@
+ __SYSCALL(__NR_ppoll,	sys_ni_syscall)		/* for now */
+ #define __NR_unshare		272
+ __SYSCALL(__NR_unshare,	sys_unshare)
++#define __NR_openg      273
++__SYSCALL(__NR_openg,   sys_openg)
++#define __NR_openfh     274
++__SYSCALL(__NR_openfh,  sys_openfh)
+ 
+-#define __NR_syscall_max __NR_unshare
++#define __NR_syscall_max __NR_openfh
+ 
+ #ifndef __NO_STUBS
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/fs.h vanilla-new/include/linux/fs.h
+--- vanilla/include/linux/fs.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/fs.h	2006-04-17 13:35:37.000000000 -0500
+@@ -991,6 +991,27 @@
+ #define HAVE_COMPAT_IOCTL 1
+ #define HAVE_UNLOCKED_IOCTL 1
+ 
++struct file_handle_generic {
++	/* Filled by VFS */
++	__le32   fhg_magic; /* magic number */
++	__le32   fhg_fsid; /* file system identifier */
++	__le32   fhg_flags; 	/* flags associated with the file object */
++	__le32   fhg_crc_csum; /* crc32c check sum of the blob */
++	__u8     fhg_hmac_sha1[24]; /* hmac-sha1 message authentication code */
++};
++
++struct file_handle {
++	/* generic part filled by VFS */
++	struct file_handle_generic fh_generic;
++	/* FS specific part */
++	void                      *fh_private;
++	size_t							fh_private_length;
++	void                      (*fh_private_dtor)(void *);
++};
++
++#define set_fh_field(X, Y, Z) (X)->fhg_##Y = cpu_to_le32(Z)
++#define get_fh_field(X, Y, Z) Z = le32_to_cpu((X)->fhg_##Y)
++
+ /*
+  * NOTE:
+  * read, write, poll, fsync, readv, writev, unlocked_ioctl and compat_ioctl
+@@ -1049,6 +1070,8 @@
+ 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
+ 	int (*removexattr) (struct dentry *, const char *);
+ 	void (*truncate_range)(struct inode *, loff_t, loff_t);
++	/* method needed for filling up handle */
++	int (*fill_handle)(struct inode *, struct file_handle *);
+ };
+ 
+ struct seq_file;
+@@ -1065,12 +1088,12 @@
+  * without the big kernel lock held in all filesystems.
+  */
+ struct super_operations {
+-   	struct inode *(*alloc_inode)(struct super_block *sb);
++   struct inode *(*alloc_inode)(struct super_block *sb);
+ 	void (*destroy_inode)(struct inode *);
+ 
+ 	void (*read_inode) (struct inode *);
+   
+-   	void (*dirty_inode) (struct inode *);
++  	void (*dirty_inode) (struct inode *);
+ 	int (*write_inode) (struct inode *, int);
+ 	void (*put_inode) (struct inode *);
+ 	void (*drop_inode) (struct inode *);
+@@ -1081,6 +1104,7 @@
+ 	void (*write_super_lockfs) (struct super_block *);
+ 	void (*unlockfs) (struct super_block *);
+ 	int (*statfs) (struct super_block *, struct kstatfs *);
++	int (*statfs_lite) (struct super_block *, struct kstatfs *, int statfs_mask);
+ 	int (*remount_fs) (struct super_block *, int *, char *);
+ 	void (*clear_inode) (struct inode *);
+ 	void (*umount_begin) (struct super_block *);
+@@ -1089,6 +1113,8 @@
+ 
+ 	ssize_t (*quota_read)(struct super_block *, int, char *, size_t, loff_t);
+ 	ssize_t (*quota_write)(struct super_block *, int, const char *, size_t, loff_t);
++	struct inode *(*find_inode_handle)(struct super_block *, const struct file_handle *);
++	void    (*get_fs_key)(struct super_block *, char **ppkey, int *keylen);
+ };
+ 
+ /* Inode state bits.  Protected by inode_lock. */
+@@ -1257,6 +1283,7 @@
+ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
+ 	int flags, void *data,
+ 	int (*fill_super)(struct super_block *, void *, int));
++struct super_block *get_sb_handle(const struct file_handle *handle);
+ void generic_shutdown_super(struct super_block *sb);
+ void kill_block_super(struct super_block *sb);
+ void kill_anon_super(struct super_block *sb);
+@@ -1292,6 +1319,7 @@
+ 				  struct vfsmount *);
+ 
+ extern int vfs_statfs(struct super_block *, struct kstatfs *);
++extern int vfs_statfs_lite(struct super_block *, struct kstatfs *, int statfs_mask);
+ 
+ /* /sys/fs */
+ extern struct subsystem fs_subsys;
+@@ -1345,6 +1373,10 @@
+ 		       struct file *filp);
+ extern long do_sys_open(int fdf, const char __user *filename, int flags,
+ 			int mode);
++
++extern long do_sys_openfh(const void __user *uhandle, size_t handle_len);
++extern long do_sys_openg(const char __user *pathname, void __user *uhandle, 
++			size_t __user *uhandle_len, int flags, int mode);
+ extern struct file *filp_open(const char *, int, int);
+ extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
+ extern int filp_close(struct file *, fl_owner_t id);
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/limits.h vanilla-new/include/linux/limits.h
+--- vanilla/include/linux/limits.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/limits.h	2006-04-07 17:25:07.000000000 -0500
+@@ -16,6 +16,7 @@
+ #define XATTR_NAME_MAX   255	/* # chars in an extended attribute name */
+ #define XATTR_SIZE_MAX 65536	/* size of an extended attribute value (64k) */
+ #define XATTR_LIST_MAX 65536	/* size of extended attribute namelist (64k) */
++#define MAX_HANDLE_LEN   128  /* maximum size of a handle used by the openfh system call */
+ 
+ #define RTSIG_MAX	  32
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/statfs.h vanilla-new/include/linux/statfs.h
+--- vanilla/include/linux/statfs.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/statfs.h	2006-04-17 11:38:07.000000000 -0500
+@@ -5,6 +5,18 @@
+ 
+ #include <asm/statfs.h>
+ 
++/* Masks used by statfs_lite callback */
++#define STATFS_M_TYPE  		(1 << 0)
++#define STATFS_M_BSIZE  	(1 << 1)
++#define STATFS_M_BLOCKS		(1 << 2)
++#define STATFS_M_BFREE  	(1 << 3)
++#define STATFS_M_BAVAIL 	(1 << 4)
++#define STATFS_M_FILES  	(1 << 5)
++#define STATFS_M_FFREE  	(1 << 6)
++#define STATFS_M_FSID   	(1 << 7)
++#define STATFS_M_NAMELEN	(1 << 8)
++#define STATFS_M_FRSIZE    (1 << 9)
++
+ struct kstatfs {
+ 	long f_type;
+ 	long f_bsize;
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/syscalls.h vanilla-new/include/linux/syscalls.h
+--- vanilla/include/linux/syscalls.h	2006-03-19 23:53:29.000000000 -0600
++++ vanilla-new/include/linux/syscalls.h	2006-04-07 13:56:07.000000000 -0500
+@@ -327,6 +327,10 @@
+ asmlinkage long sys_creat(const char __user *pathname, int mode);
+ asmlinkage long sys_open(const char __user *filename,
+ 				int flags, int mode);
++asmlinkage long sys_openfh(const void __user *uhandle, 
++				size_t handle_len);
++asmlinkage long sys_openg(const char __user *pathname, void __user *uhandle, 
++				size_t *uhandle_len, int flags, int mode);
+ asmlinkage long sys_close(unsigned int fd);
+ asmlinkage long sys_access(const char __user *filename, int mode);
+ asmlinkage long sys_vhangup(void);
+@@ -566,7 +570,10 @@
+ asmlinkage long compat_sys_newfstatat(unsigned int dfd, char __user * filename,
+ 				      struct compat_stat __user *statbuf,
+ 				      int flag);
++asmlinkage long compat_sys_open(const char __user *filename, int flags, int mode);
+ asmlinkage long compat_sys_openat(unsigned int dfd, const char __user *filename,
+ 				   int flags, int mode);
+-
++asmlinkage long compat_sys_openg(const char __user *pathname, void __user *uhandle,
++					size_t __user *uhandle_len, int flags, int mode);
++asmlinkage long compat_sys_openfh(const void __user *uhandle, size_t uhandle_len);
+ #endif

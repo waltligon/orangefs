@@ -1,0 +1,704 @@
+
+Modify the NFS exported PVFS2 client to support the pNFS file-based layout driver.
+This is done by supporting the pNFS export operations that manage the pNFS
+data layout information.
+
+The goal of this patch is to generate a pNFS file layout that matches the
+existing PVFS2 layout for a given file.  By creating a matching layout, the
+pNFS client can send NFSv4 I/O requests to the data server which contains
+the requested data.
+
+A matching layout can be created if the PVFS2 layout is round-robin and
+the start server is always server 0 (this patch ensures this). 
+
+When a pNFS client requests a file-based data layout for a file, the exported PVFS2
+client module retrieves the ordered listed of I/O servers rom the PVFS2 metadata server.
+The PVFS2 client then uses the I/O servers to create a file-based layout and
+returns the layout to the nfs server.
+
+To retrieve the I/O servers,  a new upcall, getdevlist, has been created.  The
+getdevlist operation uses the PINT_cached_config_get_server_array function
+to retrieve the I/O servers from the metadata server.
+
+To use this patch and generate a file-based layout based on the existing PVFS2
+I/O servers, the layouttype proc variable must be set to LAYOUT_NFSV4_FILES.
+
+This patch compiles against a version of the 2.6.18.3 linux kernel.
+
+---
+
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c |  120 ++++
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/common/misc/pint-cached-config.c      |   17 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/downcall.h           |    7 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c               |  278 ++++++++++
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-dev-proto.h    |    1 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h       |    3 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c          |    1 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h         |    1 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c         |    5 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c              |    4 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/upcall.h             |    6 
+ 11 files changed, 440 insertions(+), 3 deletions(-)
+
+diff -puN src/kernel/linux-2.6/pvfs2-kernel.h~nfslayoutsupport src/kernel/linux-2.6/pvfs2-kernel.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-kernel.h~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h	2008-01-05 17:52:37.000000000 -0800
+@@ -454,6 +454,8 @@ typedef struct
+     struct super_block *sb;
+     int    mount_pending;
+     struct list_head list;
++    int pnfs_devlist_size;
++    char pnfs_devlist[PVFS2_MAX_DEVLIST_LEN];
+ } pvfs2_sb_info_t;
+ 
+ /** a temporary structure used only for sb mount time that groups the
+@@ -992,6 +994,7 @@ int service_operation(pvfs2_kernel_op_t*
+     int flags);
+ 
+ extern int layouttype;
++extern int layout_stripesize;
+ 
+ /** handles two possible error cases, depending on context.
+  *
+diff -puN src/kernel/linux-2.6/pvfs2-mod.c~nfslayoutsupport src/kernel/linux-2.6/pvfs2-mod.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-mod.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c	2008-01-05 17:52:37.000000000 -0800
+@@ -30,6 +30,7 @@ int gossip_debug_mask = 0;
+ int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
+ 
+ int layouttype = LAYOUT_PVFS2;
++int layout_stripesize = 65536;
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("PVFS2 Development Team");
+diff -puN src/kernel/linux-2.6/pvfs2-proc.c~nfslayoutsupport src/kernel/linux-2.6/pvfs2-proc.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-proc.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c	2008-01-05 17:52:37.000000000 -0800
+@@ -264,6 +264,8 @@ static int min_debug[] = {0}, max_debug[
+ static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
+ /* DH: LAYOUT_NFSV4_FILES defined in the nfs header files */
+ static int min_layouttype[] = {LAYOUT_NFSV4_FILES}, max_layouttype[] = {5};
++static int min_stripesize[] = {0}, max_stripesize[] = {INT_MAX};
++
+ static ctl_table pvfs2_acache_table[] = {
+     /* controls acache timeout */
+     {1, "timeout-msecs", NULL, sizeof(int), 0644, NULL,
+@@ -331,6 +333,9 @@ static ctl_table pvfs2_table[] = {
+     {9, "layouttype", &layouttype, sizeof(int), 0644, NULL,
+         &proc_dointvec_minmax, &sysctl_intvec,
+         NULL, &min_layouttype, &max_layouttype},
++    {9, "layout_stripesize", &layout_stripesize, sizeof(int), 0644, NULL,
++        &proc_dointvec_minmax, &sysctl_intvec,
++        NULL, &min_stripesize, &max_stripesize},
+     {0}
+ };
+ static ctl_table fs_table[] = {
+diff -puN src/apps/kernel/linux/pvfs2-client-core.c~nfslayoutsupport src/apps/kernel/linux/pvfs2-client-core.c
+--- pvfs-2.6.3-pnfsfilelayout/src/apps/kernel/linux/pvfs2-client-core.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/apps/kernel/linux/pvfs2-client-core.c	2008-01-05 17:52:37.000000000 -0800
+@@ -14,6 +14,10 @@
+ #include <pthread.h>
+ #include <signal.h>
+ #include <getopt.h>
++#include <netdb.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include <arpa/inet.h>
+ 
+ #define __PINT_REQPROTO_ENCODE_FUNCS_C
+ #include "pvfs2.h"
+@@ -618,6 +622,118 @@ out_cleanup:
+      return ret;
+ }
+ 
++#define DFILE_KEY "system.pvfs2.datafile_handles"
++
++static PVFS_error service_pnfs_get_devlist(vfs_request_t *vfs_request)
++{
++    PVFS_error ret = -PVFS_EINVAL;
++    struct server_configuration_s *server_config = NULL;
++    int i, num_io, tmp;
++    PVFS_BMI_addr_t* addr_array;
++    struct hostent *hep;
++    PVFS_fs_id fsid = vfs_request->in_upcall.req.getdevlist.refn.fs_id;
++    struct sockaddr_in io_server;
++    char* ip_addr;
++    char* buffer_orig, *buffer;
++
++    gossip_debug(
++	GOSSIP_CLIENTCORE_DEBUG,
++	"service_pnfs_get_devlist: Start fsid %d | handle %llu\n",
++	fsid,
++	llu(vfs_request->in_upcall.req.getdevlist.refn.handle));
++
++    /* set output buffer */
++    buffer_orig = buffer = vfs_request->out_downcall.resp.getdevlist.devlist;
++
++    /* Retrieve server configuration */
++    server_config = PINT_get_server_config_struct(fsid);
++    if (!server_config)
++    {
++	gossip_err("service_pnfs_get_devlist: Error retrieving server configuration!\n");
++	ret = -PVFS_EINVAL;
++	goto out_noput;
++    }
++
++    /* Get number of io servers to create array */
++    PINT_cached_config_get_num_io(fsid, &num_io);
++    if (num_io <= 0)
++    {
++	gossip_err("service_pnfs_get_devlist: Zero I/O servers!\n");
++	ret = -PVFS_EINVAL;
++	goto out;
++    }
++    addr_array = (PVFS_BMI_addr_t *)malloc(num_io * sizeof(PVFS_BMI_addr_t));
++    if (addr_array == NULL)
++    {
++	gossip_err("service_pnfs_get_devlist: Could not allocate address array\n");
++	ret = -PVFS_ENOMEM;
++	goto out;
++    }
++
++    /* Get array of io servers */
++    ret = PINT_cached_config_get_server_array(server_config,
++					      fsid,
++					      PVFS_MGMT_IO_SERVER,
++					      addr_array,
++					      &num_io);
++    if (ret < 0)
++    {
++	gossip_err("service_pnfs_get_devlist: Could not retrieve server array\n");
++	goto out_free;
++    }
++
++    /* Set number of devices in downcall */
++    encode_int32_t(&buffer, &num_io);
++    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,"service_pnfs_get_devlist: num io: %d\n",num_io);
++    /* Loop through io servers for downcall */
++    for (i = 0; i < num_io; i++)
++    {
++	/* get pvfs2 bmi type addr,e.g., tcp://host:3334 */
++	const char* addr_string = PINT_cached_config_map_addr(server_config,
++							      fsid,
++							      addr_array[i],
++							      &tmp);
++	/* strip out tcp and port bits */
++	char* addr_string_alias = PINT_config_get_host_alias_ptr(server_config,
++								 (char*)addr_string);
++	/* get ip address */
++	if ((hep = gethostbyname(addr_string_alias)) == NULL)
++	{
++	    gossip_err("service_pnfs_get_devlist: Could not retrieve server array\n");
++	    goto out_free;
++	}
++	memcpy(&(io_server.sin_addr.s_addr), hep->h_addr, hep->h_length);
++	ip_addr = inet_ntoa(io_server.sin_addr);
++	/* add ip addr to downcall result */
++	encode_string(&buffer, &ip_addr);
++
++	/* print debug info */
++	gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s %d\n", hep->h_name, hep->h_length);
++	gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Dev: %d - %lld - %s - %s - %s\n",
++		     i,
++		     addr_array[i],
++		     addr_string,
++		     addr_string_alias,
++		     inet_ntoa(io_server.sin_addr));
++    }
++    vfs_request->out_downcall.resp.getdevlist.devlist_size = buffer - buffer_orig;
++    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "bufsize %d\n",
++		 vfs_request->out_downcall.resp.getdevlist.devlist_size);
++    free(addr_array);
++    ret = 0;
++out:
++    PINT_put_server_config_struct(server_config);
++out_noput:
++    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
++    vfs_request->out_downcall.status = ret;
++    write_inlined_device_response(vfs_request);
++    gossip_debug(GOSSIP_CLIENTCORE_DEBUG,"service_pnfs_get_devlist: End\n");
++    return 0;
++out_free:
++    free(addr_array);
++    goto out;
++}
++
+ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
+ {
+     PVFS_error ret = -PVFS_EINVAL;
+@@ -2871,6 +2987,9 @@ static inline PVFS_error handle_unexp_vf
+             posted_op = 1;
+             ret = post_iox_request(vfs_request);
+             break;
++        case PVFS2_VFS_OP_GETDEVLIST:
++	    ret = service_pnfs_get_devlist(vfs_request);
++            break;
+ #ifdef USE_MMAP_RA_CACHE
+             /*
+               if the mmap-readahead-cache is enabled, cache
+@@ -3798,6 +3917,7 @@ static char *get_vfs_op_name_str(int op_
+         { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
+         { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
+         { PVFS2_VFS_OP_FILE_IOX, "PVFS2_VFS_OP_FILE_IOX" },
++        { PVFS2_VFS_OP_GETDEVLIST,  "PVFS2_VFS_OP_GETDEVLIST" },
+         { 0, "UNKNOWN" }
+     };
+ 
+diff -puN src/common/misc/pint-cached-config.c~nfslayoutsupport src/common/misc/pint-cached-config.c
+--- pvfs-2.6.3-pnfsfilelayout/src/common/misc/pint-cached-config.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/common/misc/pint-cached-config.c	2008-01-05 17:52:37.000000000 -0800
+@@ -106,7 +106,8 @@ static int cache_server_array(
+     struct server_configuration_s *config, PVFS_fs_id fsid);
+ 
+ static int meta_randomized = 0;
+-static int io_randomized = 0;
++/* DH: For now, since pNFS file layout drivers always start at 0 */
++static int io_randomized = 1;
+ 
+ /* PINT_cached_config_initialize()
+  *
+@@ -438,6 +439,7 @@ int PINT_cached_config_get_next_io(
+             {
+                 jitter = 0;
+             }
++            gossip_debug(GOSSIP_CLIENT_DEBUG, "DH: jitter %d\n",jitter);
+             while(jitter-- > -1)
+             {
+                 cur_mapping = PINT_llist_head(
+@@ -450,10 +452,15 @@ int PINT_cached_config_get_next_io(
+                         cur_config_cache->data_server_cursor);
+                     assert(cur_mapping);
+                 }
++		/* DH: Eliminate jitter for pNFS and just set it to the first
+                 cur_config_cache->data_server_cursor = PINT_llist_next(
+                     cur_config_cache->data_server_cursor);
++		*/
++		cur_config_cache->data_server_cursor =
++		    cur_config_cache->fs->data_handle_ranges;
+             }
+             old_data_server_cursor = cur_config_cache->data_server_cursor;
++            gossip_debug(GOSSIP_CLIENT_DEBUG, "DH: old_data_server_cursor %p\n",old_data_server_cursor);
+ 
+             while(num_servers)
+             {
+@@ -467,11 +474,10 @@ int PINT_cached_config_get_next_io(
+                         cur_config_cache->fs->data_handle_ranges;
+                     continue;
+                 }
+-                cur_config_cache->data_server_cursor = PINT_llist_next(
+-                    cur_config_cache->data_server_cursor);
+ 
+                 data_server_bmi_str = PINT_config_get_host_addr_ptr(
+                     config,cur_mapping->alias_mapping->host_alias);
++                gossip_debug(GOSSIP_CLIENT_DEBUG, "DH: bmi: %s\n",data_server_bmi_str);
+ 
+ 		if (io_addr_array != NULL)
+ 		{
+@@ -492,12 +498,17 @@ int PINT_cached_config_get_next_io(
+                 num_servers--;
+ 		if(io_addr_array != NULL)
+ 		    io_addr_array++;
++                cur_config_cache->data_server_cursor = PINT_llist_next(
++                    cur_config_cache->data_server_cursor);
++                gossip_debug(GOSSIP_CLIENT_DEBUG, "DH: next data_server_cursor %p\n",cur_config_cache->data_server_cursor);
++
+             }
+             ret = ((num_servers == 0) ? 0 : ret);
+             /* reset data server cursor to point to the old cursor; the
+              * jitter on the next iteration will increment it by one
+              */
+             cur_config_cache->data_server_cursor = old_data_server_cursor;
++            gossip_debug(GOSSIP_CLIENT_DEBUG, "DH: dsc: %p\n",cur_config_cache->data_server_cursor);
+         }
+     }
+     return ret;
+diff -puN src/kernel/linux-2.6/downcall.h~nfslayoutsupport src/kernel/linux-2.6/downcall.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/downcall.h~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/downcall.h	2008-01-05 17:52:37.000000000 -0800
+@@ -54,6 +54,12 @@ typedef struct
+     char layout[PVFS2_MAX_LAYOUT_LEN];
+ } pvfs2_getattr_response_t;
+ 
++typedef struct
++{
++    int devlist_size;
++    char devlist[PVFS2_MAX_DEVLIST_LEN];
++} pvfs2_getdevlist_response_t;
++
+ /* the setattr response is a blank downcall */
+ typedef struct
+ {
+@@ -225,6 +231,7 @@ typedef struct
+         pvfs2_param_response_t param;
+         pvfs2_perf_count_response_t perf_count;
+         pvfs2_fs_key_response_t fs_key;
++        pvfs2_getdevlist_response_t getdevlist;
+     } resp;
+ } pvfs2_downcall_t;
+ 
+diff -puN src/kernel/linux-2.6/pnfs.c~nfslayoutsupport src/kernel/linux-2.6/pnfs.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pnfs.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c	2008-01-05 17:52:37.000000000 -0800
+@@ -17,10 +17,22 @@
+ 
+ #include "nfsd/nfs4layoutxdr.h"
+ 
++#include "bmi-byteswap.h"
++
+ /* used to protect the layout information for an inode */
+ spinlock_t pvfs2_layout_lock = SPIN_LOCK_UNLOCKED;
+ 
+ /****** Common Functions ******/
++#define pnfs_decode_int32_t(pptr,x) do {      \
++        *(x) = bmitoh32(*(int32_t*) *(pptr)); \
++        *(pptr) += 4;			      \
++    } while (0)
++#define pnfs_decode_string(pptr,pbuf) do {				\
++	u_int32_t len = bmitoh32(*(u_int32_t *) *(pptr));	\
++	*pbuf = *(pptr) + 4;					\
++	*(pptr) += roundup8(4 + len + 1);			\
++    } while (0)
++
+ static int
+ pvfs2_layout_type(void)
+ {
+@@ -185,6 +197,265 @@ pvfs2_layout_encode(u32 *p, u32 *end, vo
+     return lay_length;
+ }
+ 
++/****** NFSv4 File Layout Functions ******/
++/* Encodes a nfs file pNFS layout.
++ * TODO: For now, always return the devices in order,e.g., 0,1,...
++ * At some point we need to re-enable randomizing the starting
++ * data server in pvfs2 (io_randomized) and then call
++ * PVFS_mgmt_get_dfile_array to get the in order list
++ * of servers for this data file (see descend and verify_datafiles
++ * in src/apps/admin/pvfs2-fs-dump.c)
++*/
++static int
++nfs_build_layout(struct nfsd4_pnfs_layoutget* req, int num_devices)
++{
++    struct nfsd4_pnfs_filelayout* nfslayout;
++    int i;
++    static char buf[80];
++    struct knfsd_fh *fh = (struct knfsd_fh*)req->lg_fh;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start\n",__FUNCTION__);
++
++    /* Free existing layout if it exists */
++    if (req->lg_layout)
++    {
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Existing layout, freeing existing memory\n",__FUNCTION__);
++	kfree(req->lg_layout);
++    }
++
++    nfslayout = (struct nfsd4_pnfs_filelayout*)kmalloc(sizeof(struct nfsd4_pnfs_filelayout),
++						   GFP_KERNEL);
++
++    /* Set nfs layout information */
++    nfslayout->lg_commit_through_mds = 1;
++    nfslayout->lg_stripe_type = 1; /* sparse */
++    nfslayout->lg_file_size = 0ULL;
++    nfslayout->lg_layout_type = LAYOUT_NFSV4_FILES;
++    nfslayout->lg_indexlist = 0;
++
++    /* the stripe size is in the attributes of the pvfs2 layout,
++     * but for now, just hardcode it to the value of the proc variable
++     */
++    nfslayout->lg_stripe_unit = layout_stripesize;
++
++    /* # dataservers == # dfiles
++     * Note: This is pre-xdr'd by pvfs2 user land code
++     */
++    nfslayout->lg_llistlen = num_devices;
++    gossip_debug(GOSSIP_PNFS_DEBUG,"# data servers:%d\n", nfslayout->lg_llistlen);
++    if (nfslayout->lg_llistlen <= 0)
++    {
++	gossip_err("%s: No data servers!\n",__FUNCTION__);
++	kfree(nfslayout);
++	return -ENOSYS;
++    }
++
++    nfslayout->lg_llist = (struct nfsd4_pnfs_layoutlist*)kmalloc(
++	nfslayout->lg_llistlen * sizeof(struct nfsd4_pnfs_layoutlist), GFP_KERNEL);
++    if (!nfslayout->lg_llist)
++    {
++	gossip_err("%s: Could not allocate nfs device list!\n",__FUNCTION__);
++	kfree(nfslayout);
++	return -ENOMEM;
++    }
++
++    /* set data server and fh info */
++    for (i = 0; i < nfslayout->lg_llistlen; i++) {
++
++	nfslayout->lg_llist[i].dev_id = i;
++	nfslayout->lg_llist[i].dev_index = i;
++	nfslayout->lg_llist[i].dev_fh = *fh;
++
++        /* To edit fh, edit req->lg_fh in place as follows:
++	 int SetFH(int *fhP, int sid)
++	 {
++	 struct knfsd_fh *fh = (struct knfsd_fh *)fhP;
++
++	 if (fh->fh_size > 8) {
++	 fh->fh_size += 4; // fh_size + 4 for sid
++	 fh->fh_fsid_type += max_fsid_type;
++	 fhP[(fh->fh_size >> 2)] = sid;
++	 fh->fh_fileid_type = 7;
++
++	 return 0;
++	 }
++	 return ENOENT;
++	 }
++
++	*/
++    }
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Printing fh\n", __FUNCTION__);
++    sprintf(buf, "%d: %08x %08x %08x %08x %08x %08x",
++	    fh->fh_size,
++	    fh->fh_base.fh_pad[0],
++	    fh->fh_base.fh_pad[1],
++	    fh->fh_base.fh_pad[2],
++	    fh->fh_base.fh_pad[3],
++	    fh->fh_base.fh_pad[4],
++	    fh->fh_base.fh_pad[5]);
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s:%s\n", __FUNCTION__, buf);
++
++    /* Set layout to be encoded later */
++    req->lg_layout = (void*)nfslayout;
++    return 0;
++}
++
++/* Retrieves pvfs2 pNFS layout from mds
++ * PVFS2_VFS_OP_GETDEVLIST
++*/
++static int
++nfs_getdevlist_upcall(pvfs2_sb_info_t* pvfs2_sb, pvfs2_inode_t* pvfs2_inode)
++{
++    int ret = -EINVAL;
++    pvfs2_kernel_op_t *new_op = NULL;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start\n", __FUNCTION__);
++
++    /* Check if devlist has already been retrieve for this inode
++     * TODO: need to make this thread aware
++     */
++    if (pvfs2_sb->pnfs_devlist_size <= 0)
++    {
++	/* perform upcall to retrieve layout */
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Retrieving pNFS nfsv4 device list\n", __FUNCTION__);
++
++	new_op = op_alloc(PVFS2_VFS_OP_GETDEVLIST);
++	if (!new_op)
++	{
++	    ret = -ENOMEM;
++	    goto out;
++	}
++	new_op->upcall.type = PVFS2_VFS_OP_GETDEVLIST;
++	new_op->upcall.req.getdevlist.refn = pvfs2_inode->refn;
++	ret = service_operation(new_op,
++				"pvfs2_getdevlist",
++				get_interruptible_flag((&pvfs2_inode->vfs_inode)));
++	gossip_debug(GOSSIP_PNFS_DEBUG,"pvfs2_getdevlist got return value of %d\n",ret);
++	if (ret || new_op->downcall.resp.getdevlist.devlist_size <= 0)
++	{
++	    gossip_err("%s: Error!  Could not retrieve device list (%d)\n",__FUNCTION__, ret);
++	    op_release(new_op);
++	    ret = -ENOSYS;
++	    goto out; /* failure */
++	}
++
++	/* DH: Copy devlist blob for pNFS */
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Server copy devicelist from userland size: %d\n",
++		    __FUNCTION__,new_op->downcall.resp.getdevlist.devlist_size);
++	pvfs2_sb->pnfs_devlist_size = new_op->downcall.resp.getdevlist.devlist_size;
++	memcpy(pvfs2_sb->pnfs_devlist, new_op->downcall.resp.getdevlist.devlist, pvfs2_sb->pnfs_devlist_size);
++	op_release(new_op);
++    } else {
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Using cached pNFS nfsv4 device list\n", __FUNCTION__);
++	ret = 0;
++    }
++out:
++    return ret;
++}
++
++/* Retrieves pvfs2 data layout information about the specified file.
++ * return- positive 0
++ * negative -ENOSYS or pvfs2_inode_getattr error
++ */
++static int
++nfs_layout_get(struct inode * inode, void* buf)
++{
++    int ret, devlist_len=0;
++    struct nfsd4_pnfs_layoutget *layout_request = (struct nfsd4_pnfs_layoutget*)buf;
++    pvfs2_inode_t* pvfs2_inode = PVFS2_I(inode);
++    pvfs2_sb_info_t* pvfs2_sb = PVFS2_SB(inode->i_sb);
++    char* buffer;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: off:%Lu ex:%Lu macc:%d iomode:%d\n", __FUNCTION__,
++		layout_request->lg_seg.offset,
++		layout_request->lg_seg.length,
++		layout_request->lg_mxcnt,
++		layout_request->lg_seg.iomode);
++    if ((ret = nfs_getdevlist_upcall(pvfs2_sb, pvfs2_inode)) < 0)
++	return ret;
++    buffer = pvfs2_sb->pnfs_devlist;
++    pnfs_decode_int32_t(&buffer, &devlist_len);
++    ret = nfs_build_layout(layout_request, devlist_len);
++    if (ret)
++	gossip_err("%s: Error!  Could not copy attributes (%d)\n",__FUNCTION__,ret);
++
++    return ret;
++}
++
++/* Convert a encode char buffer into an array of devices.
++ * The devices are then freed as they are encoded by nfsd.
++*/
++struct nfsd4_pnfs_devlist*
++nfs_create_devices(int devlist_len, char* buf)
++{
++    struct nfsd4_pnfs_devlist* devlist;
++    int i;
++    struct pnfs_filelayout_devaddr *fdev;
++    char netid[] = "tcp";
++    char nfsport[] = ".8.1";
++    char* temp;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start Devs: %d\n", __FUNCTION__, devlist_len);
++    devlist = (struct nfsd4_pnfs_devlist*)kmalloc(devlist_len * sizeof(struct nfsd4_pnfs_devlist), PVFS2_GFP_FLAGS);
++    /* todo: ensure space alocated */
++    for (i=0; i < devlist_len; i++)
++    {
++	devlist[i].dev_id = i;
++
++	fdev = (struct pnfs_filelayout_devaddr*)kmalloc(
++	    sizeof(struct pnfs_filelayout_devaddr), PVFS2_GFP_FLAGS);
++	/* todo ensure space allocated */
++	fdev->r_netid.len = 3;
++	fdev->r_netid.data = (char*)kmalloc(3, PVFS2_GFP_FLAGS);
++	memcpy(fdev->r_netid.data, netid, 3);
++
++	fdev->r_addr.len = bmitoh32(*(int32_t*)buf);
++	fdev->r_addr.data = (char*)kmalloc(fdev->r_addr.len + 4, PVFS2_GFP_FLAGS);
++	pnfs_decode_string(&buf, &temp);
++	memcpy(fdev->r_addr.data, temp, fdev->r_addr.len);
++
++	/* add port */
++	memcpy(fdev->r_addr.data + fdev->r_addr.len, nfsport, 4);
++	/* Increase by 4 to add the nfs port 2049 */
++	fdev->r_addr.len += 4;
++
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: raddrlen: %d raddr: %s\n",
++		    __FUNCTION__, fdev->r_addr.len, fdev->r_addr.data);
++	devlist[i].dev_addr = (void*)fdev;
++    }
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: End\n", __FUNCTION__);
++    return devlist;
++}
++
++static int
++nfs_getdevicelist(struct super_block *sb, void *buf)
++{
++    int ret, devlist_len=0;
++    pvfs2_sb_info_t* pvfs2_sb = PVFS2_SB(sb);
++    struct inode* inode = sb->s_root->d_inode;
++    pvfs2_inode_t* pvfs2_inode = PVFS2_I(inode);
++    struct nfsd4_pnfs_getdevlist *gdevl = (struct nfsd4_pnfs_getdevlist*)buf;
++    char* buffer;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start\n", __FUNCTION__);
++
++    if ((ret = nfs_getdevlist_upcall(pvfs2_sb, pvfs2_inode)) < 0)
++	return ret;
++
++    buffer = pvfs2_sb->pnfs_devlist;
++    pnfs_decode_int32_t(&buffer, &devlist_len);
++    gdevl->gd_devlist = nfs_create_devices(devlist_len, buffer);
++    gdevl->gd_devlist_len = devlist_len;
++    /* TODO: Not filling in gd_cookie, gd_verf */
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: End (ret: %d) (len: %d)\n", __FUNCTION__, ret, devlist_len);
++
++    return ret;
++}
++
+ /* export ops for each layout type */
+ struct export_operations pvfs2layout_export_ops =
+ {
+@@ -194,6 +465,13 @@ struct export_operations pvfs2layout_exp
+     .layout_encode = pvfs2_layout_encode,
+ };
+ 
++struct export_operations nfslayout_export_ops =
++{
++    .layout_type    = pvfs2_layout_type,
++    .layout_get     = nfs_layout_get,
++    .get_devicelist = nfs_getdevicelist,
++};
++
+ /*
+  * Local variables:
+  *  c-indent-level: 4
+diff -puN src/kernel/linux-2.6/pvfs2-dev-proto.h~nfslayoutsupport src/kernel/linux-2.6/pvfs2-dev-proto.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-dev-proto.h~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-dev-proto.h	2008-01-05 17:52:37.000000000 -0800
+@@ -37,6 +37,7 @@
+ #define PVFS2_VFS_OP_REMOVEXATTR       0xFF000013
+ #define PVFS2_VFS_OP_PARAM             0xFF000014
+ #define PVFS2_VFS_OP_PERF_COUNT        0xFF000015
++#define PVFS2_VFS_OP_GETDEVLIST        0xFF000016
+ #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
+ #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
+ #define PVFS2_VFS_OP_FSKEY             0xFF00EE02
+diff -puN src/kernel/linux-2.6/pvfs2-pnfs.h~nfslayoutsupport src/kernel/linux-2.6/pvfs2-pnfs.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-pnfs.h~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h	2008-01-05 17:52:37.000000000 -0800
+@@ -25,6 +25,7 @@ struct pvfs2_layout {
+ };
+ 
+ extern struct export_operations pvfs2layout_export_ops;
++extern struct export_operations nfslayout_export_ops;
+ 
+ /* Structs need to be defined just to compile kernel module since they
+  * are used in include/linux/nfs4_pnfs.h.
+diff -puN src/kernel/linux-2.6/super.c~nfslayoutsupport src/kernel/linux-2.6/super.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/super.c~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c	2008-01-05 17:52:37.000000000 -0800
+@@ -1104,6 +1104,10 @@ int pvfs2_fill_sb(
+ 	    gossip_debug(GOSSIP_PNFS_DEBUG,"Setting pvfs2 layout export ops\n");
+ 	    sb->s_export_op = &pvfs2layout_export_ops;
+ 	    break;
++        case LAYOUT_NFSV4_FILES:
++	    gossip_debug(GOSSIP_PNFS_DEBUG,"Setting nfs layout export ops\n");
++	    sb->s_export_op = &nfslayout_export_ops;
++	    break;
+         default:
+ 	    gossip_err("Invalid layouttype, no export ops to set! (%d)\n", layouttype);
+     }
+diff -puN src/kernel/linux-2.6/upcall.h~nfslayoutsupport src/kernel/linux-2.6/upcall.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/upcall.h~nfslayoutsupport	2008-01-05 17:52:37.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/upcall.h	2008-01-05 17:52:37.000000000 -0800
+@@ -226,6 +226,11 @@ typedef struct
+ 
+ typedef struct
+ {
++    PVFS_object_ref refn;
++} pvfs2_getdevlist_request_t;
++
++typedef struct
++{
+     int32_t type;
+     int32_t __pad1;
+     PVFS_credentials credentials;
+@@ -261,6 +266,7 @@ typedef struct
+         pvfs2_param_request_t param;
+         pvfs2_perf_count_request_t perf_count;
+         pvfs2_fs_key_request_t fs_key;
++	pvfs2_getdevlist_request_t getdevlist;
+     } req;
+ } pvfs2_upcall_t;
+ 
+_

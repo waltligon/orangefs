@@ -1,0 +1,103 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+
+%%
+
+machine pvfs2_truncate_sm
+{
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => resize;
+        default => final_response;
+    }
+    
+    state resize
+    {
+        run truncate_resize;
+        default => check_error;
+    }
+
+    state check_error
+    {
+        run truncate_check_error;
+        default => final_response;
+    }
+        
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
+    
+    state cleanup
+    {
+        run truncate_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static PINT_sm_action truncate_resize(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    ret = job_trove_bstream_resize(
+        s_op->req->u.truncate.fs_id, s_op->req->u.truncate.handle,
+        s_op->req->u.truncate.size, s_op->req->u.truncate.flags,
+        NULL, smcb, 0, js_p, &i, server_job_context,
+        s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action truncate_check_error(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action truncate_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return (server_state_machine_complete(smcb));
+}
+
+PINT_GET_OBJECT_REF_DEFINE(truncate);
+
+struct PINT_server_req_params pvfs2_truncate_params =
+{
+    .string_name = "truncate",
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_truncate,
+    .state_machine = &pvfs2_truncate_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

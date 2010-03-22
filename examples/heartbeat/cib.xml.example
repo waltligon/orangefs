@@ -1,0 +1,263 @@
+<?xml version="1.0" ?>
+ <cib admin_epoch="0" epoch="0" num_updates="0">
+   <configuration>
+     <crm_config>
+       <cluster_property_set id="cib-bootstrap-options">
+         <attributes>
+           <nvpair id="cib-bootstrap-options-symmetric-cluster" name="symmetric-cluster" value="true"/>
+           <nvpair id="cib-bootstrap-options-no-quorum-policy" name="no-quorum-policy" value="freeze"/>
+           <nvpair id="cib-bootstrap-options-default-resource-stickiness" name="default-resource-stickiness" value="200"/>
+           <nvpair id="cib-bootstrap-options-default-resource-failure-stickiness" name="default-resource-failure-stickiness" value="0"/>
+           <nvpair id="cib-bootstrap-options-stonith-enabled" name="stonith-enabled" value="true"/>
+           <nvpair id="cib-bootstrap-options-stonith-action" name="stonith-action" value="reboot"/>
+           <nvpair id="cib-bootstrap-options-stop-orphan-resources" name="stop-orphan-resources" value="true"/>
+           <nvpair id="cib-bootstrap-options-stop-orphan-actions" name="stop-orphan-actions" value="true"/>
+           <nvpair id="cib-bootstrap-options-remove-after-stop" name="remove-after-stop" value="false"/>
+           <nvpair id="cib-bootstrap-options-short_resource_names" name="short_resource_names" value="true"/>
+           <nvpair id="cib-bootstrap-options-is-managed-default" name="is-managed-default" value="true"/>
+         </attributes>
+       </cluster_property_set>
+     </crm_config>
+     <nodes/>
+     <resources>
+       <group id="server0">
+         <primitive id="server0_address" class="ocf" type="IPaddr" provider="heartbeat">
+           <instance_attributes id="server0_addr_iattr">
+             <attributes>
+               <nvpair id="server0_address_ip" name="ip" value="192.168.0.1"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server0_fs" class="ocf" type="Filesystem" provider="external">
+           <instance_attributes id="server0_fs_iattr">
+             <attributes>
+               <nvpair id="server0_fs_device" name="device" value="-L label0"/>
+               <nvpair id="server0_fs_directory" name="directory" value="/san_mount0"/>
+               <nvpair id="server0_fs_fstype" name="fstype" value="ext3"/>
+               <nvpair id="server0_fs_options" name="options" value="rw"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server0_daemon" class="ocf" type="PVFS2" provider="external">
+           <instance_attributes id="server0_daemon_iattr">
+             <attributes>
+               <nvpair id="server0_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
+               <nvpair id="server0_daemon_port" name="port" value="3334"/>
+               <nvpair id="server0_daemon_pidfile" name="pidfile" value="/var/run/virtual1.pvfs2_ha_pid"/>
+               <nvpair id="server0_daemon_ip" name="ip" value="192.168.0.1"/>
+               <nvpair id="server0_daemon_alias" name="alias" value="virtual1"/>
+             </attributes>
+           </instance_attributes>
+           <operations>
+             <op id="server0_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
+           </operations>
+         </primitive>
+       </group>
+       <group id="server1">
+         <primitive id="server1_address" class="ocf" type="IPaddr" provider="heartbeat">
+           <instance_attributes id="server1_addr_iattr">
+             <attributes>
+               <nvpair id="server1_address_ip" name="ip" value="192.168.0.2"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server1_fs" class="ocf" type="Filesystem" provider="external">
+           <instance_attributes id="server1_fs_iattr">
+             <attributes>
+               <nvpair id="server1_fs_device" name="device" value="-L label1"/>
+               <nvpair id="server1_fs_directory" name="directory" value="/san_mount1"/>
+               <nvpair id="server1_fs_fstype" name="fstype" value="ext3"/>
+               <nvpair id="server1_fs_options" name="options" value="rw"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server1_daemon" class="ocf" type="PVFS2" provider="external">
+           <instance_attributes id="server1_daemon_iattr">
+             <attributes>
+               <nvpair id="server1_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
+               <nvpair id="server1_daemon_port" name="port" value="3334"/>
+               <nvpair id="server1_daemon_pidfile" name="pidfile" value="/var/run/virtual2.pvfs2_ha_pid"/>
+               <nvpair id="server1_daemon_ip" name="ip" value="192.168.0.2"/>
+               <nvpair id="server1_daemon_alias" name="alias" value="virtual2"/>
+             </attributes>
+           </instance_attributes>
+           <operations>
+             <op id="server1_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
+           </operations>
+         </primitive>
+       </group>
+       <group id="server2">
+         </primitive>
+         <primitive id="server2_address" class="ocf" type="IPaddr" provider="heartbeat">
+           <instance_attributes id="server2_addr_iattr">
+             <attributes>
+               <nvpair id="server2_address_ip" name="ip" value="192.168.0.3"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server2_fs" class="ocf" type="Filesystem" provider="external">
+           <instance_attributes id="server2_fs_iattr">
+             <attributes>
+               <nvpair id="server2_fs_device" name="device" value="-L label2"/>
+               <nvpair id="server2_fs_directory" name="directory" value="/san_mount2"/>
+               <nvpair id="server2_fs_fstype" name="fstype" value="ext3"/>
+               <nvpair id="server2_fs_options" name="options" value="rw"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server2_daemon" class="ocf" type="PVFS2" provider="external">
+           <instance_attributes id="server2_daemon_iattr">
+             <attributes>
+               <nvpair id="server2_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
+               <nvpair id="server2_daemon_port" name="port" value="3334"/>
+               <nvpair id="server2_daemon_pidfile" name="pidfile" value="/var/run/virtual3.pvfs2_ha_pid"/>
+               <nvpair id="server2_daemon_ip" name="ip" value="192.168.0.3"/>
+               <nvpair id="server2_daemon_alias" name="alias" value="virtual3"/>
+             </attributes>
+           </instance_attributes>
+           <operations>
+             <op id="server2_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
+           </operations>
+         </primitive>
+       </group>
+       <group id="server3">
+         </primitive>
+         <primitive id="server3_address" class="ocf" type="IPaddr" provider="heartbeat">
+           <instance_attributes id="server3_addr_iattr">
+             <attributes>
+               <nvpair id="server3_address_ip" name="ip" value="192.168.0.4"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server3_fs" class="ocf" type="Filesystem" provider="external">
+           <instance_attributes id="server3_fs_iattr">
+             <attributes>
+               <nvpair id="server3_fs_device" name="device" value="-L label3"/>
+               <nvpair id="server3_fs_directory" name="directory" value="/san_mount3"/>
+               <nvpair id="server3_fs_fstype" name="fstype" value="ext3"/>
+               <nvpair id="server3_fs_options" name="options" value="rw"/>
+             </attributes>
+           </instance_attributes>
+         </primitive>
+         <primitive id="server3_daemon" class="ocf" type="PVFS2" provider="external">
+           <instance_attributes id="server3_daemon_iattr">
+             <attributes>
+               <nvpair id="server3_daemon_fsconfig" name="fsconfig" value="/etc/pvfs2/pvfs2-fs.conf"/>
+               <nvpair id="server3_daemon_port" name="port" value="3334"/>
+               <nvpair id="server3_daemon_pidfile" name="pidfile" value="/var/run/virtual4.pvfs2_ha_pid"/>
+               <nvpair id="server3_daemon_ip" name="ip" value="192.168.0.4"/>
+               <nvpair id="server3_daemon_alias" name="alias" value="virtual4"/>
+             </attributes>
+           </instance_attributes>
+           <operations>
+             <op id="server3_daemon_monitor" name="monitor" interval="20s" timeout="150s"/>
+           </operations>
+         </primitive>
+       </group>
+
+       <primitive id="fence0" class="stonith" type="external/ipmi" provider="heartbeat">
+         <operations>
+           <op id="fence0-monitor" name="monitor" interval="60s" timeout="20s" prereq="nothing"/>
+           <op id="fence0-start" name="start" timeout="20s" prereq="nothing"/>
+         </operations>
+
+         <instance_attributes id="ia-fence0">
+           <attributes>
+             <nvpair id="fence0-hostname" name="hostname" value="node1"/>
+             <nvpair id="fence0-ipaddr" name="ipaddr" value="192.168.0.10"/>
+             <nvpair id="fence0-userid" name="userid" value="Administrator"/>
+             <nvpair id="fence0-passwd" name="passwd" value="password"/>
+           </attributes>
+         </instance_attributes>
+       </primitive> 
+
+       <primitive id="fence1" class="stonith" type="external/ipmi" provider="heartbeat">
+         <operations>
+           <op id="fence1-monitor" name="monitor" interval="60s" timeout="20s" prereq="nothing"/>
+           <op id="fence1-start" name="start" timeout="20s" prereq="nothing"/>
+         </operations>
+
+         <instance_attributes id="ia-fence1">
+           <attributes>
+             <nvpair id="fence1-hostname" name="hostname" value="node2"/>
+             <nvpair id="fence1-ipaddr" name="ipaddr" value="192.168.0.11"/>
+             <nvpair id="fence1-userid" name="userid" value="Administrator"/>
+             <nvpair id="fence1-passwd" name="passwd" value="password"/>
+           </attributes>
+         </instance_attributes>
+       </primitive> 
+
+       <primitive id="fence2" class="stonith" type="external/ipmi" provider="heartbeat">
+         <operations>
+           <op id="fence2-monitor" name="monitor" interval="60s" timeout="20s" prereq="nothing"/>
+           <op id="fence2-start" name="start" timeout="20s" prereq="nothing"/>
+         </operations>
+
+         <instance_attributes id="ia-fence2">
+           <attributes>
+             <nvpair id="fence2-hostname" name="hostname" value="node3"/>
+             <nvpair id="fence2-ipaddr" name="ipaddr" value="192.168.0.12"/>
+             <nvpair id="fence2-userid" name="userid" value="Administrator"/>
+             <nvpair id="fence2-passwd" name="passwd" value="password"/>
+           </attributes>
+         </instance_attributes>
+       </primitive> 
+
+       <primitive id="fence3" class="stonith" type="external/ipmi" provider="heartbeat">
+         <operations>
+           <op id="fence3-monitor" name="monitor" interval="60s" timeout="20s" prereq="nothing"/>
+           <op id="fence3-start" name="start" timeout="20s" prereq="nothing"/>
+         </operations>
+
+         <instance_attributes id="ia-fence3">
+           <attributes>
+             <nvpair id="fence3-hostname" name="hostname" value="node4"/>
+             <nvpair id="fence3-ipaddr" name="ipaddr" value="192.168.0.13"/>
+             <nvpair id="fence3-userid" name="userid" value="Administrator"/>
+             <nvpair id="fence3-passwd" name="passwd" value="password"/>
+           </attributes>
+         </instance_attributes>
+       </primitive> 
+
+     </resources>
+     <constraints>
+       <rsc_location id="run_server0" rsc="server0">
+         <rule id="pref_run_server0" score="100">
+           <expression attribute="#uname" operation="eq" value="node1" id="run_server0_expression"/>
+         </rule>
+       </rsc_location>
+       <rsc_order id="server0_order_start_fs" from="server0_fs" action="start" type="before" to="server0_daemon"/>
+       <rsc_order id="server0_order_stop_fs" from="server0_daemon" action="stop" type="before" to="server0_fs"/>
+       <rsc_order id="server0_order_start_address" from="server0_address" action="start" type="before" to="server0_daemon"/>
+       <rsc_order id="server0_order_stop_address" from="server0_daemon" action="stop" type="before" to="server0_address"/>
+       <rsc_location id="run_server1" rsc="server1">
+         <rule id="pref_run_server1" score="100">
+           <expression attribute="#uname" operation="eq" value="node2" id="run_server1_expression"/>
+         </rule>
+       </rsc_location>
+       <rsc_order id="server1_order_start_fs" from="server1_fs" action="start" type="before" to="server1_daemon"/>
+       <rsc_order id="server1_order_stop_fs" from="server1_daemon" action="stop" type="before" to="server1_fs"/>
+       <rsc_order id="server1_order_start_address" from="server1_address" action="start" type="before" to="server1_daemon"/>
+       <rsc_order id="server1_order_stop_address" from="server1_daemon" action="stop" type="before" to="server1_address"/>
+       <rsc_location id="run_server2" rsc="server2">
+         <rule id="pref_run_server2" score="100">
+           <expression attribute="#uname" operation="eq" value="node3" id="run_server2_expression"/>
+         </rule>
+       </rsc_location>
+       <rsc_order id="server2_order_start_fs" from="server2_fs" action="start" type="before" to="server2_daemon"/>
+       <rsc_order id="server2_order_stop_fs" from="server2_daemon" action="stop" type="before" to="server2_fs"/>
+       <rsc_order id="server2_order_start_address" from="server2_address" action="start" type="before" to="server2_daemon"/>
+       <rsc_order id="server2_order_stop_address" from="server2_daemon" action="stop" type="before" to="server2_address"/>
+       <rsc_location id="run_server3" rsc="server3">
+         <rule id="pref_run_server3" score="100">
+           <expression attribute="#uname" operation="eq" value="node4" id="run_server3_expression"/>
+         </rule>
+       </rsc_location>
+       <rsc_order id="server3_order_start_fs" from="server3_fs" action="start" type="before" to="server3_daemon"/>
+       <rsc_order id="server3_order_stop_fs" from="server3_daemon" action="stop" type="before" to="server3_fs"/>
+       <rsc_order id="server3_order_start_address" from="server3_address" action="start" type="before" to="server3_daemon"/>
+       <rsc_order id="server3_order_stop_address" from="server3_daemon" action="stop" type="before" to="server3_address"/>
+     </constraints>
+   </configuration>
+   <status/>
+ </cib>

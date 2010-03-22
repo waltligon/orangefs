@@ -1,0 +1,93 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "state-machine.h"
+#include "client-state-machine.h"
+#include "job-time-mgr.h"
+
+extern job_context_id pint_client_sm_context;
+
+%%
+
+machine pvfs2_client_job_timer_sm
+{
+    state do_work 
+    {
+        run job_timer_do_work;
+        success => do_work;
+        default => error;
+    }
+
+    state error 
+    {
+        run job_timer_error;
+        default => terminate;
+    }
+}
+
+%%
+
+/* job_timer_error()
+ *
+ * cleans up any resources consumed by this state machine and ends
+ * execution of the machine
+ */
+static PINT_sm_action job_timer_error(
+    struct PINT_smcb *smcb, job_status_s* js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "job timer state: job_timer_error\n");
+    gossip_err("Error: stopping client job timer.\n");
+
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
+}
+
+/* job_timer_do_work()
+ *
+ * resets counters, updates metrices, etc- this is intended to be
+ * called repeatedly on a regular interval
+ */
+static PINT_sm_action job_timer_do_work(
+    struct PINT_smcb *smcb, job_status_s* js_p)
+{
+    int ret = -1;
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+#if 0
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "job timer state: job_timer_do_work\n");
+#endif
+
+    /* look for expired jobs */
+    ret = job_time_mgr_expire();
+    if (ret < 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+        
+    /* post another timer */
+    return job_req_sched_post_timer(
+        1000, smcb, 0, js_p, &sm_p->u.job_timer.job_id, pint_client_sm_context);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
