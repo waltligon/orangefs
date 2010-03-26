@@ -2852,7 +2852,8 @@ static inline PVFS_error handle_unexp_vfs_request(
     }
 
     if (remount_complete == REMOUNT_NOTCOMPLETED &&
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT))
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) && 
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) )
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
