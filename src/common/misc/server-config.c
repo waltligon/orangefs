@@ -695,7 +695,7 @@ static const configoption_t options[] =
      *
      * usec: [%H:%M:%S.%U]
      *
-     * datetime: [%m/%d %H:%M]
+     * datetime: [%m/%d/%Y %H:%M:%S]
      *
      * thread: [%H:%M:%S.%U (%lu)]
      *
