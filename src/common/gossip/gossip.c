@@ -479,9 +479,9 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
         case GOSSIP_LOGSTAMP_DATETIME:
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
-            strftime(bptr, 14, "%m/%d %H:%M] ", localtime(&tp));
-            bptr += 13;
-            bsize -= 13;
+            strftime(bptr, 22, "%m/%d/%Y %H:%M:%S] ", localtime(&tp));
+            bptr += 21;
+            bsize -= 21;
             break;
         case GOSSIP_LOGSTAMP_THREAD:
             gettimeofday(&tv, 0);
