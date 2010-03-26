@@ -187,23 +187,28 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
       cancellations on the I/O operation are accounted for
     */
     assert(sm_p);
+    
+    PINT_client_sm *sm_base_p = 
+        PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
+
+    assert(sm_base_p);
 
     /*
       this *can* possibly be 0 in the case that the I/O has already
       completed and no job cancellation were issued at I/O cancel time
     */
-    if (sm_p->u.io.total_cancellations_remaining > 0)
+    if (sm_base_p->u.io.total_cancellations_remaining > 0)
     {
-        sm_p->u.io.total_cancellations_remaining--;
+        sm_base_p->u.io.total_cancellations_remaining--;
     }
 
     gossip_debug(
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
-        "remaining (op %s)\n", sm_p,
-        sm_p->u.io.total_cancellations_remaining,
+        "remaining (op %s)\n", sm_base_p,
+        sm_base_p->u.io.total_cancellations_remaining,
         (PINT_smcb_complete(smcb) ? "complete" : "NOT complete"));
 
-    return (sm_p->u.io.total_cancellations_remaining != 0);
+    return (sm_base_p->u.io.total_cancellations_remaining != 0);
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
