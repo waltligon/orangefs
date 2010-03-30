@@ -3686,6 +3686,142 @@ fi
 done
 
 
+if test "${ac_cv_header_pwd_h+set}" = set; then
+  { $as_echo "$as_me:$LINENO: checking for pwd.h" >&5
+$as_echo_n "checking for pwd.h... " >&6; }
+if test "${ac_cv_header_pwd_h+set}" = set; then
+  $as_echo_n "(cached) " >&6
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_header_pwd_h" >&5
+$as_echo "$ac_cv_header_pwd_h" >&6; }
+else
+  # Is the header compilable?
+{ $as_echo "$as_me:$LINENO: checking pwd.h usability" >&5
+$as_echo_n "checking pwd.h usability... " >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <pwd.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  ac_header_compiler=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_header_compiler=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+{ $as_echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+$as_echo "$ac_header_compiler" >&6; }
+
+# Is the header present?
+{ $as_echo "$as_me:$LINENO: checking pwd.h presence" >&5
+$as_echo_n "checking pwd.h presence... " >&6; }
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <pwd.h>
+_ACEOF
+if { (ac_try="$ac_cpp conftest.$ac_ext"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval ac_try_echo="\"\$as_me:$LINENO: $ac_try_echo\""
+$as_echo "$ac_try_echo") >&5
+  (eval "$ac_cpp conftest.$ac_ext") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  $as_echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null && {
+	 test -z "$ac_c_preproc_warn_flag$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       }; then
+  ac_header_preproc=yes
+else
+  $as_echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+
+rm -f conftest.err conftest.$ac_ext
+{ $as_echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+$as_echo "$ac_header_preproc" >&6; }
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: accepted by the compiler, rejected by the preprocessor!" >&5
+$as_echo "$as_me: WARNING: pwd.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: proceeding with the compiler's result" >&5
+$as_echo "$as_me: WARNING: pwd.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: present but cannot be compiled" >&5
+$as_echo "$as_me: WARNING: pwd.h: present but cannot be compiled" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h:     check for missing prerequisite headers?" >&5
+$as_echo "$as_me: WARNING: pwd.h:     check for missing prerequisite headers?" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: see the Autoconf documentation" >&5
+$as_echo "$as_me: WARNING: pwd.h: see the Autoconf documentation" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h:     section \"Present But Cannot Be Compiled\"" >&5
+$as_echo "$as_me: WARNING: pwd.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: proceeding with the preprocessor's result" >&5
+$as_echo "$as_me: WARNING: pwd.h: proceeding with the preprocessor's result" >&2;}
+    { $as_echo "$as_me:$LINENO: WARNING: pwd.h: in the future, the compiler will take precedence" >&5
+$as_echo "$as_me: WARNING: pwd.h: in the future, the compiler will take precedence" >&2;}
+
+    ;;
+esac
+{ $as_echo "$as_me:$LINENO: checking for pwd.h" >&5
+$as_echo_n "checking for pwd.h... " >&6; }
+if test "${ac_cv_header_pwd_h+set}" = set; then
+  $as_echo_n "(cached) " >&6
+else
+  ac_cv_header_pwd_h=$ac_header_preproc
+fi
+{ $as_echo "$as_me:$LINENO: result: $ac_cv_header_pwd_h" >&5
+$as_echo "$ac_cv_header_pwd_h" >&6; }
+
+fi
+if test "x$ac_cv_header_pwd_h" = x""yes; then
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_GETPWUID 1
+_ACEOF
+
+fi
+
+
 if test "${ac_cv_header_sys_vfs_h+set}" = set; then
   { $as_echo "$as_me:$LINENO: checking for sys/vfs.h" >&5
 $as_echo_n "checking for sys/vfs.h... " >&6; }
@@ -17489,6 +17625,8 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 
+AX_ZOID
+
 { $as_echo "$as_me:$LINENO: checking for fgetxattr extra arguments" >&5
 $as_echo_n "checking for fgetxattr extra arguments... " >&6; }
 cat >conftest.$ac_ext <<_ACEOF
@@ -19323,7 +19461,7 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
-ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/apps/user/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/apps/user/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/bmi/bmi_zoid/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -19951,6 +20089,7 @@ do
     "src/io/bmi/bmi_mx/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_mx/module.mk" ;;
     "src/io/bmi/bmi_ib/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_ib/module.mk" ;;
     "src/io/bmi/bmi_portals/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_portals/module.mk" ;;
+    "src/io/bmi/bmi_zoid/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_zoid/module.mk" ;;
     "src/io/description/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/description/module.mk" ;;
     "src/io/flow/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/flow/module.mk" ;;
     "src/io/flow/flowproto-bmi-trove/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/flow/flowproto-bmi-trove/module.mk" ;;
@@ -20762,7 +20901,7 @@ fi
 
 
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
 	{ $as_echo "$as_me:$LINENO: WARNING: You have selected to build $PKGSTR to use a \"fast\" network
 		    interface, but have not disabled TCP.  The way this is
