@@ -53,7 +53,7 @@ struct pvfs2_param_extra
  * into the proper debug value and then send a request to update the
  * debug mask if client or update the local debug mask if kernel.
 */
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_proc_debug_mask_handler(
     ctl_table       *ctl,
     int             write,
@@ -83,7 +83,7 @@ static int pvfs2_proc_debug_mask_handler(
   gossip_debug(GOSSIP_PROC_DEBUG,"Executing pvfs2_proc_debug_mask_handler...\n");
 
   /* use generic proc string handling function to retrieve/set string. */
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dostring(ctl, write, filp, buffer, lenp, ppos);
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dostring(ctl, write, buffer, lenp, ppos);
@@ -163,7 +163,7 @@ static int pvfs2_proc_debug_mask_handler(
  * generic proc file handler for getting and setting various tunable
  * pvfs2-client parameters
  */
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_param_proc_handler(
     ctl_table       *ctl,
     int             write,
@@ -208,7 +208,7 @@ static int pvfs2_param_proc_handler(
     if(write)
     {
         /* use generic proc handling function to retrive value to set */
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
@@ -241,7 +241,7 @@ static int pvfs2_param_proc_handler(
         /* use generic proc handling function to output value */
         val = (int)new_op->downcall.resp.param.value;
         gossip_debug(GOSSIP_PROC_DEBUG, "pvfs2: proc read %d\n", val);
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, filp, buffer, lenp, ppos);
 #elif defined(HAVE_PROC_HANDLER_PPOS_ARG)
         ret = proc_dointvec_minmax(&tmp_ctl, write, buffer, lenp, ppos);
@@ -254,7 +254,7 @@ static int pvfs2_param_proc_handler(
     return(ret);
 }
 
-#if defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_FILE_ARG)
 static int pvfs2_pc_proc_handler(
     ctl_table       *ctl,
     int             write,
@@ -283,7 +283,7 @@ static int pvfs2_pc_proc_handler(
     int pos = 0;
     int to_copy = 0;
     int* pc_type = ctl->extra1;
-#if defined(HAVE_PROC_HANDLER_PPOS_ARG) || defined(HAVE_PROC_HANDLER_SIX_ARG)
+#if defined(HAVE_PROC_HANDLER_PPOS_ARG) || defined(HAVE_PROC_HANDLER_FILE_ARG)
     loff_t *offset = ppos;
 #else
     loff_t *offset = &filp->f_pos;
