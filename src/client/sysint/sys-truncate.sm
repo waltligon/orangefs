@@ -153,7 +153,7 @@ PVFS_error PVFS_isys_truncate(
         sm_p->object_ref,
         PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
         PVFS_TYPE_METAFILE,
-        0);
+        PINT_SM_GETATTR_BYPASS_CACHE);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -312,6 +312,14 @@ static PINT_sm_action truncate_inspect_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* check for write access */
+    js_p->error_code = PINT_check_mode(
+        &sm_p->getattr.attr, sm_p->cred_p->uid, sm_p->cred_p->gid, PINT_ACCESS_WRITABLE);
+    if(js_p->error_code)
+    {
+        return 1;
+    }
 
     /* determine if we need to unstuff or not to service this request */
     if(unstuff_needed(

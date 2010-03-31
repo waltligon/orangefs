@@ -102,8 +102,9 @@ enum PVFS_encoding_type
 {
     ENCODING_DIRECT = 1,
     ENCODING_LE_BFIELD = 2,
-    ENCODING_XDR = 3,
+    ENCODING_XDR = 3
 };
+
 /* these values must correspond to the defined encoding types above */
 #define ENCODING_INVALID_MIN                    0
 #define ENCODING_INVALID_MAX                    4
@@ -501,11 +502,12 @@ struct PVFS_mgmt_setparam_value
         char *string_value;
     } u;
 };
+
 encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
 
 enum PVFS_server_mode
 {

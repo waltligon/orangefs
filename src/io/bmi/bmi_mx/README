@@ -67,7 +67,6 @@ The options are:
     BMX_BUFF_NUM                Number of managed buffers
     BMX_DEBUG                   Turn on gossip messages
     BMX_MEM_ACCT                Track memory usage
-    BMX_LOGGING                 Turn on MPE logging
     BMX_SERVER_RXS              Additional rxs for servers
     BMX_TIMEOUT                 Timeout for all MX messages
     BMX_DB_MASK                 Determine which debug messages to print
@@ -116,11 +115,6 @@ track the pre-allocated buffers managed by bmi_mx). It also does not track
 memory allcoated before bmi_mx is started such as during
 BMI_mx_method_addr_lookup().
 
-BMX_LOGGING
-This is not generally recommended. It turns on support for MPE logging but
-it requires modifying the Makefile.in script and re-generating configure.
-Contact help <at> myri.com for assistance.
-
 BMX_SERVER_RXS
 The server will receive messages from unknown peers. This value determines how
 many additional RXs to allocate to handle these messages. The upper-bound
@@ -155,7 +149,8 @@ or
 
 mx://hostname:ep_id
 
-Use the first option if mx_info lists hostname:board and use the second option if mx_info simply shows a hostname.
+Use the first option if mx_info lists hostname:board and use the second option
+if mx_info simply shows a hostname.
 
 ======================
 II. bmi_mx Performance

@@ -802,7 +802,7 @@ static PINT_sm_action create_parent_getattr_inspect(
      * All of the above can be overridden by the distribution itself.
      */
 
-    if(sm_p->u.create.user_requested_num_data_files > 1)
+    if(sm_p->u.create.user_requested_num_data_files > 0)
     {
         /* specified by sys_create caller */
         num_dfiles_requested = sm_p->u.create.user_requested_num_data_files;     

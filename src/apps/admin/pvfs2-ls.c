@@ -33,10 +33,26 @@
 #define MAX_NUM_DIRENTS  60
 
 /*
+  Define the maximum length of a single line of output. This is about the 
+  size of 256 maximum path segments, a file name, and attributes.
+ */
+#define ENTRY_MAX          66560
+
+/*
   arbitrarily restrict the number of paths
   that this ls version can take as arguments
 */
 #define MAX_NUM_PATHS       8
+
+/*
+  Max length of the fully formatted date/time fields
+*/
+#define MAX_TIME_LENGTH    128
+
+/*
+  Length of the formatted date/time for --all-times option
+*/
+#define ALL_TIMES_LENGTH    25
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -52,6 +68,7 @@ struct options
     int list_all;
     int list_no_owner;
     int list_inode;
+    int list_all_times;
     int list_use_si_units;
     char *start[MAX_NUM_PATHS];
     int num_starts;
@@ -77,19 +94,22 @@ static void print_entry(
     PVFS_fs_id fs_id,
     PVFS_sys_attr *attr,
     int attr_error,
-    struct options *opts);
+    struct options *opts,
+    char* entry_buffer);
 
 static int do_list(
     char *full_path,
     char *start,
     int fs_id,
-    struct options *opts);
+    struct options *opts,
+    char *entry_buffer);
 
 static void print_entry_attr(
     PVFS_handle handle,
     char *entry_name,
     PVFS_sys_attr *attr,
-    struct options *opts);
+    struct options *opts,
+    char *entry_buffer);
 
 #define print_dot_and_dot_dot_info_if_required(refn)        \
 do {                                                        \
@@ -107,9 +127,11 @@ do {                                                        \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
-                        refn.fs_id, NULL, 0, opts);         \
+                        refn.fs_id, NULL, 0, opts,          \
+                        entry_buffer);                      \
             print_entry(".. (faked)", refn.handle,          \
-                        refn.fs_id, NULL, 0, opts);         \
+                        refn.fs_id, NULL, 0, opts,          \
+                        entry_buffer);                      \
         }                                                   \
         else {                                              \
             printf(".\n");                                  \
@@ -189,22 +211,24 @@ void print_entry_attr(
     PVFS_handle handle,
     char *entry_name,
     PVFS_sys_attr *attr,
-    struct options *opts)
+    struct options *opts,
+    char *entry_buffer)
 {
-    char buf[128] = {0}, *formatted_size = NULL;
-    char *formatted_owner = NULL, *formatted_group = NULL;
+    char *formatted_size = NULL;
+    char *formatted_owner = NULL, *formatted_group = NULL, *formatted_time = NULL;
     struct group *grp = NULL;
     struct passwd *pwd = NULL;
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
-    time_t mtime;
-    struct tm *time;    
+    time_t mtime, atime, ctime;
+    struct tm *time;
     PVFS_size size = 0;
-    char scratch_owner[16] = {0}, scratch_group[16] = {0};
+    char scratch_owner[16] = {0}, scratch_group[16] = {0}, scratch_time[MAX_TIME_LENGTH] = {0}, scratch_big_time[MAX_TIME_LENGTH] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
     char f_type = '-';
     char group_x_char = '-';
+    int num_bytes = 0;
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -214,8 +238,32 @@ void print_entry_attr(
     {
         return;
     }
+
     mtime = (time_t)attr->mtime;
     time = localtime(&mtime);
+    if(opts->list_all_times)
+    {
+        atime = (time_t)attr->atime;
+        ctime = (time_t)attr->ctime;
+
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%F %H:%M:%S %z",time );
+        strncpy(scratch_big_time,scratch_time,num_bytes);
+
+        time = localtime(&atime);
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+        strncat(scratch_big_time,scratch_time,num_bytes);
+
+        time = localtime(&ctime);
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+        strncat(scratch_big_time,scratch_time,num_bytes);
+
+        format_size_string(scratch_big_time,strlen(scratch_big_time),&formatted_time,0,1);
+    }
+    else
+    {
+        strftime( scratch_time,17,"%F %H:%M",time );
+        format_size_string(scratch_time,16,&formatted_time,0,1);
+    }
 
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
@@ -302,8 +350,8 @@ void print_entry_attr(
         group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
     }
 
-    snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
-             "%.4d-%.2d-%.2d %.2d:%.2d %s",
+    snprintf(entry_buffer,ENTRY_MAX,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+             "%s %s",
              inode,
              f_type,
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -318,11 +366,7 @@ void print_entry_attr(
              formatted_owner,
              formatted_group,
              formatted_size,
-             (time->tm_year + 1900),
-             (time->tm_mon + 1),
-             time->tm_mday,
-             (time->tm_hour),
-             (time->tm_min),
+             formatted_time,
              entry_name);
 
     if (formatted_size)
@@ -337,6 +381,10 @@ void print_entry_attr(
     {
         free(formatted_group);
     }
+    if (formatted_time)
+    {
+        free(formatted_time);
+    }
 
     if (attr->objtype == PVFS_TYPE_SYMLINK)
     {
@@ -344,16 +392,16 @@ void print_entry_attr(
 
         if (opts->list_long)
         {
-            printf("%s -> %s\n", buf, attr->link_target);
+            printf("%s -> %s\n", entry_buffer, attr->link_target);
         }
         else
         {
-            printf("%s\n",buf);
+            printf("%s\n",entry_buffer);
         }
     }
     else
     {
-        printf("%s\n",buf);
+        printf("%s\n",entry_buffer);
     }
 }
 
@@ -363,7 +411,8 @@ void print_entry(
     PVFS_fs_id fs_id,
     PVFS_sys_attr *attr,
     int attr_error,
-    struct options *opts)
+    struct options *opts,
+    char *entry_buffer)
 {
     int ret = -1;
     PVFS_object_ref ref;
@@ -405,11 +454,11 @@ void print_entry(
                 PVFS_perror("Getattr failure", ret);
                 return;
             }
-            print_entry_attr(handle, entry_name,  &getattr_response.attr, opts);
+            print_entry_attr(handle, entry_name,  &getattr_response.attr, opts, entry_buffer);
         }
         else
         {
-            print_entry_attr(handle, entry_name, attr, opts);
+            print_entry_attr(handle, entry_name, attr, opts, entry_buffer);
         }
     }
 }
@@ -425,7 +474,8 @@ int do_list(
     char *full_path,
     char *start,
     int fs_id,
-    struct options *opts)
+    struct options *opts,
+    char *entry_buffer)
 {
     int i = 0, printed_dot_info = 0;
     int ret = -1;
@@ -494,14 +544,14 @@ int do_list(
             if (opts->list_long)
             {
                 print_entry_attr(ref.handle, segment,
-                                 &getattr_response.attr, opts);
+                                 &getattr_response.attr, opts, entry_buffer);
             }
             else
             {
                 print_entry(segment, ref.handle, ref.fs_id, 
                         NULL,
                         0,
-                        opts);
+                        opts, entry_buffer);
             }
             return 0;
         }
@@ -558,7 +608,7 @@ int do_list(
             print_entry(cur_file, cur_handle, fs_id,
                     &rdplus_response.attr_array[i],
                     rdplus_response.stat_err_array[i],
-                    opts);
+                    opts, entry_buffer);
 
             PVFS_sys_attr *attr = &rdplus_response.attr_array[i];
             if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
@@ -639,7 +689,7 @@ int do_list(
         while(current)
         {
             printf("\n");
-            do_list(full_path,current->path,fs_id,opts);
+            do_list(full_path,current->path,fs_id,opts,entry_buffer);
             current = current->next;
             free(head->path);
             free(head);
@@ -675,6 +725,7 @@ static struct options* parse_args(int argc, char* argv[])
         {"all",0,0,0},
         {"inode",0,0,0},
         {"size",0,0,0},
+        {"all-times",0,0,0},
         {0,0,0,0}
     };
 
@@ -744,6 +795,10 @@ static struct options* parse_args(int argc, char* argv[])
                 {
                     goto list_inode;
                 }
+                else if (strcmp("all-times", cur_option) == 0)
+                {
+                    goto list_all_times;
+                }
                 else
                 {
                     usage(argc, argv);
@@ -795,6 +850,9 @@ static struct options* parse_args(int argc, char* argv[])
           list_inode:
                 tmp_opts->list_inode = 1;
                 break;
+          list_all_times:
+                tmp_opts->list_all_times = 1;
+                break;
             case 't':
                 do_timing = 1;
                 break;
@@ -844,6 +902,8 @@ static void usage(int argc, char** argv)
             "format\n");
     fprintf(stderr,"  -n, --numeric-uid-gid      like -l, but list "
             "numeric UIDs and GIDs\n");
+    fprintf(stderr,"      --all-times            display atime, mtime,"
+            " and ctime information\n");
     fprintf(stderr,"  -o                         like -l, but do not "
             "list group information\n");
     fprintf(stderr,"      --help                 display this help "
@@ -866,9 +926,9 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
     int found_one = 0;
+    char *entry_buffer = malloc(ENTRY_MAX);
 
     process_name = argv[0];
-
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
@@ -959,7 +1019,7 @@ int main(int argc, char **argv)
         }
         else /* Root directory case has nothing to match */
         {
-            substr = &user_opts->start[i][strlen(user_opts->start[i])-1];
+            substr = &user_opts->start[i][strlen(user_opts->start[i])];
         }
 
         while ((index != substr) && (substr != NULL))
@@ -969,7 +1029,7 @@ int main(int argc, char **argv)
         }
         user_opts->start[i][j] = '\0';
 
-        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts);
+        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts, entry_buffer);
 
         if (user_opts->num_starts > 1)
         {
@@ -979,6 +1039,7 @@ int main(int argc, char **argv)
 
     PVFS_sys_finalize();
     free(user_opts);
+    free(entry_buffer);
 
     return(ret);
 }

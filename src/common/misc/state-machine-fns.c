@@ -430,7 +430,6 @@ static int PINT_smcb_mgmt_op(struct PINT_smcb *smcb)
 static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
 {
     return smcb->op == PVFS_SERVER_GET_CONFIG 
-        || smcb->op == PVFS_SERVER_FETCH_CONFIG
         || smcb->op == PVFS_CLIENT_JOB_TIMER 
         || smcb->op == PVFS_CLIENT_PERF_COUNT_TIMER 
         || smcb->op == PVFS_DEV_UNEXPECTED;

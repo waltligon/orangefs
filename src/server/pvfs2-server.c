@@ -19,7 +19,11 @@
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
+
+#ifndef __USE_GNU
 #define __USE_GNU
+#endif
+
 #include <ucontext.h>
 #endif
 
@@ -228,12 +232,9 @@ int main(int argc, char **argv)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: Server aborting.\n");
-        free(s_server_options.server_alias);
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
-
-    free(s_server_options.server_alias);
 
     server_status_flag |= SERVER_CONFIG_INIT;
 
@@ -1443,6 +1444,8 @@ static int server_shutdown(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "*** server shutdown in progress ***\n");
 
+    free(s_server_options.server_alias);
+
     if (status & SERVER_PRECREATE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting precreate pool "
@@ -2353,6 +2356,7 @@ static int precreate_pool_initialize(int server_index)
         job_precreate_pool_set_index(server_index);
 
         cur_f = PINT_llist_next(cur_f);
+        free(addr_array); // local variable, malloc'd above to get BMI addrs
 
     }
 

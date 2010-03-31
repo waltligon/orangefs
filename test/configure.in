@@ -51,6 +51,7 @@ AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
 AC_CHECK_HEADERS(openssl/evp.h)
 AC_CHECK_HEADERS(openssl/crypto.h)
+AC_CHECK_HEADERS(zlib.h)
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
 dnl check if it is an Intel compiler; those lie and claim to be gcc but are
@@ -83,6 +84,17 @@ AC_ARG_WITH(efence,
 	fi
 	AC_CHECK_LIB(efence,malloc)
 )
+
+AC_ARG_WITH(zlib,
+[  --with-zlib=<path>      Use zlib for checksums.],
+        if test x$withval != xyes ; then
+                LDFLAGS="${LDFLAGS} -L$withval"
+        fi
+)
+AC_CHECK_LIB(z, adler32, [
+        LIBS="${LIBS} -lz"
+        AC_DEFINE(HAVE_LIBZ, 1, Define if libz exists)
+])
 
 AC_ARG_WITH(mpi, 
 [  --with-mpi=<dir>        Location of the MPI installation],
@@ -156,7 +168,7 @@ AC_CHECK_HEADER(pvfs2-config.h, ,
 
 dnl ask pvfs2-config to tell us what libraries to use for client and server
 dnl tests
-LIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`
+LIBS="${LIBS} `/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`"
 SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --serverlibs`
 PVFS2_TOP_PREFIX=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --prefix`
 AC_SUBST(SERVERLIBS)
