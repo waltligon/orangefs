@@ -25,6 +25,8 @@ struct ZoidServerMethodData
     void* tmp_buffer; /* Used with BMI_EXT_ALLOC to store the address of the
 			 temporary shared memory buffer, NULL otherwise.  */
     int zoid_buf_id; /* 0 if the operation has not yet been sent to ZOID.  */
+    pthread_mutex_t post_mutex; /* Used to resolve the race between a post
+				   call and testcontext.  */
 };
 
 /* Describes a request with BMI_EXT_ALLOC pending for a temporary memory
@@ -684,7 +686,16 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 		    assert(i == index);
 	    }
 	    else /* testcontext */
+	    {
+		/* Make sure the returned method_op is fully initialized.
+		   Only an issue for testcontext, since other test calls
+		   require bmi_op_id_t, which implies full initialization.  */
+		pthread_mutex_lock(&((struct ZoidServerMethodData*)op->
+				     method_data)->post_mutex);
+		pthread_mutex_unlock(&((struct ZoidServerMethodData*)op->
+				       method_data)->post_mutex);
 		id_array[i] = resp_list[i].bmi_id;
+	    }
 
 	    if (resp_list[i].length < 0) /* Most likely BMI_ECANCEL */
 	    {
@@ -1143,10 +1154,21 @@ send_post_cmd(method_op_p op)
 	    cmd->buf.list[i].size = op->size_list[i];
 	}
 
+    /* The moment the command is written below, we can get a completion of
+       this request on another thread that is waiting in testcontext.  That
+       thread will release method_op_p, resulting in us accessing free memory.
+       This mutex prevents that.  */
+    pthread_mutex_init(&((struct ZoidServerMethodData*)op->method_data)->
+		       post_mutex, NULL);
+    pthread_mutex_lock(&((struct ZoidServerMethodData*)op->method_data)->
+		       post_mutex);
+
     if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
 	socket_write(zoid_fd, cmd, cmd_len) != cmd_len)
     {
 	perror("write");
+	pthread_mutex_unlock(&((struct ZoidServerMethodData*)op->method_data)->
+			     post_mutex);
 	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
@@ -1154,6 +1176,8 @@ send_post_cmd(method_op_p op)
     if (socket_read(zoid_fd, &resp, sizeof(resp)) != sizeof(resp))
     {
 	perror("read");
+	pthread_mutex_unlock(&((struct ZoidServerMethodData*)op->method_data)->
+			     post_mutex);
 	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
@@ -1161,9 +1185,16 @@ send_post_cmd(method_op_p op)
     release_zoid_socket(zoid_release);
 
     if (!resp.zoid_id)
+    {
+	pthread_mutex_unlock(&((struct ZoidServerMethodData*)op->method_data)->
+			     post_mutex);
 	return -BMI_ENOMEM;
+    }
 
     ((struct ZoidServerMethodData*)op->method_data)->zoid_buf_id = resp.zoid_id;
+
+    pthread_mutex_unlock(&((struct ZoidServerMethodData*)op->method_data)->
+			 post_mutex);
 
     return 0;
 }
