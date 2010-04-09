@@ -113,6 +113,9 @@ int main(int argc, char **argv)
         }
 
         PVFS_util_gen_credentials(&credentials);
+        credentials.uid = 0;
+        credentials.gid = 0;
+
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
@@ -126,8 +129,8 @@ int main(int argc, char **argv)
 
         /* Set attributes */
         memset(&attr, 0, sizeof(PVFS_sys_attr));
-        attr.owner = credentials.uid;
-        attr.group = credentials.gid;
+        attr.owner = 0;
+        attr.group = 0;
         attr.perms = 0777;
         attr.atime = time(NULL);
         attr.mtime = attr.atime;

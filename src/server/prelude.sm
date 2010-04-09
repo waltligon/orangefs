@@ -393,6 +393,11 @@ static PINT_sm_action prelude_perm_check(
                     s_op->req->u.mkdir.attr.owner = translated_uid;
                     s_op->req->u.mkdir.attr.group = translated_gid;
                 }
+                else if (s_op->req->op == PVFS_SERV_CREATE)
+                {
+                    s_op->req->u.create.attr.owner = translated_uid;
+                    s_op->req->u.create.attr.group = translated_gid;
+                }
             }
        }
     }
