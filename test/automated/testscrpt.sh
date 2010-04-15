@@ -13,8 +13,8 @@ export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
 # look for a 'nightly-test.cfg' in the same directory as this script
-if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
-	. $(cd `dirname $0`; pwd)/nightly-tests.cfg
+if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
+	. /tmp/$USER/nightly-tests.cfg
 fi
 
 
