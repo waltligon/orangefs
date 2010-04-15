@@ -643,6 +643,7 @@ BUILD_VIS
 GOSSIP_ENABLE_BACKTRACE
 SERVER_LDFLAGS
 CUDA_LIBDIR
+CUDA_SDK_INCDIR
 CUDA_INCDIR
 BUILD_CUDA
 PORTALS_LIBS
@@ -822,6 +823,7 @@ with_portals
 with_portals_includes
 with_portals_libs
 with_cuda
+with_cuda_sdk
 with_cuda_includes
 with_cuda_libs
 enable_static_server
@@ -1533,6 +1535,7 @@ Optional Packages:
   --with-portals-libs=<dir>
                           Extra LIBS to link Portals libraries
   --with-cuda=<dir>         Location of the CUDA install (default no CUDA)
+  --with-cuda-sdk=<dir>         Location of the CUDA SDK install (default no CUDA)
   --with-cuda-includes=<dir>
                           Location of the MX includes
   --with-cuda-libs=<dir>    Location of the CUDA libraries
@@ -17500,6 +17503,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
                     cuda_home=
+    cuda_sdk_home=
 
 # Check whether --with-cuda was given.
 if test "${with_cuda+set}" = set; then
@@ -17509,6 +17513,19 @@ $as_echo "$as_me: error: Option --with-cuda requires the path to the CUDA instal
    { (exit 1); exit 1; }; }
 	elif test "$withval" != no ; then
 	    cuda_home="$withval"
+	fi
+
+fi
+
+
+# Check whether --with-cuda-sdk was given.
+if test "${with_cuda_sdk+set}" = set; then
+  withval=$with_cuda_sdk; if test -z "$withval" -o "$withval" = yes ; then
+	    { { $as_echo "$as_me:$LINENO: error: Option --with-cuda-sdk requires the path to the CUDA install." >&5
+$as_echo "$as_me: error: Option --with-cuda-sdk requires the path to the CUDA install." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    cuda_sdk_home="$withval"
 	fi
 
 fi
@@ -17549,16 +17566,25 @@ fi
 		CUDA_LIBDIR=$cuda_home/lib
 	    fi
 	fi
-	if test "x$NVCC" = "x"; then
+        NVCC=$cuda_home/bin/nvcc
+		if test "x$NVCC" = "x"; then
 	   { { $as_echo "$as_me:$LINENO: error: no" >&5
 $as_echo "$as_me: error: no" >&2;}
    { (exit 1); exit 1; }; }
 	fi
-
     fi
-        if test -n "$CUDA_INCDIR$CUDA_LIBDIR" ; then
+    if test -n "$cuda_sdk_home" ; then
+	if test -z "$CUDA_SDK_INCDIR"; then
+	    CUDA_SDK_INCDIR=$cuda_sdk_home/common/inc
+	fi
+	if test -z "$CUDA_SDK_LIBDIR"; then
+	    CUDA_SDK_LIBDIR=$cuda_sdk_home/lib
+	    CUDA_LIBDIR="$CUDA_LIBDIR -L$CUDA_SDK_LIBDIR"
+	fi
+    fi
+        if test -n "$CUDA_INCDIR$CUDA_LIBDIR$CUDA_SDK_INCDIR$CUDA_SDK_LIBDIR" ; then
 	save_cflags="$CFLAGS"
-	CFLAGS="$CFLAGS -I$CUDA_INCDIR"
+	CFLAGS="$CFLAGS -I$CUDA_INCDIR -I$CUDA_SDK_INCDIR"
 			BUILD_CUDA=1
 	CFLAGS="$save_cflags"
     fi
@@ -17566,18 +17592,8 @@ $as_echo "$as_me: error: no" >&2;}
 
 
 
-    if test -n "$BUILD_CUDA" ; then
-                save_ldflags="$LDFLAGS"
-        LDFLAGS="-L$CUDA_LIBDIR $LDFLAGS"
-	save_libs="$LIBS"
-	LIBS="-lcudart -lcutil $LIBS"
-        save_cflags="$CFLAGS"
-        CFLAGS="$CFLAGS -I$CUDA_INCDIR"
 
-        LDFLAGS="$save_ldflags"
-        CFLAGS="$save_cflags"
-        LIBS="$save_libs"
-    fi
+
 
 
 { $as_echo "$as_me:$LINENO: checking for fgetxattr extra arguments" >&5

@@ -84,7 +84,6 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
-BUILD_CUDA = @BUILD_CUDA@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -174,7 +173,7 @@ endif
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@
-NVCC = @NVCC@
+#NVCC = @NVCC@
 LD = @CC@
 BUILD_CC = @BUILD_CC@
 BUILD_CUDA = @BUILD_CUDA@
@@ -183,7 +182,7 @@ BUILD_CFLAGS = @BUILD_CFLAGS@
 BUILD_LDFLAGS = @BUILD_LDFLAGS@
 # make sure the srcdir include gets included first
 CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
-CUDAFLAGS = --compiler-options -fno-strict-aliasing -I@CUDA_INCDIR$
+CUDAFLAGS = --compiler-options -fno-strict-aliasing
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += -lm @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
@@ -370,13 +369,14 @@ endif
 # enable CUDA if configure detected it
 
 ifdef BUILD_CUDA
-    # other settings in bmi_mx/module.mk.in
-    CFLAGS += -I$CUDA_INCDIR$
+    # other settings in server/*.cu
+    CFLAGS += -I@CUDA_INCDIR@ -I@CUDA_SDK_INCDIR@
     CUDALIBS := -L@CUDA_LIBDIR@ -lcudart -lcutil
     LIBS += $(CUDALIBS)
     DEPLIBS += $(CUDALIBS)
     LIBS_THREADED += $(CUDALIBS)
     SERVERLIBS += $(CUDALIBS)
+    #NVCC = @cuda_home@/bin/nvcc
 endif
 
 #####################################
@@ -433,9 +433,9 @@ endif
 
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
-ifndef BUILD_CUDA # sson
+ifndef BUILD_CUDA 
 CFLAGS += $(GCC_CFLAGS) 
-endif # sson
+endif
 endif
 ifdef INTELC
 CFLAGS += $(INTEL_CFLAGS)
@@ -816,7 +816,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 # default rule for building CUDA objects 
 %.o: %.cu
 	$(Q) "  NVCC		$@"
-	$(E)$(NVCC) $(CUDAFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E)$(NVCC) $(CUDAFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 
 # rule for building shared objects 
 %.po: %.c

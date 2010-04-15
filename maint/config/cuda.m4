@@ -12,12 +12,21 @@ AC_DEFUN([AX_CUDA],
     dnl    --with-cuda-includes=<dir>/include
     dnl    --with-cuda-libs=<dir>/lib  (or lib64 if that exists)
     cuda_home=
+    cuda_sdk_home=
     AC_ARG_WITH(cuda,
 [  --with-cuda=<dir>         Location of the CUDA install (default no CUDA)],
 	if test -z "$withval" -o "$withval" = yes ; then
 	    AC_MSG_ERROR([Option --with-cuda requires the path to the CUDA install.])
 	elif test "$withval" != no ; then
 	    cuda_home="$withval"
+	fi
+    )
+    AC_ARG_WITH(cuda-sdk,
+[  --with-cuda-sdk=<dir>         Location of the CUDA SDK install (default no CUDA)],
+	if test -z "$withval" -o "$withval" = yes ; then
+	    AC_MSG_ERROR([Option --with-cuda-sdk requires the path to the CUDA install.])
+	elif test "$withval" != no ; then
+	    cuda_sdk_home="$withval"
 	fi
     )
     AC_ARG_WITH(cuda-includes,
@@ -49,15 +58,25 @@ AC_DEFUN([AX_CUDA],
 		CUDA_LIBDIR=$cuda_home/lib
 	    fi
 	fi
+        NVCC=$cuda_home/bin/nvcc
+	dnl AC_MSG_ERROR($NVCC)
 	if test "x$NVCC" = "x"; then
 	   AC_MSG_ERROR(no)
 	fi
-
+    fi
+    if test -n "$cuda_sdk_home" ; then
+	if test -z "$CUDA_SDK_INCDIR"; then
+	    CUDA_SDK_INCDIR=$cuda_sdk_home/common/inc
+	fi
+	if test -z "$CUDA_SDK_LIBDIR"; then
+	    CUDA_SDK_LIBDIR=$cuda_sdk_home/lib
+	    CUDA_LIBDIR="$CUDA_LIBDIR -L$CUDA_SDK_LIBDIR"
+	fi
     fi
     dnl If anything CUDA-ish was set, go look for header.
-    if test -n "$CUDA_INCDIR$CUDA_LIBDIR" ; then
+    if test -n "$CUDA_INCDIR$CUDA_LIBDIR$CUDA_SDK_INCDIR$CUDA_SDK_LIBDIR" ; then
 	save_cflags="$CFLAGS"
-	CFLAGS="$CFLAGS -I$CUDA_INCDIR"
+	CFLAGS="$CFLAGS -I$CUDA_INCDIR -I$CUDA_SDK_INCDIR"
 dnl	AC_CHECK_HEADER(myriexpress.h,,
 dnl			AC_MSG_ERROR([Header myriexpress.h not found.]))
 	dnl Run test is not possible on a machine that does not have a MX NIC.
@@ -72,21 +91,22 @@ dnl	fi
     fi
     AC_SUBST(BUILD_CUDA)
     AC_SUBST(CUDA_INCDIR)
+    AC_SUBST(CUDA_SDK_INCDIR)
     AC_SUBST(CUDA_LIBDIR)
 
-    if test -n "$BUILD_CUDA" ; then
+    dnl if test -n "$BUILD_CUDA" ; then
         dnl Check for existence of mx_decompose_endpoint_addr2
-        save_ldflags="$LDFLAGS"
-        LDFLAGS="-L$CUDA_LIBDIR $LDFLAGS"
-	save_libs="$LIBS"
-	LIBS="-lcudart -lcutil $LIBS"
-        save_cflags="$CFLAGS"
-        CFLAGS="$CFLAGS -I$CUDA_INCDIR"
+        dnl save_ldflags="$LDFLAGS"
+        dnl LDFLAGS="-L$CUDA_LIBDIR $LDFLAGS"
+	dnl save_libs="$LIBS"
+	dnl LIBS="-lcudart -lcutil $LIBS"
+        dnl save_cflags="$CFLAGS"
+        dnl CFLAGS="$CFLAGS -I$CUDA_INCDIR"
 
-        LDFLAGS="$save_ldflags"
-        CFLAGS="$save_cflags"
-        LIBS="$save_libs"
-    fi
+        dnl LDFLAGS="$save_ldflags"
+        dnl CFLAGS="$save_cflags"
+        dnl LIBS="$save_libs"
+    dnl fi
 ])
 
 dnl vim: set ft=config :
