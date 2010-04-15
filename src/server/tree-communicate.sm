@@ -422,6 +422,11 @@ static int tree_remove_work_cleanup(
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
         }
 
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:frame #%d \ttype:%s \terror_code:%d\n"
+                                        ,__func__
+                                        ,i
+                                        ,(task_id==LOCAL_OPERATION ? "LOCAL" : "REMOTE")
+                                        ,error_code);
         /*retain first error encountered.*/
         if (error_code && !return_error_code)
             return_error_code = error_code;
