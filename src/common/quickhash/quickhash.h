@@ -341,6 +341,13 @@ static inline int quickhash_string_hash(void *k, int table_size)
     return (int)(h & ((uint64_t)(table_size - 1)));
 }
 
+/* used for cases where we the key is already in good shape for hashing */ 
+static inline int quickhash_null32_hash(void *k, int table_size)
+{
+    uint32_t *tmp = k;
+    return(int)(*tmp & (table_size - 1));
+}
+
 #endif /* QUICKHASH_H */
 
 /*

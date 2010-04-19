@@ -103,7 +103,7 @@ typedef struct qlist_head list_t;       /* easier to type */
 /* BMX [UN]EXPECTED msgs use the 64-bits of the match info as follows:
  *    Bits      Description
  *    60-63     Msg type
- *    52-59     Reserved
+ *    52-59     Msg class
  *    32-51     Peer id (of the sender, assigned by receiver)
  *     0-31     bmi_msg_tag_t
  */
@@ -117,9 +117,11 @@ typedef struct qlist_head list_t;       /* easier to type */
  */
 
 #define BMX_MSG_SHIFT   60
+#define BMX_CLASS_SHIFT 52
 #define BMX_ID_SHIFT    32
 #define BMX_MASK_ALL    (~0ULL)
 #define BMX_MASK_MSG    (0xFULL << BMX_MSG_SHIFT)
+#define BMX_MASK_MSG_AND_CLASS    (0xFFFULL << BMX_CLASS_SHIFT)
 
 #define BMX_MAX_PEER_ID ((1<<20) - 1)   /* 20 bits - actually 1,048,574 peers
                                            1 to 1,048,575 */
@@ -267,6 +269,7 @@ struct bmx_ctx
         struct method_op   *mxc_mop;        /* method op */
         struct bmx_peer    *mxc_peer;       /* owning peer */
         bmi_msg_tag_t       mxc_tag;        /* BMI tag (int32_t) */
+        uint8_t             mxc_class;      /* BMI unexpected msg class */
         uint64_t            mxc_match;      /* match info */
 
         mx_segment_t        mxc_seg;        /* local MX segment */

@@ -100,6 +100,7 @@ struct bmi_method_addr *bmi_alloc_method_addr(int method_type,
     }
     memset(my_method_addr, 0, (ssize + payload_size));
     my_method_addr->method_type = method_type;
+    my_method_addr->ref_count = 1;
 
     my_method_addr->method_data = (char *) my_method_addr + ssize;
 
