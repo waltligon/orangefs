@@ -296,7 +296,7 @@ BMI_zoid_server_unexpected_free(void* buffer)
 int
 BMI_zoid_server_testunexpected(int incount, int* outcount,
 			       struct bmi_method_unexpected_info* info,
-			       int max_idle_time_ms)
+			       uint8_t class, int max_idle_time_ms)
 {
     int zoid_fd, zoid_release;
     int hdr;
@@ -310,6 +310,7 @@ BMI_zoid_server_testunexpected(int incount, int* outcount,
 
     hdr = ZBMI_CONTROL_UNEXP_TEST;
     cmd.incount = incount;
+    cmd.class = class;
     cmd.max_idle_time_ms = max_idle_time_ms;
 
     if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||

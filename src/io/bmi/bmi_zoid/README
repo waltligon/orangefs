@@ -56,7 +56,12 @@ Additional considerations for the users of this method:
 - make sure to use a long timeout for BMI test routines, especially those
   invoked on the client side, as each such call will result in a
   communication with the I/O node (10ms is *way* too short, 1000ms is pretty
-  short too).
+  short too),
+
+- to reduce the number of round-trip messages from the compute nodes,
+  client-side message post routines can optionally wait (with a timeout)
+  and thus increase a chance of an immediate completion.  Use
+  BMI_set_info(BMI_ZOID_POST_TIMEOUT, <timeout_ms>) to enable this feature.
 
 
 ADDRESS FORMAT
@@ -111,7 +116,9 @@ messages if a matching receive has not been posted on the I/O node side by
 the time zbmi_send is invoked.  Either failure is recoverable; the send
 request is put in the "zoid_ops" queue for another attempt later.  For
 expected messages, if a matching receive has been posted, the call succeeds
-resulting in an immediate completion.
+resulting in an immediate completion.  zbmi_send normally does not block,
+but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
+matching expected message post from the BMI server side.
 
 The way zbmi_send is forwarded by ZOID, the data payload is only
 transferred to the I/O nodes if there is memory buffer there for the
@@ -123,7 +130,9 @@ routine attempts to receive a message waiting in the zbmi plugin, using
 zbmi_recv.  If a matching message has been posted on the I/O node side, it
 is sent to the compute node and zbmi_recv returns 1, resulting in an
 immediate completion.  Otherwise, the receive request is put in the
-"zoid_ops" queue for another attempt later.
+"zoid_ops" queue for another attempt later.  zbmi_recv normally does not
+block, but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
+matching expected message post from the BMI server side.
 
 BMI_cancel is very easy to implement thanks to a lack of multi-threading
 considerations and because the state is stored on the client-side only: we
@@ -137,13 +146,13 @@ were it not for the fact that we don't deal with multi-threading.  Anyway,
 the routine needs to treat canceled requests specially -- those won't be
 sent to the server anymore.  For non-canceled requests, it extracts the
 message tag, size, and send/recv indicator and forwards those to the server
-using zbmi_test.  zbmi_test is the only blocking call of the three; it can
-block on the server for the specified time if none of the specified
-requests is initially ready.  zbmi_test returns the number of ready
-requests; if it is non-zero, then zoid_test_common next attempts to satisfy
-those requests by invoking zbmi_send/zbmi_recv.  Those send/recv routines
-could still fail in spite of a successful test, if there is no memory, or
-if the server-side canceled its matching request; this is recoverable.
+using zbmi_test.  zbmi_test can block on the server for the specified time
+if none of the specified requests is initially ready.  zbmi_test returns
+the number of ready requests; if it is non-zero, then zoid_test_common next
+attempts to satisfy those requests by invoking zbmi_send/zbmi_recv.  Those
+send/recv routines could still fail in spite of a successful test, if there
+is no memory, or if the server-side canceled its matching request; this is
+recoverable.
 
 SERVER
 
@@ -200,13 +209,13 @@ plugin.  This is actually similar to what we also do on the client side.
 Those messages come from the "error_ops" queue and we deal with them first,
 since they involve no communication with the zbmi plugin.  Unlike on the
 client side, where the common test routines sort-of "emulated" testcontext
-but first building an array of all pending request ids, on the server side
+by first building an array of all pending request ids, on the server side
 we have a "native" implementation.  Testcontext is recognized by passing an
 "incount" of 0, and we forward it to the zbmi plugin so that it knows to
 return *any* completed request(s).  This is necessary because of
 multi-threading constraints, and it is possible because the zbmi plugin
-does maintain state for server-side requests.  As with the client, the test
-is the only command that can block in the zbmi plugin for the specified
+does maintain state for server-side requests.  The test is the only
+server-side command that can block in the zbmi plugin for the specified
 time period if no request is initially completed.  Completed requests
 require no further handling, with the exceptions of those that used
 temporary shared memory buffer, which needs to be released (after being
