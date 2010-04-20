@@ -60,7 +60,7 @@ int BMI_post_sendunexpected_class(bmi_op_id_t * id,
 			    bmi_size_t size,
 			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
-                            uint8_t class,
+                            uint8_t msg_class,
 			    void *user_ptr,
 			    bmi_context_id context_id,
                             bmi_hint hints);
@@ -99,7 +99,7 @@ int BMI_testsome(int incount,
 int BMI_testunexpected_class(int incount,
 		       int *outcount,
 		       struct BMI_unexpected_info *info_array,
-                       uint8_t class,
+                       uint8_t msg_class,
 		       int max_idle_time_ms);
 #define BMI_testunexpected(__incount, __outcount, __info_array, __max_idle_time_ms) \
 BMI_testunexpected_class(__incount, __outcount, __info_array, 0, __max_idle_time_ms)
@@ -181,7 +181,7 @@ int BMI_post_sendunexpected_list_class(bmi_op_id_t * id,
 				 bmi_size_t total_size,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
-                                 uint8_t class,
+                                 uint8_t msg_class,
 				 void *user_ptr,
 				 bmi_context_id context_id,
                                  bmi_hint hints);
