@@ -34,6 +34,7 @@
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_logstamp);
+static DOTCONF_CB(get_storage_path);
 static DOTCONF_CB(get_data_path);
 static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
@@ -550,6 +551,27 @@ static const configoption_t options[] =
      */
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
+
+    /* DEPRECATED 
+     * Specifies the local path for the pvfs2 server to use as 
+     * storage space for data files and metadata files. This option should not
+     * be used in conjuction with DataStorageSpace or MetadataStorageSpace. 
+     * This option is only meant as a migration path for configurations where i
+     * users do not want (or don't expect to need to) modify their configuration
+     * to run this version.
+     *
+     * This option specifies the default path for all servers and will appear 
+     * in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * StorageSpace /tmp/pvfs-data.storage
+     * DEPRECATED.
+     */
+    {"StorageSpace",ARG_STR, get_storage_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
     /* Specifies the local path for the pvfs2 server to use as storage space 
      * for data files. This option specifies the default path for all servers 
@@ -1156,6 +1178,33 @@ DOTCONF_CB(get_logstamp)
 }
 
 
+DOTCONF_CB(get_storage_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+
+    if( config_s->data_path )
+    {
+        free(config_s->data_path);
+    }
+
+    if( config_s->meta_path )
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
 DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
@@ -1169,6 +1218,7 @@ DOTCONF_CB(get_data_path)
     {
         free(config_s->data_path);
     }
+
     config_s->data_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
@@ -1187,6 +1237,7 @@ DOTCONF_CB(get_meta_path)
     {
         free(config_s->meta_path);
     }
+
     config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
