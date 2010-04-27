@@ -305,6 +305,12 @@ zoid_test_common(int incount, bmi_op_id_t* id_array, int outcount_max,
 	    incount_fwd++;
 	}
 
+	/* If we have canceled messages, then we don't need to wait.  We
+	   still check with the server to find about ready messages, but
+	   that's it.  */
+	if (canceled > 0)
+	    max_idle_time_ms = 0;
+
 	ret = zbmi_test(tags, ops, unexp_sizes, incount_fwd, ready,
 			max_idle_time_ms);
 	if ((err = __zoid_error()))

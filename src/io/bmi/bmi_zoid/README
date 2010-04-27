@@ -158,25 +158,25 @@ SERVER
 
 The communication between the I/O node BMI server and the zbmi plugin of
 the ZOID daemon is carried across two channels.  Commands are sent via a
-unix domain socket (zbmi plugin is the server; multiple threads of the BMI
-server can communicate simultaneously by opening multiple connections to
-the socket).  Payload is exchanged using a large shared memory segment,
+POSIX message queue (zbmi plugin is the server; multiple threads of the BMI
+server can communicate simultaneously by opening multiple reply queues to
+the server).  Payload is exchanged using a large shared memory segment,
 allocated by the zbmi plugin.  We make efforts to avoid unnecessary copies
 to/from that segment, so BMI_memalloc() on the BMI server side allocates
 from that segment, and ZOID-forwarded zbmi_send/recv calls store their
 buffers directly into the segment.
 
 The shared memory segment is split in two: a normally smaller region is
-used for unexpected messages and is managed by the zbmi plugin, wile a
+used for unexpected messages and is managed by the zbmi plugin, while a
 larger region is used for expected messages and is managed by the BMI
 server.
 
 The communication with the zbmi plugin is established during
-BMI_initialize, and terminated during BMI_finalize.  The stream protocol is
+BMI_initialize, and terminated during BMI_finalize.  The message protocol is
 documented in zbmi's zbmi_protocol.h.
 
 For BMI testunexpected, we communicate the metadata on the pending received
-messages via the socket, and the payload is in the shared memory buffer
+messages via the queue, and the payload is in the shared memory buffer
 which is returned to the user.  unexpected_free just sends the buffer
 address back to the zbmi plugin, since the unexpected messages memory pool
 is managed by the plugin.
@@ -201,7 +201,7 @@ registered message descriptor.  Depending on the progress of the zbmi
 plugin in handing that registered request, the cancellation request might
 be ignored.  An exception is when the request has not been registered
 because of the lack of memory for a temporary buffer as described earlier;
-in that case we cancel it locally and put in in "error_ops" queue.
+in that case we cancel it locally and put it in "error_ops" queue.
 
 When testing (in zoid_server_test_common), we need to deal with locally
 failed/canceled messages separately from the ones registered with the zbmi
