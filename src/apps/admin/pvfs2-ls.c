@@ -962,12 +962,14 @@ int main(int argc, char **argv)
             substr = &user_opts->start[i][strlen(user_opts->start[i])-1];
         }
 
+
         while ((index != substr) && (substr != NULL))
         {
             index++;
             j++;
         }
-        user_opts->start[i][j] = '\0';
+
+        user_opts->start[i][++j] = '\0';
 
         do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts);
 
