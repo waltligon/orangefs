@@ -192,6 +192,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
     }/*end for*/
 
     if (s_op->u.tree_communicate.handle_array_local_count > 0) {
+
        for (i=0; i<s_op->u.tree_communicate.handle_array_local_count; i++)
        {
         /* Create a stack frame for the local operation. */
