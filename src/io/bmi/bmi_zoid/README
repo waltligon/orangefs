@@ -16,7 +16,14 @@ CONFIGURABLE LIMITS
 - ZOID_MAX_EXPECTED_MSG (in zoid.h): defaults to 128M, can be adjusted as
   needed, but is probably already larger than necessary,
 
-- FIXME ZBMI limits
+- ZBMI_SHM_SIZE_TOTAL (in init.c in ZeptoOS
+  packages/zoid/src/zbmi/implementation/ directory): total size of the shared
+  memory buffer used to exchange bulk data between the ZOID daemon and the BMI
+  server; defaults to 512M.
+
+- ZBMI_SHM_SIZE_UNEXP (in init.c in ZeptoOS
+  packages/zoid/src/zbmi/implementation/ directory): part of the shared
+  memory buffer used for unexpected messages; defaults to 1M.
 
 
 LIMITATIONS
@@ -102,15 +109,15 @@ the I/O node is performed using three ZOID-forwarded function calls:
 zbmi_send, zbmi_recv, and zbmi_test.
 
 The zbmi plugin is mostly stateless so far as the compute node clients are
-concerned.  Specifically, the information on posted, but not immediately
-completed expected message sends/receives is stored exclusively on the
-client side.
+concerned.  Specifically, the information on posted expected message
+sends/receives that were not immediately completed is stored exclusively on
+the client side.
 
 All BMI send routines end up in zoid_post_send_common.  That includes
 unexpected messages and list I/O.  This routine attempts to forward the
 message to the zbmi plugin on the I/O node, using zbmi_send.  For
-unexpected messages, zbmi_send is normally expected to succeed and result
-in an immediate completion; however, if the zbmi plugin is out of memory,
+unexpected messages, zbmi_send should normally succeed and result in an
+immediate completion; however, if the zbmi plugin is out of memory,
 zbmi_send will fail with ENOMEM.  The same failure will occur with expected
 messages if a matching receive has not been posted on the I/O node side by
 the time zbmi_send is invoked.  Either failure is recoverable; the send
@@ -118,7 +125,9 @@ request is put in the "zoid_ops" queue for another attempt later.  For
 expected messages, if a matching receive has been posted, the call succeeds
 resulting in an immediate completion.  zbmi_send normally does not block,
 but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
-matching expected message post from the BMI server side.
+matching expected message post from the BMI server side or for memory to be
+released on the BMI server side so that an unexpected message can be
+stored.
 
 The way zbmi_send is forwarded by ZOID, the data payload is only
 transferred to the I/O nodes if there is memory buffer there for the
@@ -148,10 +157,11 @@ sent to the server anymore.  For non-canceled requests, it extracts the
 message tag, size, and send/recv indicator and forwards those to the server
 using zbmi_test.  zbmi_test can block on the server for the specified time
 if none of the specified requests is initially ready.  zbmi_test returns
-the number of ready requests; if it is non-zero, then zoid_test_common next
-attempts to satisfy those requests by invoking zbmi_send/zbmi_recv.  Those
-send/recv routines could still fail in spite of a successful test, if there
-is no memory, or if the server-side canceled its matching request; this is
+the number of ready requests; if it is non-zero, then the server side must
+have posted matching sends/receives, so zoid_test_common next attempts to
+satisfy those "ready" requests by invoking zbmi_send/zbmi_recv.  Those
+send/recv routines could still fail in spite of a successful test if there
+is no memory or if the server side canceled its matching request; this is
 recoverable.
 
 SERVER
@@ -189,11 +199,16 @@ causes an additional copy overhead.  Failures to allocate the temporary
 buffer are recoverable: we place the request in the "no_mem" queue and
 retry the allocation after every BMI_memfree.
 
-Expected server-side posts, be it sends or receives, are never completed
-immediately: we send a message descriptor to the zbmi plugin which
-registers it and just sends back a confirmation.  When registering we
-exchange the internal BMI id and the internal ZOID id, since that
-simplifies subsequent testing/canceling.
+Expected server-side posts, be it sends or receives, can be completed
+immediately if a matching client-side post (or test) is waiting when
+server-side post is issued.  Note that "immediately" is used liberally
+here; the server-side post will not return until the buffer has been
+transferred to/from the compute node, which can take some time when the
+ZOID server is under heavy load.  For posts not completed immediately we
+send a message descriptor to the zbmi plugin which registers the message
+and just sends back a confirmation.  When registering we exchange the
+internal BMI id and the internal ZOID id, since that simplifies subsequent
+testing/canceling.
 
 Canceling messages is more complex than on the client side.  Generally, we
 have to send a cancel request to the zbmi plugin to unregister an already

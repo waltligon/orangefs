@@ -87,7 +87,7 @@ static mqd_t get_zoid_reply_queue(int* queue_id);
 static void release_zoid_reply_queue(int queue_id);
 static bmi_method_addr_p get_client_addr(int zoid_addr);
 static int enqueue_no_mem(method_op_p op, bmi_size_t total_size);
-static int send_post_cmd(method_op_p op);
+static int send_post_cmd(method_op_p op, int not_immediate, int* length);
 
 
 /* These symbols come from external libraries that would need to be linked
@@ -271,7 +271,7 @@ BMI_zoid_server_memfree(void* buffer)
 		no_mem_queue_last = no_mem_queue_last->prev;
 	    free(desc);
 
-	    if ((op->error_code = -send_post_cmd(op)))
+	    if ((op->error_code = -send_post_cmd(op, 1, NULL)))
 	    {
 		gen_mutex_lock(&error_ops_mutex);
 		op_list_add(error_ops, op);
@@ -381,6 +381,7 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 			bmi_context_id context_id, PVFS_hint hints)
 {
     method_op_p new_op;
+    int ret;
 
     /* Server-side sends are never immediate, so we start by allocating a
        method op.  */
@@ -445,7 +446,16 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 	    }
     }
 
-    return send_post_cmd(new_op);
+    if ((ret = send_post_cmd(new_op, 0, NULL)) == 1)
+    {
+	/* Immediate completion.  */
+	if (buffer_type == BMI_EXT_ALLOC)
+	    BMI_zoid_server_memfree(METHOD_DATA(new_op)->tmp_buffer);
+
+	bmi_dealloc_method_op(new_op);
+    }
+
+    return ret;
 }
 
 /* A common receive routine used for all expected messages.  */
@@ -459,6 +469,7 @@ zoid_server_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 			PVFS_hint hints)
 {
     method_op_p new_op;
+    int ret, length;
 
     /* Server-side receives are never immediate, so we start by allocating a
        method op.  */
@@ -515,7 +526,35 @@ zoid_server_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 	    }
     }
 
-    return send_post_cmd(new_op);
+    if ((ret = send_post_cmd(new_op, 0, &length)) == 1)
+    {
+	/* Immediate completion.  */
+	*total_actual_size = length;
+
+	if (buffer_type == BMI_EXT_ALLOC)
+	{
+	    /* Copy the memory back to the user buffer(s).  */
+	    int j, size_remaining = length;
+	    void *buf_cur = METHOD_DATA(new_op)->tmp_buffer;
+	    j = 0;
+	    while (size_remaining > 0)
+	    {
+		int tocopy = (new_op->size_list[j] < size_remaining ?
+			      new_op->size_list[j] : size_remaining);
+
+		memcpy(new_op->buffer_list[j], buf_cur, tocopy);
+		buf_cur += tocopy;
+		size_remaining -= tocopy;
+		j++;
+	    }
+
+	    BMI_zoid_server_memfree(METHOD_DATA(new_op)->tmp_buffer);
+	}
+
+	bmi_dealloc_method_op(new_op);
+    }
+
+    return ret;
 }
 
 /* A common test routine used for all expected messages.  "incount" is 0
@@ -1033,9 +1072,17 @@ enqueue_no_mem(method_op_p op, bmi_size_t total_size)
     return 0;
 }
 
-/* A common internal posting routine for send and receive requests.  */
+/* A common internal posting routine for send and receive requests.
+   "not_immediate" is used for messages triggered from memfree; it is
+   inconvenient at that point for messages to succeed immediately (we
+   would need a separate queue for them).
+   The function returns 0 if posted successfully, 1 for immediate
+   completion, and a negative value if failed.
+   For immediate completions of receives, the length of the received
+   message is stored in *length;
+*/
 static int
-send_post_cmd(method_op_p op)
+send_post_cmd(method_op_p op, int not_immediate, int* length)
 {
     mqd_t reply_queue;
     int queue_id;
@@ -1058,6 +1105,7 @@ send_post_cmd(method_op_p op)
     cmd->command_id = (op->send_recv == BMI_SEND ? ZBMI_CONTROL_POST_SEND :
 	   ZBMI_CONTROL_POST_RECV);
     cmd->queue_id = queue_id;
+    cmd->not_immediate = not_immediate;
     cmd->bmi_id = op->op_id;
     cmd->buf.addr = ((struct zoid_addr*)op->addr->method_data)->pid;
     cmd->buf.tag = op->msg_tag;
@@ -1105,6 +1153,15 @@ send_post_cmd(method_op_p op)
     {
 	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
 	return -BMI_ENOMEM;
+    }
+    else if (resp.zoid_id == -1)
+    {
+	/* Immediate completion.  */
+	assert(!not_immediate);
+	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
+	if (length)
+	    *length = resp.length;
+	return 1;
     }
 
     METHOD_DATA(op)->zoid_buf_id = resp.zoid_id;
