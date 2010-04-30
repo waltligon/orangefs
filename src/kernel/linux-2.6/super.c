@@ -532,7 +532,53 @@ static int pvfs2_statfs(
     return ret;
 }
 
+/* pvfs2_remount_fs()
+ *
+ * remount as initiated by VFS layer.  We just need to reparse the mount
+ * options, no need to signal pvfs2-client-core about it.
+ */
+static int pvfs2_remount_fs(
+    struct super_block *sb,
+    int *flags,
+    char *data)
+{
+    int ret = -EINVAL;
+
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_remount_fs: called\n");
+
+    if (sb && PVFS2_SB(sb))
+    {
+        if (data && data[0] != '\0')
+        {
+            ret = parse_mount_options(data, sb, 1);
+            if (ret)
+            {
+                return ret;
+            }
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
+            /* mark the superblock as whether it supports acl's or not */
+            sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
+                ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
+            sb->s_xattr = pvfs2_xattr_handlers;
+#endif
+            sb->s_flags = ((sb->s_flags & ~MS_NOATIME)  |
+                ((PVFS2_SB(sb)->mnt_options.noatime == 1) ? MS_NOATIME : 0));
+            sb->s_flags = ((sb->s_flags & ~MS_NODIRATIME) |
+                ((PVFS2_SB(sb)->mnt_options.nodiratime == 1) ? MS_NODIRATIME : 0));
+        }
+
+        if (data)
+        {
+            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
+        }
+    }
+    return 0;
+}
+
 /*
+  Remount as initiated by pvfs2-client-core on restart.  This is used to
+  repopulate mount information left from previous pvfs2-client-core.
+
   the idea here is that given a valid superblock, we're
   re-initializing the user space client with the initial mount
   information specified when the super block was first initialized.
@@ -859,7 +905,7 @@ struct super_operations pvfs2_s_ops =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     read_inode : pvfs2_read_inode,
     statfs : pvfs2_statfs,
-    remount_fs : pvfs2_remount,
+    remount_fs : pvfs2_remount_fs,
     put_super : pvfs2_kill_sb,
     dirty_inode : pvfs2_dirty_inode,
     clear_inode: pvfs2_clear_inode,
@@ -878,7 +924,7 @@ struct super_operations pvfs2_s_ops =
     .put_inode = pvfs2_put_inode,
 #endif
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount,
+    .remount_fs = pvfs2_remount_fs,
 #ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
     .find_inode_handle = pvfs2_sb_find_inode_handle,
 #endif
@@ -1213,7 +1259,7 @@ int pvfs2_fill_sb(
 
     sb->s_blocksize = pvfs_bufmap_size_query();
     sb->s_blocksize_bits = pvfs_bufmap_shift_query();
-    sb->s_maxbytes = (unsigned long long) 1 << 63;
+    sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     root_object.handle = PVFS2_SB(sb)->root_handle;
     root_object.fs_id  = PVFS2_SB(sb)->fs_id;
@@ -1402,6 +1448,7 @@ free_op:
 static void pvfs2_flush_sb(
         struct super_block *sb)
 {
+#ifdef HAVE_SB_DIRTY_LIST
     if (!list_empty(&sb->s_dirty))
     {
         struct inode *inode = NULL;
@@ -1410,6 +1457,7 @@ static void pvfs2_flush_sb(
             pvfs2_flush_inode(inode);
         }
     }
+#endif
     return;
 }
 
@@ -1446,8 +1494,6 @@ void pvfs2_kill_sb(
             dput(sb->s_root);
         }
 
-        /* free the pvfs2 superblock private data */
-        kfree(PVFS2_SB(sb));
         {
             int count1, count2;
             count1 = atomic_read(&(PVFS2_SB(sb)->pvfs2_inode_alloc_count));
@@ -1463,6 +1509,8 @@ void pvfs2_kill_sb(
                         count1, count2);
             }
         }
+        /* free the pvfs2 superblock private data */
+        kfree(PVFS2_SB(sb));
 #else
         sb->u.generic_sbp = NULL;
 #endif

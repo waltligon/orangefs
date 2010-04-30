@@ -830,6 +830,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		    decode_free(req->u.create.attr.u.meta.dist);
                 if (req->u.create.layout.server_list.servers)
                     decode_free(req->u.create.layout.server_list.servers);
+                break;
 	    case PVFS_SERV_BATCH_CREATE:
 		decode_free(
                     req->u.batch_create.handle_extent_array.extent_array);

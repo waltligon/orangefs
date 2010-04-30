@@ -70,7 +70,7 @@ struct PVFS_metafile_hint_s
 typedef struct PVFS_metafile_hint_s PVFS_metafile_hint;
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 endecode_fields_1(PVFS_metafile_hint,
-        PVFS_flags, flags)
+        PVFS_flags, flags);
 #endif
 
 /* attributes specific to metadata objects */
@@ -152,7 +152,7 @@ struct PVFS_datafile_attr_s
     PVFS_size size;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
-endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
+endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
 
 /* extended hint attributes for a directory object */
 struct PVFS_directory_hint_s
@@ -176,7 +176,7 @@ endecode_fields_7(PVFS_directory_hint,
         uint32_t, dist_params_len,
         skip4,,
         string, dist_params,
-        uint32_t, dfile_count)
+        uint32_t, dfile_count);
 #endif
 
 /* attributes specific to directory objects */
@@ -209,7 +209,7 @@ endecode_fields_3(
   PVFS_symlink_attr,
   uint32_t, target_path_len,
   skip4,,
-  string, target_path)
+  string, target_path);
 
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr

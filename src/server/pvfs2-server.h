@@ -569,6 +569,8 @@ struct PINT_server_tree_communicate_op
     int num_partitions;
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
+    uint32_t *local_join_size;
+    uint32_t *remote_join_size;
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;

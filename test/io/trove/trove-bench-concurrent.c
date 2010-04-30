@@ -76,11 +76,11 @@ static int do_trove_test(char* dir)
     TROVE_ds_state state_array[concurrent];
     void* user_ptr_array[concurrent];
 
-    ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, 0);
+    ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, dir, 0);
     if(ret < 0)
     {
         /* try to create new storage space */
-        ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, NULL, &op_id);
+        ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, dir, NULL, &op_id);
         if(ret != 1)
         {
             fprintf(stderr, "Error: failed to create storage space at %s\n",
@@ -88,7 +88,7 @@ static int do_trove_test(char* dir)
             return(-1);
         }
         
-        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, 0);
+        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, dir, 0);
         if(ret < 0)
         {
             fprintf(stderr, "Error: failed to initialize.\n");

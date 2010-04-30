@@ -38,40 +38,40 @@
  * expect these noop #defines.
  */
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-#  include "src/proto/endecode-funcs.h"
+#include "src/proto/endecode-funcs.h"
 #else  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 
 /* dummy declarations to turn off functions */
-#define endecode_fields_1(n,t1,x1)
-#define endecode_fields_1_struct(n,t1,x1)
-#define endecode_fields_2(n,t1,x1,t2,x2)
-#define endecode_fields_2_struct(n,t1,x1,t2,x2)
-#define endecode_fields_3(n,t1,x1,t2,x2,t3,x3)
-#define endecode_fields_3_struct(n,t1,x1,t2,x2,t3,x3)
-#define endecode_fields_4(n,t1,x1,t2,x2,t3,x3,t4,x4)
-#define endecode_fields_4_struct(n,t1,x1,t2,x2,t3,x3,t4,x4)
-#define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
-#define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
-#define endecode_fields_6(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6)
-#define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7)
-#define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8)
-#define endecode_fields_9_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9)
-#define endecode_fields_10_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10)
-#define endecode_fields_11_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11)
-#define endecode_fields_12(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12)
+#define endecode_fields_1(n,t1,x1) struct endecode_fake_struct
+#define endecode_fields_1_struct(n,t1,x1) struct endecode_fake_struct
+#define endecode_fields_2(n,t1,x1,t2,x2) struct endecode_fake_struct
+#define endecode_fields_2_struct(n,t1,x1,t2,x2) struct endecode_fake_struct
+#define endecode_fields_3(n,t1,x1,t2,x2,t3,x3) struct endecode_fake_struct
+#define endecode_fields_3_struct(n,t1,x1,t2,x2,t3,x3) struct endecode_fake_struct
+#define endecode_fields_4(n,t1,x1,t2,x2,t3,x3,t4,x4) struct endecode_fake_struct
+#define endecode_fields_4_struct(n,t1,x1,t2,x2,t3,x3,t4,x4) struct endecode_fake_struct
+#define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5) struct endecode_fake_struct
+#define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5) struct endecode_fake_struct
+#define endecode_fields_6(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6) struct endecode_fake_struct
+#define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) struct endecode_fake_struct
+#define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8) struct endecode_fake_struct
+#define endecode_fields_9_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9) struct endecode_fake_struct
+#define endecode_fields_10_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10) struct endecode_fake_struct
+#define endecode_fields_11_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11) struct endecode_fake_struct
+#define endecode_fields_12(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12) struct endecode_fake_struct
 
-#define endecode_fields_1a(n,t1,x1,tn1,n1,ta1,a1)
-#define endecode_fields_1a_struct(n,t1,x1,tn1,n1,ta1,a1)
-#define endecode_fields_1aa_struct(n,t1,x1,tn1,n1,ta1,a1,ta2,a2)
-#define endecode_fields_2a_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1)
-#define endecode_fields_2aa_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1,ta2,a2)
-#define endecode_fields_3a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1)
-#define endecode_fields_4aa_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1,ta2,a2)
-#define endecode_fields_1a_1a_struct(n,t1,x1,tn1,n1,ta1,a1,t2,x2,tn2,n2,ta2,a2)
-#define endecode_fields_4a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1)
-#define endecode_fields_5a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,tn1,n1,ta1,a1)
+#define endecode_fields_1a(n,t1,x1,tn1,n1,ta1,a1) struct endecode_fake_struct
+#define endecode_fields_1a_struct(n,t1,x1,tn1,n1,ta1,a1) struct endecode_fake_struct
+#define endecode_fields_1aa_struct(n,t1,x1,tn1,n1,ta1,a1,ta2,a2) struct endecode_fake_struct
+#define endecode_fields_2a_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1) struct endecode_fake_struct
+#define endecode_fields_2aa_struct(n,t1,x1,t2,x2,tn1,n1,ta1,a1,ta2,a2) struct endecode_fake_struct
+#define endecode_fields_3a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1) struct endecode_fake_struct
+#define endecode_fields_4aa_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1,ta2,a2) struct endecode_fake_struct
+#define endecode_fields_1a_1a_struct(n,t1,x1,tn1,n1,ta1,a1,t2,x2,tn2,n2,ta2,a2) struct endecode_fake_struct
+#define endecode_fields_4a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,tn1,n1,ta1,a1) struct endecode_fake_struct
+#define endecode_fields_5a_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,tn1,n1,ta1,a1) struct endecode_fake_struct
 
-#define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)
+#define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2) struct endecode_fake_struct
 
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 

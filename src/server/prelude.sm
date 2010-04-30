@@ -15,7 +15,6 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
-#include "check.h"
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 

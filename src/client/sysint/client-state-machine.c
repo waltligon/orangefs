@@ -153,7 +153,28 @@ static PVFS_error completion_list_retrieve_completed(
 
             if (user_ptr_array)
             {
-                user_ptr_array[i] = (void *)sm_p->user_ptr;
+                /* if this smcb has been set cancelled and is a PVFS_SYS_IO
+                 * state machine then stick the user_ptr of the base frame
+                 * in to the user_ptr_array instead of the standard sm_p 
+                 * user_ptr. This prevents segfaults back in 
+                 * process_vfs_requests which expects the pointer to be a 
+                 * vfs_request.
+                 */
+                if( smcb->op_cancelled && smcb->op == PVFS_SYS_IO )
+                {
+                    PINT_client_sm *sm_base_p = PINT_sm_frame(smcb,
+                                                 (-(smcb->frame_count -1)));
+                    assert(sm_base_p);
+                    gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: assignment of "
+                                 "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
+                                 "user_ptr(%p)\n", __func__, sm_base_p, 
+                                 sm_base_p->user_ptr);
+                    user_ptr_array[i] = sm_base_p->user_ptr;
+                }
+                else
+                {
+                    user_ptr_array[i] = (void *)sm_p->user_ptr;
+                }
             }
             s_completion_list[i] = NULL;
 
@@ -187,23 +208,28 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
       cancellations on the I/O operation are accounted for
     */
     assert(sm_p);
+    
+    PINT_client_sm *sm_base_p = 
+        PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
+
+    assert(sm_base_p);
 
     /*
       this *can* possibly be 0 in the case that the I/O has already
       completed and no job cancellation were issued at I/O cancel time
     */
-    if (sm_p->u.io.total_cancellations_remaining > 0)
+    if (sm_base_p->u.io.total_cancellations_remaining > 0)
     {
-        sm_p->u.io.total_cancellations_remaining--;
+        sm_base_p->u.io.total_cancellations_remaining--;
     }
 
     gossip_debug(
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
-        "remaining (op %s)\n", sm_p,
-        sm_p->u.io.total_cancellations_remaining,
+        "remaining (op %s)\n", sm_base_p,
+        sm_base_p->u.io.total_cancellations_remaining,
         (PINT_smcb_complete(smcb) ? "complete" : "NOT complete"));
 
-    return (sm_p->u.io.total_cancellations_remaining != 0);
+    return (sm_base_p->u.io.total_cancellations_remaining != 0);
 }
 
 /* this array must be ordered to match the enum in client-state-machine.h */ 
@@ -312,19 +338,27 @@ int client_state_machine_terminate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "client_state_machine_terminate smcb %p\n",smcb);
 
-    PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
-
-    PVFS_hint_free(sm_p->hints);
-
     if (!((PINT_smcb_op(smcb) == PVFS_SYS_IO) &&
             (PINT_smcb_cancelled(smcb)) &&
             (cancelled_io_jobs_are_pending(smcb))) &&
         !PINT_smcb_immediate_completion(smcb))
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_state_machine_terminate smcb %p completing\n",smcb);
+
+        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+        PVFS_hint_free(sm_p->hints);
+        sm_p->hints = NULL;
+
         gossip_debug(GOSSIP_CLIENT_DEBUG, 
                 "add smcb %p to completion list\n", smcb);
         ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "client_state_machine_terminate smcb %p waiting for cancelled jobs\n",smcb);
     }
     return SM_ACTION_TERMINATE;
 }
@@ -505,13 +539,21 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 	/* op already completed; nothing to cancel. */
         return 0;
     }
-   
+    
     /* We also don't cancel small I/O operations as posted by
      * sys-small-io.sm.  Check the corresponding flag.  We have 
      * to jump to the base frame rather than the current frame for this
      * information because small-io may have pushed a msgpairarray.
+     *
+     * sm_base_p is used below instead of sm_p since it contains the correct
+     * counters and context pointers. In the event the control block only
+     * has one frame it behaves as it did previously. If the cancellation is 
+     * occuring when a non-IO frame has been pushed on the stack, which doesn't
+     * have the expected structure, it doesn't cause a segfault but leaves
+     * it on the state machines stack.
      */ 
     sm_base_p = PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
+    assert(sm_base_p);
     if(sm_base_p->u.io.small_io)
     {
         gossip_debug(GOSSIP_CANCEL_DEBUG,  "skipping cancellation of small I/O operation.\n");
@@ -531,9 +573,9 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     ret = 0;
 
     /* now run through and cancel the outstanding jobs */
-    for(i = 0; i < sm_p->u.io.context_count; i++)
+    for(i = 0; i < sm_base_p->u.io.context_count; i++)
     {
-        PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
+        PINT_client_io_ctx *cur_ctx = &sm_base_p->u.io.contexts[i];
         assert(cur_ctx);
 
         if (cur_ctx->msg_send_in_progress)
@@ -549,7 +591,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
-            sm_p->u.io.total_cancellations_remaining++;
+            sm_base_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->msg_recv_in_progress)
@@ -565,7 +607,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
-            sm_p->u.io.total_cancellations_remaining++;
+            sm_base_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->flow_in_progress)
@@ -580,7 +622,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_flow_cancel failed", ret);
                 break;
             }
-            sm_p->u.io.total_cancellations_remaining++;
+            sm_base_p->u.io.total_cancellations_remaining++;
         }
 
         if (cur_ctx->write_ack_in_progress)
@@ -596,12 +638,12 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                 PVFS_perror_gossip("job_bmi_cancel failed", ret);
                 break;
             }
-            sm_p->u.io.total_cancellations_remaining++;
+            sm_base_p->u.io.total_cancellations_remaining++;
         }
     }
     gossip_debug(GOSSIP_CANCEL_DEBUG, "(%p) Total cancellations "
-                 "remaining: %d\n", sm_p,
-                 sm_p->u.io.total_cancellations_remaining);
+                 "remaining: %d\n", sm_base_p,
+                 sm_base_p->u.io.total_cancellations_remaining);
     return ret;
 }
 

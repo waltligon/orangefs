@@ -420,7 +420,9 @@ struct PINT_server_fetch_config_sm_state
     int nservers;
     PVFS_BMI_addr_t *addr_array;
     char **fs_config_bufs;
-    int32_t *fs_config_buf_size;
+    int *fs_config_buf_size;
+    int result_count; /* number of servers that actually responded */
+    int* result_indexes; /* index into fs_config_bufs of valid responses */
 };
 
 
@@ -699,7 +701,6 @@ enum
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
     PVFS_SERVER_GET_CONFIG         = 200,
-    PVFS_SERVER_FETCH_CONFIG         = 201,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
     PVFS_DEV_UNEXPECTED            = 400

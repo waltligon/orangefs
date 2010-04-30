@@ -78,6 +78,7 @@ BUILD_MX = @BUILD_MX@
 BUILD_IB = @BUILD_IB@
 BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_PORTALS = @BUILD_PORTALS@
+BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_FUSE = @BUILD_FUSE@
@@ -397,6 +398,10 @@ ifneq (,@PORTALS_LIBS@)
     LIBS_THREADED += $(PORTALS_LIBS)
     SERVERLIBS += $(PORTALS_LIBS)
 endif
+endif
+
+ifdef BUILD_ZOID
+    CFLAGS += -D__STATIC_METHOD_BMI_ZOID__
 endif
 
 # enable mmap-readahead cache (unless disabled by configure)

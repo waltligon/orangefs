@@ -44,6 +44,8 @@ fi
 
 AC_CONFIG_HEADER(pvfs2-config.h)
 
+AC_CHECK_HEADER([pwd.h],
+    [AC_DEFINE(HAVE_GETPWUID, 1, Define if pwd.h exists)])
 AC_CHECK_HEADER([sys/vfs.h],
 		[AC_DEFINE(HAVE_SYS_VFS_H, 1, Define if sys/vfs.h exists)])
 AC_CHECK_HEADER([sys/mount.h],
@@ -927,6 +929,11 @@ dnl
 AX_PORTALS
 
 dnl
+dnl Configure bmi_zoid, if --with-zoid or a variant given.
+dnl
+AX_ZOID
+
+dnl
 dnl check if fgetxattr takes extra arguments
 AC_MSG_CHECKING([for fgetxattr extra arguments])
 AC_TRY_COMPILE([
@@ -1128,6 +1135,7 @@ src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
 src/io/bmi/bmi_ib/module.mk
 src/io/bmi/bmi_portals/module.mk
+src/io/bmi/bmi_zoid/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
@@ -1267,7 +1275,7 @@ dnl When traffic will only appear on one device, suggest that TCP be disabled.
 dnl But leave TCP as default on, certainly, as that is what most people want.
 dnl
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
 	AC_MSG_WARN([You have selected to build $PKGSTR to use a "fast" network
 		    interface, but have not disabled TCP.  The way this is

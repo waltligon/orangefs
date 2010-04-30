@@ -77,18 +77,10 @@
 #define GOSSIP_MGMT_DEBUG              ((uint64_t)1 << 55)
 #define GOSSIP_MIRROR_DEBUG            ((uint64_t)1 << 56)
 
-/* NOTE: if you want your gossip flag to be controllable from 
- * pvfs2-set-debugmask you have to add it in
- * src/common/misc/pvfs2-debug.c
- */
-
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
  GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB \
  + GOSSIP_BMI_DEBUG_MX + GOSSIP_BMI_DEBUG_PORTALS)
-
-uint64_t PVFS_debug_eventlog_to_mask(
-    const char *event_logging);
 
 const char *PVFS_debug_get_next_debug_keyword(
     int position);

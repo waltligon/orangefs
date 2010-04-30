@@ -27,6 +27,9 @@
 /* Define to 1 if you have the `pvfs2' library (-lpvfs2). */
 #undef HAVE_LIBPVFS2
 
+/* Define if libz exists */
+#undef HAVE_LIBZ
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
@@ -65,6 +68,9 @@
 
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
+/* Define to 1 if you have the <zlib.h> header file. */
+#undef HAVE_ZLIB_H
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
