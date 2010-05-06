@@ -4426,7 +4426,10 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
     }
 
     trove_pending_count--;
+    assert(trove_pending_count >= 0);
+
     tmp_trove->jd->u.precreate_pool.trove_pending--;
+    assert(tmp_trove->jd->u.precreate_pool.trove_pending >= 0);
 
     /* don't overwrite error codes from other trove ops */
     if(tmp_trove->jd->u.precreate_pool.error_code == 0)
@@ -5897,6 +5900,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             }
         }
 
+        /* pre-increment pending count before posting trove operation */
+        trove_pending_count++;
+        jd->u.precreate_pool.trove_pending++;
+
         /* post trove operation to pull out a handle */
         ret = trove_keyval_iterate_keys(
             fs->fsid, 
@@ -5926,8 +5933,6 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         else
         {
             /* callback will be triggered later */
-            trove_pending_count++;
-            jd->u.precreate_pool.trove_pending++;
         }
     }
     gen_mutex_unlock(&precreate_pool_mutex);
