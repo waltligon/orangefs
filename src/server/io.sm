@@ -228,7 +228,7 @@ static PINT_sm_action start_pipelining_sm(
     {
         /* pick up any buffer settings overrides from fs conf */
         s_op->u.io.buffer_size = fs_config->fp_buffer_size;
-	gossip_debug(GOSSIP_IO_DEBUG, "buffer_size=%ld\n", fs_config->fp_buffer_size);
+	gossip_debug(GOSSIP_IO_DEBUG, "buffer_size=%d\n", fs_config->fp_buffer_size);
         //s_op->u.io.num_of_buffers = fs_config->fp_buffers_per_flow;
 	s_op->u.io.num_of_buffers = NUM_OF_PARALLEL_SMS; /* FIXME */
     }
@@ -488,12 +488,14 @@ static PINT_sm_action io_cleanup(
     gen_mutex_destroy(&s_op->u.io.mutex); /* FIXME */
 
     //printf("event_id=%d\n", s_op->event_id); // always 0
-    printf("bmi_time=%f, trove_time=%f, total=%f\n", bmi_time, trove_time, bmi_time+trove_time);
+    //printf("bmi_time=%f, trove_time=%f, total=%f\n", bmi_time, trove_time, bmi_time+trove_time);
+    gossip_debug(GOSSIP_IO_TIMING, "%s: bmi_time=%f, trove_time=%f, total=%f\n", (s_op->req->u.io.io_type == PVFS_IO_READ?"READ":"WRITE"), bmi_time, trove_time, bmi_time+trove_time);
     struct timeval tv; 
     gettimeofday(&tv, NULL);
     eio = tv.tv_sec+(tv.tv_usec/1000000.0);
     io_time = eio - sio;
-    printf("io_time=%f\n", io_time);
+    //printf("io_time=%f\n", io_time);
+
     /* let go of our encoded response buffer, if we appear to have
      * made one
      */
