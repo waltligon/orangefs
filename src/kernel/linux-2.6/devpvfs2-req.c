@@ -112,10 +112,10 @@ static ssize_t pvfs2_devreq_read(
     }
     else
     {
-        pvfs2_kernel_op_t *op = NULL;
+        pvfs2_kernel_op_t *op = NULL, *temp = NULL;
         /* get next op (if any) from top of list */
         spin_lock(&pvfs2_request_list_lock);
-        list_for_each_entry (op, &pvfs2_request_list, list)
+        list_for_each_entry_safe (op, temp, &pvfs2_request_list, list)
         {
             PVFS_fs_id fsid = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
