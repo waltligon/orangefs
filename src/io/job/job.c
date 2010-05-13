@@ -5865,6 +5865,9 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             = &tmp_trove_array[i];
     }
 
+    /* pre-increment pending count before posting any trove operations */
+    jd->u.precreate_pool.trove_pending = jd->u.precreate_pool.precreate_handle_count;
+
     /* post all trove operations at once */
     for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
     { 
@@ -5905,9 +5908,6 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             }
         }
 
-        /* pre-increment pending count before posting trove operation */
-        trove_pending_count++;
-        jd->u.precreate_pool.trove_pending++;
 
         /* post trove operation to pull out a handle */
         ret = trove_keyval_iterate_keys(
@@ -5937,6 +5937,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         }
         else
         {
+            trove_pending_count++;
             /* callback will be triggered later */
         }
     }
