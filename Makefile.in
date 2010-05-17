@@ -5,6 +5,7 @@
 #
 # all            default rule; builds libs, server, and test programs
 # clean          cleans up files
+# develtools     builds development related tools
 # distclean      _really_ cleans up; returns to pristine tree
 # docs           builds documentation in docs subdirectory
 # docsclean      cleans up documentation files
@@ -121,7 +122,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools
 
 ################################################################
 # Find project subdirectories
@@ -470,6 +471,8 @@ KERNAPPTHRSRC :=
 MISCSRC := 
 # c files generated from state machines
 SMCGEN :=
+# DEVELSRC is source for development related tools
+DEVELSRC :=
 
 ################################################################
 # Top level (default) targets
@@ -635,6 +638,13 @@ DOCSCRUFT += $(patsubst %.tex,%.dvi, $(filter %.tex,$(DOCSRC)))
 DOCSCRUFT += $(patsubst %.tex,%.log, $(filter %.tex,$(DOCSRC)))
 DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 
+# DEVELOBJS is a list of development program objects
+DEVELOBJS := $(patsubst %.c,%.o, $(filter %.c,$(DEVELSRC)))
+# DEVELTOOLS is a list of development program executables 
+DEVELTOOLS := $(patsubst %.c,%, $(filter %.c, $(DEVELSRC)))
+# DEVELDEPENDS is a list of dependency files for development programs
+DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
+
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
@@ -668,6 +678,9 @@ kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 
 # this is needed for the make dist
 statecompgen: $(STATECOMPGEN)
+
+# target for builging development tools
+develtools: $(DEVELTOOLS)
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -780,6 +793,12 @@ $(FUSE): $(FUSEOBJS) $(LIBRARIES)
 $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $< $(VISMISCOBJS) $(LIBS) $(call modldflags,$<)
+
+# rule for building development tools and its objects. don't know why db isn't
+# already in libs.
+$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
+	$(Q) "  LD 		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
@@ -1129,6 +1148,11 @@ endif
 ifdef BUILD_FUSE
 	install -m 755 $(FUSE) $(prefix)/bin
 endif
+
+	# install any development tools built
+	for i in $(notdir $(DEVELTOOLS)) ; do \
+		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+	done
 
 	install -d $(sbindir)
 
