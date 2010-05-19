@@ -4426,7 +4426,6 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
     }
 
     trove_pending_count--;
-    assert(trove_pending_count >= 0);
 
     /* don't overwrite error codes from other trove ops */
     if(tmp_trove->jd->u.precreate_pool.error_code == 0)
