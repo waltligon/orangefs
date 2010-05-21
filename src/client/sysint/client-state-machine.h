@@ -498,15 +498,6 @@ typedef struct
     int32_t      dirent_limit;      /* input parameter */
 } PINT_sm_readdir_state;
 
-struct PINT_client_getcred_sm
-{
-    char *certificate;
-    char *key;
-    PVFS_signature signature;
-    uint32_t sig_size;
-    PVFS_sysresp_getcred *getcred_resp;
-};
-
 typedef struct PINT_client_sm
 {
     /* this code removed and corresponding fields added to the generic
@@ -573,7 +564,6 @@ typedef struct PINT_client_sm
         struct PINT_client_perf_count_timer_sm perf_count_timer;
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
-        struct PINT_client_getcred_sm getcred;
     } u;
 } PINT_client_sm;
 
@@ -651,7 +641,6 @@ enum
     PVFS_SYS_STATFS                = 18,
     PVFS_SYS_FS_ADD                = 19,
     PVFS_SYS_READDIRPLUS           = 20,
-    PVFS_SYS_GETCRED               = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -776,7 +765,6 @@ extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
-extern struct PINT_state_machine_s pvfs2_client_getcred_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

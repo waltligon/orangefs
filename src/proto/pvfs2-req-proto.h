@@ -80,7 +80,6 @@ enum PVFS_server_op
     PVFS_SERV_BATCH_REMOVE = 36,
     PVFS_SERV_PRECREATE_POOL_REFILLER = 37, /* not a real protocol request */
     PVFS_SERV_UNSTUFF = 38,
-    PVFS_SERV_GETCRED = 39,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -156,8 +155,6 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_GROUPS 32
 /* max size of credential/capability issuer (in bytes) */
 #define PVFS_REQ_LIMIT_ISSUER 128
-/* max size of the PEM encoded certificate (in bytes) */
-#define PVFS_REQ_LIMIT_CERTIFICATE 16384
 
 /* nlmills: TODO: find a better place for these definitions */
 #define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
@@ -1743,52 +1740,6 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
-/* getcred ****************************************************/
-/* - authenticate user and retrieve a credential */
-
-struct PVFS_servreq_getcred
-{
-    PVFS_fs_id fs_id;   /* filesystem used in authentication */
-    char *certificate; /* PEM encoded X.509 certificate */
-    uint32_t sig_size;
-    PVFS_signature signature; /* digital signature of certificate */
-};
-endecode_fields_2a_struct(
-    PVFS_servreq_getcred,
-    PVFS_fs_id, fs_id,
-    string, certificate,
-    uint32_t, sig_size,
-    PVFS_signature, signature)
-#define extra_size_PVFS_servreq_getcred \
-    (PVFS_REQ_LIMIT_CERTIFICATE + PVFS_REQ_LIMIT_SIGNATURE)
-
-#define PINT_SERVREQ_GETCRED_FILL(__req,              \
-                                  __cap,              \
-                                  __fs_id,             \
-                                  __cert,             \
-                                  __sig_size,         \
-                                  __sig,              \
-                                  __hints)            \
-do {                                                  \
-    memset(&(__req), 0, sizeof(__req));               \
-    (__req).op = PVFS_SERV_GETCRED;                   \
-    (__req).capability = (__cap);                     \
-    (__req).hints = (__hints);                        \
-    (__req).u.getcred.fs_id = (__fs_id);                \
-    (__req).u.getcred.certificate = (__cert);         \
-    (__req).u.getcred.sig_size = (__sig_size);        \
-    (__req).u.getcred.signature = (__sig);            \
- } while(0);
-
-struct PVFS_servresp_getcred
-{
-    PVFS_credential credential;
-};
-endecode_fields_1_struct(
-    PVFS_servresp_getcred,
-    PVFS_credential, credential)
-#define extra_size_PVFS_servresp_getcred extra_size_PVFS_credential
-
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -1831,7 +1782,6 @@ struct PVFS_server_req
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
         struct PVFS_servreq_listattr listattr;
-        struct PVFS_servreq_getcred getcred;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1886,7 +1836,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_listeattr listeattr;
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
-        struct PVFS_servresp_getcred getcred;
     } u;
 };
 endecode_fields_2_struct(

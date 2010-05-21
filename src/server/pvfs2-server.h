@@ -304,14 +304,6 @@ struct PINT_server_listattr_op
     int parallel_sms;
 };
 
-struct PINT_server_getcred_op
-{
-    char *certificate;
-    uint32_t sig_size;
-    PVFS_signature signature;
-    PVFS_credential credential;
-};
-
 /* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
@@ -410,7 +402,6 @@ typedef struct PINT_server_op
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;
-        struct PINT_server_getcred_op getcred;
     } u;
 
 } PINT_server_op;

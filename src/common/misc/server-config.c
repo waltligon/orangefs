@@ -113,11 +113,7 @@ static DOTCONF_CB(directio_ops_per_queue);
 static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
-static DOTCONF_CB(get_ca_bundle);
 static DOTCONF_CB(get_security_timeout);
-static DOTCONF_CB(enter_mappings_context);
-static DOTCONF_CB(exit_mappings_context);
-static DOTCONF_CB(get_security_mapping);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -128,7 +124,6 @@ static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
-static void free_security_mapping(void *ptr);
 static void copy_filesystem(
     struct filesystem_configuration_s *dest_fs,
     struct filesystem_configuration_s *src_fs);
@@ -917,18 +912,9 @@ static const configoption_t options[] =
     {"ServerKey", ARG_STR, get_server_key, NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
 
-    {"CABundle", ARG_STR, get_ca_bundle, NULL,
-        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
-
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS, "3600"},
 
-    {"<Mappings>", ARG_NONE, enter_mappings_context, NULL, CTX_GLOBAL, NULL},
-
-    {"</Mappings>", ARG_NONE, exit_mappings_context, NULL, CTX_MAPPINGS, NULL},
-
-    {"Mapping", ARG_RAW, get_security_mapping, NULL, CTX_MAPPINGS, NULL},
-    
     LAST_OPTION
 };
 
@@ -1061,12 +1047,6 @@ int PINT_parse_config(
     {
         gossip_err("Configuration file error. No server key path "
                    "specified.\n");
-        return 1;
-    }
-
-    if (server_alias_name && !config_s->cabundle_path)
-    {
-        gossip_err("Configuration file error. No CA bundle path specified.\n");
         return 1;
     }
 
@@ -2658,152 +2638,11 @@ DOTCONF_CB(get_server_key)
     return NULL;
 }
 
-DOTCONF_CB(get_ca_bundle)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s*)cmd->context;
-    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
-        config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-    free(config_s->cabundle_path);
-    config_s->cabundle_path =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
-    return NULL;
-}
-
 DOTCONF_CB(get_security_timeout)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->security_timeout = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(enter_mappings_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_MAPPINGS;
-    return NULL;
-}
-
-DOTCONF_CB(exit_mappings_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_GLOBAL;
-    return NULL;
-}
-
-DOTCONF_CB(get_security_mapping)
-{
-    struct server_configuration_s *config_s =
-        (struct server_configuration_s*)cmd->context;
-    const char *line = cmd->data.str;
-    int len;
-    int account, keyword, pattern;
-    struct security_mapping_s *mapping;
-    int i;
-    
-    len = strlen(line);
-    mapping = malloc(sizeof(struct security_mapping_s));
-    if (!mapping)
-    {
-        return strerror(errno);
-    }
-    
-    for (account = 0; (account < len) && isspace(line[account]); account++);
-    for (i = account+1; (i < len) && !isspace(line[i]); i++);
-    if (i >= len)
-    {
-        free(mapping);
-        return "Unable to parse account field in mapping\n";
-    }
-    
-    mapping->account = malloc(i - account + 1);
-    if (!mapping->account)
-    {
-        free(mapping);
-        return strerror(errno);
-    }
-    strncpy(mapping->account, line + account, i - account);
-    mapping->account[i-account] = '\0';
-    
-    for (keyword = i; (keyword < len) && isspace(line[keyword]); keyword++);
-    for (i = keyword+1; (i < len) && !isspace(line[i]); i++);
-    if (i >= len)
-    {
-        free(mapping->account);
-        free(mapping);
-        return "Unable to parse keyword field in mapping\n";
-    }
-    
-    if (!strncasecmp(line+keyword, "Email", i-keyword))
-    {
-        mapping->keyword = SECURITY_KEYWORD_EMAIL;
-    }
-    else if (!strncasecmp(line+keyword, "EmailRegex", i-keyword))
-    {
-        mapping->keyword = SECURITY_KEYWORD_EMAIL_REGEX;
-    }
-    else if (!strncasecmp(line+keyword, "Subject", i-keyword))
-    {
-        mapping->keyword = SECURITY_KEYWORD_SUBJECT;
-    }
-    else if (!strncasecmp(line+keyword, "SubjectRegex", i-keyword))
-    {
-        mapping->keyword = SECURITY_KEYWORD_SUBJECT_REGEX;
-    }
-    else
-    {
-        free(mapping->account);
-        free(mapping);
-        return "Invalid or unrecognized keyword field\n";
-    }
-    
-    for (pattern = i; (pattern < len) && isspace(line[pattern]); pattern++);
-    if (pattern >= len)
-    {
-        free(mapping->account);
-        free(mapping);
-        return "Unable to parse pattern field in mapping\n";
-    }
-    
-    if (line[len-1] == '\n')
-    {
-        i = len - 1;
-    }
-    else
-    {
-        i = len;
-    }
-    
-    /* TODO: consider the effects of whitespace in regexps */
-    mapping->pattern = malloc(i - pattern + 1);
-    if (!mapping->pattern)
-    {
-        free(mapping->account);
-        free(mapping);
-        return strerror(errno);
-    }
-    strncpy(mapping->pattern, line + pattern, i - pattern);
-    mapping->pattern[i-pattern] = '\0';
-    
-    if (!config_s->security_mappings)
-    {
-        config_s->security_mappings = PINT_llist_new();
-        if (!config_s->security_mappings)
-        {
-            free(mapping->pattern);
-            free(mapping->account);
-            free(mapping);
-            return strerror(errno);
-        }
-    }
-    PINT_llist_add_to_tail(config_s->security_mappings, mapping);
-    
     return NULL;
 }
 
@@ -2922,15 +2761,6 @@ void PINT_config_release(struct server_configuration_s *config_s)
         config_s->keystore_path = NULL;
         free(config_s->serverkey_path);
         config_s->serverkey_path = NULL;
-        free(config_s->cabundle_path);
-        config_s->cabundle_path = NULL;
-
-        if (config_s->security_mappings)
-        {
-            PINT_llist_free(config_s->security_mappings,free_security_mapping);
-            config_s->security_mappings = NULL;
-        }
-
     }
 }
 
@@ -3151,18 +2981,6 @@ static void free_filesystem(void *ptr)
         }
         free(fs);
         fs = NULL;
-    }
-}
-
-static void free_security_mapping(void *ptr)
-{
-    security_mapping_s *mapping = (security_mapping_s*)ptr;
-
-    if (mapping)
-    {
-        free(mapping->account);
-        free(mapping->pattern);
-        free(mapping);
     }
 }
 

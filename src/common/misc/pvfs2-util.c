@@ -286,111 +286,15 @@ int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds)
     return ret;
 }
 
-/* nlmills: WARNING: that damn mutex is held. fix that? */
+
 int PVFS_util_gen_credential(PVFS_fs_id fsid,
                              PVFS_BMI_addr_t addr,
                              const char *certpath,
                              const char *keypath,
                              PVFS_credential *cred)
 {
-    FILE *certfile, *keyfile;
-    char *certbuf, *keybuf;
-    PVFS_sysresp_getcred sysresp;
-    int ret;
-
-    if (!certpath)
-    {
-        certpath = getenv("PVFS2CERT_FILE");
-        if (!certpath)
-        {
-            certpath = PVFS2_DEFAULT_CERT_FILE;
-        }
-    }
-
-    if (!keypath)
-    {
-        keypath = getenv("PVFS2KEY_FILE");
-        if (!keypath)
-        {
-            keypath = PVFS2_DEFAULT_KEY_FILE;
-        }
-    }
-
-    certfile = fopen(certpath, "rb");
-    if (!certfile)
-    {
-        /* nlmills: TODO: error handling */
-        return -PVFS_ERROR_CODE(errno);
-    }
-
-    keyfile = fopen(keypath, "rb");
-    if (!keyfile)
-    {
-        /* nlmills: TODO: error handling */
-        ret = -PVFS_ERROR_CODE(errno);
-        fclose(certfile);
-        return ret;
-    }
-
-    certbuf = calloc(PVFS_REQ_LIMIT_CERTIFICATE+1, 1);
-    if (!certbuf)
-    {
-        /* nlmills: TODO: error handling */
-        fclose(keyfile);
-        fclose(certfile);
-        return -PVFS_ENOMEM;
-    }
-
-    /* nlmills: TODO: figure out a max size for this buffer */
-    keybuf = calloc(4096, 1);
-    if (!keybuf)
-    {
-        /* nlmills: TODO: error handling */
-        free(certbuf);
-        fclose(keyfile);
-        fclose(certfile);
-        return -PVFS_ENOMEM;
-    }
-
-    fread(certbuf, 1, PVFS_REQ_LIMIT_CERTIFICATE, certfile);
-    if (ferror(certfile))
-    {
-        /* nlmills: TODO: error handling */
-        ret = -PVFS_ERROR_CODE(errno);
-        free(keybuf);
-        free(certbuf);
-        fclose(keyfile);
-        fclose(certfile);
-        return ret;
-    }
-
-    /* nlmills: TODO: replace static size */
-    fread(keybuf, 1, 4096, keyfile);
-    if (ferror(keyfile))
-    {
-        /* nlmills: TODO: error handling */
-        ret = -PVFS_ERROR_CODE(errno);
-        free(keybuf);
-        free(certbuf);
-        fclose(keyfile);
-        fclose(certfile);
-        return ret;
-    }
-
-    ret = PVFS_sys_getcred(fsid, certbuf, keybuf, addr, &sysresp);
-    if (ret >= 0)
-    {
-        *cred = sysresp.credential;
-    }
-
-    free(keybuf);
-    free(certbuf);
-    fclose(keyfile);
-    fclose(certfile);
-
-    /* nlmills: TODO: add last-ditch error handling */
-
-    return ret;
+    /* nlmills: TODO: rewrite this function and relatives */
+    return -PVFS_ENOSYS;
 }
 
 PVFS_credential *PVFS_util_find_credential_by_fsid(PVFS_fs_id fsid,

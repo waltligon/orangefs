@@ -90,9 +90,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 35 */ {PVFS_SERV_BATCH_CREATE, &pvfs2_batch_create_params},
     /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
     /* 37 */ {PVFS_SERV_PRECREATE_POOL_REFILLER, &pvfs2_precreate_pool_refiller_params},
-    /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
-    /* nlmills: TODO: does this list need to be in a specific order? */
-    /* 39 */ {PVFS_SERV_GETCRED, &pvfs2_get_cred_params}
+    /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params}
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)

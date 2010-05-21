@@ -40,7 +40,6 @@
 #include "job.h"
 #include "acache.h"
 #include "ncache.h"
-#include "tcache.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
@@ -51,7 +50,6 @@
 #include "pint-perf-counter.h"
 #include "pvfs2-encode-stubs.h"
 #include "pint-event.h"
-#include "security-util.h"
 #include "security-types.h"
 
 #ifdef USE_MMAP_RA_CACHE
@@ -99,7 +97,6 @@ typedef struct
     int ncache_timeout;
     char* logfile;
     char* logtype;
-    char *client_dir;
     unsigned int acache_hard_limit;
     int acache_hard_limit_set;
     unsigned int acache_soft_limit;
@@ -203,19 +200,6 @@ typedef struct
 
 } vfs_request_t;
 
-typedef struct
-{
-    PVFS_fs_id fsid;
-    PVFS_uid uid;
-} credential_key_t;
-
-typedef struct
-{
-    PVFS_fs_id fsid;
-    PVFS_uid uid;
-    PVFS_credential *credential;
-} credential_payload_t;
-
 static options_t s_opts;
 
 static job_context_id s_client_dev_context;
@@ -236,9 +220,6 @@ static struct PINT_perf_counter* ncache_pc = NULL;
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
 
-/* nlmills: TODO: does a mutex need to protect these credential objects? */
-static struct PINT_tcache *credential_cache = NULL;
-
 /* this hashtable is used to keep track of operations in progress */
 #define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
 static int hash_key(void *key, int table_size);
@@ -251,7 +232,6 @@ static void reset_acache_timeout(void);
 #ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
 #endif
-static int setup_credential_cache(options_t *s_opts);
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
@@ -1213,49 +1193,6 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
     mntent->integrity_check = 0;
     return 0;
 }
-
-#if 0
-static PVFS_error add_user_credential(struct PVFS_sys_mntent *mntent, 
-                                      PVFS_uid uid)
-{
-    PVFS_BMI_addr_t addr;
-    char certpath[PATH_MAX];
-    char keypath[PATH_MAX];
-    PVFS_credential credential;
-    int ret;
-
-    assert(mntent);
-
-    if (num_user_credentials >= MAX_USER_CREDENTIALS)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    ret = BMI_addr_lookup(&addr, mntent->the_pvfs_config_server);
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to resolve BMI "
-                     "address %s\n", mntent->the_pvfs_config_server);
-        return ret;
-    }
-
-    snprintf(certpath, PATH_MAX, "%s/%u.cert", s_opts.client_dir, uid);
-    snprintf(keypath, PATH_MAX, "%s/%u.key", s_opts.client_dir, uid);
-
-    ret = PVFS_util_gen_credential(mntent->fs_id, addr, certpath, 
-                                   keypath, &credential);
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to get credential for "
-                     "userid %u\n", uid);
-        return ret;
-    }
-
-    user_credentials[num_user_credentials++] = credential;
-
-    return 0;
-}
-#endif
 
 static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
 {
@@ -3498,13 +3435,6 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
-    ret = setup_credential_cache(&s_opts);
-    if (ret < 0)
-    {
-        PVFS_perror("setup_credential_cache", ret);
-        return(ret);
-    }
-
     ret = set_acache_parameters(&s_opts);
     if(ret < 0)
     {
@@ -3709,9 +3639,6 @@ int main(int argc, char **argv)
     PINT_dev_finalize();
     PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
-    PINT_tcache_finalize(credential_cache);
-    credential_cache = NULL;
-
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");
     if (PVFS_sys_finalize())
@@ -3738,7 +3665,6 @@ static void print_help(char *progname)
     printf("-h, --help                    display this help and exit\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
-    printf("-c     --client-dir           client certificate/key directory\n");
     printf("--acache-soft-limit=LIMIT     acache soft limit\n");
     printf("--acache-hard-limit=LIMIT     acache hard limit\n");
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
@@ -3780,7 +3706,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"desc-count",1,0,0},
         {"desc-size",1,0,0},
         {"logfile",1,0,0},
-        {"client-dir",1,0,0},
         {"logtype",1,0,0},
         {"logstamp",1,0,0},
         {"child",0,0,0},
@@ -3792,7 +3717,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
     opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
-    while((ret = getopt_long(argc, argv, "ha:n:L:c:",
+    while((ret = getopt_long(argc, argv, "ha:n:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -3837,10 +3762,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
-                }
-                else if (strcmp("client-dir", cur_option) == 0)
-                {
-                    goto do_client_dir;
                 }
                 else if (strcmp("logtype", cur_option) == 0)
                 {
@@ -3980,10 +3901,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
           do_logfile:
                 opts->logfile = optarg;
                 break;
-            case 'c':
-          do_client_dir:
-                opts->client_dir = optarg;
-                break;
             case 'a':
           do_acache:
                 opts->acache_timeout = atoi(optarg);
@@ -4020,8 +3937,6 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         opts->logtype = "file";
     }
-    /* nlmills: TODO: add real error handling */
-    assert(opts->client_dir);
         
 }
 
@@ -4164,66 +4079,6 @@ static char *get_vfs_op_name_str(int op_type)
     return vfs_op_info[limit-1].type_str;
 }
 #endif
-
-static int credential_compare_fn(void *key, struct qhash_head *link)
-{
-    credential_key_t *ckey = (credential_key_t*)key;
-    struct PINT_tcache_entry *tmp;
-    credential_payload_t *cpayload;
-
-    tmp = qhash_entry(link, struct PINT_tcache_entry, hash_link);
-    assert(tmp);
-
-    cpayload = (credential_payload_t*)tmp->payload;
-    
-    return ((ckey->fsid == cpayload->fsid) && 
-            (ckey->uid == cpayload->uid));
-}
-
-static int ckey_hash_fn(void *key, int table_size)
-{
-    credential_key_t *ckey = (credential_key_t*)key;
-    int hash;
-
-    hash = quickhash_32bit_hash(&ckey->fsid, table_size);
-    hash ^= quickhash_32bit_hash(&ckey->uid, table_size);
-
-    return hash;
-}
-
-static int credential_free_fn(void *payload)
-{
-    credential_payload_t *cpayload = (credential_payload_t*)payload;
-
-    PINT_cleanup_credential(cpayload->credential);
-    free(cpayload->credential);
-    free(cpayload);
-
-    return 0;
-}
-
-/* nlmills: TODO: make use of options */
-static int setup_credential_cache(options_t* s_opts)
-{
-    int ret;
-
-    /* nlmills: TODO: find a good table size */
-    credential_cache = PINT_tcache_initialize(credential_compare_fn,
-                                              ckey_hash_fn,
-                                              credential_free_fn,
-                                              0);
-    if (credential_cache == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    /* nlmills: TODO: find a good timeout value */
-    ret = PINT_tcache_set_info(credential_cache,
-                               TCACHE_TIMEOUT_MSECS,
-                               3600000 /* 60 minutes */);
-
-    return ret;
-}
 
 static int set_acache_parameters(options_t* s_opts)
 {
@@ -4388,96 +4243,10 @@ static int get_mac(void)
     }
 }
 
-static int request_credential(PVFS_credential **credential, 
-    PVFS_fs_id fsid, PVFS_uid uid)
-{
-    struct PVFS_sys_mntent mntent;
-    PVFS_BMI_addr_t addr;
-    char certpath[PATH_MAX];
-    char keypath[PATH_MAX];
-    int ret;
-    
-    ret = PVFS_util_get_mntent_copy(fsid, &mntent);
-    if (ret < 0)
-    {
-        /* nlmills: TODO: error handling */
-        return ret;
-    }
-
-    ret = BMI_addr_lookup(&addr, mntent.the_pvfs_config_server);
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to resolve BMI "
-                     "address %s\n", mntent.the_pvfs_config_server);
-        return ret;
-    }
-
-    snprintf(certpath, PATH_MAX, "%s/%u.cert", s_opts.client_dir, uid);
-    snprintf(keypath, PATH_MAX, "%s/%u.key", s_opts.client_dir, uid);
-
-    *credential = malloc(sizeof(PVFS_credential));
-    if (*credential == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    ret = PVFS_util_gen_credential(fsid, addr, certpath, keypath, *credential);
-    {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Failed to get credential for "
-                     "userid %u\n", uid);
-        return ret;
-    }
-
-    return 0;
-}
-
 static PVFS_credential *lookup_credential(PVFS_fs_id fsid, PVFS_uid uid)
 {
-    credential_key_t ckey;
-    credential_payload_t *cpayload;
-    struct PINT_tcache_entry *entry;
-    PVFS_credential *credential;
-    struct timeval tval;
-    int status;
-    int ret;
-    
-    ckey.fsid = fsid;
-    ckey.uid = uid;
-
-    /* see if a fresh credential is in our cache */
-    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
-    if (ret >= 0 && status >= 0)
-    {
-        cpayload = (credential_payload_t*)entry->payload;
-        return (PVFS_credential*)cpayload->credential;
-    }
-
-    /* otherwise request a new credential and store it */
-    
-    ret = request_credential(&credential, fsid, uid);
-    if (ret < 0)
-    {
-        gossip_err("Unable to fetch client credential for uid %d\n", uid);
-        return NULL;
-    }
-
-    cpayload = malloc(sizeof(credential_payload_t));
-    if (!cpayload)
-    {
-        gossip_lerr("Out of memory\n");
-        return NULL;
-    }
-    cpayload->uid = uid;
-    cpayload->fsid = fsid;
-    cpayload->credential = credential;
-
-    tval.tv_sec = credential->timeout;
-    tval.tv_usec = 0;
-
-    ret = PINT_tcache_insert_entry_ex(credential_cache, &ckey, 
-                                      cpayload, &tval, &status);
-
-    return credential;
+    /* nlmills: TODO: credentials are broken and need to be fixed */
+    return NULL;
 }
 
 /*

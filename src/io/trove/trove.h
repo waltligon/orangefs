@@ -64,9 +64,6 @@ enum
     TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9  /* tell trove to delete keyvals as it iterates */
 };
 
-/* nlmills: N.B.: squashing is not implemented anymore thanks to centralized 
- * security mappings. these values are kept for backwards compatability.
- */
 enum
 {
     TROVE_EXP_ROOT_SQUASH = 1,

@@ -35,17 +35,6 @@ int PINT_init_credential(PVFS_credential *cred);
 int PINT_sign_credential(PVFS_credential *cred);
 int PINT_verify_credential(const PVFS_credential *cred);
 
-int PINT_verify_certificate(const char *certstr,
-			    const PVFS_signature signature,
-			    uint32_t sig_size);
-
-
-const char *PINT_lookup_account(const char *certstr);
-int PINT_lookup_userid(const char *account, PVFS_uid *userid);
-int PINT_lookup_groups(const char *account, 
-		       PVFS_gid **group_array, 
-		       uint32_t *num_groups);
-
 
 #endif /* _PINT_SECURITY_H_ */
 

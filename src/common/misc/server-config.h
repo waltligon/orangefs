@@ -28,7 +28,6 @@ enum
     CTX_SECURITY         = (1 << 9),
     CTX_EXPORT           = (1 << 10),
     CTX_SERVER_OPTIONS   = (1 << 11),
-    CTX_MAPPINGS         = (1 << 12),
 };
 
 typedef struct phys_server_desc
@@ -133,13 +132,6 @@ enum security_keyword
     SECURITY_KEYWORD_SUBJECT_REGEX,
 };
 
-typedef struct security_mapping_s
-{
-    char *account;
-    enum security_keyword keyword;
-    char *pattern;
-} security_mapping_s;
-
 typedef struct server_configuration_s
 {
     char *host_id;
@@ -204,10 +196,8 @@ typedef struct server_configuration_s
 	
     char *keystore_path;             /* location of trusted server public keys */
     char *serverkey_path;            /* location of server private key */
-    char *cabundle_path;             /* location of trusted CA bundle */
 
     int security_timeout;
-    PINT_llist *security_mappings;   /* ptrs are type security_mapping_s */
 
     void *private_data;
 } server_configuration_s;

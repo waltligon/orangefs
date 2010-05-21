@@ -110,8 +110,6 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "user_dev", GOSSIP_USER_DEV_DEBUG },
     /* Debug security module */
     { "security", GOSSIP_SECURITY_DEBUG },
-    /* Debug the getcred state machine */
-    { "getcred", GOSSIP_GETCRED_DEBUG },
     /* Debug the fsck tool */
     { "fsck", GOSSIP_FSCK_DEBUG },
     /* Debug the bstream code */
