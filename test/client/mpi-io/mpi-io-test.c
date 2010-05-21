@@ -36,7 +36,6 @@
 /* DEFAULT VALUES FOR OPTIONS */
 static int64_t opt_block     = 16*1024*1024;
 static int     opt_iter      = 1;
-static int     opt_individual_file = 0;
 static int     opt_coll      = 0;
 static int     opt_correct   = 0;
 static int     opt_sync      = 0;
@@ -52,7 +51,6 @@ static int     opt_pvfstab_set = 0;
 static int parse_args(int argc, char **argv);
 static void usage(void);
 static void handle_error(int errcode, char *str);
-static int check_count(int count, MPI_Datatype type, MPI_Status *status);
 
 /* global vars */
 static int mynod = 0;
@@ -81,7 +79,6 @@ int main(int argc, char **argv)
    int nchars=0;
    int namelen;
    char processor_name[MPI_MAX_PROCESSOR_NAME];
-   char file_name[1024];
 
    /* startup MPI and determine the rank of this process */
    MPI_Init(&argc,&argv);
@@ -94,15 +91,6 @@ int main(int argc, char **argv)
 
    if (opt_verbose) fprintf(stdout,"Process %d of %d is on %s\n",
 									 mynod, nprocs, processor_name);
-   
-   if (opt_individual_file)
-   {
-        sprintf(file_name, "%s_%d", opt_file, mynod);
-   }
-   else
-   {
-        strncpy(file_name, opt_file, 1023);
-   }
 
    if (mynod == 0) printf("# Using mpi-io calls.\n");
 
@@ -137,7 +125,7 @@ int main(int argc, char **argv)
 	else {
 		comm = MPI_COMM_SELF;
 	}
-   err = MPI_File_open(comm, file_name, 
+   err = MPI_File_open(comm, opt_file, 
 							  MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
    if (err != MPI_SUCCESS) {
       handle_error(err, "MPI_File_open");
@@ -154,22 +142,11 @@ int main(int argc, char **argv)
       /* reading and writing to the same block is cheating, but sometimes
        * we want to measure cached performance of file servers */
       if (opt_single == 1)
-      {
 			seek_position = 0;
-      }
       else
-      {
-           if (opt_individual_file)
-           {
-              seek_position = (j*opt_block);
-           }
-           else
-           {
 			/* seek to an appropriate position depending on the iteration 
 			 * and rank of the current process */
-		      seek_position = (j*iter_jump)+(mynod*opt_block);
-           }
-      }
+			seek_position = (j*iter_jump)+(mynod*opt_block);
 
       MPI_File_seek(fh, seek_position, MPI_SEEK_SET);
 
@@ -190,15 +167,13 @@ int main(int argc, char **argv)
 			err = MPI_File_write(fh, buf, nchars, MPI_CHAR, &status);
 		}
       if(err){
-			handle_error(err, "MPI_File_write/write_all");
+         fprintf(stderr, "node %d, write error: %s\n", mynod, 
+         strerror(errno));
       }
-		if (opt_correct && !check_count(nchars, MPI_CHAR, &status)) {
-			my_correct = 0;
-		   fprintf(stderr, "short write");
-		}
       if (opt_sync) sync_err = MPI_File_sync(fh);
       if (sync_err) {
-			handle_error(err, "MPI_File_sync");
+         fprintf(stderr, "node %d, sync error: %s\n", mynod, 
+					  strerror(errno));
       }
 
       /* discover the ending time of the operation */
@@ -212,7 +187,7 @@ int main(int argc, char **argv)
 
    err = MPI_File_close(&fh);
    if(err){
-		handle_error(err, "MPI_File_close");
+      fprintf(stderr, "node %d, close error after write\n", mynod);
    }
     
    /* wait for everyone to synchronize at this point */
@@ -222,7 +197,7 @@ int main(int argc, char **argv)
    err = MPI_File_open(comm, opt_file, 
 			   MPI_MODE_CREATE | MPI_MODE_RDWR, MPI_INFO_NULL, &fh);
    if (err < 0) {
-		handle_error(err, "MPI_File_open");
+      fprintf(stderr, "node %d, open error: %s\n", mynod, strerror(errno));
       goto die_jar_jar_die;
    }
 
@@ -232,23 +207,14 @@ int main(int argc, char **argv)
    for (j=0; j < opt_iter; j++) {
       /* reading and writing to the same block is cheating, but sometimes
        * we want to measure cached performance of file servers */
-      if (opt_single == 1)
-      {
-            seek_position = 0;
-      }
-      else
-      {
-           if (opt_individual_file)
-           {
-              seek_position = (j*opt_block);
-           }
-           else
-           {
-            /* seek to an appropriate position depending on the iteration 
-             * and rank of the current process */
-              seek_position = (j*iter_jump)+(mynod*opt_block);
-           }
-      }
+      if (opt_single == 1) {
+			seek_position = 0;
+		}
+      else {
+			/* seek to an appropriate position depending on the iteration 
+			 * and rank of the current process */
+			seek_position = (j*iter_jump)+(mynod*opt_block);
+		}
 
       MPI_File_seek(fh, seek_position, MPI_SEEK_SET);
 
@@ -270,11 +236,8 @@ int main(int argc, char **argv)
       read_tim += (etim - stim);
 
       if (err < 0) {
-			handle_error(err, "MPI_File_write/write_all");
-		}
-		if (opt_correct && !check_count(nchars, MPI_CHAR, &status)) {
-			my_correct = 0;
-			fprintf(stderr, "short read");
+			fprintf(stderr, "node %d, read error, loc = %lld: %s\n",
+				mynod, (long long) mynod*opt_block, strerror(myerrno));
 		}
 
       /* if the user wanted to check correctness, compare the write
@@ -307,7 +270,7 @@ int main(int argc, char **argv)
    /* close the file */
    err = MPI_File_close(&fh);
    if (err) {
-	   handle_error(err, "MPI_File_close");
+      fprintf(stderr, "node %d, close error after write\n", mynod);
    }
 
    /* compute the read and write times */
@@ -387,16 +350,13 @@ static int parse_args(int argc, char **argv)
 {
    int c;
    
-   while ((c = getopt(argc, argv, "b:i:f:p:CcyShvrwI")) != EOF) {
+   while ((c = getopt(argc, argv, "b:i:f:p:CcyShvrw")) != EOF) {
       switch (c) {
          case 'b': /* block size */
             opt_block = atoi(optarg);
             break;
          case 'i': /* iterations */
             opt_iter = atoi(optarg);
-            break;
-         case 'I': /* individual file per process */
-            opt_individual_file = 1;
             break;
          case 'f': /* filename */
             strncpy(opt_file, optarg, 255);
@@ -438,13 +398,6 @@ static int parse_args(int argc, char **argv)
             break;
       }
    }
-   
-   if ( opt_individual_file  && opt_coll )
-   {
-        printf("Flags individual file in combination with collective "
-            "I/O operation not compatible\n"); 
-        exit(1);
-   }
    return(0);
 }
 
@@ -456,7 +409,6 @@ static void usage(void)
     printf(" -c       verify correctness of file data [default: off]\n");
     printf(" -C       perform operations Collectively [default: off]\n");
     printf(" -i       iterations [default: 1]\n");
-    printf(" -I       individual file per process [default: off]\n");
     printf(" -f       filename [default: /foo/test.out]\n");
     printf(" -p       path to pvfs2tab file to use [default: notset]\n");
     printf(" -S       all process write to same Single region of file [default: off]\n");
@@ -474,13 +426,7 @@ static void handle_error(int errcode, char *str)
 
     MPI_Error_string(errcode, msg, &resultlen);
     fprintf(stderr, "%s: %s\n", str, msg);
-}
-
-static int check_count(int count, MPI_Datatype type, MPI_Status *status)
-{
-    int statcount;
-    MPI_Get_count(status, type, &statcount);
-	 return (statcount==count);
+    MPI_Abort(MPI_COMM_WORLD, 1);
 }
 
 /*
@@ -489,6 +435,8 @@ static int check_count(int count, MPI_Datatype type, MPI_Status *status)
  *  c-basic-offset: 3
  *  tab-width: 3
  *
- * End:
  * vim: ts=3
+ * End:
  */ 
+
+

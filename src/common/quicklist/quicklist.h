@@ -120,23 +120,6 @@ static __inline__ int qlist_empty(struct qlist_head *head)
 }
 
 /**
- * qlist_pop - pop the first item off the list and return it
- * @head: qlist to modify
- */
-static __inline__ struct qlist_head* qlist_pop(struct qlist_head *head)
-{
-    struct qlist_head *item = NULL;
-
-    if (!qlist_empty(head))
-    {
-        item = head->next;
-        qlist_del(item);
-    }
-
-    return item;
-}
-
-/**
  * qlist_splice - join two qlists
  * @qlist: the new qlist to add.
  * @head: the place to add it in the first qlist.

@@ -135,11 +135,6 @@ int PINT_cached_config_get_server_list(
 int PINT_cached_config_reinitialize(
     struct server_configuration_s *config);
 
-int PINT_cached_config_io_server_names(
-    char ***list, 
-    int *size,
-    PVFS_fs_id fsid);
-
 #endif /* __PINT_CACHED_CONFIG_H */
 
 /*

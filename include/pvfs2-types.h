@@ -6,6 +6,7 @@
 /* NOTE: if you make any changes to the encoding definitions in this file, 
  * please update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
  */
+
 /** \file
  *
  *  Definitions of types used throughout PVFS2.
@@ -369,6 +370,11 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL_TIMES \
 ((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
 
+
+/* Extended attribute flags */
+#define PVFS_XATTR_CREATE  0x1
+#define PVFS_XATTR_REPLACE 0x2
+
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
 #define PVFS_XATTR_REPLACE 0x2
@@ -440,7 +446,7 @@ endecode_fields_2(
                                         by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
-#define PVFS_MAX_XATTR_LISTLEN   8  /* Not the same as XATTR_LIST_MAX
+#define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */

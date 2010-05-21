@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pvfs2.h"
 #include "bmi.h"
 #include "test-bmi.h"
 #include "gossip.h"
@@ -142,7 +141,7 @@ int main(
     /* send the initial request on its way */
     ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req,
 				  sizeof(struct server_request), BMI_PRE_ALLOC,
-				  0, in_test_user_ptr, context, NULL);
+				  0, in_test_user_ptr, context);
     if (ret < 0)
     {
 	errno = -ret;
@@ -184,7 +183,7 @@ int main(
     /* post a recv for the server acknowledgement */
     ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack,
 			sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC,
-			0, in_test_user_ptr, context, NULL);
+			0, in_test_user_ptr, context);
     if (ret < 0)
     {
 	errno = -ret;
@@ -267,7 +266,7 @@ int main(
     ret = BMI_post_send_list(&(client_ops[0]), server_addr,
 			     (const void **) buffer_list, size_list, 3,
 			     (MSG1_SIZE + MSG2_SIZE + MSG3_SIZE),
-			     BMI_PRE_ALLOC, 0, in_test_user_ptr, context, NULL);
+			     BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
     if (ret < 0)
     {
 	errno = -ret;

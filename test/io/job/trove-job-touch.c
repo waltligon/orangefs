@@ -136,8 +136,7 @@ int main(int argc, char **argv)
 		0,
 		&job_stat,
 		&foo_id,
-		context,
-                NULL);
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_dspace_create() failure.\n");
@@ -169,7 +168,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
 	ret = job_trove_keyval_write(coll_id, parent_handle, &key,
-		&val, 0, NULL, NULL, 0, &job_stat, &foo_id, context, NULL);
+		&val, 0, NULL, NULL, 0, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");

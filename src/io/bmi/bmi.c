@@ -52,17 +52,6 @@ struct forget_item
 };
 
 /*
- * BMI trigger to reap all method resources for inactive addresses.
- */
-static QLIST_HEAD(bmi_addr_force_drop_list);
-static gen_mutex_t bmi_addr_force_drop_list_mutex = GEN_MUTEX_INITIALIZER;
-struct drop_item
-{
-    struct qlist_head link;
-    char  *method_name;
-};
-
-/*
  * Static list of defined BMI methods.  These are pre-compiled into
  * the client libraries and into the server.
  */
@@ -132,9 +121,7 @@ static int global_flags;
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
 static void bmi_addr_drop(ref_st_p tmp_ref);
-static void bmi_addr_force_drop(ref_st_p ref, ref_list_p ref_list);
 static void bmi_check_forget_list(void);
-static void bmi_check_addr_force_drop (void);
 
 /** Initializes the BMI layer.  Must be called before any other BMI
  *  functions.
@@ -979,7 +966,6 @@ int BMI_testunexpected(int incount,
 
     /* figure out if we need to drop any stale addresses */
     bmi_check_forget_list();
-    bmi_check_addr_force_drop();
 
     gen_mutex_lock(&active_method_count_mutex);
     tmp_active_method_count = active_method_count;
@@ -1994,29 +1980,6 @@ int bmi_method_addr_forget_callback(BMI_addr_t addr)
 }
 
 /*
- * Signal BMI to drop inactive connections for this method.
- */
-void bmi_method_addr_drop_callback (char* method_name)
-{
-    struct drop_item *item =
-        (struct drop_item *) malloc(sizeof(struct drop_item));
-
-    /*
-     * If we can't allocate, just return.
-     * Maybe this will succeed next time.
-     */
-    if (!item) return;
-
-    item->method_name = method_name;
-    
-    gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
-    qlist_add(&item->link, &bmi_addr_force_drop_list);
-    gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
-
-    return;
-}
-
-/*
  * Attempt to insert this name into the list of active methods,
  * and bring it up.
  * NOTE: assumes caller has protected active_method_count with a mutex lock
@@ -2253,60 +2216,6 @@ static void bmi_addr_drop(ref_st_p tmp_ref)
          */
         dealloc_ref_st(tmp_ref);
     }
-    return;
-}
-
-
-/* bmi_addr_force_drop
- *
- * Destroys a complete BMI address, including forcing the method to clean up 
- * its portion.
- *
- * NOTE: must be called with ref list mutex held 
- */
-static void bmi_addr_force_drop(ref_st_p ref, ref_list_p ref_list)
-{
-    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                 "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
-                 __func__, llu(ref->bmi_addr));
-
-    ref_list_rem(ref_list, ref->bmi_addr);
-    dealloc_ref_st(ref);
-
-    return;
-}
-
-/*
- * bmi_check_addr_force_drop
- *
- * Checks to see if any method has requested freeing resources.
- */
-static void bmi_check_addr_force_drop (void)
-{
-    struct drop_item *drop_item = NULL;
-    ref_st_p          ref_item = NULL;
-
-    gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
-    while (!qlist_empty(&bmi_addr_force_drop_list))
-    {
-        drop_item = qlist_entry(qlist_pop(&bmi_addr_force_drop_list),
-                                struct drop_item,
-                                link);
-        gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
-        gen_mutex_lock(&ref_mutex);
-        qlist_for_each_entry(ref_item, cur_ref_list, list_link)
-        {
-             if ((ref_item->ref_count == 0) &&
-                 (ref_item->interface->method_name == drop_item->method_name))
-             {
-                 bmi_addr_force_drop(ref_item, cur_ref_list);
-             }
-        }
-        gen_mutex_unlock(&ref_mutex);
-        gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
-    }
-    gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
-
     return;
 }
 

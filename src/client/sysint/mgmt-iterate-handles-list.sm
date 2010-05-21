@@ -181,16 +181,14 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
     j=0;
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-skipped:
+
 	/* skip servers that have already reached end */
 	/* TODO: use a better #define or something for ITERATE_END */
-	if(sm_p->u.iterate_handles_list.position_array[j]
+	if(sm_p->u.iterate_handles_list.position_array[i]
 	    == PVFS_ITERATE_END)
 	{
 	    sm_p->msgarray_op.count--;
-	    sm_p->u.iterate_handles_list.handle_count_array[j] = 0;
-            j++;
-            goto skipped;
+	    sm_p->u.iterate_handles_list.handle_count_array[i] = 0;
 	}
 	else
 	{
@@ -198,16 +196,16 @@ skipped:
                 msg_p->req,
 		capability,
 		sm_p->u.iterate_handles_list.fs_id,
-		sm_p->u.iterate_handles_list.handle_count_array[j],
-		sm_p->u.iterate_handles_list.position_array[j],
+		sm_p->u.iterate_handles_list.handle_count_array[i],
+		sm_p->u.iterate_handles_list.position_array[i],
                 sm_p->u.iterate_handles_list.flags,
 		sm_p->hints);
+	    j++;
 	    msg_p->fs_id = sm_p->u.iterate_handles_list.fs_id;
 	    msg_p->handle = PVFS_HANDLE_NULL;
 	    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	    msg_p->comp_fn = iterate_handles_list_comp_fn;
-	    msg_p->svr_addr = sm_p->u.iterate_handles_list.addr_array[j];
-	    j++;
+	    msg_p->svr_addr = sm_p->u.iterate_handles_list.addr_array[i];
 	}
     }
 

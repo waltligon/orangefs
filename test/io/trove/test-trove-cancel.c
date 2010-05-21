@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 
     /* first remove the file handle we're about to use if it exists */
     ret = trove_dspace_remove(coll_id, requested_file_handle,
-                              0, NULL, trove_context, &op_id, NULL);
+                              0, NULL, trove_context, &op_id);
 
     while (ret == 0)
     {
@@ -145,8 +145,7 @@ int main(int argc, char **argv)
                               TROVE_FORCE_REQUESTED_HANDLE,
                               NULL,
                               trove_context,
-                              &op_id,
-                              NULL);
+                              &op_id);
     while (ret == 0)
     {
         ret = trove_dspace_test(
@@ -166,7 +165,7 @@ int main(int argc, char **argv)
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
     ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
-                             0, NULL, NULL, trove_context, &op_id, NULL);
+                             0, NULL, NULL, trove_context, &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -219,8 +218,7 @@ int main(int argc, char **argv)
                                    NULL, /* vtag */
                                    user_ptr_array,
                                    trove_context,
-                                   &op_id,
-                                   NULL);
+                                   &op_id);
 
     ret = trove_bstream_write_list(coll_id,
                                    parent_handle,
@@ -235,8 +233,7 @@ int main(int argc, char **argv)
                                    NULL, /* vtag */
                                    user_ptr_array,
                                    trove_context,
-                                   &op_id2,
-                                   NULL);
+                                   &op_id2);
 
     fprintf(stderr, "*** Ok, calling trove_dspace_cancel now on op 2\n");
     ret = trove_dspace_cancel(coll_id, op_id2, trove_context);
@@ -289,8 +286,7 @@ int main(int argc, char **argv)
                                   NULL, /* vtag */
                                   user_ptr_array,
                                   trove_context,
-                                  &op_id,
-                                  NULL);
+                                  &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);

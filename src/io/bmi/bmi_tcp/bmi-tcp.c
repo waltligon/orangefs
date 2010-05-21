@@ -3648,17 +3648,9 @@ static int tcp_accept_init(int *socket, char** peer)
 	    (errno == EHOSTDOWN) ||
 	    (errno == ENONET) ||
             (errno == EHOSTUNREACH) ||
-	    (errno == EOPNOTSUPP) ||
-            (errno == ENETUNREACH) ||
-            (errno == ENFILE) ||
-            (errno == EMFILE))
+	    (errno == EOPNOTSUPP) || (errno == ENETUNREACH))
 	{
 	    /* try again later */
-            if ((errno == ENFILE) || (errno == EMFILE))
-            {
-	        gossip_err("Error: accept: %s (continuing)\n",strerror(errno));
-                bmi_method_addr_drop_callback(BMI_tcp_method_name);
-            }
 	    return (0);
 	}
 	else

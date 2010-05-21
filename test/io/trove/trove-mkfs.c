@@ -108,8 +108,7 @@ int main(int argc, char **argv)
 			      (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
 			      NULL,
                               trove_context,
-			      &op_id,
-                              NULL);
+			      &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);

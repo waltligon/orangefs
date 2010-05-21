@@ -443,7 +443,6 @@ static PINT_sm_action io_init(
 static PINT_sm_action io_inspect_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (PINT_smcb_cancelled(smcb))
     {
@@ -794,6 +793,7 @@ static PINT_sm_action io_datafile_post_msgpairs(
                      status_user_tag, msg->max_resp_sz);
 
         cur_ctx->session_tag = PINT_util_get_next_tag();
+
         cur_ctx->msg_recv_has_been_posted = 0;
         cur_ctx->msg_recv_in_progress = 0;
 

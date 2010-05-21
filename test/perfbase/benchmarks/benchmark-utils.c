@@ -106,7 +106,7 @@ int test_util_get_io_perfs(
     ret = PVFS_mgmt_perf_mon_list(
 	cur_fs, &creds, perf_matrix, 
 	end_time_ms_array, addr_array, next_id_array,
-	count, HISTORY, NULL, NULL);
+	count, HISTORY, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
@@ -143,7 +143,7 @@ int test_util_get_metadata_perfs(
     ret = PVFS_mgmt_perf_mon_list(
 	cur_fs, &creds, perf_matrix, 
 	end_time_ms_array, addr_array, next_id_array,
-	count, HISTORY, NULL, NULL);
+	count, HISTORY, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
@@ -179,7 +179,7 @@ int test_util_get_queue_perfs(
     ret = PVFS_mgmt_perf_mon_list(
 	cur_fs, &creds, perf_matrix, 
 	end_time_ms_array, addr_array, next_id_array,
-	count, HISTORY, NULL, NULL);
+	count, HISTORY, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);

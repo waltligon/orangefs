@@ -1787,52 +1787,6 @@ static int load_handle_lookup_table(
     return(0);
 }
 
-/* PINT_cached_config_server_names()
- *
- * Returns a list of pointers to the IO server names currently running in this   
- * file system.
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_cached_config_io_server_names( char ***list
-                                      , int *size
-                                      , PVFS_fs_id fsid)
-{
-    int i;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-
-    assert(PINT_fsid_config_cache_table);
-
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
-    if(!hash_link)
-    {
-        return(-PVFS_ENOENT);
-    }
-
-    cur_config_cache = qlist_entry(
-        hash_link, struct config_fs_cache_s, hash_link);
-
-    assert(cur_config_cache);
-
-    *size = cur_config_cache->io_server_count;
-
-    *list = malloc(sizeof(char *) * (*size));
-
-    if (! (*list) )
-       return(-PVFS_ENOMEM);
-
-    memset(*list,0,sizeof(char *) * (*size));
-
-    for (i=0; i<(*size); i++)
-    {
-        /*addr_string originates from the alias mapping->bmi_address*/
-        (*list)[i] = cur_config_cache->io_server_array[i].addr_string;
-    }
-
-   return(0);
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4

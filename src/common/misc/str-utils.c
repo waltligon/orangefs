@@ -143,40 +143,32 @@ int PINT_string_next_segment(char *pathname,
     char *ptr = (char *)0;
 
     /* initialize our starting position */
-    if (*inout_segp == NULL)
-    {
-        ptr = pathname;
+    if (*inout_segp == NULL) {
+	ptr = pathname;
     }
-    else if (*opaquep != NULL)
-    {
-        /* replace the '/', point just past it */
-        ptr = (char *) *opaquep;
-        *ptr = '/';
-        ptr++;
+    else if (*opaquep != NULL) {
+	/* replace the '/', point just past it */
+	ptr = (char *) *opaquep;
+	*ptr = '/';
+	ptr++;
     }
-    else
-        return -1; /* NULL *opaquep indicates last segment returned last time */
+    else return -1; /* NULL *opaquep indicates last segment returned last time */
 
     /* at this point, the string is back in its original state */
 
     /* jump past separators */
-    while ((*ptr != '\0') && (*ptr == '/'))
-        ptr++;
-    if (*ptr == '\0')
-        return -1; /* all that was left was trailing '/'s */
+    while ((*ptr != '\0') && (*ptr == '/')) ptr++;
+    if (*ptr == '\0') return -1; /* all that was left was trailing '/'s */
 
     *inout_segp = ptr;
 
     /* find next separator */
-    while ((*ptr != '\0') && (*ptr != '/'))
-        ptr++;
-    if (*ptr == '\0')
-        *opaquep = NULL; /* indicate last segment */
-    else
-    {
-        /* terminate segment and save position of terminator */
-        *ptr = '\0';
-        *opaquep = ptr;
+    while ((*ptr != '\0') && (*ptr != '/')) ptr++;
+    if (*ptr == '\0') *opaquep = NULL; /* indicate last segment */
+    else {
+	/* terminate segment and save position of terminator */
+	*ptr = '\0';
+	*opaquep = ptr;
     }
     return 0;
 }
@@ -319,14 +311,14 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
      * segments*/
     for(i =0; i < pathlen; i++)
     {
-        if (path[i] == '/')
-        {
-	         num_slashes_seen++;
-            if (num_slashes_seen > skip)
-            {
-                break;
-            }
-        }
+	if (path[i] == '/')
+	{
+	    num_slashes_seen++;
+	    if (num_slashes_seen > skip)
+	    {
+		break;
+	    }
+	}
     }
 
     delimiter1 = i;
@@ -363,15 +355,15 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 
     if (!comma_list || !tokens)
     {
-        return (0);
+	return (0);
     }
 
     /* count how many commas we have first */
     holder = comma_list;
     while ((holder = index(holder, ',')))
     {
-        tokencount++;
-        holder++;
+	tokencount++;
+	holder++;
     }
 
     /* if we don't find any commas, just set the entire string to the first
@@ -387,18 +379,18 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
     {
-        return 0;
+	return 0;
     }
 
     if(1 == tokencount)
     {
-        (*tokens)[0] = strdup(comma_list);
-        if(!(*tokens)[0])
-        {
-            tokencount = 0;
-            goto failure;
-        }
-        return tokencount;
+	(*tokens)[0] = strdup(comma_list);
+	if(!(*tokens)[0])
+	{
+	    tokencount = 0;
+	    goto failure;
+	}
+	return tokencount;
     }
 
     /* copy out all of the tokenized strings */
@@ -406,41 +398,42 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     end = comma_list + strlen(comma_list);
     for (i = 0; i < tokencount && holder; i++)
     {
-        holder2 = index(holder, ',');
-        if (!holder2)
-        {
-            holder2 = end;
-        }
+	holder2 = index(holder, ',');
+	if (!holder2)
+	{
+	    holder2 = end;
+	}
         if (holder2 - holder == 0) {
             retval--;
-            return (retval);
+            goto out;
         }
-        (*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
-        if (!(*tokens)[i])
-        {
-            goto failure;
-        }
-        strncpy((*tokens)[i], holder, (holder2 - holder));
-        (*tokens)[i][(holder2 - holder)] = '\0';
+	(*tokens)[i] = (char *) malloc((holder2 - holder) + 1);
+	if (!(*tokens)[i])
+	{
+	    goto failure;
+	}
+	strncpy((*tokens)[i], holder, (holder2 - holder));
+	(*tokens)[i][(holder2 - holder)] = '\0';
         assert(strlen((*tokens)[i]) != 0);
-        holder = holder2 + 1;
+	holder = holder2 + 1;
     }
 
+out:
     return (retval);
 
-failure:
+  failure:
 
     /* free up any memory we allocated if we failed */
     if (*tokens)
     {
-        for (i = 0; i < tokencount; i++)
-        {
-            if ((*tokens)[i])
-            {
-                free((*tokens)[i]);
-            }
-        }
-        free(*tokens);
+	for (i = 0; i < tokencount; i++)
+	{
+	    if ((*tokens)[i])
+	    {
+		free((*tokens)[i]);
+	    }
+	}
+	free(*tokens);
     }
     return (0);
 }

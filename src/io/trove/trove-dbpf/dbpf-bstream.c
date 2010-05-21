@@ -186,10 +186,7 @@ static void aio_progress_notification(union sigval sig)
                     gen_mutex_unlock(&dbpf_update_size_lock);
                     goto error_in_cleanup;
                 }
-                if(op_p->flags & TROVE_SYNC)
-                {
-                    sync_required = 1;
-                }
+                sync_required = 1;
             }
             gen_mutex_unlock(&dbpf_update_size_lock);
         }

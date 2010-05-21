@@ -75,9 +75,8 @@
 #define GOSSIP_USER_DEV_DEBUG          ((uint64_t)1 << 53)
 #define GOSSIP_DIRECTIO_DEBUG          ((uint64_t)1 << 54)
 #define GOSSIP_MGMT_DEBUG              ((uint64_t)1 << 55)
-#define GOSSIP_MIRROR_DEBUG            ((uint64_t)1 << 56)
-#define GOSSIP_SECURITY_DEBUG          ((uint64_t)1 << 57)
-#define GOSSIP_GETCRED_DEBUG           ((uint64_t)1 << 58)
+#define GOSSIP_SECURITY_DEBUG          ((uint64_t)1 << 56)
+#define GOSSIP_GETCRED_DEBUG           ((uint64_t)1 << 57)
 
 /* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in

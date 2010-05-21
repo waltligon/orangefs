@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "pvfs2.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "test-bmi.h"
@@ -157,7 +156,7 @@ int main(
     /* post the ack */
     ret = BMI_post_send(&(server_ops[1]), client_addr, my_ack,
 			sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL,
-			context, NULL);
+			context);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_send_failure.\n");
@@ -183,7 +182,7 @@ int main(
     /* post the recv */
     ret = BMI_post_recv(&(server_ops[0]), client_addr, recv_buffer,
 			my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL,
-			context, NULL);
+			context);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -232,7 +231,7 @@ int main(
     
     ret = BMI_post_recv_list(&(server_ops_list[0]), client_addr, buffer_list1,
 			size_list1, 2, 6, &actual_size, BMI_EXT_ALLOC, 1, NULL,
-			context, NULL);
+			context);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -275,7 +274,7 @@ int main(
     
     ret = BMI_post_recv_list(&(server_ops_list[0]), client_addr, buffer_list1,
 			size_list1, 2, 6, &actual_size, BMI_EXT_ALLOC, 1, NULL,
-			context, NULL);
+			context);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_recv_failure.\n");

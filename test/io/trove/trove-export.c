@@ -99,7 +99,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
     ret = trove_keyval_read(coll_id, parent_handle, &key, &val,
-                            0, NULL, NULL, trove_context, &op_id, NULL);
+                            0, NULL, NULL, trove_context, &op_id);
     count = 1;
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
@@ -115,18 +115,17 @@ int main(int argc, char **argv)
 			       0 /* flags */,
 			       NULL,
                                trove_context,
-			       &op_id,
-                               NULL);
+			       &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) return -1;
 
     /* get a buffer */
-    buf = (char *) malloc((size_t) s_attr.u.datafile.b_size);
+    buf = (char *) malloc((size_t) s_attr.b_size);
     if (buf == NULL) return -1;
 
-    f_size = s_attr.u.datafile.b_size;
+    f_size = s_attr.b_size;
     /* read data from trove file */
     ret = trove_bstream_read_at(coll_id,
 				file_handle,
@@ -137,8 +136,7 @@ int main(int argc, char **argv)
 				NULL, /* vtag */
 				NULL, /* user ptr */
                                 trove_context,
-				&op_id,
-                                NULL);
+				&op_id);
     count = 1;
     while ( ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,

@@ -32,7 +32,7 @@ typedef struct job_status
     /* the comments indicate which type of job will fill in which fields */
     job_aint status_user_tag;   /* tag supplied by caller */
     int error_code;		/* returned by all operations */
-    PVFS_size actual_size;	/* resize, bmi_recv */
+    PVFS_size actual_size;	/* read_at, write_at, resize, bmi_recv */
     PVFS_vtag *vtag;		/* most trove operations */
     PVFS_ds_position position;	/* iterate, iterate_keys, iterate_handles */
     PVFS_handle handle;		/* dspace_create */
@@ -226,6 +226,20 @@ int job_flow(flow_descriptor * flow_d,
 int job_flow_cancel(job_id_t id, job_context_id context_id);
 
 /* storage byte stream write */
+int job_trove_bstream_write_at(PVFS_fs_id coll_id,
+                               PVFS_handle handle,
+                               PVFS_offset offset,
+                               void *buffer,
+                               PVFS_size size,
+                               PVFS_ds_flags flags,
+                               PVFS_vtag * vtag,
+                               void *user_ptr,
+                               job_aint status_user_tag,
+                               job_status_s * out_status_p,
+                               job_id_t * id,
+                               job_context_id context_id,
+                               PVFS_hint hints);
+
 int job_trove_bstream_write_list(PVFS_fs_id coll_id,
                                  PVFS_handle handle,
                                  char **mem_offset_array,
@@ -246,6 +260,19 @@ int job_trove_bstream_write_list(PVFS_fs_id coll_id,
 
 
 /* storage byte stream read */
+int job_trove_bstream_read_at(PVFS_fs_id coll_id,
+                              PVFS_handle handle,
+                              PVFS_offset offset,
+                              void *buffer,
+                              PVFS_size size,
+                              PVFS_ds_flags flags,
+                              PVFS_vtag * vtag,
+                              void *user_ptr,
+                              job_aint status_user_tag,
+                              job_status_s * out_status_p,
+                              job_id_t * id,
+                              job_context_id context_id,
+                              PVFS_hint hints);
 
 int job_trove_bstream_read_list(PVFS_fs_id coll_id,
                                 PVFS_handle handle,

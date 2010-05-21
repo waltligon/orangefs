@@ -157,15 +157,8 @@ sub parse_hostlist
     # hostc{1,2,3}
     #
     @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?[^,]*))/g;
-    foreach my $comp_ws (@components)
+    foreach my $comp (@components)
     {
-        my $comp;
-
-        # Trim leading and trailing whitespace
-        $comp = $comp_ws;
-        $comp =~ s/^\s+//;
-        $comp =~ s/\s+$//;
-
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
         if($comp =~ /([^{]+){([^}]+)}(.*)$/)

@@ -558,7 +558,6 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         tmp = index(mntent->mnt_dir, '=');
         *tmp = 0;
         mntent->mnt_opts = strdup("rw");
-        mntent->fs_id = PVFS_FS_ID_NULL;
         return &s_stat_tab_array[0];
     }
 

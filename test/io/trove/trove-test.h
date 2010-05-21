@@ -70,7 +70,7 @@ static inline int path_lookup(
 	val.buffer_sz = sizeof(handle);
 	ret = trove_keyval_read(
             coll_id, parent_handle, &key, &val, 0,
-            NULL, NULL, context_id, &op_id, NULL);
+            NULL, NULL, context_id, &op_id);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, context_id, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -85,7 +85,7 @@ static inline int path_lookup(
 
 	/* TODO: verify that this is in fact a directory! */
 	ret = trove_dspace_getattr(
-            coll_id, handle, &s_attr, 0, NULL, context_id, &op_id, NULL);
+            coll_id, handle, &s_attr, 0, NULL, context_id, &op_id);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, context_id, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);

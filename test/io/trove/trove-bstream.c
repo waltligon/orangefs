@@ -80,8 +80,7 @@ int main(int argc, char ** argv )
 			      TROVE_FORCE_REQUESTED_HANDLE | TROVE_SYNC,
 			      NULL,
                               trove_context,
-			      &op_id,
-                              NULL);
+			      &op_id);
     while (ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -97,8 +96,7 @@ int main(int argc, char ** argv )
     ret = trove_bstream_write_at(coll_id, file_handle, 
 				 &foo, &buffsz,
 				 0, 0, NULL, NULL,
-                                 trove_context, &op_id,
-                                 NULL);
+                                 trove_context, &op_id);
     while ( ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -109,8 +107,7 @@ int main(int argc, char ** argv )
     ret = trove_bstream_write_at(coll_id, file_handle,
 				 foo.string, &buffsz,
 				 buffsz, 0, NULL, NULL,
-                                 trove_context, &op_id,
-                                 NULL);
+                                 trove_context, &op_id);
     while ( ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -123,8 +120,7 @@ int main(int argc, char ** argv )
     ret = trove_bstream_read_at(coll_id, file_handle,
 				&bar, &buffsz,
 				0, 0, NULL, NULL,
-                                trove_context, &op_id,
-                                NULL);
+                                trove_context, &op_id);
     while ( ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);
@@ -136,8 +132,7 @@ int main(int argc, char ** argv )
     ret = trove_bstream_read_at(coll_id, file_handle, 
 				bar.string, &buffsz,
 				buffsz, 0, NULL, NULL,
-                                trove_context, &op_id,
-                                NULL);
+                                trove_context, &op_id);
     while ( ret == 0) ret = trove_dspace_test(
         coll_id, op_id, trove_context, &count, NULL, NULL, &state,
         TROVE_DEFAULT_TEST_TIMEOUT);

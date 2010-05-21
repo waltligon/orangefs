@@ -10,7 +10,6 @@
 #include <errno.h>
 #include <math.h>
 #include <mpi.h>
-#include "pvfs2.h"
 #include "bmi.h"
 
 #ifndef __BENCH_MEM_H

@@ -22,7 +22,6 @@
 #include <time.h>
 #include <math.h>
 
-#include "pvfs2.h"
 #include "bmi.h"
 #include "gossip.h"
 #include "test-bmi.h"
@@ -102,7 +101,7 @@ int main(int argc, char **argv)
         if (opts->which == SERVER)
             ret = BMI_initialize(opts->method, opts->hostid, BMI_INIT_SERVER);
         else
-            ret = BMI_initialize(NULL, NULL, 0);
+            ret = BMI_initialize(opts->method, NULL, 0);
 
         if (ret < 0) {
                 errno = -ret;
@@ -257,7 +256,7 @@ static int do_server(struct options *opts, bmi_context_id *context)
         /* post the ack */
         ret = BMI_post_send(&(op_id[SEND]), peer_addr, tx_msg,
                         msg_len, BMI_PRE_ALLOC, 0, NULL,
-                        *context, NULL);
+                        *context);
         if (ret < 0) {
                 fprintf(stderr, "BMI_post_send failure.\n");
                 return (-1);
@@ -287,7 +286,7 @@ static int do_server(struct options *opts, bmi_context_id *context)
                         if (opts->test == EXPECTED) {
                                 ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
                                                 bytes, &actual_size, BMI_PRE_ALLOC, i, NULL,
-                                                *context, NULL);
+                                                *context);
                     
                                 if (ret < 0) {
                                         fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -332,7 +331,7 @@ static int do_server(struct options *opts, bmi_context_id *context)
                         }
                         /* send the pong */
                         ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
-                                        bytes, BMI_PRE_ALLOC, i, NULL, *context, NULL);
+                                        bytes, BMI_PRE_ALLOC, i, NULL, *context);
                         if (ret < 0) {
                                 fprintf(stderr, "BMI_post_send failure.\n");
                                 return (-1);
@@ -441,7 +440,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
 
         /* post the test parameters */
         ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, tx_msg,
-                        msg_len, BMI_PRE_ALLOC, 0, NULL, *context, NULL);
+                        msg_len, BMI_PRE_ALLOC, 0, NULL, *context);
         if (ret < 0) {
                 fprintf(stderr, "BMI_post_sendunexpected failure.\n");
                 return (-1);
@@ -463,7 +462,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
 
         /* post a recv for the ack */
         ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
-                        msg_len, &actual_size, BMI_PRE_ALLOC, 0, NULL, *context, NULL);
+                        msg_len, &actual_size, BMI_PRE_ALLOC, 0, NULL, *context);
         if (ret < 0) {
                 fprintf(stderr, "BMI_post_recv_failure.\n");
                 return (-1);
@@ -507,7 +506,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
                         /* post the recv for the pong */
                         ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
                                         bytes, &actual_size, BMI_PRE_ALLOC, i,
-                                        NULL, *context, NULL);
+                                        NULL, *context);
             
                         if (ret < 0) {
                                 fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -517,11 +516,11 @@ static int do_client(struct options *opts, bmi_context_id *context)
                         /* send the ping */
                         if (opts->test == EXPECTED) {
                                 ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
-                                                bytes, BMI_PRE_ALLOC, i, NULL, *context, NULL);
+                                                bytes, BMI_PRE_ALLOC, i, NULL, *context);
                         } else {
                                 ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, 
                                                 send_buffer, bytes, BMI_PRE_ALLOC, i, 
-                                                NULL, *context, NULL);
+                                                NULL, *context);
                         }
                         if (ret < 0) {
                                 fprintf(stderr, "BMI_post_sendunexpected failure.\n");
