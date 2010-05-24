@@ -347,6 +347,7 @@ int client_state_machine_terminate(
                  "client_state_machine_terminate smcb %p completing\n",smcb);
 
         PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+
         PVFS_hint_free(sm_p->hints);
         sm_p->hints = NULL;
 
@@ -423,6 +424,9 @@ PVFS_error PINT_client_state_machine_post(
 
     if (!smcb)
     {
+        /* give back the hint added above */
+        PVFS_hint_free( sm_p->hints );
+        sm_p->hints = NULL;
         return ret;
     }
 
@@ -443,7 +447,11 @@ PVFS_error PINT_client_state_machine_post(
     {
         /* state machine code failed */
         gen_mutex_unlock(&test_mutex);
-        PVFS_hint_free(sm_p->hints);
+
+        /* give back the hint added above */
+        PVFS_hint_free( sm_p->hints );
+        sm_p->hints = NULL;
+
         return sm_ret;
     }
 
@@ -491,6 +499,12 @@ PVFS_error PINT_client_state_machine_release(
     PINT_smcb * smcb)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if( sm_p )
+    {
+        PVFS_hint_free( sm_p->hints );
+        sm_p->hints = NULL;
+    }
 
     PINT_smcb_set_complete(smcb);
 
@@ -907,6 +921,9 @@ static void PINT_sys_release_smcb(PINT_smcb *smcb)
     else 
     {
         cred_p = sm_p->cred_p;
+        /* free the hint if sm_p isn't null */
+        PVFS_hint_free( sm_p->hints );
+        sm_p->hints = NULL;
     }
 
     if (PINT_smcb_op(smcb) && cred_p)
