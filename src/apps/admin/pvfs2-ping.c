@@ -167,7 +167,8 @@ int main(int argc, char **argv)
 
     print_mntent(tab->mntent_array, tab->mntent_count);
 
-    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     /* dump some key parts of the config file */
     ret = print_config(cur_fs, cred);

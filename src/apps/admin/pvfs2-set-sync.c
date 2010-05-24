@@ -87,7 +87,8 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = user_opts->meta_sync;

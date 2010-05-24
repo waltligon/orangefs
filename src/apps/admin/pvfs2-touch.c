@@ -123,7 +123,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+        /* nlmills: TODO: fix me */
+        cred = NULL;
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, pvfs_path, cred,

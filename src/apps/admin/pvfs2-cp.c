@@ -161,17 +161,14 @@ int main (int argc, char ** argv)
 
     if (src.fs_type == PVFS2_FILE)
     {
-        src.u.pvfs2.cred = PVFS_util_find_credential_by_fsid(src.u.pvfs2.fs_id,
-                                                             creds,
-                                                             ncreds);
+        /* nlmills: TODO: fix me */
+        src.u.pvfs2.cred = NULL;
     }
 
     if (dest.fs_type == PVFS2_FILE)
     {
-        dest.u.pvfs2.cred = 
-            PVFS_util_find_credential_by_fsid(dest.u.pvfs2.fs_id,
-                                              creds,
-                                              ncreds);
+        /* nlmills: TODO: fix me */
+        dest.u.pvfs2.cred = NULL;
     }
 
     ret = generic_open(&src, 0, 0, NULL, OPEN_SRC);

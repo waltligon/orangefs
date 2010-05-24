@@ -92,7 +92,8 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     /* gather normal statfs statistics from system interface */
     ret = PVFS_sys_statfs(cur_fs, cred, &resp_statfs, NULL);

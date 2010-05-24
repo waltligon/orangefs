@@ -156,134 +156,10 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
-/* nlmills: TODO: document credential utilities */
+/* nlmills: TODO: remove this function completely */
 int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds)
 {
-    int nmntent;
-    int i, j;
-    int ret;
-
-    assert(creds);
-    assert(ncreds);
-
-    gen_mutex_lock(&s_stat_tab_mutex);
-
-    /* first time through count the total (static and dynamic) number of 
-     * mount entries
-     */
-    
-    nmntent = 0;
- 
-    for (i = 0; i < s_stat_tab_count; i++)
-    {
-        for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
-        {
-            if (PVFS_FS_ID_NULL != s_stat_tab_array[i].mntent_array[j].fs_id)
-            {
-                nmntent++;
-            }
-        }
-    }
-
-    for (i = 0; i < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
-    {
-        if (PVFS_FS_ID_NULL !=
-            s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].fs_id)
-        {
-            nmntent++;
-        }
-    }
-
-    /* nlmills: TODO: find why this isn't really being zeroed out */
-    *ncreds = 0;
-    *creds = calloc(nmntent, sizeof(PVFS_credential));
-    if (*creds == NULL)
-    {
-        gen_mutex_unlock(&s_stat_tab_mutex);
-        return -PVFS_ENOMEM;
-    }
-
-    /* second time through request the actual credentials */
-
-    /* static tab mount entries */
-    for (i = 0; i < s_stat_tab_count; i++)
-    {
-        for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
-        {
-            PVFS_fs_id fsid;
-            
-            fsid = s_stat_tab_array[i].mntent_array[j].fs_id;
-            if (PVFS_FS_ID_NULL != fsid)
-            {
-                PVFS_BMI_addr_t addr;
-
-                ret = BMI_addr_lookup(&addr,
-                    s_stat_tab_array[i].mntent_array[j].the_pvfs_config_server);
-                if (ret < 0)
-                {
-                    gossip_lerr("Failed to resolve BMI address %s\n",
-                        s_stat_tab_array[i].mntent_array[j].the_pvfs_config_server);
-                    goto error;
-                }
-                
-                ret = PVFS_util_gen_credential(fsid,
-                                               addr,
-                                               NULL,
-                                               NULL,
-                                               &(*creds)[*ncreds]);
-                if (ret < 0)
-                {
-                    goto error;
-                }
-                *ncreds += 1;
-            }
-        }
-    }
-                                               
-    /* dynamic tab mount entries */
-    for (i = 0; i < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
-    {
-        PVFS_fs_id fsid;
-
-        fsid = s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].fs_id;
-        if (PVFS_FS_ID_NULL != fsid)
-        {
-            PVFS_BMI_addr_t addr;
-            
-            ret = BMI_addr_lookup(&addr,
-                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].the_pvfs_config_server);
-            if (ret < 0)
-            {
-                gossip_lerr("Failed to resolve BMI address %s\n",
-                    s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i].the_pvfs_config_server);
-                goto error;
-            }
-
-            ret = PVFS_util_gen_credential(fsid,
-                                           addr,
-                                           NULL,
-                                           NULL,
-                                           &(*creds)[*ncreds]);
-            if (ret < 0)
-            {
-                goto error;
-            }
-            *ncreds += 1;
-        }
-    }
-
-    gen_mutex_unlock(&s_stat_tab_mutex);
-    return 0;
-
- error:
-    gen_mutex_unlock(&s_stat_tab_mutex);
-    for (i = 0; i < *ncreds; i++)
-    {
-        PINT_cleanup_credential(&(*creds)[i]);
-    }
-    free(*creds);
-    *creds = NULL;
-    return ret;
+    return -PVFS_ENOSYS;
 }
 
 
@@ -295,23 +171,6 @@ int PVFS_util_gen_credential(PVFS_fs_id fsid,
 {
     /* nlmills: TODO: rewrite this function and relatives */
     return -PVFS_ENOSYS;
-}
-
-PVFS_credential *PVFS_util_find_credential_by_fsid(PVFS_fs_id fsid,
-                                                   PVFS_credential *creds,
-                                                   int ncreds)
-{
-    int i;
-
-    for (i = 0; i < ncreds; i++)
-    {
-        if (creds[i].fsid == fsid)
-        {
-            return &creds[i];
-        }
-    }
-
-    return NULL;
 }
 
 int PVFS_util_get_umask(void)

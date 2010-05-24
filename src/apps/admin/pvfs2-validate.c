@@ -137,7 +137,8 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     if (fsck_options->check_stranded_objects && (strcmp(pvfs_path, "/") != 0))
     {

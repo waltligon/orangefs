@@ -1015,9 +1015,8 @@ int main(int argc, char **argv)
         }
         user_opts->start[i][j] = '\0';
 
-        cred = PVFS_util_find_credential_by_fsid(fs_id_array[i],
-                                                 creds,
-                                                 ncreds);
+        /* nlmills: TODO: fix me */
+        cred = NULL;
 
         do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], 
                 user_opts, cred);

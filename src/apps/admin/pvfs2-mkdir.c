@@ -144,7 +144,8 @@ int main(int argc, char **argv)
 
     for(i = 0; i < user_opts.numdirs; i++)
     {
-        cred = PVFS_util_find_credential_by_fsid(pfs_id[i], creds, ncreds);
+        /* nlmills: TODO: fix me */
+        cred = NULL;
         ret = make_directory(cred,
                              pfs_id[i],
                              user_opts.mode,

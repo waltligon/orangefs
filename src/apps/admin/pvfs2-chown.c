@@ -125,8 +125,9 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile,
     return -1;
   }
 
-  cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
-  
+  /* nlmills; TODO: fix me */
+  cred = NULL; 
+ 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
    */

@@ -93,7 +93,8 @@ int main(int argc, char **argv)
         return(-1);
    }
 
-    cred = PVFS_util_find_credential_by_fsid(fs_id, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     ret = make_link(cred,
                     fs_id,

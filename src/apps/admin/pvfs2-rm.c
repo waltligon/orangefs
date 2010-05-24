@@ -95,7 +95,8 @@ int main(int argc, char **argv)
             break;
         }
 
-        cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+        /* nlmills: TODO: fix me */
+        cred = NULL;
 
         tmp_len = strlen(pvfs_path);
         if(pvfs_path[tmp_len - 1] == '/')

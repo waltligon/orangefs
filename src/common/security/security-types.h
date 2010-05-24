@@ -38,10 +38,9 @@ endecode_fields_3a2a_struct (
     PVFS_handle, handle_array)
 
 /* nlmills: TODO: link to credential documentation */
+/* nlmills: TODO: cleanup endecode */
 typedef struct PVFS_credential PVFS_credential;
 struct PVFS_credential {
-    PVFS_fs_id fsid;       /* fsid for which this credential is valid */
-    uint32_t serial;       /* serial number for use in revocation */
     PVFS_uid userid;       /* user id */
     uint32_t num_groups;   /* length of group_array */
     PVFS_gid *group_array; /* groups for which the user is a member */
@@ -52,8 +51,8 @@ struct PVFS_credential {
 };
 endecode_fields_3a2a_struct (
     PVFS_credential,
-    PVFS_fs_id, fsid,
-    uint32_t, serial,
+    skip4,,
+    skip4,,
     PVFS_uid, userid,
     uint32_t, num_groups,
     PVFS_gid, group_array,

@@ -144,7 +144,8 @@ int main(int argc, char **argv)
    {
       PVFS_credential *cred;
 
-      cred = PVFS_util_find_credential_by_fsid(pfs_id[i], creds, ncreds);
+      /* nlmills: TODO: fix me */
+      cred = NULL;
 
       ret = do_stat(user_opts.pszFiles[i], 
                     ppszPvfsPath[i], 

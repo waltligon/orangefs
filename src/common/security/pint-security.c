@@ -435,7 +435,6 @@ int PINT_sign_credential(PVFS_credential *cred)
     EVP_MD_CTX_init(&mdctx);
     
     ret = EVP_SignInit_ex(&mdctx, md, NULL);
-    ret &= EVP_SignUpdate(&mdctx, &cred->serial, sizeof(uint32_t));
     ret &= EVP_SignUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
     ret &= EVP_SignUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
@@ -496,8 +495,6 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-    /* nlmills: TODO: implement credential revocation */
-
     pubkey = SECURITY_lookup_pubkey(cred->issuer);
     if (pubkey == NULL)
     {
@@ -522,8 +519,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-    ret = EVP_VerifyUpdate(&mdctx, &cred->serial, sizeof(uint32_t));
-    ret &= EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
+    ret = EVP_VerifyUpdate(&mdctx, &cred->userid, sizeof(PVFS_uid));
     ret &= EVP_VerifyUpdate(&mdctx, &cred->num_groups, sizeof(uint32_t));
     if (cred->num_groups)
     {

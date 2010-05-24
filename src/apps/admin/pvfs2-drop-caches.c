@@ -79,7 +79,8 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    cred = PVFS_util_find_credential_by_fsid(cur_fs, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     ret = PVFS_mgmt_setparam_all(cur_fs,
 				 cred,

@@ -222,7 +222,8 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    cred = PVFS_util_find_credential_by_fsid(ref.fs_id, creds, ncreds);
+    /* nlmills: TODO: fix me */
+    cred = NULL;
 
     if (user_opts->remove_object_only)
     {
