@@ -664,6 +664,19 @@ int PVFS_sys_wait(
 
 int PVFS_sys_cancel(PVFS_sys_op_id op_id);
 
+/* MIGRATE TOOLS */
+
+PVFS_error PVFS_mgmt_migrate(
+    PVFS_object_ref ref,
+    const PVFS_credentials *credentials,
+    PVFS_hint hints);
+
+PVFS_error PVFS_imgmt_migrate(
+    PVFS_object_ref ref,
+    const PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints);
+
 #endif
 
 /* @} */

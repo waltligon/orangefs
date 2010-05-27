@@ -145,6 +145,8 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
+struct PINT_client_migrate_sm{};
+
 /* this structure is used to handle mirrored retries in the small-io case*/
 typedef struct PINT_client_mirror_ctx
 {
@@ -582,6 +584,7 @@ typedef struct PINT_client_sm
     PVFS_credentials *cred_p;
     union
     {
+        struct PINT_client_migrate_sm migrate;
 	struct PINT_client_remove_sm remove;
         struct PINT_client_create_sm create;
 	struct PINT_client_mkdir_sm mkdir;
@@ -700,6 +703,7 @@ enum
     PVFS_MGMT_REMOVE_DIRENT        = 78,
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
+    PVFS_MGMT_MIGRATE              = 81,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -708,7 +712,7 @@ enum
 
 #define PVFS_OP_SYS_MAXVALID  21
 #define PVFS_OP_SYS_MAXVAL 69
-#define PVFS_OP_MGMT_MAXVALID 81
+#define PVFS_OP_MGMT_MAXVALID 82
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
@@ -805,6 +809,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_create_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_migrate_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
