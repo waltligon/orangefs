@@ -1,0 +1,108 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-util.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
+
+
+extern job_context_id pint_client_sm_context;
+
+
+%%
+
+machine pvfs2_client_mgmt_migrate_sm{
+	
+	state init{
+		run mgmt_migrate_init;
+		default => migrate_setup_msgpair;
+	}		
+	state cleanup{
+		run mgmt_migrate_cleanup;
+		default => terminate;
+	}	
+}
+
+%%
+
+
+PVFS_error PVFS_imgmt_migrate(
+		PVFS_object_ref ref,
+		const PVFS_credentials *credentials,
+		PVFS_sys_op_id *op_id,
+		PVFS_hint hints,
+		void *user_ptr)
+{
+	int ret = -PVFS_EINVAL;
+    PINT_smcb *smcb = NULL;
+    PINT_client_sm *sm_p = NULL;
+    
+    PINT_smcb_alloc(&smcb, PVFS_MGMT_MIGRATE,
+    				sizeof(struct PINT_client_sm),
+    				client_op_state_get_machine,
+    				client_state_machine_terminate,
+    				pint_client_sm_context);
+    if(smcb == NULL){
+    	return -PVFS_ENOMEM;
+    }
+    
+    
+    sm_p = PINT_sm_frame(smcb, PINT_CURRENT_FRAME);
+    PINT_init_msgarray_params(sm_p, ref.fs_id);
+    PINT_init_sysint_credentials(sm->cred_p, credentials);
+    /* fill in stuff in the union */
+    sm_p->error_code = 0;
+    sm_p->object_ref = ref;
+    PVFS_hint_copy(hints, &sm_p->hints);
+    
+	return PINT_client_state_machine_post(
+				smcb, op_id, user_ptr);
+}
+
+
+PVFS_error PVFS_mgmt_migrate(
+		PVFS_object_ref ref,
+		const PVFS_credentials *credentials,
+		PVFS_hint hints)
+{
+	PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate entered\n");		
+			
+	ret = PVFS_imgmt_migrate(credentials, &op_id, hints)
+	
+			
+			
+			
+	
+    PINT_sys_release(op_id);
+    return error;
+}
+
+
+static PINT_sm_action mgmt_migrate_init(
+		struct PINT_smcb *smcb, job_status_s js_p)
+{
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_migrate_init called\n");
+	assert(js_p->error_code == 0);
+	return SM_ACTION_COMPLETE;
+}			
+
+
+
+		
+	
