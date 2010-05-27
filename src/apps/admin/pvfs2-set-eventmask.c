@@ -15,11 +15,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
-#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -42,11 +40,8 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credential *creds;
-    PVFS_credential *cred;
-    int ncreds;
+    PVFS_credential creds;
     struct PVFS_mgmt_setparam_value param_value;
-    int i;
 
     user_opts = parse_args(argc, argv);
     if(!user_opts)
@@ -64,14 +59,6 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
-        PVFS_sys_finalize();
-        exit(EXIT_FAILURE);
-    }
-
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -82,8 +69,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* nlmills: TODO: fix me */
-    cred = NULL;
+    PVFS_util_gen_credential_defaults(&creds);
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_STRING;
     if(!user_opts->event_string)
@@ -96,7 +82,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_mgmt_setparam_all(
-        cur_fs, cred,
+        cur_fs, &creds,
         PVFS_SERV_PARAM_EVENT_ENABLE,
         &param_value, NULL, NULL);
     if(ret < 0)
@@ -105,11 +91,6 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    for (i = 0; i < ncreds; i++)
-    {
-        PINT_cleanup_credential(&creds[i]);
-    }
-    free(creds);
     PVFS_sys_finalize();
 
     return(ret);

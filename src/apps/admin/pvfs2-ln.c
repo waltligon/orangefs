@@ -12,13 +12,11 @@
 #include <sys/time.h>
 #include <time.h>
 #include <getopt.h>
-#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
-#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -36,7 +34,7 @@ struct options
 static void usage(int argc, char** argv);
 static int parse_args(int argc, char** argv, struct options * opts);
 static void enable_verbose(struct options * opts);
-static int make_link(PVFS_credential      * pCredential,
+static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
@@ -48,13 +46,11 @@ int main(int argc, char **argv)
     char                szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id          fs_id                     = 0;
     struct options      user_opts;
-    PVFS_credential     *creds;
-    PVFS_credential     *cred;
-    int                 ncreds;
-    int                 i;
+    PVFS_credential     credentials;
 
     /* Initialize any memory */
     memset(&user_opts,   0, sizeof(user_opts));
+    memset(&credentials, 0, sizeof(credentials));
     
     /* look at command line arguments */
     ret = parse_args(argc, argv, &user_opts);
@@ -71,14 +67,6 @@ int main(int argc, char **argv)
         return (-1);
     }
 
-    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
-        PVFS_sys_finalize();
-        exit(EXIT_FAILURE);
-    }
-
     /* Let's verify that all the given files reside on a PVFS2 filesytem */
     ret = PVFS_util_resolve(user_opts.pszLinkName, 
                             &fs_id, 
@@ -93,10 +81,10 @@ int main(int argc, char **argv)
         return(-1);
    }
 
-    /* nlmills: TODO: fix me */
-    cred = NULL;
+    /* We will re-use the same credentials for each call */
+    PVFS_util_gen_credential_defaults(&credentials);
 
-    ret = make_link(cred,
+    ret = make_link(&credentials,
                     fs_id,
                     user_opts.pszLinkTarget,
                     szPvfsPath,
@@ -110,17 +98,12 @@ int main(int argc, char **argv)
     }
 
     /* TODO: need to free the request descriptions */
-    for (i = 0; i < ncreds; i++)
-    {
-        PINT_cleanup_credential(&creds[i]);
-    }
-    free(creds);
     PVFS_sys_finalize();
 
     return(0);
 }
 
-static int make_link(PVFS_credential      * pCredential,
+static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
@@ -140,8 +123,8 @@ static int make_link(PVFS_credential      * pCredential,
     memset(&resp_sym,    0, sizeof(resp_sym));
 
     /* Set the attributes for the new directory */
-    attr.owner = pCredential->userid;
-    attr.group = pCredential->group_array[0];
+    attr.owner = pCredentials->userid;
+    attr.group = pCredentials->group_array[0];
     attr.perms = 0777;              
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
@@ -171,7 +154,7 @@ static int make_link(PVFS_credential      * pCredential,
      */
     ret = PINT_lookup_parent( (char *) pszPvfsPath, 
                               fs_id, 
-                              pCredential, 
+                              pCredentials, 
                               &parent_ref.handle);
 
     if(ret < 0)
@@ -203,7 +186,7 @@ static int make_link(PVFS_credential      * pCredential,
                            parent_ref, 
                            (char *) pszLinkTarget,
                            attr, 
-                           pCredential, 
+                           pCredentials, 
                            &resp_sym, NULL);
 
     if (ret < 0)

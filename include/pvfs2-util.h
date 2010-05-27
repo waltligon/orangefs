@@ -43,12 +43,10 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(
 
 void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
-int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds);
-int PVFS_util_gen_credential(PVFS_fs_id fsid,
-                             PVFS_BMI_addr_t addr,
-                             const char *certpath,
-                             const char *keypath,
-                             PVFS_credential *cred);
+enum { PVFS_DEFAULT_CREDENTIAL_TIMEOUT=0 };
+int PVFS_util_gen_credential_defaults(PVFS_credential *cred);
+int PVFS_util_gen_credential(const char *user, unsigned int timeout,
+    const char *keypath, PVFS_credential *cred);
 
 int PVFS_util_copy_sys_attr(
     PVFS_sys_attr *dest_attr,

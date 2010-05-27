@@ -17,8 +17,12 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <signal.h>
 #include <libgen.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -32,6 +36,7 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "security-types.h"
 #include "security-util.h"
 
 #ifdef HAVE_MNTENT_H
@@ -156,21 +161,111 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
-/* nlmills: TODO: remove this function completely */
-int PVFS_util_gen_credentials_defaults(PVFS_credential **creds, int *ncreds)
+int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
-    return -PVFS_ENOSYS;
+    return PVFS_util_gen_credential(NULL, PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
+                                    NULL, cred);
 }
 
 
-int PVFS_util_gen_credential(PVFS_fs_id fsid,
-                             PVFS_BMI_addr_t addr,
-                             const char *certpath,
-                             const char *keypath,
-                             PVFS_credential *cred)
+int PVFS_util_gen_credential(const char *user, unsigned int timeout,
+    const char *keypath, PVFS_credential *cred)
 {
-    /* nlmills: TODO: rewrite this function and relatives */
-    return -PVFS_ENOSYS;
+    struct sigaction newsa, oldsa;
+    pid_t pid;
+    int filedes[2];
+    int ret;
+
+    memset(&newsa, 0, sizeof(newsa));
+    newsa.sa_handler = SIG_DFL;
+    sigaction(SIGCHLD, &newsa, &oldsa);
+
+    ret = pipe(filedes);
+    if (ret == -1)
+    {
+        return PVFS_errno_to_error(errno);
+    }
+
+    pid = fork();
+    if (pid == 0)
+    {
+        char *args[7];
+        char **ptr = args;
+        char timearg[16];
+        char *envp[] = { NULL };
+
+        close(STDERR_FILENO);
+        close(STDOUT_FILENO);
+        dup(filedes[1]);
+        close(STDIN_FILENO);
+
+        if (user)
+        {
+            *ptr++ = "-u";
+            *ptr++ = (char*)user;
+        }
+        if (timeout != PVFS_DEFAULT_CREDENTIAL_TIMEOUT)
+        {
+           snprintf(timearg, sizeof(timearg), "%u", timeout);
+           *ptr++ = "-t";
+           *ptr++ = timearg;
+        }
+        if (keypath)
+        {
+            *ptr++ = "-k";
+            *ptr++ = (char*)keypath;
+        }
+        *ptr++ = NULL;
+        execve(BINDIR"/pvfs2-gencred", args, envp);
+
+        _exit(100);
+    }
+    else if (pid == -1)
+    {
+        ret = PVFS_errno_to_error(errno);
+    }
+    else
+    {
+        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
+        ssize_t total;
+        ssize_t cnt;
+
+        for (total = 0, cnt = 0; cnt > 0; total += cnt)
+        {
+            do cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
+            while (cnt == -1 && errno == EINTR);
+        }
+
+        if (cnt == -1)
+        {
+            ret = PVFS_errno_to_error(errno);
+        }
+        else
+        {
+            int rc;
+
+            waitpid(pid, &rc, 0);
+            if (WIFEXITED(rc) && !WEXITSTATUS(rc))
+            {
+                char *ptr = buf;
+                PVFS_credential tmp;
+
+                decode_PVFS_credential(&ptr, &tmp);
+                ret = PINT_copy_credential(cred, &tmp);
+            }
+            else
+            {
+                /* nlmills: TODO: find a more appropriate error code */
+                ret = PVFS_EINVAL;
+            }
+        }
+    }
+
+    close(filedes[0]);
+    close(filedes[1]);
+    sigaction(SIGCLD, &oldsa, NULL);
+
+    return ret;
 }
 
 int PVFS_util_get_umask(void)

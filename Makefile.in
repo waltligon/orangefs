@@ -220,6 +220,9 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
+  # make bindir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"'
+
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 

@@ -15,11 +15,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <getopt.h>
-#include <assert.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
-#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -43,11 +41,8 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credential *creds;
-    PVFS_credential *cred;
-    int ncreds;
+    PVFS_credential creds;
     struct PVFS_mgmt_setparam_value param_value;
-    int i;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -65,14 +60,6 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
-    if (ret < 0)
-    {
-        PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
-        PVFS_sys_finalize();
-        exit(EXIT_FAILURE);
-    }
-
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
                             &cur_fs, pvfs_path, PVFS_NAME_MAX);
@@ -83,8 +70,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* nlmills: TODO: fix me */
-    cred = NULL;
+    PVFS_util_gen_credential_defaults(&creds);
 
     if (user_opts->single_server)
     {
@@ -94,7 +80,7 @@ int main(int argc, char **argv)
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
         param_value.u.value = (uint64_t)user_opts->debug_mask;
         ret = PVFS_mgmt_setparam_single(
-            cur_fs, cred, PVFS_SERV_PARAM_GOSSIP_MASK,
+            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
             &param_value, user_opts->single_server,
             NULL, NULL);
     }
@@ -105,7 +91,7 @@ int main(int argc, char **argv)
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
         param_value.u.value = user_opts->debug_mask;
         ret = PVFS_mgmt_setparam_all(
-            cur_fs, cred, PVFS_SERV_PARAM_GOSSIP_MASK,
+            cur_fs, &creds, PVFS_SERV_PARAM_GOSSIP_MASK,
             &param_value, NULL, NULL);
     }
 
@@ -115,13 +101,6 @@ int main(int argc, char **argv)
         PVFS_strerror_r(ret, buf, 64);
         fprintf(stderr, "Setparam failure: %s\n", buf);
     }
-
-    for (i = 0; i < ncreds; i++)
-    {
-        PINT_cleanup_credential(&creds[i]);
-    }
-    free(creds);
-
     return PVFS_sys_finalize();
 }
 

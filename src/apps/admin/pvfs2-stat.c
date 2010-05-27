@@ -19,7 +19,6 @@
 
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
-#include "security-util.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
@@ -45,7 +44,7 @@ static void enable_dereference(struct options * opts);
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
-                   const PVFS_credential * credential,
+                   const PVFS_credential  * credentials,
                    const struct options   * opts);
 void print_stats(const PVFS_object_ref * ref,
                  const char            * pszName,
@@ -58,12 +57,12 @@ int main(int argc, char **argv)
                      i            =  0;
    char           ** ppszPvfsPath = NULL;
    PVFS_fs_id     *  pfs_id       = NULL;
-   PVFS_credential * creds;
-   int               ncreds;
+   PVFS_credential   credentials;
    struct options    user_opts;
 
    /* Initialize any memory */
    memset(&user_opts,   0, sizeof(user_opts));
+   memset(&credentials, 0, sizeof(credentials));
    
    ret = parse_args(argc, argv, &user_opts);
    if(ret < 0)
@@ -115,14 +114,6 @@ int main(int argc, char **argv)
       PVFS_perror("PVFS_util_init_defaults", ret);
       return(-1);
    }
-
-   ret = PVFS_util_gen_credentials_defaults(&creds, &ncreds);
-   if (ret < 0)
-   {
-       PVFS_perror("PVFS_util_gen_credentials_defaults", ret);
-       PVFS_sys_finalize();
-       exit(EXIT_FAILURE);
-   }
    
    /* Let's verify that all the given files reside on a PVFS2 filesytem */
    for(i = 0; i < user_opts.nNumFiles; i++)
@@ -140,17 +131,15 @@ int main(int argc, char **argv)
       }
    }
 
+   /* We will re-use the same credentials for each call */
+   PVFS_util_gen_credential_defaults(&credentials);
+
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
-      PVFS_credential *cred;
-
-      /* nlmills: TODO: fix me */
-      cred = NULL;
-
       ret = do_stat(user_opts.pszFiles[i], 
                     ppszPvfsPath[i], 
                     pfs_id[i], 
-                    cred,
+                    &credentials,
                     &user_opts);
       if(ret != 0)
       {
@@ -158,11 +147,6 @@ int main(int argc, char **argv)
       }
    }
 
-   for (i = 0; i < ncreds; i++)
-   {
-       PINT_cleanup_credential(&creds[i]);
-   }
-   free(creds);
    PVFS_sys_finalize();
 
    /* Deallocate any allocated memory */
@@ -192,11 +176,11 @@ int main(int argc, char **argv)
    return(0);
 }
 
-static int do_stat(const char            * pszFile,
-                   const char            * pszRelativeFile, 
-                   const PVFS_fs_id        fs_id, 
-                   const PVFS_credential * credential,
-                   const struct options  * opts)
+static int do_stat(const char             * pszFile,
+                   const char             * pszRelativeFile, 
+                   const PVFS_fs_id         fs_id, 
+                   const PVFS_credential  * credentials,
+                   const struct options   * opts)
 {
    int                  ret = 0;
    PVFS_sysresp_lookup  lk_response;
@@ -214,7 +198,7 @@ static int do_stat(const char            * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            credential, 
+                            (PVFS_credential *) credentials, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_FOLLOW, NULL);
    }
@@ -222,7 +206,7 @@ static int do_stat(const char            * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            credential, 
+                            (PVFS_credential *) credentials, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
    }
@@ -242,7 +226,7 @@ static int do_stat(const char            * pszFile,
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          credential, 
+                          (PVFS_credential *) credentials, 
                           &getattr_response, NULL);
 
    if(ret < 0)

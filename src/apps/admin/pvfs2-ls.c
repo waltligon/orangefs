@@ -20,8 +20,6 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
-#include "bmi.h"
-#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -78,15 +76,13 @@ static void print_entry(
     PVFS_fs_id fs_id,
     PVFS_sys_attr *attr,
     int attr_error,
-    struct options *opts,
-    PVFS_credential *cred);
+    struct options *opts);
 
 static int do_list(
     char *full_path,
     char *start,
     int fs_id,
-    struct options *opts,
-    PVFS_credential *cred);
+    struct options *opts);
 
 static void print_entry_attr(
     PVFS_handle handle,
@@ -110,9 +106,9 @@ do {                                                        \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
-                        refn.fs_id, NULL, 0, opts, cred);         \
+                        refn.fs_id, NULL, 0, opts);         \
             print_entry(".. (faked)", refn.handle,          \
-                        refn.fs_id, NULL, 0, opts, cred);         \
+                        refn.fs_id, NULL, 0, opts);         \
         }                                                   \
         else {                                              \
             printf(".\n");                                  \
@@ -366,11 +362,11 @@ void print_entry(
     PVFS_fs_id fs_id,
     PVFS_sys_attr *attr,
     int attr_error,
-    struct options *opts,
-    PVFS_credential *cred)
+    struct options *opts)
 {
     int ret = -1;
     PVFS_object_ref ref;
+    PVFS_credential credentials;
     PVFS_sysresp_getattr getattr_response;
 
     if (!opts->list_long)
@@ -397,9 +393,10 @@ void print_entry(
             ref.fs_id = fs_id;
 
             memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
+            PVFS_util_gen_credential_defaults(&credentials);
 
             ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
-                cred, &getattr_response, NULL);
+                &credentials, &getattr_response, NULL);
             if (ret)
             {
                 fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
@@ -427,8 +424,7 @@ int do_list(
     char *full_path,
     char *start,
     int fs_id,
-    struct options *opts,
-    PVFS_credential *cred)
+    struct options *opts)
 {
     int i = 0, printed_dot_info = 0;
     int ret = -1;
@@ -438,6 +434,7 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdirplus rdplus_response;
     PVFS_sysresp_getattr getattr_response;
+    PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
@@ -447,13 +444,14 @@ int do_list(
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (opts->list_recursive || opts->num_starts > 1)
     {
         printf("%s%s:\n",full_path,start);
     }
 
-    ret = PVFS_sys_lookup(fs_id, name, cred,
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if(ret < 0)
     {
@@ -467,7 +465,7 @@ int do_list(
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-                         cred, &getattr_response, NULL) == 0)
+                         &credentials, &getattr_response, NULL) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -484,7 +482,7 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                if (PVFS_sys_getparent(ref.fs_id, name, cred,
+                if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
                                        &getparent_resp, NULL) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
@@ -502,8 +500,7 @@ int do_list(
                 print_entry(segment, ref.handle, ref.fs_id, 
                         NULL,
                         0,
-                        opts,
-                        cred);
+                        opts);
             }
             return 0;
         }
@@ -517,7 +514,7 @@ int do_list(
         memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
         ret = PVFS_sys_readdirplus(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, cred,
+                pvfs_dirent_incount, &credentials,
                 (opts->list_long) ? 
                 PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
                 &rdplus_response,
@@ -560,8 +557,7 @@ int do_list(
             print_entry(cur_file, cur_handle, fs_id,
                     &rdplus_response.attr_array[i],
                     rdplus_response.stat_err_array[i],
-                    opts,
-                    cred);
+                    opts);
 
             PVFS_sys_attr *attr = &rdplus_response.attr_array[i];
             if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
@@ -642,7 +638,7 @@ int do_list(
         while(current)
         {
             printf("\n");
-            do_list(full_path,current->path,fs_id,opts,cred);
+            do_list(full_path,current->path,fs_id,opts);
             current = current->next;
             free(head->path);
             free(head);
@@ -869,8 +865,6 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
     int found_one = 0;
-    PVFS_credential *creds;
-    int ncreds;
 
     process_name = argv[0];
 
@@ -920,46 +914,6 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* generate a credential for each known file system */
-
-    creds = calloc(tab->mntent_count, sizeof(PVFS_credential));
-    if (!creds)
-    {
-        perror("calloc");
-        PVFS_sys_finalize();
-        exit(EXIT_FAILURE);
-    }
-    ncreds = 0;
-
-    for (i = 0; i < tab->mntent_count; i++)
-    {
-        PVFS_BMI_addr_t addr;
-
-        ret = BMI_addr_lookup(&addr, 
-                              tab->mntent_array[i].the_pvfs_config_server);
-        if (ret < 0)
-        {
-            fprintf(stderr, "Failed to resolve BMI address %s\n",
-                    tab->mntent_array[i].the_pvfs_config_server);
-            ret = EXIT_FAILURE;
-            goto error;
-        }
-
-        ret = PVFS_util_gen_credential(tab->mntent_array[i].fs_id,
-                                       addr,
-                                       NULL,
-                                       NULL,
-                                       &creds[i]);
-        if (ret < 0)
-        {
-            fprintf(stderr, "Failed to generate credential for fsid %d\n",
-                    tab->mntent_array[i].fs_id);
-            ret = EXIT_FAILURE;
-            goto error;
-        }
-        ncreds += 1;
-    }
-            
     if (user_opts->num_starts == 0)
     {
 	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
@@ -990,7 +944,6 @@ int main(int argc, char **argv)
         char *substr = strstr(user_opts->start[i],pvfs_path[i]);
         char *index = user_opts->start[i];
         char *search = substr; 
-        PVFS_credential *cred;
         int j = 0;
 
         /* Keep the mount path info to mimic /bin/ls output */
@@ -1015,11 +968,7 @@ int main(int argc, char **argv)
         }
         user_opts->start[i][j] = '\0';
 
-        /* nlmills: TODO: fix me */
-        cred = NULL;
-
-        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], 
-                user_opts, cred);
+        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts);
 
         if (user_opts->num_starts > 1)
         {
@@ -1027,13 +976,6 @@ int main(int argc, char **argv)
         }
     }
 
- error:
-
-    for (i = 0; i < ncreds; i++)
-    {
-        PINT_cleanup_credential(&creds[i]);
-    }
-    free(creds);
     PVFS_sys_finalize();
     free(user_opts);
 
