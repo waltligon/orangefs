@@ -26,7 +26,7 @@
 
 /* nlmills: TODO: move these somewhere sane */
 #define DEFAULT_CREDENTIAL_TIMEOUT (15*60)
-#define DEFAULT_CREDENTIAL_KEYPATH "/tmp/credkey"
+#define DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
 
 
 typedef struct {

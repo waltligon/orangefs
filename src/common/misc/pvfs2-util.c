@@ -183,7 +183,7 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
     ret = pipe(filedes);
     if (ret == -1)
     {
-        return PVFS_errno_to_error(errno);
+        return -PVFS_errno_to_error(errno);
     }
 
     pid = fork();
@@ -222,23 +222,24 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
     }
     else if (pid == -1)
     {
-        ret = PVFS_errno_to_error(errno);
+        ret = -PVFS_errno_to_error(errno);
     }
     else
     {
         char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
-        ssize_t total;
+        ssize_t total = 0;
         ssize_t cnt;
 
-        for (total = 0, cnt = 0; cnt > 0; total += cnt)
+        do
         {
             do cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
             while (cnt == -1 && errno == EINTR);
-        }
-
+            total += cnt;
+        } while (cnt > 0);
+        
         if (cnt == -1)
         {
-            ret = PVFS_errno_to_error(errno);
+            ret = -PVFS_errno_to_error(errno);
         }
         else
         {
@@ -251,12 +252,12 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
                 PVFS_credential tmp;
 
                 decode_PVFS_credential(&ptr, &tmp);
-                ret = PINT_copy_credential(cred, &tmp);
+                ret = PINT_copy_credential(&tmp, cred);
             }
             else
             {
                 /* nlmills: TODO: find a more appropriate error code */
-                ret = PVFS_EINVAL;
+                ret = -PVFS_EINVAL;
             }
         }
     }
