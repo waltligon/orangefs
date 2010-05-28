@@ -28,8 +28,17 @@ machine pvfs2_client_mgmt_migrate_sm{
 	
 	state init{
 		run mgmt_migrate_init;
-		default => migrate_setup_msgpair;
+		default => validate_inputs
 	}
+	
+	//Validate inputs- filename, destination server
+	state validate_inputs{
+		run mgmt_migrate_validate_inputs;
+		success => migrate_setup_msgpair;
+		default => cleanup;
+	}
+	
+	//Setup a PVFS_mgmt_migrate request
 	
 	state migrate_setup_msgpair{
 		run mgmt_migrate_setup_msgpair;
@@ -50,7 +59,6 @@ machine pvfs2_client_mgmt_migrate_sm{
 }
 
 %%
-
 
 PVFS_error PVFS_imgmt_migrate(
 		PVFS_object_ref ref,
@@ -115,6 +123,16 @@ static PINT_sm_action mgmt_migrate_init(
 	return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action mgmt_migrate_validate_inputs(
+		struct PINT_smcb *smcb, job_status_s js_p)
+{
+	PVFS_error ret = PVFS_sys_lookup(fs_id, name		//needs to be looked at and fixed up
+						credentials, PVFS_sysresp_lookup,
+						int32_t follow_link, hints);
+
+	
+}
+
 static PINT_sm_action mgmt_migrate_setup_msgpair(
 		struct PINT_smcb *smcb, job_status_s js_p)
 {
@@ -136,8 +154,6 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
     
     /*stuff here as well */
     	
-    	
-    	
    	ret = PINT_cached_config_map_to_server(
    	&msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
    	
@@ -151,11 +167,3 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
    	
    	return SM_ACTION_COMPLETE;
 }   		
-   		
-
-	
-
-
-
-		
-	
