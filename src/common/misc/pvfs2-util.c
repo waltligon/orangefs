@@ -222,6 +222,7 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
     }
     else if (pid == -1)
     {
+        close(filedes[1]);
         ret = -PVFS_errno_to_error(errno);
     }
     else
@@ -229,6 +230,9 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
         char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
         ssize_t total = 0;
         ssize_t cnt;
+
+        /* close write end so we get EOF when child exits */
+        close(filedes[1]);
 
         do
         {
@@ -263,7 +267,6 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
     }
 
     close(filedes[0]);
-    close(filedes[1]);
     sigaction(SIGCLD, &oldsa, NULL);
 
     return ret;
