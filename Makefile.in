@@ -62,6 +62,7 @@ mandir = $(DESTDIR)@mandir@
 sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
+sysconfdir = $(DESTDIR)@sysconfdir@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -220,8 +221,8 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
-  # make bindir available to source files
-CFLAGS += -DBINDIR='"$(bindir)"'
+  # make bindir and sysconfdir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
