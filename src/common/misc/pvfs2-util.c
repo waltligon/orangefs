@@ -255,6 +255,7 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
                 char *ptr = buf;
                 PVFS_credential tmp;
 
+                /* nlmills: TODO: secure against buffer overflows in decode */
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
             }

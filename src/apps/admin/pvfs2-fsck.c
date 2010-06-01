@@ -81,6 +81,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+    /* nlmills: TODO: find a better way to handle credential timeouts */
     ret = PVFS_util_gen_credential(NULL, 5*60*60, NULL, &creds);
     if (ret < 0)
     {

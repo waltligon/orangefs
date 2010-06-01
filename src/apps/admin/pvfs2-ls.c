@@ -393,7 +393,12 @@ void print_entry(
             ref.fs_id = fs_id;
 
             memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-            PVFS_util_gen_credential_defaults(&credentials);
+            ret = PVFS_util_gen_credential_defaults(&credentials);
+            if (ret < 0)
+            {
+                PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+                return;
+            }
 
             ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                 &credentials, &getattr_response, NULL);
@@ -444,7 +449,12 @@ int do_list(
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    PVFS_util_gen_credential_defaults(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     if (opts->list_recursive || opts->num_starts > 1)
     {

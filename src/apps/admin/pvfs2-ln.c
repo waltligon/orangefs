@@ -82,7 +82,12 @@ int main(int argc, char **argv)
    }
 
     /* We will re-use the same credentials for each call */
-    PVFS_util_gen_credential_defaults(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     ret = make_link(&credentials,
                     fs_id,

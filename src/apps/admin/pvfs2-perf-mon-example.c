@@ -78,7 +78,13 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credential_defaults(&creds);
+    /* nlmills: TODO: find a better way to handle credential timeouts */
+    ret = PVFS_util_gen_credential(NULL, 1*60*60, NULL, &creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential", ret);
+        return(-1);
+    }
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,

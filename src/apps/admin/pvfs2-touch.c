@@ -112,7 +112,13 @@ int main(int argc, char **argv)
             break;
         }
 
-        PVFS_util_gen_credential_defaults(&credentials);
+        ret = PVFS_util_gen_credential_defaults(&credentials);
+        if (ret < 0)
+        {
+            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+            ret = -1;
+            break;
+        }
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,

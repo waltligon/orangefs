@@ -129,7 +129,12 @@ int main(int argc, char **argv)
 
     print_mntent(tab->mntent_array, tab->mntent_count);
 
-    PVFS_util_gen_credential_defaults(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     /* dump some key parts of the config file */
     ret = print_config(cur_fs);
@@ -271,7 +276,12 @@ static int noop_all_servers(PVFS_fs_id fsid)
     int i;
     int tmp;
  
-    PVFS_util_gen_credential_defaults(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return ret;
+    }
 
     printf("\n   meta servers:\n");
     ret = PVFS_mgmt_count_servers(
@@ -374,7 +384,12 @@ static int print_config(PVFS_fs_id fsid)
     int count;
     PVFS_BMI_addr_t *addr_array;
  
-    PVFS_util_gen_credential_defaults(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return ret;
+    }
 
     printf("\n   meta servers:\n");
     ret = PVFS_mgmt_count_servers(

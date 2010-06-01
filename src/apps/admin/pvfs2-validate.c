@@ -135,7 +135,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    PVFS_util_gen_credential_defaults(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        PVFS_sys_finalize();
+        free(fsck_options);
+        return -1;
+    }
 
     ret = PVFS_sys_lookup(
             cur_fs, pvfs_path, 

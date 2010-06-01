@@ -98,7 +98,12 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
     return -1;
   }
 
-  PVFS_util_gen_credential_defaults(&credentials);
+  ret = PVFS_util_gen_credential_defaults(&credentials);
+  if (ret < 0)
+  {
+    PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+    return -1;
+  }
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere

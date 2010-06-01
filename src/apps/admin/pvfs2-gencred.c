@@ -1,5 +1,8 @@
-/* N.B. root_squash could create problems with this over NFS */
-
+/*
+ * Copyright 2010 Clemson University and The University of Chicago.
+ *
+ * See COPYING in top-level directory.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -275,7 +278,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
     
-    /* TODO: fall back to getugroups */
+    /* nlmills: TODO: fall back to getugroups */
     
     ngroups = sizeof(groups)/sizeof(*groups);
     ret = getgrouplist(pwd->pw_name, pwd->pw_gid, groups, &ngroups);

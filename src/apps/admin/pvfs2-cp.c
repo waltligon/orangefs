@@ -149,6 +149,7 @@ int main (int argc, char ** argv)
     resolve_filename(&src,  user_opts->srcfile );
     resolve_filename(&dest, user_opts->destfile);
 
+    /* nlmills: TODO: find a better way to handle timeouts */
     ret = PVFS_util_gen_credential(NULL, 5*60*60, NULL, &credentials);
     if (ret < 0)
     {

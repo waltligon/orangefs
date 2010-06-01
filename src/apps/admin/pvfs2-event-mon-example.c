@@ -69,7 +69,12 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credential_defaults(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs,
