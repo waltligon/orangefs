@@ -183,29 +183,15 @@ dnl check to see if the "fast" getgrouplist function is available
 AX_GETGROUPLIST
 
 AC_ARG_ENABLE(security,
-[  --disable-security Disables security encryption],
-[if test "x$enableval" = "xno" ; then
-    SECURITY_TYPE=1
-fi]
-,)
-	
-AC_ARG_ENABLE(security,
- [  --enable-security[=state type] Specify the states type:
-                      rsa: RSA encryption
-                      dsa: DSA encryption],
- [ if test "x$enableval" = "xrsa" ; then
-      SECURITY_TYPE=2
-      AC_DEFINE([SECURITY_ENCRYPTION_RSA], [], [RSA encryption])
-   elif test "x$enableval" = "xdsa" ; then
-   	  SECURITY_TYPE=3
-      AC_DEFINE([SECURITY_ENCRYPTION_DSA], [], [DSA encryption])
-   else
-      echo
-      echo "Unknown security type!"
-      echo
-      exit -1
-   fi
- ])
+[  --enable-security       Enables robust security features],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY=yes
+    AC_DEFINE(ENABLE_SECURITY, 1, Define if robust security is enabled)
+else
+    ENABLE_SECURITY=no
+fi],
+[ENABLE_SECURITY=no]
+)
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -1247,12 +1233,10 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
-if   test "x$SECURITY_TYPE" = "x1" ; then
-   AC_MSG_RESULT([PVFS2 encryption type                             :none])
-elif test "x$SECURITY_TYPE" = "x2" ; then
-   AC_MSG_RESULT([PVFS2 encryption type                             : rsa])
-elif test "x$SECURITY_TYPE" = "x3" ; then
-   AC_MSG_RESULT([PVFS2 encryption type                             : dsa])
+if test "x$ENABLE_SECURITY" = "xyes"; then
+   AC_MSG_RESULT([PVFS2 configured with robust security             : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with robust security             :  no])
 fi
 
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then

@@ -229,11 +229,20 @@ int PINT_sign_capability(PVFS_capability *cap)
     }
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
-#if defined(SECURITY_ENCRYPTION_RSA)
-    md = EVP_sha1();
-#elif defined(SECURITY_ENCRYPTION_DSA)
-    md = EVP_dss1();
-#endif
+    if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
+    {
+        md = EVP_sha1();
+    }
+    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
+    {
+        md = EVP_dss1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     security_privkey->type);
+        return -1;
+    }
 
     EVP_MD_CTX_init(&mdctx);
 
@@ -325,11 +334,20 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 0;
     }
 
-#if defined(SECURITY_ENCRYPTION_RSA)
-    md = EVP_sha1();
-#elif defined(SECURITY_ENCRYPTION_DSA)
-    md = EVP_dss1();
-#endif
+    if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
+    {
+        md = EVP_sha1();
+    }
+    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
+    {
+        md = EVP_dss1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     pubkey->type);
+        return 0;
+    }
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
@@ -425,13 +443,22 @@ int PINT_sign_credential(PVFS_credential *cred)
     cred->issuer = strdup(config->server_alias);
     
     cred->timeout = PINT_util_get_current_time() + config->security_timeout;
-    
-#if defined(SECURITY_ENCRYPTION_RSA)
-    md = EVP_sha1();
-#elif defined(SECURITY_ENCRYPTION_DSA)
-    md = EVP_dss1();
-#endif
 
+    if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
+    {
+        md = EVP_sha1();
+    }
+    else if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_DSA)
+    {
+        md = EVP_dss1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     security_privkey->type);
+        return -1;
+    }
+    
     EVP_MD_CTX_init(&mdctx);
     
     ret = EVP_SignInit_ex(&mdctx, md, NULL);
@@ -504,11 +531,20 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
-#if defined(SECURITY_ENCRYPTION_RSA)
-    md = EVP_sha1();
-#elif defined(SECURITY_ENCRYPTION_DSA)
-    md = EVP_dss1();
-#endif
+    if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
+    {
+        md = EVP_sha1();
+    }
+    else if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_DSA)
+    {
+        md = EVP_dss1();
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Unsupported key type %u\n",
+                     pubkey->type);
+        return 0;
+    }
 
     EVP_MD_CTX_init(&mdctx);
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);

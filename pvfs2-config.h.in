@@ -3,6 +3,9 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if robust security is enabled */
+#undef ENABLE_SECURITY
+
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
@@ -444,12 +447,6 @@
 
 /* sub version number */
 #undef PVFS2_VERSION_SUB
-
-/* DSA encryption */
-#undef SECURITY_ENCRYPTION_DSA
-
-/* RSA encryption */
-#undef SECURITY_ENCRYPTION_RSA
 
 /* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT

@@ -846,10 +846,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-thread-safety Disables thread safety in the client library
   --disable-server        Disables building of PVFS2 server
-  --disable-security Disables security encryption
-  --enable-security=state type Specify the states type:
-                      rsa: RSA encryption
-                      dsa: DSA encryption
+  --enable-security       Enables robust security features
   --disable-karma-mem-usage-stats
                           Disables memory usage stats in karma
   --enable-bmi-only       Build only the BMI library
@@ -5856,35 +5853,18 @@ rm -f conftest*
 # Check whether --enable-security or --disable-security was given.
 if test "${enable_security+set}" = set; then
   enableval="$enable_security"
-  if test "x$enableval" = "xno" ; then
-    SECURITY_TYPE=1
+  if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY=yes
+
+cat >>confdefs.h <<\_ACEOF
+#define ENABLE_SECURITY 1
+_ACEOF
+
+else
+    ENABLE_SECURITY=no
 fi
-
-fi;
-
-# Check whether --enable-security or --disable-security was given.
-if test "${enable_security+set}" = set; then
-  enableval="$enable_security"
-   if test "x$enableval" = "xrsa" ; then
-      SECURITY_TYPE=2
-
-cat >>confdefs.h <<\_ACEOF
-#define SECURITY_ENCRYPTION_RSA
-_ACEOF
-
-   elif test "x$enableval" = "xdsa" ; then
-   	  SECURITY_TYPE=3
-
-cat >>confdefs.h <<\_ACEOF
-#define SECURITY_ENCRYPTION_DSA
-_ACEOF
-
-   else
-      echo
-      echo "Unknown security type!"
-      echo
-      exit -1
-   fi
+else
+  ENABLE_SECURITY=no
 
 fi;
 
@@ -20105,15 +20085,12 @@ else
 echo "${ECHO_T}PVFS2 will use workaround for buggy NPTL          : yes" >&6
 fi
 
-if   test "x$SECURITY_TYPE" = "x1" ; then
-   echo "$as_me:$LINENO: result: PVFS2 encryption type                             :none" >&5
-echo "${ECHO_T}PVFS2 encryption type                             :none" >&6
-elif test "x$SECURITY_TYPE" = "x2" ; then
-   echo "$as_me:$LINENO: result: PVFS2 encryption type                             : rsa" >&5
-echo "${ECHO_T}PVFS2 encryption type                             : rsa" >&6
-elif test "x$SECURITY_TYPE" = "x3" ; then
-   echo "$as_me:$LINENO: result: PVFS2 encryption type                             : dsa" >&5
-echo "${ECHO_T}PVFS2 encryption type                             : dsa" >&6
+if test "x$ENABLE_SECURITY" = "xyes"; then
+   echo "$as_me:$LINENO: result: PVFS2 configured with robust security             : yes" >&5
+echo "${ECHO_T}PVFS2 configured with robust security             : yes" >&6
+else
+   echo "$as_me:$LINENO: result: PVFS2 configured with robust security             :  no" >&5
+echo "${ECHO_T}PVFS2 configured with robust security             :  no" >&6
 fi
 
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
