@@ -25,7 +25,6 @@
 
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
-#include "security-types.h"
 
 /* non-blocking mgmt operation handle */
 typedef PVFS_id_gen_t PVFS_mgmt_op_id;

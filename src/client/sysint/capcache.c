@@ -12,7 +12,6 @@
 #include "quickhash.h"
 #include "tcache.h"
 #include "capcache.h"
-#include "security-types.h"
 #include "security-util.h"
 
 /* default option values */

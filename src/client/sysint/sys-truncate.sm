@@ -24,7 +24,6 @@
 #include "PINT-reqproto-encode.h"
 #include "acache.h"
 #include "pvfs2-internal.h"
-#include "security-types.h"
 
 #define TRUNCATE_UNSTUFF 100
 

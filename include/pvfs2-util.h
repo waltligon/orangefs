@@ -14,7 +14,6 @@
 
 #include "pvfs2.h"
 #include "pvfs2-types.h"
-#include "security-types.h"
 
 /* Define min macro with pvfs2 prefix */
 #ifndef PVFS_util_min

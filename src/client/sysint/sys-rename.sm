@@ -27,7 +27,6 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "ncache.h"
-#include "security-types.h"
 
 extern job_context_id pint_client_sm_context;
 

@@ -26,7 +26,6 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-hint.h"
-#include "security-types.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options

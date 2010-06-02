@@ -32,7 +32,6 @@
 #include "pvfs2-req-proto.h"
 #include "state-machine.h"
 #include "pint-event.h"
-#include "security-types.h"
 
 extern job_context_id server_job_context;
 

@@ -22,7 +22,6 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
-#include "security-types.h"
 
 /** Options supported by get_info() and set_info(). */
 enum PVFS_sys_setinfo_opt

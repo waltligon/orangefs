@@ -23,7 +23,6 @@
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-types.h"
-#include "security-types.h"
 #include "src/proto/pvfs2-req-proto.h"
 
 

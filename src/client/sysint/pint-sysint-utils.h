@@ -24,7 +24,6 @@
 #include "gen-locks.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
-#include "security-types.h"
 
 #include "trove.h"
 #include "server-config.h"

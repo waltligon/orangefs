@@ -22,7 +22,6 @@
 #include "pint-util.h"
 #include "server-config.h"
 #include "client-state-machine.h"
-#include "security-types.h"
 
 /** Maps a given opaque server address back to a string address.  Also
  *  fills in server type.

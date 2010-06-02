@@ -23,7 +23,6 @@
 #include "pvfs2-util.h"
 #include "client-state-machine.h"
 #include "gen-locks.h"
-#include "security-types.h"
 
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;

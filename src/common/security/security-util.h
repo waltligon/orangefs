@@ -8,7 +8,6 @@
 #define _SECURITY_UTIL_H_
 
 
-#include "security-types.h"
 
 
 void PINT_null_capability(PVFS_capability *cap);

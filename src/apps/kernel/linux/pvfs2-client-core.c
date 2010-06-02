@@ -50,7 +50,6 @@
 #include "pint-perf-counter.h"
 #include "pvfs2-encode-stubs.h"
 #include "pint-event.h"
-#include "security-types.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"

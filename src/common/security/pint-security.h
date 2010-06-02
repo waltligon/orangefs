@@ -9,7 +9,6 @@
 
 
 #include "pvfs2-types.h"
-#include "security-types.h"
 
 
 /* nlmills: TODO: document these */

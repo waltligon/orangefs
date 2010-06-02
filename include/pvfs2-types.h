@@ -419,17 +419,6 @@ typedef struct
     int32_t    __pad1;
 } PVFS_object_ref;
 
-/** Credentials (stubbed for future authentication methods). */
-typedef struct
-{
-    PVFS_uid uid;
-    PVFS_gid gid;
-} PVFS_credentials;
-endecode_fields_2(
-    PVFS_credentials,
-    PVFS_uid, uid,
-    PVFS_gid, gid);
-
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
 /* max length of PVFS filename */
@@ -869,6 +858,58 @@ enum PVFS_io_type
  * reserved handle values
  */
 #define PVFS_MGMT_RESERVED 1
+
+/*
+ * New types for robust security implementation.
+ */
+typedef unsigned char *PVFS_signature;
+
+typedef struct PVFS_capability PVFS_capability;
+struct PVFS_capability
+{
+    char *issuer;              /* alias of the issuing server */
+    PVFS_fs_id fsid;           /* fsid for which this capability is valid */
+    uint32_t sig_size;         /* length of the signature in bytes */
+    PVFS_signature signature;  /* digital signature */
+    PVFS_time timeout;         /* seconds after epoch to time out */
+    uint32_t op_mask;          /* allowed operations mask */
+    uint32_t num_handles;      /* number of elements in the handle array */
+    PVFS_handle *handle_array; /* handles in this capability */
+};
+endecode_fields_3a2a_struct (
+    PVFS_capability,
+    string, issuer,
+    PVFS_fs_id, fsid,
+    skip4,,
+    uint32_t, sig_size,
+    PVFS_signature, signature,
+    PVFS_time, timeout,
+    uint32_t, op_mask,
+    uint32_t, num_handles,
+    PVFS_handle, handle_array)
+
+typedef struct PVFS_credential PVFS_credential;
+struct PVFS_credential 
+{
+    PVFS_uid userid;           /* user id */
+    uint32_t num_groups;       /* length of group_array */
+    PVFS_gid *group_array;     /* groups for which the user is a member */
+    char *issuer;              /* alias of the issuing server */
+    PVFS_time timeout;         /* seconds after epoch to time out */
+    uint32_t sig_size;         /* length of the signature in bytes */
+    PVFS_signature signature;  /* digital signature */
+};
+endecode_fields_3a2a_struct (
+    PVFS_credential,
+    skip4,,
+    skip4,,
+    PVFS_uid, userid,
+    uint32_t, num_groups,
+    PVFS_gid, group_array,
+    string, issuer,
+    PVFS_time, timeout,
+    uint32_t, sig_size,
+    PVFS_signature, signature)
 
 #endif /* __PVFS2_TYPES_H */
 

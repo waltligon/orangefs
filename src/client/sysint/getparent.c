@@ -10,7 +10,6 @@
 #include "str-utils.h"
 #include "gossip.h"
 #include "pvfs2-util.h"
-#include "security-types.h"
 
 int PVFS_sys_getparent(
     PVFS_fs_id fs_id,

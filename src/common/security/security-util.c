@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "pvfs2-config.h"
-#include "security-types.h"
+#include "pvfs2-types.h"
 #include "security-util.h"
 
 

@@ -36,7 +36,6 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
-#include "security-types.h"
 #include "security-util.h"
 
 #ifdef HAVE_MNTENT_H

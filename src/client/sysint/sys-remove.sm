@@ -23,7 +23,6 @@
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
-#include "security-types.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:
