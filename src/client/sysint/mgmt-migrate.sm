@@ -21,6 +21,8 @@
 
 extern job_context_id pint_client_sm_context;
 
+static int mgmt_migrate_comp_fn(
+		void *v_p, struct PVFS_server_resp *resp, int i);
 
 %%
 
@@ -28,17 +30,8 @@ machine pvfs2_client_mgmt_migrate_sm{
 	
 	state init{
 		run mgmt_migrate_init;
-		default => validate_inputs
+		default => migrate_setup_msgpair;
 	}
-	
-	//Validate inputs- filename, destination server
-	state validate_inputs{
-		run mgmt_migrate_validate_inputs;
-		success => migrate_setup_msgpair;
-		default => cleanup;
-	}
-	
-	//Setup a PVFS_mgmt_migrate request
 	
 	state migrate_setup_msgpair{
 		run mgmt_migrate_setup_msgpair;
@@ -60,6 +53,7 @@ machine pvfs2_client_mgmt_migrate_sm{
 
 %%
 
+
 PVFS_error PVFS_imgmt_migrate(
 		PVFS_object_ref ref,
 		const PVFS_credentials *credentials,
@@ -71,6 +65,19 @@ PVFS_error PVFS_imgmt_migrate(
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     
+     gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_imgmt_migrate entered\n");
+                 
+                 
+     
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+             
+    
     PINT_smcb_alloc(&smcb, PVFS_MGMT_MIGRATE,
     				sizeof(struct PINT_client_sm),
     				client_op_state_get_machine,
@@ -79,12 +86,13 @@ PVFS_error PVFS_imgmt_migrate(
     if(smcb == NULL){
     	return -PVFS_ENOMEM;
     }
-    
-    
+       
     sm_p = PINT_sm_frame(smcb, PINT_CURRENT_FRAME);
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm->cred_p, credentials);
+    
     /* fill in stuff in the union */
+    
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -105,15 +113,37 @@ PVFS_error PVFS_mgmt_migrate(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate entered\n");		
 			
 	ret = PVFS_imgmt_migrate(credentials, &op_id, hints)
-	
-			
-			
+	if(ret)
+	{
+		PVFS_perror_gossip("PVFS_imgmt_migrate call", ret);
+        error = ret;			
+	}
+	else
+	{
+		ret = PVFS_mgmt_wait(op_id, "migrate", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
+            error = ret;
+        }
+    }		
 			
 	
     PINT_sys_release(op_id);
     return error;
 }
 /************************************************************************/
+
+static int mgmt_migrate_comp_fn(
+		void *v_p, struct PVFS_server_resp *resp, int i)
+{
+	/*need to know what this does */
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_migrate_comp_fn\n");
+	
+	
+	return resp->status;			
+}
+
 
 static PINT_sm_action mgmt_migrate_init(
 		struct PINT_smcb *smcb, job_status_s js_p)
@@ -123,19 +153,11 @@ static PINT_sm_action mgmt_migrate_init(
 	return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action mgmt_migrate_validate_inputs(
-		struct PINT_smcb *smcb, job_status_s js_p)
-{
-	PVFS_error ret = PVFS_sys_lookup(fs_id, name		//needs to be looked at and fixed up
-						credentials, PVFS_sysresp_lookup,
-						int32_t follow_link, hints);
-
-	
-}
-
 static PINT_sm_action mgmt_migrate_setup_msgpair(
 		struct PINT_smcb *smcb, job_status_s js_p)
 {
+	gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_migrate_setup_msgpair called\n");
+	
 	struct PINT_client_sm *sm_p = PINT_sm_frame(smbc, PINT_FRAME_CURRET);
 	int ret = -PVFS_EINVAL;
 	PINT_sm_msgpair_state *msg_p = NULL;
@@ -153,7 +175,9 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
     	sm_p->hints);
     
     /*stuff here as well */
-    	
+    
+  	msg_p->comp_fn = mgmt_migrate_comp_fn;
+  	   	
    	ret = PINT_cached_config_map_to_server(
    	&msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
    	
@@ -167,3 +191,30 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
    	
    	return SM_ACTION_COMPLETE;
 }   		
+   		
+
+static PINT_sm_action mgmt_migrate_cleanup(
+		struct PINT_smcb *smcb, job_status_s js_p)
+{
+	stuct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_CURRENT_FRAME);
+	
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"mgmt_migrate state: mgmt_migrate_cleanup\n");
+		
+	sm_p->error_code = js_p->error_code;	
+		
+	/*do something involving cache or free allocated stuff*/	
+		
+	PINT_SET_OP_COMPLETE;
+	return SM_ACTION_TERMINATE;	
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */		
