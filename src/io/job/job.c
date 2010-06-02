@@ -4426,10 +4426,6 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
     }
 
     trove_pending_count--;
-    assert(trove_pending_count >= 0);
-
-    tmp_trove->jd->u.precreate_pool.trove_pending--;
-    assert(tmp_trove->jd->u.precreate_pool.trove_pending >= 0);
 
     /* don't overwrite error codes from other trove ops */
     if(tmp_trove->jd->u.precreate_pool.error_code == 0)
@@ -4437,11 +4433,18 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
         tmp_trove->jd->u.precreate_pool.error_code = error_code;
     }
 
+    /* acquiring this mutex a little early so that it can also serve to
+     * prevent multiple trove operations from racing between decrementing 
+     * and then reading the pool.trove_pending counter
+     */
+    gen_mutex_lock(&completion_mutex);
+
+    tmp_trove->jd->u.precreate_pool.trove_pending--;
+    assert(tmp_trove->jd->u.precreate_pool.trove_pending >= 0);
+
     /* is this job done? */
     if(tmp_trove->jd->u.precreate_pool.trove_pending == 0)
     {
-        gen_mutex_lock(&completion_mutex);
-
         /* set job descriptor fields and put into completion queue */
         tmp_trove->jd->u.precreate_pool.error_code = 0;
         job_desc_q_add(completion_queue_array[tmp_trove->jd->context_id], 
@@ -4458,6 +4461,7 @@ static void precreate_pool_get_thread_mgr_callback_unlocked(
         return;
     }
 
+    gen_mutex_unlock(&completion_mutex);
     return;
 }
 
@@ -5704,8 +5708,8 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.precreate_handle_index = 0;
     jd->u.precreate_pool.fsid = fsid;
     jd->u.precreate_pool.servers = servers;
-    jd->u.precreate_pool.trove_pending = 0;
     jd->u.precreate_pool.flags = flags;
+    jd->u.precreate_pool.trove_pending = 0;
 
     /* rotate to use a different starting server in the pool next time */
     gen_mutex_lock(&precreate_pool_mutex);
@@ -5860,6 +5864,9 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             = &tmp_trove_array[i];
     }
 
+    /* pre-increment pending count before posting any trove operations */
+    jd->u.precreate_pool.trove_pending = jd->u.precreate_pool.precreate_handle_count;
+
     /* post all trove operations at once */
     for(i=0; i<jd->u.precreate_pool.precreate_handle_count; i++)
     { 
@@ -5900,9 +5907,6 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             }
         }
 
-        /* pre-increment pending count before posting trove operation */
-        trove_pending_count++;
-        jd->u.precreate_pool.trove_pending++;
 
         /* post trove operation to pull out a handle */
         ret = trove_keyval_iterate_keys(
@@ -5932,6 +5936,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         }
         else
         {
+            trove_pending_count++;
             /* callback will be triggered later */
         }
     }
