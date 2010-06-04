@@ -84,7 +84,7 @@ static void PINT_event_free( struct PINT_event *p )
     return;
 }
 
-void PINT_group_free( struct PINT_group *g )
+static void PINT_group_free( struct PINT_group *g )
 {
     if( g != NULL )
     {
