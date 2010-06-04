@@ -99,55 +99,57 @@ zoid_post_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 		size_list_cp[i] = size_list[i];
 	}
 
-	ret = zbmi_send(buffer_list, size_list_cp, list_count, tag, class,
-			unexpected, post_timeout);
-	if ((err = __zoid_error()))
+	if (total_size <= ZOID_MAX_EAGER_MSG)
+	    ret = zbmi_send_eager((const void**)buffer_list, size_list_cp,
+				  list_count, tag, class, unexpected,
+				  post_timeout);
+	else
+	    ret = zbmi_send(buffer_list, size_list_cp, list_count, tag, class,
+			    unexpected, post_timeout);
+	err = __zoid_error();
+	if (total_size <= ZOID_MAX_EAGER_MSG ?
+	    (!err && ret == 0) : (err == ENOMEM))
 	{
-	    if (err == ENOMEM)
+	    /* Indicates that there was no memory on the server side
+	       for the message.  Could happen if this is an expected
+	       message and no matching receive has been posted, or if
+	       we sent too many unexpected messages without the server-side
+	       receiving anything.  */
+
+	    if (!(new_op = bmi_alloc_method_op(0)))
+		return -BMI_ENOMEM;
+	    *id = new_op->op_id;
+	    new_op->addr = dest;
+	    new_op->send_recv = BMI_SEND;
+	    new_op->user_ptr = user_ptr;
+	    new_op->msg_tag = tag;
+	    new_op->class = class;
+	    new_op->list_count = list_count;
+	    new_op->actual_size = total_size;
+	    if (list_count == 1)
 	    {
-		/* Indicates that there was no memory on the server side
-		   for the message.  Could happen if this is an expected
-		   message and no matching receive has been posted, or if
-		   we sent too many unexpected messages without the server-side
-		   receiving anything.  */
-
-		if (!(new_op = bmi_alloc_method_op(0)))
-		    return -BMI_ENOMEM;
-		*id = new_op->op_id;
-		new_op->addr = dest;
-		new_op->send_recv = BMI_SEND;
-		new_op->user_ptr = user_ptr;
-		new_op->msg_tag = tag;
-		new_op->class = class;
-		new_op->list_count = list_count;
-		new_op->actual_size = total_size;
-		if (list_count == 1)
-		{
-		    /* Our buffer_list and size_list pointers might be
-		       temporary (see, e.g., BMI_zoid_post_send), so we
-		       prefer to copy the data over to someplace more
-		       permanent.  */
-		    new_op->buffer = (void*)buffer_list[0];
-		    new_op->buffer_list = &new_op->buffer;
-		    new_op->size_list = &new_op->actual_size;
-		}
-		else
-		{
-		    new_op->buffer_list = (void*const*)buffer_list;
-		    new_op->size_list = size_list;
-		}
-		new_op->error_code = 0;
-		new_op->method_data = (void*)unexpected;
-
-		op_list_add(zoid_ops, new_op);
-
-		return 0; /* Non-immediate completion.  */
+		/* Our buffer_list and size_list pointers might be
+		   temporary (see, e.g., BMI_zoid_post_send), so we
+		   prefer to copy the data over to someplace more
+		   permanent.  */
+		new_op->buffer = (void*)buffer_list[0];
+		new_op->buffer_list = &new_op->buffer;
+		new_op->size_list = &new_op->actual_size;
 	    }
 	    else
-		return zoid_err_to_bmi(err);
-	}
+	    {
+		new_op->buffer_list = (void*const*)buffer_list;
+		new_op->size_list = size_list;
+	    }
+	    new_op->error_code = 0;
+	    new_op->method_data = (void*)unexpected;
 
-	assert (ret == 1);
+	    op_list_add(zoid_ops, new_op);
+
+	    return 0; /* Non-immediate completion.  */
+	}
+	else if (err)
+	    return zoid_err_to_bmi(err);
 
 	return 1; /* Immediate completion.  */
     }
