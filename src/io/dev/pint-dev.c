@@ -45,7 +45,7 @@ static int pdev_fd = -1;
 static int32_t pdev_magic;
 #ifdef WITH_LINUX_KMOD
 static int32_t pdev_max_upsize;
-extern uint64_t gossip_debug_mask;
+
 #endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
 

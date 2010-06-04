@@ -12,6 +12,10 @@
 #include <malloc.h>
 #endif
 
+/* prototype definitions */
+inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment);
+inline void PINT_mem_aligned_free(void *ptr);
+
 /* PINT_mem_aligned_alloc()
  *
  * allocates a memory region of the specified size and returns a 

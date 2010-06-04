@@ -66,10 +66,12 @@ static void PINT_event_tau_init(void);
 static void PINT_event_tau_fini(void);
 static void PINT_event_tau_thread_init(char* gname);
 static void PINT_event_tau_thread_fini(void);
+static void PINT_event_free( struct PINT_event *p );
+static void PINT_group_free( strcut PINT_group *g );
 
 #endif /* HAVE_TAU */
 
-void PINT_event_free( struct PINT_event *p )
+static void PINT_event_free( struct PINT_event *p )
 {
     if( p != NULL )
     {
