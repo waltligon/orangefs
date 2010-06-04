@@ -81,11 +81,10 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* nlmills: TODO: find a better way to handle credential timeouts */
-    ret = PVFS_util_gen_credential(NULL, 5*60*60, NULL, &creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_gen_credential", ret);
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
         return -1;
     }
 
@@ -188,6 +187,8 @@ int main(int argc, char **argv)
 
     handlelist_finalize(&hl_all);
 
+    PVFS_util_refresh_credential(&creds);
+
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 
@@ -224,6 +225,8 @@ int main(int argc, char **argv)
     handlelist_finalize(&hl_unrefd);
 
  exit_now:
+    PVFS_util_refresh_credential(&creds);
+
     if (in_admin_mode) {
 
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -262,6 +265,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     struct PVFS_mgmt_server_stat *stat_array;
     struct handlelist *hl;
     struct PVFS_mgmt_setparam_value param_value;
+
+    PVFS_util_refresh_credential(creds);
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
@@ -367,6 +372,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -451,6 +458,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -533,6 +542,8 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
+
+    PVFS_util_refresh_credential(creds);
 
     ret = PVFS_sys_lookup(cur_fs,
 			  "/",
@@ -888,6 +899,8 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
 
+        PVFS_util_refresh_credential(creds);
+
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
 
@@ -968,6 +981,8 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+        PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1079,6 +1094,8 @@ void cull_leftovers(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+        PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;

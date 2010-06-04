@@ -148,8 +148,7 @@ int main (int argc, char ** argv)
     resolve_filename(&src,  user_opts->srcfile );
     resolve_filename(&dest, user_opts->destfile);
 
-    /* nlmills: TODO: find a better way to handle timeouts */
-    ret = PVFS_util_gen_credential(NULL, 5*60*60, NULL, &credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);    
     if (ret < 0)
     {
         PVFS_perror("PVFS_util_gen_credential", ret);
@@ -343,6 +342,7 @@ static size_t generic_read(file_object *src, char *buffer,
 	    fprintf(stderr, "Error: PVFS_Request_contiguous failure\n");
 	    return (ret);
 	}
+	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_read(src->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0)
@@ -375,6 +375,7 @@ static size_t generic_write(file_object *dest, char *buffer,
 	    PVFS_perror("PVFS_Request_contiguous", ret);
 	    return(ret);
 	}
+	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_write(dest->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0) 

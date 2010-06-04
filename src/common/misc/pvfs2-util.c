@@ -272,6 +272,24 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
     return ret;
 }
 
+int PVFS_util_refresh_credential(PVFS_credential *cred)
+{
+    int ret;
+
+    /* =if the credential is valid for at least a minute */
+    if (PINT_util_get_current_time() <= cred->timeout - 60)
+    {
+        ret = 0;
+    }
+    else
+    {
+        PINT_cleanup_credential(cred);
+        ret = PVFS_util_gen_credential_defaults(cred);
+    }
+
+    return ret;
+}
+
 int PVFS_util_get_umask(void)
 {
     static int mask = 0, set = 0;

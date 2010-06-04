@@ -138,11 +138,10 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* nlmills: TODO: find a better way to handle credential timeouts */
-    ret = PVFS_util_gen_credential(NULL, 5*60*60, NULL, &creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_gen_credential", ret);
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
         return(-1);
     }
 
@@ -256,6 +255,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
     struct PVFS_mgmt_server_stat *stat_array;
     struct PVFS_mgmt_setparam_value param_value;
 
+    PVFS_util_refresh_credential(creds);
+
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
 	malloc(server_count * sizeof(struct PVFS_mgmt_server_stat));
@@ -358,7 +359,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
     /* iterate until we have retrieved all handles */
     do
     {
-	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
+	PVFS_util_refresh_credential(creds);
+        ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
 					     hcount_array,
@@ -453,6 +455,8 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
 
+    PVFS_util_refresh_credential(creds);
+
     PVFS_sys_lookup(cur_fs, "/", creds,
                     &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     /* lookup_resp.pinode_refn.handle gets root handle */
@@ -505,6 +509,8 @@ int descend(PVFS_fs_id cur_fs,
 
     token = 0;
     do {
+        PVFS_util_refresh_credential(creds);
+        
         memset(&readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(pref,
                          (!token ? PVFS_READDIR_START : token),
@@ -517,6 +523,8 @@ int descend(PVFS_fs_id cur_fs,
             int server_idx;
             char *cur_file;
             PVFS_handle cur_handle;
+
+            PVFS_util_refresh_credential(creds);
 
             cur_handle = readdir_resp.dirent_array[i].handle;
             cur_file   = readdir_resp.dirent_array[i].d_name;
@@ -599,6 +607,8 @@ void verify_datafiles(PVFS_fs_id cur_fs,
     int ret, i, server_idx;
     PVFS_handle *df_handles;
 
+    PVFS_util_refresh_credential(creds);
+
     df_handles = (PVFS_handle *) malloc(df_count * sizeof(PVFS_handle));
     if (df_handles == NULL)
     {
@@ -653,6 +663,8 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         PVFS_sysresp_getattr getattr_resp;
         PVFS_object_ref entry_ref;
         char* fmt_string;
+
+        PVFS_util_refresh_credential(creds);
 
         entry_ref.handle = handle;
         entry_ref.fs_id  = cur_fs;
