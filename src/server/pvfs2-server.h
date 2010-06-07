@@ -409,13 +409,6 @@ typedef struct PINT_server_op
 /* nlmills: in that case we can move this whole block back to the file's top */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
-/* nlmills: TODO: remove these? */
-/* default checks that should work for most ops */
-extern int PINT_server_perm_read(PINT_server_op *s_op);
-extern int PINT_server_perm_write(PINT_server_op *s_op);
-extern int PINT_server_perm_none(PINT_server_op *s_op);
-extern int PINT_server_perm_setattr(PINT_server_op *s_op);
-
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
 static inline int PINT_get_object_ref_##req_name(                        \
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
@@ -423,6 +416,14 @@ static inline int PINT_get_object_ref_##req_name(                        \
     *fs_id = req->u.req_name.fs_id;                                      \
     *handle = req->u.req_name.handle;                                    \
     return 0;                                                            \
+}
+
+#define PINT_GET_CREDENTIAL_DEFINE(req_name)             \
+static inline int PINT_get_credential_##req_name(        \
+    struct PVFS_server_req *req, PVFS_credential **cred) \
+{                                                        \
+    *cred = &req->u.req_name.credential;                  \
+    return 0;                                            \
 }
 
 enum PINT_server_req_access_type PINT_server_req_readonly(
@@ -436,7 +437,7 @@ struct PINT_server_req_params
 
     /* For each request that specifies an object ref we
      * call the permission function set by the op state machine
-     * to authorize access. Most ops can use the default functions.
+     * to authorize access.
      */
     PINT_server_req_perm_fun perm;
 
@@ -463,6 +464,13 @@ struct PINT_server_req_params
     int (*get_object_ref)(
         struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
 
+    /* A callback implemented by the request to return the credential from
+     * the server request structure. If the server request does not contain
+     * a credential this field should be set to NULL.
+     */
+    int (*get_credential)(
+        struct PVFS_server_req *req, PVFS_credential **cred);
+
     /* The state machine that performs the request */
     struct PINT_state_machine_s *state_machine;
 };
@@ -477,6 +485,8 @@ extern struct PINT_server_req_entry PINT_server_req_table[];
 
 int PINT_server_req_get_object_ref(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred);
 
 PINT_server_req_perm_fun
 PINT_server_req_get_perm_fun(struct PVFS_server_req *req);

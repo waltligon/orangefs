@@ -152,6 +152,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_credential *cred = NULL;
     int ret = -PVFS_EINVAL;
 
     /*
@@ -181,42 +182,20 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                  s_op->req->capability.handle_array
                  );
 
-    /* nlmills: TODO: find a more secure way to verify credential */
-    if (s_op->op == PVFS_SERV_CREATE)
+    PINT_server_req_get_credential(s_op->req, &cred);
+    if (cred != NULL)
     {
-        ret = PINT_verify_credential(&s_op->req->u.create.credential);
-    }
-    else if (s_op->op == PVFS_SERV_MKDIR)
-    {
-        ret = PINT_verify_credential(&s_op->req->u.mkdir.credential);
-    }
-    else if (s_op->op == PVFS_SERV_GETATTR)
-    {
-        ret = PINT_verify_credential(&s_op->req->u.getattr.credential);
-    }
-    else if (s_op->op == PVFS_SERV_SETATTR)
-    {
-        ret = PINT_verify_credential(&s_op->req->u.setattr.credential);
-    }
-    else if (s_op->op == PVFS_SERV_UNSTUFF)
-    {
-        ret = PINT_verify_credential(&s_op->req->u.unstuff.credential);
-    }
-    else
-    {
-        /* pass through all ops that don't take a credential */
-        ret = 1;
+        ret = PINT_verify_credential(cred);   
+        if (!ret)
+        {
+            gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                         "Credential failed verification.\n");
+            /* nlmills: TODO: find a better error code */
+            js_p->error_code = -PVFS_EAGAIN;
+            return SM_ACTION_COMPLETE;
+        }
     }
 
-    if (!ret)
-    {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                     "Credential failed verification.\n");
-        /* nlmills: TODO: find a better error code */
-        js_p->error_code = -PVFS_EAGAIN;
-        return SM_ACTION_COMPLETE;
-    }
-    
     ret = PINT_verify_capability(&s_op->req->capability);
     if (ret)
     {

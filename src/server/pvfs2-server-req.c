@@ -151,6 +151,26 @@ int PINT_server_req_get_object_ref(
     }
 }
 
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred)
+{
+    int ret;
+    CHECK_OP(req->op);
+
+    if (!PINT_server_req_table[req->op].params->get_credential)
+    {
+        *cred = NULL;
+        ret = 0;
+    }
+    else
+    {
+        ret = PINT_server_req_table[req->op].params->get_credential(
+            req, cred);
+    }
+
+    return ret;
+}
+
 /*
  * PINT_map_server_op_to_string()
  *

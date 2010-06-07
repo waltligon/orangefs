@@ -845,6 +845,8 @@ static inline int PINT_get_object_ref_create(
     return 0;
 };
 
+PINT_GET_CREDENTIAL_DEFINE(create);
+
 static int perm_create(PINT_server_op *s_op)
 {
     PVFS_object_attr *attr = &s_op->req->u.create.attr;
@@ -892,6 +894,7 @@ struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
     .get_object_ref = PINT_get_object_ref_create,
+    .get_credential = PINT_get_credential_create,
     .perm = perm_create,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_create_sm

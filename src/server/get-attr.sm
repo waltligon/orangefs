@@ -1534,6 +1534,7 @@ static int perm_getattr(PINT_server_op *s_op)
 }
 
 PINT_GET_OBJECT_REF_DEFINE(getattr);
+PINT_GET_CREDENTIAL_DEFINE(getattr);
 
 struct PINT_server_req_params pvfs2_get_attr_params =
 {
@@ -1542,6 +1543,7 @@ struct PINT_server_req_params pvfs2_get_attr_params =
     .access_type = PINT_server_req_readonly,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_getattr,
+    .get_credential = PINT_get_credential_getattr,
     .state_machine = &pvfs2_get_attr_sm
 };
 

@@ -538,6 +538,7 @@ static int perm_setattr(PINT_server_op *s_op)
 }
 
 PINT_GET_OBJECT_REF_DEFINE(setattr);
+PINT_GET_CREDENTIAL_DEFINE(setattr);
 
 struct PINT_server_req_params pvfs2_set_attr_params =
 {
@@ -546,6 +547,7 @@ struct PINT_server_req_params pvfs2_set_attr_params =
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setattr,
+    .get_credential = PINT_get_credential_setattr,
     .state_machine = &pvfs2_set_attr_sm
 };
 

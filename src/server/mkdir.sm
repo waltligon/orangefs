@@ -333,11 +333,14 @@ static int perm_mkdir(PINT_server_op *s_op)
     return ret;
 }
 
+PINT_GET_CREDENTIAL_DEFINE(mkdir);
+
 struct PINT_server_req_params pvfs2_mkdir_params =
 {
     .string_name = "mkdir",
     .perm = perm_mkdir,
     .access_type = PINT_server_req_modify,
+    .get_credential = PINT_get_credential_mkdir,
     .state_machine = &pvfs2_mkdir_sm
 };
 
