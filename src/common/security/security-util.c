@@ -77,13 +77,16 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 	return -PVFS_ENOMEM;
     }
 
-    dest->signature = malloc(src->sig_size);
-    if (!dest->signature)
+    if (src->sig_size)
     {
-	free(dest->issuer);
-	return -PVFS_ENOMEM;
+        dest->signature = malloc(src->sig_size);
+        if (!dest->signature)
+        {
+            free(dest->issuer);
+            return -PVFS_ENOMEM;
+        }
+        memcpy(dest->signature, src->signature, src->sig_size);
     }
-    memcpy(dest->signature, src->signature, src->sig_size);
 
     if (src->num_handles)
     {
@@ -164,13 +167,16 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
         return -PVFS_ENOMEM;
     }
 
-    dest->signature = malloc(src->sig_size);
-    if (!dest->signature)
+    if (src->sig_size)
     {
-        free(dest->issuer);
-        return -PVFS_ENOMEM;
+        dest->signature = malloc(src->sig_size);
+        if (!dest->signature)
+        {
+            free(dest->issuer);
+            return -PVFS_ENOMEM;
+        }
+        memcpy(dest->signature, src->signature, src->sig_size);
     }
-    memcpy(dest->signature, src->signature, src->sig_size);
 
     if (src->num_groups)
     {
