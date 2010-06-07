@@ -127,9 +127,6 @@ PVFS_time PINT_util_mkversion_time(PVFS_time version);
 
 struct timespec PINT_util_get_abs_timespec(int microsecs);
 
-void PINT_util_digest_init(void);
-void PINT_util_digest_finalize(void);
-
 int PINT_util_digest_sha1(const void *input_message, size_t input_length,
 		char **output, size_t *output_length);
 

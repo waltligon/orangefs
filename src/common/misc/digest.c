@@ -20,89 +20,6 @@
 #include <errno.h>
 #include "gen-locks.h"
 
-#ifdef __GEN_POSIX_LOCKING__
-#include <pthread.h>
-#include <sys/types.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-
-
-static gen_mutex_t *mutex = NULL;
-static pthread_once_t once_initialize = PTHREAD_ONCE_INIT;
-static pthread_once_t once_finalize = PTHREAD_ONCE_INIT;
-
-static void do_lock(int mode, int n, const char *file, int line)
-{
-    if (mode & CRYPTO_LOCK) {
-        gen_mutex_lock(&mutex[n]);
-    }
-    else {
-        gen_mutex_unlock(&mutex[n]);
-    }
-    return;
-}
-
-static unsigned long get_tid(void)
-{
-    /* If gettid syscall does not exist, fall back to getpid, which I
-     * think will do something similar to gettid on non-ntpl
-     * implementations */
-#if defined(__NR_gettid)
-    return syscall(__NR_gettid);
-#else
-    return getpid();
-#endif
-}
-
-static void callback_init(void)
-{
-    int i, num_locks = 0;
-
-    OpenSSL_add_all_digests();
-    num_locks = CRYPTO_num_locks();
-    mutex = (gen_mutex_t *) calloc(num_locks, sizeof(gen_mutex_t));
-    for (i = 0; i < num_locks; i++) {
-        gen_mutex_init(&mutex[i]);
-    }
-    CRYPTO_set_locking_callback(do_lock);
-    CRYPTO_set_id_callback(get_tid);
-    return;
-}
-
-void PINT_util_digest_init(void)
-{
-    pthread_once(&once_initialize, callback_init);
-    return;
-}
-
-static void callback_finalize(void)
-{
-    free(mutex);
-    mutex = NULL;
-    EVP_cleanup();
-}
-
-void PINT_util_digest_finalize(void)
-{
-    pthread_once(&once_finalize, callback_finalize);
-    return;
-}
-
-#else
-
-void PINT_util_digest_init(void)
-{
-    OpenSSL_add_all_digests();
-    return;
-}
-
-void PINT_util_digest_finalize(void)
-{
-    EVP_cleanup();
-    return;
-}
-
-#endif
 
 /* 
  * Given a digest name, a message buffer of a particular length,
@@ -155,16 +72,6 @@ static int digest(const char *digest_name,
 }
 
 #else /* !HAVE_OPENSSL */
-
-void PINT_util_digest_init(void)
-{
-    return;
-}
-
-void PINT_util_digest_finalize(void)
-{
-    return;
-}
 
 /* 
  * returns -PVFS_EOPNOTSUPP
