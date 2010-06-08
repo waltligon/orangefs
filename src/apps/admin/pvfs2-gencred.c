@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
