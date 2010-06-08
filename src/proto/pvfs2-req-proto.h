@@ -1909,14 +1909,14 @@ endecode_fields_2a_struct(
 struct PVFS_servreq_mgmt_migrate{
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    const char *dist_server;
+    char *dist_server;
 };
 
 endecode_fields_3_struct(
      PVFS_servreq_mgmt_migrate,
      PVFS_handle, handle,
      PVFS_fs_id, fs_id,
-     char, dist_server );
+     string , dist_server );
 
 #define PINT_SERVREQ_MGMT_MIGRATE_FILL(__req,        \
                                      __creds,        \
@@ -1931,6 +1931,7 @@ do{                                                  \
     (__req).hints = (__hints);                       \
     (__req).u.mgmt_migrate.handle = (__handle);      \
     (__req).u.mgmt_migrate.fs_id = (__fsid);         \
+    (__req).u.mgmt_migrate.dist_server = (__dist_ser); \
 } while(0);
 
  

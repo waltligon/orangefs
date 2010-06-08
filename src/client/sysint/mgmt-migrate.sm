@@ -58,7 +58,7 @@ PVFS_error PVFS_imgmt_migrate(
 		PVFS_object_ref ref,
 		const PVFS_credentials *credentials,
 		PVFS_sys_op_id *op_id,
-                const char *dist_ser,
+                char *dist_ser,
 		PVFS_hint hints,
 		void *user_ptr)
 {
@@ -88,9 +88,9 @@ PVFS_error PVFS_imgmt_migrate(
     	return -PVFS_ENOMEM;
     }
        
-    sm_p = PINT_sm_frame(smcb, PINT_CURRENT_FRAME);
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm->cred_p, credentials);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     
     /* fill in stuff in the union */
     sm_p->u.migrate.dist_server = dist_ser;
@@ -106,7 +106,7 @@ PVFS_error PVFS_imgmt_migrate(
 PVFS_error PVFS_mgmt_migrate(
 		PVFS_object_ref ref,
 		const PVFS_credentials *credentials,
-                const char *dist_server,
+                char *dist_server,
 		PVFS_hint hints)
 {
 	PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -114,7 +114,7 @@ PVFS_error PVFS_mgmt_migrate(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate entered\n");		
 			
-	ret = PVFS_imgmt_migrate(credentials, &op_id, dist_server, hints)
+	ret = PVFS_imgmt_migrate(ref, credentials, &op_id, dist_server, hints, NULL);
 	if(ret)
 	{
 		PVFS_perror_gossip("PVFS_imgmt_migrate call", ret);
@@ -148,7 +148,7 @@ static int mgmt_migrate_comp_fn(
 
 
 static PINT_sm_action mgmt_migrate_init(
-		struct PINT_smcb *smcb, job_status_s js_p)
+		struct PINT_smcb *smcb, job_status_s *js_p)
 {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_migrate_init called\n");
 	assert(js_p->error_code == 0);
@@ -156,11 +156,11 @@ static PINT_sm_action mgmt_migrate_init(
 }
 
 static PINT_sm_action mgmt_migrate_setup_msgpair(
-		struct PINT_smcb *smcb, job_status_s js_p)
+		struct PINT_smcb *smcb, job_status_s *js_p)
 {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_migrate_setup_msgpair called\n");
 	
-	struct PINT_client_sm *sm_p = PINT_sm_frame(smbc, PINT_FRAME_CURRET);
+	struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 	int ret = -PVFS_EINVAL;
 	PINT_sm_msgpair_state *msg_p = NULL;
 	
@@ -175,11 +175,11 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
 	    sm_p->object_ref.fs_id,
 	    sm_p->object_ref.handle,
             sm_p->u.migrate.dist_server,
-    	sm_p->hints);
+    	    sm_p->hints);
     
     /*stuff here as well */
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->object_re.handle;
+        msg_p->handle = sm_p->object_ref.handle;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY; 
   	msg_p->comp_fn = mgmt_migrate_comp_fn;
   	   	
@@ -199,9 +199,9 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
    		
 
 static PINT_sm_action mgmt_migrate_cleanup(
-		struct PINT_smcb *smcb, job_status_s js_p)
+		struct PINT_smcb *smcb, job_status_s *js_p)
 {
-	stuct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_CURRENT_FRAME);
+	struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 	
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"mgmt_migrate state: mgmt_migrate_cleanup\n");

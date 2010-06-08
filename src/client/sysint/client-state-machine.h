@@ -147,7 +147,7 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
 
 struct PINT_client_migrate_sm
 {
-    const char *dist_server;
+     char *dist_server;
 };
 
 /* this structure is used to handle mirrored retries in the small-io case*/
