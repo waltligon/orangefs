@@ -576,6 +576,15 @@ struct PINT_server_tree_communicate_op
     int handle_index;
 };
 
+struct PINT_server_mgmt_migrate_op
+{
+   PVFS_handle *metahandle;
+   PVFS_fs_id fs_id;
+   /*need dest server address */
+};    
+
+
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -667,6 +676,7 @@ typedef struct PINT_server_op
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
         struct PINT_server_tree_communicate_op tree_communicate;
+        struct PINT_server_mgmt_migrate_op mgmt_migrate;
     } u;
 
 } PINT_server_op;
@@ -733,6 +743,7 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_mgmt_migrate_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

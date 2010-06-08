@@ -83,6 +83,7 @@ enum PVFS_server_op
     PVFS_SERV_IMM_COPIES = 40,
     PVFS_SERV_TREE_REMOVE = 41,
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
+    PVFS_SERV_MGMT_MIGRATE = 43,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1902,6 +1903,39 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+/* MGMT MIGRATE *****************************************//*COME HERE TO CHANGE STUFF!*/
+/* copy a single object and move to another server*/     
+
+struct PVFS_servreq_mgmt_migrate{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    const char *dist_server;
+};
+
+endecode_fields_3_struct(
+     PVFS_servreq_mgmt_migrate,
+     PVFS_handle, handle,
+     PVFS_fs_id, fs_id,
+     char, dist_server );
+
+#define PINT_SERVREQ_MGMT_MIGRATE_FILL(__req,        \
+                                     __creds,        \
+                                     __fsid,         \
+                                     __handle,       \
+                                     __dist_ser,     \
+                                     __hints)        \
+do{                                                  \
+    memset(&(__req), 0, sizeof(__req));              \
+    (__req).op = PVFS_SERV_MGMT_MIGRATE;             \
+    (__req).credentials = (__creds);                 \
+    (__req).hints = (__hints);                       \
+    (__req).u.mgmt_migrate.handle = (__handle);      \
+    (__req).u.mgmt_migrate.fs_id = (__fsid);         \
+} while(0);
+
+ 
+                                        
+
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1948,6 +1982,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
+        struct PVFS_servreq_mgmt_migrate mgmt_migrate;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

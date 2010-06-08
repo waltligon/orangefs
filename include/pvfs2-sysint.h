@@ -669,12 +669,14 @@ int PVFS_sys_cancel(PVFS_sys_op_id op_id);
 PVFS_error PVFS_mgmt_migrate(
     PVFS_object_ref ref,
     const PVFS_credentials *credentials,
+    const char *dist_server,
     PVFS_hint hints);
 
 PVFS_error PVFS_imgmt_migrate(
     PVFS_object_ref ref,
     const PVFS_credentials *credentials,
     PVFS_sys_op_id *op_id,
+    const char *dist_ser,
     PVFS_hint hints);
 
 #endif

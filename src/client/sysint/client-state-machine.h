@@ -145,7 +145,10 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
     PVFS_handle *dirdata_handle;
 };
 
-struct PINT_client_migrate_sm{};
+struct PINT_client_migrate_sm
+{
+    const char *dist_server;
+};
 
 /* this structure is used to handle mirrored retries in the small-io case*/
 typedef struct PINT_client_mirror_ctx
