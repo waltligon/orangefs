@@ -234,7 +234,7 @@ static int block_on_flow(
 {
     int ret = -1;
 
-    flow_d->callback = callback_fn;
+    flow_d->callback = (void *)callback_fn;
     ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {
