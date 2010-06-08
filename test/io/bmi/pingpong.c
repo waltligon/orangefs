@@ -556,7 +556,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
                                                 bytes, BMI_PRE_ALLOC, i, NULL, *context, NULL);
                         } else {
                                 ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, 
-                                                send_buffer + offset, bytes, BMI_PRE_ALLOC, i, 
+                                                ((char*)send_buffer) + offset, bytes, BMI_PRE_ALLOC, i, 
                                                 NULL, *context, NULL);
                         }
                         if (ret < 0) {
