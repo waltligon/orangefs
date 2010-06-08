@@ -1,0 +1,88 @@
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+ 
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+
+
+%%
+
+machine pvfs2_mgmt_migrate_sm
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		success => get_new_handle;
+		default =>final_response;
+	}
+	
+	state get_new_handle;
+	{
+		run migrate_get_new_handle;
+		success => 
+		default => final_response;
+	}
+	
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+	
+	state cleanup
+	{
+			run migrate_cleanup;
+			default => terminate;
+	}
+	
+}
+
+%%
+
+
+
+static PINT_sm_action migrate_get_new_handel(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	
+
+	return SM_ACTION_COMPLETE;	
+}
+
+
+static PINT_sm_action migrate_cleanup(
+		struct PINT_smcb *smcb, job_status_s *jp_p)
+{
+	
+	
+	
+	return(server_state_machine_complete(smcb));
+}
+
+
+/* need to know what some of these things are/mean!!!!!!!! */
+struct PINT_server_req_parms pvfs2_mgmt_migrate_params =
+{
+	.string_name = "migrate",
+	.perm = PINT_SERVER_CHECK_NONE,
+	.state_machine = &pvfs2_mgmt_migrate_sm
+};	
+	.
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+								
+					
