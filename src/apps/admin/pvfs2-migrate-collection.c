@@ -173,6 +173,7 @@ int main(int argc, char **argv)
         server_alias = PINT_util_guess_alias();
     }
 
+    memset(&server_config, 0, sizeof(server_config));
     ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias);
     if(ret < 0)
     {

@@ -17,9 +17,11 @@
 #include <grp.h>
 #include <unistd.h>
 
+#ifdef ENABLE_SECURITY
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-types.h"
@@ -131,6 +133,8 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     return EXIT_SUCCESS;
 }
 
+#ifdef ENABLE_SECURITY
+
 static int sign_credential(PVFS_credential *cred, time_t timeout,
     const char *keypath)
 {
@@ -221,6 +225,20 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     return EXIT_SUCCESS;
 }
 
+#else /* !ENABLE_SECURITY */
+
+static int sign_credential(PVFS_credential *cred, time_t timeout,
+    const char *keypath)
+{
+    cred->timeout = (PVFS_time)(time(NULL) + timeout);
+    cred->sig_size = 0;
+    cred->signature = NULL;
+
+    return 0;
+}
+
+#endif /* ENABLE_SECURITY */
+
 static int write_credential(const PVFS_credential *cred, 
     const struct passwd *pwd)
 {
@@ -260,8 +278,10 @@ int main(int argc, char **argv)
         return ret;
     }
     
+#ifdef ENABLE_SECURITY
     OpenSSL_add_all_algorithms();
     ERR_load_crypto_strings();
+#endif
     
     pwd = opts.user ? getpwnam(opts.user) : getpwuid(getuid());
     if (pwd == NULL)

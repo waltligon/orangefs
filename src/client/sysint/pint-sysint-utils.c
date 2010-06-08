@@ -7,10 +7,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 
-#include <openssl/crypto.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-
 #include "pvfs2-sysint.h"
 #include "pvfs2-req-proto.h"
 #include "pint-sysint-utils.h"
@@ -23,6 +19,13 @@
 #include "pvfs2-util.h"
 #include "client-state-machine.h"
 #include "gen-locks.h"
+
+
+#ifdef HAVE_OPENSSL
+
+#include <openssl/crypto.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
 
 
 static gen_mutex_t security_init_mutex = GEN_MUTEX_INITIALIZER;
@@ -44,6 +47,8 @@ static void dyn_lock_function(int, struct CRYPTO_dynlock_value*, const char*,
                               int);
 static void dyn_destroy_function(struct CRYPTO_dynlock_value*, const char*,
                                  int);
+
+#endif /* HAVE_OPENSSL */
 
 
 /*
@@ -104,6 +109,11 @@ int PINT_lookup_parent(
     *handle = resp_look.ref.handle;
     return 0;
 }
+
+/* Certain functions outside of the security code use OpenSSL
+ * (e.g. src/common/misc/digest.c)
+ */
+#ifdef HAVE_OPENSSL
 
 /* nlmills: TODO: document me */
 int PINT_client_security_initialize(void)
@@ -292,6 +302,20 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value *l,
     gen_mutex_destroy(&l->mutex);
     free(l);
 }
+
+#else /* !HAVE_OPENSSL */
+
+int PINT_client_security_initialize(void)
+{
+    return 0;
+}
+
+int PINT_client_security_finalize(void)
+{
+    return 0;
+}
+
+#endif /* HAVE_OPENSSL */
    
 
 /*

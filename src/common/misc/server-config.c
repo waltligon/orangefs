@@ -1037,6 +1037,7 @@ int PINT_parse_config(
         return 1;
     }
 
+#ifdef ENABLE_SECURITY
     if (server_alias_name && !config_s->keystore_path)
     {
         gossip_err("Configuration file error. No keystore path specified.\n");
@@ -1049,6 +1050,7 @@ int PINT_parse_config(
                    "specified.\n");
         return 1;
     }
+#endif /* ENABLE_SECURITY */
 
     return 0;
 }
