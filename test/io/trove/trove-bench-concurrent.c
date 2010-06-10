@@ -83,6 +83,12 @@ static int do_trove_test(char* dir)
     void* user_ptr_array[concurrent];
     int write_flag = 0;
 
+    if(sync_mode == 'b')
+    {
+        printf("# NOTE: b option never syncs the actual write(); it instead\n");
+        printf("#       makes sure that the size update is synced.\n");
+    }
+
     if(sync_mode == 's' || sync_mode == 'b')
         write_flag = TROVE_SYNC;
 
@@ -275,6 +281,7 @@ int main(int argc, char *argv[])
     int64_t offset;
     int ret;
     struct bench_op* tmp_op;
+    int i;
 
     if(argc != 7)
     {
@@ -352,10 +359,25 @@ int main(int argc, char *argv[])
 
     do_trove_test(argv[2]);
 
+    /* print command line in comments */
+    printf("#");
+    for(i=0; i<argc; i++)
+    {
+        printf(" %s", argv[i]);
+    }
+    printf("\n");
+    printf("# <r/w>\t<buffer size>\t<total size>\t<seconds>\t<MiB/s>\t<ops/s>\n");
+    printf("%s\t%lld\t%lld\t%f\t%f\t%f\n",
+        op_string, lld(size), lld(total_size), (end_tm-start_tm),
+        (((double)total_size)/(1024.0*1024.0))/(end_tm-start_tm),
+        ((double)ops)/(end_tm-start_tm));
+
+#if 0
     printf("# Moved %lld bytes in %f seconds.\n", lld(total_size),
         (end_tm-start_tm));
     printf("%f MB/s\n", (((double)total_size)/(1024.0*1024.0))/(end_tm-start_tm));
     printf("%f ops/s\n", ((double)ops)/(end_tm-start_tm));
+#endif
 
     return 0;
 }
