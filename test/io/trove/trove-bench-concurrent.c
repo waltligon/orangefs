@@ -4,6 +4,7 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "trove.h"
 #include "trove-types.h"
@@ -148,7 +149,8 @@ static int do_trove_test(char* dir)
          * is bigger than this 
          */
         tmp_buffer->size = 4*1024*1024;
-        tmp_buffer->buffer = malloc(tmp_buffer->size);
+        ret = posix_memalign((void**)&tmp_buffer->buffer, 4096, tmp_buffer->size);
+        assert(ret == 0);
         assert(tmp_buffer->buffer);
         qlist_add_tail(&tmp_buffer->list_link, &buffer_list);
     }
