@@ -50,10 +50,15 @@ int concurrent;
 int meta_sync;
 static char data_mode;
 int ops = 0;
+char sync_mode;
 
-static TROVE_method_id trove_method_callback(TROVE_coll_id id)
+static TROVE_method_id trove_method_callback_directio(TROVE_coll_id id)
 {
     return(TROVE_METHOD_DBPF_DIRECTIO);
+}
+static TROVE_method_id trove_method_callback_altaio(TROVE_coll_id id)
+{
+    return(TROVE_METHOD_DBPF_ALTAIO);
 }
 
 static int do_trove_test(char* dir)
@@ -76,12 +81,23 @@ static int do_trove_test(char* dir)
     TROVE_op_id id_array[concurrent];
     TROVE_ds_state state_array[concurrent];
     void* user_ptr_array[concurrent];
+    int write_flag = 0;
 
-    ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, 0);
+    if(sync_mode == 's' || sync_mode == 'b')
+        write_flag = TROVE_SYNC;
+
+    if(sync_mode == 'o' || sync_mode == 'b')
+        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback_directio, dir, 0);
+    else
+        ret = trove_initialize(TROVE_METHOD_DBPF_ALTAIO, trove_method_callback_altaio, dir, 0);
+
     if(ret < 0)
     {
         /* try to create new storage space */
-        ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, NULL, &op_id);
+        if(sync_mode == 'o' || sync_mode == 'b')
+            ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, NULL, &op_id);
+        else
+            ret = trove_storage_create(TROVE_METHOD_DBPF_ALTAIO, dir, NULL, &op_id);
         if(ret != 1)
         {
             fprintf(stderr, "Error: failed to create storage space at %s\n",
@@ -89,7 +105,11 @@ static int do_trove_test(char* dir)
             return(-1);
         }
         
-        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, 0);
+        if(sync_mode == 'o' || sync_mode == 'b')
+            ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback_directio, dir, 0);
+        else
+            ret = trove_initialize(TROVE_METHOD_DBPF_ALTAIO, trove_method_callback_altaio, dir, 0);
+
         if(ret < 0)
         {
             fprintf(stderr, "Error: failed to initialize.\n");
@@ -182,7 +202,7 @@ static int do_trove_test(char* dir)
                 /* post operation */
                 ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
                     &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
-                    &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
+                    &out_size, write_flag, NULL, tmp_buffer, trove_context, &op_id,
                     NULL);
             }
             else if(tmp_op->type == READ && data_mode == 'd')
@@ -202,7 +222,7 @@ static int do_trove_test(char* dir)
                 tmp_op->value.buffer_sz = tmp_op->size;
 
                 ret = trove_keyval_write(1, 1, &tmp_op->key,
-                    &tmp_op->value, TROVE_SYNC, NULL, tmp_buffer,
+                    &tmp_op->value, write_flag, NULL, tmp_buffer,
                     trove_context, &op_id, NULL);
             }
             else if(tmp_op->type == READ && data_mode == 'k')
@@ -256,26 +276,42 @@ int main(int argc, char *argv[])
     int ret;
     struct bench_op* tmp_op;
 
-    if(argc != 6)
+    if(argc != 7)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
 
     ret = sscanf(argv[3], "%d", &concurrent);
     if(ret != 1 || concurrent < 1)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        return(-1);
     }
     ret = sscanf(argv[4], "%d", &meta_sync);
     if(ret != 1 || meta_sync > 1 || meta_sync < 0)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        return(-1);
     }
     ret = sscanf(argv[5], "%c", &data_mode);
     if(ret != 1 || (data_mode != 'k' && data_mode != 'd'))
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        return(-1);
+    }
+
+    ret = sscanf(argv[6], "%s", &sync_mode);
+    if(ret != 1 || (sync_mode != 'o' && sync_mode != 's' && sync_mode != 'b' &&
+        sync_mode != 'n'))
+    {
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        return(-1);
     }
 
     /* parse description of workload */
