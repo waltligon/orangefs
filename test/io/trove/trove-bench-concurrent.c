@@ -51,6 +51,7 @@ int meta_sync;
 static char data_mode;
 int ops = 0;
 char sync_mode;
+int max_seconds;
 
 static TROVE_method_id trove_method_callback_directio(TROVE_coll_id id)
 {
@@ -82,6 +83,7 @@ static int do_trove_test(char* dir)
     TROVE_ds_state state_array[concurrent];
     void* user_ptr_array[concurrent];
     int write_flag = 0;
+    double now;
 
     if(sync_mode == 'b')
     {
@@ -183,7 +185,8 @@ static int do_trove_test(char* dir)
 
     start_tm = Wtime();
 
-    while(inflight > 0 || !qlist_empty(&op_list))
+    now = Wtime();
+    while((inflight > 0 || !qlist_empty(&op_list)) && (max_seconds == 0 || (now-start_tm) < max_seconds))
     {
         /* first priority is to keep maximum ops posted */
         while(inflight < concurrent && !qlist_empty(&op_list))
@@ -265,6 +268,7 @@ static int do_trove_test(char* dir)
             tmp_buffer = user_ptr_array[i];
             qlist_add_tail(&tmp_buffer->list_link, &buffer_list);
         }
+        now = Wtime();
     }
 
     end_tm = Wtime();
@@ -283,9 +287,9 @@ int main(int argc, char *argv[])
     struct bench_op* tmp_op;
     int i;
 
-    if(argc != 7)
+    if(argc != 8)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
         fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
@@ -293,21 +297,21 @@ int main(int argc, char *argv[])
     ret = sscanf(argv[3], "%d", &concurrent);
     if(ret != 1 || concurrent < 1)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
         fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
     ret = sscanf(argv[4], "%d", &meta_sync);
     if(ret != 1 || meta_sync > 1 || meta_sync < 0)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
         fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
     ret = sscanf(argv[5], "%c", &data_mode);
     if(ret != 1 || (data_mode != 'k' && data_mode != 'd'))
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
         fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
@@ -316,7 +320,15 @@ int main(int argc, char *argv[])
     if(ret != 1 || (sync_mode != 'o' && sync_mode != 's' && sync_mode != 'b' &&
         sync_mode != 'n'))
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n>\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
+        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        return(-1);
+    }
+
+    ret = sscanf(argv[7], "%d", &max_seconds);
+    if(ret != 1 || max_seconds < 0)
+    {
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
         fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
         return(-1);
     }
