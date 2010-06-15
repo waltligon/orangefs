@@ -51,6 +51,7 @@ struct PVFS_sys_attr_s
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
     PVFS2_ALIGN_VAR(char*, dist_name);   /* NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(char*, dist_params); /* NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(PVFS_handle, dirent_handle);
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     PVFS_flags flags;

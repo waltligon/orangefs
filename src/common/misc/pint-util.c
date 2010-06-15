@@ -126,6 +126,9 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_DIR_DIRENT_FILES)
         {
+            dest->u.dir.dirent_file_count = src->u.dir.dirent_file_count;
+            dest->u.dir.dirent_handle = src->u.dir.dirent_handle;
+/*
             PVFS_size dirent_file_array_size = src->u.dir.dirent_file_count *
                 sizeof(PVFS_handle);
 
@@ -153,6 +156,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.dir.dirent_file_array = NULL;
             }
             dest->u.dir.dirent_file_count = src->u.dir.dirent_file_count;
+*/
         }
 
         if((src->objtype == PVFS_TYPE_METAFILE) &&
@@ -377,11 +381,13 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.dir.hint.dist_params = NULL;
                 }
             }
+/*
             if (attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
             {
                 free(attr->u.dir.dirent_file_array);
                 attr->u.dir.dirent_file_array = NULL;
             }
+*/
         }
     }
 }

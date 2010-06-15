@@ -37,7 +37,14 @@ machine pvfs2_client_mgmt_remove_dirent_sm
     state init
     {
         run mgmt_remove_dirent_init;
-        default => remove_dirent_setup_msgpair;
+        default => parent_getattr;
+    }
+
+    state parent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => remove_dirent_setup_msgpair;
+        default => cleanup;
     }
 
     state remove_dirent_setup_msgpair
@@ -152,9 +159,19 @@ PVFS_error PVFS_mgmt_remove_dirent(
 static PINT_sm_action mgmt_remove_dirent_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_remove_dirent_init called\n");
 
     assert(js_p->error_code == 0);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->parent_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -175,6 +192,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
+        sm_p->getattr.attr.u.dir.dirent_handle,
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
 

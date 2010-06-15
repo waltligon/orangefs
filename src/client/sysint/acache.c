@@ -69,6 +69,8 @@ struct static_payload
     uint32_t dfile_count;
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
+    PVFS_handle dirent_handle;
+    uint32_t dirent_file_count;
 };
   
 static struct PINT_tcache* acache = NULL;
@@ -448,6 +450,13 @@ status=%d, attr_status=%d, size_status=%d\n",
             }
             attr->u.meta.dist_size = tmp_static_payload->dist_size;
         }
+        if(tmp_static_payload->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+        {
+            attr->u.dir.dirent_handle = tmp_static_payload->dirent_handle;
+            attr->u.dir.dirent_file_count = tmp_static_payload->dirent_file_count;
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): dirent_file_count=%d, dirent_handle=%llu\n", attr->u.dir.dirent_file_count, llu(attr->u.dir.dirent_handle));
+        }
+
         *attr_status = 0;
     }
 
@@ -644,6 +653,12 @@ int PINT_acache_update(
                 goto err;
             }
             tmp_static_payload->dist_size = attr->u.meta.dist_size;
+        }
+        if(attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+        {
+             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): dirent_file_count=%d, dirent_handle=%llu\n", attr->u.dir.dirent_file_count, llu(attr->u.dir.dirent_handle));
+            tmp_static_payload->dirent_handle = attr->u.dir.dirent_handle;
+            tmp_static_payload->dirent_file_count = attr->u.dir.dirent_file_count;
         }
     }
 

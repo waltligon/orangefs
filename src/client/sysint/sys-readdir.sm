@@ -212,7 +212,7 @@ static PINT_sm_action readdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL,
+        (PVFS_ATTR_DIR_ALL|PVFS_ATTR_DIR_DIRENT_FILES),
         PVFS_TYPE_DIRECTORY,
         0);
     
@@ -240,8 +240,9 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %llu | limit is %d\n",
+        GOSSIP_READDIR_DEBUG, "%llu|%llu|%d | token is %llu | limit is %d\n",
         llu(sm_p->object_ref.handle),
+        llu(sm_p->getattr.attr.u.dir.dirent_handle),
         sm_p->object_ref.fs_id,
         llu(sm_p->readdir.pos_token),
         sm_p->readdir.dirent_limit);
@@ -254,6 +255,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
+        sm_p->getattr.attr.u.dir.dirent_handle,
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit,
         sm_p->hints);

@@ -67,7 +67,14 @@ machine pvfs2_client_remove_sm
     state init
     {
         run remove_init;
-        default => rmdirent_setup_msgpair;
+        default => init_getattr;
+    }
+
+    state init_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rmdirent_setup_msgpair;
+        default => cleanup;
     }
 
     state rmdirent_setup_msgpair
@@ -102,19 +109,32 @@ machine pvfs2_client_remove_sm
         run remove_check_error_code;
         success => cleanup;
         RETURN_STORED_ERROR_CODE => cleanup;
-        default => crdirent_setup_msgpair;
+        default => getattr_setup;
     }
 
     state crdirent_timer
     {
         run remove_generic_timer;
-        default => crdirent_setup_msgpair;
+        default => getattr_setup;
     }
 
     state rmdirent_timer
     {
         run remove_generic_timer;
         default => rmdirent_setup_msgpair;
+    }
+
+    state getattr_setup
+    {
+        run remove_getattr_setup;
+        default => parent_getattr;
+    }
+
+    state parent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => cleanup;
     }
 
     state crdirent_setup_msgpair
@@ -244,9 +264,19 @@ PVFS_error PVFS_sys_remove(
 static PINT_sm_action remove_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->parent_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -273,6 +303,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
+        sm_p->getattr.attr.u.dir.dirent_handle,
         sm_p->u.remove.object_name,
         sm_p->hints);
 
@@ -299,10 +330,32 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action remove_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: getattr_setup\n");
+
+    sm_p->u.remove.stored_error_code = js_p->error_code;
+    js_p->error_code = 0;
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_DIR_DIRENT_FILES,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action remove_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = NULL;
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
@@ -313,6 +366,12 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirent_handle: %llu\n",
+        llu(attr->u.dir.dirent_handle));
+ 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
@@ -322,6 +381,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
+        attr->u.dir.dirent_handle,
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 

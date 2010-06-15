@@ -410,12 +410,14 @@ static int rename_lookups_comp_fn(
         resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
         sm_p->u.rename.parent_refns[index].fs_id;
+    sm_p->u.rename.dirent_handle[index] =
+        resp_p->u.lookup_path.attr_array[0].u.dir.dirent_handle;
 
     if (index == 0)
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu\n",
-            llu(sm_p->u.rename.refns[index].handle));
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu, dirent_handle %llu\n",
+            llu(sm_p->u.rename.refns[index].handle), llu(sm_p->u.rename.dirent_handle[index]));
     }
     else
     {
@@ -547,7 +549,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL,
+            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES,
             sm_p->hints);
 
         /* fill in msgpair structure components */
@@ -605,6 +607,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
         sm_p->u.rename.entries[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.parent_refns[1].handle,
+        sm_p->u.rename.dirent_handle[1],
         sm_p->u.rename.parent_refns[1].fs_id,
         sm_p->hints);
 
@@ -657,6 +660,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
+        sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index],
         sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
         sm_p->hints);
 
@@ -786,6 +790,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->u.rename.parent_refns[1].fs_id,
         sm_p->u.rename.parent_refns[1].handle,
+        sm_p->u.rename.dirent_handle[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.entries[1],
         sm_p->hints);
