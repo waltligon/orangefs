@@ -17,7 +17,6 @@
 #include "pint-perf-counter.h"
 #include "check.h"
 
-/* nlmills: TODO: fix comment */
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
  * steps that are common to many server operations.

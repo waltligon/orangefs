@@ -887,6 +887,10 @@ endecode_fields_3a2a_struct (
     uint32_t, op_mask,
     uint32_t, num_handles,
     PVFS_handle, handle_array)
+#define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
+                                    sizeof(PVFS_handle)          + \
+                                    PVFS_REQ_LIMIT_ISSUER        + \
+                                    PVFS_REQ_LIMIT_SIGNATURE)
 
 typedef struct PVFS_credential PVFS_credential;
 struct PVFS_credential 
@@ -910,6 +914,10 @@ endecode_fields_3a2a_struct (
     PVFS_time, timeout,
     uint32_t, sig_size,
     PVFS_signature, signature)
+#define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
+                                    sizeof(PVFS_gid)         + \
+                                    PVFS_REQ_LIMIT_ISSUER    + \
+                                    PVFS_REQ_LIMIT_SIGNATURE)
 
 #endif /* __PVFS2_TYPES_H */
 

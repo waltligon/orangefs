@@ -48,8 +48,12 @@ static int permit_operation(PVFS_fs_id fsid,
 
 /* PINT_get_capabilities
  *
- * nlmills: TODO: document me
- * nlmills: TODO: add to header
+ * Sets all of the capability bits in the op_mask that apply to
+ * the combination of the given user and permissions. UID 0 is
+ * given all possible capabilities.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
  */
 int PINT_get_capabilities(void *acl_buf, 
                           size_t acl_size, 
@@ -164,7 +168,14 @@ int PINT_get_capabilities(void *acl_buf,
     return 0;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_perm_check
+ *
+ * Performs a permission check for the given server operation. Calls
+ * the permission function given in the server state machine.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
+ */
 int PINT_perm_check(struct PINT_server_op *s_op)
 {
     PVFS_capability *cap = &s_op->req->capability;
@@ -304,7 +315,6 @@ static int check_mode(enum access_type access,
  * by the acl. Returns -PVFS_EIO if ACL is invalid or not found,
  * returns -PVFS_EACCESS if access is denied
  */
-/* nlmills: TODO: this should be rewritten */
 static int check_acls(void *acl_buf, 
                       size_t acl_size, 
                       const PVFS_object_attr *attr,

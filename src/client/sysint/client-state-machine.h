@@ -47,8 +47,7 @@
 /* Default number of milliseconds to delay before retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
-/* Default timout buffer for capabilities */
-/* nlmills: TODO:  Figure out a better way to handle this */
+/* grab a new capability if the current one expires in 2 minutes or less */
 #define CAP_TIMEOUT_BUFFER 120
 
 int PINT_client_state_machine_initialize(void);

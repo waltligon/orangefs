@@ -11,15 +11,23 @@
 #include "pvfs2-types.h"
 
 
-/* nlmills: TODO: document these */
+/* POSIX-style execute permission */
 #define PINT_CAP_EXEC         (1 << 0)
+/* POSIX-style write permission */
 #define PINT_CAP_WRITE        (1 << 1)
+/* POSIX-style read permission */
 #define PINT_CAP_READ         (1 << 2)
+/* permission to set attributes on a handle */
 #define PINT_CAP_SETATTR      (1 << 3)
+/* permission to create new object */
 #define PINT_CAP_CREATE       (1 << 4)
+/* permission to perform administrative-level functions */
 #define PINT_CAP_ADMIN        (1 << 5)
+/* permission to remove an object */
 #define PINT_CAP_REMOVE       (1 << 6)
+/* permission to create multiple new objects */
 #define PINT_CAP_BATCH_CREATE (1 << 7)
+/* permission to remove multiple objects */
 #define PINT_CAP_BATCH_REMOVE (1 << 8)
 
 

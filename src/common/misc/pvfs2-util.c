@@ -254,7 +254,6 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
                 char *ptr = buf;
                 PVFS_credential tmp;
 
-                /* nlmills: TODO: secure against buffer overflows in decode */
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
             }
@@ -276,8 +275,8 @@ int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
-    /* =if the credential is valid for at least a minute */
-    if (PINT_util_get_current_time() <= cred->timeout - 60)
+    /* =if the credential is valid for at least an hour */
+    if (PINT_util_get_current_time() <= cred->timeout - 3600)
     {
         ret = 0;
     }

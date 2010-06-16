@@ -156,15 +156,6 @@ enum PVFS_server_op
 /* max size of credential/capability issuer (in bytes) */
 #define PVFS_REQ_LIMIT_ISSUER 128
 
-/* nlmills: TODO: find a better place for these definitions */
-#define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
-                                    sizeof(PVFS_handle)          + \
-                                    PVFS_REQ_LIMIT_ISSUER        + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
-#define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
-                                    sizeof(PVFS_gid)         + \
-                                    PVFS_REQ_LIMIT_ISSUER    + \
-                                    PVFS_REQ_LIMIT_SIGNATURE)
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -615,7 +606,6 @@ do {                                             \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
-/* nlmills: TODO: check security on lookup_path */
 /* lookup path ************************************************/
 /* - looks up as many elements of the specified path as possible */
 
@@ -655,7 +645,6 @@ do {                                                   \
     (__req).u.lookup_path.attrmask = (__amask);        \
 } while (0)
 
-/* nlmills: TODO: may need to make this return only one element */
 struct PVFS_servresp_lookup_path
 {
     PVFS_handle handle;
@@ -663,8 +652,6 @@ struct PVFS_servresp_lookup_path
 endecode_fields_1_struct(
     PVFS_servresp_lookup_path,
     PVFS_handle, handle)
-/* this is a big thing that could be either a full path,
-* or lots of handles, just use the max io req limit */
 #define extra_size_PVFS_servresp_lookup_path 0
 
 /* mkdir *******************************************************/

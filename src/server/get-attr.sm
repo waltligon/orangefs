@@ -893,7 +893,6 @@ static PINT_sm_action getattr_read_acl(
 
     assert(s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY);
 
-    /* nlmills: TODO: make key a constant */
     s_op->key.buffer = "system.posix_acl_access";
     s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
     if(s_op->free_val)
@@ -931,8 +930,9 @@ static PINT_sm_action getattr_read_acl(
 }
 
 /* getattr_create_capability
- * 
- * nlmills: TODO: document me
+ *
+ * Creates and fills in a capability object with the appropriate
+ * operation mask for the given object.
  */
 static PINT_sm_action getattr_create_capability(
         struct PINT_smcb *smcb, job_status_s *js_p)

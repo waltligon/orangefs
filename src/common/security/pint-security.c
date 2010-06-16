@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-/* nlmills: TODO: fix for no security case */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -353,8 +352,6 @@ int PINT_verify_capability(const PVFS_capability *cap)
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
     if (!ret)
     {
-	/* nlmills: TODO: use better error reporting */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure.\n");
         EVP_MD_CTX_cleanup(&mdctx);
         return 0;
     }
@@ -380,8 +377,6 @@ int PINT_verify_capability(const PVFS_capability *cap)
     }
     else 
     {
-	/* nlmills: TODO: use better error reporting */
-	gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");
 	EVP_MD_CTX_cleanup(&mdctx);
 	return 0;
     }

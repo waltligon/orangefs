@@ -58,7 +58,6 @@ int PVFS_sys_finalize()
 
     PINT_encode_finalize();
 
-    /* nlmills: TODO: fix finalize (segfault) */
     PINT_client_security_finalize();
 
     PINT_dist_finalize();

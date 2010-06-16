@@ -115,7 +115,13 @@ int PINT_lookup_parent(
  */
 #ifdef HAVE_OPENSSL
 
-/* nlmills: TODO: document me */
+/* PINT_client_security_initialize
+ *
+ * Initializes OpenSSL libraries used by security code.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
+ */
 int PINT_client_security_initialize(void)
 {
     int ret;
@@ -143,7 +149,13 @@ int PINT_client_security_initialize(void)
     return 0;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_client_security_finalize
+ *
+ * Cleans up after the OpenSSL library.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
+ */
 int PINT_client_security_finalize(void)
 {
     gen_mutex_lock(&security_init_mutex);

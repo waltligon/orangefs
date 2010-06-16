@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-/* nlmills: TODO: fix for disabled encryption */
 
 #include <stdlib.h>
 #include <string.h>
@@ -13,13 +12,23 @@
 #include "security-util.h"
 
 
+/* PINT_null_capability
+ *
+ * Creates a capability object with no permissions.
+ */
 void PINT_null_capability(PVFS_capability *cap)
 {
     memset(cap, 0, sizeof(PVFS_capability));
     cap->issuer = strdup("");
 }
 
-/* nlmills: TODO: document me */
+/* PINT_capability_is_null
+ *
+ * Checks for a null capability with no permissions.
+ *
+ * returns 1 if the capability is null
+ * returns 0 if the capability is not null
+ */
 int PINT_capability_is_null(const PVFS_capability *cap)
 {
     int ret;
@@ -29,8 +38,14 @@ int PINT_capability_is_null(const PVFS_capability *cap)
     return ret;
 }
 
-/* nlmills: TODO: fix documentation */
-/* allocates memory for and copies a capability */
+/* PINT_dup_capability
+ *
+ * Duplicates a capability object by allocating memory for the
+ * new object and then performing a deep copy.
+ *
+ * returns the new capability object on success
+ * returns NULL on error
+ */
 PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
 {
     PVFS_capability *newcap;
@@ -57,7 +72,13 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
     return newcap;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_copy_capability
+ *
+ * Performs a deep copy of a capability object.
+ *
+ * returns 0 on success
+ * returns negative PVFS error code on failure
+ */
 int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 {
     if (!src || !dest || (src == dest))
@@ -104,7 +125,12 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
     return 0;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_cleanup_capability
+ *
+ * Destructs a capability object by freeing its internal structures.
+ * After this function returns the capability object is in an
+ * invalid state.
+ */
 void PINT_cleanup_capability(PVFS_capability *cap)
 {
     if (cap)
@@ -120,7 +146,14 @@ void PINT_cleanup_capability(PVFS_capability *cap)
     }
 }
 
-/* nlmills: TODO: document me */
+/* PINT_dup_credential
+ *
+ * Duplicates a credential object by allocating memory for the
+ * new object and then performing a deep copy.
+ *
+ * returns the new credential object on success
+ * returns NULL on error
+ */
 PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
 {
     PVFS_credential *newcred;
@@ -147,7 +180,13 @@ PVFS_credential *PINT_dup_credential(const PVFS_credential *cred)
     return newcred;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_copy_credential
+ *
+ * Performs a deep copy of a credential object.
+ *
+ * returns 0 on success
+ * returns negative PVFS error code on failure
+ */
 int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
 {
     if (!src || !dest || (src == dest))
@@ -194,7 +233,12 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     return 0;
 }
 
-/* nlmills: TODO: document me */
+/* PINT_cleanup_credential
+ *
+ * Destructs a credential object by freeing its internal structures.
+ * After this function returns the credential object is in an
+ * invalid state.
+ */
 void PINT_cleanup_credential(PVFS_credential *cred)
 {
     if (cred)

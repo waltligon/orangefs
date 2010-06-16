@@ -276,9 +276,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 
-#define extra_size_PVFS_object_attr_capability \
-    (PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle) + \
-    PVFS_REQ_LIMIT_SIGNATURE * sizeof(PVFS_signature))
+#define extra_size_PVFS_object_attr_capability extra_size_PVFS_capability
 
 #define extra_size_PVFS_object_attr \
         (extra_size_PVFS_object_attr_capability + \

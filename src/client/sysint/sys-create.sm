@@ -451,7 +451,6 @@ static PINT_sm_action create_create_setup_msgpair(
                 &server_type));
     }
 
-    /* nlmills: TODO: get the capability before this */
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,

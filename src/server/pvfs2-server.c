@@ -1364,7 +1364,6 @@ static int server_shutdown(
                      "interface         [ stopped ]\n");
     }
 
-    /* nlmills: TODO: this the right place ? */
     if (status & SERVER_SECURITY_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting security "

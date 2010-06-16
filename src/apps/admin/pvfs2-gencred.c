@@ -27,6 +27,7 @@
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-types.h"
 #include "src/proto/pvfs2-req-proto.h"
+#include "src/common/security/getugroups.h"
 
 
 /* nlmills: TODO: move these somewhere sane */
@@ -297,9 +298,9 @@ int main(int argc, char **argv)
                 "for %s\n", pwd->pw_name, pwd->pw_name);
         return EXIT_FAILURE;
     }
-    
-    /* nlmills: TODO: fall back to getugroups */
-    
+
+#ifdef HAVE_GETGROUPLIST
+
     ngroups = sizeof(groups)/sizeof(*groups);
     ret = getgrouplist(pwd->pw_name, pwd->pw_gid, groups, &ngroups);
     if (ret == -1)
@@ -314,6 +315,19 @@ int main(int argc, char **argv)
         groups[ngroups-1] = groups[0];
         groups[0] = pwd->pw_gid;
     }
+
+#else /* !HAVE_GETGROUPLIST */
+
+    ngroups = sizeof(groups)/sizeof(*groups);
+    ngroups = getugroups(ngroups, groups, pwd->pw_name, pwd->pw_gid);
+    if (ret == -1)
+    {
+        fprintf(stderr, "error: unable to get group list for user %s: %s\n",
+                pwd->pw_name, strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+#endif /* HAVE_GETGROUPLIST */
     
     ret = create_credential(pwd, groups, ngroups, &credential);
     if (ret != EXIT_SUCCESS)
