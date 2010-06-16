@@ -18,14 +18,20 @@ machine pvfs2_mgmt_migrate_sm
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => get_new_handle;
-		default =>final_response;
+                success => test_stuff;
+		/*success => get_new_handle;*/
+		default => final_response;
 	}
+
+        state test_stuff
+        {
+                run test_stuff;
+                default => final_response;
+        }
 	
-	state get_new_handle;
+	state get_new_handle
 	{
 		run migrate_get_new_handle;
-		success => 
 		default => final_response;
 	}
 	
@@ -45,9 +51,22 @@ machine pvfs2_mgmt_migrate_sm
 
 %%
 
+static PINT_sm_action test_stuff(
+                struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_handle *handle = s_op->u.mgmt_migrate.metahandle;
+    PVFS_fs_id fs_id = s_op->u.mgmt_migrate.fs_id;
+    //char *dist_server = s_op->u.mgmt_migrate.dist_server;
+    
+    //printf("dist server: %s\n", dist_server);
+    printf("data handle: %llu\n", llu(handle));
+    printf("file system ID: %d\n", fs_id);
 
+    return SM_ACTION_COMPLETE;
+}
 
-static PINT_sm_action migrate_get_new_handel(
+static PINT_sm_action migrate_get_new_handle(
 		struct PINT_smcb *smcb, job_status_s *js_p)
 {
 	
@@ -67,13 +86,13 @@ static PINT_sm_action migrate_cleanup(
 
 
 /* need to know what some of these things are/mean!!!!!!!! */
-struct PINT_server_req_parms pvfs2_mgmt_migrate_params =
+struct PINT_server_req_params pvfs2_mgmt_migrate_params =
 {
 	.string_name = "migrate",
 	.perm = PINT_SERVER_CHECK_NONE,
 	.state_machine = &pvfs2_mgmt_migrate_sm
 };	
-	.
+
 
 /*
  * Local variables:

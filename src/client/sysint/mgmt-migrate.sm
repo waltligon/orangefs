@@ -62,7 +62,7 @@ PVFS_error PVFS_imgmt_migrate(
 		PVFS_hint hints,
 		void *user_ptr)
 {
-	int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     
@@ -222,4 +222,8 @@ static PINT_sm_action mgmt_migrate_cleanup(
  * End:
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
+<<<<<<< mgmt-migrate.sm
+ */ 
+=======
  */		
+>>>>>>> 1.1.6.5
