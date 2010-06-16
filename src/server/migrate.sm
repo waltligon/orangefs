@@ -57,9 +57,9 @@ static PINT_sm_action test_stuff(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_handle *handle = s_op->u.mgmt_migrate.metahandle;
     PVFS_fs_id fs_id = s_op->u.mgmt_migrate.fs_id;
-    //char *dist_server = s_op->u.mgmt_migrate.dist_server;
+    int64_t dist_server = s_op->u.mgmt_migrate.dist_server;
     
-    //printf("dist server: %s\n", dist_server);
+    printf("dist server: %ll\n", dist_server);
     printf("data handle: %llu\n", llu(handle));
     printf("file system ID: %d\n", fs_id);
 

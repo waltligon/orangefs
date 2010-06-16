@@ -580,6 +580,7 @@ struct PINT_server_mgmt_migrate_op
 {
    PVFS_handle *metahandle;
    PVFS_fs_id fs_id;
+   int64_t dist_server;
    /*need dest server address */
 };    
 

@@ -222,8 +222,4 @@ static PINT_sm_action mgmt_migrate_cleanup(
  * End:
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
-<<<<<<< mgmt-migrate.sm
- */ 
-=======
- */		
->>>>>>> 1.1.6.5
+*/
