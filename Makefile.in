@@ -185,7 +185,7 @@ CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
@@ -224,6 +224,9 @@ CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
   # make bindir and sysconfdir available to source files
 CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+
+  # OpenSSL support
+CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
@@ -317,6 +320,9 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
+  # OpenSSL support
+SERVERCFLAGS += @OPENSSL_CPPFLAGS@
+
 SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lpthread 
 
 ifdef NEEDS_LIBRT 
@@ -327,7 +333,7 @@ endif
 # though it's not recommended unless *required*.
 #
 # run ./configure --help for information on how to do this cleanly.
-LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
+LIBCFLAGS=@LIBCFLAGS@ @OPENSSL_CPPFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
 LIBS += @THREAD_LIB@ @OPENSSL_LIB@
 DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
