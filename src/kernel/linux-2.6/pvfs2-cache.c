@@ -168,11 +168,7 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
         new_op->attempts = 0;
         gossip_debug(GOSSIP_CACHE_DEBUG, "Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
-#ifdef HAVE_CURRENT_FSUID
-        new_op->upcall.uid = current_fsuid();
-#else
-        new_op->upcall.uid = current->fsuid;
-#endif
+        pvfs2_gen_credentials(&new_op->upcall.credentials);
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else

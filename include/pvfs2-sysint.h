@@ -48,6 +48,7 @@ struct PVFS_sys_attr_s
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/* NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+    PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
     PVFS2_ALIGN_VAR(char*, dist_name);   /* NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(char*, dist_params); /* NOTE: caller must free if valid */
     PVFS_size dirent_count;
@@ -454,11 +455,11 @@ PVFS_error PVFS_isys_io(
     PVFS_hint hints,
     void *user_ptr);
 
-#define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8) \
-PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8)
+#define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8,x9)
 
-#define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y,x7,x8) \
-PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,x7,x8)
+#define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
+PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,x7,x8,x9)
 
 PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,

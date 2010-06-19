@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "pvfs2.h"
 #include "gossip.h"
 #include "flow.h"
 #include "flowproto-support.h"
@@ -89,7 +90,7 @@ int main(
     }
 
     ret = BMI_post_sendunexpected(&op, server_addr, &mybuffer, 1,
-				  BMI_EXT_ALLOC, 0, NULL, context);
+				  BMI_EXT_ALLOC, 0, NULL, context, NULL);
     if (ret < 0)
     {
 	fprintf(stderr, "BMI_post_sendunexpected failure.\n");
@@ -236,7 +237,7 @@ static int block_on_flow(
 {
     int ret = -1;
 
-    flow_d->callback = callback_fn;
+    flow_d->callback = (void *)callback_fn;
     ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {

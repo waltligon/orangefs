@@ -658,7 +658,7 @@ static size_t direct_read(int fd,
 
     PINT_mem_aligned_free(aligned_buf);
 
-    return read_size;
+    return ret;
 }
 
 static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
@@ -1064,7 +1064,7 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
                         coll_p,
                         NULL,
                         user_ptr,
-                        0,
+                        TROVE_SYNC,
                         context_id);
 
     op = &q_op_p->op.u.b_rw_list;
@@ -1350,6 +1350,8 @@ static int dbpf_bstream_get_extents(
         {
             /* consume stream region and update mem region */
             ext_size = cur_stream_size;
+	    ext_ptr = cur_mem_off;
+	    ext_off = cur_stream_off;
 
             cur_mem_size -= cur_stream_size;
             cur_mem_off  += cur_stream_size;

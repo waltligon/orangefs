@@ -5,8 +5,6 @@
 #include <stdarg.h>
 #include <time.h>
 #include <unistd.h>
-#include <assert.h>
-
 #include "pvfs2-request.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -27,24 +25,24 @@ void reset_buff(void);
 void print_buff(int padding, int len);
 
 int do_smallmem_noncontig_read(
-    PVFS_object_ref ref, PVFS_credential * cred,
+    PVFS_object_ref ref, PVFS_credentials * creds,
     int memsize,
     int chunks,
     ...);
 
 int do_noncontig_read(
-    PVFS_object_ref ref, PVFS_credential * cred, 
+    PVFS_object_ref ref, PVFS_credentials * creds, 
     int chunks, 
     ...);
 
 int do_contig_read(
     PVFS_object_ref ref, 
-    PVFS_credential * cred, 
+    PVFS_credentials * creds, 
     PVFS_offset offset, 
     int length,
     PVFS_Request freq);
 
-int do_write(PVFS_object_ref ref, PVFS_credential * cred,
+int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
 	     PVFS_offset offset, PVFS_size size, char * buff);
 
 int check_results(
@@ -158,7 +156,7 @@ int check_results(
 	    
 
 int do_smallmem_noncontig_read(
-    PVFS_object_ref ref, PVFS_credential * cred,
+    PVFS_object_ref ref, PVFS_credentials * creds,
     int memsize,
     int chunks,
     ...)
@@ -211,7 +209,7 @@ int do_smallmem_noncontig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, 0, buff, memreq, cred, &io_resp);
+	ref, readreq, 0, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -233,7 +231,7 @@ int do_smallmem_noncontig_read(
 } 
 
 int do_noncontig_read(
-    PVFS_object_ref ref, PVFS_credential * cred, 
+    PVFS_object_ref ref, PVFS_credentials * creds, 
     int chunks, 
     ...)
 {
@@ -286,7 +284,7 @@ int do_noncontig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, 0, buff, memreq, cred, &io_resp);
+	ref, readreq, 0, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -308,7 +306,7 @@ int do_noncontig_read(
 
 int do_contig_read(
     PVFS_object_ref ref, 
-    PVFS_credential * cred, 
+    PVFS_credentials * creds, 
     PVFS_offset offset, 
     int length,
     PVFS_Request freq)
@@ -350,7 +348,7 @@ int do_contig_read(
     reset_buff();
 
     res = PVFS_sys_read(
-	ref, readreq, offset, buff, memreq, cred, &io_resp);
+	ref, readreq, offset, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("read failed with errcode", res);
@@ -368,7 +366,7 @@ int do_contig_read(
     return res;
 }
 
-int do_write(PVFS_object_ref ref, PVFS_credential * cred,
+int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
 	     PVFS_offset offset, PVFS_size size, char * buff)
 {
     PVFS_Request filereq;
@@ -404,7 +402,7 @@ int do_write(PVFS_object_ref ref, PVFS_credential * cred,
 
     res = PVFS_sys_write(
 	ref, filereq, 
-	offset, buff, memreq, cred, &io_resp);
+	offset, buff, memreq, creds, &io_resp, NULL);
     if(res < 0)
     {
 	PVFS_perror("write failed with errcode", res);
@@ -434,7 +432,7 @@ int main(int argc, char * argv[])
     PVFS_sysresp_lookup lookup_resp;
     PVFS_fs_id curfs;
     PVFS_sys_attr attr;
-    PVFS_credential *cred;
+    PVFS_credentials creds;
     PVFS_sys_dist * dist;
     int strip_size = 9;
     int half_strip;
@@ -503,11 +501,8 @@ int main(int argc, char * argv[])
 		before_len, dashes, after_len, dashes,
 		before_len, dashes, after_len, dashes);
     }
-    
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
 
-    res = PVFS_sys_lookup(curfs, "/", cred, &lookup_resp, 0);
+    res = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(res < 0)
     {
 	PVFS_perror("lookup failed with errcode", res);
@@ -522,9 +517,11 @@ int main(int argc, char * argv[])
 	PVFS_perror("dist setparam failed with errcode", res);
     }
 
+    PVFS_util_gen_credentials(&creds);
+
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = cred->userid;
-    attr.group = cred->group_array[0];
+    attr.owner = creds.uid;
+    attr.group = creds.gid;
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
@@ -536,7 +533,7 @@ int main(int argc, char * argv[])
     }
 
     res = PVFS_sys_create(
-	zerofill_fname, lookup_resp.ref, attr, cred, dist, NULL, &create_resp);
+	zerofill_fname, lookup_resp.ref, attr, &creds, dist, &create_resp, NULL, NULL);
     if(res < 0)
     {
 	PVFS_perror("create failed with errcode", res);
@@ -545,26 +542,26 @@ int main(int argc, char * argv[])
 
     half_strip = strip_size / 2;
 
-    do_write(create_resp.ref, cred, 0, half_strip, as);
+    do_write(create_resp.ref, &creds, 0, half_strip, as);
 
-    do_write(create_resp.ref, cred, strip_size * 2, half_strip, bs);
+    do_write(create_resp.ref, &creds, strip_size * 2, half_strip, bs);
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, strip_size + half_strip, NULL);
+	create_resp.ref, &creds, 0, strip_size + half_strip, NULL);
     if(res < 0)
     {
 	goto exit;
     }
 	
     res = do_contig_read(
-	create_resp.ref, cred, 0, strip_size + half_strip, PVFS_BYTE);
+	create_resp.ref, &creds, 0, strip_size + half_strip, PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 
+	create_resp.ref, &creds, 
 	(strip_size + half_strip), (strip_size + half_strip), NULL);
     if(res < 0)
     {
@@ -572,7 +569,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 
+	create_resp.ref, &creds, 
 	(strip_size + half_strip), (strip_size + half_strip), PVFS_BYTE);
     if(res < 0)
     {
@@ -580,79 +577,79 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, (strip_size * 3), NULL);
+	create_resp.ref, &creds, 0, (strip_size * 3), NULL);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, (strip_size * 3), PVFS_BYTE);
+	create_resp.ref, &creds, 0, (strip_size * 3), PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, half_strip + 2, NULL);
+	create_resp.ref, &creds, 0, half_strip + 2, NULL);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, half_strip + 2, PVFS_BYTE);
+	create_resp.ref, &creds, 0, half_strip + 2, PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, half_strip + 2, strip_size, NULL);
+	create_resp.ref, &creds, half_strip + 2, strip_size, NULL);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, half_strip + 2, strip_size, PVFS_BYTE);
+	create_resp.ref, &creds, half_strip + 2, strip_size, PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, strip_size + 1, 3, NULL);
+	create_resp.ref, &creds, strip_size + 1, 3, NULL);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, strip_size + 1, 3, PVFS_BYTE);
+	create_resp.ref, &creds, strip_size + 1, 3, PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, 2, NULL);
+	create_resp.ref, &creds, 0, 2, NULL);
     if(res < 0)
     {
 	goto exit;
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 0, 2, PVFS_BYTE);
+	create_resp.ref, &creds, 0, 2, PVFS_BYTE);
     if(res < 0)
     {
 	goto exit;
     }
 
-    do_write(create_resp.ref, cred, strip_size * 4, half_strip, cs);
+    do_write(create_resp.ref, &creds, strip_size * 4, half_strip, cs);
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	(strip_size * 3 + half_strip), (strip_size + half_strip), NULL);
     if(res < 0)
     {
@@ -660,7 +657,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	(strip_size * 3 + half_strip), (strip_size + half_strip), PVFS_BYTE);
     if(res < 0)
     {
@@ -668,7 +665,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	0, (strip_size * 5), NULL);
     if(res < 0)
     {
@@ -676,7 +673,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	0, (strip_size * 5), PVFS_BYTE);
     if(res < 0)
     {
@@ -684,7 +681,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 
+	create_resp.ref, &creds, 
 	(strip_size + half_strip), (strip_size + half_strip), NULL);
     if(res < 0)
     {
@@ -692,7 +689,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred, 
+	create_resp.ref, &creds, 
 	(strip_size + half_strip), (strip_size + half_strip), PVFS_BYTE);
     if(res < 0)
     {
@@ -700,7 +697,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	0, (strip_size * 3), NULL);
     if(res < 0)
     {
@@ -708,7 +705,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_contig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	0, (strip_size * 3), PVFS_BYTE);
     if(res < 0)
     {
@@ -716,7 +713,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	2,
 	0, strip_size + half_strip,
 	strip_size * 4, half_strip);
@@ -726,7 +723,7 @@ int main(int argc, char * argv[])
     }
     
     res = do_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	2,
 	0, strip_size,
 	strip_size * 5, half_strip);
@@ -736,7 +733,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	2,
 	0, strip_size,
 	strip_size * 3, half_strip);
@@ -746,7 +743,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	2,
 	strip_size, strip_size,
 	strip_size * 4 + 2, strip_size);
@@ -756,7 +753,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	9,
 	2, 2,
 	8, 2,
@@ -773,7 +770,7 @@ int main(int argc, char * argv[])
     }
 
     res = do_smallmem_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	strip_size,
 	4,
 	strip_size, half_strip,
@@ -786,7 +783,7 @@ int main(int argc, char * argv[])
     }
     
     res = do_smallmem_noncontig_read(
-	create_resp.ref, cred,
+	create_resp.ref, &creds,
 	strip_size,
 	2,
 	strip_size, 2,
@@ -799,7 +796,8 @@ int main(int argc, char * argv[])
     PVFS_sys_remove(
 	zerofill_fname,
 	lookup_resp.ref,
-	cred);
+	&creds,
+        NULL);
 
 exit:
     

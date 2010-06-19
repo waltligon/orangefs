@@ -54,6 +54,9 @@ int PVFS_sys_finalize()
 
     PINT_req_sched_finalize();
 
+    /* release timer_queue resources, if there are any */
+    PINT_timer_queue_finalize();
+
     BMI_finalize();
 
     PINT_encode_finalize();

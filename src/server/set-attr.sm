@@ -329,12 +329,14 @@ static PINT_sm_action setattr_setobj_attribs(
         GOSSIP_SETATTR_DEBUG,
         "  WRITING attrs: [owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
+        "ctime = %llu | dfile_count = %d | dist_size = %d\n\t"
+        "handle = %llu | S = %p | mask = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, llu(dspace_a_p->atime),
         llu(PINT_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
-        (int)dspace_a_p->u.meta.dist_size);
+        (int)dspace_a_p->u.meta.dist_size,
+        llu(s_op->req->u.setattr.handle), s_op, a_p->mask);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);

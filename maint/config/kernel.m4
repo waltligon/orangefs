@@ -543,18 +543,63 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
-	dnl Test to see if sysctl proc handlers have a 6th argument
-	AC_MSG_CHECKING(for 6th argument to sysctl proc handlers)
-	dnl if this test passes, there is a 6th argument
+        dnl the proc handler functions have changed over the years.
+        dnl pre-2.6.8: proc_handler(ctl_table       *ctl,
+        dnl                         int             write,
+        dnl                         struct file     *filp,
+        dnl                         void            *buffer,
+        dnl                         size_t          *lenp)
+        dnl
+        dnl 2.6.8-2.6.31: proc_handler(ctl_table       *ctl,
+        dnl                            int             write,
+        dnl                            struct file     *filp,
+        dnl                            void            *buffer,
+        dnl                            size_t          *lenp,
+        dnl                            loff_t          *ppos)
+        dnl > 2.6.31: proc_handler(ctl_table       *ctl,
+        dnl                        int             write,
+        dnl                        void            *buffer,
+        dnl                        size_t          *lenp,
+        dnl                        loff_t          *ppos)
+ 
+	dnl Test to see if sysctl proc handlers have a file argument
+	AC_MSG_CHECKING(for file argument to sysctl proc handlers)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
 	    #include <linux/sysctl.h>
 	    ], [
-	    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                struct file * filp = NULL;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, filp, buffer, lenp, ppos);
 	    ],
 	    AC_MSG_RESULT(yes)
-	    AC_DEFINE(HAVE_PROC_HANDLER_SIX_ARG, 1, Define if sysctl proc handlers have 6th argument),
+	    AC_DEFINE(HAVE_PROC_HANDLER_FILE_ARG, 1, Define if sysctl proc handlers have 6th argument),
+	    AC_MSG_RESULT(no)
+	    )
+
+	AC_MSG_CHECKING(for ppos argument to sysctl proc handlers)
+	dnl if this test passes, there is a ppos argument
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    #include <linux/sysctl.h>
+	    ], [
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, buffer, lenp, ppos);
+	    ],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_PROC_HANDLER_PPOS_ARG, 1, Define if sysctl proc handlers have ppos argument),
 	    AC_MSG_RESULT(no)
 	    )
 
@@ -908,39 +953,18 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl old linux kernels do not have class_create and related functions
+        dnl
+        dnl check for class_device_destroy() to weed out RHEL4 kernels that
+        dnl have some class functions but not others
 	AC_MSG_CHECKING(if kernel has device classes)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/device.h>
 	], [
-	    class_create(NULL, NULL);
+	    class_device_destroy(NULL, "pvfs2")
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_KERNEL_DEVICE_CLASSES, 1, Define if kernel has device classes),
-	AC_MSG_RESULT(no)
-	)
-
-	AC_MSG_CHECKING(for device_create)
-	AC_TRY_COMPILE([
-	    #define __KERNEL__
-	    #include <linux/device.h>
-	], [
-	    device_create(NULL, NULL, 0, NULL, NULL);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KERNEL_DEVICE_CREATE, 1, Define if kernel has device_create),
-	AC_MSG_RESULT(no)
-	)
-
-	AC_MSG_CHECKING(for class_device_create)
-	AC_TRY_COMPILE([
-	    #define __KERNEL__
-	    #include <linux/device.h>
-	], [
-	    class_device_create(NULL, NULL, 0, NULL, NULL);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_KERNEL_CLASS_DEVICE_CREATE, 1, Define if kernel has class_device_create),
 	AC_MSG_RESULT(no)
 	)
 
@@ -1194,6 +1218,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         AC_MSG_RESULT(no)
         )
 
+        AC_MSG_CHECKING(for s_dirty in struct super_block)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+        ], [
+                struct super_block *s;
+                list_empty(&s->s_dirty);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_SB_DIRTY_LIST, 1, [Define if struct super_block has s_dirty list]),
+        AC_MSG_RESULT(no)
+        )
+
         dnl newer 2.6 kernels (2.6.29-ish) use current_fsuid() macro instead
         dnl of accessing task struct fields directly
         tmp_cflags=$CFLAGS
@@ -1208,6 +1245,40 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         ],
         AC_MSG_RESULT(yes)
         AC_DEFINE(HAVE_CURRENT_FSUID, 1, [Define if cred.h contains current_fsuid]),
+        AC_MSG_RESULT(no)
+        )
+        CFLAGS=$tmp_cflags
+
+        dnl 2.6.32 added a mandatory name field to the bdi structure
+        AC_MSG_CHECKING(if kernel backing_dev_info struct has a name field)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+	], [
+                struct backing_dev_info foo = 
+                {
+                    .name = "foo"
+                };
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_BACKING_DEV_INFO_NAME, 1, [Define if kernel backing_dev_info struct has a name field]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl some 2.6 kernels have functions to explicitly initialize bdi structs
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        AC_MSG_CHECKING(for bdi_init)
+        AC_TRY_COMPILE([
+                #define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+        ], [
+                int ret = bdi_init(NULL);
+        ],
+        AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_BDI_INIT, 1, [Define if bdi_init function is present]),
         AC_MSG_RESULT(no)
         )
         CFLAGS=$tmp_cflags

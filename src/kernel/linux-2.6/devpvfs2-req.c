@@ -12,6 +12,18 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
+#include "pint-dev.h"
+
+/* these functions are defined in pvfs2-utils.c */
+int PVFS_proc_kmod_mask_to_eventlog(uint64_t mask, char *debug_string);
+int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string);
+
+/*these variables are defined in pvfs2-proc.c*/
+extern char kernel_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
+extern char client_debug_string[PVFS2_MAX_DEBUG_STRING_LEN];
+
+/*these variables are defined in pvfs2-mod.c*/
+extern unsigned int kernel_mask_set_mod_init;
 
 /* this file implements the /dev/pvfs2-req device node */
 
@@ -100,10 +112,10 @@ static ssize_t pvfs2_devreq_read(
     }
     else
     {
-        pvfs2_kernel_op_t *op = NULL;
+        pvfs2_kernel_op_t *op = NULL, *temp = NULL;
         /* get next op (if any) from top of list */
         spin_lock(&pvfs2_request_list_lock);
-        list_for_each_entry (op, &pvfs2_request_list, list)
+        list_for_each_entry_safe (op, temp, &pvfs2_request_list, list)
         {
             PVFS_fs_id fsid = fsid_of_op(op);
             /* Check if this op's fsid is known and needs remounting */
@@ -697,6 +709,8 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     struct PVFS_dev_map_desc user_desc;
+    int ret;
+    dev_mask_info_t mask_info = {0};
 
     switch(command)
     {
@@ -762,8 +776,41 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
             return ret;
         }
         case PVFS_DEV_DEBUG:
-            return (get_user(gossip_debug_mask, (int32_t __user *)arg) ==
-                     -EFAULT) ? -EIO : 0;
+            ret = copy_from_user(&mask_info, (void __user *)arg
+                                ,sizeof(mask_info));
+            if (ret != 0)
+               return(-EIO);
+
+            if (mask_info.mask_type == KERNEL_MASK)
+            {
+               if ( (mask_info.mask_value == 0) && (kernel_mask_set_mod_init) )
+               {
+                   /* the kernel debug mask was set when the kernel module was loaded;
+                    * don't override it if the client-core was started without a value
+                    * for PVFS2_KMODMASK.
+                   */
+                   return(0);
+               }
+               ret = PVFS_proc_kmod_mask_to_eventlog(mask_info.mask_value
+                                                    ,kernel_debug_string);
+               gossip_debug_mask = mask_info.mask_value;
+               printk("PVFS: kernel debug mask has been modified to \"%s\" (0x%08llx)\n"
+                     ,kernel_debug_string,llu(gossip_debug_mask));
+            } 
+            else if (mask_info.mask_type == CLIENT_MASK)
+            {
+               ret = PVFS_proc_mask_to_eventlog(mask_info.mask_value
+                                               ,client_debug_string);
+               printk("PVFS: client debug mask has been modified to \"%s\" (0x%08llx)\n"
+                     ,client_debug_string,llu(mask_info.mask_value));
+            } 
+            else
+            {
+              gossip_lerr("Invalid mask type....\n");
+              return(-EINVAL);
+            }
+            
+            return(ret);
         break;
     default:
 	return -ENOIOCTLCMD;
@@ -1034,18 +1081,10 @@ int pvfs2_dev_init(void)
         ret = PTR_ERR(pvfs2_dev_class);
         return ret;
     }
-#if defined (HAVE_KERNEL_CLASS_DEVICE_CREATE)
     class_device_create(pvfs2_dev_class, NULL,
                         MKDEV(pvfs2_dev_major, 0), NULL,
-                        "%s", PVFS2_REQDEVICE_NAME);
-#elif defined (HAVE_KERNEL_DEVICE_CREATE)
-    device_create(pvfs2_dev_class, NULL,
-                  MKDEV(pvfs2_dev_major, 0), NULL,
-                  "%s", PVFS2_REQDEVICE_NAME);
-#else
-    #error "Your kernel does not fully implement device classes"
+                        PVFS2_REQDEVICE_NAME);
 #endif
-#endif /* HAVE_KERNEL_DEVICE_CLASSES */
 
     gossip_debug(GOSSIP_INIT_DEBUG, "*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
@@ -1057,11 +1096,7 @@ int pvfs2_dev_init(void)
 void pvfs2_dev_cleanup(void)
 {
 #ifdef HAVE_KERNEL_DEVICE_CLASSES
-#if defined (HAVE_KERNEL_CLASS_DEVICE_CREATE)
     class_device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
-#elif defined (HAVE_KERNEL_DEVICE_CREATE)
-    device_destroy(pvfs2_dev_class, MKDEV(pvfs2_dev_major, 0));
-#endif
     class_destroy(pvfs2_dev_class);
 #endif
     unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
@@ -1103,7 +1138,6 @@ struct file_operations pvfs2_devreq_file_operations =
     ioctl : pvfs2_devreq_ioctl,
     poll : pvfs2_devreq_poll
 #else
-    .owner = THIS_MODULE,
     .read = pvfs2_devreq_read,
 #ifdef HAVE_COMBINED_AIO_AND_VECTOR
     .aio_write = pvfs2_devreq_aio_write,

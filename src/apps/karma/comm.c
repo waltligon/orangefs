@@ -14,7 +14,6 @@
 #include <time.h>       /* nanosleep() */
 
 #include "karma.h"
-#include "security-util.h"
 
 #define GUI_COMM_PERF_HISTORY 5
 #undef FAKE_STATS
@@ -42,7 +41,7 @@ static struct gui_traffic_raw_data *visible_perf = NULL;
 
 GtkListStore *gui_comm_fslist;
 
-static PVFS_credential *cred;
+static PVFS_credentials creds;
 static PVFS_fs_id cur_fsid = -1;
 
 #ifdef FAKE_STATS
@@ -161,8 +160,7 @@ int gui_comm_setup(
                            GUI_FSLIST_FSID, (gint) cur_fs_id, -1);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&creds);
 
     /* print message indicating what file system we are monitoring */
     snprintf(msgbuf,
@@ -221,7 +219,7 @@ void gui_comm_set_active_fs(
     cur_fsid = new_fsid;
 
     ret = PVFS_mgmt_count_servers(cur_fsid,
-                                  cred,
+                                  &creds,
                                   PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                   &outcount);
     if (ret < 0)
@@ -261,7 +259,7 @@ void gui_comm_set_active_fs(
         malloc(outcount * sizeof(PVFS_BMI_addr_t));
     internal_addr_ct = outcount;
     ret = PVFS_mgmt_get_server_array(cur_fsid,
-                                     cred,
+                                     &creds,
                                      PVFS_MGMT_IO_SERVER |
                                      PVFS_MGMT_META_SERVER, internal_addrs,
                                      &outcount);
@@ -350,7 +348,7 @@ static int gui_comm_stats_collect(
     assert(internal_addr_ct == internal_stat_ct);
 
     ret = PVFS_mgmt_statfs_list(cur_fsid,
-                                cred,
+                                &creds,
                                 internal_stats,
                                 internal_addrs,
                                 internal_stat_ct, internal_details, NULL);
@@ -369,7 +367,7 @@ static int gui_comm_stats_collect(
                      64,
                      "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
-                                        cred,
+                                        &creds,
                                         internal_details->error[i].addr,
                                         &dummy),
                      err_msg);
@@ -404,13 +402,13 @@ static int gui_comm_perf_collect(
 
 #ifndef FAKE_PERF
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
-                                  cred,
+                                  &creds,
                                   internal_perf,
                                   internal_end_time_ms,
                                   internal_addrs,
                                   internal_perf_ids,
                                   internal_addr_ct,
-                                  GUI_COMM_PERF_HISTORY, internal_details,
+                                  GUI_COMM_PERF_HISTORY, internal_details, 
                                   NULL);
     if (ret == 0)
         return 0;
@@ -427,7 +425,7 @@ static int gui_comm_perf_collect(
                      64,
                      "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
-                                        cred,
+                                        &creds,
                                         internal_details->error[i].addr,
                                         &dummy),
                     err_msg);

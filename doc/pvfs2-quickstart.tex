@@ -938,8 +938,10 @@ to ``file, inode'' prior to starting pvfs2-client-core daemon,
 verbose kmod subsystem error diagnostics are written to the system ring buffer
 and eventually to the kernel logs.
 One could also set the kmod diagnostic level when the kernel module is loaded
-like so, insmod pvfs2.ko gossip\_debug\_mask=<diagnostic level>.
+like so, insmod pvfs2.ko module\_parm\_debug\_mask=<diagnostic level>.
 The diagnostic level will be a bitwise OR of values specified in pvfs2-debug.h.
+For more information on setting the kernel or client debug mask, see
+\texttt{doc/pvfs2-logging.txt} in the PVFS source tree.
 
 \section{ROMIO Support}
 \label{sec:romio}

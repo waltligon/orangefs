@@ -103,7 +103,7 @@ PVFS_error PVFS_imgmt_remove_object(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, object_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = object_ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 

@@ -8,6 +8,7 @@
 #define __PINT_EVENT_H
 
 #include "pvfs2-types.h"
+#include "quickhash.h"
 
 typedef PVFS_id_gen_t PINT_event_type;
 typedef PVFS_id_gen_t PINT_event_id;
@@ -30,6 +31,8 @@ enum PINT_event_info
 int PINT_event_init(enum PINT_event_method type);
 
 void PINT_event_finalize(void);
+void PINT_event_free_bucket_resources(struct qhash_table *qt
+                                     ,unsigned long distance_from_link);
 
 int PINT_event_enable(const char *events);
 int PINT_event_disable(const char *events);

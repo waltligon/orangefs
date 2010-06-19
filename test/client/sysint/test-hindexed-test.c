@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     char* entry_name;
     PVFS_object_ref parent_ref;
     PVFS_sys_attr attr;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_object_ref ref;
     PVFS_Request file_req;
     PVFS_Request mem_req;
@@ -191,12 +191,11 @@ int main(int argc, char **argv)
 	ret = -1;
 	goto main_out;
     }
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
-    attr.owner = cred->userid; 
-    attr.group = cred->group_array[0];
+    attr.owner = credentials.uid; 
+    attr.group = credentials.gid;
     attr.perms = PVFS_U_WRITE|PVFS_U_READ;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
@@ -211,8 +210,8 @@ int main(int argc, char **argv)
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                              cred, &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              &credentials, &resp_lookup,
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -244,7 +243,7 @@ int main(int argc, char **argv)
             goto main_out;
         }
 
-        ret = PINT_lookup_parent(pvfs_path, cur_fs, cred, &parent_ref.handle);
+        ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, &parent_ref.handle);
 	
         if(ret < 0)
         {
@@ -274,13 +273,13 @@ int main(int argc, char **argv)
 
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
-                              parent_ref, cred, &resp_lookup,
-                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                              parent_ref, &credentials, &resp_lookup,
+                              PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret == 0)
     {
          fprintf(stderr, "Target file %s already exists! Deleting.\n", entry_name);
 			if (PVFS_sys_remove(entry_name,
-					 parent_ref, cred) < 0)
+					 parent_ref, &credentials, NULL) < 0)
 			{
 				 fprintf(stderr, "Could not unlink?\n");
 			}
@@ -293,7 +292,7 @@ int main(int argc, char **argv)
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
-                          cred, NULL, NULL, &resp_create);
+                          &credentials, NULL, &resp_create, NULL, NULL);
     if (ret < 0)
     {
 			PVFS_perror("PVFS_sys_create", ret);
@@ -334,7 +333,7 @@ int main(int argc, char **argv)
 			/* write out the data */
 			ret = PVFS_sys_write(ref, file_req,
 											  0, frame.wr_buffer, mem_req, 
-											  cred, &resp_io);
+											  &credentials, &resp_io, NULL);
 			if(ret < 0)
 			{
 				 PVFS_perror("PVFS_sys_write", ret);
@@ -371,7 +370,7 @@ int main(int argc, char **argv)
     printf("********************************************************\n\n");
 
     ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-	    cred, &resp_getattr);
+	    &credentials, &resp_getattr, NULL);
     if (ret < 0)
     {
 			PVFS_perror("Getattr failed", ret);
@@ -414,7 +413,7 @@ int main(int argc, char **argv)
 		   /* read back the data */
 			ret = PVFS_sys_read(ref, file_req,
 											  0, frame.rd_buffer, mem_req, 
-											  cred, &resp_io);
+											  &credentials, &resp_io, NULL);
 			if(ret < 0)
 			{
 				 PVFS_perror("PVFS_sys_read", ret);

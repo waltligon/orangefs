@@ -22,7 +22,8 @@ LOCALTESTSRC := \
 	$(DIR)/trove-key-iterate.c \
 	$(DIR)/db-hack.c \
 	$(DIR)/db-dspace.c \
-	$(DIR)/test-listio-aio-convert.c
+	$(DIR)/test-listio-aio-convert.c \
+        $(DIR)/trove-bench-concurrent.c
 	
 
 TESTSRC += $(LOCALTESTSRC)

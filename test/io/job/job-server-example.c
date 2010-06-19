@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = trove_initialize(
-	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", 0);
+	    TROVE_METHOD_DBPF, NULL, "/tmp/pvfs2-test-space", "/tmp/pvfs2-test-space", 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "trove_initialize failure.\n");
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
 	/* send a message */
 	ret = job_bmi_send(req_info.addr, ack, sizeof(struct ack_foo),
 		0, BMI_PRE_ALLOC, 0, NULL, 0, &status1, &tmp_id, context,
-		JOB_TIMEOUT_INF);
+		JOB_TIMEOUT_INF, NULL);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");

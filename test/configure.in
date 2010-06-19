@@ -49,6 +49,9 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+AC_CHECK_HEADERS(openssl/evp.h)
+AC_CHECK_HEADERS(openssl/crypto.h)
+AC_CHECK_HEADERS(zlib.h)
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
 dnl check if it is an Intel compiler; those lie and claim to be gcc but are
@@ -82,6 +85,17 @@ AC_ARG_WITH(efence,
 	AC_CHECK_LIB(efence,malloc)
 )
 
+AC_ARG_WITH(zlib,
+[  --with-zlib=<path>      Use zlib for checksums.],
+        if test x$withval != xyes ; then
+                LDFLAGS="${LDFLAGS} -L$withval"
+        fi
+)
+AC_CHECK_LIB(z, adler32, [
+        LIBS="${LIBS} -lz"
+        AC_DEFINE(HAVE_LIBZ, 1, Define if libz exists)
+])
+
 AC_ARG_WITH(mpi, 
 [  --with-mpi=<dir>        Location of the MPI installation],
     if test x$withval = xyes; then
@@ -92,6 +106,17 @@ AC_ARG_WITH(mpi,
 	LDFLAGS="${LDFLAGS} -L${withval}/lib"
 	BUILD_MPI="1"
     fi
+)
+
+dnl a mechanism to turn off threads in the client library
+AC_ARG_ENABLE(thread-safety,
+[  --disable-thread-safety Disables thread safety in the client library],
+[if test "x$enableval" = "xno" ; then
+    CFLAGS="$CFLAGS -D__GEN_NULL_LOCKING__"
+    AC_MSG_RESULT(no)
+fi],
+[   CFLAGS="$CFLAGS -D__GEN_POSIX_LOCKING__"
+    AC_MSG_RESULT(yes) ]
 )
 
 dnl default paths:
@@ -143,17 +168,16 @@ AC_CHECK_HEADER(pvfs2-config.h, ,
 
 dnl ask pvfs2-config to tell us what libraries to use for client and server
 dnl tests
-LIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`
+LIBS="${LIBS} `/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --libs`"
 SERVERLIBS=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --serverlibs`
 PVFS2_TOP_PREFIX=`/bin/sh ${PVFS2_BUILD_RELATIVE_TOP}/src/apps/admin/pvfs2-config --prefix`
 AC_SUBST(SERVERLIBS)
 AC_SUBST(PVFS2_TOP_PREFIX)
 
-AX_OPENSSL
-
 dnl make sure the libs exist and work
 AC_CHECK_LIB(pvfs2, PVFS_sys_create, ,
-    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2-build"), -lssl -lcrypto)
+    AC_MSG_ERROR("could not find libpvfs2... must specify path to PVFS2 installation or build tree with --with-pvfs2-build")
+    )
 
 MPI_INTELC=
 MPI_GNUC=
@@ -203,6 +227,13 @@ AC_ARG_WITH(db,
 	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
 	[AX_BERKELEY_DB(${withval})],
 	[AX_BERKELEY_DB("")])
+
+AC_ARG_WITH(openssl,
+		 [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)
+		 	 --without-openssl     Don't build with openssl.
+		 ],
+		 [AX_OPENSSL(${withval})],
+		 [AX_OPENSSL_OPTIONAL])
 
 AC_ARG_WITH(libaio,
 		 [  --with-libaio=<dir>  Location of installed libaio package (default=/usr)

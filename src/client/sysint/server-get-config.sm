@@ -28,9 +28,6 @@ static int server_parse_config(
 static int server_get_config_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
-static int server_fetch_config_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int i);
-
 %%
 
 nested machine pvfs2_server_get_config_nested_sm
@@ -73,43 +70,6 @@ machine pvfs2_server_get_config_sm
     state parent_cleanup
     {
         run server_get_config_parent_cleanup;
-        default => terminate;
-    }
-}
-
-nested machine pvfs2_server_fetch_config_nested_sm
-{
-    state fetch_setup_msgpair
-    {
-        run server_fetch_config_setup_msgpair;
-        success => fetch_xfer_msgpair;
-        default => fetch_cleanup;
-    }
-
-    state fetch_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
-        default => fetch_cleanup;
-    }
-
-    state fetch_cleanup
-    {
-        run server_fetch_config_cleanup;
-        default => return;
-    }
-}
-
-machine pvfs2_server_fetch_config_sm
-{
-    state run_fetch_nested 
-    {
-        jump pvfs2_server_fetch_config_nested_sm;
-        default => parent_fetch_cleanup;
-    }
-
-    state parent_fetch_cleanup
-    {
-        run server_fetch_config_parent_cleanup;
         default => terminate;
     }
 }
@@ -167,7 +127,7 @@ int PINT_server_get_config(
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
     PINT_msgpair_init(&sm_p->msgarray_op);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
     
@@ -407,172 +367,6 @@ static int server_get_config_comp_fn(
         return PINT_msgarray_status(&sm_p->msgarray_op);
     }
     return 0;
-}
-
-/*
- * Force a fetch the configuration file from a given set of servers
- * This is different from get_config() in that we do not depend on the
- * configuration server specified in the mnt tab file
- * Assumes that servers specified in the array are unique!
- * CURRENTLY UNUSED
- */
-#ifdef __GNUC__
-static int PINT_fetch_config_list(int nservers, 
-                                  PVFS_BMI_addr_t *servers,
-                                  char **fs_config_bufs, 
-                                  int *fs_config_buf_size,
-                                  const PVFS_credential *credential) __attribute__((unused));
-#endif
-
-static int PINT_fetch_config_list(int nservers, 
-                                  PVFS_BMI_addr_t *servers,
-                                  char **fs_config_bufs, 
-                                  int *fs_config_buf_size,
-                                  const PVFS_credential *credential)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_smcb *smcb = NULL;
-    PINT_client_sm *sm_p = NULL;
-    PVFS_error error = 0;
-    PVFS_sys_op_id op_id;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_fetch_config_list entered\n");
-    if (nservers < 0 || !servers || !fs_config_bufs || !fs_config_buf_size)
-    {
-        return ret;
-    }
-
-    PINT_smcb_alloc(&smcb, PVFS_SERVER_FETCH_CONFIG,
-             sizeof(struct PINT_client_sm),
-             client_op_state_get_machine,
-             client_state_machine_terminate,
-             pint_client_sm_context);
-    if (smcb == NULL)
-    {
-        return -PVFS_ENOMEM;
-    }
-    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* NOTE: we set these fields manually here rather than use
-     * PINT_init_msgarray_params(), because we don't yet have a server
-     * configuration file to override default parameters.
-     */
-    sm_p->msgarray_op.params.job_context = pint_client_sm_context;
-    sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
-    sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
-    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
-    sm_p->fetch_config.nservers = nservers;
-    sm_p->fetch_config.addr_array = servers;
-    sm_p->fetch_config.fs_config_bufs = fs_config_bufs;
-    sm_p->fetch_config.fs_config_buf_size = fs_config_buf_size;
-
-    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, nservers);
-    if(ret != 0)
-    {
-        PINT_smcb_free(smcb);
-        return ret;
-    }
-
-    ret = PINT_client_state_machine_post(
-        smcb, &op_id, NULL);
-    if (ret)
-    {
-        PVFS_perror_gossip("PINT_client_state_machine_post call", ret);
-        error = ret;
-    }
-    else
-    {
-        ret = PVFS_sys_wait(op_id, "X-fetch_config", &error);
-        if (ret)
-        {
-            PVFS_perror_gossip("PVFS_sys_wait call", ret);
-            error = ret;
-        }
-    }
-
-    PINT_sys_release(op_id);
-    return(error);
-}
-
-static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
-                                           job_status_s *js_p)
-{
-    int i;
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability capability;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"fetch_config state: server_fetch_config_setup_msgpair\n");
-
-    PINT_null_capability(&capability);
-
-    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
-    {
-        sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
-        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, capability, sm_p->hints);
-
-        msg_p->fs_id = PVFS_FS_ID_NULL;
-        msg_p->handle = PVFS_HANDLE_NULL;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = server_fetch_config_comp_fn;
-        msg_p->svr_addr = sm_p->fetch_config.addr_array[i];
-    }
-
-    js_p->error_code = 0;
-
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
-    return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action server_fetch_config_cleanup(struct PINT_smcb *smcb,
-                                    job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-    /* preserve js_p->error_code */
-
-    return SM_ACTION_COMPLETE;
-}
-
-static int server_fetch_config_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int i)
-{
-    PINT_smcb *smcb = v_p;
-    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
-    /* if this particular request was successful, then store the server
-     * response and let the caller sort it out */
-
-    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
-    {
-	sm_p->fetch_config.fs_config_bufs[i] = 
-		strdup(resp_p->u.getconfig.fs_config_buf);
-	sm_p->fetch_config.fs_config_buf_size[i] = 
-		resp_p->u.getconfig.fs_config_buf_size;
-    }
-
-    /* if this is the last response, check all of the status values
-     * and return error code if any requests failed
-     */
-    if (i == (sm_p->msgarray_op.count -1))
-    {
-        return PINT_msgarray_status(&sm_p->msgarray_op);
-    }
-    return 0;
-}
-
-static PINT_sm_action server_fetch_config_parent_cleanup(struct PINT_smcb *smcb,
-                                    job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    sm_p->error_code  = js_p->error_code;
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_DEFERRED;
 }
         
 /*

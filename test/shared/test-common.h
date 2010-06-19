@@ -127,7 +127,7 @@ int pvfs2_open(const char      * fileName,
 
 int pvfs2_create_file(const char             * fileName,
                       const PVFS_fs_id         fs_id, 
-                      const PVFS_credential  * cred,
+                      const PVFS_credentials * credentials,
                       const int                mode,
                       const int                verbose,
                       struct file_ref        * pstFileRef);
@@ -185,7 +185,7 @@ void print_stats(const struct stat stats, const int verbose);
 
 int lookup_parent(char             * filename,
                   PVFS_fs_id         fs_id,
-                  PVFS_credential  * cred,
+                  PVFS_credentials * credentials,
                   PVFS_handle      * handle,
                   int                verbose);
 

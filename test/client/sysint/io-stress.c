@@ -19,14 +19,12 @@
 #include <getopt.h>
 #include <pthread.h>
 #include <aio.h>
-#include <assert.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pint-util.h"
-#include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "quicklist.h"
 #include "quickhash.h"
@@ -70,7 +68,7 @@ typedef struct file_object_s {
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credential *cred);
+static int generic_open(file_object *obj, PVFS_credentials *credentials);
 
 static file_object src;
 static char buf[2097152];
@@ -86,7 +84,7 @@ typedef struct {
     char  *buffer;
     int64_t offset;
     int64_t count;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     struct aiocb acb;
     struct qlist_head hash_link;
 } io_request;
@@ -199,9 +197,7 @@ static void post_op(io_request *req)
     req->src = &src;
     req->buffer = buf;
     req->count = 2097152;
-    req->cred = PVFS_util_gen_fake_credential();
-    assert(req->cred);
-    
+    PVFS_util_gen_credentials(&req->credentials);
     if (rd_wr == 0) 
         post_generic_read(req);
     else
@@ -341,7 +337,7 @@ int main(int argc, char ** argv)
 {
     struct options* user_opts = NULL;
     int64_t ret;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
 
     initialize_ops_in_progress_table();
     user_opts = parse_args(argc, argv);
@@ -361,10 +357,9 @@ int main(int argc, char ** argv)
 
     resolve_filename(&src,  user_opts->srcfile);
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
 
-    ret = generic_open(&src, cred);
+    ret = generic_open(&src, &credentials);
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
@@ -457,7 +452,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credential *cred)
+static int generic_open(file_object *obj, PVFS_credentials *credentials)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
@@ -498,9 +493,9 @@ static int generic_open(file_object *obj, PVFS_credential *cred)
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(obj->u.pvfs2.fs_id, 
                               (char *) obj->u.pvfs2.pvfs2_path,
-                              cred, 
+                              credentials, 
                               &resp_lookup,
-                              PVFS2_LOOKUP_LINK_FOLLOW);
+                              PVFS2_LOOKUP_LINK_FOLLOW, NULL);
         if (ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
@@ -511,7 +506,7 @@ static int generic_open(file_object *obj, PVFS_credential *cred)
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
         ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
-                               cred, &resp_getattr);
+                               credentials, &resp_getattr, NULL);
         if (ret)
         {
             fprintf(stderr, "Failed to do pvfs2 getattr on %s\n",
@@ -559,8 +554,8 @@ static PVFS_error post_generic_read(io_request *req)
 	    return (ret);
 	}
 	ret = PVFS_isys_io(req->src->u.pvfs2.ref, req->file_req, req->offset,
-		req->buffer, req->mem_req, req->cred, &req->resp_io,
-                PVFS_IO_READ, &req->op_id, req);
+		req->buffer, req->mem_req, &req->credentials, &req->resp_io,
+                PVFS_IO_READ, &req->op_id, NULL, req);
 	if (ret != 0)
 	{
             PVFS_perror("PVFS_isys_io", ret);
@@ -597,8 +592,8 @@ static PVFS_error post_generic_write(io_request *req)
 	    return (ret);
 	}
 	ret = PVFS_isys_io(req->src->u.pvfs2.ref, req->file_req, req->offset,
-		req->buffer, req->mem_req, req->cred, &req->resp_io,
-                PVFS_IO_WRITE, &req->op_id, req);
+		req->buffer, req->mem_req, &req->credentials, &req->resp_io,
+                PVFS_IO_WRITE, &req->op_id, NULL, req);
 	if (ret != 0)
 	{
             PVFS_perror("PVFS_isys_io", ret);

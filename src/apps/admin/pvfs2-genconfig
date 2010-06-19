@@ -9,8 +9,6 @@
 use Term::ReadLine;
 use Getopt::Long;
 use Math::BigInt;
-use File::Basename;
-use Cwd 'abs_path';;
 
 # turn on strictness
 use strict 'vars';
@@ -30,8 +28,6 @@ my $opt_ioservers = '';
 my $opt_metaservers = '';
 my $opt_logfile = '';
 my $opt_storage = '';
-my $opt_pubkey = '';
-my $opt_privkey = '';
 my $opt_trovesync = '1';
 my $opt_trovemethod = '';
 my $opt_quiet = '';
@@ -60,10 +56,8 @@ my $opt_metaspec = undef;
 my %all_endpoints = ();
 
 my $default_storage = undef;
+my $default_meta_storage = undef;
 my $default_logfile = undef;
-my $default_pubkey = undef;
-my $default_privkey = undef;
-my $security_flag = '';
 
 my $bmi_module = undef;
 
@@ -74,7 +68,6 @@ my $IO_ENDPOINT   = 0x2;
 
 my $OUT = undef;
 my $term = undef;
-my $dirname = undef;
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
@@ -157,8 +150,15 @@ sub parse_hostlist
     # hostc{1,2,3}
     #
     @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?[^,]*))/g;
-    foreach my $comp (@components)
+    foreach my $comp_ws (@components)
     {
+        my $comp;
+
+        # Trim leading and trailing whitespace
+        $comp = $comp_ws;
+        $comp =~ s/^\s+//;
+        $comp =~ s/\s+$//;
+
         # if we've got a component that has {..}, then expand.
         # match the prefix (hostname) and curly brackets
         if($comp =~ /([^{]+){([^}]+)}(.*)$/)
@@ -216,7 +216,12 @@ sub emit_defaults
 
     if(defined($default_storage))
     {
-        print $target "\n\tStorageSpace " . $default_storage . "\n";
+        print $target "\n\tDataStorageSpace " . $default_storage . "\n";
+    }
+
+    if(defined($default_meta_storage))
+    {
+        print $target "\tMetadataStorageSpace " . $default_meta_storage . "\n\n";
     }
 
     if(defined($default_logfile))
@@ -227,16 +232,6 @@ sub emit_defaults
     if($opt_tcpbindspecific)
     {
         print $target "\tTCPBindSpecific yes\n";
-    }
-    
-    if(!($default_pubkey eq ""))
-    {
-        print $target "\tKeyStore " . $default_pubkey . "\n";
-    }
-    
-    if(!($default_privkey eq ""))
-    {
-        print $target "\tServerKey " . $default_privkey . "\n";
     }
 
     print $target "</Defaults>\n";
@@ -390,7 +385,8 @@ sub emit_serveropts
         my $endpoint = $all_endpoints{$alias};
         print $target "\n<ServerOptions>\n";
         print $target "\tServer $alias\n";
-        print $target "\tStorageSpace $endpoint->{STORAGE}\n";
+        print $target "\tDataStorageSpace $endpoint->{STORAGE}\n";
+        print $target "\tMetadataStorageSpace $endpoint->{METASTORAGE}\n";
         print $target "\tLogFile $endpoint->{LOGFILE}\n";
         print $target "</ServerOptions>\n";
     }
@@ -399,9 +395,10 @@ sub emit_serveropts
 
 sub emit_server_conf
 {
-    my($target, $node, $storage, $logfile) = @_;
+    my($target, $node, $storage, $metastorage, $logfile) = @_;
 
-    print $target "StorageSpace $storage\n";
+    print $target "DataStorageSpace $storage\n";
+    print $target "MetadataStorageSpace $metastorage\n";
     print $target "HostID \"" . get_bmi_endpoint($node) . "\"\n";
     print $target "LogFile $logfile\n";
 }
@@ -852,43 +849,17 @@ sub get_storage
     return $storage;
 }
 
-sub get_pubkey
+sub get_meta_storage
 {
-    my $pubkey = $dirname . "/keystore";
-    if ($opt_pubkey) {
-        $pubkey = $opt_pubkey;
+    my $metastorage = "/pvfs2-storage-space";
+    if ($opt_storage) {
+        $metastorage = $opt_storage;
     } elsif (!$opt_quiet) {
-        if($security_flag eq "")
-        {
-            print $OUT "Choose whether or not you compiled with encryption enabled.\n";
-            $security_flag = prompt_word("Did you compile with encryption [Default is n]? ","n");
-        }
-        if(($security_flag eq "n" or $security_flag eq "no"))
-        {
-            return "";
-        }
-        print $OUT "Choose the path to the public key file.\n";
-        $pubkey = prompt_word("Enter public key file path: [Default is " . $dirname . "/keystore]: ",$dirname . "/keystore");
+            print $OUT "Choose a directory for each server to store metadata in.\n";
+            $metastorage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
     }
-    return $pubkey;
+    return $metastorage;
 }
-
-sub get_privkey
-{
-    if(($security_flag eq "n" or $security_flag eq "no"))
-    {
-        return "";
-    }
-    my $privkey = $dirname . "/privkey.pem";
-    if ($opt_privkey) {
-        $privkey = $opt_privkey;
-    } elsif (!$opt_quiet) {
-        print $OUT "Choose the path to the private key file.\n";
-        $privkey = prompt_word("Enter private key file path: [Default is " . $dirname . "/privkey.pem]: ",$dirname . "/privkey.pem");
-    }
-    return $privkey;
-}
-
 
 # get host port
 sub tcp_get_port
@@ -994,9 +965,8 @@ sub get_ionames
 {
     my $portmap = shift;
     my $storage = shift;
+    my $metastorage = shift;
     my $logfile = shift;
-    my $pubkey = shift;
-    my $privkey = shift;
     my $ioline = '';
     if ($opt_ioservers) {
         $ioline = $opt_ioservers;
@@ -1025,10 +995,9 @@ sub get_ionames
                 TYPE => $IO_ENDPOINT,
                 HOSTNAME => $io_host, 
                 PORTMAP => $portmap, 
-                STORAGE => $storage, 
-                LOGFILE => $logfile,
-                PUBKEY => $pubkey,
-                PRIVKEY => $privkey};
+                STORAGE => $storage,
+                METASTORAGE => $metastorage, 
+                LOGFILE => $logfile};
         }
     }
 }
@@ -1037,9 +1006,8 @@ sub get_metanames
 {
     my $portmap = shift;
     my $storage = shift;
+    my $metastorage = shift;
     my $logfile = shift;
-    my $pubkey = shift;
-    my $privkey = shift;
     my $metaline = '';
     my @meta_hosts;
     if ($opt_metaservers) {
@@ -1084,10 +1052,9 @@ sub get_metanames
                 TYPE => $META_ENDPOINT,
                 HOSTNAME => $meta_host, 
                 PORTMAP => $portmap, 
-                STORAGE => $storage, 
-                LOGFILE => $logfile,
-                PUBKEY => $pubkey,
-                PRIVKEY => $privkey};
+                STORAGE => $storage,
+                METASTORAGE => $metastorage, 
+                LOGFILE => $logfile};
         }
     }
 }
@@ -1115,6 +1082,7 @@ sub get_specs
     foreach my $ep (@endpoints)
     {
         my $stor = undef;
+        my $mstor = undef;
         my $logf = undef;
         my $proto = undef;
         my $hostname = undef;
@@ -1125,12 +1093,14 @@ sub get_specs
             # the string must have multiple protocols specified for the same
             # endpoint.  We want to match on [...]:storage:logfile
             # and place the stuff between the [] in $1, and optionally
-            # place the matched storage path and logfile in $2 and $3 
+            # place the matched storage path and meta path in $2 and $3,
+            # logfile is in $4
             #
             $ep =~ /\[([^\]]+)\](?::([^:]+))?(?::([^:]+))?/;
 
             $stor = $2;
-            $logf = $3;
+            $mstor = $3;
+            $logf = $4;
 
             if(!defined($1))
             {
@@ -1181,7 +1151,8 @@ sub get_specs
                 TYPE => $type,
                 HOSTNAME => $hostname, 
                 PORTMAP => \%port, 
-                STORAGE => $stor, 
+                STORAGE => $stor,
+                METASTORAGE => $mstor, 
                 LOGFILE => $logf};
         }
         else
@@ -1228,12 +1199,14 @@ sub get_specs
             my $branges = $3;
             my $pranges = $4;
             $stor = $5;
-            $logf = $6;
+            $mstor = $6;
+            $logf = $7;
 
             if($proto !~ /mx/)
             {
                 $logf = $stor;
-                $stor = $pranges;
+                $stor = $mstor;
+                $mstor = $pranges;
                 $pranges = $branges;
                 $branges = undef;
             }
@@ -1275,6 +1248,7 @@ sub get_specs
                                 HOSTNAME => $hostname,
                                 PORTMAP => $portmap, 
                                 STORAGE => $stor, 
+                                METASTORAGE => $mstor,
                                 LOGFILE => $logf};
                         }
                     }
@@ -1296,6 +1270,7 @@ sub get_specs
                                     HOSTNAME => $hostname,
                                     PORTMAP => $portmap,
                                     STORAGE => $stor,
+                                    METASTORAGE => $mstor,
                                     LOGFILE => $logf};
                             }
                         }
@@ -1334,6 +1309,7 @@ sub get_specs
                                         HOSTNAME => $hostname,
                                         PORTMAP => $portmap,
                                         STORAGE => $stor,
+                                        METASTORAGE => $mstor,
                                         LOGFILE => $logf};
                                 }
                             }
@@ -1455,8 +1431,6 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'server-job-timeout=i' => \$opt_server_job_timeout,
     'client-job-timeout=i' => \$opt_client_job_timeout,
     'storage=s'     => \$opt_storage,
-    'pubkey=s'      => \$opt_pubkey,
-    'privkey=s'		=> \$opt_privkey,
     'help'          => \$show_help,
     'quiet!'        => \$opt_quiet,
     'trovesync!'    => \$opt_trovesync,
@@ -1525,7 +1499,6 @@ else
         die "Can't open specified file $ARGV[0]: $!\n";
     }
     $output_target = \*FILEOUT;
-    $dirname = abs_path(dirname($ARGV[0]));
 }
 
 die "-port not allowed with -iospec or -metaspec."
@@ -1553,12 +1526,11 @@ else
     $bmi_module = join(',', map("bmi_" . $_, keys (%{$portmap})));
 
     $default_storage = get_storage();
+    $default_meta_storage = get_meta_storage();
     $default_logfile = get_logfile();
-    $default_pubkey = get_pubkey();
-    $default_privkey = get_privkey();
 
-    get_ionames($portmap, $default_storage, $default_logfile, $default_pubkey, $default_privkey);
-    get_metanames($portmap, $default_storage, $default_logfile, $default_pubkey, $default_privkey);
+    get_ionames($portmap, $default_storage, $default_logfile);
+    get_metanames($portmap, $default_meta_storage, $default_logfile);
 }
 
 # find out if any of the storage or logfile entries in the endpoints
@@ -1574,6 +1546,16 @@ if(needs_default_value(STORAGE))
     set_default_value(STORAGE, $default_storage);
 }
 
+if(needs_default_value(METASTORAGE))
+{
+    if(!defined($default_meta_storage))
+    {
+        $default_meta_storage = get_meta_storage();
+    }
+    set_default_value(METASTORAGE, $default_meta_storage);
+    set_default_value(METASTORAGE, $default_meta_storage);
+}
+
 if(needs_default_value(LOGFILE))
 {
     if(!defined($default_logfile))
@@ -1583,28 +1565,6 @@ if(needs_default_value(LOGFILE))
 
     set_default_value(LOGFILE, $default_logfile);
     set_default_value(LOGFILE, $default_logfile);
-}
-
-if(needs_default_value(PUBKEY))
-{
-    if(!defined($default_pubkey))
-    {
-        $default_pubkey = get_pubkey();
-    }
-
-    set_default_value(PUBKEY, $default_pubkey);
-    set_default_value(PUBKEY, $default_pubkey);
-}
-
-if(needs_default_value(PRIVKEY))
-{
-    if(!defined($default_pubkey))
-    {
-        $default_privkey = get_privkey();
-    }
-
-    set_default_value(PRIVKEY, $default_privkey);
-    set_default_value(PRIVKEY, $default_privkey);
 }
 
 my $count = scalar(keys %all_endpoints);

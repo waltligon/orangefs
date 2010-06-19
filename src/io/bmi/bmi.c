@@ -52,6 +52,17 @@ struct forget_item
 };
 
 /*
+ * BMI trigger to reap all method resources for inactive addresses.
+ */
+static QLIST_HEAD(bmi_addr_force_drop_list);
+static gen_mutex_t bmi_addr_force_drop_list_mutex = GEN_MUTEX_INITIALIZER;
+struct drop_item
+{
+    struct qlist_head link;
+    char  *method_name;
+};
+
+/*
  * Static list of defined BMI methods.  These are pre-compiled into
  * the client libraries and into the server.
  */
@@ -70,6 +81,9 @@ extern struct bmi_method_ops bmi_ib_ops;
 #ifdef __STATIC_METHOD_BMI_PORTALS__
 extern struct bmi_method_ops bmi_portals_ops;
 #endif
+#ifdef __STATIC_METHOD_BMI_ZOID__
+extern struct bmi_method_ops bmi_zoid_ops;
+#endif
 
 static struct bmi_method_ops *const static_methods[] = {
 #ifdef __STATIC_METHOD_BMI_TCP__
@@ -86,6 +100,9 @@ static struct bmi_method_ops *const static_methods[] = {
 #endif
 #ifdef __STATIC_METHOD_BMI_PORTALS__
     &bmi_portals_ops,
+#endif
+#ifdef __STATIC_METHOD_BMI_ZOID__
+    &bmi_zoid_ops,
 #endif
     NULL
 };
@@ -109,11 +126,17 @@ static int active_method_count = 0;
 static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 
 static struct bmi_method_ops **active_method_table = NULL;
-static struct {
+
+struct method_usage_t {
     int iters_polled;  /* how many iterations since this method was polled */
     int iters_active;  /* how many iterations since this method had action */
     int plan;
-} *method_usage = NULL;
+    int flags;
+};
+
+static struct method_usage_t * expected_method_usage = NULL;
+static struct method_usage_t * unexpected_method_usage = NULL;
+
 static const int usage_iters_starvation = 100000;
 static const int usage_iters_active = 10000;
 static int global_flags;
@@ -121,7 +144,9 @@ static int global_flags;
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
 static void bmi_addr_drop(ref_st_p tmp_ref);
+static void bmi_addr_force_drop(ref_st_p ref, ref_list_p ref_list);
 static void bmi_check_forget_list(void);
+static void bmi_check_addr_force_drop (void);
 
 /** Initializes the BMI layer.  Must be called before any other BMI
  *  functions.
@@ -517,8 +542,11 @@ int BMI_finalize(void)
     free(known_method_table);
     known_method_count = 0;
 
-    if (method_usage)
-        free(method_usage);
+    if (expected_method_usage)
+        free(expected_method_usage);
+
+    if (unexpected_method_usage)
+       free(unexpected_method_usage);
 
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
@@ -900,7 +928,8 @@ int BMI_testsome(int incount,
  * poll them all.  Return idle_time per method too.
  */
 static void
-construct_poll_plan(int nmeth, int *idle_time_ms)
+construct_poll_plan(struct method_usage_t * method_usage,
+      int nmeth, int *idle_time_ms)
 {
     int i, numplan;
 
@@ -909,7 +938,8 @@ construct_poll_plan(int nmeth, int *idle_time_ms)
         ++method_usage[i].iters_polled;
         ++method_usage[i].iters_active;
         method_usage[i].plan = 0;
-        if (method_usage[i].iters_active <= usage_iters_active) {
+        if ((method_usage[i].iters_active <= usage_iters_active) &&
+            (!(method_usage[i].flags & BMI_METHOD_FLAG_NO_POLLING))){
             /* recently busy, poll */
 	    if (0) gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                          "%s: polling active meth %d: %d / %d\n", __func__, i,
@@ -966,6 +996,7 @@ int BMI_testunexpected(int incount,
 
     /* figure out if we need to drop any stale addresses */
     bmi_check_forget_list();
+    bmi_check_addr_force_drop();
 
     gen_mutex_lock(&active_method_count_mutex);
     tmp_active_method_count = active_method_count;
@@ -976,11 +1007,12 @@ int BMI_testunexpected(int incount,
 
     *outcount = 0;
 
-    construct_poll_plan(tmp_active_method_count, &max_idle_time_ms);
+    construct_poll_plan(unexpected_method_usage,
+          tmp_active_method_count, &max_idle_time_ms);
 
     while (position < incount && i < tmp_active_method_count)
     {
-        if (method_usage[i].plan) {
+        if (unexpected_method_usage[i].plan) {
             ret = active_method_table[i]->testunexpected(
                 (incount - position), &tmp_outcount,
                 (&(sub_info[position])), max_idle_time_ms);
@@ -992,9 +1024,9 @@ int BMI_testunexpected(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            method_usage[i].iters_polled = 0;
+            unexpected_method_usage[i].iters_polled = 0;
             if (ret)
-                method_usage[i].iters_active = 0;
+                unexpected_method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -1073,11 +1105,12 @@ int BMI_testcontext(int incount,
 	return(0);
     }
 
-    construct_poll_plan(tmp_active_method_count, &max_idle_time_ms);
+    construct_poll_plan(expected_method_usage,
+          tmp_active_method_count, &max_idle_time_ms);
 
     while (position < incount && i < tmp_active_method_count)
     {
-        if (method_usage[i].plan) {
+        if (expected_method_usage[i].plan) {
             ret = active_method_table[i]->testcontext(
                 incount - position, 
                 &out_id_array[position],
@@ -1095,9 +1128,9 @@ int BMI_testcontext(int incount,
             }
             position += tmp_outcount;
             (*outcount) += tmp_outcount;
-            method_usage[i].iters_polled = 0;
+            expected_method_usage[i].iters_polled = 0;
             if (ret)
-                method_usage[i].iters_active = 0;
+                expected_method_usage[i].iters_active = 0;
         }
 	i++;
     }
@@ -1201,6 +1234,11 @@ void *BMI_memalloc(BMI_addr_t addr,
     /* allocate the buffer using the method's mechanism */
     new_buffer = tmp_ref->interface->memalloc(size, send_recv);
 
+    /* initialize buffer, if not NULL. */
+    if (new_buffer)
+    {
+       memset(new_buffer,0,size);
+    }
     return (new_buffer);
 }
 
@@ -1980,6 +2018,51 @@ int bmi_method_addr_forget_callback(BMI_addr_t addr)
 }
 
 /*
+ * Signal BMI to drop inactive connections for this method.
+ */
+void bmi_method_addr_drop_callback (char* method_name)
+{
+    struct drop_item *item =
+        (struct drop_item *) malloc(sizeof(struct drop_item));
+
+    /*
+     * If we can't allocate, just return.
+     * Maybe this will succeed next time.
+     */
+    if (!item) return;
+
+    item->method_name = method_name;
+    
+    gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
+    qlist_add(&item->link, &bmi_addr_force_drop_list);
+    gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
+
+    return;
+}
+
+
+/**
+ * Try to increase method_usage_t struct to include room for a new method.
+ */
+static int grow_method_usage (struct method_usage_t ** p, int newflags)
+{
+    struct method_usage_t * x = *p;
+    *p = malloc((active_method_count + 1) * sizeof(**p));
+    if (!*p) {
+        *p = x;
+        return 0;
+    }
+    if (active_method_count) {
+        memcpy(*p, x, active_method_count * sizeof(**p));
+        free(x);
+    }
+    memset(&((*p)[active_method_count]), 0, sizeof(**p));
+    (*p)[active_method_count].flags = newflags;
+
+    return 1;
+ }
+
+/*
  * Attempt to insert this name into the list of active methods,
  * and bring it up.
  * NOTE: assumes caller has protected active_method_count with a mutex lock
@@ -2029,17 +2112,16 @@ activate_method(const char *name, const char *listen_addr, int flags)
     }
     active_method_table[active_method_count] = meth;
 
-    x = method_usage;
-    method_usage = malloc((active_method_count + 1) * sizeof(*method_usage));
-    if (!method_usage) {
-        method_usage = x;
-        return -ENOMEM;
-    }
-    if (active_method_count) {
-        memcpy(method_usage, x, active_method_count * sizeof(*method_usage));
-        free(x);
-    }
-    memset(&method_usage[active_method_count], 0, sizeof(*method_usage));
+    if (!grow_method_usage (&unexpected_method_usage, meth->flags))
+       return -ENOMEM;
+
+    /**
+     * If we run out of memory here, the unexpected_method_usage will be
+     * larger than strictly required but there is no memory leak.
+     */
+
+    if (!grow_method_usage (&expected_method_usage, meth->flags))
+       return -ENOMEM;
 
     ++active_method_count;
 
@@ -2216,6 +2298,60 @@ static void bmi_addr_drop(ref_st_p tmp_ref)
          */
         dealloc_ref_st(tmp_ref);
     }
+    return;
+}
+
+
+/* bmi_addr_force_drop
+ *
+ * Destroys a complete BMI address, including forcing the method to clean up 
+ * its portion.
+ *
+ * NOTE: must be called with ref list mutex held 
+ */
+static void bmi_addr_force_drop(ref_st_p ref, ref_list_p ref_list)
+{
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+                 "[BMI CONTROL]: %s: bmi discarding address: %llu\n",
+                 __func__, llu(ref->bmi_addr));
+
+    ref_list_rem(ref_list, ref->bmi_addr);
+    dealloc_ref_st(ref);
+
+    return;
+}
+
+/*
+ * bmi_check_addr_force_drop
+ *
+ * Checks to see if any method has requested freeing resources.
+ */
+static void bmi_check_addr_force_drop (void)
+{
+    struct drop_item *drop_item = NULL;
+    ref_st_p          ref_item = NULL;
+
+    gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
+    while (!qlist_empty(&bmi_addr_force_drop_list))
+    {
+        drop_item = qlist_entry(qlist_pop(&bmi_addr_force_drop_list),
+                                struct drop_item,
+                                link);
+        gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
+        gen_mutex_lock(&ref_mutex);
+        qlist_for_each_entry(ref_item, cur_ref_list, list_link)
+        {
+             if ((ref_item->ref_count == 0) &&
+                 (ref_item->interface->method_name == drop_item->method_name))
+             {
+                 bmi_addr_force_drop(ref_item, cur_ref_list);
+             }
+        }
+        gen_mutex_unlock(&ref_mutex);
+        gen_mutex_lock(&bmi_addr_force_drop_list_mutex);
+    }
+    gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
+
     return;
 }
 

@@ -5,7 +5,6 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 
 #include "pvfs2-sysint.h"
 #include "pint-sysint-utils.h"
@@ -54,10 +53,6 @@ int main(int argc, char **argv)
     PVFS_handle_extent_array meta_handle_extent_array;
     PVFS_handle_extent_array data_handle_extent_array[
         NUM_DATA_SERVERS_TO_QUERY];
-    PVFS_credential *cred;
-    
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
 
     tab = PVFS_util_parse_pvfstab(NULL);
     if(!tab)
@@ -99,7 +94,7 @@ int main(int argc, char **argv)
     memset(&server_config,0,sizeof(struct server_configuration_s));
     for(i=0; i<tab->mntent_count; i++)
     {
-	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i]), cred))
+	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i]), NULL))
 	{
 	    fprintf(stderr, "PINT_server_get_config failure.\n");
 	    return(-1);

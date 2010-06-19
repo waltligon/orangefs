@@ -61,7 +61,7 @@ int PVFS_mgmt_get_config(
 
     PINT_init_msgarray_params(sm_p, *fsid);
 
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
 
     config = PINT_get_server_config_struct(*fsid);
 

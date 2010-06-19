@@ -15,6 +15,19 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define DEBUG_HELP_STRING_SIZE 4096
+
+
+/* these functions are defined in pvfs2-utils.c */
+uint64_t PVFS_proc_debug_eventlog_to_mask(const char *);
+uint64_t PVFS_proc_kmod_eventlog_to_mask(const char *event_logging);
+int PVFS_proc_kmod_mask_to_eventlog(uint64_t mask, char *debug_string);
+int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string);
+
+/* external references */
+extern char kernel_debug_string[];
+
+/* prototypes */
 static int hash_func(void *key, int table_size);
 static int hash_compare(void *key, struct qhash_head *link);
 
@@ -24,14 +37,31 @@ static int hash_compare(void *key, struct qhash_head *link);
 
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
-int gossip_debug_mask = 0;
+
+/* the insmod command only understands "unsigned long" and NOT "unsigned long long" as
+ * an input parameter.  So, to accomodate both 32- and 64- bit machines, we will read
+ * the debug mask parameter as an unsigned long (4-bytes on a 32-bit machine and 8-bytes
+ * on a 64-bit machine) and then cast the "unsigned long" to an "unsigned long long"
+ * once we have the value in the kernel.  In this way, the gossip_debug_mask can remain
+ * as a "uint64_t" and the kernel and client may continue to use the same gossip functions.
+ * NOTE: the kernel debug mask currently does not have more than 32 valid keywords, so
+ * only reading a 32-bit integer from the insmod command line is not a problem.  However,
+ * the /proc/sys/pvfs2/kernel-debug functionality can accomodate up to 64 keywords, in 
+ * the event that the kernel debug mask supports more than 32 keywords.
+*/
+uint32_t module_parm_debug_mask = 0;
+uint64_t gossip_debug_mask = 0;
+unsigned int kernel_mask_set_mod_init = false;
 int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
 int slot_timeout_secs = PVFS2_DEFAULT_SLOT_TIMEOUT_SECS;
+uint32_t DEBUG_LINE = 50;
+char debug_help_string[DEBUG_HELP_STRING_SIZE] = {0};
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
-MODULE_PARM_DESC(debug, "debugging level (0 for none, 1 for verbose)");
+MODULE_PARM_DESC(debug, "debugging level (see pvfs2-debug.h for values)");
 MODULE_PARM_DESC(op_timeout_secs, "Operation timeout in seconds");
 MODULE_PARM_DESC(slot_timeout_secs, "Slot timeout in seconds");
 MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
@@ -44,7 +74,7 @@ MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress
 DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
 
 MODULE_PARM(hash_table_size, "i");
-MODULE_PARM(gossip_debug_mask, "i");
+MODULE_PARM(module_parm_debug_mask, "i");
 MODULE_PARM(op_timeout_secs, "i");
 MODULE_PARM(slot_timeout_secs, "i");
 
@@ -66,7 +96,7 @@ struct file_system_type pvfs2_fs_type =
 };
 
 module_param(hash_table_size, int, 0);
-module_param(gossip_debug_mask, int, 0);
+module_param(module_parm_debug_mask, uint, 0);
 module_param(op_timeout_secs, int, 0);
 module_param(slot_timeout_secs, int, 0);
 
@@ -98,7 +128,83 @@ DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
 static int __init pvfs2_init(void)
 {
     int ret = -1;
-    gossip_debug(GOSSIP_INIT_DEBUG, "pvfs2: pvfs2_init called with debug mask 0x%x\n", gossip_debug_mask);
+    uint32_t index = 0;
+    char client_title[] = "Client Debug Keywords:\n";
+    char kernel_title[] = "Kernel Debug Keywords:\n";
+    uint32_t i = 0;
+
+    /* convert input debug mask to a 64-bit unsigned integer */
+    gossip_debug_mask = (uint64_t)module_parm_debug_mask;
+
+    /*set the kernel's gossip debug string; invalid mask values will be ignored.*/
+    PVFS_proc_kmod_mask_to_eventlog(gossip_debug_mask,kernel_debug_string);
+
+    /* remove any invalid values from the mask */
+    gossip_debug_mask = PVFS_proc_kmod_eventlog_to_mask(kernel_debug_string);
+
+    /* if the mask has a non-zero value, then indicate that the mask was set when the kernel module
+     * was loaded.  The pvfs2 dev ioctl command will look at this boolean to determine if the kernel's
+     * debug mask should be overwritten when the client-core is started.
+    */
+    if (gossip_debug_mask != 0)
+    {
+        kernel_mask_set_mod_init = true;
+    }
+
+    /*print information message to the system log*/
+    printk(KERN_INFO "pvfs2: pvfs2_init called with debug mask: \"%s\" (0x%08llx)\n"
+          ,kernel_debug_string,gossip_debug_mask);
+
+
+    /* load debug_help_string...this string is used during the /proc/sys/pvfs2/debug-help operation */
+    if (strlen(client_title) < DEBUG_LINE)
+    {
+       memcpy(&debug_help_string[index],client_title,sizeof(client_title));
+       index += strlen(client_title);
+    }
+ 
+    for(i=0;i<num_keyword_mask_map;i++)
+    {
+       if ( (strlen(s_keyword_mask_map[i].keyword) + 2) < DEBUG_LINE)
+       {
+          debug_help_string[index] = '\t';
+          index++;
+          memcpy(&debug_help_string[index],s_keyword_mask_map[i].keyword
+                ,strlen(s_keyword_mask_map[i].keyword));
+          index += strlen(s_keyword_mask_map[i].keyword);
+          debug_help_string[index] = '\n';
+          index++;
+       }
+    }/*end for*/
+
+    if ( (strlen(kernel_title) + 1) < DEBUG_LINE)
+    {
+       debug_help_string[index] = '\n';
+       index++;
+
+       memcpy(&debug_help_string[index],kernel_title,sizeof(kernel_title));
+       index += strlen(kernel_title);
+    }/*end if*/
+
+    for(i=0;i<num_kmod_keyword_mask_map;i++)
+    {
+       if ( (strlen(s_kmod_keyword_mask_map[i].keyword) + 2) < DEBUG_LINE)
+       {
+          debug_help_string[index] = '\t';
+          index++;
+          memcpy(&debug_help_string[index],s_kmod_keyword_mask_map[i].keyword
+                ,strlen(s_kmod_keyword_mask_map[i].keyword));
+          index += strlen(s_kmod_keyword_mask_map[i].keyword);
+          debug_help_string[index] = '\n';
+          index++;
+       }
+    }/*end for*/
+
+#ifdef HAVE_BDI_INIT
+    ret = bdi_init(&pvfs2_backing_dev_info);
+    if(ret)
+        return(ret);
+#endif
 
     if(op_timeout_secs < 0)
     {
@@ -170,6 +276,9 @@ cleanup_req:
 cleanup_op:
     op_cache_finalize();
 err:
+#ifdef HAVE_BDI_INIT
+    bdi_destroy(&pvfs2_backing_dev_info);
+#endif
     return ret;
 }
 
@@ -218,6 +327,10 @@ static void __exit pvfs2_exit(void)
 
     qhash_finalize(htable_ops_in_progress);
     
+#ifdef HAVE_BDI_INIT
+    bdi_destroy(&pvfs2_backing_dev_info);
+#endif
+
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 

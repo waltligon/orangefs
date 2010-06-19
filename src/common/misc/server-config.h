@@ -102,6 +102,21 @@ typedef struct filesystem_configuration_s
     char **ro_hosts;
     int   *ro_netmasks;
 
+    int    root_squash_count;
+    char **root_squash_hosts;
+    int   *root_squash_netmasks;
+
+    int    root_squash_exceptions_count;
+    char **root_squash_exceptions_hosts;
+    int   *root_squash_exceptions_netmasks;
+
+    int    all_squash_count;
+    char **all_squash_hosts;
+    int   *all_squash_netmasks;
+
+    PVFS_uid exp_anon_uid;
+    PVFS_gid exp_anon_gid;
+
     int32_t small_file_size;
 
     int32_t directio_thread_num;
@@ -124,21 +139,14 @@ typedef struct distribution_configuration_s
 
 } distribution_configuration;
 
-enum security_keyword
-{
-    SECURITY_KEYWORD_EMAIL,
-    SECURITY_KEYWORD_EMAIL_REGEX,
-    SECURITY_KEYWORD_SUBJECT,
-    SECURITY_KEYWORD_SUBJECT_REGEX,
-};
-
 typedef struct server_configuration_s
 {
     char *host_id;
     int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
-    char *storage_path;
+    char *data_path;                /* path to data storage directory */
+    char *meta_path;                /* path to metadata storage directory */
     char *fs_config_filename;       /* the fs.conf file name            */
     size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */

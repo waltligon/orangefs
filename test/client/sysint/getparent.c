@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -20,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_getparent resp_getparent;
     int ret = -1;
     PVFS_fs_id fs_id;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
 
     if (argc != 2)
     {
@@ -43,10 +42,8 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-    
-    ret = PVFS_sys_getparent(fs_id, argv[1], cred, &resp_getparent);
+    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_sys_getparent(fs_id, argv[1], &credentials, &resp_getparent, NULL);
     if (ret == 0)
     {
         printf("=== getparent data:\n");

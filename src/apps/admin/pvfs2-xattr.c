@@ -2,6 +2,9 @@
  * (C) 2004 Clemson University and The University of Chicago
  * 
  * See COPYING in top-level directory.
+ *
+ * 03/19/07 - Added set and get for user.pvfs2.mirror.mode and ..mirror.copies.
+ *            Added get for user.pvfs2.mirror.handles and ..mirror.status
  */
 
 #include <unistd.h>
@@ -25,6 +28,8 @@
 
 #include "xattr-utils.h"
 
+#include "pvfs2-mirror.h"
+
 #define VALBUFSZ 1024
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -40,10 +45,10 @@ const char *PINT_eattr_namespaces[] =
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    PVFS_ds_keyval key;
-    PVFS_ds_keyval val;
+    PVFS_ds_keyval *key;
+    PVFS_ds_keyval *val;
     char* srcfile;
-    int get, text;
+    int get, text, key_count;
 };
 
 enum object_type { 
@@ -77,8 +82,14 @@ typedef struct file_object_s {
 
 static struct options* parse_args(int argc, char* argv[]);
 static int generic_open(file_object *obj, PVFS_credential *credentials);
-static int pvfs2_eattr(int get, file_object *, PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p, PVFS_credential *creds);
+
+static int pvfs2_eattr(int get
+                      ,file_object      *obj
+                      ,PVFS_ds_keyval   *key_p
+                      ,PVFS_ds_keyval   *val_p
+                      ,PVFS_credential  *creds
+                      ,int key_count); 
+
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
 static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p);
@@ -91,6 +102,7 @@ int main(int argc, char **argv)
   struct options* user_opts = NULL;
   file_object src;
   PVFS_credential credentials;
+  int i;
 
   memset(&src, 0, sizeof(src));
   /* look at command line arguments */
@@ -123,49 +135,118 @@ int main(int argc, char **argv)
       fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
       return -1;
   }
-  if (!eattr_is_prefixed(user_opts->key.buffer))
+
+  if (!eattr_is_prefixed(user_opts->key[0].buffer))
   {
-      fprintf(stderr, "extended attribute key is not prefixed %s\n", (char *) user_opts->key.buffer);
+      fprintf(stderr, "extended attribute key is not prefixed %s\n"
+                    , (char *) user_opts->key[0].buffer);
       return -1;
   }
   if (!user_opts->get)
   {
-      if (!permit_set(&user_opts->key))
+      if (!permit_set(&user_opts->key[0]))
       {
-          fprintf(stderr, "Not permitted to set key %s\n", (char *) user_opts->key.buffer);
+          fprintf(stderr, "Not permitted to set key %s\n"
+                        , (char *) user_opts->key[0].buffer);
           return -1;
       }
-      if (modify_val(&user_opts->key, &user_opts->val) < 0)
+      if (modify_val(&user_opts->key[0], &user_opts->val[0]) < 0)
       {
-          fprintf(stderr, "Invalid value for user-settable hint %s, %s\n", (char *) user_opts->key.buffer, (char *) user_opts->val.buffer);
+          fprintf(stderr, "Invalid value for user-settable attribute %s, %s\n"
+                        , (char *) user_opts->key[0].buffer
+                        , (char *) user_opts->val[0].buffer);
           return -1;
       }
   }
 
-    ret = pvfs2_eattr(user_opts->get, &src, &user_opts->key, &user_opts->val, &credentials);
+    ret = pvfs2_eattr(user_opts->get
+                     ,&src
+                     ,user_opts->key
+                     ,user_opts->val
+                     ,&credentials
+                     ,user_opts->key_count);
     if (ret != 0) 
     {
         return ret;
     }
     if (user_opts->get && user_opts->text)  
     {
-        if (strncmp(user_opts->key.buffer, "user.pvfs2.meta_hint", SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
-            PVFS_metafile_hint *hint = (PVFS_metafile_hint *) user_opts->val.buffer;
-            printf("Metafile hints: ");
+        if (strncmp(user_opts->key[0].buffer
+                   ,"user.pvfs2.meta_hint"
+                   ,SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
+            PVFS_metafile_hint *hint = 
+                            (PVFS_metafile_hint *) user_opts->val[0].buffer;
+            printf("Metafile hints (0x%08x)",(unsigned int)hint->flags);
             if (hint->flags & PVFS_IMMUTABLE_FL) {
-                printf("immutable file ");
+                printf(" :immutable file ");
             }
             if (hint->flags & PVFS_APPEND_FL) {
-                printf("Append-only file ");
+                printf(" :Append-only file ");
             }
             if (hint->flags & PVFS_NOATIME_FL) {
-                printf("Atime updates disabled.");
+                printf(" :Atime updates disabled");
+            }
+            if (hint->flags & PVFS_MIRROR_FL) {
+		printf("  :Mirroring is enabled");
             }
             printf("\n");
+        } else if ( strncmp(user_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.handles"
+                           ,sizeof("user.pvfs2.mirror.handles")) == 0)
+        {
+             PVFS_handle *myHandles = (PVFS_handle *)user_opts->val[0].buffer;
+             int copies = *(int *)user_opts->val[1].buffer;
+             int dfile_count = src.u.pvfs2.attr.dfile_count;
+             for (i=0; i<(copies * dfile_count); i++)
+             {
+                 printf("Handle(%d):%llu\n",i,llu(myHandles[i]));
+             }
+        } else if ( strncmp(user_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.copies"
+                           ,sizeof("user.pvfs2.mirror.copies")) == 0)
+        {
+             int *myCopies = (int *)user_opts->val[0].buffer;
+             printf("Number of Mirrored Copies : %d\n",*myCopies);
+        } else if ( strncmp(user_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.status"
+                           ,sizeof("user.pvfs2.mirror.status")) == 0)
+        {
+             int copies = *(int *)user_opts->val[1].buffer;
+             int dfile_count = src.u.pvfs2.attr.dfile_count;
+             PVFS_handle *status = (PVFS_handle *)user_opts->val[0].buffer;
+             for (i=0; i<(dfile_count * copies); i++)
+                 printf("src handle(%d) : status(%s) : value(%llu)\n"
+                       ,i
+                       ,status[i]==0?"usable":"UNusable"
+                       ,llu(status[i]));
+        } else if ( strncmp(user_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.mode"
+                           , sizeof("user.pvfs2.mirror.mode")) == 0)
+        {
+             printf("Mirroring Mode : ");
+             switch(*(MIRROR_MODE *)user_opts->val[0].buffer)
+             {
+                case NO_MIRRORING :
+                {
+                    printf("Turned OFF\n");
+                    break;
+                }
+                case MIRROR_ON_IMMUTABLE :
+                {
+                    printf("Create Mirror when IMMUTABLE is set\n");
+                    break;
+                }
+                default:
+                {
+                    printf("Unknown mode(%d)\n"
+                          ,*(int *)user_opts->val[0].buffer);
+                    break;
+                }
+             }/*end switch*/
         } else {
-            printf("key:%s Value:\n%s\n",
-                    (char *)user_opts->key.buffer,
-                    (char *)user_opts->val.buffer);
+            printf("key : \"%s\" \tValue : \"%s\"\n",
+                    (char *)user_opts->key[0].buffer,
+                    (char *)user_opts->val[0].buffer);
         }
     }
   PVFS_sys_finalize();
@@ -174,7 +255,8 @@ int main(int argc, char **argv)
 
 static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p)
 {
-    if (strncmp(key_p->buffer, "user.pvfs2.meta_hint", SPECIAL_METAFILE_HINT_KEYLEN) == 0)
+    if (strncmp(key_p->buffer,"user.pvfs2.meta_hint"
+                             , SPECIAL_METAFILE_HINT_KEYLEN) == 0)
     {
         PVFS_metafile_hint hint;
         memset(&hint, 0, sizeof(hint));
@@ -194,7 +276,18 @@ static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p)
             return -1;
         memcpy(val_p->buffer, &hint, sizeof(hint));
         val_p->buffer_sz = sizeof(hint);
+    } else if (strncmp(key_p->buffer,"user.pvfs2.mirror.mode"
+                                    ,sizeof("user.pvfs2.mirror.mode")) == 0)
+    {
+       printf("Setting mirror mode to %d\n",*(int *)val_p->buffer);
+    } else if (strncmp(key_p->buffer,"user.pvfs2.mirror.copies"
+                                    ,sizeof("user.pvfs2.mirror.mode")) == 0)
+    {
+       printf("Setting number of mirrored copies to %d\n"
+             ,*(int *)val_p->buffer);
     }
+
+
     return 0;
 }
 
@@ -213,8 +306,12 @@ static int permit_set(PVFS_ds_keyval *key_p)
  *
  * returns zero on success and negative one on failure
  */
-static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p, PVFS_credential *creds) 
+static int pvfs2_eattr(int get
+                      ,file_object      *obj
+                      ,PVFS_ds_keyval   *key_p
+                      ,PVFS_ds_keyval   *val_p
+                      ,PVFS_credential  *creds
+                      ,int key_count) 
 {
   int ret = -1;
 
@@ -223,9 +320,17 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
       if (get == 1)
       {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
-        if ((ret = fgetxattr(obj->u.ufs.fd, key_p->buffer, val_p->buffer, val_p->buffer_sz)) < 0)
+        if ((ret = fgetxattr(obj->u.ufs.fd
+                            ,key_p->buffer
+                            ,val_p->buffer
+                            ,val_p->buffer_sz)) < 0)
 #else
-        if ((ret = fgetxattr(obj->u.ufs.fd, key_p->buffer, val_p->buffer, val_p->buffer_sz, 0, 0)) < 0)
+        if ((ret = fgetxattr(obj->u.ufs.fd
+                            ,key_p->buffer
+                            ,val_p->buffer
+                            ,val_p->buffer_sz 
+                            ,0
+                            ,0)) < 0)
 #endif
         {
             perror("fgetxattr:");
@@ -252,11 +357,34 @@ static int pvfs2_eattr(int get, file_object *obj, PVFS_ds_keyval *key_p,
   }
   else
   {
-      if (get == 1)
+      if (get == 1 && key_count == 1)
       {
           ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, creds, key_p, val_p, NULL);
-      }
-      else {
+      } else if (get == 1 && key_count == 2)
+      {
+          PVFS_sysresp_geteattr *resp = malloc(sizeof(*resp));
+          if (!resp)
+          {
+             fprintf(stderr,"Unable to allocate resp structure.\n");
+             exit(EXIT_FAILURE);
+          }
+          memset(resp,0,sizeof(*resp));
+          resp->val_array = val_p;
+          resp->err_array = malloc(2 * sizeof(PVFS_error));
+          if (!resp->err_array)
+          {
+             fprintf(stderr,"Unable to allocate err_array.\n");
+             exit(EXIT_FAILURE);
+          }
+          memset(resp->err_array,0,sizeof(2 * sizeof(PVFS_error)));
+          
+          ret = PVFS_sys_geteattr_list(obj->u.pvfs2.ref
+                                      ,creds
+                                      ,key_count
+                                      ,key_p
+                                      ,resp
+                                      ,NULL );
+      } else {
           ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, creds, key_p, val_p, 0, NULL);
       }
 
@@ -290,9 +418,28 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
+    /*create one key structure*/
+    tmp_opts->key = malloc(sizeof(PVFS_ds_keyval));
+    if (!tmp_opts->key)
+    {
+        fprintf(stderr,"Unable to allocate tmp_opts->key.\n");
+        exit(EXIT_FAILURE);
+    }
+    memset(tmp_opts->key,0,sizeof(PVFS_ds_keyval));
+
+    /*create one val structure*/
+    tmp_opts->val = malloc(sizeof(PVFS_ds_keyval));
+    if (!tmp_opts->val)
+    {
+        fprintf(stderr,"Unable to allocate tmp_opts->val.\n");
+        exit(EXIT_FAILURE);
+    }
+    memset(tmp_opts->val,0,sizeof(PVFS_ds_keyval));
+
+    /*set default key_count*/
+    tmp_opts->key_count = 1;
+
     /* fill in defaults */
-    memset(&tmp_opts->key, 0, sizeof(PVFS_ds_keyval));
-    memset(&tmp_opts->val, 0, sizeof(PVFS_ds_keyval));
     tmp_opts->srcfile = strdup(argv[argc-1]);
     tmp_opts->get = 1;
 
@@ -307,38 +454,124 @@ static struct options* parse_args(int argc, char* argv[])
                 tmp_opts->get = 0;
                 break;
             case 'k':
-                tmp_opts->key.buffer = strdup(optarg);
-                tmp_opts->key.buffer_sz = strlen(tmp_opts->key.buffer) + 1;
+                tmp_opts->key[0].buffer = strdup(optarg);
+                tmp_opts->key[0].buffer_sz = strlen(tmp_opts->key[0].buffer) + 1;
                 break;
             case 'v':
-                tmp_opts->val.buffer = strdup(optarg);
-                tmp_opts->val.buffer_sz = strlen(tmp_opts->val.buffer) + 1;
-                break;
+                if (strncmp(tmp_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.mode"
+                           ,sizeof("user.pvfs2.mirror.mode")) == 0 ||
+                    strncmp(tmp_opts->key[0].buffer
+                           ,"user.pvfs2.mirror.copies"
+                           ,sizeof("user.pvfs2.mirror.copies")) == 0)
+                { /*convert string argument into numeric argument*/
+                  tmp_opts->val[0].buffer = malloc(sizeof(int));
+                  if (!tmp_opts->val[0].buffer)
+                  {
+                     printf("Unable to allocate memory for key value.\n");
+                     exit(EXIT_FAILURE);
+                  }
+                  memset(tmp_opts->val[0].buffer,0,sizeof(int));
+                  *(int *)tmp_opts->val[0].buffer = atoi(optarg);
+                  tmp_opts->val[0].buffer_sz = sizeof(int);
+                  break;
+                } else {
+                  tmp_opts->val[0].buffer = strdup(optarg);
+                  tmp_opts->val[0].buffer_sz = strlen(tmp_opts->val[0].buffer);
+                  break;
+                }
 	    case('?'):
                 printf("?\n");
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
+    /*ensure that the given mode is supported by PVFS*/
+    if (!tmp_opts->get &&
+         strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.mode") == 0)
+    {
+       if (*(int *)tmp_opts->val[0].buffer < BEGIN_MIRROR_MODE ||
+           *(int *)tmp_opts->val[0].buffer > END_MIRROR_MODE )
+       {
+          fprintf(stderr,"Invalid Mirror Mode ==> %d\n"
+                         "\tValid Modes\n"
+                         "\t1. %d == No Mirroring\n"
+                         "\t2. %d == Mirroring on Immutable\n"
+                        ,*(int *)tmp_opts->val[0].buffer
+                        ,NO_MIRRORING,MIRROR_ON_IMMUTABLE);
+
+          exit(EXIT_FAILURE);
+       }
+    }
+
     if (tmp_opts->get == 1)
     {
-        tmp_opts->val.buffer = calloc(1, VALBUFSZ);
-        tmp_opts->val.buffer_sz = VALBUFSZ;
-        if (tmp_opts->val.buffer == NULL)
+        /*if user wants mirror.handles or mirror.status, then we must also */
+        /*retrieve the number of copies, so we know how to display the     */
+        /*information properly.                                            */
+        if (strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.handles") == 0 ||
+            strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.status") == 0 )
         {
-            fprintf(stderr, "Could not allocate val\n");
-            exit(EXIT_FAILURE);
+           tmp_opts->key_count = 2;
+           PVFS_ds_keyval *myKeys = malloc(tmp_opts->key_count * 
+                                           sizeof(PVFS_ds_keyval));
+           if (!myKeys)
+           {
+               fprintf(stderr,"Unable to allocate myKeys.\n");
+               exit(EXIT_FAILURE);
+           }
+           memset(myKeys,0,sizeof(tmp_opts->key_count *
+                                  sizeof(PVFS_ds_keyval)));
+           myKeys[0] = *tmp_opts->key;
+           myKeys[1].buffer = strdup("user.pvfs2.mirror.copies");
+           myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.copies");
+           free(tmp_opts->key);
+           tmp_opts->key = myKeys;
+        }/*end if handles or status*/
+
+        
+
+        tmp_opts->val[0].buffer = calloc(1, VALBUFSZ);
+        if (!tmp_opts->val[0].buffer)
+        {
+           fprintf(stderr,"Unable to allocate tmp_opts->val[0].buffer.\n");
+           exit(EXIT_FAILURE);
         }
-    }
-    else {
-        if (tmp_opts->val.buffer == NULL)
+        tmp_opts->val[0].buffer_sz = VALBUFSZ;
+        
+        if (tmp_opts->key_count == 2)
         {
-            fprintf(stderr, "Please specify value if setting extended attributes\n");
+           PVFS_ds_keyval *myVals = malloc(tmp_opts->key_count * 
+                                           sizeof(PVFS_ds_keyval));
+           if (!myVals)
+           {
+               fprintf(stderr,"Unable to allocate myVals.\n");
+               exit(EXIT_FAILURE);
+           }
+           memset(myVals,0,sizeof(tmp_opts->key_count *
+                                  sizeof(PVFS_ds_keyval)));
+           myVals[0] = *tmp_opts->val;
+           free(tmp_opts->val);
+
+           myVals[1].buffer = malloc(sizeof(int));
+           if (!myVals[1].buffer)
+           {
+              fprintf(stderr,"Unable to allocate myVals[1].buffer.\n");
+              exit(EXIT_FAILURE);
+           }
+           myVals[1].buffer_sz = sizeof(int);
+           tmp_opts->val = myVals;
+         }/*end if*/  
+    } else {
+        if (tmp_opts->val[0].buffer == NULL)
+        {
+            fprintf(stderr, "Please specify value if setting extended "
+                            "attributes\n");
             usage(argc, argv);
             exit(EXIT_FAILURE);
         }
     }
-    if (tmp_opts->key.buffer == NULL)
+    if (tmp_opts->key[0].buffer == NULL)
     {
         fprintf(stderr, "Please specify key if getting extended attributes\n");
         usage(argc, argv);
@@ -350,7 +583,8 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,"Usage: %s -s {set xattrs} -k <key> -v <val> -t {print attributes} filename\n",argv[0]);
+    fprintf(stderr,"Usage: %s -s {set xattrs} -k <key> -v <val> "
+                   "-t {print attributes} filename\n",argv[0]);
     return;
 }
 
@@ -449,7 +683,11 @@ static int generic_open(file_object *obj, PVFS_credential *credentials)
         obj->u.pvfs2.perms = resp_getattr.attr.perms;
         memcpy(&obj->u.pvfs2.attr, &resp_getattr.attr,
                sizeof(PVFS_sys_attr));
-        obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+        /* we should not modify the returned mask, so we know which data fields
+         * in the attribute structure are valid.  I don't see any reason why
+         * it is being reset here.
+        */
+        //obj->u.pvfs2.attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         obj->u.pvfs2.ref = ref;
     }
     return 0;

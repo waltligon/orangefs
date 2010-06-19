@@ -899,7 +899,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
 
-        PVFS_util_refresh_credential(creds);
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -982,7 +982,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
 
-        PVFS_util_refresh_credential(creds);
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1095,7 +1095,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
 
-        PVFS_util_refresh_credential(creds);
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;

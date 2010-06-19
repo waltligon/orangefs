@@ -97,7 +97,7 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.perf_mon_list.fs_id = fs_id;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;

@@ -33,6 +33,11 @@ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
 
+static ssize_t wait_for_cached_io(struct rw_options *old_rw, 
+                                  struct iovec *vec, 
+                                  int nr_segs, 
+                                  size_t total_size) __attribute__((unused));
+
 static ssize_t wait_for_direct_io(struct rw_options *rw,
                                   struct iovec *vec,
                                   unsigned long  nr_segs,
@@ -1041,8 +1046,10 @@ static ssize_t wait_for_missing_io(struct rw_options *rw)
     if (rw->dest.pages.nr_issue_pages) {
         int contig_on_file = 0;
 
-        gossip_debug(GOSSIP_FILE_DEBUG, "Number of pages for I/O issue %ld, total_size: %ld\n", 
-                rw->dest.pages.nr_issue_pages, (rw->dest.pages.nr_issue_pages << PAGE_CACHE_SHIFT));
+        gossip_debug(GOSSIP_FILE_DEBUG, "Number of pages for I/O issue %ld,"
+                                        " total_size: %ld\n", 
+                rw->dest.pages.nr_issue_pages
+              , (rw->dest.pages.nr_issue_pages << PAGE_CACHE_SHIFT));
         /* scan through the issue pages array and see if we can submit a direct
          * contiguous request first.
          */
@@ -1140,9 +1147,10 @@ out:
  * Returns the actual size of completed I/O.
  */
 static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec, 
-        int nr_segs, size_t total_size)
+        int nr_segs, size_t total_size) 
 {
     ssize_t err = 0, total_actual_io = 0;
+    ssize_t ret = 0;
     struct rw_options rw;
     loff_t isize, offset;
 
@@ -1167,13 +1175,23 @@ static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec,
     /* Issue and wait for I/O only for pages that are not uptodate 
      * or are not found in the cache 
      */
-    if ((err = wait_for_missing_io(&rw)) < 0) {
-        gossip_err("wait_for_missing_io: error in waiting for missing I/O %ld\n", (long) err);
+    if ((ret = wait_for_missing_io(&rw)) < 0) {
+       gossip_err("wait_for_missing_io: error in waiting for missing I/O %ld\n"
+                 ,(long)err);
         goto cleanup;
     }
     /* return value is basically file size minus current file offset */
-    total_actual_io = isize - offset;
-    gossip_debug(GOSSIP_FILE_DEBUG, "total_actual_io to be staged from page-cache %zd\n", total_actual_io);
+    //total_actual_io = isize - offset;
+
+    /* number of bytes to retrieve from the pagecache should be based on
+     * the number of bytes returned from wait_for_missing_io, which executes
+     * the io call with the number of bytes requested and returns the number
+     * of bytes actually transferred.
+    */
+    total_actual_io = ret;
+
+    gossip_debug(GOSSIP_FILE_DEBUG, "total_actual_io to be staged from "
+                                    "page-cache %zd\n", total_actual_io);
     /* Copy the data from the page-cache to the application's address space */
     err = copy_from_pagecache(&rw, vec, nr_segs, total_actual_io);
     err = 0;
@@ -1247,7 +1265,8 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     /* Compute total and max number of segments after split */
     if ((max_new_nr_segs = bound_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-        gossip_lerr("%s: could not bound iovec %lu\n", rw->fnstr, max_new_nr_segs);
+        gossip_lerr("%s: could not bound iovec %lu\n", rw->fnstr
+                                                     , max_new_nr_segs);
         goto out;
     }
     if (rw->type == IO_WRITEV)
@@ -1274,14 +1293,16 @@ static ssize_t do_readv_writev(struct rw_options *rw)
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
             goto out;
         }
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: proceeding with offset : %llu, size %zd\n",
-                rw->fnstr, llu(*offset), count);
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: proceeding with offset : %llu, "
+                                        "size %zd\n",
+                                        rw->fnstr, llu(*offset), count);
     }
     if (count == 0)
     {
         ret = 0;
         goto out;
     }
+
     rw->count = count;
     /*
      * if the total size of data transfer requested is greater than
@@ -1308,10 +1329,12 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 	if(ret < 0)
         {
             gossip_err("%s: Failed to split iovecs to satisfy larger "
-                    " than blocksize readv/writev request %zd\n", rw->fnstr, ret);
+                       " than blocksize readv/writev request %zd\n", rw->fnstr
+                                                                   , ret);
             goto out;
         }
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: Splitting iovecs from %lu to %lu"
+                                        " [max_new %lu]\n", 
                 rw->fnstr, nr_segs, new_nr_segs, max_new_nr_segs);
         /* We must free seg_array and iovecptr */
         to_free = 1;
@@ -1339,17 +1362,17 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     {
         gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %p to %p [%d bytes]\n", 
                 rw->fnstr,
-                seg + 1, iovecptr[seg].iov_base, 
+                (int)seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
                 (int) iovecptr[seg].iov_len);
     }
     for (seg = 0; seg < seg_count; seg++)
     {
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %d) %lu\n",
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s: %zd) %lu\n",
                 rw->fnstr, seg + 1, seg_array[seg]);
-    }
+   }
 #endif
-    seg = 0;
+    seg = 0;    
     while (total_count < count)
     {
         size_t each_count, amt_complete;
@@ -1358,18 +1381,22 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 #ifndef PVFS2_LINUX_KERNEL_2_4
+        /* caching is not working properly. removing functionality for now.  Becky Ligon. */
+        /* caching REQUIRES the user's buffer to be a multiple of 4096; the code breaks if */
+        /* it is not!                                                                      */
+
         /* if a file is immutable, stage its I/O 
          * through the cache */
-        if (IS_IMMUTABLE(rw->inode)) {
+        //if (IS_IMMUTABLE(rw->inode)) {
             /* Stage the I/O through the kernel's pagecache */
-            ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
-        }
-        else 
+        //    ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
+        //}
+        //else 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
-        {
+        //{
             /* push the I/O directly through to storage */
-            ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
-        }
+     ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
+        //}
         if (ret < 0)
         {
             goto out;
@@ -1460,6 +1487,11 @@ ssize_t pvfs2_file_read(
     struct rw_options rw;
     struct iovec vec;
 
+    gossip_debug(GOSSIP_IO_DEBUG,"pvfs2_file_read: count=%zd \toffset=%lld\n"
+               ,count
+               ,(long long)*offset);
+
+
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READ;
@@ -1467,7 +1499,7 @@ ssize_t pvfs2_file_read(
     rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     vec.iov_base = buf;
-    vec.iov_len  = count;
+    vec.iov_len = count;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
     rw.file = file;
@@ -1475,15 +1507,9 @@ ssize_t pvfs2_file_read(
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
 
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-    }
+    rw.readahead_size = 0;
     g_pvfs2_stats.reads++;
+
     return do_readv_writev(&rw);
 }
 
@@ -2156,6 +2182,9 @@ static ssize_t pvfs2_file_readx(
     unsigned long xtnr_segs)
 {
     struct rw_options rw;
+
+    gossip_err("Executing pvfs2_file_readx.  offset:NONE \ttotal length:%zd\n"
+              ,iov_length(iov,nr_segs));
 
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
@@ -2842,6 +2871,11 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
+
+    gossip_err("Executing pvfs2_file_aio_read_iovec.  offset:%lld \ttotal length:%zd\n"
+              ,(long long)offset
+              ,iov_length(iov,nr_segs));
+
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
@@ -2974,7 +3008,14 @@ int pvfs2_ioctl(
         {
             return -EFAULT;
         }
-        if(uval & (~(FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL)))
+        /* PVFS_MIRROR_FL is set internally when the mirroring mode is turned 
+         * on for a file.  The user is not allowed to turn on this bit, but the
+         * bit is present if the user first gets the flags and then updates the
+         * flags with some new settings. So, we ignore it in the following
+         * edit. bligon.
+        */
+        if((uval & ~PVFS_MIRROR_FL) & 
+           (~(FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL)))
         {
             gossip_err("pvfs2_ioctl: the FS_IOC_SETFLAGS only supports setting "
                        "one of FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL\n");

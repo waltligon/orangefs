@@ -214,7 +214,7 @@ PVFS_error PVFS_isys_mkdir(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.mkdir.object_name = object_name;
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -382,7 +382,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
     PINT_SERVREQ_MKDIR_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
-        *sm_p->newcred_p,
+        *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
         sm_p->u.mkdir.sys_attr,

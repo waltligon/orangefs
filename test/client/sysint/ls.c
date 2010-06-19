@@ -101,19 +101,18 @@ void print_entry(
     PVFS_fs_id fs_id)
 {
     PVFS_object_ref pinode_refn;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
     
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
-                         cred, &getattr_response))
+                         &credentials, &getattr_response, NULL))
     {
         fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
                 "(fs_id is %d)\n",llu(handle),fs_id);
@@ -133,7 +132,7 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
 
@@ -142,11 +141,10 @@ int do_list(
 
     name = start_dir;
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
 
-    if (PVFS_sys_lookup(fs_id, name, cred,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
+    if (PVFS_sys_lookup(fs_id, name, &credentials,
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
                 start_dir,fs_id);
@@ -156,9 +154,10 @@ int do_list(
     pinode_refn.handle = lk_response.ref.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
+    PVFS_util_gen_credentials(&credentials);
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
-                         cred, &getattr_response) == 0)
+                         &credentials, &getattr_response, NULL) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK))
@@ -176,7 +175,7 @@ int do_list(
         memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
         if (PVFS_sys_readdir(pinode_refn,
                              (!token ? PVFS_READDIR_START : token),
-                             pvfs_dirent_incount, cred, &rd_response))
+                             pvfs_dirent_incount, &credentials, &rd_response, NULL))
         {
             fprintf(stderr,"readdir failed\n");
             return -1;

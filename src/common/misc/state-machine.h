@@ -50,6 +50,27 @@ enum PINT_state_code {
     SM_RUN     = 9
 };
 
+/*define msgpairarray parameters for server-to-server requests*/
+#define PINT_serv_init_msgarray_params(sm_p, __fsid)             \
+do {                                                             \
+   PINT_sm_msgpair_params *mpp = &sm_p->msgarray_op.params;      \
+   struct server_configuration_s *server_config =                \
+        get_server_config_struct();                              \
+   mpp->job_context = server_job_context;                        \
+   if (server_config)                                            \
+   {                                                             \
+      mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+      mpp->retry_limit = server_config->client_retry_limit;      \
+      mpp->retry_delay = server_config->client_retry_delay_ms;   \
+   }                                                             \
+   else                                                          \
+   {                                                             \
+      mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
+      mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
+      mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+   }                                                             \
+} while (0)                                                      
+
 /* these define things like stack size and so forth for the common
  * state machine code.
  * The state stack size limits the number of nested state machines that
@@ -203,8 +224,9 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *error_code,
                         int *remaining);
 
-/* This macro is used in calls to PINT_sm_fram() */
+/* This macro is used in calls to PINT_sm_frame() */
 #define PINT_FRAME_CURRENT 0
+#define PINT_FRAME_TOP 1
 
 struct PINT_state_machine_s pvfs2_void_sm;
 

@@ -66,8 +66,37 @@ static void PINT_event_tau_init(void);
 static void PINT_event_tau_fini(void);
 static void PINT_event_tau_thread_init(char* gname);
 static void PINT_event_tau_thread_fini(void);
+static void PINT_event_free( struct PINT_event *p );
+static void PINT_group_free( strcut PINT_group *g );
 
 #endif /* HAVE_TAU */
+
+static void PINT_event_free( struct PINT_event *p )
+{
+    if( p != NULL )
+    {
+        if( p->name != NULL )
+        {
+            free( p->name );
+        }
+        free( p );
+    }
+    return;
+}
+
+static void PINT_group_free( struct PINT_group *g )
+{
+    if( g != NULL )
+    {
+        if( g->name != NULL )
+        {
+            free( g->name );
+        }
+        free( g );
+    }
+    return;
+}
+
 
 static int PINT_group_compare(void *key, struct qhash_head *link)
 {
@@ -104,15 +133,19 @@ int PINT_event_init(enum PINT_event_method method)
     groups_table = qhash_init(PINT_group_compare, quickhash_string_hash, 1024);
     if(!groups_table)
     {
-        qhash_finalize(events_table);
+        qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+            PINT_event_free);
         return -PVFS_ENOMEM;
     }
 
     ret = PINT_event_define_group("defaults", &default_group);
     if(ret < 0)
     {
-        qhash_finalize(events_table);
-        qhash_finalize(groups_table);
+        qhash_destroy_and_finalize( groups_table, struct PINT_group, link, 
+            PINT_group_free );
+        qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+            PINT_event_free);
+
         return ret;
     }
 
@@ -130,15 +163,57 @@ int PINT_event_init(enum PINT_event_method method)
     return(0);
 }
 
+void PINT_event_free_bucket_resources(struct qhash_table *qht, unsigned long distance_from_link)
+{
+  char **name = NULL;
+  char *start_of_structure = NULL; 
+  struct qhash_head *bucket_entry = NULL;
+  struct qhash_head *bucket = NULL;
+  struct qhash_head *next = NULL;
+  int i;
+
+  for (i=0; i<qht->table_size; i++)
+  {
+     bucket = &(qht->array[i]);
+     if (bucket==bucket->next && bucket==bucket->prev)
+        continue;  //this bucket is empty
+     
+     /*for each entry, deallocate the name string and the entry structure*/
+     for (bucket_entry=bucket->next; bucket_entry != bucket; bucket_entry = next)
+     {
+         start_of_structure = (char *)((char *)bucket_entry - distance_from_link);
+         name = (char **)start_of_structure;
+         if (*name)
+         {
+            free(*name);
+            *name=NULL;
+         }
+         name=NULL;
+
+         next = bucket_entry->next;
+         free(start_of_structure);
+         start_of_structure=NULL;
+     }/*end for*/
+
+
+  } /*end for*/
+
+  return;
+}
+
+
 void PINT_event_finalize(void)
 {
-
 #if defined(HAVE_TAU)
     PINT_event_tau_fini();
 #endif
 
-    qhash_finalize(groups_table);
-    qhash_finalize(events_table);
+    /*free the buckets in the tables and the tables themselves*/
+    /* need to free contents as well */
+    qhash_destroy_and_finalize( groups_table, struct PINT_group, link, 
+        PINT_group_free );
+    qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+        PINT_event_free);
     return;
 }
 

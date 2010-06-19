@@ -1,5 +1,6 @@
 #!/bin/sh
-
+#changed permissions
+#copied from dbench
 cd ${EXTRA_TESTS}/dbench-3.03
 ./configure -q
 make 2>&1

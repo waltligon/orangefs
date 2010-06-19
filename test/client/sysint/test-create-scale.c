@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     char entry_name[256];
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     int max_dfiles = 0;
     int iters = 0;
     int i,j;
@@ -97,18 +97,17 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = cred->userid;
-    attr.group = cred->group_array[0];
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
     attr.dfile_count = max_dfiles;
     attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
 
-    ret = PINT_lookup_parent(basename, cur_fs, cred, 
+    ret = PINT_lookup_parent(basename, cur_fs, &credentials, 
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -120,13 +119,13 @@ int main(int argc, char **argv)
     /* do one big one to prime connections if needed */
     sprintf(entry_name, "%s%d", str_buf, 0);
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			  cred, NULL, NULL, &resp_create);
+			  &credentials, NULL, &resp_create, NULL, NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
 	return(-1);
     }
-    ret = PVFS_sys_remove(entry_name, parent_refn, cred);
+    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials, NULL);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_remove", ret);
@@ -141,7 +140,7 @@ int main(int argc, char **argv)
 	    attr.dfile_count = i+1;
 	    start_time = Wtime();
 	    ret = PVFS_sys_create(entry_name, parent_refn, attr,
-				  cred, NULL, NULL, &resp_create);
+				  &credentials, NULL, &resp_create, NULL, NULL);
 	    end_time = Wtime();
 	    if (ret < 0)
 	    {
@@ -154,7 +153,7 @@ int main(int argc, char **argv)
 	for(j=0; j<iters; j++)
 	{
 	    sprintf(entry_name, "%s%d", str_buf, j);
-	    ret = PVFS_sys_remove(entry_name, parent_refn, cred);
+	    ret = PVFS_sys_remove(entry_name, parent_refn, &credentials, NULL);
 	    if(ret < 0)
 	    {
 		PVFS_perror("PVFS_sys_remove", ret);

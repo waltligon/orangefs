@@ -30,7 +30,7 @@
 
 #define MAX_REGIONS 64
 
-#define FLOW_CLEANUP(__flow_data)                                     \
+#define FLOW_CLEANUP_CANCEL_PATH(__flow_data, __cancel_path)          \
 do {                                                                  \
     struct flow_descriptor *__flow_d = (__flow_data)->parent;         \
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n",\
@@ -39,8 +39,10 @@ do {                                                                  \
     __flow_d = (__flow_data)->parent;                                 \
     free(__flow_data);                                                \
     __flow_d->release(__flow_d);                                      \
-    __flow_d->callback(__flow_d);                                     \
+    __flow_d->callback(__flow_d, __cancel_path);                      \
 } while(0)
+
+#define FLOW_CLEANUP(___flow_data) FLOW_CLEANUP_CANCEL_PATH(___flow_data, 0)
 
 struct result_chain_entry
 {
@@ -479,7 +481,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
         if(flow_data->parent->state == FLOW_COMPLETE)
         {
             gen_mutex_unlock(&flow_data->parent->flow_mutex);
-            FLOW_CLEANUP(flow_data);
+            FLOW_CLEANUP_CANCEL_PATH(flow_data, 1);
             return(0);
         }
     }

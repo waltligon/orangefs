@@ -94,6 +94,10 @@ static PINT_sm_action msgpairarray_init(
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_init...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
+
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
                  "(%d msgpair(s))\n", smcb, mop->count);
 
@@ -115,6 +119,7 @@ static PINT_sm_action msgpairarray_init(
         msg_p->encoded_resp_p = NULL;
         msg_p->retry_count = 0;
         msg_p->complete = 0;
+
     }
     return SM_ACTION_COMPLETE;
 }
@@ -232,6 +237,7 @@ static PINT_sm_action msgpairarray_post(
             msg_p->max_resp_sz = PINT_encode_calc_max_size(
                 PINT_ENCODE_RESP, msg_p->req.op, msg_p->enc_type);
 
+
             msg_p->encoded_resp_p = BMI_memalloc(
                 msg_p->svr_addr, msg_p->max_resp_sz, BMI_RECV);
 
@@ -244,6 +250,10 @@ static PINT_sm_action msgpairarray_post(
         }
 
         session_tag = PINT_util_get_next_tag();
+
+        /*store the session tag for this msgpair, so the msgpair completion */
+        /*function can pass it to the caller of msgpairarray.               */
+        msg_p->session_tag = session_tag;
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d: "
                      "posting recv\n", __func__, smcb, i);
@@ -300,6 +310,7 @@ static PINT_sm_action msgpairarray_post(
             if (local_enc_and_alloc)
             {
                 PINT_encode_release(&msg_p->encoded_req, PINT_ENCODE_REQ);
+                memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
                 BMI_memfree(msg_p->svr_addr,msg_p->encoded_resp_p,
                             msg_p->max_resp_sz, BMI_RECV);
                 msg_p->encoded_resp_p = NULL;
@@ -488,6 +499,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 
     gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: "
                  "completion_fn\n", smcb);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_completion_fn..\n");
 
     for (i = 0; i < mop->count; i++)
     {
@@ -545,6 +557,7 @@ static PINT_sm_action msgpairarray_completion_fn(
          */
         if (msg_p->comp_fn != NULL)
         {
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\texecuting msg_p->comp_fn..\n");
             /* If we call the completion function, store the result on
              * a per message pair basis.  Also store some non-zero
              * (failure) value in js_p->error_code if we see one.
@@ -589,6 +602,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             return SM_ACTION_COMPLETE;
         }
 
+        memset(&msg_p->encoded_req,0,sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
         msg_p->max_resp_sz = 0;
 
@@ -600,7 +614,7 @@ static PINT_sm_action msgpairarray_completion_fn(
 
         gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair %d "
                      "marked complete\n", __func__, smcb, i);
-    }
+    }/*end for*/
 
     if (need_retry) {
         /*
@@ -782,10 +796,13 @@ int PINT_serv_free_msgpair_resources(
     if (encoded_req_p && decoded_resp_p && svr_addr_p)
     {
         PINT_encode_release(encoded_req_p, PINT_ENCODE_REQ);
+        memset(encoded_req_p,0,sizeof(*encoded_req_p));
 
         PINT_decode_release(decoded_resp_p, PINT_DECODE_RESP);
+        memset(decoded_resp_p,0,sizeof(*decoded_resp_p));
 
         BMI_memfree(*svr_addr_p, encoded_resp_p, max_resp_sz, BMI_RECV);
+        encoded_resp_p = NULL;
 
         ret = 0;
     }

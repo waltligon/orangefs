@@ -6,7 +6,6 @@
 /* NOTE: if you make any changes to the encoding definitions in this file, 
  * please update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
  */
-
 /** \file
  *
  *  Definitions of types used throughout PVFS2.
@@ -103,8 +102,9 @@ enum PVFS_encoding_type
 {
     ENCODING_DIRECT = 1,
     ENCODING_LE_BFIELD = 2,
-    ENCODING_XDR = 3,
+    ENCODING_XDR = 3
 };
+
 /* these values must correspond to the defined encoding types above */
 #define ENCODING_INVALID_MIN                    0
 #define ENCODING_INVALID_MAX                    4
@@ -290,11 +290,14 @@ typedef enum
 #include <linux/fs.h>
 #endif
 
+
+/*The value for PVFS_MIRROR_FL will not conflict with the FS values.*/
 #if defined(FS_IMMUTABLE_FL)
 
 #define PVFS_IMMUTABLE_FL FS_IMMUTABLE_FL
 #define PVFS_APPEND_FL    FS_APPEND_FL
 #define PVFS_NOATIME_FL   FS_NOATIME_FL
+#define PVFS_MIRROR_FL    0x01000000ULL
 
 #else
 
@@ -302,6 +305,7 @@ typedef enum
 #define PVFS_IMMUTABLE_FL 0x10ULL
 #define PVFS_APPEND_FL    0x20ULL
 #define PVFS_NOATIME_FL   0x80ULL
+#define PVFS_MIRROR_FL    0x01000000ULL
 
 #endif
 
@@ -337,7 +341,8 @@ typedef struct
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
 #define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
-#define PVFS_ATTR_SYS_CAPABILITY            (1 << 29)
+#define PVFS_ATTR_SYS_MIRROR_COPIES_COUNT   (1 << 29)
+#define PVFS_ATTR_SYS_CAPABILITY            (1 << 30)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -356,24 +361,22 @@ typedef struct
 #define PVFS_ATTR_SYS_ALL                    \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
+ PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOHINT                \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
+ PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
  PVFS_ATTR_SYS_DIRENT_COUNT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
 (PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT \
- | PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT | \
+ PVFS_ATTR_SYS_MIRROR_COPIES_COUNT | \
+ PVFS_ATTR_SYS_DIR_HINT | PVFS_ATTR_SYS_BLKSIZE)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) 
 #define PVFS_ATTR_SYS_ALL_TIMES \
 ((PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE) | PVFS_ATTR_SYS_ATIME_SET | PVFS_ATTR_SYS_MTIME_SET)
-
-
-/* Extended attribute flags */
-#define PVFS_XATTR_CREATE  0x1
-#define PVFS_XATTR_REPLACE 0x2
 
 /* Extended attribute flags */
 #define PVFS_XATTR_CREATE  0x1
@@ -435,7 +438,7 @@ typedef struct
                                         by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
-#define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
+#define PVFS_MAX_XATTR_LISTLEN   8  /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
@@ -489,11 +492,12 @@ struct PVFS_mgmt_setparam_value
         char *string_value;
     } u;
 };
+
 encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
 
 enum PVFS_server_mode
 {
@@ -858,6 +862,40 @@ enum PVFS_io_type
  * reserved handle values
  */
 #define PVFS_MGMT_RESERVED 1
+
+/*
+ * Structure and macros for timing things for profile-like output.
+ *
+ */
+struct profiler
+{
+    struct  timeval  start;
+    struct  timeval  finish;
+    uint64_t  save_timing;
+};
+
+#define INIT_PROFILER(prof_struct) prof_struct.cumulative_diff = 0;
+
+#define START_PROFILER(prof_struct) \
+    gettimeofday(&prof_struct.start, NULL);
+
+#define FINISH_PROFILER(label, prof_struct, print_timing) \
+{ \
+    double t_start, t_finish; \
+    gettimeofday(&prof_struct.finish, NULL); \
+    t_start = prof_struct.start.tv_sec + (prof_struct.start.tv_usec/1000000.0); \
+    t_finish = prof_struct.finish.tv_sec + (prof_struct.finish.tv_usec/1000000.0); \
+    prof_struct.save_timing = t_finish - t_start * 1000000.0; \
+    if (print_timing) { \
+      gossip_err("PROFILING %s: %f\n", label, t_finish - t_start); \
+    } \
+}
+
+#define PRINT_PROFILER(label, prof_struct) \
+      gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
+
+
+
 
 /*
  * New types for robust security implementation.

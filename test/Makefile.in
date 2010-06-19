@@ -74,7 +74,6 @@ INCLUDES := \
     ${pvfs2_srcdir}/src/common/gossip \
     ${pvfs2_srcdir}/src/common/gen-locks \
     ${pvfs2_srcdir}/src/common/llist \
-    ${pvfs2_srcdir}/src/common/security \
     ${pvfs2_srcdir}/src/io/trove \
     ${pvfs2_srcdir}/src/io/bmi \
     ${pvfs2_srcdir}/src/io/description \
@@ -85,7 +84,9 @@ INCLUDES := \
     ${pvfs2_srcdir}/src/proto \
     ${pvfs2_srcdir}/src/server \
     ${pvfs2_srcdir}/src/server/request-scheduler \
-	 ${pvfs2_srcdir}
+    ${pvfs2_srcdir} \
+    ${pvfs2_srcdir} \
+    ${pvfs2_builddir}/include
 
 #################################################################
 # Setup global flags
@@ -96,7 +97,7 @@ CC = @CC@
 CFLAGS = @CFLAGS@ @DB_CFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ 
-LD = gcc -lssl -lcrypto
+LD = gcc
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -Llib 

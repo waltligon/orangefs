@@ -222,7 +222,7 @@ PVFS_error PVFS_isys_symlink(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
     sm_p->u.sym.sym_resp = resp;
@@ -551,7 +551,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
-        *sm_p->newcred_p,
+        *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,

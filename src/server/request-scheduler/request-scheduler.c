@@ -145,6 +145,29 @@ int PINT_req_sched_initialize(
     return (0);
 }
 
+/** Free resources held by the timer queue
+ */
+int PINT_timer_queue_finalize(void)
+{
+   struct qlist_head *scratch=NULL;
+   struct qlist_head *iterator=NULL;
+   struct req_sched_element *element=NULL;
+
+   qlist_for_each_safe(iterator,scratch,&timer_queue)
+   {
+       element = qlist_entry(iterator,struct req_sched_element,list_link);
+       if (element && element->user_ptr)
+          free(element->user_ptr);
+       if (element)
+          free(element);
+       element=NULL;
+   }
+
+  return(0);
+}
+
+
+
 /** Tears down the request scheduler and its data structures 
  *
  *  \return 0 on success, -errno on failure

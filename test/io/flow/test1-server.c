@@ -104,7 +104,7 @@ int main(
     }
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0)
     {
 	fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
@@ -166,7 +166,7 @@ int main(
 			      TROVE_TEST_FILE,
 			      NULL, 
 			      TROVE_FORCE_REQUESTED_HANDLE,
-			      NULL, trove_context, &op_id);
+			      NULL, trove_context, &op_id, NULL);
     while (ret == 0)
 	ret =
 	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
@@ -186,7 +186,7 @@ int main(
     val.buffer_sz = sizeof(file_handle);
     ret =
 	trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL,
-			   trove_context, &op_id);
+			   trove_context, &op_id, NULL);
     while (ret == 0)
 	ret =
 	    trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL,
@@ -321,7 +321,7 @@ static int block_on_flow(
     int ret = -1;
     struct timespec req = {0, 1000};
 
-    flow_d->callback = callback_fn;
+    flow_d->callback = (void *)callback_fn;
     ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {

@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "pint-util.h"
 #include "pint-security.h"
 
 enum

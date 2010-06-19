@@ -643,9 +643,16 @@ Filesystem_status_qla_monitor()
       /usr/bin/fs-power-control.pl --fs-name $fsname --conf-dir $conf_dir --host `hostname` --command reboot
       # shoot ourselves in the head
       return $OCF_ERR_GENERIC
-    else
-      return $ORIG_RET
-    fi    
+    fi
+    dd bs=4096 count=1 if=/dev/zero oflag=direct of=${MOUNTPOINT}/filesystem.monitor
+    if [ $? -ne 0 ]; then
+      ocf_log err "Error: Unable to write to $DEVICE on node `hostname`."
+      /usr/bin/logger -p user.err -t PVFS2 "Error: Unable to write to $DEVICE on node `hostname`, failing over."
+      /usr/bin/fs-instance-alarm.pl --fs-name $fsname --ce `hostname` --type PVFS2_HA --msg "Error: Unable to write to $DEVICE on node `hostname`, failing over."
+      # shoot ourselves in the head
+      /usr/bin/fs-power-control.pl --fs-name $fsname --conf-dir $conf_dir --host `hostname` --command reboot
+      return $OCF_ERR_GENERIC
+    fi
   fi
   return $ORIG_RET
 }
@@ -717,6 +724,18 @@ then
   exit $OCF_ERR_ARGS
 fi
 
+OP=$1
+
+# These operations do not require instance parameters
+case $OP in
+  meta-data)		meta_data
+			exit $OCF_SUCCESS
+			;;
+  usage)		usage
+			exit $OCF_SUCCESS
+			;;
+esac
+
 if 
   [ -z "$OCF_RESKEY_fsname" ]
 then
@@ -741,18 +760,6 @@ if [ ! -z "$OCF_RESKEY_options" ]; then
 fi
 fsname=$OCF_RESKEY_fsname
 conf_dir=$OCF_RESKEY_conf_dir
-
-OP=$1
-
-# These operations do not require instance parameters
-case $OP in
-  meta-data)		meta_data
-			exit $OCF_SUCCESS
-			;;
-  usage)		usage
-			exit $OCF_SUCCESS
-			;;
-esac
 
 blockdevice=no
 case $DEVICE in

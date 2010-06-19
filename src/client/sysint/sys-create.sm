@@ -203,7 +203,7 @@ PVFS_error PVFS_isys_create(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
@@ -454,7 +454,7 @@ static PINT_sm_action create_create_setup_msgpair(
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
-        *sm_p->newcred_p,
+        *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.create.attr,
         sm_p->u.create.num_data_files,
@@ -817,7 +817,7 @@ static PINT_sm_action create_parent_getattr_inspect(
      * All of the above can be overridden by the distribution itself.
      */
 
-    if(sm_p->u.create.user_requested_num_data_files > 1)
+    if(sm_p->u.create.user_requested_num_data_files > 0)
     {
         /* specified by sys_create caller */
         num_dfiles_requested = sm_p->u.create.user_requested_num_data_files;     

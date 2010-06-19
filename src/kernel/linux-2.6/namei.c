@@ -201,6 +201,7 @@ static struct dentry *pvfs2_lookup(
     if (inode && !is_bad_inode(inode))
     {
         struct dentry *res;
+
         gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d Found good inode [%lu] with count [%d]\n", 
             __FILE__, __func__, __LINE__, inode->i_ino, (int)atomic_read(&inode->i_count));
 

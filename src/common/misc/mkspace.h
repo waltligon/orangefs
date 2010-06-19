@@ -13,7 +13,8 @@
 #define PVFS2_MKSPACE_STDERR_VERBOSE 2
 
 int pvfs2_mkspace(
-    char *storage_space,
+    char *data_path,
+    char *meta_path,
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
@@ -23,7 +24,8 @@ int pvfs2_mkspace(
     int verbose);
 
 int pvfs2_rmspace(
-    char *storage_space,
+    char *data_path,
+    char *meta_path,
     char *collection,
     TROVE_coll_id coll_id,
     int remove_collection_only,

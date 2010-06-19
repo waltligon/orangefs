@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION PVFS2_VERSION_MAJOR PVFS2_VERSION_MINOR PVFS2_VERSION_SUB build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC BUILD_CFLAGS BUILD_LDFLAGS LIBCFLAGS THREAD_LIB BUILD_SERVER OPENSSL_CPPFLAGS OPENSSL_LDFLAGS OPENSSL_LIB ENABLE_SECURITY BUILD_BMI_ONLY NEED_BERKELEY_DB MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS TAU_INCS BUILD_TAU BUILD_KERNEL THREADED_KMOD_HELPER LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP FUSE_LDFLAGS FUSE_CFLAGS BUILD_FUSE ENABLE_COVERAGE STRICT_CFLAGS QUIET_COMPILE BUILD_EPOLL PVFS2_SEGV_BACKTRACE build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX BUILD_BMI_TCP BUILD_GM GM_INCDIR GM_LIBDIR BUILD_MX MX_INCDIR MX_LIBDIR BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR BUILD_PORTALS PORTALS_INCS PORTALS_LIBS SERVER_LDFLAGS GOSSIP_ENABLE_BACKTRACE BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION PVFS2_VERSION_MAJOR PVFS2_VERSION_MINOR PVFS2_VERSION_SUB build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC BUILD_CFLAGS BUILD_LDFLAGS LIBCFLAGS THREAD_LIB BUILD_SERVER OPENSSL_CPPFLAGS OPENSSL_LDFLAGS OPENSSL_LIB ENABLE_SECURITY BUILD_BMI_ONLY NEED_BERKELEY_DB MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS TAU_INCS BUILD_TAU BUILD_KERNEL THREADED_KMOD_HELPER LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP FUSE_LDFLAGS FUSE_CFLAGS BUILD_FUSE ENABLE_COVERAGE STRICT_CFLAGS QUIET_COMPILE BUILD_EPOLL PVFS2_SEGV_BACKTRACE build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX BUILD_BMI_TCP BUILD_GM GM_INCDIR GM_LIBDIR BUILD_MX MX_INCDIR MX_LIBDIR BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR BUILD_PORTALS PORTALS_INCS PORTALS_LIBS BUILD_ZOID ZOID_SRCDIR SERVER_LDFLAGS GOSSIP_ENABLE_BACKTRACE BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -919,6 +919,7 @@ Optional Packages:
                           Extra CFLAGS to specify Portals includes
   --with-portals-libs=<dir>
                           Extra LIBS to link Portals libraries
+  --with-zoid=<dir>         Location of the ZOID tree (default no ZOID)
 
 Some influential environment variables:
   CC          C compiler command
@@ -1398,8 +1399,8 @@ CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
 PVFS2_VERSION_SUB=1
-PVFS2_PRE=""
-#PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
+#PVFS2_PRE=""
+PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
 
@@ -8989,9 +8990,10 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	fi
 
-		echo "$as_me:$LINENO: checking for 6th argument to sysctl proc handlers" >&5
-echo $ECHO_N "checking for 6th argument to sysctl proc handlers... $ECHO_C" >&6
-		cat >conftest.$ac_ext <<_ACEOF
+
+		echo "$as_me:$LINENO: checking for file argument to sysctl proc handlers" >&5
+echo $ECHO_N "checking for file argument to sysctl proc handlers... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -9006,7 +9008,14 @@ int
 main ()
 {
 
-	    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                struct file * filp = NULL;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, filp, buffer, lenp, ppos);
 
   ;
   return 0;
@@ -9038,7 +9047,75 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
 echo "${ECHO_T}yes" >&6
 
 cat >>confdefs.h <<\_ACEOF
-#define HAVE_PROC_HANDLER_SIX_ARG 1
+#define HAVE_PROC_HANDLER_FILE_ARG 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	echo "$as_me:$LINENO: checking for ppos argument to sysctl proc handlers" >&5
+echo $ECHO_N "checking for ppos argument to sysctl proc handlers... $ECHO_C" >&6
+		cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    #include <linux/sysctl.h>
+
+int
+main ()
+{
+
+                struct ctl_table * ctl = NULL;
+                int write = 0;
+                void __user * buffer = NULL;
+                size_t * lenp = NULL;
+                loff_t * ppos = NULL;
+
+                proc_dointvec_minmax(ctl, write, buffer, lenp, ppos);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_PROC_HANDLER_PPOS_ARG 1
 _ACEOF
 
 else
@@ -10815,7 +10892,7 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-		echo "$as_me:$LINENO: checking if kernel has device classes" >&5
+	                        	echo "$as_me:$LINENO: checking if kernel has device classes" >&5
 echo $ECHO_N "checking if kernel has device classes... $ECHO_C" >&6
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -10831,7 +10908,7 @@ int
 main ()
 {
 
-	    class_create(NULL, NULL);
+	    class_device_destroy(NULL, "pvfs2")
 
   ;
   return 0;
@@ -10864,128 +10941,6 @@ echo "${ECHO_T}yes" >&6
 
 cat >>confdefs.h <<\_ACEOF
 #define HAVE_KERNEL_DEVICE_CLASSES 1
-_ACEOF
-
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6
-
-fi
-rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-
-	echo "$as_me:$LINENO: checking for device_create" >&5
-echo $ECHO_N "checking for device_create... $ECHO_C" >&6
-	cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-
-	    #define __KERNEL__
-	    #include <linux/device.h>
-
-int
-main ()
-{
-
-	    device_create(NULL, NULL, 0, NULL, NULL);
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
-  (eval $ac_compile) 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-	 { ac_try='test -z "$ac_c_werror_flag"
-			 || test ! -s conftest.err'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; } &&
-	 { ac_try='test -s conftest.$ac_objext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  echo "$as_me:$LINENO: result: yes" >&5
-echo "${ECHO_T}yes" >&6
-
-cat >>confdefs.h <<\_ACEOF
-#define HAVE_KERNEL_DEVICE_CREATE 1
-_ACEOF
-
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6
-
-fi
-rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-
-	echo "$as_me:$LINENO: checking for class_device_create" >&5
-echo $ECHO_N "checking for class_device_create... $ECHO_C" >&6
-	cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-
-	    #define __KERNEL__
-	    #include <linux/device.h>
-
-int
-main ()
-{
-
-	    class_device_create(NULL, NULL, 0, NULL, NULL);
-
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext
-if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
-  (eval $ac_compile) 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-	 { ac_try='test -z "$ac_c_werror_flag"
-			 || test ! -s conftest.err'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; } &&
-	 { ac_try='test -s conftest.$ac_objext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  echo "$as_me:$LINENO: result: yes" >&5
-echo "${ECHO_T}yes" >&6
-
-cat >>confdefs.h <<\_ACEOF
-#define HAVE_KERNEL_CLASS_DEVICE_CREATE 1
 _ACEOF
 
 else
@@ -11955,6 +11910,68 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        echo "$as_me:$LINENO: checking for s_dirty in struct super_block" >&5
+echo $ECHO_N "checking for s_dirty in struct super_block... $ECHO_C" >&6
+        cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+                #define __KERNEL__
+                #include <linux/fs.h>
+
+int
+main ()
+{
+
+                struct super_block *s;
+                list_empty(&s->s_dirty);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_SB_DIRTY_LIST 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
                         tmp_cflags=$CFLAGS
         CFLAGS="$CFLAGS -Werror"
         echo "$as_me:$LINENO: checking for current_fsuid" >&5
@@ -12007,6 +12024,136 @@ echo "${ECHO_T}yes" >&6
 
 cat >>confdefs.h <<\_ACEOF
 #define HAVE_CURRENT_FSUID 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+                echo "$as_me:$LINENO: checking if kernel backing_dev_info struct has a name field" >&5
+echo $ECHO_N "checking if kernel backing_dev_info struct has a name field... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+
+int
+main ()
+{
+
+                struct backing_dev_info foo =
+                {
+                    .name = "foo"
+                };
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_BACKING_DEV_INFO_NAME 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+                tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+        echo "$as_me:$LINENO: checking for bdi_init" >&5
+echo $ECHO_N "checking for bdi_init... $ECHO_C" >&6
+        cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+                #define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/backing-dev.h>
+
+int
+main ()
+{
+
+                int ret = bdi_init(NULL);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_BDI_INIT 1
 _ACEOF
 
 else
@@ -16641,6 +16788,468 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 
 
+
+
+# Check whether --with-zoid or --without-zoid was given.
+if test "${with_zoid+set}" = set; then
+  withval="$with_zoid"
+  if test -z "$withval" -o "$withval" = yes ; then
+	    { { echo "$as_me:$LINENO: error: Option --with-zoid requires the path to your ZOID source tree." >&5
+echo "$as_me: error: Option --with-zoid requires the path to your ZOID source tree." >&2;}
+   { (exit 1); exit 1; }; }
+	elif test "$withval" != no ; then
+	    ZOID_SRCDIR="$withval"
+	fi
+
+fi;
+    if test -n "$ZOID_SRCDIR" ; then
+	save_cppflags="$CPPFLAGS"
+	CPPFLAGS="$CPPFLAGS -Isrc/io/bmi -I$ZOID_SRCDIR/include -I$ZOID_SRCDIR/zbmi -I$ZOID_SRCDIR/zbmi/implementation"
+	if test "${ac_cv_header_zbmi_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for zbmi.h" >&5
+echo $ECHO_N "checking for zbmi.h... $ECHO_C" >&6
+if test "${ac_cv_header_zbmi_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zbmi_h" >&5
+echo "${ECHO_T}$ac_cv_header_zbmi_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking zbmi.h usability" >&5
+echo $ECHO_N "checking zbmi.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <zbmi.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking zbmi.h presence" >&5
+echo $ECHO_N "checking zbmi.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <zbmi.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: zbmi.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: zbmi.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: zbmi.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: zbmi.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: zbmi.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: zbmi.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: zbmi.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: zbmi.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------------ ##
+## Report this to the AC_PACKAGE_NAME lists.  ##
+## ------------------------------------------ ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for zbmi.h" >&5
+echo $ECHO_N "checking for zbmi.h... $ECHO_C" >&6
+if test "${ac_cv_header_zbmi_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_zbmi_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zbmi_h" >&5
+echo "${ECHO_T}$ac_cv_header_zbmi_h" >&6
+
+fi
+if test $ac_cv_header_zbmi_h = yes; then
+  :
+else
+  { { echo "$as_me:$LINENO: error: Header zbmi.h not found." >&5
+echo "$as_me: error: Header zbmi.h not found." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+
+	if test "${ac_cv_header_zoid_api_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for zoid_api.h" >&5
+echo $ECHO_N "checking for zoid_api.h... $ECHO_C" >&6
+if test "${ac_cv_header_zoid_api_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zoid_api_h" >&5
+echo "${ECHO_T}$ac_cv_header_zoid_api_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking zoid_api.h usability" >&5
+echo $ECHO_N "checking zoid_api.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <zoid_api.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking zoid_api.h presence" >&5
+echo $ECHO_N "checking zoid_api.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <zoid_api.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: zoid_api.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: zoid_api.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: zoid_api.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: zoid_api.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: zoid_api.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: zoid_api.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: zoid_api.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zoid_api.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: zoid_api.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------------ ##
+## Report this to the AC_PACKAGE_NAME lists.  ##
+## ------------------------------------------ ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for zoid_api.h" >&5
+echo $ECHO_N "checking for zoid_api.h... $ECHO_C" >&6
+if test "${ac_cv_header_zoid_api_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_zoid_api_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zoid_api_h" >&5
+echo "${ECHO_T}$ac_cv_header_zoid_api_h" >&6
+
+fi
+if test $ac_cv_header_zoid_api_h = yes; then
+  :
+else
+  { { echo "$as_me:$LINENO: error: Header zoid_api.h not found." >&5
+echo "$as_me: error: Header zoid_api.h not found." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+
+	if test "${ac_cv_header_zbmi_protocol_h+set}" = set; then
+  echo "$as_me:$LINENO: checking for zbmi_protocol.h" >&5
+echo $ECHO_N "checking for zbmi_protocol.h... $ECHO_C" >&6
+if test "${ac_cv_header_zbmi_protocol_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zbmi_protocol_h" >&5
+echo "${ECHO_T}$ac_cv_header_zbmi_protocol_h" >&6
+else
+  # Is the header compilable?
+echo "$as_me:$LINENO: checking zbmi_protocol.h usability" >&5
+echo $ECHO_N "checking zbmi_protocol.h usability... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+#include <zbmi_protocol.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  ac_header_compiler=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+ac_header_compiler=no
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_compiler" >&5
+echo "${ECHO_T}$ac_header_compiler" >&6
+
+# Is the header present?
+echo "$as_me:$LINENO: checking zbmi_protocol.h presence" >&5
+echo $ECHO_N "checking zbmi_protocol.h presence... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#include <zbmi_protocol.h>
+_ACEOF
+if { (eval echo "$as_me:$LINENO: \"$ac_cpp conftest.$ac_ext\"") >&5
+  (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } >/dev/null; then
+  if test -s conftest.err; then
+    ac_cpp_err=$ac_c_preproc_warn_flag
+    ac_cpp_err=$ac_cpp_err$ac_c_werror_flag
+  else
+    ac_cpp_err=
+  fi
+else
+  ac_cpp_err=yes
+fi
+if test -z "$ac_cpp_err"; then
+  ac_header_preproc=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+  ac_header_preproc=no
+fi
+rm -f conftest.err conftest.$ac_ext
+echo "$as_me:$LINENO: result: $ac_header_preproc" >&5
+echo "${ECHO_T}$ac_header_preproc" >&6
+
+# So?  What about this header?
+case $ac_header_compiler:$ac_header_preproc:$ac_c_preproc_warn_flag in
+  yes:no: )
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: accepted by the compiler, rejected by the preprocessor!" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: accepted by the compiler, rejected by the preprocessor!" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: proceeding with the compiler's result" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: proceeding with the compiler's result" >&2;}
+    ac_header_preproc=yes
+    ;;
+  no:yes:* )
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: present but cannot be compiled" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: present but cannot be compiled" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h:     check for missing prerequisite headers?" >&5
+echo "$as_me: WARNING: zbmi_protocol.h:     check for missing prerequisite headers?" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: see the Autoconf documentation" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: see the Autoconf documentation" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h:     section \"Present But Cannot Be Compiled\"" >&5
+echo "$as_me: WARNING: zbmi_protocol.h:     section \"Present But Cannot Be Compiled\"" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: proceeding with the preprocessor's result" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: proceeding with the preprocessor's result" >&2;}
+    { echo "$as_me:$LINENO: WARNING: zbmi_protocol.h: in the future, the compiler will take precedence" >&5
+echo "$as_me: WARNING: zbmi_protocol.h: in the future, the compiler will take precedence" >&2;}
+    (
+      cat <<\_ASBOX
+## ------------------------------------------ ##
+## Report this to the AC_PACKAGE_NAME lists.  ##
+## ------------------------------------------ ##
+_ASBOX
+    ) |
+      sed "s/^/$as_me: WARNING:     /" >&2
+    ;;
+esac
+echo "$as_me:$LINENO: checking for zbmi_protocol.h" >&5
+echo $ECHO_N "checking for zbmi_protocol.h... $ECHO_C" >&6
+if test "${ac_cv_header_zbmi_protocol_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_cv_header_zbmi_protocol_h=$ac_header_preproc
+fi
+echo "$as_me:$LINENO: result: $ac_cv_header_zbmi_protocol_h" >&5
+echo "${ECHO_T}$ac_cv_header_zbmi_protocol_h" >&6
+
+fi
+if test $ac_cv_header_zbmi_protocol_h = yes; then
+  :
+else
+  { { echo "$as_me:$LINENO: error: Header zbmi_protocol.h not found." >&5
+echo "$as_me: error: Header zbmi_protocol.h not found." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+
+	CPPFLAGS="$save_cppflags"
+	BUILD_ZOID=1
+    fi
+
+
+
+
 echo "$as_me:$LINENO: checking for fgetxattr extra arguments" >&5
 echo $ECHO_N "checking for fgetxattr extra arguments... $ECHO_C" >&6
 cat >conftest.$ac_ext <<_ACEOF
@@ -18738,7 +19347,7 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/common/security/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/devel/module.mk src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/apps/user/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/common/security/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/bmi/bmi_zoid/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -19269,10 +19878,12 @@ do
   "module.mk" ) CONFIG_FILES="$CONFIG_FILES module.mk" ;;
   "src/apps/admin/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/admin/module.mk" ;;
   "src/apps/admin/pvfs2-config" ) CONFIG_FILES="$CONFIG_FILES src/apps/admin/pvfs2-config" ;;
+  "src/apps/devel/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/devel/module.mk" ;;
   "src/apps/karma/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/karma/module.mk" ;;
   "src/apps/vis/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/vis/module.mk" ;;
   "src/apps/fuse/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/fuse/module.mk" ;;
   "src/apps/kernel/linux/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/kernel/linux/module.mk" ;;
+  "src/apps/user/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/apps/user/module.mk" ;;
   "src/io/trove/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/trove/module.mk" ;;
   "src/io/trove/trove-handle-mgmt/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/trove/trove-handle-mgmt/module.mk" ;;
   "src/io/trove/trove-dbpf/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/trove/trove-dbpf/module.mk" ;;
@@ -19294,6 +19905,7 @@ do
   "src/io/bmi/bmi_mx/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_mx/module.mk" ;;
   "src/io/bmi/bmi_ib/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_ib/module.mk" ;;
   "src/io/bmi/bmi_portals/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_portals/module.mk" ;;
+  "src/io/bmi/bmi_zoid/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_zoid/module.mk" ;;
   "src/io/description/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/description/module.mk" ;;
   "src/io/flow/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/flow/module.mk" ;;
   "src/io/flow/flowproto-bmi-trove/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/flow/flowproto-bmi-trove/module.mk" ;;
@@ -19492,6 +20104,8 @@ s,@OPENIB_LIBDIR@,$OPENIB_LIBDIR,;t t
 s,@BUILD_PORTALS@,$BUILD_PORTALS,;t t
 s,@PORTALS_INCS@,$PORTALS_INCS,;t t
 s,@PORTALS_LIBS@,$PORTALS_LIBS,;t t
+s,@BUILD_ZOID@,$BUILD_ZOID,;t t
+s,@ZOID_SRCDIR@,$ZOID_SRCDIR,;t t
 s,@SERVER_LDFLAGS@,$SERVER_LDFLAGS,;t t
 s,@GOSSIP_ENABLE_BACKTRACE@,$GOSSIP_ENABLE_BACKTRACE,;t t
 s,@BUILD_VIS@,$BUILD_VIS,;t t
@@ -20140,7 +20754,7 @@ fi
 
 
 if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
-	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 ; then
+	x$BUILD_OPENIB = x1 -o x$BUILD_PORTALS = x1 -o x$BUILD_ZOID = x1 ; then
     if test x$BUILD_BMI_TCP = x1 ; then
 	{ echo "$as_me:$LINENO: WARNING: You have selected to build $PKGSTR to use a \"fast\" network
 		    interface, but have not disabled TCP.  The way this is

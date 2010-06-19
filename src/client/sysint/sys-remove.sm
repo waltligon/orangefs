@@ -190,7 +190,7 @@ PVFS_error PVFS_isys_remove(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
     sm_p->u.remove.stored_error_code = 0;

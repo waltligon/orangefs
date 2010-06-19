@@ -2140,8 +2140,8 @@ retrieving revision 1.5
 @@ -1,19 +1,27 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs.h,v 1.3 2002/10/24 17:00:57 gropp Exp $    
++ *   $Id: ad_pvfs.h,v 1.5 2004/06/07 19:26:28 gropp Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2176,8 +2176,8 @@ retrieving revision 1.12
 @@ -1,26 +1,38 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs_flush.c,v 1.11 2003/04/18 20:15:01 David Exp $    
++ *   $Id: ad_pvfs_flush.c,v 1.12 2004/05/20 19:05:17 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2224,8 +2224,8 @@ retrieving revision 1.13
 @@ -1,26 +1,35 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs_resize.c,v 1.11 2003/04/18 20:15:01 David Exp $    
++ *   $Id: ad_pvfs_resize.c,v 1.13 2004/06/07 16:42:26 gropp Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2281,8 +2281,8 @@ retrieving revision 1.3
 @@ -1,19 +1,22 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_close.c,v 1.2 2003/06/27 23:23:16 robl Exp $
++ *   $Id: ad_pvfs2_close.c,v 1.3 2004/05/20 19:13:57 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2313,8 +2313,8 @@ retrieving revision 1.9
 @@ -1,75 +1,63 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_common.c,v 1.7 2003/09/05 20:43:58 robl Exp $
++ *   $Id: ad_pvfs2_common.c,v 1.9 2004/03/25 22:17:45 robl Exp $
   *
   *   Copyright (C) 2003 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2422,8 +2422,8 @@ retrieving revision 1.10
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*-
   * vim: ts=8 sts=4 sw=4 noexpandtab
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs2_common.h,v 1.8 2003/09/18 23:13:18 robl Exp $    
++ *   $Id: ad_pvfs2_common.h,v 1.10 2004/03/25 22:22:34 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2468,8 +2468,8 @@ retrieving revision 1.8
 @@ -1,62 +1,52 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs2_delete.c,v 1.5 2003/09/05 20:43:58 robl Exp $    
++ *   $Id: ad_pvfs2_delete.c,v 1.8 2004/05/20 20:31:05 robl Exp $    
   *
   *   Copyright (C) 2003 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2546,8 +2546,8 @@ retrieving revision 1.5
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs2_fcntl.c,v 1.3 2003/08/05 22:59:20 robl Exp $    
++ *   $Id: ad_pvfs2_fcntl.c,v 1.5 2004/05/20 20:31:05 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2587,8 +2587,8 @@ retrieving revision 1.9
 @@ -1,41 +1,49 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_pvfs2_flush.c,v 1.3 2003/10/30 18:53:40 robl Exp $    
++ *   $Id: ad_pvfs2_flush.c,v 1.9 2004/05/20 20:31:05 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2654,8 +2654,8 @@ retrieving revision 1.14
 @@ -1,22 +1,22 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*-
   * vim: ts=8 sts=4 sw=4 noexpandtab
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_open.c,v 1.11 2003/11/02 15:55:18 rross Exp $
++ *   $Id: ad_pvfs2_open.c,v 1.14 2004/05/20 20:31:05 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2864,8 +2864,8 @@ retrieving revision 1.10
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_read.c,v 1.7 2003/08/07 23:34:31 robl Exp $
++ *   $Id: ad_pvfs2_read.c,v 1.10 2004/06/07 20:48:15 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -3639,8 +3639,8 @@ retrieving revision 1.10
 @@ -1,29 +1,46 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_resize.c,v 1.4 2003/09/04 23:20:09 robl Exp $
++ *   $Id: ad_pvfs2_resize.c,v 1.10 2004/05/20 20:31:05 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -3699,8 +3699,8 @@ retrieving revision 1.13
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- 
   *   vim: ts=8 sts=4 sw=4 noexpandtab
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+- *   $Id: ad_pvfs2_write.c,v 1.11 2003/09/05 20:47:47 robl Exp $
++ *   $Id: ad_pvfs2_write.c,v 1.13 2004/05/20 20:31:05 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -3942,8 +3942,8 @@ retrieving revision 1.27
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_open.c,v 1.23 2003/09/05 22:35:49 gropp Exp $    
++ *   $Id: ad_open.c,v 1.27 2004/05/20 07:43:36 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -4149,8 +4149,8 @@ retrieving revision 1.12
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ad_write_str.c,v 1.11 2003/07/26 23:16:57 David Exp $    
++ *   $Id: ad_write_str.c,v 1.12 2003/12/16 21:51:22 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -4199,7 +4199,7 @@ RCS file: romio/adio/common/ad_write_str_naive.c
 @@ -0,0 +1,375 @@
 +/* -*- Mode: C; c-basic-offset:4 ; -*- */
 +/* 
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
++ *   $Id: ad_write_str_naive.c,v 1.1 2003/12/16 21:51:23 robl Exp $
 + *
 + *   Copyright (C) 2001 University of Chicago. 
 + *   See COPYRIGHT notice in top-level directory.
@@ -4582,8 +4582,8 @@ retrieving revision 1.14
 @@ -1,46 +1,72 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: flatten.c,v 1.12 2003/09/04 21:35:29 rross Exp $    
++ *   $Id: flatten.c,v 1.14 2004/02/19 16:24:02 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5227,8 +5227,8 @@ retrieving revision 1.11
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: lock.c,v 1.10 2003/12/10 22:44:12 gropp Exp $    
++ *   $Id: lock.c,v 1.11 2004/05/26 17:56:55 thakur Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5266,8 +5266,8 @@ retrieving revision 1.35
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: adio.h,v 1.30 2003/09/08 13:35:43 gropp Exp $    
++ *   $Id: adio.h,v 1.35 2004/06/07 17:59:57 gropp Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5344,8 +5344,8 @@ retrieving revision 1.22
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: adioi.h,v 1.21 2003/12/04 22:20:06 robl Exp $    
++ *   $Id: adioi.h,v 1.22 2003/12/17 16:49:52 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5384,8 +5384,8 @@ retrieving revision 1.9
 +++ romio/adio/include/mpipr.h	8 Jan 2004 22:41:54 -0000	1.9
 @@ -1,10 +1,10 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
--/*  $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
-+/*  $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $
+-/*  $Id: mpipr.h,v 1.8 2003/09/08 13:36:43 gropp Exp $
++/*  $Id: mpipr.h,v 1.9 2004/01/08 22:41:54 gropp Exp $
   *
   *  (C) 2001 by Argonne National Laboratory.
   *      See COPYRIGHT in top-level directory.
@@ -5523,8 +5523,8 @@ retrieving revision 1.25
 @@ -1,40 +1,46 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: mpio.h.in,v 1.20 2003/11/07 00:14:54 robl Exp $    
++ *   $Id: mpio.h.in,v 1.25 2004/06/01 19:21:16 thakur Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5774,8 +5774,8 @@ retrieving revision 1.12
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: close.c,v 1.11 2003/07/01 19:12:39 robl Exp $    
++ *   $Id: close.c,v 1.12 2004/04/06 18:46:31 thakur Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5815,8 +5815,8 @@ retrieving revision 1.19
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: delete.c,v 1.18 2003/09/15 13:33:30 gropp Exp $    
++ *   $Id: delete.c,v 1.19 2004/02/12 06:08:22 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5901,8 +5901,8 @@ retrieving revision 1.18
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: get_posn_sh.c,v 1.17 2003/07/01 19:12:39 robl Exp $    
++ *   $Id: get_posn_sh.c,v 1.18 2004/02/12 06:08:24 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -5970,8 +5970,8 @@ retrieving revision 1.16
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: get_view.c,v 1.15 2003/04/18 20:15:08 David Exp $    
++ *   $Id: get_view.c,v 1.16 2004/02/12 06:08:26 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6025,8 +6025,8 @@ retrieving revision 1.11
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: ioreq_f2c.c,v 1.10 2003/02/24 23:52:08 robl Exp $    
++ *   $Id: ioreq_f2c.c,v 1.11 2004/02/12 06:08:27 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6065,8 +6065,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: iread_sh.c,v 1.20 2003/07/01 19:12:40 robl Exp $    
++ *   $Id: iread_sh.c,v 1.21 2004/02/12 06:08:29 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6323,8 +6323,8 @@ retrieving revision 1.10
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: mpioprof.h,v 1.9 2003/09/08 13:32:48 gropp Exp $    
++ *   $Id: mpioprof.h,v 1.10 2004/05/28 23:05:41 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6411,8 +6411,8 @@ retrieving revision 1.34
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: open.c,v 1.32 2003/09/22 21:23:23 gropp Exp $    
++ *   $Id: open.c,v 1.34 2004/05/19 23:55:09 thakur Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6629,8 +6629,8 @@ retrieving revision 1.16
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: read_alle.c,v 1.15 2003/09/08 13:35:04 gropp Exp $    
++ *   $Id: read_alle.c,v 1.16 2004/02/12 06:08:42 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6695,8 +6695,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: read_at.c,v 1.20 2003/09/08 13:33:43 gropp Exp $    
++ *   $Id: read_at.c,v 1.21 2004/02/12 06:08:44 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -6896,8 +6896,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: read_ordb.c,v 1.20 2003/09/25 13:25:11 gropp Exp $    
++ *   $Id: read_ordb.c,v 1.21 2004/02/12 06:08:49 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7062,8 +7062,8 @@ retrieving revision 1.16
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: read_orde.c,v 1.15 2003/09/08 13:35:04 gropp Exp $    
++ *   $Id: read_orde.c,v 1.16 2004/02/12 06:08:51 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7117,8 +7117,8 @@ retrieving revision 1.20
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: read_sh.c,v 1.19 2003/09/15 13:33:31 gropp Exp $    
++ *   $Id: read_sh.c,v 1.20 2004/02/12 06:08:53 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7291,8 +7291,8 @@ retrieving revision 1.19
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: seek_sh.c,v 1.18 2003/09/15 13:33:31 gropp Exp $    
++ *   $Id: seek_sh.c,v 1.19 2004/02/12 06:09:02 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7521,8 +7521,8 @@ retrieving revision 1.12
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: set_errh.c,v 1.11 2003/04/18 20:15:12 David Exp $    
++ *   $Id: set_errh.c,v 1.12 2003/12/16 17:32:34 thakur Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7560,8 +7560,8 @@ retrieving revision 1.17
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: wr_atallb.c,v 1.16 2003/09/05 22:33:57 gropp Exp $    
++ *   $Id: wr_atallb.c,v 1.17 2004/02/12 06:09:09 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7712,8 +7712,8 @@ retrieving revision 1.17
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: wr_atalle.c,v 1.16 2003/09/08 13:35:05 gropp Exp $    
++ *   $Id: wr_atalle.c,v 1.17 2004/02/12 06:09:10 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7778,8 +7778,8 @@ retrieving revision 1.16
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_allb.c,v 1.15 2003/09/05 22:34:31 gropp Exp $    
++ *   $Id: write_allb.c,v 1.16 2004/02/12 06:09:12 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7915,8 +7915,8 @@ retrieving revision 1.18
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_alle.c,v 1.15 2003/09/05 22:34:32 gropp Exp $    
++ *   $Id: write_alle.c,v 1.18 2004/03/17 20:31:27 gropp Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -7983,8 +7983,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_at.c,v 1.20 2003/09/08 21:29:22 gropp Exp $    
++ *   $Id: write_at.c,v 1.21 2004/02/12 06:09:15 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -8182,8 +8182,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_ordb.c,v 1.20 2003/09/25 13:25:11 gropp Exp $    
++ *   $Id: write_ordb.c,v 1.21 2004/02/12 06:09:17 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -8350,8 +8350,8 @@ retrieving revision 1.16
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_orde.c,v 1.15 2003/09/08 13:35:05 gropp Exp $    
++ *   $Id: write_orde.c,v 1.16 2004/02/12 06:09:19 David Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -8416,8 +8416,8 @@ retrieving revision 1.21
 @@ -1,11 +1,11 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
-- *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
-+ *   $Id: romio-MPICH2-0.96p2-PVFS2-0.51.diff,v 1.2 2009/06/11 15:49:22 nlmills Exp $    
+- *   $Id: write_sh.c,v 1.19 2003/09/15 13:33:36 gropp Exp $    
++ *   $Id: write_sh.c,v 1.21 2004/02/20 19:47:59 gropp Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.

@@ -4,7 +4,6 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <string.h>
-#include <stdlib.h>
 
 #include "trove.h"
 #include "trove-types.h"
@@ -50,16 +49,10 @@ int concurrent;
 int meta_sync;
 static char data_mode;
 int ops = 0;
-char sync_mode;
-int max_seconds;
 
-static TROVE_method_id trove_method_callback_directio(TROVE_coll_id id)
+static TROVE_method_id trove_method_callback(TROVE_coll_id id)
 {
     return(TROVE_METHOD_DBPF_DIRECTIO);
-}
-static TROVE_method_id trove_method_callback_altaio(TROVE_coll_id id)
-{
-    return(TROVE_METHOD_DBPF_ALTAIO);
 }
 
 static int do_trove_test(char* dir)
@@ -82,30 +75,12 @@ static int do_trove_test(char* dir)
     TROVE_op_id id_array[concurrent];
     TROVE_ds_state state_array[concurrent];
     void* user_ptr_array[concurrent];
-    int write_flag = 0;
-    double now;
 
-    if(sync_mode == 'b')
-    {
-        printf("# NOTE: b option never syncs the actual write(); it instead\n");
-        printf("#       makes sure that the size update is synced.\n");
-    }
-
-    if(sync_mode == 's' || sync_mode == 'b')
-        write_flag = TROVE_SYNC;
-
-    if(sync_mode == 'o' || sync_mode == 'b')
-        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback_directio, dir, 0);
-    else
-        ret = trove_initialize(TROVE_METHOD_DBPF_ALTAIO, trove_method_callback_altaio, dir, 0);
-
+    ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, dir, 0);
     if(ret < 0)
     {
         /* try to create new storage space */
-        if(sync_mode == 'o' || sync_mode == 'b')
-            ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, NULL, &op_id);
-        else
-            ret = trove_storage_create(TROVE_METHOD_DBPF_ALTAIO, dir, NULL, &op_id);
+        ret = trove_storage_create(TROVE_METHOD_DBPF_DIRECTIO, dir, dir, NULL, &op_id);
         if(ret != 1)
         {
             fprintf(stderr, "Error: failed to create storage space at %s\n",
@@ -113,11 +88,7 @@ static int do_trove_test(char* dir)
             return(-1);
         }
         
-        if(sync_mode == 'o' || sync_mode == 'b')
-            ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback_directio, dir, 0);
-        else
-            ret = trove_initialize(TROVE_METHOD_DBPF_ALTAIO, trove_method_callback_altaio, dir, 0);
-
+        ret = trove_initialize(TROVE_METHOD_DBPF_DIRECTIO, trove_method_callback, dir, dir, 0);
         if(ret < 0)
         {
             fprintf(stderr, "Error: failed to initialize.\n");
@@ -177,16 +148,14 @@ static int do_trove_test(char* dir)
          * is bigger than this 
          */
         tmp_buffer->size = 4*1024*1024;
-        ret = posix_memalign((void**)&tmp_buffer->buffer, 4096, tmp_buffer->size);
-        assert(ret == 0);
+        tmp_buffer->buffer = malloc(tmp_buffer->size);
         assert(tmp_buffer->buffer);
         qlist_add_tail(&tmp_buffer->list_link, &buffer_list);
     }
 
     start_tm = Wtime();
 
-    now = Wtime();
-    while((inflight > 0 || !qlist_empty(&op_list)) && (max_seconds == 0 || (now-start_tm) < max_seconds))
+    while(inflight > 0 || !qlist_empty(&op_list))
     {
         /* first priority is to keep maximum ops posted */
         while(inflight < concurrent && !qlist_empty(&op_list))
@@ -211,7 +180,7 @@ static int do_trove_test(char* dir)
                 /* post operation */
                 ret = trove_bstream_write_list(1, 1, &tmp_buffer->buffer,
                     &tmp_op->size, 1, &tmp_op->offset, &tmp_op->size, 1,
-                    &out_size, write_flag, NULL, tmp_buffer, trove_context, &op_id,
+                    &out_size, TROVE_SYNC, NULL, tmp_buffer, trove_context, &op_id,
                     NULL);
             }
             else if(tmp_op->type == READ && data_mode == 'd')
@@ -231,7 +200,7 @@ static int do_trove_test(char* dir)
                 tmp_op->value.buffer_sz = tmp_op->size;
 
                 ret = trove_keyval_write(1, 1, &tmp_op->key,
-                    &tmp_op->value, write_flag, NULL, tmp_buffer,
+                    &tmp_op->value, TROVE_SYNC, NULL, tmp_buffer,
                     trove_context, &op_id, NULL);
             }
             else if(tmp_op->type == READ && data_mode == 'k')
@@ -268,7 +237,6 @@ static int do_trove_test(char* dir)
             tmp_buffer = user_ptr_array[i];
             qlist_add_tail(&tmp_buffer->list_link, &buffer_list);
         }
-        now = Wtime();
     }
 
     end_tm = Wtime();
@@ -285,52 +253,27 @@ int main(int argc, char *argv[])
     int64_t offset;
     int ret;
     struct bench_op* tmp_op;
-    int i;
 
-    if(argc != 8)
+    if(argc != 6)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
         return(-1);
     }
 
     ret = sscanf(argv[3], "%d", &concurrent);
     if(ret != 1 || concurrent < 1)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
-        return(-1);
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
     }
     ret = sscanf(argv[4], "%d", &meta_sync);
     if(ret != 1 || meta_sync > 1 || meta_sync < 0)
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
-        return(-1);
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
     }
     ret = sscanf(argv[5], "%c", &data_mode);
     if(ret != 1 || (data_mode != 'k' && data_mode != 'd'))
     {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
-        return(-1);
-    }
-
-    ret = sscanf(argv[6], "%s", &sync_mode);
-    if(ret != 1 || (sync_mode != 'o' && sync_mode != 's' && sync_mode != 'b' &&
-        sync_mode != 'n'))
-    {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
-        return(-1);
-    }
-
-    ret = sscanf(argv[7], "%d", &max_seconds);
-    if(ret != 1 || max_seconds < 0)
-    {
-        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k> <o|s|b|n> <max seconds>\n");
-        fprintf(stderr, "       # o for odirect, s for sync, b for both, n for neither\n");
-        return(-1);
+        fprintf(stderr, "Usage: trove-bench-concurrent <workload description file> <trove dir> <concurrent ops> <meta sync 1|0> <data/keyval d|k>\n");
     }
 
     /* parse description of workload */
@@ -371,25 +314,10 @@ int main(int argc, char *argv[])
 
     do_trove_test(argv[2]);
 
-    /* print command line in comments */
-    printf("#");
-    for(i=0; i<argc; i++)
-    {
-        printf(" %s", argv[i]);
-    }
-    printf("\n");
-    printf("# <r/w>\t<buffer size>\t<total size>\t<seconds>\t<MiB/s>\t<ops/s>\n");
-    printf("%s\t%lld\t%lld\t%f\t%f\t%f\n",
-        op_string, lld(size), lld(total_size), (end_tm-start_tm),
-        (((double)total_size)/(1024.0*1024.0))/(end_tm-start_tm),
-        ((double)ops)/(end_tm-start_tm));
-
-#if 0
     printf("# Moved %lld bytes in %f seconds.\n", lld(total_size),
         (end_tm-start_tm));
     printf("%f MB/s\n", (((double)total_size)/(1024.0*1024.0))/(end_tm-start_tm));
     printf("%f ops/s\n", ((double)ops)/(end_tm-start_tm));
-#endif
 
     return 0;
 }

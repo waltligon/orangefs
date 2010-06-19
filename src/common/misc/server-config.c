@@ -34,7 +34,9 @@
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_logstamp);
-static DOTCONF_CB(get_storage_space);
+static DOTCONF_CB(get_storage_path);
+static DOTCONF_CB(get_data_path);
+static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
 #ifdef USE_TRUSTED
@@ -78,7 +80,14 @@ static DOTCONF_CB(get_trusted_network);
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
+
+static DOTCONF_CB(get_root_squash);
+static DOTCONF_CB(get_root_squash_exceptions);
 static DOTCONF_CB(get_read_only);
+static DOTCONF_CB(get_all_squash);
+static DOTCONF_CB(get_anon_gid);
+static DOTCONF_CB(get_anon_uid);
+
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
 static DOTCONF_CB(get_flow_buffer_size_bytes);
 static DOTCONF_CB(get_flow_buffers_per_flow);
@@ -345,8 +354,9 @@ static const configoption_t options[] =
         NULL},
 
      /* Specifies the beginning of a ExportOptions context.
-      * This groups options specific to a filesystem and related to the 
-      * behavior of how it gets exported to various clients.
+      * This groups options specific to a filesystem and related to the behavior
+      * of how it gets exported to various clients. Most of these options
+      * will affect things like what uids get translated to and so on..
       */
      {"<ExportOptions>",ARG_NONE, enter_export_options_context, NULL,CTX_FILESYSTEM,
          NULL},
@@ -545,17 +555,51 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
 
-    /* Specifies the local path for the pvfs2 server to use as storage space.
-     * This option specifies the default path for all servers and will appear
+    /* DEPRECATED 
+     * Specifies the local path for the pvfs2 server to use as 
+     * storage space for data files and metadata files. This option should not
+     * be used in conjuction with DataStorageSpace or MetadataStorageSpace. 
+     * This option is only meant as a migration path for configurations where i
+     * users do not want (or don't expect to need to) modify their configuration
+     * to run this version.
+     *
+     * This option specifies the default path for all servers and will appear 
      * in the Defaults context.
      *
      * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
      * basis. Look at the "Option" tag for more details
      * Example:
      *
-     * StorageSpace /tmp/pvfs.storage
+     * StorageSpace /tmp/pvfs-data.storage
+     * DEPRECATED.
      */
-    {"StorageSpace",ARG_STR, get_storage_space,NULL,
+    {"StorageSpace",ARG_STR, get_storage_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for data files. This option specifies the default path for all servers 
+     * and will appear in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * DataStorageSpace /tmp/pvfs-data.storage
+     */
+    {"DataStorageSpace",ARG_STR, get_data_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for metadata files. This option specifies the default path for all 
+     * servers and will appear in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * MetadataStorageSpace /tmp/pvfs-meta.storage
+     */
+    {"MetadataStorageSpace",ARG_STR, get_meta_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
      /* Current implementations of TCP on most systems use a window
@@ -690,7 +734,7 @@ static const configoption_t options[] =
      *
      * usec: [%H:%M:%S.%U]
      *
-     * datetime: [%m/%d %H:%M]
+     * datetime: [%m/%d/%Y %H:%M:%S]
      *
      * thread: [%H:%M:%S.%U (%lu)]
      *
@@ -721,6 +765,27 @@ static const configoption_t options[] =
      * to the rest of the world.
      */
 
+    /* RootSquash option specifies whether the exported file-system needs to
+    *  squash accesses by root. This is an optional parameter that needs 
+    *  to be specified as part of the ExportOptions
+     * context and is a list of BMI URL specification of client addresses 
+     * for which RootSquash has to be enforced. 
+     *
+     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"RootSquash", ARG_LIST, get_root_squash, NULL,
+        CTX_EXPORT, ""},
+  
+    /* RootSquashExceptions option specifies exceoptions to the RootSquash 
+     * list. This is an optional parameter that needs to be specified as 
+     * part of the ExportOptions context and is a list of BMI URL 
+     * specification of client addresses for which RootSquash
+     * has to be enforced. 
+     * RootSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"RootSquashExceptions", ARG_LIST, get_root_squash_exceptions, NULL,
+        CTX_EXPORT, ""},
+
     /* ReadOnly option specifies whether the exported file-system needs to
     *  disallow write accesses from clients or anything that modifies the 
     *  state of the file-system.
@@ -733,6 +798,34 @@ static const configoption_t options[] =
      */
     {"ReadOnly", ARG_LIST,  get_read_only,    NULL,
         CTX_EXPORT, ""},
+
+    /* AllSquash option specifies whether the exported file-system needs to 
+    *  squash all accesses to the file-system to a specified uid/gid!
+     * This is an optional parameter that needs to be specified as part of 
+     * the ExportOptions context and is a list of BMI URL specification of client 
+     * addresses for which AllSquash has to be enforced.
+     * An example:
+     *
+     * AllSquash tcp://192.168.2.0@24 tcp://10.0.0.* tcp://192.168.* ...
+     */
+    {"AllSquash", ARG_LIST, get_all_squash,   NULL,
+        CTX_EXPORT, ""},
+
+    /* AnonUID and AnonGID are 2 integers that tell the servers to translate 
+    *  the requesting clients' uid/gid to the specified ones whenever AllSquash
+    *  is specified!
+     * If these are not specified and AllSquash is specified then the uid used 
+     * will be that of nobody and gid that of nobody.
+     * An example:
+     *
+     * AnonUID 3454
+     * AnonGID 3454
+     */
+
+    {"AnonUID",  ARG_STR,  get_anon_uid,     NULL,
+        CTX_EXPORT, "65534"},
+    {"AnonGID",  ARG_STR,  get_anon_gid,     NULL,
+        CTX_EXPORT, "65534"},
 
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
@@ -1006,10 +1099,17 @@ int PINT_parse_config(
         config_s->host_id = strdup(halias->bmi_address);
     }
 
-    if (server_alias_name && !config_s->storage_path)
+    if (server_alias_name && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
-                   "No storage path specified for alias %s.\n", server_alias_name);
+                   "No data storage path specified for alias %s.\n", server_alias_name);
+        return 1;
+    }
+
+    if (server_alias_name && !config_s->meta_path)
+    {
+        gossip_err("Configuration file error. "
+                   "No metadata storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
@@ -1108,7 +1208,7 @@ DOTCONF_CB(get_logstamp)
 }
 
 
-DOTCONF_CB(get_storage_space)
+DOTCONF_CB(get_storage_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -1117,11 +1217,58 @@ DOTCONF_CB(get_storage_space)
     {
         return NULL;
     }
-    if (config_s->storage_path)
+
+    if( config_s->data_path )
     {
-        free(config_s->storage_path);
+        free(config_s->data_path);
     }
-    config_s->storage_path =
+
+    if( config_s->meta_path )
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_data_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->data_path)
+    {
+        free(config_s->data_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_meta_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->meta_path)
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1738,6 +1885,98 @@ static int setup_netmasks(int count, char **bmi_address, int *netmasks)
     return 0;
 }
 
+DOTCONF_CB(get_root_squash)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count == 0)
+    {
+        fs_conf->exp_flags &= ~TROVE_EXP_ROOT_SQUASH;
+    }
+    else 
+    {
+        fs_conf->exp_flags |= TROVE_EXP_ROOT_SQUASH;
+        fs_conf->root_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->root_squash_netmasks == NULL)
+        {
+            fs_conf->root_squash_count = 0;
+            return("Could not allocate memory for root_squash_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->root_squash_hosts) < 0)
+        {
+            free(fs_conf->root_squash_netmasks);
+            fs_conf->root_squash_netmasks = NULL;
+            fs_conf->root_squash_count = 0;
+            return("Could not allocate memory for root_squash_hosts\n");
+        }
+        fs_conf->root_squash_count = cmd->arg_count;
+        /* Setup the netmasks */
+        if (setup_netmasks(fs_conf->root_squash_count, fs_conf->root_squash_hosts, 
+                    fs_conf->root_squash_netmasks) < 0)
+        {
+            free(fs_conf->root_squash_netmasks);
+            fs_conf->root_squash_netmasks = NULL;
+            free_list_of_strings(fs_conf->root_squash_count, &fs_conf->root_squash_hosts);
+            fs_conf->root_squash_count = 0;
+            return("Could not setup netmasks for root_squash_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquash wildcard entries\n",
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_root_squash_exceptions)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count != 0)
+    {
+        fs_conf->root_squash_exceptions_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->root_squash_exceptions_netmasks == NULL)
+        {
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not allocate memory for root_squash_exceptions_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->root_squash_exceptions_hosts) < 0)
+        {
+            free(fs_conf->root_squash_exceptions_netmasks);
+            fs_conf->root_squash_exceptions_netmasks = NULL;
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not allocate memory for root_squash_exceptions_hosts\n");
+        }
+        fs_conf->root_squash_exceptions_count = cmd->arg_count;
+        /* Setup the netmasks */
+        if (setup_netmasks(fs_conf->root_squash_exceptions_count, fs_conf->root_squash_exceptions_hosts, 
+                    fs_conf->root_squash_exceptions_netmasks) < 0)
+        {
+            free(fs_conf->root_squash_exceptions_netmasks);
+            fs_conf->root_squash_exceptions_netmasks = NULL;
+            free_list_of_strings(fs_conf->root_squash_exceptions_count, &fs_conf->root_squash_exceptions_hosts);
+            fs_conf->root_squash_exceptions_count = 0;
+            return("Could not setup netmasks for root_squash_exceptions_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d RootSquashExceptions wildcard entries\n",
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+
 DOTCONF_CB(get_read_only)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1781,6 +2020,93 @@ DOTCONF_CB(get_read_only)
         gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d ro wildcard entries\n",
                 cmd->arg_count);
     }
+    return NULL;
+}
+
+DOTCONF_CB(get_all_squash)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (cmd->arg_count == 0)
+    {
+        fs_conf->exp_flags &= ~TROVE_EXP_ALL_SQUASH;
+    }
+    else 
+    {
+        fs_conf->exp_flags |= TROVE_EXP_ALL_SQUASH;
+        fs_conf->all_squash_netmasks = (int *) calloc(cmd->arg_count, sizeof(int));
+        if (fs_conf->all_squash_netmasks == NULL)
+        {
+            fs_conf->all_squash_count = 0;
+            return("Could not allocate memory for all_squash_netmasks\n");
+        }
+        if (get_list_of_strings(cmd->arg_count, cmd->data.list,
+                    &fs_conf->all_squash_hosts) < 0)
+        {
+            free(fs_conf->all_squash_netmasks);
+            fs_conf->all_squash_netmasks = NULL;
+            fs_conf->all_squash_count = 0;
+            return("Could not allocate memory for all_squash_hosts\n");
+        }
+        fs_conf->all_squash_count = cmd->arg_count;
+        if (setup_netmasks(fs_conf->all_squash_count, fs_conf->all_squash_hosts, 
+                    fs_conf->all_squash_netmasks) < 0)
+        {
+            free(fs_conf->all_squash_netmasks);
+            fs_conf->all_squash_netmasks = NULL;
+            free_list_of_strings(fs_conf->all_squash_count, &fs_conf->all_squash_hosts);
+            fs_conf->all_squash_count = 0;
+            return("Could not setup netmasks for all_squash_hosts\n");
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "Parsed %d AllSquash wildcard entries\n", 
+                cmd->arg_count);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_anon_uid)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    unsigned int tmp_var;
+    int ret = -1;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+    ret = sscanf(cmd->data.str, "%u", &tmp_var);
+    if(ret != 1)
+    {
+        return("AnonUID does not have a long long unsigned value.\n");
+    }
+    fs_conf->exp_anon_uid = tmp_var;
+    return NULL;
+}
+
+DOTCONF_CB(get_anon_gid)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    unsigned int tmp_var;
+    int ret = -1;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+    ret = sscanf(cmd->data.str, "%u", &tmp_var);
+    if(ret != 1)
+    {
+        return("AnonGID does not have a unsigned value.\n");
+    }
+    fs_conf->exp_anon_gid = tmp_var;
     return NULL;
 }
 
@@ -2669,10 +2995,16 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->host_id = NULL;
         }
 
-        if (config_s->storage_path)
+	if (config_s->data_path)
         {
-            free(config_s->storage_path);
-            config_s->storage_path = NULL;
+            free(config_s->data_path);
+            config_s->data_path = NULL;
+        }
+
+        if (config_s->meta_path)
+        {
+            free(config_s->meta_path);
+            config_s->meta_path = NULL;
         }
 
         if (config_s->fs_config_filename)
@@ -2981,6 +3313,39 @@ static void free_filesystem(void *ptr)
             free(fs->ro_netmasks);
             fs->ro_netmasks = NULL;
         }
+        /* free all root_squash_exception_hosts specifications */
+        if (fs->root_squash_exceptions_hosts)
+        {
+            free_list_of_strings(fs->root_squash_exceptions_count, &fs->root_squash_exceptions_hosts);
+            fs->root_squash_exceptions_count = 0;
+        }
+        if (fs->root_squash_exceptions_netmasks)
+        {
+            free(fs->root_squash_exceptions_netmasks);
+            fs->root_squash_exceptions_netmasks = NULL;
+        }
+        /* free all root_squash_hosts specifications */
+        if (fs->root_squash_hosts)
+        {
+            free_list_of_strings(fs->root_squash_count, &fs->root_squash_hosts);
+            fs->root_squash_count = 0;
+        }
+        if (fs->root_squash_netmasks)
+        {
+            free(fs->root_squash_netmasks);
+            fs->root_squash_netmasks = NULL;
+        }
+        /* free all all_squash_hosts specifications */
+        if (fs->all_squash_hosts)
+        {
+            free_list_of_strings(fs->all_squash_count, &fs->all_squash_hosts);
+            fs->all_squash_count = 0;
+        }
+        if (fs->all_squash_netmasks)
+        {
+            free(fs->all_squash_netmasks);
+            fs->all_squash_netmasks = NULL;
+        }
         free(fs);
         fs = NULL;
     }
@@ -3096,6 +3461,8 @@ static void copy_filesystem(
         /* copy all relevant export options */
         dest_fs->exp_flags    = src_fs->exp_flags;
         dest_fs->ro_count     = src_fs->ro_count;
+        dest_fs->root_squash_count = src_fs->root_squash_count;
+        dest_fs->all_squash_count = src_fs->all_squash_count;
         if (src_fs->ro_count > 0 && src_fs->ro_hosts)
         {
             int i;
@@ -3113,11 +3480,48 @@ static void copy_filesystem(
             assert(dest_fs->ro_netmasks);
             memcpy(dest_fs->ro_netmasks, src_fs->ro_netmasks, src_fs->ro_count * sizeof(int));
         }
+        if (src_fs->root_squash_count > 0 && src_fs->root_squash_hosts)
+        {
+            int i;
+            dest_fs->root_squash_hosts = (char **) calloc(src_fs->root_squash_count, sizeof(char *));
+            assert(dest_fs->root_squash_hosts);
+            for (i = 0; i < src_fs->root_squash_count; i++)
+            {
+                dest_fs->root_squash_hosts[i] = strdup(src_fs->root_squash_hosts[i]);
+                assert(dest_fs->root_squash_hosts[i]);
+            }
+        }
+        if (src_fs->root_squash_count > 0 && src_fs->root_squash_netmasks)
+        {
+            dest_fs->root_squash_netmasks = (int *) calloc(src_fs->root_squash_count, sizeof(int));
+            assert(dest_fs->root_squash_netmasks);
+            memcpy(dest_fs->root_squash_netmasks, src_fs->root_squash_netmasks, src_fs->root_squash_count * sizeof(int));
+        }
+        if (src_fs->all_squash_count > 0 && src_fs->all_squash_hosts)
+        {
+            int i;
+            dest_fs->all_squash_hosts = (char **) calloc(src_fs->all_squash_count, sizeof(char *));
+            assert(dest_fs->all_squash_hosts);
+            for (i = 0; i < src_fs->all_squash_count; i++)
+            {
+                dest_fs->all_squash_hosts[i] = strdup(src_fs->all_squash_hosts[i]);
+                assert(dest_fs->all_squash_hosts[i]);
+            }
+        }
+        if (src_fs->all_squash_count > 0 && src_fs->all_squash_netmasks)
+        {
+            dest_fs->all_squash_netmasks = (int *) calloc(src_fs->all_squash_count, sizeof(int));
+            assert(dest_fs->all_squash_netmasks);
+            memcpy(dest_fs->all_squash_netmasks, src_fs->all_squash_netmasks, src_fs->all_squash_count * sizeof(int));
+        }
+        dest_fs->exp_anon_uid = src_fs->exp_anon_uid;
+        dest_fs->exp_anon_gid = src_fs->exp_anon_gid;
 
         dest_fs->fp_buffer_size = src_fs->fp_buffer_size;
         dest_fs->fp_buffers_per_flow = src_fs->fp_buffers_per_flow;
     }
 }
+
 
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
@@ -4105,7 +4509,7 @@ int PINT_config_pvfs2_mkspace(
                  "storage space"));
 
             ret = pvfs2_mkspace(
-                config->storage_path, cur_fs->file_system_name,
+                config->data_path, config->meta_path, cur_fs->file_system_name,
                 cur_fs->coll_id, root_handle, cur_meta_handle_range,
                 cur_data_handle_range, create_collection_only, 1);
 
@@ -4160,7 +4564,8 @@ int PINT_config_pvfs2_rmspace(
                 GOSSIP_SERVER_DEBUG,"Removing existing PVFS2 %s\n",
                 (remove_collection_only ? "collection" :
                  "storage space"));
-            ret = pvfs2_rmspace(config->storage_path,
+            ret = pvfs2_rmspace(config->data_path,
+				config->meta_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,

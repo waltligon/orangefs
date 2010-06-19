@@ -99,7 +99,7 @@ struct flow_descriptor
     /* fields that can be set publicly before posting */
 
     /* function to be triggered upon completion */
-    void(*callback)(struct flow_descriptor* flow_d);
+    void(*callback)(struct flow_descriptor* flow_d, int cancel_path);
 
     struct flow_endpoint src;	/* src endpoint */
     struct flow_endpoint dest;	/* dest endpoint */

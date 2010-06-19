@@ -203,6 +203,7 @@ enum pvfs2_param_request_op
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_HARD_LIMIT = 13,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_SOFT_LIMIT = 14,
     PVFS2_PARAM_REQUEST_OP_STATIC_ACACHE_RECLAIM_PERCENTAGE = 15,
+    PVFS2_PARAM_REQUEST_OP_CLIENT_DEBUG = 16,
 };  
     
 typedef struct
@@ -210,6 +211,7 @@ typedef struct
     enum pvfs2_param_request_type type;
     enum pvfs2_param_request_op op;
     int64_t value;
+    char s_value[PVFS2_MAX_DEBUG_STRING_LEN]; 
 } pvfs2_param_request_t;
 
 enum pvfs2_perf_count_request_type
@@ -233,7 +235,8 @@ typedef struct
 typedef struct
 {
     int32_t type;
-    PVFS_uid uid;
+    int32_t __pad1;
+    PVFS_credentials credentials;
     int pid;
     int tgid;
     /* currently trailer is used only by readx/writex (iox) */

@@ -886,9 +886,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             if(sizeof_handle != sizeof(TROVE_handle) ||
                sizeof_attr != sizeof(attr))
             {
-                /* something is wrong with the result */
-                ret = -TROVE_EINVAL;
-                goto return_error;
+                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: skipping entry.\n");
+                i--;
+                continue;
             }
 
             op_p->u.d_iterate_handles.handle_array[i] =
@@ -904,22 +905,26 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * the position to the next handle after the last one we
          * return
          */
-        DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
-                             tmp_handle, sizeof_handle,
-                             tmp_attr, sizeof_attr);
-        if(!tmp_ptr)
+        sizeof_handle = sizeof(TROVE_handle);
+        sizeof_attr = sizeof(attr);
+        do
         {
-            goto get_next;
-        }
-
-        /* verify sizes are correct */
-        if(sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr))
-        {
-            /* something is wrong with the result */
-            ret = -TROVE_EINVAL;
-            goto return_error;
-        }
+            /* verify sizes are correct */
+            if(sizeof_handle != sizeof(TROVE_handle) ||
+               sizeof_attr != sizeof(attr))
+            {
+                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: skipping entry.\n");
+            }
+            DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
+                                 tmp_handle, sizeof_handle,
+                                 tmp_attr, sizeof_attr);
+            if(!tmp_ptr)
+            {
+                goto get_next;
+            }
+        } while (sizeof_handle != sizeof(TROVE_handle) ||
+           sizeof_attr != sizeof(attr));
 
         *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
         goto return_ok;
@@ -1541,8 +1546,17 @@ static int dbpf_dspace_cancel(
             return -TROVE_EINVAL;
         }
 
-        return bstream_method_table[method_id]->bstream_cancel(
-            coll_id, id, context_id);
+        if(bstream_method_table[method_id]->bstream_cancel)
+        {
+            return bstream_method_table[method_id]->bstream_cancel(
+                coll_id, id, context_id);
+        }
+        else
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "Trove cancellation is not supported for this operation type; ignoring.\n");
+            return(0);
+
+        }
     }
 
     /* check the state of the current op to see if it's completed */
@@ -2110,7 +2124,7 @@ static int dbpf_dspace_create_store_handle(
      * possible if the db gets out of sync with the rest of the collection
      * somehow
      */
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->data_path,
                               coll_p->coll_id, llu(new_handle));
     ret = access(filename, F_OK);
     if(ret == 0)
@@ -2123,7 +2137,7 @@ static int dbpf_dspace_create_store_handle(
                    filename);
         
         DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
-                                           my_storage_p->name, 
+                                           my_storage_p->data_path, 
                                            coll_p->coll_id,
                                            llu(new_handle));
         /* an old file exists.  Move it to the stranded subdirectory */

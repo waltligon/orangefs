@@ -153,7 +153,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params = strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params 
+                        = strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
@@ -217,6 +218,41 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 }
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
+
+          if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                PVFS_size df_array_size = src->u.meta.dfile_count         *
+                                          src->u.meta.mirror_copies_count *
+                                          sizeof(PVFS_handle);
+
+                if (df_array_size)
+                {
+                    if (   (dest->mask & PVFS_ATTR_META_MIRROR_DFILES) 
+                        && (dest->u.meta.dfile_count > 0)
+                        && (dest->u.meta.mirror_copies_count > 0) )
+                    {
+                        if (dest->u.meta.mirror_dfile_array)
+                        {
+                            free(dest->u.meta.mirror_dfile_array);
+                            dest->u.meta.mirror_dfile_array = NULL;
+                        }
+                    }
+                    dest->u.meta.mirror_dfile_array = malloc(df_array_size);
+                    if (!dest->u.meta.mirror_dfile_array)
+                    {
+                        return ret;
+                    }
+                    memcpy(dest->u.meta.mirror_dfile_array,
+                           src->u.meta.mirror_dfile_array, df_array_size);
+                }
+                else
+                {
+                    dest->u.meta.mirror_dfile_array = NULL;
+                }
+                dest->u.meta.mirror_copies_count 
+                   = src->u.meta.mirror_copies_count;
+            }
+
 
             if(src->mask & PVFS_ATTR_META_DIST)
             {
@@ -283,6 +319,14 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.meta.dfile_array = NULL;
                 }
             }
+            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                if (attr->u.meta.mirror_dfile_array)
+                {
+                    free(attr->u.meta.mirror_dfile_array);
+                    attr->u.meta.mirror_dfile_array = NULL;
+                }
+            }
             if (attr->mask & PVFS_ATTR_META_DIST)
             {
                 if (attr->u.meta.dist)
@@ -306,7 +350,8 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
         }
         else if (attr->objtype == PVFS_TYPE_DIRECTORY)
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT) || (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
+                (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
             {
                 if (attr->u.dir.hint.dist_name)
                 {

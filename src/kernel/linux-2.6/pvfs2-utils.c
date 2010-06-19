@@ -11,6 +11,27 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
+int pvfs2_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    int ret = -1;
+
+    if (credentials)
+    {
+        memset(credentials, 0, sizeof(PVFS_credentials));
+#ifdef HAVE_CURRENT_FSUID
+        credentials->uid = current_fsuid();
+        credentials->gid = current_fsgid();
+#else
+        credentials->uid = current->fsuid;
+        credentials->gid = current->fsgid;
+#endif
+
+        ret = 0;
+    }
+    return ret;
+}
+
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
 {
     PVFS_fs_id fsid = PVFS_FS_ID_NULL;
@@ -1453,6 +1474,12 @@ struct inode *pvfs2_create_entry(
 {
     if (dir && dentry && error_code)
     {
+        if(strlen(dentry->d_name.name) > (PVFS2_NAME_LEN - 1))
+        {
+            *error_code = -ENAMETOOLONG;
+            return(NULL);
+        }
+
         switch (op_type)
         {
             case PVFS2_VFS_OP_CREATE:
@@ -2136,6 +2163,206 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
     return ret;
 #undef NUM_MODES
 }
+
+
+static char * pvfs2_strtok(char *s, const char *toks)
+{
+   static char *in_string_p;         /* original string */
+   char *this_string_p;              /* starting value of in_string_p */
+                                     /* during this iteration         */
+   uint32_t toks_len = strlen(toks); /* # of tokens */
+   uint32_t i;                       /* index */
+   
+   if (s)
+   {
+      /* when s has a value, we are using a new input string */
+      in_string_p=s;
+   }
+
+   /* set new starting position */
+   this_string_p = in_string_p;
+
+   /* loop through the string until a token or end-of-string(null)
+    * is found. 
+   */
+   for (;*in_string_p;in_string_p++)
+   {
+      /* Is character a token? */
+      for (i=0; i<toks_len; i++)
+      {
+         if (*in_string_p == toks[i])
+         {
+            /*token found => end-of-word*/
+            *in_string_p = 0;
+             in_string_p++;
+             return(this_string_p);
+         }
+      }/*end looping of tokens*/
+   }/*end looping of the string*/
+
+  if (*this_string_p==0)
+     return(NULL); 
+
+  return (this_string_p);
+}/*end function pvfs2_strtok*/
+
+/*convert 64-bit debug mask into a readable string of keywords*/
+static int proc_mask_to_debug(__keyword_mask_t *mask_map
+                             ,int num_mask_map
+                             ,uint64_t mask
+                             ,char *debug_string)
+{
+   unsigned int index = 0;
+   unsigned int i;
+
+   memset(debug_string,0,PVFS2_MAX_DEBUG_STRING_LEN);
+
+   for (i=0; i<num_mask_map; i++)
+   {
+      if ( (index + strlen(mask_map[i].keyword)) >= PVFS2_MAX_DEBUG_STRING_LEN )
+      {
+         return(0);
+      }
+     
+      switch( mask_map[i].mask_val )
+      {
+          case GOSSIP_NO_DEBUG  :
+          {
+               if ( mask == GOSSIP_NO_DEBUG )
+               {
+                  /* "none" */
+                  strcpy(debug_string,mask_map[i].keyword);
+                  return(0);
+               }
+               break;
+          }
+          case GOSSIP_MAX_DEBUG :
+          {
+              if ( mask == GOSSIP_MAX_DEBUG )
+              {
+                 /* "all" */
+                 strcpy(debug_string,mask_map[i].keyword);
+                 return(0);
+              }
+              break;
+          }
+          default :
+          {
+              if ((mask & mask_map[i].mask_val) != mask_map[i].mask_val)
+              {   /*mask does NOT contain the mask value*/
+                  break;
+              }
+              if (index != 0)
+              {   /*add comma for second and subsequent mask keywords*/
+                  (debug_string[index]) = ',';
+                  index++;
+              }
+
+              /*add keyword and slide index*/
+              memcpy(&debug_string[index], mask_map[i].keyword
+                    ,strlen(mask_map[i].keyword));
+              index += strlen(mask_map[i].keyword);
+          }
+      }/*end switch*/
+   }/*end for*/
+
+   return(0);
+}/*end function proc_mask_to_debug*/
+
+
+static uint64_t proc_debug_to_mask(__keyword_mask_t *mask_map, 
+        int num_mask_map, const char *event_logging)
+{
+    uint64_t mask = 0;
+    char *s = NULL, *t = NULL;
+    const char *toks = ", ";
+    int i = 0, negate = 0, slen = 0;
+
+    if (event_logging)
+    {
+        /* s = strdup(event_logging); */
+        slen=strlen(event_logging);
+        s = kmalloc(slen+1,GFP_KERNEL);
+        if (!s)
+        {
+           return (-ENOMEM);
+        }
+        memset(s,0,slen+1);
+        memcpy(s,event_logging,slen);
+
+        /* t = strtok(s, toks); */
+        t = pvfs2_strtok(s, toks);
+
+        while(t)
+        {
+            if (*t == '-')
+            {
+                negate = 1;
+                ++t;
+            }
+
+            for(i = 0; i < num_mask_map; i++)
+            {
+                if (!strcmp(t, mask_map[i].keyword))
+                {
+                    if (negate)
+                    {
+                        mask &= ~mask_map[i].mask_val;
+                    }
+                    else
+                    {
+                        mask |= mask_map[i].mask_val;
+                    }
+                    break;
+                }
+            } 
+            /* t = strtok(NULL, toks); */
+            t = pvfs2_strtok(NULL, toks);
+        }
+        kfree(s);
+    }
+    return mask;
+}
+
+/*
+ * Based on human readable keywords, translate them into
+ * a mask value appropriate for the debugging level desired.
+ * The 'computed' mask is returned; 0 if no keywords are
+ * present or recognized.  Unrecognized keywords are ignored when
+ * mixed with recognized keywords.
+ *
+ * Prefix a keyword with "-" to turn it off.  All keywords
+ * processed in specified order.
+ */
+uint64_t PVFS_proc_debug_eventlog_to_mask(const char *event_logging)
+{
+    return proc_debug_to_mask(s_keyword_mask_map, 
+            num_keyword_mask_map, event_logging);
+}
+
+uint64_t PVFS_proc_kmod_eventlog_to_mask(const char *event_logging)
+{
+    return proc_debug_to_mask(s_kmod_keyword_mask_map, 
+            num_kmod_keyword_mask_map, event_logging);
+}
+
+int PVFS_proc_kmod_mask_to_eventlog(uint64_t mask, char *debug_string)
+{
+    return( proc_mask_to_debug(s_kmod_keyword_mask_map
+                              , num_kmod_keyword_mask_map
+                              ,mask
+                              ,debug_string) );
+}/*end function PVFS_proc_kmod_mask_to_eventlog*/
+
+int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string)
+{
+   
+    return( proc_mask_to_debug(s_keyword_mask_map
+                              ,num_keyword_mask_map
+                              ,mask
+                              ,debug_string) );
+}
+
 
 /*
  * Local variables:

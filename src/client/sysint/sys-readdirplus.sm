@@ -150,7 +150,7 @@ PVFS_error PVFS_isys_readdirplus(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     /* point the sm dirent array and outcount to the readdirplus response field */
@@ -851,57 +851,76 @@ static PINT_sm_action readdirplus_cleanup(
         if (readdirplus_resp->stat_err_array[i] == 0)
         {
             /* convert into sys attributes */
-            readdirplus_resp->attr_array[i].owner = sm_p->u.readdirplus.obj_attr_array[i].owner;
-            readdirplus_resp->attr_array[i].group = sm_p->u.readdirplus.obj_attr_array[i].group;
-            readdirplus_resp->attr_array[i].perms = sm_p->u.readdirplus.obj_attr_array[i].perms;
-            readdirplus_resp->attr_array[i].atime = sm_p->u.readdirplus.obj_attr_array[i].atime;
-            readdirplus_resp->attr_array[i].mtime = sm_p->u.readdirplus.obj_attr_array[i].mtime;
-            readdirplus_resp->attr_array[i].ctime = sm_p->u.readdirplus.obj_attr_array[i].ctime;
-            readdirplus_resp->attr_array[i].objtype = sm_p->u.readdirplus.obj_attr_array[i].objtype;
-            readdirplus_resp->attr_array[i].mask =
-                PVFS_util_object_to_sys_attr_mask(sm_p->u.readdirplus.obj_attr_array[i].mask);
+            readdirplus_resp->attr_array[i].owner 
+                    = sm_p->u.readdirplus.obj_attr_array[i].owner;
+            readdirplus_resp->attr_array[i].group 
+                    = sm_p->u.readdirplus.obj_attr_array[i].group;
+            readdirplus_resp->attr_array[i].perms 
+                    = sm_p->u.readdirplus.obj_attr_array[i].perms;
+            readdirplus_resp->attr_array[i].atime 
+                    = sm_p->u.readdirplus.obj_attr_array[i].atime;
+            readdirplus_resp->attr_array[i].mtime 
+                    = sm_p->u.readdirplus.obj_attr_array[i].mtime;
+            readdirplus_resp->attr_array[i].ctime 
+                    = sm_p->u.readdirplus.obj_attr_array[i].ctime;
+            readdirplus_resp->attr_array[i].objtype 
+                    = sm_p->u.readdirplus.obj_attr_array[i].objtype;
+            readdirplus_resp->attr_array[i].mask
+                    = PVFS_util_object_to_sys_attr_mask
+                      (sm_p->u.readdirplus.obj_attr_array[i].mask);
             if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_METAFILE)
             {
-                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST)
-                {
-                    if(sm_p->u.readdirplus.obj_attr_array[i].mask 
-                        & PVFS_ATTR_META_UNSTUFFED)
-                    {
-                        PVFS_size (*logical_file_size)(void* params,
-                                                       uint32_t num_handles,
-                                                       PVFS_size *psizes) = NULL;
-                        /* compute the file size */
-                        assert(sm_p->u.readdirplus.size_array[i]);
-                        logical_file_size = 
-                            sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->methods->logical_file_size;
-                        assert(logical_file_size);
-                        assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params);
+              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DIST )
+              {
+                  if(sm_p->u.readdirplus.obj_attr_array[i].mask 
+                      & PVFS_ATTR_META_UNSTUFFED)
+                  {
+                      PVFS_size (*logical_file_size)(void* params,
+                                                     uint32_t num_handles,
+                                                     PVFS_size *psizes) = NULL;
+                      /* compute the file size */
+                      assert(sm_p->u.readdirplus.size_array[i]);
+                      logical_file_size = 
+                        sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->methods->logical_file_size;
+                      assert(logical_file_size);
+                      assert(sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params);
 
-                        readdirplus_resp->attr_array[i].size = logical_file_size(
-                                sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params,
-                                sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count,
-                                sm_p->u.readdirplus.size_array[i]);
+                      readdirplus_resp->attr_array[i].size = logical_file_size(
+                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dist->params,
+                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count,
+                      sm_p->u.readdirplus.size_array[i]);
 
-                    }
-                    else
-                    {
-                        /* size for stuffed case */
-                        readdirplus_resp->attr_array[i].size = sm_p->u.readdirplus.obj_attr_array[i].u.meta.stuffed_size;
-                    }
+                  }
+                  else
+                  {
+                     /* size for stuffed case */
+                     readdirplus_resp->attr_array[i].size = 
+                     sm_p->u.readdirplus.obj_attr_array[i].u.meta.stuffed_size;
+                  }
                     readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_SIZE;
-                }
-                if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 
-                {
-                    readdirplus_resp->attr_array[i].dfile_count = 
-                        sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
-                    readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_DFILE_COUNT;
-                }
+              }
+              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_DFILES) 
+              {
+                  readdirplus_resp->attr_array[i].dfile_count = 
+                      sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count;
+                  readdirplus_resp->attr_array[i].mask 
+                                               |= PVFS_ATTR_SYS_DFILE_COUNT;
+              }
+              if (sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_MIRROR_DFILES)
+              {
+               readdirplus_resp->attr_array[i].mirror_copies_count =
+               sm_p->u.readdirplus.obj_attr_array[i].u.meta.mirror_copies_count;
+               readdirplus_resp->attr_array[i].mask 
+                           |= PVFS_ATTR_SYS_MIRROR_COPIES_COUNT;
+              }
             }
-            else if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_DIRECTORY)
+            else if (readdirplus_resp->attr_array[i].objtype ==
+                     PVFS_TYPE_DIRECTORY)
             {
                 readdirplus_resp->attr_array[i].dirent_count = 
                     sm_p->u.readdirplus.obj_attr_array[i].u.dir.dirent_count;
-                readdirplus_resp->attr_array[i].mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
+                readdirplus_resp->attr_array[i].mask 
+                      |= PVFS_ATTR_SYS_DIRENT_COUNT;
             }
             else if (readdirplus_resp->attr_array[i].objtype == PVFS_TYPE_SYMLINK
                     && sm_p->u.readdirplus.attrmask & PVFS_ATTR_SYMLNK_TARGET) 

@@ -68,6 +68,10 @@ nested machine pvfs2_prelude_sm
 static PINT_sm_action prelude_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_sm:prelude_setup...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -89,6 +93,17 @@ static PINT_sm_action prelude_req_sched(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
+    if (s_op->prelude_mask & PRELUDE_SCHEDULER_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: req_sched already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }   
+ 
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase_frame:%d\tframe_count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
     gossip_debug(GOSSIP_SERVER_DEBUG,
         "(%p) %s (prelude sm) state: req_sched\n", s_op,
         PINT_map_server_op_to_string(s_op->req->op));
@@ -116,6 +131,14 @@ static PINT_sm_action prelude_getattr_if_needed(
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
+    if (s_op->prelude_mask & PRELUDE_GETATTR_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "(%p) %s (prelude sm) state: getattr already done... skipping.\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op));
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
@@ -128,6 +151,7 @@ static PINT_sm_action prelude_getattr_if_needed(
      */
     if (s_op->target_handle == PVFS_HANDLE_NULL)
     {
+
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }

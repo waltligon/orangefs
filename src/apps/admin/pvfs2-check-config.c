@@ -128,7 +128,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Unable to initialize PVFS\n");
         return -1;
     }
-    
+
     /* Construct the list of mount points */
     mnt = PVFS_util_parse_pvfstab(0);
     if (0 != mnt)

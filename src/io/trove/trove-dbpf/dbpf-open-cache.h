@@ -44,6 +44,8 @@ int dbpf_open_cache_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle);
 
+void clear_stranded_bstreams(TROVE_coll_id coll_id);
+    
 #endif /* __DBPF_OPEN_CACHE_H__ */
 
 /*

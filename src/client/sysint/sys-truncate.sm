@@ -143,7 +143,7 @@ PVFS_error PVFS_isys_truncate(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.truncate.size = size;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -153,7 +153,7 @@ PVFS_error PVFS_isys_truncate(
         sm_p->object_ref,
         PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_METAFILE,
-        0);
+        PINT_SM_GETATTR_BYPASS_CACHE);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -405,7 +405,7 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
     PINT_SERVREQ_UNSTUFF_FILL(
             msg_p->req,
             sm_p->getattr.attr.capability,
-            *sm_p->newcred_p,
+            *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);

@@ -310,7 +310,7 @@ PVFS_error PVFS_isys_rename(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, old_parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     /*
       this state machine has several hardcoded 2's around because
       we're dealing with 1 'old' entry, 1 'old' handle, 1 'old' parent

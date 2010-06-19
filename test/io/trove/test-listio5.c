@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	/* initialization stuff */
 
 	ret = trove_initialize(
-	    TROVE_METHOD_DBPF, NULL, storage_space, 0);
+	    TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
 	if (ret < 0) {
 	    fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
 	    return -1;
@@ -133,7 +133,8 @@ int main(int argc, char **argv)
 				  TROVE_FORCE_REQUESTED_HANDLE,
 				  NULL,
                                   trove_context,
-				  &op_id);
+				  &op_id,
+                                  NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
 	val.buffer = &file_handle;
 	val.buffer_sz = sizeof(file_handle);
 	ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
-                                 0, NULL, NULL, trove_context, &op_id);
+                                 0, NULL, NULL, trove_context, &op_id, NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -204,7 +205,8 @@ int main(int argc, char **argv)
 				       NULL, /* vtag */
 				       user_ptr_array,
                                        trove_context,
-				       &op_id);
+				       &op_id,
+                                       NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);
@@ -243,7 +245,8 @@ int main(int argc, char **argv)
                                       NULL, /* vtag */
                                       user_ptr_array,
                                       trove_context,
-                                      &op_id);
+                                      &op_id,
+                                      NULL);
 	while (ret == 0) ret = trove_dspace_test(
             coll_id, op_id, trove_context, &count, NULL, NULL, &state,
             TROVE_DEFAULT_TEST_TIMEOUT);

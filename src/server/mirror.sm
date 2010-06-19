@@ -1,0 +1,1044 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-eattr.h"
+#include "pint-cached-config.h"
+#include "client-state-machine.h"
+
+extern job_context_id pint_client_sm_context;
+
+#define WRITE_ACK_RCV 0
+#define SRC_FLOW_POST 1
+#define NUM_OF_PHASES 2
+
+#define PHASE(__tag) (__tag%NUM_OF_PHASES)
+#define DST(__tag) (__tag/NUM_OF_PHASES)
+#define TAG(__phase,__dst) ( (NUM_OF_PHASES * __dst) + __phase )
+
+
+
+enum
+{
+    NO_DATA_TO_COPY = 100,
+    COMM_DONE       = 400,
+};
+
+int write_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i);
+
+
+%%
+machine pvfs2_mirror_sm
+{
+   state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => inspect_inputs;
+        default => final_response;
+    }
+
+   state inspect_inputs
+    {
+         run inspect_inputs;
+         success => mirror_do_work;
+         default => final_response;
+    }
+
+   state mirror_do_work
+    {
+         jump pvfs2_mirror_work_sm;
+         default => final_response;
+    }
+
+   state final_response
+    {
+       jump pvfs2_final_response_sm;
+       default => mirror_cleanup;
+    }
+
+   state mirror_cleanup
+    {
+       run mirror_cleanup;
+       default => terminate;
+    } 
+
+} /*end machine pvfs2_mirror_sm*/
+
+%%
+
+%%
+nested machine pvfs2_mirror_work_sm
+{
+   state initialize_structures
+    {
+        run initialize_structures;
+        NO_DATA_TO_COPY => cleanup_mirror_work;
+        success => setup_write_request;
+        default => cleanup_mirror_work;
+    } 
+
+   state setup_write_request
+    {
+        run setup_write_request;
+        success => call_msgpairarray;
+        default => cleanup_mirror_work;
+    }
+
+   state call_msgpairarray
+    {
+        jump pvfs2_msgpairarray_sm;
+
+        /*success => cleanup_msgpairarray;*/
+
+        /*default case implies that at least one of the io requests failed*/
+        /*default => cleanup_mirror_work;*/
+        default => cleanup_msgpairarray;
+    }
+
+   state cleanup_msgpairarray
+    {
+        run cleanup_msgpairarray;
+        success => post_ack_and_flow;
+        default => cleanup_mirror_work;
+    }
+
+   state post_ack_and_flow
+    {
+        run post_ack_and_flow;
+        success => check_comm;
+        default => cleanup_mirror_work;
+    }
+
+   state check_comm
+    {
+        run check_comm;
+        COMM_DONE => check_results;
+        default   => check_comm;
+    }
+
+   state check_results
+    {
+        run check_results;
+        default => cleanup_mirror_work;
+    }
+
+   state cleanup_mirror_work
+    {
+        run cleanup_mirror_work;
+        default => return;
+    }
+   
+} /*end nested machine pvfs2_mirror_work_sm*/
+%%
+
+/*START OF pvfs2_mirror_sm*/
+static PINT_sm_action inspect_inputs(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing mirror:inspect_inputs....\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tframe count is %d.\n",smcb->frame_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t base frame is %d.\n",smcb->base_frame);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+    int i;
+
+    js_p->error_code = 0;
+
+    reqmir_p->bsize = s_op->ds_attr.u.datafile.b_size;
+    
+    if (s_op->req)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tREQUEST STRUCTURE EXISTS.\n");
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\trequest->op:%d"
+                                         "\tmirror.src_handle:%llu"
+                                         "\tmirror.dst_count: %d"
+                                         "\tmirror.fs_id:%d"
+                                         "\tmirror.dist.name:%s"
+                                         "\tmirror.bsize:%d"
+                                         "\tmirror.src_server_nr:%d"
+                                         "\n"
+                                         ,s_op->req->op
+                                         ,llu(reqmir_p->src_handle) 
+                                         ,reqmir_p->dst_count
+                                         ,reqmir_p->fs_id
+                                         ,reqmir_p->dist->dist_name
+                                         ,reqmir_p->bsize
+                                         ,reqmir_p->src_server_nr);
+
+      for (i=0; i<reqmir_p->dst_count; i++)
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\treqmir->dst_handle[%d] : %llu\n"
+                                          ,i
+                                          ,llu(reqmir_p->dst_handle[i]));
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tds_attr.b_size:%d\n"
+                                    ,(int)s_op->ds_attr.u.datafile.b_size);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tobject type:%0x\n"
+                                    ,(int)s_op->attr.objtype);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tdatafile size:%d\n"
+                                    ,(int)s_op->attr.u.data.size);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmask:%0x\n"
+                                    ,s_op->attr.mask);
+    return SM_ACTION_COMPLETE;
+}/*end action inspect_inputs*/
+
+
+static PINT_sm_action mirror_cleanup( struct PINT_smcb *smcb
+                                     ,job_status_s *js_p)
+{
+
+   return(server_state_machine_complete(smcb));
+
+}/*end action mirror_cleanup*/
+
+
+
+/******************************************************************************/
+/* START OF pvfs2_mirror_work_sm                                              */
+/******************************************************************************/
+static PINT_sm_action initialize_structures(struct PINT_smcb *smcb
+                                           ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing mirror:"
+                                     "initialize_structures...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tframe count is %d.\n",smcb->frame_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t base frame is %d.\n",smcb->base_frame);
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+    struct PVFS_servresp_mirror *respmir_p = &(s_op->resp.u.mirror);
+    struct PINT_server_mirror_op *mir_p = &(s_op->u.mirror);
+    int i,ret;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\ts_op->op:%d\n",s_op->op);
+
+    js_p->error_code = 0;
+
+    memset(respmir_p,0,sizeof(*respmir_p));
+
+    respmir_p->src_handle        = reqmir_p->src_handle;
+    respmir_p->src_server_nr     = reqmir_p->src_server_nr;
+    respmir_p->dst_count         = reqmir_p->dst_count;
+
+    respmir_p->bytes_written = malloc(sizeof(uint32_t) * respmir_p->dst_count);
+    if (!respmir_p->bytes_written)
+    {
+       gossip_lerr("Unable to allocate respmir_p->bytes_written\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+    memset(respmir_p->bytes_written,0,sizeof(uint32_t) * respmir_p->dst_count);
+
+    respmir_p->write_status_code = malloc(sizeof(uint32_t) *
+                                          respmir_p->dst_count);
+    if (!respmir_p->write_status_code)
+    {
+       gossip_lerr("Unable to allocate respmir->write_status_code.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }
+    memset(respmir_p->write_status_code,0,sizeof(uint32_t) * 
+                                          respmir_p->dst_count);
+
+    if (reqmir_p->bsize == 0)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tNo data to copy...\n");
+        js_p->error_code  = NO_DATA_TO_COPY;
+        return SM_ACTION_COMPLETE;
+    }
+
+    if (s_op->req)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\trequest->op:%d"
+                                         "\tmirror.src_handle:%llu"
+                                         "\tmirror.fs_id:%d"
+                                         "\tmirror.dist.name:%s"
+                                         "\tmirror.bsize:%d"
+                                         "\tmirror.src_server_nr:%d"
+                                         "\tmirror.dst_count:%d"
+                                         "\n"
+                                         ,s_op->req->op
+                                         ,llu(reqmir_p->src_handle) 
+                                         ,reqmir_p->fs_id
+                                         ,reqmir_p->dist->dist_name
+                                         ,reqmir_p->bsize
+                                         ,reqmir_p->src_server_nr
+                                         ,reqmir_p->dst_count);
+      for (i=0; i<reqmir_p->dst_count; i++)
+      {
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror.dst_handle[%d] : %llu\n"
+                                          ,i
+                                          ,llu(reqmir_p->dst_handle[i]));
+      }
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCreating jobs array....\n");
+
+    mir_p->jobs = malloc(sizeof(write_job_t) * reqmir_p->dst_count);
+    if (!mir_p->jobs)
+    {
+       gossip_lerr("Unable to allocate jobs array.\n");
+       js_p->error_code = -PVFS_ENOMEM;
+       return SM_ACTION_COMPLETE;
+    }    
+    memset(mir_p->jobs,0,sizeof(write_job_t) * reqmir_p->dst_count);
+
+    /*Scheduling occurred in pvfs2_mirror_sm/prelude if the schedule_id is    */
+    /*already provided.  Otherwise, this mirror request was called as a nested*/
+    /*function, and therefore needs to be scheduled.                          */
+    if (s_op->scheduled_id != 0) 
+        return SM_ACTION_COMPLETE;
+
+    ret = job_req_sched_post(s_op->op
+                            ,reqmir_p->fs_id
+                            ,reqmir_p->src_handle
+                            ,PINT_server_req_get_access_type(s_op->req)
+                            ,PINT_server_req_get_sched_policy(s_op->req)
+                            ,smcb
+                            ,0
+                            ,js_p
+                            ,&(s_op->scheduled_id)
+                            ,server_job_context);
+    return (ret);
+}/*end action initialize_structures*/
+
+
+
+static PINT_sm_action setup_write_request(struct PINT_smcb *smcb
+                                         ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing mirror:"
+                                     "setup_write_request.....\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+    struct PINT_server_mirror_op *mir_p  = &(s_op->u.mirror);
+    write_job_t *jobs = mir_p->jobs;
+    int ret,i;
+    PVFS_Request myFileReq = PVFS_BYTE;
+    PVFS_offset  myFileReqOffset = 0;
+
+    js_p->error_code = 0;
+
+    /*initialize msgarray_op structure*/
+    PINT_sm_msgarray_op *msgarray_op = &(s_op->msgarray_op);
+    memset(msgarray_op,0,sizeof(PINT_sm_msgarray_op));
+
+    /*parameters are setup like a client except for job_context*/
+    PINT_serv_init_msgarray_params(s_op,reqmir_p->fs_id);
+
+    /*allocate a mspair_state structure for each destination handle.*/
+    ret=PINT_msgpairarray_init(msgarray_op,reqmir_p->dst_count);
+    if (ret)
+    {
+        gossip_lerr("Failed to allocate msgarray.\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*setup msgpairarray to initiate PVFS_SERV_IO write request for the       */
+    /*destination handles.                                                    */
+    for (i=0; i<reqmir_p->dst_count; i++)
+    {
+       PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
+
+       msg_p->fs_id      = reqmir_p->fs_id;
+       msg_p->handle     = reqmir_p->dst_handle[i];
+       msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+       msg_p->comp_fn    = write_comp_fn;    
+
+       /*determine the BMI svr address for the destination handle*/
+       ret = PINT_cached_config_map_to_server(&msg_p->svr_addr
+                                             ,msg_p->handle
+                                             ,msg_p->fs_id );
+       if (ret)
+       {
+           gossip_lerr("Failed to map address\n");
+           js_p->error_code = ret;
+           return SM_ACTION_COMPLETE;
+       }
+
+       /*save the svr_addr for later use*/
+       jobs[i].svr_addr = msg_p->svr_addr;
+
+
+       /*setup the server PVFS_SERV_IO write request itself*/
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\treqmir_p->bsize:%d.\n"
+                                       ,reqmir_p->bsize);
+       PINT_SERVREQ_IO_FILL( msg_p->req  
+                            ,s_op->req->credentials
+                            ,reqmir_p->fs_id
+                            ,reqmir_p->dst_handle[i]
+                            ,PVFS_IO_WRITE
+                            ,reqmir_p->flow_type
+                            ,0
+                            ,1
+                            ,reqmir_p->dist
+                            ,myFileReq
+                            ,myFileReqOffset
+                            ,reqmir_p->bsize
+                            ,NULL );
+    }/*end for*/
+
+    PINT_sm_push_frame(smcb,0,msgarray_op);
+  
+    return SM_ACTION_COMPLETE;
+
+}/*end action setup_write_request*/
+
+
+static PINT_sm_action cleanup_msgpairarray( struct PINT_smcb *smcb
+                                          , job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing MIRROR:cleanup_msgpairarray\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+
+    PINT_sm_msgarray_op *msgarray_op = &(s_op->msgarray_op);
+    PINT_server_mirror_op *mir_op = &(s_op->u.mirror);
+    write_job_t *jobs = mir_op->jobs;
+    int i;
+
+    js_p->error_code = 0;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tCURRENT:\tsmcb->base_frame:%d"
+                                     "\tframe_count:%d\n"
+                                    ,smcb->base_frame,smcb->frame_count);
+
+    /*if ALL msgpairs have errors, then set an error code and skip the rest */
+    /*of this request.                                                      */
+    for (i=0; i<reqmir_p->dst_count; i++)
+    {
+        if (jobs[i].io_status == 0)
+           break;
+    }
+    if (i==reqmir_p->dst_count)
+    {
+        js_p->error_code = -PVFS_EIO;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /*retain the session/flow identifier created in the PVFS_SERV_IO request */
+    /*for each destination handle.                                           */
+    for (i=0; i<reqmir_p->dst_count; i++)
+    {
+       if (jobs[i].io_status == 0)
+       {
+          jobs[i].session_tag = msgarray_op->msgarray[i].session_tag;
+       } else {
+          jobs[i].session_tag = 0; /*session tags are NEVER zero*/
+                                   /*PINT_util_get_next_tag()   */
+       } 
+    }
+
+    /*will free msgarray if necessary*/
+    PINT_msgpairarray_destroy(msgarray_op);
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tIO_STATUS & SESSION TAG\n");
+    for (i=0; i<reqmir_p->dst_count; i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tio_status[%d]:%d "
+                                         "\tsession_tag[%d]:%d\n"
+                                        ,i,jobs[i].io_status
+                                        ,i,jobs[i].session_tag);
+    }
+
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Leaving MIRROR:cleanup msgpairarray.\n");
+
+    return SM_ACTION_COMPLETE;
+}/*end action cleanup_msgpairarray*/
+
+
+
+
+static PINT_sm_action post_ack_and_flow (struct PINT_smcb *smcb
+                                        ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing mirror:post_ack_and_flow..\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+    PINT_server_mirror_op      *mir_op   = &(s_op->u.mirror);
+    write_job_t *jobs = mir_op->jobs;
+
+    int ret,i;
+    unsigned long status_user_tag = 0;
+
+    js_p->error_code  = 0;
+
+    mir_op->job_count = 0;
+    mir_op->max_resp_sz = PINT_encode_calc_max_size( PINT_ENCODE_RESP
+                                                    ,PVFS_SERV_WRITE_COMPLETION
+                                                    ,reqmir_p->encoding );
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmax_resp_sz:%d\n",mir_op->max_resp_sz);
+
+    /*get flow info from the server configuration file.*/
+    struct filesystem_configuration_s *cur_fs = NULL;
+    struct server_configuration_s *server_config = NULL;
+
+    server_config = get_server_config_struct();
+    cur_fs = PINT_config_find_fs_id(server_config,reqmir_p->fs_id);
+         
+    /*post write-ack and flow for each destination handle*/
+    for (i=0; i<reqmir_p->dst_count; i++)
+    { 
+       /*if the initial IO request for this destination handle failed, then */
+       /*skip it.                                                           */
+       if (jobs[i].io_status != 0)
+       {
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"io_status[%d] : %d ...skipping\n"
+                                           ,i,jobs[i].io_status);
+           continue;
+       }
+
+       jobs[i].encoded_resp_p = BMI_memalloc( jobs[i].svr_addr
+                                             ,mir_op->max_resp_sz
+                                             ,BMI_RECV );
+       if (!jobs[i].encoded_resp_p)
+       {
+           gossip_lerr("mirror:BMI_memalloc (for write ack) failed.\n");
+           js_p->error_code = -PVFS_ENOMEM;
+           continue; 
+       }
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tencoded response successfully "
+                                        "allocated.\n");
+
+       /*pre-post this recv with an infinite timeout and adjust it after the  */
+       /*flow completes, since we don't know how long a flow can take at this */
+       /*point.                                                               */
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\trecv_id:%d\n",(int)jobs[i].recv_id);
+       status_user_tag = TAG(WRITE_ACK_RCV,i);
+       ret = job_bmi_recv( jobs[i].svr_addr
+                          ,jobs[i].encoded_resp_p
+                          ,mir_op->max_resp_sz
+                          ,jobs[i].session_tag
+                          ,BMI_PRE_ALLOC
+                          ,smcb
+                          ,status_user_tag
+                          ,&(jobs[i].recv_status)
+                          ,&(jobs[i].recv_id)
+                          ,server_job_context
+                          ,JOB_TIMEOUT_INF
+                          ,NULL );
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tWRITE_ACK_RCV:return code:%d\n"
+                                   ,ret);
+       /*we expect this job to __not__ complete immediately, since we have not*/
+       /*posted the flow.                                                     */
+       if (ret == 1 && jobs[i].recv_status.error_code)
+       {   
+           /*Error posting the job*/
+           js_p->error_code = jobs[i].recv_status.error_code;
+           continue;
+       }
+       else if (ret == 1)
+       {
+           /*Job completed immediately with no errors.  In this context, */
+           /*immediate completion is an error.                           */
+           js_p->error_code = -EPERM; /*operation not permitted.*/
+           continue;
+       }
+       else if (ret != 0)
+       {
+           /*Error adding job to the job_time_mgr*/
+           js_p->error_code = ret;
+           continue;
+       }
+
+       /*increment once for successful post of write-ack*/
+       mir_op->job_count++;
+
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tWrite ACK recv successfully posted."
+                                        "\tjob_id:%d \tjob_count:%d\n"
+                                       ,(int)jobs[i].recv_id,mir_op->job_count);
+
+
+       /*issue flow request for the src datahandle using the session tag      */
+       /* obtained from the PVFS_SERV_IO request.                             */
+       /*                                                                     */
+       /*setup the flow descriptor.  Read from the src datahandle and send to */
+       /*the destination BMI endpoint.  The PVFS_SERV_IO has already setup the*/
+       /*other end of the flow (BMI src/TROVE dest).                          */
+       jobs[i].flow_desc = PINT_flow_alloc();
+       if (!jobs[i].flow_desc)
+       {
+           js_p->error_code = -PVFS_ENOMEM;
+           gossip_lerr("unable to allocate memory for flow descriptor");
+           job_bmi_cancel(jobs[i].recv_id,server_job_context);
+           mir_op->job_count--;
+           continue;
+       }
+
+       PINT_flow_reset(jobs[i].flow_desc);
+
+       jobs[i].flow_desc->src.endpoint_id     = TROVE_ENDPOINT;
+       jobs[i].flow_desc->src.u.trove.handle  = reqmir_p->src_handle;
+       jobs[i].flow_desc->src.u.trove.coll_id = reqmir_p->fs_id;
+
+       jobs[i].flow_desc->dest.endpoint_id   = BMI_ENDPOINT;
+       jobs[i].flow_desc->dest.u.bmi.address = jobs[i].svr_addr;
+
+       jobs[i].flow_desc->buffer_size      = cur_fs->fp_buffer_size;
+       jobs[i].flow_desc->buffers_per_flow = cur_fs->fp_buffers_per_flow;
+
+       jobs[i].flow_desc->file_data.extend_flag = 1;
+       jobs[i].flow_desc->file_data.fsize       = reqmir_p->bsize;
+       jobs[i].flow_desc->file_data.dist        = reqmir_p->dist;
+       jobs[i].flow_desc->file_data.server_nr   = 0;
+       jobs[i].flow_desc->file_data.server_ct   = 1;
+
+       jobs[i].flow_desc->file_req              = PVFS_BYTE;
+       jobs[i].flow_desc->file_req_offset       = 0;
+       jobs[i].flow_desc->mem_req               = NULL;
+
+       jobs[i].flow_desc->tag                   = jobs[i].session_tag;
+       jobs[i].flow_desc->type                  = reqmir_p->flow_type;
+       jobs[i].flow_desc->user_ptr              = NULL;
+       jobs[i].flow_desc->aggregate_size        = reqmir_p->bsize;
+
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbsize:%lld \tdatafile:nr:%d\tct:%d"
+                                        "\toffset:%lld \ttag:%d\n"
+                                       ,lld(jobs[i].flow_desc->file_data.fsize)
+                                       ,jobs[i].flow_desc->file_data.server_nr
+                                       ,jobs[i].flow_desc->file_data.server_ct
+                                       ,lld(jobs[i].flow_desc->file_req_offset)
+                                       ,jobs[i].flow_desc->tag );
+
+       /*post the flow*/
+       status_user_tag = TAG(SRC_FLOW_POST,i);
+       ret = job_flow( jobs[i].flow_desc
+                      ,smcb
+                      ,status_user_tag
+                      ,&(jobs[i].flow_status)
+                      ,&(jobs[i].flow_job_id)
+                      ,server_job_context
+                      ,server_config->server_job_flow_timeout
+                      ,NULL );
+
+      /*if the flow fails immediately, then we have to do some special        */
+      /*handling.  This function is not equipped to handle the failure        */
+      /*directly, so instead we post a null job that will propagate the error */
+      /*to the normal state where we interpret flow errors.                   */
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tSRC_FLOW_POST:return code:%d\n"
+                                      ,ret);
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tflow job id:%d\n"
+                                      ,(int)jobs[i].flow_job_id);
+      if (ret<0)
+      {
+          /* a failure occured while adding this job to the job_time_mgr*/
+          js_p->error_code = ret;
+          job_bmi_cancel(jobs[i].recv_id,server_job_context);
+          mir_op->job_count--;
+          continue;
+      }
+      else if (ret == 1 && jobs[i].flow_status.error_code == 0)
+      {
+          /*job completed immediately AND was successful*/
+          js_p->error_code = 0;
+          /*increment job_count again for successful post of flow*/
+          mir_op->job_count++;
+          continue;
+      }
+      else if (jobs[i].flow_status.error_code)
+      {
+          /*job completed immediately AND was NOT successful*/
+          js_p->error_code = jobs[i].flow_status.error_code;
+          job_bmi_cancel(jobs[i].recv_id,server_job_context);
+          mir_op->job_count--;
+          continue;      
+      }
+
+      /*increment job_count again for successful post of flow*/
+      mir_op->job_count++;
+
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsuccessfully posted flow "
+                                       "\tjob_count : %d...\n"
+                                      ,mir_op->job_count);  
+  }/*end for each destination handle*/
+
+  /*if the job_count > 0, then at least one of the IO requests was successful */
+  /*and the submission of the write-ack and flow were also successful.        */
+  if (mir_op->job_count > 0)
+     return SM_ACTION_DEFERRED;
+  else
+  {
+     /*if job_count is zero, then nothing worked.*/
+     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tNo jobs successfully posted in "
+                                      "post_ack_and_flow : %d\n"
+                                     ,js_p->error_code);
+     js_p->error_code = -PVFS_EIO;
+     return SM_ACTION_COMPLETE;
+  }
+}/*end action post_ack_and_flow*/
+
+
+static PINT_sm_action check_comm ( struct PINT_smcb *smcb
+                                  ,job_status_s *js_p)
+{
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_comm...\n");
+
+   struct PINT_server_op      *s_op    = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+   struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
+
+   PINT_server_mirror_op *mir_op   = &(s_op->u.mirror);
+   write_job_t *jobs = mir_op->jobs;
+
+   job_aint status_user_tag = js_p->status_user_tag;
+   int ret,i;
+
+   struct filesystem_configuration_s *cur_fs        = NULL;
+   struct server_configuration_s     *server_config = NULL;
+
+   server_config = get_server_config_struct();
+   cur_fs = PINT_config_find_fs_id(server_config,reqmir_p->fs_id);
+
+   /*status_user_tag's will only exist for those destination handles that had */
+   /*successful posts of a write-ack and flow.                                */
+   switch(PHASE(status_user_tag))
+   {
+       case SRC_FLOW_POST:
+       {
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReceived SRC_FLOW_POST for "
+                                            "dst(%d)...\n"
+                                           ,(int)DST(status_user_tag));
+           i = (int)DST(status_user_tag);
+           jobs[i].flow_status = *js_p;
+           mir_op->job_count--;
+           if (mir_op->job_count > 0)
+           {
+              ret = job_reset_timeout(jobs[i].recv_id
+                                     ,server_config->server_job_bmi_timeout);
+              if (ret == 0 || ret == -PVFS_EINVAL)
+              {
+                 gossip_debug(GOSSIP_MIRROR_DEBUG,"\ttimeout reset:%d(%0x)\n"
+                                                 ,ret,ret);
+                 /*ack was reset or it has already completed.*/
+              }
+              else
+              {
+                  gossip_lerr("Unable to reset timeout");
+                  return(ret);
+              }               
+           }
+           break;
+       }
+       case WRITE_ACK_RCV:
+       {
+           i=(int)DST(status_user_tag);
+           jobs[i].recv_status = *js_p;
+           mir_op->job_count--;
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReceived WRITE_ACK_RCV for "
+                                            "dst(%d)...\n"
+                                           ,(int)DST(status_user_tag));
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjob_count:%d\n"
+                                           ,mir_op->job_count);
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\trecv_status.error_code:%d\n"
+                                           ,jobs[i].recv_status.error_code);
+           break;
+       }
+       default:
+       {
+           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tReceived unknown:%d\n"
+                                           ,(int)status_user_tag);
+           mir_op->job_count = 0;
+           break;
+       }
+   }/*end switch*/
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d"
+                                    "\tjs_p->actual_size:%d\n"
+                                   ,js_p->error_code
+                                   ,(int)js_p->actual_size);
+
+   js_p->error_code = 0;
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjob_count:%d\n",mir_op->job_count);
+   if (mir_op->job_count) /*more jobs to process*/
+   {
+      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d "
+                                       "\tjob_count:%d "
+                                       "\tleaving deferred\n"
+                                      ,js_p->error_code
+                                      ,mir_op->job_count);
+      return SM_ACTION_DEFERRED;
+   }
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d"
+                                    "\tjob_count:%d"
+                                    "\tleaving complete\n"
+                                   ,js_p->error_code
+                                   ,mir_op->job_count);
+
+   if (mir_op->job_count == 0) /*no more jobs to process*/
+       js_p->error_code = COMM_DONE;
+
+   return SM_ACTION_COMPLETE;
+}/*end action check_comm*/
+
+
+static PINT_sm_action check_results( struct PINT_smcb *smcb
+                                    ,job_status_s *js_p )
+{
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_results...\n");
+   struct PINT_server_op *s_op   = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+   struct PVFS_servreq_mirror  *reqmir_p  = &(s_op->req->u.mirror);
+   struct PVFS_servresp_mirror *respmir_p = &(s_op->resp.u.mirror);
+   PINT_server_mirror_op *mir_p  = &(s_op->u.mirror);
+   write_job_t *jobs = mir_p->jobs;
+
+   struct PINT_decoded_msg decoded_resp = {0};
+   struct PVFS_server_resp *resp = NULL;
+
+   int ret,i;
+
+   js_p->error_code = 0;
+
+   /*check result statuses for each destination handle*/
+   for (i=0; i<reqmir_p->dst_count; i++)
+   {
+      if (jobs[i].io_status != 0)
+      {
+          respmir_p->write_status_code[i] = jobs[i].io_status;
+      }
+      else if (jobs[i].recv_status.error_code)
+      {
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tACK rcv failed:%d\n"
+                                          ,jobs[i].recv_status.error_code );
+          respmir_p->write_status_code[i] = jobs[i].recv_status.error_code;
+      }
+      else if (jobs[i].flow_status.error_code)
+      {
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tFLOW failed:%d\n"
+                                          ,jobs[i].flow_status.error_code);
+          respmir_p->write_status_code[i] = jobs[i].flow_status.error_code;
+      }
+      else
+      {
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tACK & FLOW succeeded\n");
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\trecv_status.actual_size:%d\n"
+                                         ,(int)jobs[i].recv_status.actual_size);
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tparameters sent into "
+                                           "PINT_serv_decode_resp:\n");
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tfs_id : %d\n"
+                                           "\t\t\tencoded_resp_p : %p\n"
+                                           "\t\t\tdecoded_resp : %p\n"
+                                           "\t\t\tsvr_addr : %ld\n"
+                                           "\t\t\tactual_size : %d\n"
+                                           "\t\t\tresp : %p\n"
+                                          ,reqmir_p->fs_id
+                                          ,(void *)jobs[i].encoded_resp_p
+                                          ,&decoded_resp
+                                          ,(long int)jobs[i].svr_addr
+                                          ,(int)jobs[i].recv_status.actual_size
+                                          ,resp);
+          ret = PINT_serv_decode_resp( reqmir_p->fs_id
+                                      ,jobs[i].encoded_resp_p
+                                      ,&decoded_resp
+                                      ,&(jobs[i].svr_addr)
+                                      ,jobs[i].recv_status.actual_size
+                                      ,&resp );
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tafter PINT_serv_decode_resp..\n");
+          if (ret == 0)
+          {
+             gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsession_tag : %d\n"
+                                             ,jobs[i].session_tag);
+             respmir_p->bytes_written[i] = 
+                     resp->u.write_completion.total_completed;
+             gossip_debug(GOSSIP_MIRROR_DEBUG,"\tafter bytes_written..\n");
+             respmir_p->write_status_code[i] = jobs[i].recv_status.error_code;
+             gossip_debug(GOSSIP_MIRROR_DEBUG,"\tafter write_status_code..\n");
+             PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
+             gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbytes written:%d "
+                                              "\tresp status:%d "
+                                              "\tresp op:%d\n"
+                                             ,respmir_p->bytes_written[i]
+                                             ,respmir_p->write_status_code[i]
+                                             ,resp->op );
+          }
+          else
+          {
+             gossip_lerr("PINT_serv_decode_resp failed(%d)",ret);
+             respmir_p->write_status_code[i] = ret;
+          }  
+      }/*end if*/
+
+      if (jobs[i].flow_desc)
+         PINT_flow_free(jobs[i].flow_desc);
+      if (jobs[i].encoded_resp_p)
+          BMI_memfree( jobs[i].svr_addr
+                      ,jobs[i].encoded_resp_p
+                      ,mir_p->max_resp_sz
+                      ,BMI_RECV);
+   }/*end for each destination handle*/
+
+   /*if at least ONE of the writes was successful, then return a zero to indi-*/
+   /*cate that ALL status codes must be checked.  If NONE of the writes were  */
+   /*successful, then return a non-zero to indicate that individual statuses  */
+   /*do not need to be checked.                                               */
+   for (i=0; i<reqmir_p->dst_count; i++)
+   {
+       if (respmir_p->write_status_code[i] == 0)
+          break;
+   }
+   if (i==reqmir_p->dst_count)
+       js_p->error_code = -PVFS_EIO;
+   else
+       js_p->error_code = 0;
+ 
+   return SM_ACTION_COMPLETE;
+}/*end action check_results*/
+
+
+
+
+
+
+
+static PINT_sm_action cleanup_mirror_work(struct PINT_smcb *smcb
+                                         ,job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing cleanup_mirror_work.....\n");
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PVFS_servresp_mirror  *respmir_p = &(s_op->resp.u.mirror);
+    struct PVFS_servreq_mirror   *reqmir_p  = &(s_op->req->u.mirror);
+    struct PINT_server_mirror_op *mir_p     = &(s_op->u.mirror);
+    write_job_t *jobs = mir_p->jobs;
+    int i,ret;
+    job_id_t job_id;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tIN:js_p->error_code:%d\n"
+                                    ,js_p->error_code);
+    if (js_p->error_code == NO_DATA_TO_COPY)
+    {
+        js_p->error_code = 0;
+    }
+
+    if (mir_p->jobs)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tJOBS IO STATUS...\n");
+        for (i=0; i<reqmir_p->dst_count; i++)
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tio_status(%d):%d\n"
+                                            ,i
+                                            ,(int)jobs[i].io_status);
+    }
+
+    if (mir_p->jobs)
+        free(mir_p->jobs);
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tOUT:js_p->error_code:%d\n"
+                                    ,js_p->error_code);
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\trespmir_p->src_handle:%llu\n"
+                                    ,llu(respmir_p->src_handle));
+   
+    for (i=0; i<respmir_p->dst_count; i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tbytes_written[%d]:%d\n"
+                                         "\t\t\twrite_status_code[%d]:%d\n"
+                                        ,i,respmir_p->bytes_written[i]
+                                        ,i,respmir_p->write_status_code[i]);
+    }
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\ts_op->resp.status:%d\n"
+                                    ,s_op->resp.status);
+
+    /*If s_op->schedule_id is non-zero, then we must release the object */
+    /*from the scheduler.                                               */
+    if (s_op->scheduled_id)
+    {
+       ret = job_req_sched_release(s_op->scheduled_id
+                                  ,smcb
+                                  ,0
+                                  ,js_p
+                                  ,&job_id
+                                  ,server_job_context);
+       s_op->scheduled_id = 0;
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLeaving cleanup_mirror_work.....\n");
+       return (ret);
+    }
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Leaving cleanup_mirror_work.....\n");
+    return SM_ACTION_COMPLETE;
+}/*end action cleanup_mirror_work*/
+
+
+
+int write_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+{
+  /*This function executes AFTER each msgpair has completed and is under the  */
+  /*control of msgpairarray.sm.  Here, we will capture the response from the  */
+  /*PVFS_SERV_IO request; however, the response pertains only to the initial  */
+  /*ACK and start of the flow on the remote server.  We will retain the status*/
+  /*from each response and then check it when we return from the jump to      */
+  /*msgpairarray.  We will always return a zero from this function, even if   */
+  /*the request failed, so we can check it later.                             */
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing write_comp_fn.....\n");
+
+   PINT_smcb *smcb = v_p;
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+   struct PINT_server_mirror_op *mir_p = &(s_op->u.mirror);
+   write_job_t *jobs = mir_p->jobs;
+
+   /*resp_p contains the response from the PVFS_SERV_IO request after it */
+   /*has posted its initial write ack and flow.                          */
+
+   jobs[i].io_status = resp_p->status;
+
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tInitial ACK from IO write request(%d). "
+                                    "bstream_size is %d.\n"
+                                   ,i
+                                   ,(int)resp_p->u.io.bstream_size);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tstatus:%d\n",(int)jobs[i].io_status);
+
+   if (resp_p->status != 0)
+   {
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tNegative response from "
+                                        "PVFS_SERV_IO:%d\n"
+                                       ,resp_p->status);
+   }
+
+   return(0);
+} /*end msgpair completion function mirror_comp_fn*/
+
+
+
+
+/*set handle and fs-id ... required by the state machine processor*/
+static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req
+                                             ,PVFS_fs_id *fs_id
+                                             ,PVFS_handle *handle )
+{
+   *fs_id  = req->u.mirror.fs_id;
+   *handle = req->u.mirror.src_handle;
+    return 0;
+};
+
+/*request parameters*/
+struct PINT_server_req_params pvfs2_mirror_params =
+{
+	.string_name = "mirror",
+	.perm = PINT_SERVER_CHECK_NONE,
+	.access_type = PINT_server_req_modify,
+	.sched_policy = PINT_SERVER_REQ_SCHEDULE,
+	.get_object_ref = PINT_get_object_ref_mirror,
+	.state_machine = &pvfs2_mirror_sm
+};
+/****************************end of file***************************************/
+
+
+
+
+
+

@@ -87,7 +87,7 @@ PVFS_error PVFS_isys_listeattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.listeattr.nkey = nkey;
     sm_p->u.listeattr.resp_p = resp_p;
     sm_p->u.listeattr.pos_token = token;

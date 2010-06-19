@@ -494,7 +494,7 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -510,9 +510,9 @@ PVFS_error PVFS_isys_ref_lookup(
         gossip_err("%s: failed to init context (path = %s)\n",
                    __func__, relative_pathname);
 
-        PINT_cleanup_credential(sm_p->newcred_p);
-        free(sm_p->newcred_p);
-        sm_p->newcred_p = NULL;
+        PINT_cleanup_credential(sm_p->cred_p);
+        free(sm_p->cred_p);
+        sm_p->cred_p = NULL;
         PINT_smcb_free(smcb);
         return ret;
     }

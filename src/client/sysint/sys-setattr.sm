@@ -129,7 +129,7 @@ PVFS_error PVFS_isys_setattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
@@ -232,7 +232,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         sm_p->getattr.attr.capability,
-        *sm_p->newcred_p,
+        *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         objtype,

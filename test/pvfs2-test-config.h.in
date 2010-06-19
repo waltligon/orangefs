@@ -27,11 +27,17 @@
 /* Define to 1 if you have the `pvfs2' library (-lpvfs2). */
 #undef HAVE_LIBPVFS2
 
+/* Define if libz exists */
+#undef HAVE_LIBZ
+
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
-/* Define to 1 if the libssl is available */
-#undef HAVE_OPENSSL
+/* Define to 1 if you have the <openssl/crypto.h> header file. */
+#undef HAVE_OPENSSL_CRYPTO_H
+
+/* Define to 1 if you have the <openssl/evp.h> header file. */
+#undef HAVE_OPENSSL_EVP_H
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -63,6 +69,9 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define to 1 if you have the <zlib.h> header file. */
+#undef HAVE_ZLIB_H
+
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
@@ -83,3 +92,6 @@
 
 /* Define if libaio exists */
 #undef WITH_AIO
+
+/* Define if openssl exists */
+#undef WITH_OPENSSL

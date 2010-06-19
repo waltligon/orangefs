@@ -40,10 +40,12 @@ static int parse_devices(
     int *majornum);
 #endif  /* WITH_LINUX_KMOD */
 
+
 static int pdev_fd = -1;
 static int32_t pdev_magic;
 #ifdef WITH_LINUX_KMOD
 static int32_t pdev_max_upsize;
+
 #endif  /* WITH_LINUX_KMOD */
 static int32_t pdev_max_downsize;
 
@@ -63,7 +65,13 @@ int PINT_dev_initialize(
 #ifdef WITH_LINUX_KMOD
     int ret = -1;
     char *debug_string = getenv("PVFS2_KMODMASK");
-    int32_t debug_mask = 0;
+    uint64_t debug_mask = 0;
+    dev_mask_info_t mask_info;
+
+    if (!debug_string)
+    {
+        debug_string = "none";
+    }
 
     /* we have to be root to access the device */
     if ((getuid() != 0) && (geteuid() != 0))
@@ -119,16 +127,33 @@ int PINT_dev_initialize(
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
 
-    /* set the debug mask through an ioctl */
-    if (!debug_string)
-        return 0;
-
-    /* truncate it to a 32 bit mask since we dont have a need for more than that anyways */
-    debug_mask = (int32_t) PVFS_kmod_eventlog_to_mask(debug_string);
-    ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &debug_mask);
+    /* push the kernel debug mask into the kernel, set gossip_debug_mask in the
+     * kernel and initialize the kernel debug string used by 
+     * /proc/sys/pvfs2/kernel-debug.
+    */
+    mask_info.mask_type  = KERNEL_MASK;
+    mask_info.mask_value = PVFS_kmod_eventlog_to_mask(debug_string);
+    ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
     if (ret < 0)
     {
-        gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (debug mask to %x)\n", debug_mask);
+        gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (kernel debug mask to"
+                   " %x)\n"
+                  ,(unsigned int)debug_mask);
+        close(pdev_fd);
+        return -(PVFS_ENODEV|PVFS_ERROR_DEV);
+    }
+
+    /* push the client debug mask into the kernel and initialize the client 
+     * debug string used by /proc/sys/pvfs2/client-debug.  
+    */
+    mask_info.mask_type  = CLIENT_MASK;
+    mask_info.mask_value = gossip_debug_mask;
+    ret = ioctl(pdev_fd, PVFS_DEV_DEBUG, &mask_info);
+    if (ret < 0)
+    {
+        gossip_err("Error: ioctl() PVFS_DEV_DEBUG failure (client debug mask to"
+                   " %x)\n"
+                  ,(unsigned int)gossip_debug_mask);
         close(pdev_fd);
         return -(PVFS_ENODEV|PVFS_ERROR_DEV);
     }

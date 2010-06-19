@@ -186,7 +186,10 @@ static void aio_progress_notification(union sigval sig)
                     gen_mutex_unlock(&dbpf_update_size_lock);
                     goto error_in_cleanup;
                 }
-                sync_required = 1;
+                if(op_p->flags & TROVE_SYNC)
+                {
+                    sync_required = 1;
+                }
             }
             gen_mutex_unlock(&dbpf_update_size_lock);
         }
@@ -234,13 +237,18 @@ error_in_cleanup:
             dbpf_queued_op_complete(cur_op, OP_COMPLETED);
         }
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %s)\n", 
-                     list_proc_state_strings[
-                     op_p->u.b_rw_list.list_proc_state]);
+        /* if sync is not required, then dbpf_queued_op_complete executes and will issue a cond_signal. if
+         * the signal'd thread executes before the following gossip_debug statement, then cur_op is un-
+         * defined, causing the gossip_debug statement to seg fault.  So, we check for existence first!
+        */
+
+        /* if the signal'd thread executes op_p can also go away
+         * causing the list_proc_state access to segfault. there isn't really
+         * much debugging information to be had by accessing cur_op or
+         * op_p, the key is that delayed ops are starting. */
+        gossip_debug(GOSSIP_TROVE_DEBUG,"*** starting delayed ops if any.\n");
 
         start_delayed_ops_if_any(1);
-
     }
     else
     {

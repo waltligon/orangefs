@@ -360,7 +360,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     do
     {
 	PVFS_util_refresh_credential(creds);
-        ret = PVFS_mgmt_iterate_handles_list(cur_fs,
+	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
 					     hcount_array,

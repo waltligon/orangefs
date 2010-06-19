@@ -13,7 +13,6 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -100,7 +99,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
   PVFS_sysresp_lookup resp_lookup;
   PVFS_sysresp_geteattr resp_geteattr;
   PVFS_object_ref parent_ref;
-  PVFS_credential *cred;
+  PVFS_credentials credentials;
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -109,8 +108,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
     return -1;
   }
 
-  cred = PVFS_util_gen_fake_credential();
-  assert(cred);
+  PVFS_util_gen_credentials(&credentials);
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere
@@ -119,8 +117,8 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
   {
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
     ret = PVFS_sys_lookup(cur_fs, pvfs_path,
-                          cred, &resp_lookup,
-                          PVFS2_LOOKUP_LINK_FOLLOW);
+                          &credentials, &resp_lookup,
+                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
       PVFS_perror("PVFS_sys_lookup", ret);
@@ -143,7 +141,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
       return -1;
     }
 
-    ret = PINT_lookup_parent(pvfs_path, cur_fs, cred, 
+    ret = PINT_lookup_parent(pvfs_path, cur_fs, &credentials, 
                                   &parent_ref.handle);
     if(ret < 0)
     {
@@ -158,8 +156,8 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
   memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
   ret = PVFS_sys_ref_lookup(parent_ref.fs_id, str_buf,
-                            parent_ref, cred, &resp_lookup,
-                            PVFS2_LOOKUP_LINK_NO_FOLLOW);
+                            parent_ref, &credentials, &resp_lookup,
+                            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
   if (ret != 0)
   {
     fprintf(stderr, "Target '%s' does not exist!\n", str_buf);
@@ -169,7 +167,7 @@ int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
   /* get extended attribute */
   resp_geteattr.val_array = val_p;
   ret = PVFS_sys_geteattr_list(resp_lookup.ref,
-          cred, nkey, key_p, &resp_geteattr);
+          &credentials, nkey, key_p, &resp_geteattr, NULL);
   if (ret < 0)
   {
       PVFS_perror("PVFS_sys_geteattr failed with errcode", ret);

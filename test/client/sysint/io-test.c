@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
@@ -81,11 +81,9 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[1]);
     }
 
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-    
-    ret = PVFS_sys_lookup(fs_id, name, cred,
-			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
+    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret == -PVFS_ENOENT)
     {
         PVFS_sysresp_getparent gp_resp;
@@ -93,15 +91,15 @@ int main(int argc, char **argv)
 	printf("IO-TEST: lookup failed; creating new file.\n");
 
         memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
-	ret = PVFS_sys_getparent(fs_id, name, cred, &gp_resp);
+	ret = PVFS_sys_getparent(fs_id, name, &credentials, &gp_resp, NULL);
 	if (ret < 0)
 	{
             PVFS_perror("PVFS_sys_getparent failed", ret);
 	    return ret;
 	}
 
-	attr.owner = cred->userid;
-	attr.group = cred->group_array[0];
+	attr.owner = credentials.uid;
+	attr.group = credentials.gid;
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -113,7 +111,7 @@ int main(int argc, char **argv)
         assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
-			      cred, NULL, NULL, &resp_cr);
+			      &credentials, NULL, &resp_cr, NULL, NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_create() failure", ret);
@@ -157,7 +155,7 @@ int main(int argc, char **argv)
     }
 
     ret = PVFS_sys_write(pinode_refn, file_req, 0, buffer, mem_req,
-			 cred, &resp_io);
+			 &credentials, &resp_io, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_write failure", ret);
@@ -175,7 +173,7 @@ int main(int argc, char **argv)
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     ret = PVFS_sys_read(pinode_refn, file_req, 0, buffer, mem_req,
-			cred, &resp_io);
+			&credentials, &resp_io, NULL);
     if (ret < 0)
     {
         PVFS_perror("PVFS_sys_read failure", ret);
@@ -211,7 +209,7 @@ int main(int argc, char **argv)
 
     /* test out some of the mgmt functionality */
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
-			   cred, &resp_getattr);
+			   &credentials, &resp_getattr, NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_getattr", ret);
@@ -228,8 +226,8 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    ret = PVFS_mgmt_get_dfile_array(pinode_refn, cred,
-				    dfile_array, resp_getattr.attr.dfile_count);
+    ret = PVFS_mgmt_get_dfile_array(pinode_refn, &credentials,
+				    dfile_array, resp_getattr.attr.dfile_count, NULL);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_dfile_array", ret);

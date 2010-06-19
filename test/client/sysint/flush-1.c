@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
 
     if (argc != 2)
     {
@@ -61,17 +61,16 @@ int main(int argc, char **argv)
     printf("File to be created is %s\n",str_buf);
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
+    PVFS_util_gen_credentials(&credentials);
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = cred->userid;
-    attr.group = cred->group_array[0];
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, cred, 
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -81,7 +80,7 @@ int main(int argc, char **argv)
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
-                          cred, NULL, NULL, &resp_create);
+                          &credentials, NULL, &resp_create, NULL, NULL);
     if (ret < 0)
     {
         printf("create failed with errcode = %d\n", ret);
@@ -92,7 +91,7 @@ int main(int argc, char **argv)
     printf("--create--\n"); 
     printf("Handle: %lld\n",lld(resp_create.ref.handle));
 
-    ret = PVFS_sys_flush(resp_create.ref, cred);
+    ret = PVFS_sys_flush(resp_create.ref, &credentials, NULL);
     if (ret < 0)
     {
 	    PVFS_perror_gossip("flush failed", ret);

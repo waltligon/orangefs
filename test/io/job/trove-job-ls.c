@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     }
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     while ( num_processed == chunk ) 
 	{
 		ret = job_trove_keyval_iterate(coll_id, handle, pos, key, val, chunk,
-			0, NULL, NULL, 0, &job_stat, &foo_id, context);
+			0, NULL, NULL, 0, &job_stat, &foo_id, context, NULL);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval iterate failed.\n");

@@ -4,10 +4,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <time.h>
-
 #include "pvfs2.h"
 #include "pvfs2-sysint.h"
-#include "pvfs2-util.h"
 
 #if PVFS2_SIZEOF_VOIDP == 32 
 #  define llu(x) (x)
@@ -32,7 +30,7 @@ int main(int argc, char * argv[])
     char line[255];
     int size;
     PVFS_offset offset=0;
-    PVFS_credential *cred;
+    PVFS_credentials creds;
     PVFS_sysresp_create create_resp;
     PVFS_sysresp_io io_resp;
     PVFS_sysresp_lookup lookup_resp;
@@ -67,27 +65,26 @@ int main(int argc, char * argv[])
 	exit(1);
     }
     
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-    
     ret = PVFS_util_init_defaults();
     if(ret < 0) goto error;
 
     ret = PVFS_util_get_default_fsid(&curfs);
     if(ret < 0) goto error;
 
-    ret = PVFS_sys_lookup(curfs, "/", cred, &lookup_resp, 0);
+    ret = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(ret < 0) goto error;
 
+    PVFS_util_gen_credentials(&creds);
+
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = cred->userid;
-    attr.group = cred->group_array[0];
+    attr.owner = creds.uid;
+    attr.group = creds.gid;
     attr.perms = 0644;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
     ret = PVFS_sys_create(
 	(char*)filename, 
-	lookup_resp.ref, attr, cred, NULL, NULL, &create_resp);
+	lookup_resp.ref, attr, &creds, NULL, &create_resp, NULL, NULL);
     if(ret < 0) goto error;
 
     for(; i < count; ++i)
@@ -125,7 +122,7 @@ int main(int argc, char * argv[])
 
 	ret = PVFS_sys_io(
 	    create_resp.ref, file_req, offset, membuff, mem_req,
-	    cred, &io_resp, PVFS_IO_WRITE);
+	    &creds, &io_resp, PVFS_IO_WRITE, NULL);
 	if(ret < 0) goto error;
 
 	printf("Write response: size: %llu\n", llu(io_resp.total_completed));
@@ -144,7 +141,8 @@ error:
     PVFS_sys_remove(
 	(char*)filename,
 	lookup_resp.ref,
-	cred);
+	&creds,
+        NULL);
 
     PVFS_perror_gossip(errormsg, ret);
     fprintf(stderr, "%s\n", errormsg);

@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <assert.h>
 
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
@@ -24,7 +23,7 @@ int main(int argc,char **argv)
     char starting_point[256] = "/";
     PVFS_fs_id fs_id;
     char* name;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
@@ -55,11 +54,9 @@ int main(int argc,char **argv)
 
 
     name = starting_point;
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
-    
-    ret = PVFS_sys_lookup(fs_id, name, cred,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
         PVFS_perror_gossip("Lookup failed", ret);
@@ -80,7 +77,7 @@ int main(int argc,char **argv)
         memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
         ret = PVFS_sys_readdir(pinode_refn, (!token ? PVFS_READDIR_START :
                                              token), pvfs_dirent_incount, 
-                               cred, &resp_readdir);
+                               &credentials, &resp_readdir, NULL);
         if (ret < 0)
         {
             PVFS_perror_gossip("readdir failed", ret);

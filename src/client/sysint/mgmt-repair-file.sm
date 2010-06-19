@@ -207,7 +207,7 @@ PVFS_error PVFS_imgmt_repair_file(
     memset(sm_p->u.create.datafile_handles, 0,sizeof(PVFS_handle));
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.datafile_handles[0] = handle; /*Assign handle pulled in here*/

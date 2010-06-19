@@ -90,7 +90,7 @@ PVFS_error PVFS_isys_deleattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.deleattr.key_p = key_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;

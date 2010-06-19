@@ -6,7 +6,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -20,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
     PVFS_fs_id fs_id;
-    PVFS_credential *cred;
+    PVFS_credentials credentials;
     PVFS_object_ref pinode_refn;
     PVFS_size size;
 
@@ -50,14 +49,11 @@ int main(int argc,char **argv)
 	PVFS_perror("PVFS_util_get_default_fsid", ret);
 	return (-1);
     }
-    
-    cred = PVFS_util_gen_fake_credential();
-    assert(cred);
 
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, "/", cred,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+    ret = PVFS_sys_lookup(fs_id, "/", &credentials,
+                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -66,8 +62,9 @@ int main(int argc,char **argv)
 
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    ret = PVFS_sys_lookup(fs_id, filename, cred,
-                          &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
+    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_sys_lookup(fs_id, filename, &credentials,
+                          &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
@@ -79,7 +76,7 @@ int main(int argc,char **argv)
     pinode_refn.handle = resp_lk.ref.handle;
     pinode_refn.fs_id = resp_lk.ref.fs_id;
 
-    ret = PVFS_sys_truncate(pinode_refn, size, cred);
+    ret = PVFS_sys_truncate(pinode_refn, size, &credentials, NULL);
     if (ret < 0)
     {
         printf("truncate failed with errcode = %d\n",ret);

@@ -54,6 +54,7 @@ void print_stats(const PVFS_object_ref * ref,
 int main(int argc, char **argv)
 {
    int               ret          = -1,
+                     ret_agg      =  0,
                      i            =  0;
    char           ** ppszPvfsPath = NULL;
    PVFS_fs_id     *  pfs_id       = NULL;
@@ -150,6 +151,7 @@ int main(int argc, char **argv)
       {
          fprintf(stderr, "Error stating [%s]\n", user_opts.pszFiles[i]);
       }
+      ret_agg |= ret;
    }
 
    PVFS_sys_finalize();
@@ -178,7 +180,7 @@ int main(int argc, char **argv)
       free(pfs_id);
    }
 
-   return(0);
+   return(ret_agg);
 }
 
 static int do_stat(const char             * pszFile,
@@ -477,6 +479,13 @@ void print_stats(const PVFS_object_ref * ref,
    {
       fprintf(stdout, "  datafiles     : %d\n", attr->dfile_count);
    }
+
+   if( (attr->mask & PVFS_ATTR_SYS_BLKSIZE) &&
+       (attr->objtype == PVFS_TYPE_METAFILE))
+   {
+      fprintf(stdout, "  blksize       : %lld\n", lld(attr->blksize));
+   }
+
    /* dirent_count is only valid on directories */
    if( (attr->mask & PVFS_ATTR_SYS_DIRENT_COUNT) &&
        (attr->objtype == PVFS_TYPE_DIRECTORY))

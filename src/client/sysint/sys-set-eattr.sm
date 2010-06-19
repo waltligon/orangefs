@@ -78,16 +78,19 @@ PVFS_error PVFS_isys_seteattr_list(
     if(gossip_debug_enabled(GOSSIP_SETEATTR_DEBUG))
     {
         int i = 0;
-        gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                     "Setting extended attributes:\n");
+        int j; char *valBuf = (char *)val_array[i].buffer;
+        gossip_debug(GOSSIP_SETEATTR_DEBUG,"Setting extended attributes:\n");
         for(; i < nkey; ++i)
         {
-            gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                         "eattr[%d]: key=%s val=%.*s\n",
-                         i, (char *)key_array[i].buffer,
-                         val_array[i].buffer_sz, (char *)val_array[i].buffer);
-        }
-    }
+            gossip_debug(GOSSIP_SETEATTR_DEBUG,"eattr[%d]: key=%s\n"
+                                              , i
+                                              ,(char *)key_array[i].buffer);
+            for (j=0; j<val_array[i].buffer_sz; j++)
+                gossip_debug(GOSSIP_SETEATTR_DEBUG,"          val[%d]=%#x\n"
+                                                  ,j
+                                                  ,(unsigned int)valBuf[j]);
+        }/*end for*/
+    } /*end if*/
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
@@ -108,7 +111,7 @@ PVFS_error PVFS_isys_seteattr_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credential(sm_p->newcred_p, credential);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.seteattr.nkey = nkey;
     sm_p->u.seteattr.key_array = key_array;
     sm_p->u.seteattr.val_array = val_array;

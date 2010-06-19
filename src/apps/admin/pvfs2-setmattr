@@ -1,0 +1,116 @@
+#!/bin/csh -f
+unalias *
+
+#set echo
+#set verbose
+
+#echo $0
+
+#if no options entered, then display usage information
+if ( $#argv == 0 ) then
+   goto usage
+endif
+
+#get the path associated with this command
+set mybin = $0:h
+
+#make sure that pvfs-xattr exists
+if ( ! -e $mybin/pvfs2-xattr ) then
+   echo "$mybin/pvfs2-xattr command not found."
+   goto usage
+endif
+
+#initialize parms
+set init = "init"
+set myFile   = $init
+set myCopies = $init
+set myMode   = $init
+set myCopiesParm = 0
+set myModeParm   = 0
+set myFileParm   = 0
+
+#parse the command line....
+set index = 1
+while ( $index <= $#argv )
+   if ( {$argv[$index]} == {-h} ) then
+      goto usage
+   endif
+
+   if ( $index == $#argv ) then
+      echo
+      echo "Missing parameters.  Recheck usage."
+      goto usage
+   endif
+
+   @ i = $index + 1
+
+   if ( {$argv[$index]} == {-c} ) then
+              set myCopies = $argv[$i]
+              set myCopiesParm = 1
+   else if ( {$argv[$index]} == {-m} ) then
+              set myMode = $argv[$i]
+              set myModeParm = 1
+   else if ( {$argv[$index]} == {-f} ) then
+              set myFile = $argv[$i]
+              set myFileParm = 1
+   else
+        echo
+        echo "Missing or invalid parameters.  Recheck usage."
+        goto usage
+   endif
+
+   @ index += 2
+end #while
+
+#NOTE:  When PVFS is NOT in kernel mode, we can't easily check for file
+#       existence.  So, we just check to see that SOMETHING was entered.
+#       pvfs-xattr will validate the filename.
+#Did the user enter a file name?
+if ( $myFile == $init ) then
+   echo
+   echo "Filename is required. Recheck usage."
+   goto usage
+endif
+
+#Did the user enter a numeric copy value?
+if ( $myCopiesParm ) then
+   echo $myCopies | grep -E "[^0-9]" -
+   if ( ! $status ) then
+      echo
+      echo "Invalid copies value entered : $myCopies.  Check usage."
+      goto usage
+   endif
+endif
+
+#Did the user enter a valid mode?
+if ( $myModeParm ) then
+   if ( ! ($myMode == 100 || $myMode == 200) ) then
+      echo
+      echo "Invalid mirror mode entered : $myMode.  Check usage."
+      goto usage
+   endif
+endif
+
+
+#issue commands
+if ( $myCopiesParm ) then
+   {$mybin}/pvfs2-xattr -s -k user.pvfs2.mirror.copies -v {$myCopies} {$myFile}
+endif
+if ( $myModeParm ) then
+   {$mybin}/pvfs2-xattr -s -k user.pvfs2.mirror.mode   -v {$myMode} {$myFile}
+endif
+
+#leave script
+exit
+
+#display help and exit script
+usage:
+    echo
+    echo "pvfs2-setmattr {-c copies} {-m mode} {-h} -f file"
+    echo "  copies : positive numeric value"
+    echo "    mode : 100 => No Mirroring"
+    echo "           200 => Create Mirror when IMMUTABLE is set"
+    echo "      -h : Display this message" 
+    echo "    file : file to mirror (may include path)"
+exit
+######## end of script file ##########
