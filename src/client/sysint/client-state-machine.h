@@ -56,6 +56,93 @@ int PINT_client_state_machine_initialize(void);
 void PINT_client_state_machine_finalize(void);
 job_context_id PINT_client_get_sm_context(void);
 
+/* this structure is used to handle mirrored retries in the small-io case*/
+typedef struct PINT_client_mirror_ctx
+{
+  /*which copy of the mirrored handle are we using?*/
+  uint32_t     current_copies_count;
+
+  /*the primary datahandle*/
+  PVFS_handle  original_datahandle;
+
+  /*the server_nr for the primary datahandle*/
+  uint32_t original_server_nr;
+
+  /*do we retry the primary or use a mirrored handle?*/ 
+  PVFS_boolean retry_original;
+
+  /*did the current message for this handle complete without any errors?*/
+  PVFS_boolean msg_completed;
+
+} PINT_client_small_io_ctx;
+
+/* this structure is used to handle mirrored retries when 
+ * pvfs2_client_datafile_getattr_sizes_sm is called.
+*/
+typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
+
+/* flag to disable cached lookup during getattr nested sm */
+#define PINT_SM_GETATTR_BYPASS_CACHE 1
+
+typedef struct PINT_sm_getattr_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+
+    /* mirror retry information */
+    PINT_client_getattr_mirror_ctx *mir_ctx_array;
+    uint32_t mir_ctx_count;
+    uint32_t retry_count;
+    uint32_t *index_to_server;
+
+    PVFS_ds_type ref_type;
+
+    PVFS_size * size_array;
+    PVFS_size size;
+
+    int flags;
+    
+} PINT_sm_getattr_state;
+
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
+        (_state).flags = _flags; \
+    } while(0)
+
+#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
+    do { \
+        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
+        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
+    do { \
+        free(*(_array)); \
+        *(_array) = NULL; \
+    } while(0)
+
 /* PINT_client_sm_recv_state_s
  *
  * This is used for extra receives, such as acknowledgements from
@@ -150,35 +237,6 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
 {
     PVFS_handle *dirdata_handle;
 };
-
-/* this structure is used to handle mirrored retries in the small-io case*/
-typedef struct PINT_client_mirror_ctx
-{
-  /*which copy of the mirrored handle are we using?*/
-  uint32_t     current_copies_count;
-
-  /*the primary datahandle*/
-  PVFS_handle  original_datahandle;
-
-  /*the server_nr for the primary datahandle*/
-  uint32_t original_server_nr;
-
-  /*do we retry the primary or use a mirrored handle?*/ 
-  PVFS_boolean retry_original;
-
-  /*did the current message for this handle complete without any errors?*/
-  PVFS_boolean msg_completed;
-
-} PINT_client_small_io_ctx;
-
-
-
-/* this structure is used to handle mirrored retries when 
- * pvfs2_client_datafile_getattr_sizes_sm is called.
-*/
-typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
-
-
 
 typedef struct PINT_client_io_ctx
 {
@@ -430,70 +488,6 @@ struct PINT_server_fetch_config_sm_state
     int result_count; /* number of servers that actually responded */
     int* result_indexes; /* index into fs_config_bufs of valid responses */
 };
-
-
-
-/* flag to disable cached lookup during getattr nested sm */
-#define PINT_SM_GETATTR_BYPASS_CACHE 1
-
-typedef struct PINT_sm_getattr_state
-{
-    PVFS_object_ref object_ref;
-
-   /* request sys attrmask.  Some combination of
-     * PVFS_ATTR_SYS_*
-     */
-    uint32_t req_attrmask;
-    
-    /*
-      Either from the acache or full getattr op, this is the resuling
-      attribute that can be used by calling state machines
-    */
-    PVFS_object_attr attr;
-
-
-    /* mirror retry information */
-    PINT_client_getattr_mirror_ctx *mir_ctx_array;
-    uint32_t mir_ctx_count;
-    uint32_t retry_count;
-    uint32_t *index_to_server;
-
-    PVFS_ds_type ref_type;
-
-    PVFS_size * size_array;
-    PVFS_size size;
-
-    int flags;
-    
-} PINT_sm_getattr_state;
-
-#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
-    do { \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref.fs_id = (_objref).fs_id; \
-        (_state).object_ref.handle = (_objref).handle; \
-        (_state).req_attrmask = _mask; \
-        (_state).ref_type = _reftype; \
-        (_state).flags = _flags; \
-    } while(0)
-
-#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
-    do { \
-        PINT_free_object_attr(&(_state).attr); \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-    } while(0)
-
-#define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
-    do { \
-        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
-        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
-    } while(0)
-
-#define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
-    do { \
-        free(*(_array)); \
-        *(_array) = NULL; \
-    } while(0)
 
 struct PINT_client_geteattr_sm
 {
