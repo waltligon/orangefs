@@ -335,7 +335,7 @@ endecode_fields_1a_struct(
     PVFS_servreq_batch_remove,
     PVFS_fs_id, fs_id,
     int32_t, handle_count,
-    PVFS_handle, handles)
+    PVFS_handle, handles);
 #define extra_size_PVFS_servreq_batch_remove \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
@@ -603,7 +603,7 @@ struct PVFS_servresp_getattr
 };
 endecode_fields_1_struct(
     PVFS_servresp_getattr,
-    PVFS_object_attr, attr)
+    PVFS_object_attr, attr);
 #define extra_size_PVFS_servresp_getattr \
     extra_size_PVFS_object_attr
 
@@ -1139,7 +1139,7 @@ endecode_fields_5_struct(
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_size, size,
-    int32_t, flags)
+    int32_t, flags);
 #define PINT_SERVREQ_TRUNCATE_FILL(__req,  \
                                 __cap,     \
                                 __fsid,    \
@@ -1165,7 +1165,7 @@ struct PVFS_servreq_statfs
 };
 endecode_fields_1_struct(
     PVFS_servreq_statfs,
-    PVFS_fs_id, fs_id)
+    PVFS_fs_id, fs_id);
 
 #define PINT_SERVREQ_STATFS_FILL(__req, __cap, __fsid, __hints)\
 do {                                                    \
@@ -1469,7 +1469,7 @@ endecode_fields_3a_struct(
     uint32_t, attrmask, 
     skip4,,
     uint32_t, nhandles,
-    PVFS_handle, handles)
+    PVFS_handle, handles);
 #define extra_size_PVFS_servreq_listattr \
     (PVFS_REQ_LIMIT_LISTATTR * sizeof(PVFS_handle))
 

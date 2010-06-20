@@ -954,7 +954,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
             case PVFS_SERV_BATCH_REMOVE:
-            case PVFS_SERV_UNSTUFF:
             case PVFS_SERV_IMM_COPIES:
               /*nothing to free*/
                   break;
