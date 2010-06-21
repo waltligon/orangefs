@@ -284,10 +284,12 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_TREE_GET_FILE_SIZE:
 		req.u.tree_get_file_size.handle_array = NULL;
 		req.u.tree_get_file_size.num_data_files = 0;
+                zero_credential(&req.u.tree_get_file_size.credential);
 		resp.u.tree_get_file_size.size = NULL;
 		resp.u.tree_get_file_size.error = NULL;
 		resp.u.tree_get_file_size.handle_count = 0;
                 resp.u.tree_get_file_size.caller_handle_index = 0;
+                reqsize = extra_size_PVFS_servreq_tree_get_file_size;
 		respsize = extra_size_PVFS_servresp_tree_get_file_size;
 		break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
@@ -905,6 +907,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
 	    case PVFS_SERV_TREE_GET_FILE_SIZE:
 		decode_free(req->u.tree_get_file_size.handle_array);
+                decode_free(req->u.tree_get_file_size.credential.group_array);
+                decode_free(req->u.tree_get_file_size.credential.signature);
 		break;
 
             case PVFS_SERV_LISTATTR:

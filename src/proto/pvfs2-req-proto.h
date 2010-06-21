@@ -429,7 +429,7 @@ endecode_fields_1a_struct(
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
 #define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                                  \
-                                 __creds,                                \
+                                 __cap,                                  \
                                  __fsid,                                 \
                                  __num_data_files,                       \
                                  __handle_array,                         \
@@ -438,7 +438,7 @@ do {                                                                     \
     memset(&(__req), 0, sizeof(__req));                                  \
     (__req).op = PVFS_SERV_TREE_REMOVE;                                  \
     (__req).hints = (__hints);                                           \
-    (__req).credentials = (__creds);                                     \
+    (__req).capability = (__cap);                                        \
     (__req).u.tree_remove.fs_id = (__fsid);                              \
     (__req).u.tree_remove.num_data_files = (__num_data_files);           \
     (__req).u.tree_remove.handle_array = (__handle_array);               \
@@ -449,21 +449,24 @@ struct PVFS_servreq_tree_get_file_size
     PVFS_fs_id  fs_id;
     uint32_t caller_handle_index;
     uint32_t retry_msgpair_at_leaf;
+    PVFS_credential credential;
     uint32_t num_data_files;
     PVFS_handle *handle_array;
 };
-endecode_fields_3a_struct(
+endecode_fields_4a_struct(
     PVFS_servreq_tree_get_file_size,
     PVFS_fs_id, fs_id,
     uint32_t, caller_handle_index,
     uint32_t, retry_msgpair_at_leaf,
+    PVFS_credential, credential,
     uint32_t, num_data_files,
     PVFS_handle, handle_array);
 #define extra_size_PVFS_servreq_tree_get_file_size \
-  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+    ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + extra_size_PVFS_credential)
 
 #define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                                \
-                                 __creds,                                          \
+                                 __cap,                                            \
+                                 __cred,                                           \
                                  __fsid,                                           \
                                  __caller_handle_index,                            \
                                  __num_data_files,                                 \
@@ -474,7 +477,8 @@ do {                                                                            
     memset(&(__req), 0, sizeof(__req));                                            \
     (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                                     \
     (__req).hints = (__hints);                                                     \
-    (__req).credentials = (__creds);                                               \
+    (__req).capability = (__cap);                                                  \
+    (__req).u.tree_get_file_size.credential = (__cred);                            \
     (__req).u.tree_get_file_size.fs_id = (__fsid);                                 \
     (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index);    \
     (__req).u.tree_get_file_size.num_data_files = (__num_data_files);              \
