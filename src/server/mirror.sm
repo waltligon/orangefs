@@ -16,6 +16,7 @@
 #include "pint-eattr.h"
 #include "pint-cached-config.h"
 #include "client-state-machine.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -327,6 +328,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb
     int ret,i;
     PVFS_Request myFileReq = PVFS_BYTE;
     PVFS_offset  myFileReqOffset = 0;
+    PVFS_capability capability;
 
     js_p->error_code = 0;
 
@@ -345,6 +347,9 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    /* nlmills: TODO: replace with a real capability */
+    PINT_null_capability(&capability);
 
     /*setup msgpairarray to initiate PVFS_SERV_IO write request for the       */
     /*destination handles.                                                    */
@@ -376,7 +381,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\treqmir_p->bsize:%d.\n"
                                        ,reqmir_p->bsize);
        PINT_SERVREQ_IO_FILL( msg_p->req  
-                            ,s_op->req->credentials
+                            ,capability
                             ,reqmir_p->fs_id
                             ,reqmir_p->dst_handle[i]
                             ,PVFS_IO_WRITE
@@ -1025,16 +1030,37 @@ static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req
     return 0;
 };
 
+static int perm_mirror(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: replace with a real check */
+    ret = 0;
+
+    return ret;
+}
+
 /*request parameters*/
 struct PINT_server_req_params pvfs2_mirror_params =
 {
 	.string_name = "mirror",
-	.perm = PINT_SERVER_CHECK_NONE,
+	.perm = perm_mirror,
 	.access_type = PINT_server_req_modify,
 	.sched_policy = PINT_SERVER_REQ_SCHEDULE,
 	.get_object_ref = PINT_get_object_ref_mirror,
 	.state_machine = &pvfs2_mirror_sm
 };
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
 /****************************end of file***************************************/
 
 
