@@ -109,18 +109,19 @@ static size_t direct_read(int fd,
  * all bits less than the block size.
  */
 #define BLOCK_MULTIPLES_MASK (~((uintptr_t) BLOCK_SIZE - 1))
+#define BLOCK_MULTIPLES_MASK_OFFSET (~((off_t) BLOCK_SIZE - 1))
 
 /* calculate the max offset that is a multiple of the block size but still
  * less than or equal to requested offset passed in
  */
-#define ALIGNED_OFFSET(__offset) (__offset & BLOCK_MULTIPLES_MASK)
+#define ALIGNED_OFFSET(__offset) (__offset & BLOCK_MULTIPLES_MASK_OFFSET)
 
 /* calculate the minimum size that is a multiple of the block size and
  * still greater than or equal to the requested size
  */
 #define ALIGNED_SIZE(__offset, __size) \
     (((__offset + __size + BLOCK_SIZE - 1) \
-      & BLOCK_MULTIPLES_MASK) - ALIGNED_OFFSET(__offset))
+      & BLOCK_MULTIPLES_MASK_OFFSET) - ALIGNED_OFFSET(__offset))
 
 #define IS_ALIGNED_PTR(__ptr) \
     ((((uintptr_t)__ptr) & BLOCK_MULTIPLES_MASK) == (uintptr_t)__ptr)
