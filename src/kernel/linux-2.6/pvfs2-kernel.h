@@ -844,8 +844,6 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
-int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 int pvfs2_flush_inode(struct inode *inode);
 

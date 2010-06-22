@@ -11,27 +11,6 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-int pvfs2_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    int ret = -1;
-
-    if (credentials)
-    {
-        memset(credentials, 0, sizeof(PVFS_credentials));
-#ifdef HAVE_CURRENT_FSUID
-        credentials->uid = current_fsuid();
-        credentials->gid = current_fsgid();
-#else
-        credentials->uid = current->fsuid;
-        credentials->gid = current->fsgid;
-#endif
-
-        ret = 0;
-    }
-    return ret;
-}
-
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
 {
     PVFS_fs_id fsid = PVFS_FS_ID_NULL;

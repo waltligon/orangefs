@@ -235,8 +235,8 @@ typedef struct
 typedef struct
 {
     int32_t type;
-    int32_t __pad1;
-    PVFS_credentials credentials;
+    /* nlmills: TODO: add more credentials? (like gids) */
+    PVFS_uid uid;
     int pid;
     int tgid;
     /* currently trailer is used only by readx/writex (iox) */
