@@ -193,7 +193,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
 
     PINT_SERVREQ_TREE_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        attr->capability,
         sm_p->object_ref.fs_id,
         attr->u.meta.dfile_count,
         attr->u.meta.dfile_array,

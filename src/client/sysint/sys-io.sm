@@ -500,6 +500,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
          */
         PINT_SERVREQ_UNSTUFF_FILL(
                 msg_p->req,
+                sm_p->getattr.attr.capability,
                 (*sm_p->cred_p),
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
@@ -509,6 +510,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     {
         PINT_SERVREQ_GETATTR_FILL(
                 msg_p->req,
+                sm_p->getattr.attr.capability,
                 (*sm_p->cred_p),
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,

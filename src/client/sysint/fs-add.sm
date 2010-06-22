@@ -621,14 +621,17 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
     int i;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"fetch_config state: server_fetch_config_setup_msgpair\n");
 
+    PINT_null_capability(&capability);
+
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
-        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
+        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, capability, sm_p->hints);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;

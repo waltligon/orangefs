@@ -779,6 +779,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 //START_PROFILER(getattr_prof);
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
             msg_p->req,
+            capability,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
             0,
