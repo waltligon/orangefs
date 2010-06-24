@@ -1,0 +1,238 @@
+
+
+INTRODUCTION
+
+
+This is a BMI method that runs on top of ZOID, the ZeptoOS I/O Daemon,
+running on IBM Blue Gene/P with the ZeptoOS Compute Node Linux.
+
+
+CONFIGURABLE LIMITS
+
+
+- ZOID_MAX_UNEXPECTED_MSG (in zoid.h): defaults to 8192, can be adjusted as
+  needed,
+
+- ZOID_MAX_EXPECTED_MSG (in zoid.h): defaults to 128M, can be adjusted as
+  needed, but is probably already larger than necessary,
+
+- ZBMI_SHM_SIZE_TOTAL (in init.c in ZeptoOS
+  packages/zoid/src/zbmi/implementation/ directory): total size of the shared
+  memory buffer used to exchange bulk data between the ZOID daemon and the BMI
+  server; defaults to 512M.
+
+- ZBMI_SHM_SIZE_UNEXP (in init.c in ZeptoOS
+  packages/zoid/src/zbmi/implementation/ directory): part of the shared
+  memory buffer used for unexpected messages; defaults to 1M.
+
+
+LIMITATIONS
+
+
+This method was specifically developed to address the needs of IOFSL, the
+I/O Forwarding Scalability Layer project.  Consequently, not all features
+of BMI are supported; we focused on those needed by IOFSL.
+
+Here is a (possibly incomplete) list of the limitations of this method:
+
+- processes on the compute nodes can only communicate with their I/O nodes
+  (the compute nodes cannot communicate with each other, neither can the
+  I/O nodes; communication is limited to each pset),
+
+- unexpected messages can only be sent from compute nodes to I/O nodes
+  (sending from I/O nodes to compute nodes will not work),
+
+- client-side is not multi-thread safe.  It is not easy to make it safe,
+  because the lower-level ZOID client-side forwarding if not multi-thread
+  safe,
+
+- CTRL-C might be tricky on the client side, as interrupting a ZOID routine
+  can deadlock the tree network (this is a ZOID limitation),
+
+- only one, global context is supported.
+
+Additional considerations for the users of this method:
+
+- on the server (I/O node) side, using preallocated (BMI_memalloc) buffer
+  can significantly improve performance,
+
+- on both client and server, buffers passed to send/receive routines should
+  be 16-bytes aligned (they normally will if they were allocated with malloc
+  or BMI_memalloc),
+
+- make sure to use a long timeout for BMI test routines, especially those
+  invoked on the client side, as each such call will result in a
+  communication with the I/O node (10ms is *way* too short, 1000ms is pretty
+  short too),
+
+- to reduce the number of round-trip messages from the compute nodes,
+  client-side message post routines can optionally wait (with a timeout)
+  and thus increase a chance of an immediate completion.  Use
+  BMI_set_info(BMI_ZOID_POST_TIMEOUT, <timeout_ms>) to enable this feature.
+
+
+ADDRESS FORMAT
+
+
+The only supported address is "zoid://".  It denotes the server process
+running on the I/O node.
+
+
+IMPLEMENTATION OVERVIEW
+
+
+The implementation is asymmetric; different code paths are used on the
+compute node clients and on the I/O node server.  The main code can be
+found in the "zoid.c" file, which contains the client code and the code to
+invoke the server routines.  The server routines themselves can be found in
+"server.c".
+
+The method source also includes "dlmalloc", a public domain custom memory
+pool implementation used to maintain a shared memory pool on the I/O nodes,
+and a "zbmi_pool.c" that acts as a wrapper around "dlmalloc".
+
+Both the compute node client and the I/O node server codes actually act as
+clients to the ZOID daemon's "zbmi" plugin, which is the most complex part
+of the code.  The source of the zbmi plugin is not included here, but is
+rather in the ZeptoOS repository, in the
+"packages/zoid/src/zbmi/implementation/" directory.  Note that the zbmi
+plugin is not documented in detail here, but has its own documentation with
+its source code.
+
+
+IMPLEMENTATION DETAILS
+
+CLIENT
+
+The communication between the compute node clients and the zbmi plugin on
+the I/O node is performed using three ZOID-forwarded function calls:
+zbmi_send, zbmi_recv, and zbmi_test.
+
+The zbmi plugin is mostly stateless so far as the compute node clients are
+concerned.  Specifically, the information on posted expected message
+sends/receives that were not immediately completed is stored exclusively on
+the client side.
+
+All BMI send routines end up in zoid_post_send_common.  That includes
+unexpected messages and list I/O.  This routine attempts to forward the
+message to the zbmi plugin on the I/O node, using zbmi_send.  For
+unexpected messages, zbmi_send should normally succeed and result in an
+immediate completion; however, if the zbmi plugin is out of memory,
+zbmi_send will fail with ENOMEM.  The same failure will occur with expected
+messages if a matching receive has not been posted on the I/O node side by
+the time zbmi_send is invoked.  Either failure is recoverable; the send
+request is put in the "zoid_ops" queue for another attempt later.  For
+expected messages, if a matching receive has been posted, the call succeeds
+resulting in an immediate completion.  zbmi_send normally does not block,
+but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
+matching expected message post from the BMI server side or for memory to be
+released on the BMI server side so that an unexpected message can be
+stored.
+
+The way zbmi_send is forwarded by ZOID, the data payload is only
+transferred to the I/O nodes if there is memory buffer there for the
+message.  So, in spite of how it looks in zoid.c, no bytes are wasted on
+the wire.
+
+All BMI expected receive routines end up in zoid_post_recv_common.  This
+routine attempts to receive a message waiting in the zbmi plugin, using
+zbmi_recv.  If a matching message has been posted on the I/O node side, it
+is sent to the compute node and zbmi_recv returns 1, resulting in an
+immediate completion.  Otherwise, the receive request is put in the
+"zoid_ops" queue for another attempt later.  zbmi_recv normally does not
+block, but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
+matching expected message post from the BMI server side.
+
+BMI_cancel is very easy to implement thanks to a lack of multi-threading
+considerations and because the state is stored on the client-side only: we
+just flag a request as canceled.
+
+All BMI test routines eventually end up in zoid_test_common.  The path is
+somewhat longer for "testcontext", which first goes through the "zoid_ops"
+queue filling in a temporary array with the ids of pending operations
+before invoking zoid_test_common.  Again, that would not have been correct
+were it not for the fact that we don't deal with multi-threading.  Anyway,
+the routine needs to treat canceled requests specially -- those won't be
+sent to the server anymore.  For non-canceled requests, it extracts the
+message tag, size, and send/recv indicator and forwards those to the server
+using zbmi_test.  zbmi_test can block on the server for the specified time
+if none of the specified requests is initially ready.  zbmi_test returns
+the number of ready requests; if it is non-zero, then the server side must
+have posted matching sends/receives, so zoid_test_common next attempts to
+satisfy those "ready" requests by invoking zbmi_send/zbmi_recv.  Those
+send/recv routines could still fail in spite of a successful test if there
+is no memory or if the server side canceled its matching request; this is
+recoverable.
+
+SERVER
+
+The communication between the I/O node BMI server and the zbmi plugin of
+the ZOID daemon is carried across two channels.  Commands are sent via a
+POSIX message queue (zbmi plugin is the server; multiple threads of the BMI
+server can communicate simultaneously by opening multiple reply queues to
+the server).  Payload is exchanged using a large shared memory segment,
+allocated by the zbmi plugin.  We make efforts to avoid unnecessary copies
+to/from that segment, so BMI_memalloc() on the BMI server side allocates
+from that segment, and ZOID-forwarded zbmi_send/recv calls store their
+buffers directly into the segment.
+
+The shared memory segment is split in two: a normally smaller region is
+used for unexpected messages and is managed by the zbmi plugin, while a
+larger region is used for expected messages and is managed by the BMI
+server.
+
+The communication with the zbmi plugin is established during
+BMI_initialize, and terminated during BMI_finalize.  The message protocol is
+documented in zbmi's zbmi_protocol.h.
+
+For BMI testunexpected, we communicate the metadata on the pending received
+messages via the queue, and the payload is in the shared memory buffer
+which is returned to the user.  unexpected_free just sends the buffer
+address back to the zbmi plugin, since the unexpected messages memory pool
+is managed by the plugin.
+
+To get the best performance, it is important that the user allocates
+buffers using BMI_memalloc on the server side, because that will allocate
+them in the shared memory area.  If instead an externally allocated buffer
+is passed to BMI_send/recv, we will allocate a temporary buffer, which
+causes an additional copy overhead.  Failures to allocate the temporary
+buffer are recoverable: we place the request in the "no_mem" queue and
+retry the allocation after every BMI_memfree.
+
+Expected server-side posts, be it sends or receives, can be completed
+immediately if a matching client-side post (or test) is waiting when
+server-side post is issued.  Note that "immediately" is used liberally
+here; the server-side post will not return until the buffer has been
+transferred to/from the compute node, which can take some time when the
+ZOID server is under heavy load.  For posts not completed immediately we
+send a message descriptor to the zbmi plugin which registers the message
+and just sends back a confirmation.  When registering we exchange the
+internal BMI id and the internal ZOID id, since that simplifies subsequent
+testing/canceling.
+
+Canceling messages is more complex than on the client side.  Generally, we
+have to send a cancel request to the zbmi plugin to unregister an already
+registered message descriptor.  Depending on the progress of the zbmi
+plugin in handing that registered request, the cancellation request might
+be ignored.  An exception is when the request has not been registered
+because of the lack of memory for a temporary buffer as described earlier;
+in that case we cancel it locally and put it in "error_ops" queue.
+
+When testing (in zoid_server_test_common), we need to deal with locally
+failed/canceled messages separately from the ones registered with the zbmi
+plugin.  This is actually similar to what we also do on the client side.
+Those messages come from the "error_ops" queue and we deal with them first,
+since they involve no communication with the zbmi plugin.  Unlike on the
+client side, where the common test routines sort-of "emulated" testcontext
+by first building an array of all pending request ids, on the server side
+we have a "native" implementation.  Testcontext is recognized by passing an
+"incount" of 0, and we forward it to the zbmi plugin so that it knows to
+return *any* completed request(s).  This is necessary because of
+multi-threading constraints, and it is possible because the zbmi plugin
+does maintain state for server-side requests.  The test is the only
+server-side command that can block in the zbmi plugin for the specified
+time period if no request is initially completed.  Completed requests
+require no further handling, with the exceptions of those that used
+temporary shared memory buffer, which needs to be released (after being
+copied back for receives).  Completed requests can also indicate
+cancellations, if we previously canceled a registered request.
