@@ -186,10 +186,10 @@ static int do_trove_test(char* dir)
     start_tm = Wtime();
 
     now = Wtime();
-    while((inflight > 0 || !qlist_empty(&op_list)) && (max_seconds == 0 || (now-start_tm) < max_seconds))
+    while(inflight > 0 || (!qlist_empty(&op_list) && (max_seconds == 0 || (now-start_tm) < max_seconds)))
     {
         /* first priority is to keep maximum ops posted */
-        while(inflight < concurrent && !qlist_empty(&op_list))
+        while(inflight < concurrent && !qlist_empty(&op_list) && (max_seconds == 0 || (now-start_tm) < max_seconds))
         {
             /* get a buffer */
             tmp_link = qlist_pop(&buffer_list);
