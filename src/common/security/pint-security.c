@@ -221,11 +221,16 @@ int PINT_sign_capability(PVFS_capability *cap)
     config = PINT_get_server_config();
     assert(config->security_timeout);
 
-    cap->issuer = strdup(config->server_alias);
-    if (!cap->issuer)
+    cap->issuer = malloc(strlen(config->server_alias) + 3);
+    if (cap->issuer == NULL)
     {
         return -PVFS_ENOMEM;
     }
+    /* issuer field for servers is prefixed with "S:" */
+    cap->issuer[0] = 'S';
+    cap->issuer[1] = ':';
+    strcpy(cap->issuer+2, config->server_alias);
+
     cap->timeout = PINT_util_get_current_time() + config->security_timeout;
 
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
@@ -435,7 +440,15 @@ int PINT_sign_credential(PVFS_credential *cred)
     config = PINT_get_server_config();
     assert(config->server_alias);
     
-    cred->issuer = strdup(config->server_alias);
+    cred->issuer = malloc(strlen(config->server_alias) + 3);
+    if (cred->issuer == NULL)
+    {
+        return -1;
+    }
+    /* issuer field for servers is prefixed with "S:" */
+    cred->issuer[0] = 'S';
+    cred->issuer[1] = ':';
+    strcpy(cred->issuer+2, config->server_alias);
     
     cred->timeout = PINT_util_get_current_time() + config->security_timeout;
 

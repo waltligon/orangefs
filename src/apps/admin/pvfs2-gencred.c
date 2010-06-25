@@ -114,9 +114,12 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     {
         return EXIT_FAILURE;
     }
+    /* issuer field for clients is prefixed with "C:" */
+    issuer[0] = 'C';
+    issuer[1] = ':';
     gethostname(hostname, HOST_NAME_MAX);
     hostname[sizeof(hostname)-1] = '\0';
-    strncpy(issuer, hostname, PVFS_REQ_LIMIT_ISSUER);
+    strncpy(issuer+2, hostname, PVFS_REQ_LIMIT_ISSUER-2);
 
     cred->userid = (PVFS_uid)pwd->pw_uid;
     cred->num_groups = (uint32_t)ngroups;
