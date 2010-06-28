@@ -1666,7 +1666,6 @@ static PINT_sm_action getattr_cleanup(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PINT_cleanup_credential(&s_op->u.getattr.credential);
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
 }
@@ -1682,18 +1681,15 @@ static PINT_sm_action getattr_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
 
     memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr));
 
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
+    s_op->u.getattr.credential = s_op->req->u.getattr.credential;
 
-    ret = PINT_copy_credential(&s_op->req->u.getattr.credential,
-                               &s_op->u.getattr.credential);
-
-    js_p->error_code = ret;
+    js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
 
