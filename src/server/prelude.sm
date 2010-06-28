@@ -186,6 +186,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
     s_op->target_object_attr = &s_op->attr;
 
+    if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE) {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "(%p) %s (prelude sm) state: perm check already done... skipping.\n", s_op,
+                     PINT_map_server_op_to_string(s_op->req->op));
+        return SM_ACTION_COMPLETE;
+    }
+
     gossip_debug(GOSSIP_SECURITY_DEBUG, "Received capability with: \n"
                  "issuer: %s\n"
                  "fsid: %u\n"
