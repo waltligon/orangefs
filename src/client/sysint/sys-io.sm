@@ -1802,11 +1802,8 @@ static PINT_sm_action io_analyze_results(
              * we need to go and get them
              */
 
-            /* this sets the array that gets filled in by the
-             * getattr_datafile_sizes states machine we jump to
-             */
-            /* getattr_datafile_sizes state machine allocates getattr.size_array */
-            //sm_p->getattr.size_array = sm_p->u.io.dfile_size_array;
+            /* NOTE:  when jumping to getattr_datafile_sizes, results will be */
+            /* allocated and stored in sm_p->getattr.size_array.              */
 
             /* setting this state result will cause the state machine to
              * jump to getattr_datafile_sizes and get all the 
@@ -1870,7 +1867,6 @@ static PINT_sm_action io_analyze_size_results(
             attr->u.meta.dist->params,
             attr->u.meta.dfile_count,
             sm_p->getattr.size_array);
-            //sm_p->u.io.dfile_size_array);
     if(eof > eor)
     {
         eor = eof;
@@ -1884,7 +1880,6 @@ static PINT_sm_action io_analyze_size_results(
         ret = io_zero_fill_holes(sm_p, eor,
                                  attr->u.meta.dfile_count,
                                  sm_p->getattr.size_array,
-                                 //sm_p->u.io.dfile_size_array,
                                  NULL);
         if(ret < 0)
         {
@@ -1908,7 +1903,6 @@ static PINT_sm_action io_analyze_size_results(
         ret = io_zero_fill_holes(sm_p, eof,
                                  attr->u.meta.dfile_count,
                                  sm_p->getattr.size_array,
-                                 //sm_p->u.io.dfile_size_array,
                                  NULL);
         if(ret < 0)
         {
