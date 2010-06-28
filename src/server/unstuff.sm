@@ -93,29 +93,29 @@ machine pvfs2_unstuff_sm
     state remove_layout
     {
         run remove_layout;
-        success => check_if_capability_required;
+        success => get_capability_setup;
         default => final_response;
     }
 
-    state check_if_capability_required
+    state get_capability_setup
     {
-        run check_if_capability_required;
-        STATE_CAPABILITY => read_acl;
+        run get_capability_setup;
+        STATE_CAPABILITY => get_capability;
         default => final_response;
     }
 
-    state read_acl
+    state get_capability
     {
-        run read_acl;
-        default => create_capability;
+        jump pvfs2_get_attr_work_sm;
+        default => get_capability_cleanup;
     }
 
-    state create_capability
+    state get_capability_cleanup
     {
-        run create_capability;
+        run get_capability_cleanup;
         default => final_response;
     }
-
+ 
     state final_response
     {
         jump pvfs2_final_response_sm;
@@ -386,26 +386,44 @@ static PINT_sm_action remove_layout(
         s_op->req->hints);
 }
 
-/* nlmills: TODO: replace all this messy capability code with
- * a call to the getattr nested state machine. or better yet,
- * extract the capability code to a separate function since
- * getattr nested state machine was already called earlier.
- */
-
-/* check_if_capability_required
+/* get_capability_setup
  *
- * Branch point for capability creation.
+ * Sets up a getattr nested op if a capability is requested.
  */
-static PINT_sm_action check_if_capability_required(
+static PINT_sm_action get_capability_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
 
     if (s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY)
     {
-        /* get rid of the old capability */
-        PINT_cleanup_capability(&s_op->resp.u.unstuff.attr.capability);
-        js_p->error_code = STATE_CAPABILITY;
+        struct PINT_server_op *getattr_op;
+
+        getattr_op = malloc(sizeof(*getattr_op));
+        if (getattr_op == NULL)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(getattr_op, 0, sizeof(*getattr_op));
+
+        getattr_op->req = s_op->req;
+        getattr_op->attr = s_op->attr;
+        getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
+        getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
+        getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+        getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
+
+        ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+        if (ret < 0)
+        {
+            js_p->error_code = ret;
+        }
+        else
+        {
+            js_p->error_code = STATE_CAPABILITY;
+        }
     }
     else
     {
@@ -415,150 +433,32 @@ static PINT_sm_action check_if_capability_required(
     return SM_ACTION_COMPLETE;
 }
 
-/* read_acl
- * 
- * Reads any ACL data from Trove if a capability is requested.
+/* get_capability_cleanup 
+ *
+ * Cleans up after the call to getattr nested state machine.
  */
-static PINT_sm_action read_acl(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action get_capability_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    job_id_t tmp_id;
-    int ret;
+    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *s_op;
+    int task_id, remaining;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "(%p) %s (unstuff sm) state: read_acl\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op));
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code,
+                                   &remaining);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    assert(s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY);
+    /* free outdated attrs set in getattr_interpret */
+    PINT_free_object_attr(&s_op->resp.u.unstuff.attr);
+    s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
 
-    s_op->key.buffer = "system.posix_acl_access";
-    s_op->key.buffer_sz = strlen(s_op->key.buffer) + 1;
-    if(s_op->free_val)
-    {
-        free(s_op->val.buffer);
-        s_op->free_val = 0;
-    }
-    s_op->val.buffer = malloc(PVFS_REQ_LIMIT_VAL_LEN);
-    if (!s_op->val.buffer)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
-    s_op->free_val = 1;
-    
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "About to retrieve acl keyvals "
-                     "for handle %llu\n", llu(s_op->target_handle));
+    free(getattr_op);
 
-    ret = job_trove_keyval_read(
-        s_op->req->u.unstuff.fs_id,
-        s_op->req->u.unstuff.handle,
-        &s_op->key,
-        &s_op->val,
-        0,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &tmp_id,
-        server_job_context,
-        s_op->req->hints);
-
-    return ret;
-}
-
-/* create_capability
- * 
- */
-static PINT_sm_action create_capability(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *resp_attr = &s_op->resp.u.unstuff.attr;
-    void *acl_buf;
-    size_t acl_size;
-    int ret;
-
-    if (js_p->error_code == -TROVE_ENOENT)
-    {
-        acl_buf = NULL;
-        acl_size = 0;
-        js_p->error_code = 0;
-    }
-    else if (js_p->error_code < 0)
-    {
-        /* let fatal errors fall through */
-        return SM_ACTION_COMPLETE;
-    }
-    else
-    {
-        acl_buf = s_op->val.buffer;
-        acl_size = s_op->val.read_sz;
-    }
-
-    ret = PINT_init_capability(&resp_attr->capability);
-    if (ret < 0)
+    if(js_p->error_code)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "unstuff: capability init failed\n");
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
+            "unstuff failed to retrieve new attrs.\n");
     }
-
-    resp_attr->capability.num_handles = 1;
-
-    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
-        (resp_attr->mask & PVFS_ATTR_META_DFILES))
-    {
-        resp_attr->capability.num_handles += resp_attr->u.meta.dfile_count;
-    }
-
-    resp_attr->capability.handle_array = 
-        calloc(resp_attr->capability.num_handles, sizeof(PVFS_handle));
-    if (!resp_attr->capability.handle_array)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-
-    resp_attr->capability.handle_array[0] = s_op->req->u.unstuff.handle;
-    if ((resp_attr->objtype == PVFS_TYPE_METAFILE) &&
-        (resp_attr->mask & PVFS_ATTR_META_DFILES))
-    {
-        /* copy datafile handles after the metafile handle */
-        memcpy((resp_attr->capability.handle_array + 1),
-               resp_attr->u.meta.dfile_array,
-               resp_attr->u.meta.dfile_count * sizeof(PVFS_handle));
-    }
-
-    ret = PINT_get_capabilities(acl_buf,
-                                acl_size,
-                                s_op->req->u.unstuff.credential.userid,
-                                s_op->req->u.unstuff.credential.group_array,
-                                s_op->req->u.unstuff.credential.num_groups,
-                                resp_attr,
-                                &resp_attr->capability.op_mask);
-    if (ret < 0)
-    {
-        PINT_cleanup_capability(&resp_attr->capability);
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
-    
-    resp_attr->capability.fsid = s_op->req->u.unstuff.fs_id;
-
-    ret = PINT_sign_capability(&resp_attr->capability);
-    if (ret < 0)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "unstuff: failed to sign capability\n");
-        PINT_cleanup_capability(&resp_attr->capability);
-        js_p->error_code = -PVFS_EINVAL;
-        return SM_ACTION_COMPLETE;
-    }
-                                 
-    resp_attr->mask |= PVFS_ATTR_CAPABILITY;
 
     return SM_ACTION_COMPLETE;
 }
