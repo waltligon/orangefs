@@ -1869,7 +1869,8 @@ static PINT_sm_action io_analyze_size_results(
         logical_file_size(
             attr->u.meta.dist->params,
             attr->u.meta.dfile_count,
-            sm_p->u.io.dfile_size_array);
+            sm_p->getattr.size_array);
+            //sm_p->u.io.dfile_size_array);
     if(eof > eor)
     {
         eor = eof;
