@@ -93,7 +93,8 @@ machine pvfs2_unstuff_sm
     state remove_layout
     {
         run remove_layout;
-        default => check_if_capability_required;
+        success => check_if_capability_required;
+        default => final_response;
     }
 
     state check_if_capability_required
@@ -352,8 +353,8 @@ static PINT_sm_action update_dfile_count(
     job_id_t j_id;
 
     /* take the current on-disk attribute in object_attr form
-     * (acquired from prelude) with the modified datafile array,
-     * and convert it to the dspace form for writing.
+     * with the modified datafile array, and convert it to the 
+     * dspace form for writing.
      */
     PVFS_object_attr_to_ds_attr(&s_op->resp.u.unstuff.attr, &s_op->ds_attr);
 
@@ -386,7 +387,9 @@ static PINT_sm_action remove_layout(
 }
 
 /* nlmills: TODO: replace all this messy capability code with
- * a call to the getattr nested state machine
+ * a call to the getattr nested state machine. or better yet,
+ * extract the capability code to a separate function since
+ * getattr nested state machine was already called earlier.
  */
 
 /* check_if_capability_required
@@ -397,12 +400,6 @@ static PINT_sm_action check_if_capability_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    /* errors fall through */
-    if (js_p->error_code < 0)
-    {
-        return SM_ACTION_COMPLETE;
-    }
 
     if (s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY)
     {
@@ -627,6 +624,7 @@ static PINT_sm_action getattr_setup(
     getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
     getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
     getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+    getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if(ret < 0)
@@ -681,8 +679,7 @@ static int perm_unstuff(PINT_server_op *s_op)
 {
     int ret;
 
-    /* nlmills: TODO: probably just need write permission */
-    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    if (s_op->req->capability.op_mask & PINT_CAP_WRITE)
     {
         ret = 0;
     }
