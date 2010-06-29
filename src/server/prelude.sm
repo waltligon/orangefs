@@ -171,6 +171,174 @@ static PINT_sm_action prelude_getattr_if_needed(
     return ret;
 }
 
+static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
+    PVFS_uid *uid, PVFS_gid *gid)
+{
+    *uid = fsconfig->exp_anon_uid;
+    *gid = fsconfig->exp_anon_gid;
+    return;
+}
+
+static int iterate_all_squash_wildcards(struct filesystem_configuration_s *fsconfig,
+    PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    for (i = 0; i < fsconfig->all_squash_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->all_squash_hosts[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->all_squash_hosts[i],
+                fsconfig->all_squash_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int iterate_root_squash_wildcards(struct filesystem_configuration_s *fsconfig,
+    PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    /* check exceptions first */
+    for (i = 0; i < fsconfig->root_squash_exceptions_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_exceptions_hosts[i],
+            fsconfig->root_squash_exceptions_netmasks[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_exceptions_hosts[i], 
+                fsconfig->root_squash_exceptions_netmasks[i]) == 1)
+        {
+            /* in the exception list, do not squash */
+            return 0;
+        }
+    }
+
+    for (i = 0; i < fsconfig->root_squash_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s, netmask: %i\n",
+            lld(client_addr), fsconfig->root_squash_hosts[i],
+            fsconfig->root_squash_netmasks[i]);
+        if (BMI_query_addr_range(client_addr, fsconfig->root_squash_hosts[i], 
+                fsconfig->root_squash_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Translate_ids will return 1 if it did some uid/gid squashing, 0 otherwise */
+static int translate_ids(PVFS_fs_id fsid, PVFS_uid uid, PVFS_gid gid, 
+    PVFS_uid *translated_uid, PVFS_gid *translated_gid, PVFS_BMI_addr_t client_addr)
+{
+    int exp_flags = 0;
+    struct server_configuration_s *serv_config = NULL;
+    struct filesystem_configuration_s * fsconfig = NULL;
+
+    serv_config = PINT_get_server_config();
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
+
+    if (fsconfig == NULL)
+    {
+        return 0;
+    }
+    exp_flags = fsconfig->exp_flags;
+    /* If all squash was set */
+    if (exp_flags & TROVE_EXP_ALL_SQUASH)
+    {
+        if (iterate_all_squash_wildcards(fsconfig, client_addr) == 1)
+        {
+            get_anon_ids(fsconfig, translated_uid, translated_gid);
+            gossip_debug(GOSSIP_SERVER_DEBUG,
+                "Translated ids from <%u:%u> to <%u:%u>\n",
+                uid, gid, *translated_uid, *translated_gid);
+            return 1;
+        }
+    }
+    /* if only root squash was set translate uids for root alone*/
+    if (exp_flags & TROVE_EXP_ROOT_SQUASH)
+    {
+        if (uid == 0 || gid == 0)
+        {
+            if (iterate_root_squash_wildcards(fsconfig, client_addr) == 1)
+            {
+                get_anon_ids(fsconfig, translated_uid, translated_gid);
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                    "Translated ids from <%u:%u> to <%u:%u>\n",
+                    uid, gid, *translated_uid, *translated_gid);
+                return 1;
+            }
+        }
+    }
+    /* no such translation required! */
+    *translated_uid = uid;
+    *translated_gid = gid;
+    return 0;
+}
+
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    for (i = 0; i < fsconfig->ro_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+            lld(client_addr), fsconfig->ro_hosts[i]);
+        /* Does the client address match the wildcard specification and/or */
+        /* the netmask specification?                                      */
+        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
+                fsconfig->ro_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Return zero if this operation should be allowed.
+ */
+static int permit_operation(PVFS_fs_id fsid,
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr)
+{ 
+    int exp_flags = 0; 
+    struct server_configuration_s *serv_config = NULL;
+    struct filesystem_configuration_s * fsconfig = NULL;
+
+    if (access_type == PINT_SERVER_REQ_READONLY)
+    {
+        return 0;  /* anything that doesn't modify state is okay */
+    }
+    serv_config = PINT_get_server_config();
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
+
+    if (fsconfig == NULL)
+    {
+        return 0;
+    }
+    exp_flags = fsconfig->exp_flags;
+
+    /* cheap test to see if ReadOnly was even specified in the exportoptions */
+    if (!(exp_flags & TROVE_EXP_READ_ONLY))
+    {
+        return 0;
+    }
+    /* Drat. Iterate thru the list of wildcards specified in server_configuration and see
+     * the client address matches. if yes, then we deny permission
+     */
+    if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "Disallowing read-write operation on a read-only exported file-system\n");
+        return -EROFS;
+    }
+    return 0;
+}
+
 static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
@@ -212,6 +380,20 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                  s_op->req->capability.handle_array
                  );
 
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
+    {
+        /*
+         * if we are exporting a volume readonly, disallow any operation 
+         * that modifies the state of the file-system.
+         */
+        if (permit_operation(
+                s_op->target_fs_id, s_op->access_type, s_op->addr) < 0)
+        {
+            js_p->error_code = -PVFS_EROFS;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
     PINT_server_req_get_credential(s_op->req, &cred);
     if (cred != NULL)
     {
@@ -223,6 +405,59 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             /* nlmills: TODO: find a better error code */
             js_p->error_code = -PVFS_EAGAIN;
             return SM_ACTION_COMPLETE;
+        }
+    }
+
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL && cred != NULL)
+    {
+        PVFS_uid translated_uid;
+        PVFS_gid translated_gid;
+
+        /* Translate the uid and gid's in case we need to do some squashing 
+         * based on the export and the client address
+         */
+        if (translate_ids(s_op->target_fs_id, cred->userid, 
+                          cred->group_array[0], &translated_uid, 
+                          &translated_gid, s_op->addr) == 1)
+        {
+            /* modify the credential. doesn't support secondary groups */
+            cred->userid = translated_uid;
+            cred->group_array[0] = translated_gid;
+            cred->num_groups = 1;
+
+            /* nlmills: XXX: will re-signing the credential (after it was
+             * verified once) with the server's issuer string and key
+             * have any unwanted side-effects?
+             */
+            /* nlmills: can't call PINT_cleanup_credential because
+             * the issuer string points inside the message buffer.
+             */
+            free(cred->signature);
+            ret = PINT_sign_credential(cred);
+            if (ret)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return SM_ACTION_COMPLETE;
+            }
+            
+            /* certain requests rely on the request attributes having the
+             * same uid/gid as the client 
+             */
+            if (s_op->req->op == PVFS_SERV_SETATTR)
+            {
+                s_op->req->u.setattr.attr.owner = translated_uid;
+                s_op->req->u.setattr.attr.group = translated_gid;
+            }
+            else if (s_op->req->op == PVFS_SERV_MKDIR)
+            {
+                s_op->req->u.mkdir.attr.owner = translated_uid;
+                s_op->req->u.mkdir.attr.group = translated_gid;
+            }
+            else if (s_op->req->op == PVFS_SERV_CREATE)
+            {
+                s_op->req->u.create.attr.owner = translated_uid;
+                s_op->req->u.create.attr.group = translated_gid;
+            }
         }
     }
 
