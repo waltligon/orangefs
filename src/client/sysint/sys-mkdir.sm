@@ -407,10 +407,13 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
+    /* TODO: Need to find the correct dirent_handle */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%llu) under "
-                 "parent handle %llu\n", sm_p->u.mkdir.object_name,
+                 "parent handle %llu, dirent_handle %llu\n",
+                 sm_p->u.mkdir.object_name,
                  llu(sm_p->u.mkdir.metafile_handle),
-                 llu(sm_p->object_ref.handle));
+                 llu(sm_p->object_ref.handle),
+                 llu(sm_p->u.mkdir.dirent_handle[0]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -421,7 +424,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->u.mkdir.dirent_handle,
+        sm_p->u.mkdir.dirent_handle[0],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
@@ -524,6 +527,7 @@ static PINT_sm_action mkdir_cleanup(
     }
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
+    PINT_free_object_attr(&sm_p->getattr.attr);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
@@ -564,6 +568,12 @@ static PINT_sm_action mkdir_cleanup(
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
+    if(sm_p->u.mkdir.dirent_handle)
+    {
+        free(sm_p->u.mkdir.dirent_handle);
+        sm_p->u.mkdir.dirent_handle = NULL;
+    }
+
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
@@ -576,6 +586,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = NULL;
+    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: parent_getattr_inspect\n");
 
@@ -583,9 +594,15 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
     assert(attr);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "parent owner: %d, group: %d, perms: %d, dirent_handle: %llu\n",
+        "parent owner: %d, group: %d, perms: %d, dirent_file_count: %d\n",
         (int)attr->owner, (int)attr->group, (int)attr->perms,
-        llu(attr->u.dir.dirent_handle));
+        attr->u.dir.dirent_file_count);
+    for (i = 0; i < attr->u.dir.dirent_file_count; i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "                           dirent_handle[%d] = %llu\n",
+                     i, llu(attr->u.dir.dirent_handle[i]));
+    }
 
     /* do we have a setgid bit? */
     if(attr->perms & PVFS_G_SGID)
@@ -596,7 +613,19 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
         sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
         /* note that permission checking is left to server even in this case */
     }
-    sm_p->u.mkdir.dirent_handle = attr->u.dir.dirent_handle;
+
+    sm_p->u.mkdir.dirent_handle = malloc(
+        sizeof(*attr->u.dir.dirent_handle) * attr->u.dir.dirent_file_count);
+    if (!sm_p->u.mkdir.dirent_handle)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memcpy(sm_p->u.mkdir.dirent_handle,
+           attr->u.dir.dirent_handle,
+           sizeof(*attr->u.dir.dirent_handle) * attr->u.dir.dirent_file_count);
+    sm_p->u.mkdir.dirent_file_count = attr->u.dir.dirent_file_count;
+
+
 
     return SM_ACTION_COMPLETE;
 }

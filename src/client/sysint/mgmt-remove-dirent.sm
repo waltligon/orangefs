@@ -17,6 +17,7 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
+#include "pint-util.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -187,12 +188,14 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(
+    /* TODO: Need to find the correct dirent_handle */
+    /* TODO: Need to call PINT_free_object_attr? */
+     PINT_SERVREQ_MGMT_REMOVE_DIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle,
+        sm_p->getattr.attr.u.dir.dirent_handle[0],
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
 
@@ -245,6 +248,7 @@ static PINT_sm_action mgmt_remove_dirent_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mgmt_remove_dirent_cleanup called\n");
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     sm_p->error_code = js_p->error_code;
 
     PINT_SET_OP_COMPLETE;

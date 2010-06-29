@@ -472,12 +472,13 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
+    /* TODO: Need to find the correct dirent_handle */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: %s: posting crdirent req: parent handle: %llu, "
                  "name: %s, handle: %llu, dirent_handle: %llu\n",
                  __func__,
                  llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
-                 llu(sm_p->u.create.metafile_handle), llu(sm_p->u.create.dirent_handle));
+                 llu(sm_p->u.create.metafile_handle), llu(sm_p->u.create.dirent_handle[0]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -488,7 +489,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->u.create.dirent_handle,
+        sm_p->u.create.dirent_handle[0],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
@@ -632,6 +633,12 @@ static PINT_sm_action create_cleanup(
         sm_p->u.create.datafile_handles = NULL;
     }
 
+    if(sm_p->u.create.dirent_handle)
+    {
+        free(sm_p->u.create.dirent_handle);
+        sm_p->u.create.dirent_handle = NULL;
+    }
+
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SET_OP_COMPLETE;
@@ -649,6 +656,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     PINT_dist *current_dist; 
     int ret = 0;
     int num_dfiles_requested = 0;
+    int tmp_i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 
@@ -668,17 +676,33 @@ static PINT_sm_action create_parent_getattr_inspect(
         /* note that permission checking is left to server even in this case */
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_parent_getattr: [%p] "
+        "dirent_file_count = %d "
         "dfile_count     = %d "
         "dist_name_len   = %d "
-        "dist_params_len = %d "
-        "dirent_handle   = %llu\n",
+        "dist_params_len = %d\n",
         attr,
+        attr->u.dir.dirent_file_count,
         attr->u.dir.hint.dfile_count,
         attr->u.dir.hint.dist_name_len,
-        attr->u.dir.hint.dist_params_len,
-        llu(attr->u.dir.dirent_handle));
+        attr->u.dir.hint.dist_params_len);
 
-    sm_p->u.create.dirent_handle = attr->u.dir.dirent_handle;
+    for (tmp_i = 0; tmp_i < attr->u.dir.dirent_file_count; tmp_i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "                           dirent_handle[%d] = %llu\n",
+                     tmp_i, llu(attr->u.dir.dirent_handle[tmp_i]));
+    }
+        
+    sm_p->u.create.dirent_handle = malloc(
+        sizeof(*attr->u.dir.dirent_handle) * attr->u.dir.dirent_file_count);
+    if (!sm_p->u.create.dirent_handle)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memcpy(sm_p->u.create.dirent_handle,
+           attr->u.dir.dirent_handle,
+           sizeof(*attr->u.dir.dirent_handle) * attr->u.dir.dirent_file_count);
+    sm_p->u.create.dirent_file_count = attr->u.dir.dirent_file_count;
 
     current_dist = sm_p->u.create.dist;
     /* We have an overriding distribution name for this directory.. honor that */

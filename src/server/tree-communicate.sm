@@ -612,6 +612,7 @@ static int tree_get_file_size_work_cleanup(
             //s_op->resp.u.tree_get_file_size.caller_handle_index = 0;
             s_op->resp.u.tree_get_file_size.size[0] = old_frame->resp.u.getattr.attr.u.data.size;
             s_op->resp.u.tree_get_file_size.error[0] = error_code;
+            PINT_free_object_attr(&old_frame->resp.u.getattr.attr);
         }
         free(old_frame);
     }/*end for*/

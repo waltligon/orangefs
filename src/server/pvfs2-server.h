@@ -537,7 +537,7 @@ struct PINT_server_getattr_op
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
-    PVFS_handle dirent_handle;
+    PVFS_handle *dirent_handle;
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
 };
@@ -668,6 +668,14 @@ typedef struct PINT_server_op
     } u;
 
 } PINT_server_op;
+
+#define CREATE_LOCAL_OP(__s_op) \
+    do { \
+      __s_op = malloc(sizeof(struct PINT_server_op)); \
+      if(!__s_op) { js_p->error_code = -PVFS_ENOMEM; return SM_ACTION_COMPLETE; } \
+      memset(__s_op, 0, sizeof(struct PINT_server_op)); \
+      __s_op->req = &__s_op->decoded.stub_dec.req; \
+    } while (0)
 
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
     do { \

@@ -69,7 +69,7 @@ struct static_payload
     uint32_t dfile_count;
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
-    PVFS_handle dirent_handle;
+    PVFS_handle *dirent_handle;
     uint32_t dirent_file_count;
 };
   
@@ -452,9 +452,26 @@ status=%d, attr_status=%d, size_status=%d\n",
         }
         if(tmp_static_payload->mask & PVFS_ATTR_DIR_DIRENT_FILES)
         {
-            attr->u.dir.dirent_handle = tmp_static_payload->dirent_handle;
+            uint32_t tmp_i;
+
+            if(attr->u.dir.dirent_handle)
+                free(attr->u.dir.dirent_handle);
+            attr->u.dir.dirent_handle =
+                malloc(tmp_static_payload->dirent_file_count*sizeof(PVFS_handle));
+            if (!attr->u.dir.dirent_handle)
+            {
+                gen_mutex_unlock(&acache_mutex);
+                return(-PVFS_ENOMEM);
+            }
+            memcpy(attr->u.dir.dirent_handle,
+                   tmp_static_payload->dirent_handle,
+                   tmp_static_payload->dirent_file_count*sizeof(PVFS_handle));
             attr->u.dir.dirent_file_count = tmp_static_payload->dirent_file_count;
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): dirent_file_count=%d, dirent_handle=%llu\n", attr->u.dir.dirent_file_count, llu(attr->u.dir.dirent_handle));
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): dirent_file_count=%d\n", attr->u.dir.dirent_file_count);
+            for (tmp_i=0; tmp_i < attr->u.dir.dirent_file_count; tmp_i++)
+            {
+                gossip_debug(GOSSIP_ACACHE_DEBUG, "                           dirent_handle[%d]=%llu\n", tmp_i, llu(attr->u.dir.dirent_handle[tmp_i]));
+            }
         }
 
         *attr_status = 0;
@@ -656,9 +673,26 @@ int PINT_acache_update(
         }
         if(attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
         {
-             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): dirent_file_count=%d, dirent_handle=%llu\n", attr->u.dir.dirent_file_count, llu(attr->u.dir.dirent_handle));
-            tmp_static_payload->dirent_handle = attr->u.dir.dirent_handle;
-            tmp_static_payload->dirent_file_count = attr->u.dir.dirent_file_count;
+            uint32_t tmp_i;
+
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): dirent_file_count=%d\n", attr->u.dir.dirent_file_count);
+            for (tmp_i=0; tmp_i < attr->u.dir.dirent_file_count; tmp_i++)
+            {
+                gossip_debug(GOSSIP_ACACHE_DEBUG, "                  dirent_handle[%d]=%llu\n", tmp_i, llu(attr->u.dir.dirent_handle[tmp_i]));
+            }
+ 
+           tmp_static_payload->dirent_handle =
+                malloc(attr->u.dir.dirent_file_count * sizeof(PVFS_handle));
+           if (!tmp_static_payload->dirent_handle)
+           {
+                ret = -PVFS_ENOMEM;
+                goto err;
+           }
+           memcpy(tmp_static_payload->dirent_handle
+                 ,attr->u.dir.dirent_handle
+                 ,attr->u.dir.dirent_file_count * sizeof(PVFS_handle));
+           tmp_static_payload->dirent_file_count =
+                attr->u.dir.dirent_file_count;
         }
     }
 
@@ -728,6 +762,8 @@ err:
             free(tmp_static_payload->dfile_array);
         if(tmp_static_payload->mirror_dfile_array)
             free(tmp_static_payload->mirror_dfile_array);
+        if(tmp_static_payload->dirent_handle)
+            free(tmp_static_payload->dirent_handle);
         if(tmp_static_payload->dist)
             PINT_dist_free(tmp_static_payload->dist);
         free(tmp_static_payload);
@@ -826,6 +862,10 @@ static int static_free_payload(void* payload)
     if(tmp_static_payload->mirror_dfile_array)
     {
         free(tmp_static_payload->mirror_dfile_array);
+    }
+    if(tmp_static_payload->dirent_handle)
+    {
+        free(tmp_static_payload->dirent_handle);
     }
     if(tmp_static_payload->dist)
     {

@@ -424,13 +424,14 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* TODO: Need to find the correct dirent_handle */
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle,
+        sm_p->getattr.attr.u.dir.dirent_handle[0],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
@@ -611,6 +612,7 @@ static PINT_sm_action symlink_cleanup(
     }
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

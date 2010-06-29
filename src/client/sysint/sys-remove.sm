@@ -15,6 +15,7 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
+#include "pint-util.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -298,12 +299,13 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
+    /* TODO: Need to find the correct dirent_handle */
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle,
+        sm_p->getattr.attr.u.dir.dirent_handle[0],
         sm_p->u.remove.object_name,
         sm_p->hints);
 
@@ -369,8 +371,9 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
+    /* TODO: Need to find the correct dirent_handle */
     gossip_debug(GOSSIP_CLIENT_DEBUG, "dirent_handle: %llu\n",
-        llu(attr->u.dir.dirent_handle));
+        llu(attr->u.dir.dirent_handle[0]));
  
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -381,7 +384,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
-        attr->u.dir.dirent_handle,
+        attr->u.dir.dirent_handle[0],
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 
@@ -500,6 +503,7 @@ static PINT_sm_action remove_cleanup(
                            (const PVFS_object_ref*) &(sm_p->parent_ref));
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

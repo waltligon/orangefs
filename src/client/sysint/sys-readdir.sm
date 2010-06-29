@@ -239,10 +239,11 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
+    /* TODO: Need to find the correct dirent_handle */
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "%llu|%llu|%d | token is %llu | limit is %d\n",
         llu(sm_p->object_ref.handle),
-        llu(sm_p->getattr.attr.u.dir.dirent_handle),
+        llu(sm_p->getattr.attr.u.dir.dirent_handle[0]),
         sm_p->object_ref.fs_id,
         llu(sm_p->readdir.pos_token),
         sm_p->readdir.dirent_limit);
@@ -255,7 +256,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle,
+        sm_p->getattr.attr.u.dir.dirent_handle[0],
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit,
         sm_p->hints);
@@ -369,6 +370,7 @@ static PINT_sm_action do_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: do_cleanup\n");
 
+    PINT_free_object_attr(&sm_p->getattr.attr);
     sm_p->error_code = js_p->error_code;
     gossip_debug(GOSSIP_READDIR_DEBUG, " final return code is %d\n",
                  sm_p->error_code);

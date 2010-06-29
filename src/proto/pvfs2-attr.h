@@ -184,7 +184,7 @@ endecode_fields_7(PVFS_directory_hint,
 struct PVFS_directory_attr_s
 {
     /* list of files to hold directory entries */
-    PVFS_handle dirent_handle;
+    PVFS_handle *dirent_handle;
     uint32_t dirent_file_count;
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
@@ -193,9 +193,11 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_directory_attr(pptr, x) do { \
+    int dirent_files_i;\
     encode_uint32_t(pptr, &(x)->dirent_file_count);\
+    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
+        encode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
     encode_skip4(pptr,);\
-    encode_PVFS_handle(pptr, &(x)->dirent_handle);\
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
@@ -203,14 +205,20 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 #if 0
     int dirent_files_i;\
     for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
-        encode_PVFS_handle(pptr, &(x)->dirent_file_array[dirent_files_i]);\
+        encode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
 
 #endif
 
 #define decode_PVFS_directory_attr(pptr, x) do { \
+    int dirent_files_i;\
     decode_uint32_t(pptr, &(x)->dirent_file_count);\
+    (x)->dirent_handle = decode_malloc((x)->dirent_file_count \
+      * sizeof(*(x)->dirent_handle));\
+    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
+    { \
+        decode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
+    } \
     decode_skip4(pptr,);\
-    decode_PVFS_handle(pptr, &(x)->dirent_handle);\
     decode_PVFS_size(pptr, &(x)->dirent_count);\
     decode_PVFS_directory_hint(pptr, &(x)->hint);\
 } while(0)
@@ -218,11 +226,11 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #if 0
     int dirent_files_i;\
-    (x)->dirent_file_array = decode_malloc((x)->dirent_file_count \
-      * sizeof(*(x)->dirent_file_array));\
+    (x)->dirent_handle = decode_malloc((x)->dirent_file_count \
+      * sizeof(*(x)->dirent_handle));\
     for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
     { \
-        decode_PVFS_handle(pptr, &(x)->dirent_file_array[dirent_files_i]);\
+        decode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
     } \
 
 #endif

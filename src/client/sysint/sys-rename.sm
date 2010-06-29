@@ -410,8 +410,10 @@ static int rename_lookups_comp_fn(
         resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
         sm_p->u.rename.parent_refns[index].fs_id;
+
+    /* TODO: Need to find the correct dirent_handle */
     sm_p->u.rename.dirent_handle[index] =
-        resp_p->u.lookup_path.attr_array[0].u.dir.dirent_handle;
+        resp_p->u.lookup_path.attr_array[0].u.dir.dirent_handle[0];
 
     if (index == 0)
     {

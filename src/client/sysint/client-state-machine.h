@@ -91,7 +91,8 @@ struct PINT_client_create_sm
     PVFS_handle *datafile_handles;
     int stuffed;
 
-    PVFS_handle dirent_handle;
+    int dirent_file_count;
+    PVFS_handle *dirent_handle;
 
     PVFS_handle handles[2];
 };
@@ -107,7 +108,8 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
-    PVFS_handle dirent_handle;
+    int dirent_file_count;
+    PVFS_handle *dirent_handle;
 };
 
 struct PINT_client_symlink_sm
