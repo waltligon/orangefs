@@ -698,6 +698,10 @@ static PINT_sm_action getattr_object_getattr_failure(
     return SM_ACTION_COMPLETE;
 }
 
+/* NOTE:  This nested state machine allocates and stores the results in getattr.size_array.  So,
+ * if you call this state machine directly, do not allocate space prior to calling it to avoid a
+ * nasty memory leak.
+*/
 static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
