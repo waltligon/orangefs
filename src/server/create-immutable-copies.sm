@@ -1249,7 +1249,8 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
 
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tabout to allocate mirror_op...\n");
 
-       req->u.mirror.bsize = imm_p->bstream_array_base_local[src];
+       if (imm_p->bstream_array_base_local)
+          req->u.mirror.bsize = imm_p->bstream_array_base_local[src];
        mirror_op->req = req;
        mirror_op->op  = req->op;
        mirror_op->addr = sm_p->addr;/*get addr for this server*/
