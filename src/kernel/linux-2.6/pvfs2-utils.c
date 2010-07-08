@@ -688,6 +688,32 @@ int pvfs2_flush_inode(struct inode *inode)
 /* directory entry key */
 #define DIRENT_KEY  "system.pvfs2." DIRECTORY_ENTRY_KEYSTR
 
+/* Extended attributes helper functions */
+static char *xattr_non_zero_terminated[] = {
+    DFILE_KEY,
+    DIST_KEY,
+    ROOT_KEY,
+};
+
+/* Extended attributes helper functions */
+
+/*
+ * this function returns 
+ * 0 if the val corresponding to name is known to be not terminated with an explicit \0
+ * 1 if the val corresponding to name is known to be \0 terminated
+ */
+static int xattr_zero_terminated(const char *name)
+{
+    int i;
+    static int xattr_count = sizeof(xattr_non_zero_terminated)/sizeof(char *);
+    for (i = 0;i < xattr_count; i++)
+    {
+        if (strcmp(name, xattr_non_zero_terminated[i]) == 0)
+            return 0;
+    }
+    return 1;
+}
+
 static char *xattr_resvd_keys[] = {
     DFILE_KEY,
     DIST_KEY,
@@ -785,15 +811,33 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
          */
         if (ret == 0)
         {
+            ssize_t new_length;
             length = new_op->downcall.resp.getxattr.val_sz;
+            /*
+             * if the xattr corresponding to name was not terminated with a \0
+             * then we return the entire response length
+             */
+            if (xattr_zero_terminated(name) == 0)
+            {
+                new_length = length;
+            }
+            /*
+             * if it was terminated by a \0 then we return 1 less for the getfattr
+             * programs to play nicely with displaying it
+             */
+            else {
+                new_length = length - 1;
+            }
+            /* Just return the length of the queried attribute after
+             * subtracting the \0 thingie */
             if (size == 0)
             {
-                ret = length;
+                ret = new_length;
             }
             else
             {
-                /* check to see if val length is > provided buffer size */
-                if (length > size)
+                /* check to see if key length is > provided buffer size */
+                if (new_length > size)
                 {
                     ret = -ERANGE;
                 }
@@ -802,10 +846,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     /* No size problems */
                     memset(buffer, 0, size);
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                           length);
-                    ret = length; 
-                    gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: "
-                        "inode %llu key %s key_sz %d, val_length %d\n", 
+                            new_length);
+                    ret = new_length;
+                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s "
+                            " key_sz %d, val_length %d\n", 
                         llu(get_handle_from_ino(inode)),
                         (char*)new_op->upcall.req.getxattr.key, 
                         (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
@@ -815,10 +859,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         else if (ret == -ENOENT)
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
-            gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_getxattr: inode %llu "
-                                            "key %s does not exist!\n"
-                                      ,llu(get_handle_from_ino(inode))
-                                      ,(char *)new_op->upcall.req.getxattr.key);
+            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s does not exist!\n",
+                    llu(get_handle_from_ino(inode)), (char *) new_op->upcall.req.getxattr.key);
         }
 
         /* when request is serviced properly, free req op struct */
@@ -839,8 +881,6 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
-    int i;
-    char *valBuf;
 
     if (size < 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
     {
@@ -916,28 +956,21 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
         new_op->upcall.req.setxattr.keyval.key_sz = 
             ret + 1;
         memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
-        new_op->upcall.req.setxattr.keyval.val_sz = size;
+        new_op->upcall.req.setxattr.keyval.val[size] = '\0';
+        /* For some reason, val_sz should include the \0 at the end as well */
+        new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
-        gossip_debug(GOSSIP_XATTR_DEBUG,"Upcall: size=%d\n"
-                    ,new_op->upcall.req.setxattr.keyval.val_sz);
-        valBuf = (char *)new_op->upcall.req.setxattr.keyval.val;
-        for (i=0; i<new_op->upcall.req.setxattr.keyval.val_sz; i++)
-            gossip_debug(GOSSIP_XATTR_DEBUG,"\tval[%d]=%#x\n"
-                        ,i
-                        ,(unsigned int)valBuf[i]);
-
-        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, "
-                "key_sz %d value size %zd\n", 
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: key %s, key_sz %d "
+                " value size %zd\n", 
                  (char*)new_op->upcall.req.setxattr.keyval.key, 
                  (int) new_op->upcall.req.setxattr.keyval.key_sz,
-                 size);
+                 size + 1);
 
         ret = service_operation(
             new_op, "pvfs2_inode_setxattr", 
             get_interruptible_flag(inode));
 
-        gossip_debug(GOSSIP_XATTR_DEBUG,"pvfs2_inode_setxattr: returning %d\n"
-                                       , ret);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_setxattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -1441,6 +1474,12 @@ struct inode *pvfs2_create_entry(
 {
     if (dir && dentry && error_code)
     {
+        if(strlen(dentry->d_name.name) > (PVFS2_NAME_LEN - 1))
+        {
+            *error_code = -ENAMETOOLONG;
+            return(NULL);
+        }
+
         switch (op_type)
         {
             case PVFS2_VFS_OP_CREATE:
@@ -2124,6 +2163,206 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
     return ret;
 #undef NUM_MODES
 }
+
+
+static char * pvfs2_strtok(char *s, const char *toks)
+{
+   static char *in_string_p;         /* original string */
+   char *this_string_p;              /* starting value of in_string_p */
+                                     /* during this iteration         */
+   uint32_t toks_len = strlen(toks); /* # of tokens */
+   uint32_t i;                       /* index */
+   
+   if (s)
+   {
+      /* when s has a value, we are using a new input string */
+      in_string_p=s;
+   }
+
+   /* set new starting position */
+   this_string_p = in_string_p;
+
+   /* loop through the string until a token or end-of-string(null)
+    * is found. 
+   */
+   for (;*in_string_p;in_string_p++)
+   {
+      /* Is character a token? */
+      for (i=0; i<toks_len; i++)
+      {
+         if (*in_string_p == toks[i])
+         {
+            /*token found => end-of-word*/
+            *in_string_p = 0;
+             in_string_p++;
+             return(this_string_p);
+         }
+      }/*end looping of tokens*/
+   }/*end looping of the string*/
+
+  if (*this_string_p==0)
+     return(NULL); 
+
+  return (this_string_p);
+}/*end function pvfs2_strtok*/
+
+/*convert 64-bit debug mask into a readable string of keywords*/
+static int proc_mask_to_debug(__keyword_mask_t *mask_map
+                             ,int num_mask_map
+                             ,uint64_t mask
+                             ,char *debug_string)
+{
+   unsigned int index = 0;
+   unsigned int i;
+
+   memset(debug_string,0,PVFS2_MAX_DEBUG_STRING_LEN);
+
+   for (i=0; i<num_mask_map; i++)
+   {
+      if ( (index + strlen(mask_map[i].keyword)) >= PVFS2_MAX_DEBUG_STRING_LEN )
+      {
+         return(0);
+      }
+     
+      switch( mask_map[i].mask_val )
+      {
+          case GOSSIP_NO_DEBUG  :
+          {
+               if ( mask == GOSSIP_NO_DEBUG )
+               {
+                  /* "none" */
+                  strcpy(debug_string,mask_map[i].keyword);
+                  return(0);
+               }
+               break;
+          }
+          case GOSSIP_MAX_DEBUG :
+          {
+              if ( mask == GOSSIP_MAX_DEBUG )
+              {
+                 /* "all" */
+                 strcpy(debug_string,mask_map[i].keyword);
+                 return(0);
+              }
+              break;
+          }
+          default :
+          {
+              if ((mask & mask_map[i].mask_val) != mask_map[i].mask_val)
+              {   /*mask does NOT contain the mask value*/
+                  break;
+              }
+              if (index != 0)
+              {   /*add comma for second and subsequent mask keywords*/
+                  (debug_string[index]) = ',';
+                  index++;
+              }
+
+              /*add keyword and slide index*/
+              memcpy(&debug_string[index], mask_map[i].keyword
+                    ,strlen(mask_map[i].keyword));
+              index += strlen(mask_map[i].keyword);
+          }
+      }/*end switch*/
+   }/*end for*/
+
+   return(0);
+}/*end function proc_mask_to_debug*/
+
+
+static uint64_t proc_debug_to_mask(__keyword_mask_t *mask_map, 
+        int num_mask_map, const char *event_logging)
+{
+    uint64_t mask = 0;
+    char *s = NULL, *t = NULL;
+    const char *toks = ", ";
+    int i = 0, negate = 0, slen = 0;
+
+    if (event_logging)
+    {
+        /* s = strdup(event_logging); */
+        slen=strlen(event_logging);
+        s = kmalloc(slen+1,GFP_KERNEL);
+        if (!s)
+        {
+           return (-ENOMEM);
+        }
+        memset(s,0,slen+1);
+        memcpy(s,event_logging,slen);
+
+        /* t = strtok(s, toks); */
+        t = pvfs2_strtok(s, toks);
+
+        while(t)
+        {
+            if (*t == '-')
+            {
+                negate = 1;
+                ++t;
+            }
+
+            for(i = 0; i < num_mask_map; i++)
+            {
+                if (!strcmp(t, mask_map[i].keyword))
+                {
+                    if (negate)
+                    {
+                        mask &= ~mask_map[i].mask_val;
+                    }
+                    else
+                    {
+                        mask |= mask_map[i].mask_val;
+                    }
+                    break;
+                }
+            } 
+            /* t = strtok(NULL, toks); */
+            t = pvfs2_strtok(NULL, toks);
+        }
+        kfree(s);
+    }
+    return mask;
+}
+
+/*
+ * Based on human readable keywords, translate them into
+ * a mask value appropriate for the debugging level desired.
+ * The 'computed' mask is returned; 0 if no keywords are
+ * present or recognized.  Unrecognized keywords are ignored when
+ * mixed with recognized keywords.
+ *
+ * Prefix a keyword with "-" to turn it off.  All keywords
+ * processed in specified order.
+ */
+uint64_t PVFS_proc_debug_eventlog_to_mask(const char *event_logging)
+{
+    return proc_debug_to_mask(s_keyword_mask_map, 
+            num_keyword_mask_map, event_logging);
+}
+
+uint64_t PVFS_proc_kmod_eventlog_to_mask(const char *event_logging)
+{
+    return proc_debug_to_mask(s_kmod_keyword_mask_map, 
+            num_kmod_keyword_mask_map, event_logging);
+}
+
+int PVFS_proc_kmod_mask_to_eventlog(uint64_t mask, char *debug_string)
+{
+    return( proc_mask_to_debug(s_kmod_keyword_mask_map
+                              , num_kmod_keyword_mask_map
+                              ,mask
+                              ,debug_string) );
+}/*end function PVFS_proc_kmod_mask_to_eventlog*/
+
+int PVFS_proc_mask_to_eventlog(uint64_t mask, char *debug_string)
+{
+   
+    return( proc_mask_to_debug(s_keyword_mask_map
+                              ,num_keyword_mask_map
+                              ,mask
+                              ,debug_string) );
+}
+
 
 /*
  * Local variables:
