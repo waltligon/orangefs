@@ -2,21 +2,21 @@
 
 LTPVER="20081130"
 THISDATE=`date +%F-%R`
-DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
+#DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
 
 cd ${EXTRA_TESTS}
 
 # get rid of any old copies
-sudo rm -rf ltp-full-${LTPVER} ltp-full-${LTPVER}.tgz 
+sudo rm -rf ltp-full-${LTPVER}  
 
 # download
-echo Downloading LTP...
-wget -q ${DOWNLOAD} > /dev/null
-if [ "${?}" != 0 ]
-then
-    echo "Error: failed to download ${DOWNLOAD}."
-    exit 1;
-fi
+#echo Downloading LTP...
+#wget -q ${DOWNLOAD} > /dev/null
+#if [ "${?}" != 0 ]
+#then
+#    echo "Error: failed to download ${DOWNLOAD}."
+#    exit 1;
+#fi
 
 tar -xvzf ltp-full-${LTPVER}.tgz > /dev/null
 if [ "${?}" != 0 ]
@@ -28,7 +28,10 @@ fi
 # fix some pvfs specific problems
 cd ltp-full-${LTPVER}
 for patch in \
-	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch ; do
+	${VFS_SCRIPTS}/ltp-20080630-zoo-path.patch \
+        ${VFS_SCRIPTS}/ltp-20080630-accept4-wrapper.patch \
+	${VFS_SCRIPTS}/ltp-full-20081130-no-signalfd.patch \
+        ${VFS_SCRIPTS}/ltp-full-20081130-unzip.patch; do
 		patch -p1 < $patch
 done
 if [ "${?}" != 0 ]
