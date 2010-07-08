@@ -1953,9 +1953,11 @@ int dbpf_collection_lookup(char *collname,
     coll_p->c_low_watermark = 1;
     coll_p->meta_sync_enabled = 1; /* MUST be 1 !*/
 
-
     dbpf_collection_register(coll_p);
     *out_coll_id_p = coll_p->coll_id;
+
+    clear_stranded_bstreams(coll_p->coll_id);
+
     return 1;
 }
 
