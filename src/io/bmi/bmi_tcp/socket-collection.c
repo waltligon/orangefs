@@ -89,16 +89,17 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     if(new_server_socket > -1)
     {
-	tmp_scp->pollfd_array[0].fd = new_server_socket;
-	tmp_scp->pollfd_array[0].events = POLLIN;
-	tmp_scp->addr_array[0] = NULL;
+	tmp_scp->pollfd_array[tmp_scp->array_count].fd = new_server_socket;
+	tmp_scp->pollfd_array[tmp_scp->array_count].events = POLLIN;
+	tmp_scp->addr_array[tmp_scp->array_count] = NULL;
 	tmp_scp->array_count++;
-        /* Add the pipe_fd[0] fd to the poll in set always */
-        tmp_scp->pollfd_array[1].fd = tmp_scp->pipe_fd[0];
-        tmp_scp->pollfd_array[1].events = POLLIN;
-        tmp_scp->addr_array[1] = NULL;
-        tmp_scp->array_count++;
     }
+
+    /* Add the pipe_fd[0] fd to the poll in set always */
+    tmp_scp->pollfd_array[tmp_scp->array_count].fd = tmp_scp->pipe_fd[0];
+    tmp_scp->pollfd_array[tmp_scp->array_count].events = POLLIN;
+    tmp_scp->addr_array[tmp_scp->array_count] = NULL;
+    tmp_scp->array_count++;
 
     return (tmp_scp);
 }
