@@ -2,6 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
+ *
  */
 
 /** \file
@@ -247,7 +248,7 @@ machine pvfs2_client_io_sm
     {
         run io_analyze_results;
         IO_RETRY => init;
-        IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;
+        /*IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;*/
         IO_GET_DATAFILE_SIZE => io_datafile_size;
         default => io_cleanup;
     }
@@ -797,8 +798,6 @@ static PINT_sm_action io_datafile_post_msgpairs(
                     goto try_next_encoding;
                 }
             }     
-            if (ret == 1)
-
             /*
               FIXME: make this a clean error transition by adjusting
               the completion count and/or (not) exiting
@@ -886,8 +885,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
             PVFS_perror_gossip("Receive immediately failed",
                                msg->recv_status.error_code);
 
-            ret = msg->recv_status.error_code;
-            js_p->error_code = ret;
+            //ret = msg->recv_status.error_code;
+            js_p->error_code = IO_RETRY;
             continue;
         }
 
@@ -993,6 +992,8 @@ static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
     struct PINT_client_io_sm *io = &(sm_p->u.io);
 
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_post_msgpairs_retry...\n");
+
     /* Are we mirroring on a READ request? */
     if ( (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) &&
          io->io_type == PVFS_IO_READ )
@@ -1010,6 +1011,7 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
                                    ,job_status_s *js_p )
 {
    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
+   gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_mirror_retry...\n");
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
     PVFS_metafile_attr *meta = &(attr->u.meta);
@@ -1800,10 +1802,8 @@ static PINT_sm_action io_analyze_results(
              * we need to go and get them
              */
 
-            /* this sets the array that gets filled in by the
-             * getattr_datafile_sizes states machine we jump to
-             */
-            sm_p->getattr.size_array = sm_p->u.io.dfile_size_array;
+            /* NOTE:  when jumping to getattr_datafile_sizes, results will be */
+            /* allocated and stored in sm_p->getattr.size_array.              */
 
             /* setting this state result will cause the state machine to
              * jump to getattr_datafile_sizes and get all the 
@@ -1866,7 +1866,7 @@ static PINT_sm_action io_analyze_size_results(
         logical_file_size(
             attr->u.meta.dist->params,
             attr->u.meta.dfile_count,
-            sm_p->u.io.dfile_size_array);
+            sm_p->getattr.size_array);
     if(eof > eor)
     {
         eor = eof;
@@ -1879,7 +1879,7 @@ static PINT_sm_action io_analyze_size_results(
 
         ret = io_zero_fill_holes(sm_p, eor,
                                  attr->u.meta.dfile_count,
-                                 sm_p->u.io.dfile_size_array,
+                                 sm_p->getattr.size_array,
                                  NULL);
         if(ret < 0)
         {
@@ -1902,7 +1902,7 @@ static PINT_sm_action io_analyze_size_results(
 
         ret = io_zero_fill_holes(sm_p, eof,
                                  attr->u.meta.dfile_count,
-                                 sm_p->u.io.dfile_size_array,
+                                 sm_p->getattr.size_array,
                                  NULL);
         if(ret < 0)
         {
