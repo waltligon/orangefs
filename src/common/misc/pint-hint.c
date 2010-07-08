@@ -564,7 +564,7 @@ void *PINT_hint_get_value_by_name(
 
     while(h)
     {
-        if(!strcmp(hint->type_string, name))
+        if(!strcmp(h->type_string, name))
         {
             if(length)
             {
