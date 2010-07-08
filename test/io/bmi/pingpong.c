@@ -28,6 +28,12 @@
 #include "test-bmi.h"
 #include <src/common/misc/pvfs2-internal.h>  /* lld(), llu() */
 
+#include "pvfs2-test-config.h"
+
+#ifdef HAVE_ZLIB_H
+#include <zlib.h>
+#endif
+
 /**************************************************************
  * Data structures 
  */
@@ -58,6 +64,7 @@ struct options
         char *method;
         int  which;
         int  test;
+        int  crc;
 };
 
 
@@ -71,11 +78,12 @@ static int do_client(struct options *opts, bmi_context_id *context);
 
 static void print_usage(void)
 {
-        fprintf(stderr, "usage: pingpong -h HOST_URI -s|-c [-u]\n");
+        fprintf(stderr, "usage: pingpong -h HOST_URI -s|-c [-u] [-r]\n");
         fprintf(stderr, "       where:\n");
         fprintf(stderr, "       HOST_URI is tcp://host:port, mx://host:board:endpoint, etc\n");
         fprintf(stderr, "       -s is server and -c is client\n");
         fprintf(stderr, "       -u will use unexpected messages (pass to client only)\n");
+        fprintf(stderr, "       -r will calculate and verify checksums (adler32)\n");
         return;
 }
 
@@ -196,7 +204,8 @@ static int do_server(struct options *opts, bmi_context_id *context)
         rx_msg = (struct msg *) request_info.buffer;
         opts->test = ntohl(rx_msg->test);
 
-        printf("Starting %s test\n", opts->test == EXPECTED ? "expected" : "unexpected");
+        printf("Starting %s test%s\n", opts->test == EXPECTED ? "expected" : "unexpected",
+               opts->crc ? " with checksums" : "");
 
         peer_addr = request_info.addr;
 
@@ -246,7 +255,8 @@ static int do_server(struct options *opts, bmi_context_id *context)
 
         tx_msg = (struct msg *) send_buffer;
         tx_msg->test = htonl(opts->test);
-    
+
+            
         /* create a buffer to recv into */
         recv_buffer = BMI_memalloc(peer_addr, max_bytes, BMI_RECV);
         if (!recv_buffer) {
@@ -331,7 +341,9 @@ static int do_server(struct options *opts, bmi_context_id *context)
                                 }
                         }
                         /* send the pong */
-                        ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
+                        ret = BMI_post_send(&(op_id[SEND]), peer_addr,
+                                            (opts->test == EXPECTED ?
+                                             recv_buffer : request_info.buffer),
                                         bytes, BMI_PRE_ALLOC, i, NULL, *context, NULL);
                         if (ret < 0) {
                                 fprintf(stderr, "BMI_post_send failure.\n");
@@ -392,6 +404,10 @@ static int do_client(struct options *opts, bmi_context_id *context)
         double                  min             = 99999.9;
         double                  max             = 0.0;
         double                  avg             = 0.0;
+        int                     offset;
+#ifdef HAVE_LIBZ
+        unsigned long           crc, rcrc;
+#endif
 
         /* get a bmi_addr for the server */
         ret = BMI_addr_lookup(&peer_addr, opts->hostid);
@@ -427,7 +443,18 @@ static int do_client(struct options *opts, bmi_context_id *context)
                 fprintf(stderr, "BMI_memalloc failed.\n");
                 return (-1);
         }
-        memset(send_buffer, 0, max_bytes);
+
+        if(opts->crc)
+        {
+            for(i = 0; i < max_bytes; ++i)
+            {
+                ((char *)send_buffer)[i] = i;
+            }
+        }
+        else
+        {
+            memset(send_buffer, 0, max_bytes);
+        }
 
         tx_msg = (struct msg *) send_buffer;
         tx_msg->test = htonl(opts->test);
@@ -502,7 +529,16 @@ static int do_client(struct options *opts, bmi_context_id *context)
 
                 for (i=0; i < iterations; i++) {
 
+                        offset = random() % (max_bytes - bytes - 1);
                         gettimeofday(&start, NULL);
+
+#ifdef HAVE_LIBZ
+                        if(opts->crc)
+                        {
+                            crc = adler32(0L, Z_NULL, 0);
+                            crc = adler32(crc, (send_buffer + offset), bytes);
+                        }
+#endif
 
                         /* post the recv for the pong */
                         ret = BMI_post_recv(&(op_id[RECV]), peer_addr, recv_buffer,
@@ -516,11 +552,11 @@ static int do_client(struct options *opts, bmi_context_id *context)
         
                         /* send the ping */
                         if (opts->test == EXPECTED) {
-                                ret = BMI_post_send(&(op_id[SEND]), peer_addr, send_buffer,
+                                ret = BMI_post_send(&(op_id[SEND]), peer_addr, ((char *)send_buffer) + offset,
                                                 bytes, BMI_PRE_ALLOC, i, NULL, *context, NULL);
                         } else {
                                 ret = BMI_post_sendunexpected(&(op_id[SEND]), peer_addr, 
-                                                send_buffer, bytes, BMI_PRE_ALLOC, i, 
+                                                ((char*)send_buffer) + offset, bytes, BMI_PRE_ALLOC, i, 
                                                 NULL, *context, NULL);
                         }
                         if (ret < 0) {
@@ -558,6 +594,18 @@ static int do_client(struct options *opts, bmi_context_id *context)
                                 return (-1);
                         }
 
+#ifdef HAVE_LIBZ
+                        if(opts->crc && opts->test == EXPECTED)
+                        {
+                            rcrc = adler32(0L, Z_NULL, 0);
+                            rcrc = adler32(rcrc, recv_buffer, bytes);
+                            if(rcrc != crc)
+                            {
+                                fprintf(stderr, "CRC Mismatch!  Sent %llu but received %llu\n",
+                                        llu(crc), llu(rcrc));
+                            }
+                        }
+#endif
                         gettimeofday(&end, NULL);
 
                         if (!warmup) {
@@ -637,7 +685,7 @@ static struct options *parse_args(int argc, char *argv[])
 
         /* getopt stuff */
         extern char *optarg;
-        char flags[] = "h:scu";
+        char flags[] = "h:scur";
         int one_opt = 0;
 
         struct options *opts = NULL;
@@ -674,6 +722,9 @@ static struct options *parse_args(int argc, char *argv[])
                         break;
                 case ('u'):
                         opts->test = UNEXPECTED;
+                        break;
+                case ('r'):
+                        opts->crc = 1;
                         break;
                 default:
                         break;
