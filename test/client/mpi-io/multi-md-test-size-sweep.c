@@ -55,7 +55,7 @@ PVFS_object_ref* pvfs_refs = NULL;
 char* pvfs_buf = NULL;
 PVFS_object_ref pvfs_basedir;
 PVFS_object_ref pvfs_testdir;
-PVFS_credentials pvfs_creds;
+PVFS_credential pvfs_creds;
 
 struct api_ops
 {
@@ -516,8 +516,8 @@ void pvfs_mktestdir(int rank, int* n_ops)
 
     sprintf(test_dir, "rank%d", rank);
 
-    attr.owner = pvfs_creds.uid;
-    attr.group = pvfs_creds.gid;
+    attr.owner = pvfs_creds.userid;
+    attr.group = pvfs_creds.group_array[0];
     attr.perms = PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
@@ -658,8 +658,8 @@ void pvfs_create(int rank, int* n_ops)
 
     *n_ops = opt_nfiles;
 
-    attr.owner = pvfs_creds.uid;
-    attr.group = pvfs_creds.gid;
+    attr.owner = pvfs_creds.userid;
+    attr.group = pvfs_creds.group_array[0];
     attr.perms = PVFS_U_WRITE|PVFS_U_READ;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
@@ -825,7 +825,7 @@ void pvfs_prep(int rank, int* n_ops)
         handle_error(ret, "PVFS_util_resolve");
     }
 
-    PVFS_util_gen_credentials(&pvfs_creds);
+    PVFS_util_gen_credential_defaults(&pvfs_creds);
 
     ret = PVFS_sys_lookup(fs_id, pvfs_path, &pvfs_creds, &resp_lookup, 
         PVFS2_LOOKUP_LINK_FOLLOW);

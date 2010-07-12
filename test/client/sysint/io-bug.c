@@ -31,7 +31,7 @@ int main(
     int i;
     PVFS_fs_id fs_id;
     char *name;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -102,7 +102,7 @@ int main(
 
     name = filename;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     /* TODO: really we probably want to look for a specific error code,
@@ -124,8 +124,8 @@ int main(
 	}
 
 	/* create new file */
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = credentials.userid;
+	attr.group = credentials.group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;

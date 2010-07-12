@@ -7,23 +7,23 @@
 
 int test_util_init_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int32_t flags,
     int * server_count);
 
 int test_util_get_queue_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count);
 
 int test_util_get_io_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count);
 
 int test_util_get_metadata_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count);
 
 void test_util_start_timing(void);

@@ -19,7 +19,7 @@ int main(int argc, char **argv)
     int ret = -1;
     char *filename = NULL;
     PVFS_fs_id fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_object_ref pinode_refn;
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 	return (-1);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     printf("about to lookup %s\n", filename);
 
@@ -98,8 +98,8 @@ int main(int argc, char **argv)
     resp_getattr.attr.mask |= PVFS_ATTR_SYS_ATIME;
 
     /* use stored credentials here */
-    credentials.uid = resp_getattr.attr.owner;
-    credentials.gid = resp_getattr.attr.group;
+    credentials.userid = resp_getattr.attr.owner;
+    credentials.group_array[0] = resp_getattr.attr.group;
 
     printf("about to setattr on %s\n", filename);
 

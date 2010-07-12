@@ -18,7 +18,7 @@ static PVFS_BMI_addr_t * addr_array;
 
 int test_util_init_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int32_t flags,
     int * server_count)
 {
@@ -26,7 +26,7 @@ int test_util_init_perfs(
     int count;
 
     /* count how many meta servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, flags,
+    ret = PVFS_mgmt_count_servers(cur_fs, flags,
 				  server_count);
     if(ret < 0)
     {
@@ -83,7 +83,6 @@ int test_util_init_perfs(
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
 				     flags,
 				     addr_array,
 				     &count);
@@ -99,7 +98,7 @@ int test_util_init_perfs(
 
 int test_util_get_io_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count)
 {
     int ret, i, j;
@@ -136,7 +135,7 @@ int test_util_get_io_perfs(
 
 int test_util_get_metadata_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count)
 {
     int ret, i, j;
@@ -172,7 +171,7 @@ int test_util_get_metadata_perfs(
 
 int test_util_get_queue_perfs(
     PVFS_fs_id cur_fs,
-    PVFS_credentials creds,
+    PVFS_credential creds,
     int count)
 {
     int ret, i, j;

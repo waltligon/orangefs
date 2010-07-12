@@ -91,7 +91,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
   PVFS_object_ref parent_ref;
-  PVFS_credentials credentials;
+  PVFS_credential credentials;
   /* translate local path into pvfs2 relative path */
   ret = PVFS_util_resolve(destfile,&cur_fs, pvfs_path, PVFS_NAME_MAX);
   if(ret < 0)
@@ -100,7 +100,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
     return -1;
   }
 
-  PVFS_util_gen_credentials(&credentials);
+  PVFS_util_gen_credential_defaults(&credentials);
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere

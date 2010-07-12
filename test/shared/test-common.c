@@ -313,7 +313,7 @@ int stat_file(
    PVFS_sysresp_lookup  lk_response;
    PVFS_object_ref      ref;
    PVFS_sysresp_getattr getattr_response;
-   PVFS_credentials     credentials;
+   PVFS_credential      credentials;
    PVFS_fs_id           fs_id;
   
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
@@ -331,7 +331,7 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
 
-        PVFS_util_gen_credentials(&credentials);
+        PVFS_util_gen_credential_defaults(&credentials);
  
         if(followLink)
         {
@@ -460,7 +460,7 @@ int create_file(
     int  ret=0;
     char szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     struct file_ref stFileRef;
    
     if(verbose) { printf("\tCreating [%s] using mode [%o]\n", fileName, mode); }
@@ -478,7 +478,7 @@ int create_file(
             return(TEST_COMMON_FAIL);
         }
 
-        PVFS_util_gen_credentials(&credentials);
+        PVFS_util_gen_credential_defaults(&credentials);
 
         ret = pvfs2_create_file(szPvfsPath,
                                 fs_id,
@@ -977,7 +977,7 @@ int pvfs2_open(
     int                  ret=0;
     char                 szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id           fs_id;
-    PVFS_credentials     credentials;
+    PVFS_credential     credentials;
     PVFS_sysresp_lookup  resp_lookup;
 
     /* Initialize memory */
@@ -996,7 +996,7 @@ int pvfs2_open(
         return(ret);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if(followLink)
     {
@@ -1052,7 +1052,7 @@ int pvfs2_open(
  */
 int pvfs2_create_file(const char             * fileName,    /**< File Name */
                       const PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                      const PVFS_credentials * credentials, /**< Struct with user/group permissions for operation */
+                      const PVFS_credential  * credentials, /**< Struct with user/group permissions for operation */
                       const int                mode,        /**< open mode flags */
                       const int                verbose,     /**< Turns on verbose prints if set to non-zero value */
                       struct file_ref        * pstFileRef)  /**< File descriptor (or handle) for an open file*/
@@ -1072,8 +1072,8 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     memset(&parent_ref,  0, sizeof(parent_ref));
     memset(&attr,        0, sizeof(attr));
    
-    attr.owner = credentials->uid; 
-    attr.group = credentials->gid;
+    attr.owner = credentials->userid; 
+    attr.group = credentials->group_array[0];
     attr.perms = PVFS_util_translate_mode(mode,0);
     attr.atime = time(NULL);
     attr.mtime = attr.atime;
@@ -1093,7 +1093,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
 
     ret = PVFS_sys_lookup(fs_id, 
                           parentDirectory, 
-                          (PVFS_credentials *) credentials, 
+                          (PVFS_credential *) credentials, 
                           &resp_lookup, 
                           PVFS2_LOOKUP_LINK_FOLLOW,
                           NULL);
@@ -1119,7 +1119,7 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     ret = PVFS_sys_create(baseName, 
                           parent_ref,     /* handle & fs_id of parent  */
                           attr, 
-                          (PVFS_credentials *) credentials,
+                          (PVFS_credential *) credentials,
                           NULL,           /* Accept default distribution for fs */
                           &resp_create,
                           NULL,
@@ -1157,7 +1157,7 @@ void copy_pvfs2_to_stat(const PVFS_sys_attr * attr,
  */
 int lookup_parent(char             * filename,    /**< File Name */
                   PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                  PVFS_credentials * credentials, /**< Struct with user/group permissions for operation */
+                  PVFS_credential  * credentials, /**< Struct with user/group permissions for operation */
                   PVFS_handle      * handle,      /**< PVFS2 handle  */
                   int                verbose)     /**< Turns on verbose prints if set to non-zero value */
 {

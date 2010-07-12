@@ -26,7 +26,7 @@ struct thread_info
 {
     PVFS_object_ref* pinode_refn;
     PVFS_object_ref* pinode_refn2;
-    PVFS_credentials* credentials;
+    PVFS_credential* credentials;
 };
 
 void* thread_fn(void* foo);
@@ -42,7 +42,7 @@ int main(int argc, char **argv)
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[2]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret == -PVFS_ENOENT)
@@ -108,8 +108,8 @@ int main(int argc, char **argv)
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = credentials.userid;
+	attr.group = credentials.group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
@@ -147,7 +147,7 @@ int main(int argc, char **argv)
         snprintf(name, 512, "/%s", argv[3]);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret == -PVFS_ENOENT)
@@ -162,8 +162,8 @@ int main(int argc, char **argv)
 	    return ret;
 	}
 
-	attr.owner = credentials.uid;
-	attr.group = credentials.gid;
+	attr.owner = credentials.userid;
+	attr.group = credentials.group_array[0];
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;

@@ -30,7 +30,7 @@ int main(int argc, char * argv[])
     char line[255];
     int size;
     PVFS_offset offset=0;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     PVFS_sysresp_create create_resp;
     PVFS_sysresp_io io_resp;
     PVFS_sysresp_lookup lookup_resp;
@@ -74,11 +74,11 @@ int main(int argc, char * argv[])
     ret = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(ret < 0) goto error;
 
-    PVFS_util_gen_credentials(&creds);
+    PVFS_util_gen_credential_defaults(&creds);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = creds.uid;
-    attr.group = creds.gid;
+    attr.owner = creds.userid;
+    attr.group = creds.group_array[0];
     attr.perms = 0644;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 

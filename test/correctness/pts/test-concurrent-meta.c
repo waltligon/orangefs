@@ -32,12 +32,12 @@
 static int lookup(char *name, int fs_id)
 {
     int ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
 
     ret = -2;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -59,7 +59,7 @@ static int lookup(char *name, int fs_id)
 static int getattr(char *name, int fs_id)
 {
     int ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_sysresp_getattr resp_getattr;
     uint32_t attrmask;
@@ -67,7 +67,7 @@ static int getattr(char *name, int fs_id)
 
     ret = -2;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -94,13 +94,13 @@ static int getattr(char *name, int fs_id)
  */
 static int remove_file_dir(char *name, int fs_id)
 {
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     int ret;
 
     ret = -2;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -130,12 +130,12 @@ static int list_dir(char *test_dir, int fs_id)
     PVFS_ds_position token;
     PVFS_sysresp_readdir resp_readdir;
     int pvfs_dirent_incount;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
 
     ret = -2;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if ((ret = PVFS_sys_lookup(
              fs_id, test_dir, &credentials,
@@ -168,17 +168,17 @@ static int create_file(char *filename, char *directory, int fs_id)
 {
     int ret;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
 
     ret = -2;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 
@@ -210,10 +210,10 @@ static int create_dir2(char *name, int fs_id)
     PVFS_sysresp_mkdir resp_mkdir;
 
     int ret = -2;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, "/", &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -224,8 +224,8 @@ static int create_dir2(char *name, int fs_id)
 
     parent_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
