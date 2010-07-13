@@ -1,8 +1,12 @@
 #!/bin/sh
-#changed permissions
-#copied from dbench
 cd ${EXTRA_TESTS}/dbench-3.03
 ./configure -q
+patch -p3 < ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d/dbench.patch
+if [ "${?}" != 0 ]
+then
+   echo "Error: failed to apply patches to DBENCH."
+   exit 1;
+fi
 make 2>&1
 cp client.txt ${PVFS2_MOUNTPOINT}
 cd ${PVFS2_MOUNTPOINT} &&  ${EXTRA_TESTS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
