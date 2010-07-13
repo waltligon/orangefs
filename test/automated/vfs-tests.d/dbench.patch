@@ -1,0 +1,43 @@
+--- test/benchmarks/dbench-3.03/snprintf.c	2004-12-12 21:26:32.000000000 -0500
++++ src/benchmarks/dbench-3.03/snprintf.c	2010-07-13 16:07:48.000000000 -0400
+@@ -81,6 +81,7 @@
+ #include <stdlib.h>
+ #endif
+ 
++/*
+ #ifndef VA_COPY
+ #ifdef HAVE_VA_COPY
+ #define VA_COPY(dest, src) __va_copy(dest, src)
+@@ -88,7 +89,20 @@
+ #define VA_COPY(dest, src) (dest) = (src)
+ #endif
+ #endif
+-
++#define VA_COPY(dest, src) __va_copy(dest, src)
++*/
++#ifdef va_copy
++/*using va_copy macro*/
++#define VA_COPY(d,s) va_copy(d,s)
++#else
++#ifdef __va_copy
++/*using __va_copy macro*/
++#define VA_COPY(d,s) __va_copy(d,s)
++#else
++/*using va_copy library function*/
++#define VA_COPY(d,s) va_copy(d,s)
++#endif
++#endif
+ 
+ #if defined(HAVE_SNPRINTF) && defined(HAVE_VSNPRINTF) && defined(HAVE_C99_VSNPRINTF)
+ /* only include stdio.h if we are not re-defining snprintf or vsnprintf */
+--- test/benchmarks/dbench-3.03/tbench_srv.c	2004-12-12 21:47:59.000000000 -0500
++++ src/benchmarks/dbench-3.03/tbench_srv.c	2010-07-13 16:12:42.000000000 -0400
+@@ -64,7 +64,7 @@
+ 
+ 	while (1) {
+ 		struct sockaddr addr;
+-		int in_addrlen = sizeof(addr);
++		socklen_t in_addrlen = sizeof(addr);
+ 		int fd;
+ 
+ 		while (waitpid((pid_t)-1,(int *)NULL, WNOHANG) > 0) ;
