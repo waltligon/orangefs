@@ -170,8 +170,10 @@ static pvfs2_kernel_op_t *op_alloc_common(int32_t op_linger, int32_t type)
 
 #ifdef HAVE_CURRENT_FSUID
         new_op->upcall.uid = current_fsuid();
+        new_op->upcall.gid = current_fsgid();
 #else
         new_op->upcall.uid = current->fsuid;
+        new_op->upcall.gid = current->fsgid;
 #endif
         new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }

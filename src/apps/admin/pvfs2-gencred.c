@@ -288,7 +288,26 @@ int main(int argc, char **argv)
     ERR_load_crypto_strings();
 #endif
     
-    pwd = opts.user ? getpwnam(opts.user) : getpwuid(getuid());
+    if (opts.user)
+    {
+        unsigned long val;
+        char *endptr;
+
+        val = strtoul(opts.user, &endptr, 10);
+        if (*endptr == '\0' && *opts.user != '\0')
+        {
+            /* nlmills: TODO: check this cast for security vulnerabilities */
+            pwd = getpwuid((uid_t)val);
+        }
+        else
+        {
+            pwd = getpwnam(opts.user);
+        }
+    }
+    else
+    {
+        pwd = getpwuid(getuid());
+    }
     if (pwd == NULL)
     {
         fprintf(stderr, "unknown user -- %s\n", opts.user);
