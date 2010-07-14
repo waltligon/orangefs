@@ -4557,12 +4557,18 @@ static PVFS_credential *lookup_credential(
     ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
     if (ret >= 0 && status >= 0)
     {
-        
+        gossip_debug(
+            GOSSIP_SECURITY_DEBUG,
+            "credential cache HIT for (%u, %u)\n", uid, gid);
         cpayload = (struct credential_payload*)entry->payload;
         return (PVFS_credential*)cpayload->credential;
     }
 
     /* otherwise request a new credential and store it in the cache */
+
+    gossip_debug(
+        GOSSIP_SECURITY_DEBUG,
+        "credential cache MISS for (%u, %u)\n", uid, gid);
 
     credential = generate_credential(uid, gid);
     if (credential == NULL)
