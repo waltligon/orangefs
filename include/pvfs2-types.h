@@ -28,6 +28,10 @@
 #define INT32_MAX (2147483647)
 #endif
 
+#ifndef UINT32_MAX
+#define UINT32_MAX (4294967295U)
+#endif
+
 #ifndef NAME_MAX
 #define NAME_MAX 255
 #endif
@@ -141,7 +145,9 @@ typedef int32_t PVFS_ds_flags;
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
+#define PVFS_UID_MAX UINT32_MAX
 typedef uint32_t PVFS_gid;
+#define PVFS_GID_MAX UINT32_MAX
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 typedef uint64_t PVFS_flags;

@@ -296,8 +296,14 @@ int main(int argc, char **argv)
         val = strtoul(opts.user, &endptr, 10);
         if (*endptr == '\0' && *opts.user != '\0')
         {
-            /* nlmills: TODO: check this cast for security vulnerabilities */
-            pwd = getpwuid((uid_t)val);
+            if (val > PVFS_UID_MAX)
+            {
+                pwd = NULL;
+            }
+            else
+            {
+                pwd = getpwuid((uid_t)val);
+            }
         }
         else
         {
