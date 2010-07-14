@@ -1252,6 +1252,12 @@ int BMI_tcp_test(bmi_op_id_t id,
              bmi_tcp_send_event_id : bmi_tcp_recv_event_id), bmi_tcp_pid, NULL,
              query_op->event_id, id, *actual_size);
 
+        /* sson */
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug (GOSSIP_IO_TIMING, "1: end(%s): %f(event_id=%d,tcp_id=%d)\n", (query_op->send_recv == BMI_SEND)?"BMI_SEND":"BMI_RECV", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+        
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
@@ -1316,6 +1322,13 @@ int BMI_tcp_testsome(int incount,
                      bmi_tcp_send_event_id : bmi_tcp_recv_event_id),
                     bmi_tcp_pid, NULL,
                     query_op->event_id, actual_size_array[*outcount]);
+                
+                /* sson */
+                struct timeval tv;
+                gettimeofday(&tv, NULL);
+                double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+                gossip_debug(GOSSIP_IO_TIMING, "2: end(%s): %f(event_id=%d,tcp_id=%d)\n", (query_op->send_recv == BMI_SEND)?"BMI_SEND":"BMI_RECV", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+                
                 dealloc_tcp_method_op(query_op);
                 (*outcount)++;
             }
@@ -1447,12 +1460,11 @@ int BMI_tcp_testcontext(int incount,
                         bmi_tcp_send_event_id : bmi_tcp_recv_event_id),
                        bmi_tcp_pid, NULL, query_op->event_id,
                        query_op->actual_size);
-#if 0
-                struct timeval tv;
-                gettimeofday(&tv, NULL);
-                double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
-                printf("end(%s): %f\n", ((query_op->send_recv==BMI_SEND)?"BMI_SEND":"BMI_RECV"), t1);
-#endif
+        
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug(GOSSIP_IO_TIMING, "3: end(%s): %f\n", ((query_op->send_recv==BMI_SEND)?"BMI_SEND":"BMI_RECV"), t1);
 
 
         dealloc_tcp_method_op(query_op);
@@ -2541,6 +2553,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     int i;
     PINT_event_id eid = 0;
 
+    /* sson */
+    struct timeval tv; 
+    gettimeofday(&tv, NULL);
+    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+    gossip_debug(GOSSIP_IO_TIMING, "start(%s): %f\n", "BMI_RECV", t1);
+
     PINT_EVENT_START(
         bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, &eid,
         PINT_HINT_GET_CLIENT_ID(hints),
@@ -2549,13 +2567,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         expected_size);
-#if 0
-    /* sson */
-    struct timeval tv; 
-    gettimeofday(&tv, NULL);
-    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
-    printf("start(%s): %f\n", "BMI_RECV", t1);
-#endif
+
     tcp_addr_data = src->method_data;
 
     /* short out immediately if the address is bad and we have no way to
@@ -2616,6 +2628,11 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
         dealloc_tcp_method_op(query_op);
         PINT_EVENT_END(bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, eid, 0,
                        *actual_size);
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug (GOSSIP_IO_TIMING, "end(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_RECV", t1, bmi_tcp_recv_event_id, bmi_tcp_pid);
 
         return (1);
     }
@@ -2736,6 +2753,11 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
                 bmi_tcp_recv_event_id, bmi_tcp_pid, NULL, eid,
                 0, *actual_size);
 
+            struct timeval tv;
+            gettimeofday(&tv, NULL);
+            double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+            gossip_debug (GOSSIP_IO_TIMING, "end(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_RECV", t1, bmi_tcp_recv_event_id, bmi_tcp_pid);
+            
             return (1);
         }
         else
@@ -3962,6 +3984,12 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         }
     }
 
+    /* sson */
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+    gossip_debug (GOSSIP_IO_TIMING, "start(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+
     PINT_EVENT_START(
         bmi_tcp_send_event_id, bmi_tcp_pid, NULL, &eid,
         PINT_HINT_GET_CLIENT_ID(hints),
@@ -3970,14 +3998,6 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         PINT_HINT_GET_HANDLE(hints),
         PINT_HINT_GET_OP_ID(hints),
         total_size);
-#if 0
-    /* sson */
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
-    if(bmi_tracing==1) 
-        printf("start(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
-#endif
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -4047,6 +4067,12 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         /* tcp_sock_init() returns BMI error code */
 	tcp_forget_addr(dest, 0, ret);
         PINT_EVENT_END(bmi_tcp_send_event_id, bmi_tcp_pid, NULL, 0, ret);
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug (GOSSIP_IO_TIMING, "4: end(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+
 	return (ret);
     }
 
@@ -4092,6 +4118,12 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         /* payload_progress() returns BMI error codes */
 	tcp_forget_addr(dest, 0, ret);
         PINT_EVENT_END(bmi_tcp_send_event_id, bmi_tcp_pid, NULL, eid, 0, ret);
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug (GOSSIP_IO_TIMING, "5: end(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+
 	return (ret);
     }
 
@@ -4103,6 +4135,12 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         /* we are already done */
         PINT_EVENT_END(bmi_tcp_send_event_id, bmi_tcp_pid,
                        NULL, eid, 0, amt_complete);
+
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        double t1 = tv.tv_sec+(tv.tv_usec/1000000.0);
+        gossip_debug (GOSSIP_IO_TIMING, "6: end(%s): %f(event_id=%d,tcp_id=%d)\n", "BMI_SEND", t1, bmi_tcp_send_event_id, bmi_tcp_pid);
+
         return (1);
     }
 

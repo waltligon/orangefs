@@ -15,6 +15,7 @@ static void usage(char *argv0) {
         "       -s size : file size to generate in MB\n"
         "       -r record_size : record size in bytes\n"
         "       -p search pattern \n"
+        "       -t test normal storage module\n"
         "       -x : test active storage module\n";
     fprintf(stderr, help, argv0);
 }
@@ -32,7 +33,7 @@ int main( int argc, char *argv[] )
     extern char   *optarg;
     extern int     optind;
     int is_output_timing=0, is_print_usage = 0;
-    int _debug, use_gen_file = 0, use_actsto = 0;
+    int _debug, use_gen_file = 0, use_actsto = 0, use_normalsto = 0;
     int use_gpu = 0;
 
     MPI_Offset disp, offset, file_size;
@@ -58,7 +59,7 @@ int main( int argc, char *argv[] )
     MPI_Comm_size( comm, &nprocs );
     MPI_Comm_rank( comm, &rank );
  
-    while ( (opt=getopt(argc,argv,"i:s:r:p:godhx"))!= EOF) {
+    while ( (opt=getopt(argc,argv,"i:s:r:p:godhxt"))!= EOF) {
         switch (opt) {
         case 'i': fname = optarg;
             break;
@@ -88,6 +89,8 @@ int main( int argc, char *argv[] )
             break;
         case 'x': use_actsto = 1;
             break;
+        case 't': use_normalsto = 1;
+            break;
         default: is_print_usage = 1;
             break;
         }
@@ -108,57 +111,64 @@ int main( int argc, char *argv[] )
         printf("type_size (MPI_CHAR) = %d\n", type_size);
     }
 
-    MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
-    /* Read nothing (check status) */
-    memset( &status, 0xff, sizeof(MPI_Status) );
-
     char *buf = (char *)malloc( nitem * sizeof(char) );
-    offset = rank * nitem * type_size;
-    printf("%d: offset=%d\n", rank, offset);
+   
+    if (use_normalsto == 1)
+    {
+        int result;
 
-    /* Set the file view */
-    disp = offset;
-    etype = MPI_CHAR;
-    ftype = MPI_CHAR;
-    int result;
-    result = MPI_File_set_view(fh, disp, etype, ftype, "native", MPI_INFO_NULL);
+        MPI_File_open (comm, fname, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+        memset (&status, 0xff, sizeof(MPI_Status));
 
-    if(result != MPI_SUCCESS) 
-        sample_error(result, "MPI_File_set_view");
+        /* Set the file view */
+        disp = rank * nitem * type_size;
+        printf("%d: disp = %lld\n", rank, disp);
+        etype = MPI_CHAR;
+        ftype = MPI_CHAR;
 
-    stime = MPI_Wtime();
-    MPI_File_read_all(fh, buf, nitem, MPI_CHAR, &status);
-    etime = MPI_Wtime();
-    iotime = etime - stime;
+        result = MPI_File_set_view(fh, disp, etype, ftype, "native", MPI_INFO_NULL);
 
-    MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
- 
-    char myString[rsize];
-    char *tmp = buf;
+        if(result != MPI_SUCCESS) 
+            sample_error(result, "MPI_File_set_view");
 
-    stime = MPI_Wtime();
+        offset = rank * nitem * type_size;
+        printf("%d: offset=%d, nitem=%d\n", rank , offset, nitem);
 
-    for(i=0; i<nrecord; i++) {
-        strncpy(myString, tmp, rsize);
-        if(strstr(myString, search_string)) {
-            printf("Found by rank(%d): %s\n", rank, myString);
-            fflush(stdout);
+        stime = MPI_Wtime();
+        MPI_File_read_at(fh, offset, buf, nitem, MPI_CHAR, &status);
+        etime = MPI_Wtime();
+        iotime = etime - stime;
+
+        if(_debug==1) printf("%d: iotime = %10.4f\n", rank, iotime);
+        MPI_Reduce(&iotime, &max_iotime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+        
+        char myString[rsize];
+        char *tmp = buf;
+        
+        stime = MPI_Wtime();
+        
+        for(i=0; i<nrecord; i++) {
+            strncpy(myString, tmp, rsize);
+            if(strstr(myString, search_string)) {
+                printf("Found by rank(%d): %s\n", rank, myString);
+                fflush(stdout);
+            }
+            tmp += rsize;
         }
-        tmp += rsize;
-    }
-    etime = MPI_Wtime();
+        etime = MPI_Wtime();
+        
+        comptime = etime - stime;
+        
+        MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-    comptime = etime - stime;
-
-    MPI_Reduce(&comptime, &max_comptime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-
-    if(rank == 0) {
-        elapsed_time = max_comptime + max_iotime;
-        printf("<<Result (grep) with normal read>>\n"
-               "Grep time        = %10.4f sec\n"
-               "I/O time         = %10.4f sec\n"
-               "total time       = %10.4f sec\n\n", comptime, iotime, elapsed_time);
-    }
+        if(rank == 0) {
+            elapsed_time = max_comptime + max_iotime;
+            printf("<<Result (grep) with normal read>>\n"
+                   "Grep time        = %10.4f sec\n"
+                   "I/O time         = %10.4f sec\n"
+                   "total time       = %10.4f sec\n\n", max_comptime, max_iotime, elapsed_time);
+        }
+    } /* normal I/O */
   
     MPI_File_close(&fh);
 

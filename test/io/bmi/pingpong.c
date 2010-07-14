@@ -35,7 +35,7 @@
 #define SERVER          1
 #define CLIENT          2
 #define MIN_BYTES       1
-#define MAX_BYTES       (4<<20)
+#define MAX_BYTES       (128<<20)
 
 #define RECV            0
 #define SEND            1

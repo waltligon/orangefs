@@ -1,7 +1,7 @@
 all: simple1_unaligned test_grep test_kmeans test_vren
 
-#MPICC=mpicc
-MPICC = /home/sson/as-branch/mpich2.tcp/bin/mpicc
+MPICC=mpicc
+#MPICC = /home/sson/as-branch/mpich2.tcp/bin/mpicc
 CFLAGS=-Wall -O2 
 
 simple.o: simple.c

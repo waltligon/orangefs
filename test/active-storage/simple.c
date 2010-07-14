@@ -209,12 +209,12 @@ int main( int argc, char *argv[] )
     }
 
     MPI_File_close(&fh);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(rank == 0) printf("File is written\n\n");
   }
 
-  MPI_Barrier(MPI_COMM_WORLD);
-  if(rank == 0) printf("File is written\n\n");
-
   double *tmp = (double *)malloc( nitem * sizeof(double) );
+  memset (tmp, 0, nitem*sizeof(double));
 
   if(use_normalsto == 1) {
       MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
@@ -264,10 +264,8 @@ int main( int argc, char *argv[] )
       
       MPI_File_close(&fh);
   }
-
+#if 0
   if(use_actsto == 1) {
-      memset(&status, 0xff, sizeof(MPI_Status));
-      offset = rank * nitem * type_size;
 #if 0
     /* MPI_MAX */
     MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
@@ -295,6 +293,8 @@ int main( int argc, char *argv[] )
 
     /* MPI_SUM */
     MPI_File_open( comm, fname, MPI_MODE_RDWR, MPI_INFO_NULL, &fh );
+    memset(&status, 0xff, sizeof(MPI_Status));
+    offset = rank * nitem * type_size;
     
     stime = MPI_Wtime();
     MPI_File_read_at_ex( fh, offset, tmp, nitem, MPI_DOUBLE, MPI_SUM, &status );
@@ -305,9 +305,9 @@ int main( int argc, char *argv[] )
     
     MPI_File_close( &fh );
   }
-
+#endif
   MPI_Barrier(MPI_COMM_WORLD);
-  free( buf );
+  if (use_gen_file == 1) free( buf );
   free( tmp );
  
   MPI_Finalize();

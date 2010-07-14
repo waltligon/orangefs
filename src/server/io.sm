@@ -184,6 +184,7 @@ static PINT_sm_action start_pipelining_sm(
     s_op->u.io.file_data.server_nr = s_op->req->u.io.server_nr;
     s_op->u.io.file_data.server_ct = s_op->req->u.io.server_ct;
 
+    /* FIXME: timing should be per request or I/O transaction */
     if(iotype != s_op->req->u.io.io_type) {
         iotype = s_op->req->u.io.io_type;
         bmi_time = trove_time = 0.0;
