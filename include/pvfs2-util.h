@@ -44,8 +44,8 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
 enum { PVFS_DEFAULT_CREDENTIAL_TIMEOUT=0 };
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred);
-int PVFS_util_gen_credential(const char *user, unsigned int timeout,
-    const char *keypath, PVFS_credential *cred);
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred);
 int PVFS_util_refresh_credential(PVFS_credential *cred);
 
 int PVFS_util_copy_sys_attr(

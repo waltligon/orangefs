@@ -37,6 +37,7 @@
 
 typedef struct {
     const char *user;
+    const char *group;
     int timeout;
     const char *keypath;
 } options_t;
@@ -76,6 +77,9 @@ static int parse_options(int argc, char **argv, options_t *opts)
         {
             case 'u':
                 opts->user = optarg;
+                break;
+            case 'g':
+                opts->group = optarg;
                 break;
             case 't':
                 opts->timeout = strtol(optarg, NULL, 10);
@@ -270,8 +274,9 @@ static int write_credential(const PVFS_credential *cred,
 
 int main(int argc, char **argv)
 {
-    options_t opts = { NULL, 0, NULL };
+    options_t opts = { NULL, NULL, 0, NULL };
     const struct passwd *pwd;
+    const struct group *grp;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
     int ngroups;
     PVFS_credential credential;
@@ -316,10 +321,48 @@ int main(int argc, char **argv)
     }
     if (pwd == NULL)
     {
-        fprintf(stderr, "unknown user -- %s\n", opts.user);
+        if (opts.user)
+        {        
+            fprintf(stderr, "unknown user -- %s\n", opts.user);
+        }
         return EXIT_FAILURE;
     }
-    
+
+    if (opts.group)
+    {
+        unsigned long val;
+        char *endptr;
+
+        val = strtoul(opts.group, &endptr, 10);
+        if (*endptr == '\0' && *opts.group != '\0')
+        {
+            if (val > PVFS_GID_MAX)
+            {
+                grp = NULL;
+            }
+            else
+            {
+                grp = getgrgid((gid_t)val);
+            }
+        }
+        else
+        {
+            grp = getgrnam(opts.group);
+        }
+    }
+    else
+    {
+        grp = getgrgid(getgid());
+    }
+    if (grp == NULL)
+    {
+        if (opts.group)
+        {
+            fprintf(stderr, "unknown group -- %s\n", opts.group);
+        }
+        return EXIT_FAILURE;
+    }
+
     if (getuid() && pwd->pw_uid != getuid())
     {
         fprintf(stderr, "error: only %s and root can generate a credential "
@@ -327,27 +370,34 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+    if (getuid() && grp->gr_gid != getgid())
+    {
+        fprintf(stderr, "error: cannot generate a credential for group %s: "
+                "Permission denied\n", grp->gr_name);
+        return EXIT_FAILURE;
+    }
+
 #ifdef HAVE_GETGROUPLIST
 
     ngroups = sizeof(groups)/sizeof(*groups);
-    ret = getgrouplist(pwd->pw_name, pwd->pw_gid, groups, &ngroups);
+    ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
     if (ret == -1)
     {
         fprintf(stderr, "error: unable to get group list for user %s\n",
                 pwd->pw_name);
         return EXIT_FAILURE;
     }
-    if (groups[0] != pwd->pw_gid)
+    if (groups[0] != grp->gr_gid)
     {
-        assert(groups[ngroups-1] == pwd->pw_gid);
+        assert(groups[ngroups-1] == grp->gr_gid);
         groups[ngroups-1] = groups[0];
-        groups[0] = pwd->pw_gid;
+        groups[0] = grp->gr_gid;
     }
 
 #else /* !HAVE_GETGROUPLIST */
 
     ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd->pw_name, pwd->pw_gid);
+    ngroups = getugroups(ngroups, groups, pwd->pw_name, grp->gr_gid);
     if (ret == -1)
     {
         fprintf(stderr, "error: unable to get group list for user %s: %s\n",

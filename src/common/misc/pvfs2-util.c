@@ -162,13 +162,14 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
 
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
-    return PVFS_util_gen_credential(NULL, PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
+    return PVFS_util_gen_credential(NULL, NULL, 
+                                    PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
                                     NULL, cred);
 }
 
 
-int PVFS_util_gen_credential(const char *user, unsigned int timeout,
-    const char *keypath, PVFS_credential *cred)
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
@@ -202,6 +203,11 @@ int PVFS_util_gen_credential(const char *user, unsigned int timeout,
         {
             *ptr++ = "-u";
             *ptr++ = (char*)user;
+        }
+        if (group)
+        {
+            *ptr++ = "-g";
+            *ptr++ = (char*)group;
         }
         if (timeout != PVFS_DEFAULT_CREDENTIAL_TIMEOUT)
         {

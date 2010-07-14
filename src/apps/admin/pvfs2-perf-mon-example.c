@@ -78,7 +78,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = PVFS_util_gen_credential(NULL, 1*60*60, NULL, &creds);
+    ret = PVFS_util_gen_credential(NULL, NULL, 1*60*60, NULL, &creds);
     if (ret < 0)
     {
         PVFS_perror("PVFS_util_gen_credential", ret);

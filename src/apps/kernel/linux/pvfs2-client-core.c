@@ -4506,12 +4506,18 @@ static PVFS_credential *generate_credential(
     PVFS_uid uid,
     PVFS_gid gid)
 {
-    char user[16];
+    char user[16], group[16];
     int ret;
     PVFS_credential *credential;
 
     ret = snprintf(user, sizeof(user), "%u", uid);
     if (ret < 0 || ret >= sizeof(user))
+    {
+        return NULL;
+    }
+
+    ret = snprintf(group, sizeof(group), "%u", gid);
+    if (ret < 0 || ret >= sizeof(group))
     {
         return NULL;
     }
@@ -4522,15 +4528,15 @@ static PVFS_credential *generate_credential(
         return NULL;
     }
 
-    /* nlmills: TODO: modify function to take group id */
     ret = PVFS_util_gen_credential(
         user,
+        group,
         PVFS_DEFAULT_CREDENTIAL_TIMEOUT, /* nlmills: TODO: use cache timeout */
         s_opts.keypath,
         credential);
     if (ret < 0)
     {
-        /* nlmills: TODO: log error */
+        gossip_err("generate_credential: unable to generate credential\n");
         free(credential);
         return NULL;
     }
