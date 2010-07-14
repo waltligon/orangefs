@@ -1,24 +1,32 @@
 #!/bin/bash
 
+#default URL, in case this script is run separately
+if [ ! $URL ]
+then
+  URL=http://devorange.clemson.edu/pvfs
+fi
+
 LTPVER="20081130"
 THISDATE=`date +%F-%R`
-#DOWNLOAD="http://www-unix.mcs.anl.gov/~carns/nightly-download/ltp-full-${LTPVER}.tgz"
+BENCHMARK=ltp-full-${LTPVER}.tgz
+DOWNLOAD=${URL}/${BENCHMARK}
 
 cd ${EXTRA_TESTS}
 
 # get rid of any old copies
-sudo rm -rf ltp-full-${LTPVER}  
+sudo rm -rf ltp-full-${LTPVER}
+sudo rm -f ltp-full-${LTPVER}.tgz  
 
 # download
-#echo Downloading LTP...
-#wget -q ${DOWNLOAD} > /dev/null
-#if [ "${?}" != 0 ]
-#then
-#    echo "Error: failed to download ${DOWNLOAD}."
-#    exit 1;
-#fi
+echo Downloading LTP...
+wget -q ${DOWNLOAD} > /dev/null
+if [ "${?}" != 0 ]
+then
+    echo "Error: failed to download ${DOWNLOAD}."
+    exit 1;
+fi
 
-tar -xvzf ltp-full-${LTPVER}.tgz > /dev/null
+tar -xvzf ${BENCHMARK} > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to untar ${DOWNLOAD}."
