@@ -71,7 +71,7 @@ static int parse_options(int argc, char **argv, options_t *opts)
 {
     int ch;
     
-    while ((ch = getopt(argc, argv, "u:t:k:")) != -1)
+    while ((ch = getopt(argc, argv, "u:g:t:k:")) != -1)
     {
         switch(ch)
         {
