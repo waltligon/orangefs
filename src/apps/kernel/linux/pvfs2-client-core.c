@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
@@ -40,6 +41,7 @@
 #include "job.h"
 #include "acache.h"
 #include "ncache.h"
+#include "tcache.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
@@ -204,6 +206,21 @@ typedef struct
 
 } vfs_request_t;
 
+struct credential_key
+{
+    PVFS_fs_id fsid;
+    PVFS_uid uid;
+    PVFS_gid gid;
+};
+
+struct credential_payload
+{
+    PVFS_fs_id fsid;
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_credential *credential;
+};
+
 static options_t s_opts;
 
 static job_context_id s_client_dev_context;
@@ -224,6 +241,9 @@ static struct PINT_perf_counter* ncache_pc = NULL;
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
 
+/* nlmills: TODO: is thread safety important here? */
+static struct PINT_tcache *credential_cache = NULL;
+
 /* this hashtable is used to keep track of operations in progress */
 #define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
 static int hash_key(void *key, int table_size);
@@ -236,6 +256,7 @@ static void reset_acache_timeout(void);
 #ifndef GOSSIP_DISABLE_DEBUG
 static char *get_vfs_op_name_str(int op_type);
 #endif
+static int setup_credential_cache(options_t *s_opts);
 static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
@@ -3556,6 +3577,13 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
+    ret = setup_credential_cache(&s_opts);
+    if (ret < 0)
+    {
+        PVFS_perror("setup_credential_cache", ret);
+        return(ret);
+    }
+
     ret = set_acache_parameters(&s_opts);
     if(ret < 0)
     {
@@ -4269,6 +4297,70 @@ static char *get_vfs_op_name_str(int op_type)
 }
 #endif
 
+static int credential_compare_fn(void *key, struct qhash_head *link)
+{
+    struct credential_key *ckey = (struct credential_key*)key;
+    struct PINT_tcache_entry *tmp;
+    struct credential_payload *cpayload;
+
+    tmp = qhash_entry(link, struct PINT_tcache_entry, hash_link);
+    assert(tmp);
+
+    cpayload = (struct credential_payload*)tmp->payload;
+
+    return ((ckey->fsid == cpayload->fsid) &&
+            (ckey->uid == cpayload->uid) &&
+            (ckey->gid == cpayload->gid));
+}
+
+static int ckey_hash_fn(void *key, int table_size)
+{
+    struct credential_key *ckey = (struct credential_key*)key;
+    int hash;
+
+    /* nlmills: TODO: consider building a better hash function */
+    hash = quickhash_32bit_hash(&ckey->fsid, table_size);
+    hash ^= quickhash_32bit_hash(&ckey->uid, table_size);
+    hash ^= quickhash_32bit_hash(&ckey->gid, table_size);
+
+    return hash;
+}
+
+static int credential_free_fn(void *payload)
+{
+    struct credential_payload *cpayload = (struct credential_payload*)payload;
+
+    PINT_cleanup_credential(cpayload->credential);
+    free(cpayload->credential);
+    free(cpayload);
+
+    return 0;
+}
+
+/* nlmills: TODO: add useful options */
+static int setup_credential_cache(options_t *s_opts)
+{
+    int ret;
+
+    credential_cache = PINT_tcache_initialize(
+        credential_compare_fn,
+        ckey_hash_fn,
+        credential_free_fn,
+        0);
+    if (credential_cache == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    /* nlmills: TODO: add timeout option */
+    ret = PINT_tcache_set_info(
+        credential_cache,
+        TCACHE_TIMEOUT_MSECS,
+        3600000 /* 60 minutes */);
+
+    return ret;
+}
+
 static int set_acache_parameters(options_t* s_opts)
 {
     int ret = -1;
@@ -4478,13 +4570,56 @@ static PVFS_credential *lookup_credential(
     PVFS_uid uid,
     PVFS_gid gid)
 {
+    struct credential_key ckey;
+    struct credential_payload *cpayload;
+    struct PINT_tcache_entry *entry;
     PVFS_credential *credential;
+    struct timeval tval;
+    int status;
+    int ret;
 
-    /* nlmills: TODO: implement a cache, especially important
-     * since otherwise the credential is never freed
-     */
+    ckey.fsid = fsid;
+    ckey.uid = uid;
+    ckey.gid = gid;
+
+    /* see if a fresh credential is in the cache */
+    ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
+    if (ret >= 0 && status >= 0)
+    {
+        cpayload = (struct credential_payload*)entry->payload;
+        return (PVFS_credential*)cpayload->credential;
+    }
+
+    /* otherwise request a new credential and store it in the cache */
 
     credential = generate_credential(fsid, uid, gid);
+    if (credential == NULL)
+    {
+        gossip_err("unable to fetch client credential for uid, gid "
+                   "(%u, %u)\n", uid, gid);
+        return NULL;
+    }
+
+    cpayload = malloc(sizeof(struct credential_payload));
+    if (cpayload == NULL)
+    {
+        gossip_lerr("out of memory\n");
+        return NULL;
+    }
+    cpayload->fsid = fsid;
+    cpayload->uid = uid;
+    cpayload->gid = gid;
+    cpayload->credential = credential;
+
+    tval.tv_sec = credential->timeout;
+    tval.tv_usec = 0;
+
+    PINT_tcache_insert_entry_ex(
+        credential_cache,
+        &ckey,
+        cpayload,
+        &tval,
+        &status);
 
     return credential;
 }
