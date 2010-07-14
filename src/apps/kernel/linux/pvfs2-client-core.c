@@ -208,14 +208,12 @@ typedef struct
 
 struct credential_key
 {
-    PVFS_fs_id fsid;
     PVFS_uid uid;
     PVFS_gid gid;
 };
 
 struct credential_payload
 {
-    PVFS_fs_id fsid;
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_credential *credential;
@@ -265,7 +263,6 @@ static void finalize_perf_items(int n, ... );
 inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_credential *lookup_credential(
-    PVFS_fs_id fsid,
     PVFS_uid uid,
     PVFS_gid gid);
 
@@ -589,7 +586,6 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
     /* get rank from pid */
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_ref_lookup(
@@ -628,7 +624,6 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.create.parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_create(
@@ -663,7 +658,6 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.sym.parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_symlink(
@@ -697,7 +691,6 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.getattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_getattr(
@@ -730,7 +723,6 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.setattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_setattr(
@@ -762,7 +754,6 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.remove.parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_remove(
@@ -794,7 +785,6 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_mkdir(
@@ -827,7 +817,6 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.readdir.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_readdir(
@@ -860,7 +849,6 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.readdirplus.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_readdirplus(
@@ -898,7 +886,6 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.rename.old_parent_refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_rename(
@@ -932,7 +919,6 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.truncate.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_truncate(
@@ -996,7 +982,6 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.getxattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     /* Remember to free these up */
@@ -1044,7 +1029,6 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.setxattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_seteattr_list(
@@ -1087,7 +1071,6 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.removexattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_deleattr(
@@ -1157,7 +1140,6 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.listxattr.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_listeattr(
@@ -1627,7 +1609,6 @@ static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.statfs.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_statfs(
@@ -1739,7 +1720,6 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.io.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_io(
@@ -1882,7 +1862,6 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.io.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_io(
@@ -2067,7 +2046,6 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
 
         fill_hints(&hints, vfs_request);
         credential = lookup_credential(
-            vfs_request->in_upcall.req.iox.refn.fs_id,
             vfs_request->in_upcall.uid,
             vfs_request->in_upcall.gid);
         /* post the I/O */
@@ -2183,7 +2161,6 @@ static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     credential = lookup_credential(
-        vfs_request->in_upcall.req.fsync.refn.fs_id,
         vfs_request->in_upcall.uid,
         vfs_request->in_upcall.gid);
     ret = PVFS_isys_flush(
@@ -2471,7 +2448,6 @@ static inline void package_downcall_members(
 
                     fill_hints(&hints, vfs_request);
                     credential = lookup_credential(
-                        vfs_request->in_upcall.req.create.parent_refn.fs_id,
                         vfs_request->in_upcall.uid,
                         vfs_request->in_upcall.gid);
                     vfs_request->out_downcall.resp.create.refn =
@@ -4308,8 +4284,7 @@ static int credential_compare_fn(void *key, struct qhash_head *link)
 
     cpayload = (struct credential_payload*)tmp->payload;
 
-    return ((ckey->fsid == cpayload->fsid) &&
-            (ckey->uid == cpayload->uid) &&
+    return ((ckey->uid == cpayload->uid) &&
             (ckey->gid == cpayload->gid));
 }
 
@@ -4319,8 +4294,7 @@ static int ckey_hash_fn(void *key, int table_size)
     int hash;
 
     /* nlmills: TODO: consider building a better hash function */
-    hash = quickhash_32bit_hash(&ckey->fsid, table_size);
-    hash ^= quickhash_32bit_hash(&ckey->uid, table_size);
+    hash = quickhash_32bit_hash(&ckey->uid, table_size);
     hash ^= quickhash_32bit_hash(&ckey->gid, table_size);
 
     return hash;
@@ -4529,7 +4503,6 @@ static int get_mac(void)
  * group id is currently ignored.
  */
 static PVFS_credential *generate_credential(
-    PVFS_fs_id fsid,
     PVFS_uid uid,
     PVFS_gid gid)
 {
@@ -4566,7 +4539,6 @@ static PVFS_credential *generate_credential(
 }
 
 static PVFS_credential *lookup_credential(
-    PVFS_fs_id fsid,
     PVFS_uid uid,
     PVFS_gid gid)
 {
@@ -4578,7 +4550,6 @@ static PVFS_credential *lookup_credential(
     int status;
     int ret;
 
-    ckey.fsid = fsid;
     ckey.uid = uid;
     ckey.gid = gid;
 
@@ -4586,13 +4557,14 @@ static PVFS_credential *lookup_credential(
     ret = PINT_tcache_lookup(credential_cache, &ckey, &entry, &status);
     if (ret >= 0 && status >= 0)
     {
+        
         cpayload = (struct credential_payload*)entry->payload;
         return (PVFS_credential*)cpayload->credential;
     }
 
     /* otherwise request a new credential and store it in the cache */
 
-    credential = generate_credential(fsid, uid, gid);
+    credential = generate_credential(uid, gid);
     if (credential == NULL)
     {
         gossip_err("unable to fetch client credential for uid, gid "
@@ -4606,7 +4578,6 @@ static PVFS_credential *lookup_credential(
         gossip_lerr("out of memory\n");
         return NULL;
     }
-    cpayload->fsid = fsid;
     cpayload->uid = uid;
     cpayload->gid = gid;
     cpayload->credential = credential;
