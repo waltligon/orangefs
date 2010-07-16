@@ -380,18 +380,13 @@ static PINT_sm_action getattr_acache_lookup(
     }
     if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
     {
-        if (sm_p->getattr.attr.capability.timeout == 0)
-        {
-            trimmed_mask |= PVFS_ATTR_CAPABILITY;
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "Cache capability invalid...\n");
-        }
-        if(PINT_util_get_current_time() >
-            (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
-        {
-            trimmed_mask |= PVFS_ATTR_CAPABILITY;
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "Cache capability timeout...\n");
-        }
+        /* add back the capability flag */
+        trimmed_mask |= PVFS_ATTR_CAPABILITY;
     }
+
+    /* nlmills: TODO: don't accept the capability if it is about to
+     * time out. make use of CAP_TIMEOUT_BUFFER.
+     */
   
     /* trimmed_mask contains the list of attributes
      * requested for a particular object, 
@@ -409,6 +404,8 @@ static PINT_sm_action getattr_acache_lookup(
     missing_attrs = ((trimmed_mask ^ sm_p->getattr.attr.mask) &
                      trimmed_mask);
     if((missing_attrs == PVFS_ATTR_DATA_SIZE && size_status == 0) ||
+        /* nlmills: TODO: dirty hack: XXX: remove me */
+        (missing_attrs == PVFS_ATTR_META_MIRROR_DFILES) ||
         (missing_attrs == 0))
     {
         /* nothing's missing, a hit! */
