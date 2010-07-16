@@ -11,10 +11,13 @@
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
+#export EXTRA_TESTS=/tmp/src/benchmarks
+export URL=http://devorange.clemson.edu/pvfs
+export BENCHMARKS=benchmarks-20060512.tar.gz
 
 # look for a 'nightly-test.cfg' in the same directory as this script
-if [ -f $(cd `dirname $0`; pwd)/nightly-tests.cfg ] ; then 
-	. $(cd `dirname $0`; pwd)/nightly-tests.cfg
+if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
+	. /tmp/$USER/nightly-tests.cfg
 fi
 
 
@@ -26,8 +29,10 @@ STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
+VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+BENCHMARKS=benchmarks-20060512.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -42,7 +47,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain stan"
+VFS_HOSTS="devorange2"
 
 #
 # Detect basic heap corruption
@@ -102,11 +107,12 @@ teardown_vfs() {
 setup_vfs() {
 	sudo dmesg -c >/dev/null
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
-		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
-		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+#	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+#		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+#		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
+        sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client  -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
@@ -139,7 +145,9 @@ setup_pvfs2() {
 	grep -q 'pvfs2-nightly' /etc/fstab
 	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-	fi	
+	fi
+	#turn on degging on each server
+	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
 teardown_pvfs2() {
@@ -198,7 +206,7 @@ run_parts() {
 		# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
-			echo -n "====== running $f ..."
+			echo -n "====== `date` == running $f ..."
 			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
@@ -212,6 +220,20 @@ run_parts() {
 	done
 }
 
+#run only one script
+run_one() {
+   cd $1
+   echo -n "===== `date` == running ${1}/${2} ..."
+   ${1}/${2} > ${PVFS2_DEST}/${2}-${CVS_TAG}.log
+   if [ $? -eq 0 ] ; then 
+      nr_passed=$((nr_passed + 1))
+      echo "OK"
+   else
+      nr_failed=$((nr_failed + 1))
+      failure_logs="$failure_logs ${PVFS2_DEST}/${2}-${CVS_TAG}.log"
+      echo "FAILED"
+   fi
+}
 ###
 ### entry point for script
 ###
@@ -228,18 +250,57 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
-failure_logs=""   # a space-delimited list of logs that failed
-# compile and install
+# "install" benchmark software, if EXTRA_TESTS is not null
+if [ $EXTRA_TESTS ] 
+then
+   echo "Installing benchmark software...."
+   my_cwd=`pwd`
+
+   #create directory, if not already there
+   mkdir -p $EXTRA_TESTS
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: mkdir failed"
+      setupfail
+   fi
+
+   #remove existing tar file and/or subdirectories
+   cd $EXTRA_TESTS/..
+   sudo /bin/rm -rf *
+
+   #get new tar file
+   wget ${URL}/${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: wget failed"
+      setupfail
+   fi
+
+   #untar the file
+   tar -xzf ${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: tar failed"
+      setupfail
+   fi
+
+   #go back to original working directory
+   cd $my_cwd
+fi
+
+echo "pull_and_build_pvfs2"
 pull_and_build_pvfs2  $CVS_TAG || buildfail
 
+echo "setup_pvfs2"
 teardown_pvfs2 && setup_pvfs2 
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
-	setupfail
+        setupfail
 fi
 
 if [ $do_vfs -eq 1 ] ; then 
+	echo "setup_vfs"
 	teardown_vfs && setup_vfs
 
 	if [ $? != 0 ] ; then
@@ -263,11 +324,14 @@ exec 7<&2
 
 exec 1> ${REPORT_LOG}
 exec 2>&1
+echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	echo "running vfs scripts"
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
+#        run_one ${VFS_SCRIPTS} ${VFS_SCRIPT}
 fi
 
 # down the road (as we get our hands on more clusters) we'll need a more
@@ -296,5 +360,5 @@ else
 	tinder_report success
 fi
 
-[ $do_vfs -eq 1 ] && teardown_vfs
-teardown_pvfs2
+#[ $do_vfs -eq 1 ] && teardown_vfs
+#teardown_pvfs2
