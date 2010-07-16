@@ -1,10 +1,10 @@
 #!/bin/sh
 
 #this script assumes that the benchmark tar file is already copied into $EXTRA_TESTS
-if [ ! $BENCHMARK ]
+if [ ! $BENCHMARKS ]
 then
    #this is the existing name of the tar file
-   BENCHMARK=benchmarks-20060512.tar.gz
+   BENCHMARKS=benchmarks-20060512.tar.gz
 fi
 
 #make directory, if it doesn't exist
@@ -21,7 +21,7 @@ sudo /bin/rm -rf dbench-3.03
 cd ..
 
 #untar the dbench directory
-tar -xzf ${BENCHMARK} benchmarks/dbench-3.03/*
+tar -xzf ${BENCHMARKS} benchmarks/dbench-3.03/*
 
 #goto the dbench directory
 cd benchmarks/dbench-3.03

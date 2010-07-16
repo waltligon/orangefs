@@ -8,8 +8,8 @@ fi
 
 LTPVER="20081130"
 THISDATE=`date +%F-%R`
-BENCHMARK=ltp-full-${LTPVER}.tgz
-DOWNLOAD=${URL}/${BENCHMARK}
+LTP_ARCHIVE=ltp-full-${LTPVER}.tgz
+DOWNLOAD=${URL}/${LTP_ARCHIVE}
 
 cd ${EXTRA_TESTS}
 
@@ -26,7 +26,7 @@ then
     exit 1;
 fi
 
-tar -xvzf ${BENCHMARK} > /dev/null
+tar -xvzf ${LTP_ARCHIVE} > /dev/null
 if [ "${?}" != 0 ]
 then
     echo "Error: failed to untar ${DOWNLOAD}."
