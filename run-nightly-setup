@@ -1,0 +1,20 @@
+#!/bin/sh
+
+cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs
+run_nightly_scripts="pvfs2/run-nightly pvfs2/maint/build pvfs2/test/automated"
+
+#remove existing files
+sudo /bin/rm -rf ~+/pvfs2
+
+#checkout needed directories and files to run the nightly process
+cvs -Q -d $cvsroot co -rOrange-Branch $run_nightly_scripts
+if [ $? != 0 ]
+then
+   echo "Failed to retrieve scripts from CVS"
+   exit 1
+fi
+
+cd ~+/pvfs2
+./run-nightly Orange-Branch
+
+exit 
