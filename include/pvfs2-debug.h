@@ -214,6 +214,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "bstream", GOSSIP_BSTREAM_DEBUG },
     /* Debug trove in direct io mode */
     {"directio", GOSSIP_DIRECTIO_DEBUG},
+    /* Debug mirroring process */
+    {"mirror",GOSSIP_MIRROR_DEBUG},
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |

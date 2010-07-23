@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-types-debug.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -356,6 +357,16 @@ static PINT_sm_action getattr_acache_lookup(
      * entry
      */
     trimmed_mask = sm_p->getattr.req_attrmask;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"request attrmask:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,sm_p->getattr.req_attrmask);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"trimmed attrmask:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,trimmed_mask);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"returned attrmask:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,sm_p->getattr.attr.mask);
+
     /* the trimmed mask is used for making sure that we're only
      * checking attr bits that make sense for the object type
      * since the caller may have requested all attributes in
@@ -393,6 +404,19 @@ static PINT_sm_action getattr_acache_lookup(
      */
     missing_attrs = ((trimmed_mask ^ sm_p->getattr.attr.mask) &
                      trimmed_mask);
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"missing attrmask BEFORE:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,missing_attrs);
+
+    if ( missing_attrs & PVFS_ATTR_META_MIRROR_DFILES )
+    {
+       /*Mirroring is optional, so remove mirror-dfiles*/
+         missing_attrs &= ~PVFS_ATTR_META_MIRROR_DFILES;   
+    }
+         
+    gossip_debug(GOSSIP_GETATTR_DEBUG,"missing attrmask AFTER:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,missing_attrs);
+
     if((missing_attrs == PVFS_ATTR_DATA_SIZE && size_status == 0) ||
         (missing_attrs == 0))
     {
