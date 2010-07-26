@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo "Setting up and running the nightly tests for ${1}"
+
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs
 run_nightly_scripts="pvfs2/run-nightly pvfs2/maint/build pvfs2/test/automated"
 
@@ -15,6 +17,6 @@ then
 fi
 
 cd ~+/pvfs2
-./run-nightly Orange-Branch
+./run-nightly $1 
 
 exit 
