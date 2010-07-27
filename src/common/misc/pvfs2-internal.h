@@ -84,6 +84,17 @@
 #define NUM_DFILES_REQ_KEYSTR   "nd\0"
 #define NUM_DFILES_REQ_KEYLEN   3
 
+/* new keys for distributed directory, '/' makes sure no conflict with dirent names */
+#define DIST_DIR_ATTR_KEYSTR   "/dda\0"
+#define DIST_DIR_ATTR_KEYLEN   5
+
+#define DIST_DIRDATA_HANDLES_KEYSTR   "/ddh\0"
+#define DIST_DIRDATA_HANDLES_KEYLEN   5
+
+#define DIST_DIRDATA_BITMAP_KEYSTR   "/ddb\0"
+#define DIST_DIRDATA_BITMAP_KEYLEN   5
+
+
 /* Optional xattrs have "user.pvfs2." as a prefix */
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"
 #define SPECIAL_DIST_NAME_KEYLEN         21

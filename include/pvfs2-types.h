@@ -469,6 +469,31 @@ endecode_fields_2(
     here_string, d_name,
     PVFS_handle, handle);
 
+
+
+/* Distributed directory attributes struct
+ * will be stored in keyval space under DIST_DIR_ATTR
+ */
+typedef struct {
+	/* global info */
+	int32_t tree_height; /* ceil(log2(num_servers)) */
+	int32_t num_servers; /* total number of servers */
+	int32_t bitmap_size; /* number of bytes of the bitmap tree stored under the key DIST_DIR_BITMAP,
+	should be a multiple of 4*/
+	int32_t split_size; /* maximum number of entries before a split */
+
+	/* local info */
+	int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
+	int32_t branch_level; /* level of branching on this server */
+} PVFS_dist_dir_attr;
+
+/* bitmap type */
+typedef uint32_t PVFS_dist_dir_bitmap_basetype;
+typedef uint32_t* PVFS_dist_dir_bitmap;
+typedef uint64_t PVFS_dist_dir_hash_type;
+
+
+
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.
  */

@@ -169,7 +169,10 @@ enum
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
     METAFILE_LAYOUT_KEY  = 5,
-    NUM_DFILES_REQ_KEY   = 6
+    NUM_DFILES_REQ_KEY   = 6,
+    DIST_DIR_ATTR_KEY	 = 7,
+    DIST_DIRDATA_HANDLES = 8,
+    DIST_DIRDATA_BITMAP	 = 9
 };
 
 /* optional; user-settable keys */
