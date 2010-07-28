@@ -1,7 +1,7 @@
 #!/bin/sh
 
 cd ${EXTRA_TESTS}/iozone3_239/src/current  || exit 1
-patch -p5 < ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d/iozone.patch
+patch -p5 < ${VFS_SCRIPTS}/iozone.patch
 if [ $? != 0 ]
 then
    echo "Attemp to patch iozone software failed."
