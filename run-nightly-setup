@@ -1,6 +1,13 @@
 #!/bin/sh
 
-echo "Setting up and running the nightly tests for ${1}"
+if [ $# -lt 1 ]; then
+   echo "Usage: $0 <tagnames>"
+   echo "        e.g. $0 HEAD Orange-Branch"
+   exit 0
+fi
+CVSTAGS=$*
+
+echo "Running nightly tests for ${CVSTAGS}"
 
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs
 run_nightly_scripts="pvfs2/run-nightly pvfs2/maint/build pvfs2/test/automated"
@@ -16,7 +23,8 @@ then
    exit 1
 fi
 
+
 cd ~+/pvfs2
-./run-nightly $1 
+./run-nightly $CVSTAGS
 
 exit 
