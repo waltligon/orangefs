@@ -25,34 +25,45 @@
 /* the bitnum should start from 0 */
 
 #define SET_BIT(i_bitfield, bitnum) \
-	do { i_bitfield[(bitnum) >> 5] |= (1 << ((bitnum) & 0x1f));} while (0)
+    do { i_bitfield[(bitnum) >> 5] |= (1 << ((bitnum) & 0x1f));} while (0)
 
 #define CRL_BIT(i_bitfield, bitnum) \
-	do { i_bitfield[(bitnum) >> 5] &= ~(1 << ((bitnum) & 0x1f));} while (0)
+    do { i_bitfield[(bitnum) >> 5] &= ~(1 << ((bitnum) & 0x1f));} while (0)
 
 #define TST_BIT(i_bitfield, bitnum) \
-	( i_bitfield[(bitnum) >> 5] & (1 << ((bitnum) & 0x1f)) )
+    ( i_bitfield[(bitnum) >> 5] & (1 << ((bitnum) & 0x1f)) )
 
 
 /* dummy value of split size for now */
 #define PVFS_DIST_DIR_MAX_ENTRIES 16000
 
+/* set a fixed value for testing */
+#define PVFS_DIST_DIR_DEFAULT_TOTAL_DIRDATA_NUM 4
+#define PVFS_DIST_DIR_DEFAULT_INITIAL_DIRDATA_NUM 4
+
 
 static double my_log2(const double n);
 static int dist_dir_calc_branch_level(
-		const PVFS_dist_dir_attr *dist_dir_attr,
-		const PVFS_dist_dir_bitmap bitmap);
+        const PVFS_dist_dir_attr *dist_dir_attr,
+        const PVFS_dist_dir_bitmap bitmap);
 int PINT_init_dist_dir_state(
-		PVFS_dist_dir_attr *dist_dir_attr, PVFS_dist_dir_bitmap *bitmap_ptr,
-		int num_servers, int server_no, int pre_dsg_num_server);
+		PVFS_dist_dir_attr *dist_dir_attr, 
+		PVFS_dist_dir_bitmap *bitmap_ptr,
+		const int num_servers, 
+		const int server_no, 
+		const int pre_dsg_num_server);
 int PINT_find_dist_dir_bucket(
-		PVFS_dist_dir_hash_type hash, PVFS_dist_dir_attr *dist_dir_attr,
-		PVFS_dist_dir_bitmap bitmap);
+		const PVFS_dist_dir_hash_type hash, 
+		const PVFS_dist_dir_attr *const dist_dir_attr,
+		const PVFS_dist_dir_bitmap bitmap);
 int PINT_find_dist_dir_split_node(
-		PVFS_dist_dir_attr *dist_dir_attr, PVFS_dist_dir_bitmap bitmap);
+		const PVFS_dist_dir_attr *const dist_dir_attr, 
+		const PVFS_dist_dir_bitmap bitmap);
 int PINT_update_dist_dir_bitmap_from_bitmap(
-		PVFS_dist_dir_attr *to_dir_attr, PVFS_dist_dir_bitmap to_dir_bitmap,
-		const PVFS_dist_dir_attr *from_dir_attr, const PVFS_dist_dir_bitmap from_dir_bitmap);
+		PVFS_dist_dir_attr *to_dir_attr, 
+		PVFS_dist_dir_bitmap to_dir_bitmap,
+		const PVFS_dist_dir_attr *from_dir_attr, 
+		const PVFS_dist_dir_bitmap from_dir_bitmap);
 PVFS_dist_dir_hash_type PINT_encrypt_dirdata(const char *const name);
 
 
