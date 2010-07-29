@@ -30,7 +30,7 @@ cd benchmarks/dbench-3.03
 ./configure -q
 
 #apply patches
-patch -p3 < ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d/dbench.patch
+patch -p3 < ${VFS_SCRIPTS}/dbench.patch
 if [ "${?}" != 0 ]
 then
    echo "Error: failed to apply patches to DBENCH."

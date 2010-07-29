@@ -27,8 +27,8 @@ export CVS_TAG="${CVS_TAG:-HEAD}"
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
-VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
+SYSINT_SCRIPTS=~+/sysint-tests.d
+VFS_SCRIPTS=~+/vfs-tests.d
 VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
