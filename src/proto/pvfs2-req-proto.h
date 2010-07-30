@@ -84,6 +84,7 @@ enum PVFS_server_op
     PVFS_SERV_TREE_REMOVE = 41,
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
     PVFS_SERV_MGMT_MIGRATE = 43,
+    PVFS_SERV_MIGRATE_CREATE = 44,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1907,22 +1908,25 @@ endecode_fields_2a_struct(
 /* copy a single object and move to another server*/     
 
 struct PVFS_servreq_mgmt_migrate{
+    char *dest_server;
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    char *dist_server;
 };
 
 endecode_fields_3_struct(
      PVFS_servreq_mgmt_migrate,
+     string, dest_server,
      PVFS_handle, handle,
-     PVFS_fs_id, fs_id,
-     string , dist_server );
+     PVFS_fs_id, fs_id);
+
+#define extra_size_PVFS_servreq_migrate \
+    roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
 
 #define PINT_SERVREQ_MGMT_MIGRATE_FILL(__req,        \
                                      __creds,        \
                                      __fsid,         \
                                      __handle,       \
-                                     __dist_ser,     \
+                                     __dest_server,  \
                                      __hints)        \
 do{                                                  \
     memset(&(__req), 0, sizeof(__req));              \
@@ -1931,11 +1935,79 @@ do{                                                  \
     (__req).hints = (__hints);                       \
     (__req).u.mgmt_migrate.handle = (__handle);      \
     (__req).u.mgmt_migrate.fs_id = (__fsid);         \
-    (__req).u.mgmt_migrate.dist_server = (__dist_ser); \
-} while(0);
+    (__req).u.mgmt_migrate.dest_server = __dest_server; \
+} while(0)
 
- 
-                                        
+/**************************************************************************/
+/*migrate-create*/
+
+struct PVFS_servreq_migrate_create
+{
+    int32_t mask;
+    PVFS_ds_keyval *val;
+    PVFS_ds_keyval *key;
+    int32_t nkey;
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_object_attr attr;
+};
+
+endecode_fields_4aa_struct(
+    PVFS_servreq_migrate_create,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    int32_t, mask,
+    PVFS_object_attr, attr,
+    int32_t, nkey,
+    PVFS_ds_keyval, key,
+    PVFS_ds_keyval, val);
+
+#define extra_size_PVFS_servreq_migrate_create \
+        ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN) \
+        * PVFS_REQ_LIMIT_KEYVAL_LIST)
+
+#define PINT_SERVREQ_MIGRATE_CREATE_FILL(__req,     \
+                                         __creds,   \
+                                         __fs_id,   \
+                                         __handle,  \
+                                         __mask,    \
+                                         __attr,    \
+                                         __key,     \
+                                         __val,     \
+                                         __nkey,    \
+                                         __hints)   \
+do{                                                 \
+    memset(&(__req), 0, sizeof(__req));             \
+    (__req).op = PVFS_SERV_MIGRATE_CREATE;          \
+    (__req).credentials = (__creds);                \
+    (__req).hints = (__hints);                      \
+    (__req).u.migrate_create.fs_id = (__fs_id);     \
+    (__req).u.migrate_create.handle = (__handle);   \
+    (__req).u.migrate_create.attr = (__attr);       \
+    (__req).u.migrate_create.nkey = (__nkey);       \
+    (__req).u.migrate_create.mask = (__mask);       \
+    (__req).u.migrate_create.key = (__key);         \
+    (__req).u.migrate_create.val = (__val);         \
+}while(0)
+
+
+    
+/* Types for mask used for migrate_create.sm */   
+#define MIGRATE_CREATE (1 << 0)
+#define MIGRATE_STORE  (1 << 1)
+
+                                     
+struct PVFS_servresp_migrate_create
+{
+    PVFS_handle new_handle;
+};
+
+endecode_fields_1_struct(
+    PVFS_servresp_migrate_create,
+    PVFS_handle, new_handle);
+
+
+/****************************************************************/
 
 
 /* server request *********************************************/
@@ -1984,6 +2056,7 @@ struct PVFS_server_req
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
         struct PVFS_servreq_mgmt_migrate mgmt_migrate;
+        struct PVFS_servreq_migrate_create migrate_create;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2039,6 +2112,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
+        struct PVFS_servresp_migrate_create migrate_create;
     } u;
 };
 endecode_fields_2_struct(

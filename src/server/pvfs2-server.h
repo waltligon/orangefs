@@ -529,6 +529,19 @@ struct PINT_server_mkdir_op
     PVFS_size init_dirdata_size;
 };
 
+
+/*This macro is used for other server operations to make a local call to get-attr*/
+
+#define PINT_SETUP_LOCAL_FRAME(__s_op) \
+    do{ \
+        __s_op = malloc(sizeof(struct PINT_server_op)); \
+        if(!__s_op){js_p->error_code = -PVFS_ENOMEM; return SM_ACTION_COMPLETE;} \
+        memset(__s_op, 0, sizeof(struct PINT_server_op)); \
+        __s_op->req = &__s_op->decoded.stub_dec.req; \
+    }while(0)
+
+
+
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
@@ -578,12 +591,17 @@ struct PINT_server_tree_communicate_op
 
 struct PINT_server_mgmt_migrate_op
 {
-   PVFS_handle *metahandle;
-   PVFS_fs_id fs_id;
-   int64_t dist_server;
-   /*need dest server address */
+   char *dest_server;
+   PVFS_object_attr attr;
+   PVFS_handle dest_handle;
 };    
 
+
+struct PINT_server_migrate_create_op
+{
+    PVFS_handle new_handle;
+    PVFS_ds_attributes *ds_attr;
+};
 
 
 /* This structure is passed into the void *ptr 
@@ -678,6 +696,7 @@ typedef struct PINT_server_op
         struct PINT_server_mirror_op mirror;
         struct PINT_server_tree_communicate_op tree_communicate;
         struct PINT_server_mgmt_migrate_op mgmt_migrate;
+        struct PINT_server_migrate_create_op migrate_create;
     } u;
 
 } PINT_server_op;
@@ -744,7 +763,7 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
-extern struct PINT_state_machine_s pvfs2_mgmt_migrate_sm;
+extern struct PINT_state_machine_s pvfs2_migrate_create_create_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

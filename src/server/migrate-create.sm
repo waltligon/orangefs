@@ -1,0 +1,258 @@
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+ 
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-cached-config.h"
+#include "pvfs2-dist-basic.h"
+
+
+
+#define CREATE 100
+#define STORE 200
+
+%%
+
+machine pvfs2_migrate_create_sm
+{
+	state prelude
+	{
+		jump pvfs2_prelude_sm;
+		success => init;
+		default => final_response;
+	}
+	
+	state init
+	{
+		run migrate_create_init;
+		CREATE => create;
+		default => final_response;
+	}			
+	
+	state create
+	{
+		jump pvfs2_migrate_create_create_sm;
+		success => setup_resp;
+		default => final_response;
+	}
+		
+	state setup_resp
+	{
+		run migrate_create_setup_resp;
+		default => final_response;
+	}		
+	
+	state final_response
+	{
+		jump pvfs2_final_response_sm;
+		default => cleanup;
+	}
+	
+	state cleanup
+	{
+		run migrate_create_cleanup;
+		default => terminate;
+	}	
+	
+}
+
+
+nested machine pvfs2_migrate_create_create_sm
+{
+	state create_create
+	{
+		run migrate_create_create;
+		success => create_store_common;
+		default => return;
+	}
+	
+	state create_store_common
+	{
+		run migrate_create_store_common;
+		default => return;	
+	}
+	
+}
+
+%%
+
+/**************************************************************/
+
+static PINT_sm_action migrate_create_init(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	
+	gossip_debug( GOSSIP_SERVER_DEBUG, "Entered: migrate_create_init\n");
+	
+	if( s_op->req->u.migrate_create.mask == MIGRATE_CREATE )
+	{
+		js_p->error_code = CREATE;
+		return SM_ACTION_COMPLETE;
+	}
+	
+	if(s_op->req->u.migrate_create.mask == MIGRATE_STORE )
+	{
+		js_p->error_code = STORE;	
+		return SM_ACTION_COMPLETE;	
+	}	
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Not a correct mask\n");
+	
+	return SM_ACTION_COMPLETE;
+}	
+
+static PINT_sm_action migrate_create_create(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	int ret = -1;
+	server_configuration_s *config = get_server_config_struct();
+	PVFS_handle_extent_array meta_handle_ext_array;	
+	job_id_t j_id; 
+
+	gossip_debug( GOSSIP_SERVER_DEBUG, "Entered: migrate_create_create\n");
+		
+		
+	ret = PINT_cached_config_get_server(
+		s_op->req->u.migrate_create.fs_id,
+		config->host_id,
+		PINT_SERVER_TYPE_META,
+		&meta_handle_ext_array);
+		
+	if(ret)
+	{
+		js_p->error_code = ret;
+		return SM_ACTION_COMPLETE;
+	}		
+		
+	ret = job_trove_dspace_create(
+		s_op->req->u.migrate_create.fs_id,
+		&meta_handle_ext_array,
+		PVFS_TYPE_METAFILE,
+		NULL,
+		0,
+		smcb,
+		0,
+		js_p,
+		&j_id,
+		server_job_context,
+		s_op->req->hints);
+		
+		return ret;		
+}		
+
+
+static PINT_sm_action migrate_create_store_common(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	PVFS_object_attr *a_p = NULL;
+	
+	int ret = -1;
+	job_id_t j_id;
+	
+	gossip_debug( GOSSIP_SERVER_DEBUG, "Entered: migrate_create_store_common\n");
+	
+	a_p = &s_op->req->u.migrate_create.attr;
+	s_op->u.migrate_create.ds_attr = (PVFS_ds_attributes *)malloc(sizeof(PVFS_ds_attributes));
+	 gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs read from request:\n\t"
+                    "[owner = %d, group = %d, perms = %o, type = %d]\n",
+                   (a_p->mask & PVFS_ATTR_COMMON_UID)  ? a_p->owner : -1,
+                   (a_p->mask & PVFS_ATTR_COMMON_GID)  ? a_p->group : -1,  
+                   (a_p->mask & PVFS_ATTR_COMMON_PERM) ? a_p->perms : -1,
+                   (a_p->mask & PVFS_ATTR_COMMON_TYPE) ? a_p->objtype : -1);
+	
+	
+	s_op->resp.u.migrate_create.new_handle = js_p->handle;
+	gossip_debug( GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n", llu(js_p->handle));
+	
+	PVFS_object_attr_to_ds_attr(a_p, s_op->u.migrate_create.ds_attr);
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Pre dpspace setattr\n");
+	ret = job_trove_dspace_setattr(
+		s_op->req->u.migrate_create.fs_id,
+		js_p->handle,
+		s_op->u.migrate_create.ds_attr,
+		TROVE_SYNC,
+		smcb,
+		0,
+		js_p,
+		&j_id,
+		server_job_context,
+		s_op->req->hints);
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Post dpspace setattr\n");
+	return ret;
+}	
+	
+
+static PINT_sm_action migrate_create_setup_resp(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered: migrate_create_setup_resp\n");
+	//struct PINt_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	
+	return SM_ACTION_COMPLETE;
+}	
+	
+static PINT_sm_action migrate_create_cleanup(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	gossip_debug(GOSSIP_SERVER_DEBUG, "Entered: migrate_create_cleanup\n");
+	if(s_op->u.migrate_create.ds_attr)
+	{
+		free(s_op->u.migrate_create.ds_attr);
+	}	
+	return(server_state_machine_complete(smcb));			
+}	
+	
+	
+static inline int PINT_get_object_ref_migrate_create(
+     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+	*fs_id = req->u.create.fs_id;
+	*handle = PVFS_HANDLE_NULL;
+	return 0;
+}		
+
+struct PINT_server_req_params pvfs2_migrate_create_params =
+{
+	.string_name = "migrate_create",
+	.perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_migrate_create,
+	.state_machine = &pvfs2_migrate_create_sm
+};	
+
+
+/* spare
+
+	state store
+	{
+		run migrate_create_store;
+		success =>setup_resp;
+		default => final_response;
+	}
+*/
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim:ft=c ts=8 sts=4 sw=4 expandtab
+ */
+ 

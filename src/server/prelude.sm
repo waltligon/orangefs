@@ -89,7 +89,6 @@ static PINT_sm_action prelude_setup(
                                     ,smcb->base_frame,smcb->frame_count);
     int ret;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
     ret = PINT_server_req_get_object_ref(
         s_op->req, &s_op->target_fs_id, &s_op->target_handle);
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);

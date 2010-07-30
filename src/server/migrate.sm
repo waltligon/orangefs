@@ -9,6 +9,16 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pint-cached-config.h"
+#include "pvfs2-dist-basic.h"
+
+
+static int migrate_create_msg_comp_fn(
+			void *v_p, struct PVFS_server_resp *resp, int i);
+
 
 
 %%
@@ -18,23 +28,58 @@ machine pvfs2_mgmt_migrate_sm
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-                success => test_stuff;
-		/*success => get_new_handle;*/
+		success => test_stuff;
 		default => final_response;
+		
 	}
-
-        state test_stuff
-        {
-                run test_stuff;
-                default => final_response;
-        }
 	
-	state get_new_handle
+    state test_stuff
+    {
+        run test_stuff;
+        success => get_dest_server;
+        default => final_response;
+    } 
+      
+    state get_dest_server
+    {
+    	run migrate_get_dest_server;
+    	success => setup_get_attr;
+    	default => final_response;
+    }	
+    		
+	state setup_get_attr
 	{
-		run migrate_get_new_handle;
+		run migrate_setup_get_attr;
+		success => get_attr_work;
 		default => final_response;
 	}
+	state get_attr_work
+	{
+		jump pvfs2_get_attr_work_sm;
+		default => interpret_get_attr;
+	}	
 	
+	state interpret_get_attr
+	{
+		run migrate_interpret_get_attr;
+        success => setup_migrate_create_msgpair;
+		default => final_response;
+	}	
+	
+	state setup_migrate_create_msgpair
+	{
+		run migrate_setup_migrate_create_msgpair;
+		success => xfer_msgpair;
+		default => final_response;
+	}	
+	
+	state xfer_msgpair
+	{
+		jump pvfs2_msgpairarray_sm;
+		default => final_response;
+	}	
+		
+
 	state final_response
 	{
 		jump pvfs2_final_response_sm;
@@ -43,8 +88,8 @@ machine pvfs2_mgmt_migrate_sm
 	
 	state cleanup
 	{
-			run migrate_cleanup;
-			default => terminate;
+		run migrate_cleanup;
+		default => terminate;
 	}
 	
 }
@@ -54,45 +99,218 @@ machine pvfs2_mgmt_migrate_sm
 static PINT_sm_action test_stuff(
                 struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_SERVER_DEBUG,"test stuff in server migrate sm\n");
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_handle *handle = s_op->u.mgmt_migrate.metahandle;
-    PVFS_fs_id fs_id = s_op->u.mgmt_migrate.fs_id;
-    int64_t dist_server = s_op->u.mgmt_migrate.dist_server;
-    
-    printf("dist server: %ll\n", dist_server);
-    printf("data handle: %llu\n", llu(handle));
-    printf("file system ID: %d\n", fs_id);
+    PVFS_handle handle = s_op->req->u.mgmt_migrate.handle;
+    PVFS_fs_id fs_id = s_op->req->u.mgmt_migrate.fs_id;
+    char *dest_server = s_op->req->u.mgmt_migrate.dest_server;
+    gossip_debug(GOSSIP_SERVER_DEBUG,"made it to teststuff\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG,"dest server: %s\n", dest_server);
+    gossip_debug(GOSSIP_SERVER_DEBUG,"data handle: %llu\n", llu(handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG,"file system ID: %d\n", fs_id);
 
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action migrate_get_new_handle(
+static PINT_sm_action migrate_get_dest_server(
 		struct PINT_smcb *smcb, job_status_s *js_p)
 {
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered migrate_get_dest_server\n");
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	char *dest_server;
+	struct server_configuration_s *config_s = get_server_config_struct();
+		
+	dest_server = PINT_config_get_host_addr_ptr( 
+						config_s, s_op->req->u.mgmt_migrate.dest_server);
+					
+	gossip_debug(GOSSIP_SERVER_DEBUG,"dest_server: %s\n", dest_server);
+	s_op->u.mgmt_migrate.dest_server = dest_server;						
+	if(!dest_server)
+	{
+		gossip_debug(GOSSIP_SERVER_DEBUG,"Bad server alias\n");
+		return SM_ACTION_COMPLETE;						
+	}	
+						
+	return SM_ACTION_COMPLETE;
+}	
 	
-
-	return SM_ACTION_COMPLETE;	
-}
-
+		
 
 static PINT_sm_action migrate_cleanup(
-		struct PINT_smcb *smcb, job_status_s *jp_p)
-{
-	
-	
-	
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{	
+	//struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered migrate_cleanup\n");
 	return(server_state_machine_complete(smcb));
 }
 
 
-/* need to know what some of these things are/mean!!!!!!!! */
+/*****************************************************************************/
+/*Get attr half of migratation*/
+
+static PINT_sm_action migrate_setup_get_attr(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered migrate_setup_get_attr\n");
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	struct PINT_server_op *getattr_op;
+	int ret;
+	
+	js_p->error_code = 0;
+		
+	/*setup op for local server call to getattr*/
+	PINT_SETUP_LOCAL_FRAME(getattr_op);
+	PINT_SERVREQ_GETATTR_FILL( *getattr_op->req,
+								s_op->req->credentials,
+								s_op->req->u.mgmt_migrate.fs_id,
+								s_op->req->u.mgmt_migrate.handle,
+								PVFS_ATTR_COMMON_ALL,
+								s_op->req->hints);
+	
+	
+	getattr_op->attr = s_op->attr;
+	
+	ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+	if(ret < 0)
+	{
+			js_p->error_code = ret;
+	}
+	return SM_ACTION_COMPLETE;
+}	
+
+
+
+static PINT_sm_action migrate_interpret_get_attr(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered migrate_interpret_get_attr \n");
+	struct PINT_server_op *getattr_op;
+	struct PINT_server_op *s_op;
+	int task_id;
+	int remaining;
+	
+	getattr_op = PINT_sm_pop_frame( smcb, &task_id, &js_p->error_code,
+				 &remaining);
+	s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	
+	if(js_p->error_code)
+	{
+		gossip_debug(GOSSIP_SERVER_DEBUG,"Migrate failed to retrieve attrs\n");
+		return(SM_ACTION_COMPLETE);
+	}
+	
+	s_op->u.mgmt_migrate.attr = getattr_op->resp.u.getattr.attr;
+	
+	free(getattr_op);
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Should have gotten migrated file attr\n");				 	
+	
+	return SM_ACTION_COMPLETE;
+}		
+
+
+
+static PINT_sm_action migrate_setup_migrate_create_msgpair(
+		struct PINT_smcb *smcb, job_status_s *js_p)
+{
+	struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+	int ret = -PVFS_EINVAL;
+	PINT_sm_msgpair_state *msg_p = NULL;
+	
+	js_p->error_code = 0;
+	
+	PVFS_object_attr *a_p = NULL;
+	
+	a_p = &s_op->u.mgmt_migrate.attr;
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG,"Entered migrate_setup_migrate_create_msgpair\n"); 
+	PINT_msgpair_init(&s_op->msgarray_op);
+	msg_p = &s_op->msgarray_op.msgpair;
+				
+	PINT_SERVREQ_MIGRATE_CREATE_FILL(
+		msg_p->req,
+		s_op->req->credentials,
+		s_op->req->u.mgmt_migrate.fs_id,
+		PVFS_HANDLE_NULL,
+		MIGRATE_CREATE,
+		s_op->u.mgmt_migrate.attr,
+		NULL,
+		NULL,
+		0,
+		s_op->req->hints);
+	
+	
+	gossip_debug(GOSSIP_SERVER_DEBUG, "  attrs read from request:\n\t"
+                    "[owner = %d, group = %d, perms = %o, type = %d]\n",
+                   (a_p->mask & PVFS_ATTR_COMMON_UID)  ? a_p->owner : -1,
+                   (a_p->mask & PVFS_ATTR_COMMON_GID)  ? a_p->group : -1,  
+                   (a_p->mask & PVFS_ATTR_COMMON_PERM) ? a_p->perms : -1,
+                   (a_p->mask & PVFS_ATTR_COMMON_TYPE) ? a_p->objtype : -1);
+	
+	
+			
+	msg_p->fs_id = s_op->req->u.mgmt_migrate.fs_id;
+	msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+	msg_p->comp_fn = migrate_create_msg_comp_fn;			
+	
+	ret = BMI_addr_lookup(&msg_p->svr_addr, s_op->u.mgmt_migrate.dest_server);
+		
+	if(ret)
+	{
+		gossip_err("Failed to loop up meta server address\n");
+		js_p->error_code = ret;
+	}
+	
+			
+	PINT_sm_push_frame(smcb, 0 ,&s_op->msgarray_op);	
+	return SM_ACTION_COMPLETE;
+}						
+		
+
+/*******************************************************************/
+
+
+static int migrate_create_msg_comp_fn(
+			void *v_p, struct PVFS_server_resp *resp_p, int i)
+{
+		PINT_smcb *smcb = v_p;
+		struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+	
+		gossip_debug(GOSSIP_SERVER_DEBUG,"migrate_create_msg_comp_fn\n");
+		gossip_debug( GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n", llu(resp_p->u.migrate_create.new_handle));
+		assert(resp_p->op == PVFS_SERV_MIGRATE_CREATE);
+		
+		if(resp_p->status != 0)
+		{
+			return resp_p->status;
+		}
+		
+		resp_p->u.migrate_create.new_handle = s_op->u.mgmt_migrate.dest_handle;
+		
+		return 0;
+}					
+
+
+static inline int PINT_get_object_ref_migrate(struct PVFS_server_req *req,
+                                                PVFS_fs_id *fs_id,
+                                                PVFS_handle *handle)
+{
+    *fs_id = req->u.mgmt_migrate.fs_id;
+    *handle = req->u.mgmt_migrate.handle;
+    return 0;
+}
+
+/* need to know what some of these things are/mean*/
 struct PINT_server_req_params pvfs2_mgmt_migrate_params =
 {
 	.string_name = "migrate",
 	.perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .get_object_ref = PINT_get_object_ref_migrate,
 	.state_machine = &pvfs2_mgmt_migrate_sm
 };	
-
 
 /*
  * Local variables:

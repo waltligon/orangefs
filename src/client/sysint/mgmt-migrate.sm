@@ -17,7 +17,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
-
+#include "bmi.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -26,25 +26,30 @@ static int mgmt_migrate_comp_fn(
 
 %%
 
-machine pvfs2_client_mgmt_migrate_sm{
+machine pvfs2_client_mgmt_migrate_sm
+{
 	
-	state init{
+	state init
+	{
 		run mgmt_migrate_init;
 		default => migrate_setup_msgpair;
 	}
 	
-	state migrate_setup_msgpair{
+	state migrate_setup_msgpair
+	{
 		run mgmt_migrate_setup_msgpair;
 		success => migrate_xfer_msgpair;
 		default => cleanup;
 	}
 	
-	state migrate_xfer_msgpair{
+	state migrate_xfer_msgpair
+	{
 		jump pvfs2_msgpairarray_sm;
 		default => cleanup;
 	}
 				
-	state cleanup{
+	state cleanup
+	{
 		run mgmt_migrate_cleanup;
 		default => terminate;
 	}
@@ -58,7 +63,7 @@ PVFS_error PVFS_imgmt_migrate(
 		PVFS_object_ref ref,
 		const PVFS_credentials *credentials,
 		PVFS_sys_op_id *op_id,
-                char *dist_ser,
+                char *dest_ser,
 		PVFS_hint hints,
 		void *user_ptr)
 {
@@ -93,7 +98,7 @@ PVFS_error PVFS_imgmt_migrate(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     
     /* fill in stuff in the union */
-    sm_p->u.migrate.dist_server = dist_ser;
+    sm_p->u.migrate.dest_server = dest_ser;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -106,19 +111,19 @@ PVFS_error PVFS_imgmt_migrate(
 PVFS_error PVFS_mgmt_migrate(
 		PVFS_object_ref ref,
 		const PVFS_credentials *credentials,
-                char *dist_server,
+                char *dest_server,
 		PVFS_hint hints)
 {
-	PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_migrate entered\n");		
 			
-	ret = PVFS_imgmt_migrate(ref, credentials, &op_id, dist_server, hints, NULL);
+	ret = PVFS_imgmt_migrate(ref, credentials, &op_id, dest_server, hints, NULL);
 	if(ret)
 	{
 		PVFS_perror_gossip("PVFS_imgmt_migrate call", ret);
-        error = ret;			
+       		error = ret;			
 	}
 	else
 	{
@@ -163,35 +168,47 @@ static PINT_sm_action mgmt_migrate_setup_msgpair(
 	struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 	int ret = -PVFS_EINVAL;
 	PINT_sm_msgpair_state *msg_p = NULL;
+      
+
 	
 	js_p->error_code = 0;
 	
 	PINT_msgpair_init(&sm_p->msgarray_op);
 	msg_p = &sm_p->msgarray_op.msgpair;
 	
+    	
+    fprintf(stderr,"I made it here\n");
+
+    fprintf(stderr,"%s\n", sm_p->u.migrate.dest_server);
+
+        
+	
 	PINT_SERVREQ_MGMT_MIGRATE_FILL( 
 	    msg_p->req,
 	    *sm_p->cred_p,
 	    sm_p->object_ref.fs_id,
 	    sm_p->object_ref.handle,
-            sm_p->u.migrate.dist_server,
-    	    sm_p->hints);
+        sm_p->u.migrate.dest_server,
+    	sm_p->hints);
     
     /*stuff here as well */
-        msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = sm_p->object_ref.handle;
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY; 
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
   	msg_p->comp_fn = mgmt_migrate_comp_fn;
-  	   	
+        fprintf(stderr,"fs_id %d\n",msg_p->fs_id);
+        fprintf(stderr,"handle %llu\n",llu(msg_p->handle));	
+		   	
    	ret = PINT_cached_config_map_to_server(
    	&msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-   	
+   		fprintf(stderr,"server = %lld\n", lld(msg_p->svr_addr));
    	if(ret)
    	{
    		gossip_err("Failed to map to server address\n");
    		js_p->error_code = ret;
    	}
-   	
+    
+	
    	PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
    	
    	return SM_ACTION_COMPLETE;
@@ -207,7 +224,9 @@ static PINT_sm_action mgmt_migrate_cleanup(
 		"mgmt_migrate state: mgmt_migrate_cleanup\n");
 		
 	sm_p->error_code = js_p->error_code;	
-		
+    	
+       fprintf(stderr,"I made it to client cleanup\n");
+	
 	/*do something involving cache or free allocated stuff*/	
 		
 	PINT_SET_OP_COMPLETE;
@@ -222,4 +241,5 @@ static PINT_sm_action mgmt_migrate_cleanup(
  * End:
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
-*/
+ */ 
+

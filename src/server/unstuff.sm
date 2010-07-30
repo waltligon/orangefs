@@ -402,13 +402,13 @@ static PINT_sm_action getattr_setup(
 
     js_p->error_code = 0;
 
-    getattr_op = malloc(sizeof(*getattr_op));
-    if(!getattr_op)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    memset(getattr_op, 0, sizeof(*getattr_op));
+    PINT_SETUP_LOCAL_FRAME(getattr_op);
+    PINT_SERVREQ_GETATTR_FILL(*getattr_op->req,
+                s_op->req->credentials,
+                s_op->req->u.unstuff.fs_id,
+                s_op->req->u.unstuff.handle,
+                s_op->req->u.unstuff.attrmask,
+                s_op->req->hints);
 
     /* TODO: can we come up with a way to clean up and nail down what has 
      * to be set in order to run this nested machine?  This seems fragile.
@@ -416,14 +416,7 @@ static PINT_sm_action getattr_setup(
 
     /* need attrs that the prelude read already */
     getattr_op->attr = s_op->attr;
-    /* need a valid request structure for some generic features like access
-     * logging 
-     */
-    getattr_op->req = s_op->req;
-    /* need to fill in the input parameters to the getattr nested machine */
-    getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
-    getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
-    getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+    
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if(ret < 0)

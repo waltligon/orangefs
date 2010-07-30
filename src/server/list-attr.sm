@@ -141,18 +141,14 @@ static PINT_sm_action listattr_setup_getattr(
             /* skip nested machine for this handle */
             continue;
         }
-
-        getattr_op = malloc(sizeof(*getattr_op));
-        if(!getattr_op)
-        {
-            s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
-            continue;
-        }
-        memset(getattr_op, 0, sizeof(*getattr_op));
-
+        
+        PINT_SETUP_LOCAL_FRAME(getattr_op);
+        PINT_SERVREQ_GETATTR_FILL(*getattr_op->req,
+                        s_op->req->credentials,
+                        s_op->req->u.listattr.fs_id,
+                        s_op->req->u.listattr.handles[i],
+                        s_op->req->u.listattr.attrmask,
+                        s_op->req->hints);
         /* TODO: need a way to explicitly set the right inputs to the
          * getattr nested sm.  This code block is very fragile.
          */
@@ -165,11 +161,9 @@ static PINT_sm_action listattr_setup_getattr(
         /* need a valid request structure for some generic features like access
          * logging 
          */
-        getattr_op->req = s_op->req;
+        
         /* need to fill in the input parameters to the getattr nested machine */
-        getattr_op->u.getattr.fs_id = s_op->req->u.listattr.fs_id;
-        getattr_op->u.getattr.handle = s_op->req->u.listattr.handles[i];
-        getattr_op->u.getattr.attrmask = s_op->req->u.listattr.attrmask;
+        
 
         ret = PINT_sm_push_frame(smcb, 0, getattr_op);
         if(ret < 0)
@@ -232,7 +226,7 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
         /* match it up with the correct array entry */
         for(j=0; j<s_op->req->u.listattr.nhandles; j++)
         {
-            if(s_op->req->u.listattr.handles[j] == getattr_op->u.getattr.handle)
+            if(s_op->req->u.listattr.handles[j] == getattr_op->req->u.getattr.handle)
             {
                 s_op->u.listattr.attr_a[j] = getattr_op->resp.u.getattr.attr;
                 s_op->u.listattr.errors[j] = tmp_err;
