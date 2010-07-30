@@ -80,9 +80,9 @@ int PINT_init_dist_dir_state(
 	assert(dist_dir_attr != NULL);
 
 	/* -1 <= server_no < num_servers && 0 < pre_dsg_num_server <= num_servers */
-	assert(	(num_servers < 1) ||
-	 		(server_no < -1) || /* metadata handle has server_no = -1 */
-			(server_no >= num_servers));
+	assert(	(num_servers > 0) &&
+	 		(server_no >= -1) && /* metadata handle has server_no = -1 */
+			(server_no < num_servers));
 
 	if ((pre_dsg_num_server <= 0) ||
 		(pre_dsg_num_server > num_servers))
