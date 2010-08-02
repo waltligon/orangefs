@@ -28,8 +28,6 @@ fi
 
 
 cd ~+/pvfs2/test
-echo "pwd is `pwd`"
-exit
 ./run-nightly $CVSTAGS
 
 exit 
