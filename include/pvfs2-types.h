@@ -272,6 +272,9 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 #define PVFS_ALL_READ    (PVFS_U_READ|PVFS_G_READ|PVFS_O_READ)
 
 /** Object and attribute types. */
+/* If this enum is modified the server parameters related to the precreate pool
+ * batch and low threshold sizes may need to be modified  to reflect this 
+ * change. Also, the PVFS_DS_TYPE_COUNT #define below must be updated */
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
@@ -285,6 +288,43 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+#define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
+                                        * the PVFS_ds_type enum */
+                                            
+
+/* helper to translate bit-shifted enum types to array index number in the 
+ * range (0-(PVFS_DS_TYPE_COUNT-1)) */
+#define PVFS_ds_type_to_int(__type, __intp)         \
+do {                                                \
+    uint32_t r = 0;                                 \
+    PVFS_ds_type t = __type;                        \
+    if( t == 0 )                                    \
+    {                                               \
+        *((uint32_t *)__intp) = 0;                  \
+    }                                               \
+    else                                            \
+    {                                               \
+        while( t >>=1 )                             \
+        {                                           \
+            r++;                                    \
+        }                                           \
+        *((uint32_t *)__intp) = r+1;                \
+    }                                               \
+} while( 0 )
+
+/* helper to translate array index int to a proper PVFS_ds_type bit-shifted
+ * value */
+#define int_to_PVFS_ds_type(__i, __typep)           \
+do {                                                \
+    if( __i == 0 )                                  \
+    {                                               \
+        *((PVFS_ds_type *)__typep) = 0;             \
+    }                                               \
+    else                                            \
+    {                                               \
+        *((PVFS_ds_type *)__typep) = 1 << (__i - 1);\
+    }                                               \
+} while(0)
 
 #ifdef __KERNEL__
 #include <linux/fs.h>

@@ -61,6 +61,7 @@ struct precreate_pool_desc
     PVFS_ds_position position;
     PVFS_ds_position pool_index;
     int count;
+    PVFS_ds_type type;              /* ds type of operation */
     
     PVFS_error error_code;
 };

@@ -267,6 +267,7 @@ static PINT_sm_action get_handles(
     ret = job_precreate_pool_get_handles(
         s_op->req->u.unstuff.fs_id,
         (s_op->u.unstuff.num_dfiles_req-1),
+        PVFS_TYPE_DATAFILE,
         NULL,
         &s_op->u.unstuff.dfile_array[1],
         0,

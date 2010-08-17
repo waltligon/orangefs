@@ -472,6 +472,7 @@ struct PINT_server_precreate_pool_refiller_op
     char* host;
     PVFS_BMI_addr_t host_addr;
     PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_ds_type type;
 };
 
 struct PINT_server_batch_create_op

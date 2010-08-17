@@ -663,14 +663,31 @@ static const configoption_t options[] =
          CTX_DEFAULTS, "2000"},
 
      /* Specifies the number of handles to be preceated at a time from each
-      * server using the batch create request.
+      * server using the batch create request. One value is specified for each
+      * type of DS handle. Order is important, it matches the order the types 
+      * are defined in the PVFS_ds_type enum, which lives in 
+      * include/pvfs2-types.h. If that enum changes, it must be changed here 
+      * to match. Currently, this parameter follows the order:
+      *  
+      *  PVFS_TYPE_NONE
+      *  PVFS_TYPE_METAFILE
+      *  PVFS_TYPE_DATAFILE
+      *  PVFS_TYPE_DIRECTORY
+      *  PVFS_TYPE_SYMLINK
+      *  PVFS_TYPE_DIRDATA
+      *  PVFS_TYPE_INTERNAL
+      *
       */
-     {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "512"},
+     {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
  
-     /* Precreate pools will be "topped off" if they fall below this value */
-     {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "256"},
+     /* Precreate pools will be "topped off" if they fall below this value. 
+      * One value is specified for each DS handle type. This parameter operates
+      * the same as the PrecreateBatchSize in that each count coorespends to 
+      * one DS handle type. The order of types is identical to the 
+      * PrecreateBatchSize defined above.  */
+     {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 16, 256, 16, 16, 16, 0"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
@@ -1039,8 +1056,6 @@ int PINT_parse_config(
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
-    config_s->precreate_batch_size = PVFS2_PRECREATE_BATCH_SIZE_DEFAULT;
-    config_s->precreate_low_threshold = PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1577,12 +1592,55 @@ DOTCONF_CB(get_precreate_batch_size)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
+    char **tokens;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
         return NULL;
     }
-    config_s->precreate_batch_size = cmd->data.value;
+
+    if (config_s->precreate_batch_size != NULL) 
+    {
+        free(config_s->precreate_batch_size);
+        config_s->precreate_batch_size = NULL;
+    }
+
+    /* so this seems silly but a config option of type ARG_LIST doesn't
+     * split on commas (which is claimed to be the delimiter) but on white 
+     * space. That could possibly be fixed. So, until it is we have to handle 
+     * the possibility of multiple arguments with some number of values per 
+     * argument. */
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
+        for(j = 0; j < token_count; ++j)
+        {
+            counts[count_count++] = atoi(tokens[j]);
+        }
+        PINT_free_string_list(tokens, token_count);
+    }
+
+    /* make sure we scrounged up the right number of values */
+    if( count_count != PVFS_DS_TYPE_COUNT ) 
+    {
+        return "PrecreateBatchSize must contain counts for each DS "
+               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
+               "SYMLINK, DIRDATA, INTERNAL\n";
+    }
+
+    config_s->precreate_batch_size = calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
+    if( config_s->precreate_batch_size == NULL )
+    {
+        return "PrecreateBatchSize malloc failure";
+    }
+
+    for( i = 0; i < count_count; i++ )
+    {
+        config_s->precreate_batch_size[i] = counts[i];
+    }
+
     return NULL;
 }
 
@@ -1590,12 +1648,52 @@ DOTCONF_CB(get_precreate_low_threshold)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
+    char **tokens;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
         return NULL;
     }
-    config_s->precreate_low_threshold = cmd->data.value;
+
+    if (config_s->precreate_low_threshold != NULL) 
+    {
+        free(config_s->precreate_low_threshold);
+        config_s->precreate_low_threshold = NULL;
+    }
+
+    /* handle multiple values per arguments, gross */
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
+        for(j = 0; j < token_count; ++j)
+        {
+            counts[count_count++] = atoi(tokens[j]);
+        }
+        PINT_free_string_list(tokens, token_count);
+    }
+
+    /* make sure we scrounged up the right number of values */
+    if( count_count != PVFS_DS_TYPE_COUNT ) 
+    {
+        return "PrecreateLowThreshold must contain counts for each DS "
+               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
+               "SYMLINK, DIRDATA, INTERNAL\n";
+    }
+
+    config_s->precreate_low_threshold = 
+        calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
+    if( config_s->precreate_low_threshold == NULL )
+    {
+        return "PrecreateLowThreshold malloc failure";
+    }
+
+    for( i = 0; i < count_count; i++ )
+    {
+        config_s->precreate_low_threshold[i] = counts[i];
+    }
+
     return NULL;
 }
 
@@ -2949,6 +3047,18 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->fs_config_buf);
             config_s->fs_config_buf = NULL;
+        }
+
+        if(config_s->precreate_batch_size)
+        {
+            free(config_s->precreate_batch_size);
+            config_s->precreate_batch_size = NULL;
+        }
+
+        if(config_s->precreate_low_threshold)
+        {
+            free(config_s->precreate_low_threshold);
+            config_s->precreate_low_threshold = NULL;
         }
 
         if (config_s->logfile)

@@ -676,6 +676,7 @@ int job_precreate_pool_iterate_handles(
 int job_precreate_pool_get_handles(
     PVFS_fs_id fsid,
     int count,
+    PVFS_ds_type type,
     const char** servers,
     PVFS_handle* handle_array,
     PVFS_ds_flags flags,
@@ -688,12 +689,15 @@ int job_precreate_pool_get_handles(
 
 int job_precreate_pool_register_server(
     const char* host, 
+    PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle pool_handle, 
-    int count);
+    int count,
+    uint32_t *batch_count);
  
 int job_precreate_pool_lookup_server(
     const char* host, 
+    PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle* pool_handle);
   
