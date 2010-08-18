@@ -64,7 +64,7 @@ nested machine pvfs2_get_attr_work_sm
         run getattr_verify_attribs;
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
-        STATE_DIR => get_dirdata_handle;
+        STATE_DIR => get_num_dirdata_handles;
         default => setup_resp;
     }
 
@@ -154,9 +154,19 @@ nested machine pvfs2_get_attr_work_sm
         default => setup_resp;
     }
 
-    state get_dirdata_handle
+    state get_num_dirdata_handles
     {
-        run getattr_get_dirdata_handle;
+        run getattr_get_num_dirdata_handles;
+        default => get_dirdata_handles;
+/*
+        success => get_dirdata_handles;
+        default => setup_resp;
+*/
+    }
+
+    state get_dirdata_handles
+    {
+        run getattr_get_dirdata_handles;
         success => get_dirent_count;
         default => setup_resp;
     }
@@ -1305,6 +1315,9 @@ static PINT_sm_action getattr_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
 
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "  getattr_setup_resp: error_code = %d\n",
+                 js_p->error_code);
     if(js_p->error_code > 0)
     {
         /* if we reach this state with a positive error code it means that
@@ -1550,13 +1563,53 @@ static PINT_sm_action getattr_datafile_handles_safety_check(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_get_dirdata_handle(
+static PINT_sm_action getattr_get_num_dirdata_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
 
+    s_op->key.buffer = Trove_Common_Keys[NUM_DIR_ENT_KEYS].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[NUM_DIR_ENT_KEYS].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+    s_op->u.getattr.num_dirent_handles = 0;
+    s_op->val.buffer = &s_op->u.getattr.num_dirent_handles;
+    s_op->val.buffer_sz = sizeof(int32_t);
+    s_op->free_val = 0;
+
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read(
+        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+static PINT_sm_action getattr_get_dirdata_handles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: num_dirent_handles: %d\n",
+        s_op->u.getattr.num_dirent_handles);
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: setting num_dirent_handles to 1\n");
+        s_op->u.getattr.num_dirent_handles = 1;
+    }
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
     if(s_op->free_val)
@@ -1564,16 +1617,17 @@ static PINT_sm_action getattr_get_dirdata_handle(
         free(s_op->val.buffer);
     }
     s_op->u.getattr.dirent_handle =
-            (PVFS_handle *) calloc(PVFS_REQ_LIMIT_HANDLES_COUNT,
+            (PVFS_handle *) calloc(s_op->u.getattr.num_dirent_handles,
                                    sizeof(PVFS_handle));
     if (! s_op->u.getattr.dirent_handle) {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
     s_op->val.buffer = s_op->u.getattr.dirent_handle;
-    s_op->val.buffer_sz = PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle);
+    s_op->val.buffer_sz = s_op->u.getattr.num_dirent_handles * sizeof(PVFS_handle);
     s_op->free_val = 0;
 
+    js_p->error_code = 0;
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &s_op->key, &s_op->val,
@@ -1594,12 +1648,13 @@ static PINT_sm_action getattr_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
+    int i;
 
     if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
     {
         /* Implementation of distributed directories will mean there
            may be multiple. */
-        s_op->resp.u.getattr.attr.u.dir.dirent_file_count = 1;
+        s_op->resp.u.getattr.attr.u.dir.dirent_file_count = s_op->u.getattr.num_dirent_handles;
         s_op->resp.u.getattr.attr.u.dir.dirent_handle = 
             (PVFS_handle *) calloc(s_op->resp.u.getattr.attr.u.dir.dirent_file_count,
                                    sizeof(PVFS_handle));
@@ -1607,8 +1662,16 @@ static PINT_sm_action getattr_get_dirent_count(
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
-        s_op->resp.u.getattr.attr.u.dir.dirent_handle[0] =
-          s_op->u.getattr.dirent_handle[0];
+        memcpy(s_op->resp.u.getattr.attr.u.dir.dirent_handle,
+          s_op->u.getattr.dirent_handle,
+          s_op->resp.u.getattr.attr.u.dir.dirent_file_count * sizeof(PVFS_handle));
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: num_dirent_handles: %d\n",
+            s_op->resp.u.getattr.attr.u.dir.dirent_file_count);
+        for (i = 0; i < s_op->resp.u.getattr.attr.u.dir.dirent_file_count; i++)
+        {
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: dirent_handle[%d]: %llu\n",
+                i, llu(s_op->resp.u.getattr.attr.u.dir.dirent_handle[i]));
+        }
     }
     else
     {

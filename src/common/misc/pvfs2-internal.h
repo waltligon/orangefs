@@ -94,6 +94,8 @@
 #define DIST_DIRDATA_BITMAP_KEYSTR   "/ddb\0"
 #define DIST_DIRDATA_BITMAP_KEYLEN   5
 
+#define NUM_DIRECTORY_ENTRY_KEYSTR	"ne\0"
+#define NUM_DIRECTORY_ENTRY_KEYLEN	3
 
 /* Optional xattrs have "user.pvfs2." as a prefix */
 #define SPECIAL_DIST_NAME_KEYSTR        "dist_name\0"

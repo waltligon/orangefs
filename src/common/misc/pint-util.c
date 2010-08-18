@@ -22,6 +22,8 @@
 #include "pint-util.h"
 #include "bmi.h"
 #include "gossip.h"
+#include "pvfs2-debug.h"
+#include <src/common/misc/pvfs2-internal.h>  /* lld(), llu() */
 #include "pvfs2-req-proto.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
@@ -367,8 +369,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
         }
         else if (attr->objtype == PVFS_TYPE_DIRECTORY)
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
-                (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if (attr->mask & PVFS_ATTR_DIR_HINT)
             {
                 if (attr->u.dir.hint.dist_name)
                 {
@@ -381,10 +382,13 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.dir.hint.dist_params = NULL;
                 }
             }
-            if (attr->u.dir.dirent_handle)
+            if (attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
             {
-                free(attr->u.dir.dirent_handle);
-                attr->u.dir.dirent_handle = NULL;
+                if (attr->u.dir.dirent_handle)
+                {
+                    free(attr->u.dir.dirent_handle);
+                    attr->u.dir.dirent_handle = NULL;
+                }
             }
         }
     }

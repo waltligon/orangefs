@@ -404,6 +404,7 @@ static PINT_sm_action request_datafiles(
     ret = job_precreate_pool_get_handles(
         s_op->req->u.create.fs_id,
         s_op->u.create.handle_array_remote_count,
+        PVFS_TYPE_DATAFILE,
         s_op->u.create.remote_io_servers,
         s_op->u.create.handle_array_remote,
         0,
@@ -496,6 +497,7 @@ static PINT_sm_action replace_remote_datafile_handles(
         /* find pool that this handle belongs to */
         ret = job_precreate_pool_lookup_server(
             s_op->u.create.remote_io_servers[s_op->u.create.handle_index],
+            PVFS_TYPE_DATAFILE,
             s_op->req->u.create.fs_id,
             &pool_handle);
         if(ret < 0)

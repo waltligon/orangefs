@@ -997,8 +997,9 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb
    }
 
   ret = job_precreate_pool_get_handles(imm_p->fs_id
-                                       ,rows*cols
-                                       ,(const char **)imm_p->my_remote_servers
+                                       ,rows*cols,
+                                       PVFS_TYPE_DATAFILE,
+                                       (const char **)imm_p->my_remote_servers
                                        ,imm_p->handle_array_copies_remote
                                        ,0
                                        ,smcb
@@ -1763,8 +1764,9 @@ static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb
    tmpindex = imm_p->handle_array_copies_remote_count;
 
    /* find the pool that this handle belongs to */
-   ret = job_precreate_pool_lookup_server( imm_p->remote_io_servers[tmpindex]
-                                          ,imm_p->fs_id
+   ret = job_precreate_pool_lookup_server( imm_p->remote_io_servers[tmpindex],
+                                           PVFS_TYPE_DATAFILE, 
+                                          imm_p->fs_id
                                           ,&pool_handle );
    if (ret < 0)
    {

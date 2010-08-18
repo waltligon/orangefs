@@ -14,6 +14,8 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "pint-cached-config.h"
+#include "pvfs2-dist-basic.h"
 
 %%
 
@@ -36,13 +38,20 @@ nested machine pvfs2_mkdir_work_sm
     state create_dirdata_dspace
     {
         run mkdir_create_dirdata_dspace;
+        success => create_local_dirdata_dspace;
+        default => err_msg;
+    }
+
+    state create_local_dirdata_dspace
+    {
+        run mkdir_request_remote_dirdata_dspace;
         success => write_dirdata_handle;
         default => err_msg;
     }
 
     state write_dirdata_handle
     {
-        run mkdir_write_dirdata_handle;
+        run mkdir_write_dirdata_handles;
         success => return;
         default => err_msg;
     }
@@ -175,12 +184,33 @@ static int mkdir_create_dirdata_dspace(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_ENOMEM;
-    job_id_t i;
+    job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
+
+    /* TODO: Determine how many dspace handles to create.  For now just
+             default to all metadata servers. Eventually this should work
+             similar to specifying the number of datafiles for a file.
+             (See function create_parent_getattr_inspect of sys-create.sm.) */
+    s_op->u.mkdir.dirent_handle = malloc(
+        sizeof(*s_op->u.mkdir.dirent_handle) * s_op->req->u.mkdir.num_dirent_files_req);
+    if(!s_op->u.mkdir.dirent_handle)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    ret = SM_ACTION_COMPLETE;
+
+    s_op->u.mkdir.handle_array_local_count = 1;
+    s_op->u.mkdir.handle_array_remote_count = s_op->req->u.mkdir.num_dirent_files_req - 1;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d local dirent files\n",
+        s_op->u.mkdir.handle_array_local_count);
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "creating %d remote dirent files\n",
+        s_op->u.mkdir.handle_array_remote_count);
 
     /* find our meta handle range for this create */
     ret = PINT_config_get_meta_handle_extent_array(
@@ -188,60 +218,131 @@ static int mkdir_create_dirdata_dspace(
     assert(ret == 0);
     assert(extent_array.extent_count > 0);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will "
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " local dirdata handle(s) will "
                  "be in starting hrange[0] %llu-%llu\n",
                  llu(extent_array.extent_array[0].first),
                  llu(extent_array.extent_array[0].last));
 
-    ret = job_trove_dspace_create(
-        s_op->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
+
+    ret = job_trove_dspace_create_list(
+        s_op->req->u.mkdir.fs_id,
+        &extent_array,
+        s_op->u.mkdir.dirent_handle,
+        s_op->u.mkdir.handle_array_local_count,
+        PVFS_TYPE_DIRDATA,
+        NULL,
         TROVE_SYNC,
-        smcb, 0, js_p, &i,
-        server_job_context, s_op->req->hints);
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context,
+        s_op->req->hints);
 
     free(extent_array.extent_array);
-    extent_array.extent_array = NULL;
-
+    js_p->error_code = 0;
     return ret;
 }
 
-static PINT_sm_action mkdir_write_dirdata_handle(
+static PINT_sm_action mkdir_request_remote_dirdata_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t tmp_id;
+
+    gossip_debug(
+        GOSSIP_MKDIR_DEBUG, "  local dirdata handle (%llu)\n",
+        llu(s_op->u.mkdir.dirent_handle[0]));
+
+    if(s_op->u.mkdir.handle_array_remote_count == 0)
+    {
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = job_precreate_pool_get_handles(
+        s_op->u.mkdir.fs_id,
+        s_op->u.mkdir.handle_array_remote_count,
+        PVFS_TYPE_DIRDATA,
+        NULL,
+        &s_op->u.mkdir.dirent_handle[1],
+        0,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context,
+        s_op->req->hints);
+    return ret;
+}
+
+static PINT_sm_action mkdir_write_dirdata_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
+    gossip_debug(
+        GOSSIP_MKDIR_DEBUG, "  mkdir_write_dirdata_handles: error_code = %d\n",
+        js_p->error_code);
+
     if (js_p->error_code)
     {
         return SM_ACTION_COMPLETE;
     }
-    js_p->error_code = 0;
 
+    int32_t keyval_count = 2;
 
-    s_op->u.mkdir.dirent_handle = js_p->handle;
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }       
+            
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {               
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+ 
+    s_op->key_a[0].buffer = Trove_Common_Keys[NUM_DIR_ENT_KEYS].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[NUM_DIR_ENT_KEYS].size;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
-                 llu(s_op->u.mkdir.dirent_handle));
+    s_op->val_a[0].buffer = &s_op->req->u.mkdir.num_dirent_files_req;
+    s_op->val_a[0].buffer_sz = sizeof(int32_t);
 
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    s_op->val.buffer = &s_op->u.mkdir.dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->val_a[1].buffer = s_op->u.mkdir.dirent_handle;
+    s_op->val_a[1].buffer_sz = sizeof(PVFS_handle) * s_op->req->u.mkdir.num_dirent_files_req;
 
     gossip_debug(
-        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%llu) "
-        "into parent dir (%llu)\n", llu(s_op->u.mkdir.dirent_handle),
-        llu(s_op->resp.u.mkdir.handle));
+        GOSSIP_MKDIR_DEBUG, "  num_dirent_files_req = %d\n",
+        s_op->req->u.mkdir.num_dirent_files_req);
+    for (i=0; i<s_op->req->u.mkdir.num_dirent_files_req; i++)
+    {
+        gossip_debug(
+            GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%llu) "
+            "into parent dir (%llu)\n", llu(s_op->u.mkdir.dirent_handle[i]),
+            llu(s_op->resp.u.mkdir.handle));
+    }
 
     /* we don't sync here since we're going to anyway in the following
      * operation (setting the dirent count).
      */
-    ret = job_trove_keyval_write(
-        s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
-        &s_op->key, &s_op->val, 
-        0,
+    ret = job_trove_keyval_write_list(
+        s_op->u.mkdir.fs_id,
+        s_op->resp.u.mkdir.handle,
+        s_op->key_a, s_op->val_a, 
+        keyval_count,
+        TROVE_SYNC,
         NULL, smcb, 0, js_p, &i, server_job_context, s_op->req->hints);
 
     return ret;
@@ -251,6 +352,10 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     s_op->resp.u.mkdir.handle = 0;
+
+    gossip_debug(
+        GOSSIP_MKDIR_DEBUG, "  mkdir_error: error_code = %d\n",
+        js_p->error_code);
 
     if (js_p->error_code > -1)
     {
@@ -273,6 +378,23 @@ static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 static PINT_sm_action mkdir_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (s_op->u.mkdir.dirent_handle)
+    {
+        free(s_op->u.mkdir.dirent_handle);
+    }
+
+    if(s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+
+    if(s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+
     return(server_state_machine_complete(smcb));
 }
 

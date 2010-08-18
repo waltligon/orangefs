@@ -172,7 +172,8 @@ enum
     NUM_DFILES_REQ_KEY   = 6,
     DIST_DIR_ATTR_KEY	 = 7,
     DIST_DIRDATA_HANDLES = 8,
-    DIST_DIRDATA_BITMAP	 = 9
+    DIST_DIRDATA_BITMAP	 = 9,
+    NUM_DIR_ENT_KEYS     =10
 };
 
 /* optional; user-settable keys */
@@ -475,6 +476,7 @@ struct PINT_server_precreate_pool_refiller_op
     char* host;
     PVFS_BMI_addr_t host_addr;
     PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_ds_type type;
 };
 
 struct PINT_server_batch_create_op
@@ -528,7 +530,14 @@ struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
-    PVFS_handle dirent_handle;
+    PVFS_handle *dirent_handle;
+//    PVFS_handle *handle_array_local;
+//    PVFS_handle *handle_array_remote;
+    int handle_array_local_count;
+    int handle_array_remote_count;
+//    const char **meta_servers;
+//    const char **remote_meta_servers;
+    int num_meta_servers;
     PVFS_size init_dirdata_size;
 };
 
@@ -540,6 +549,7 @@ struct PINT_server_getattr_op
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
+    int32_t num_dirent_handles;
     PVFS_handle *dirent_handle;
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;

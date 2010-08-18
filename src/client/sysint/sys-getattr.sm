@@ -633,7 +633,7 @@ static int getattr_object_getattr_comp_fn(
             return 0;
         case PVFS_TYPE_DIRECTORY:
         {
-//            uint32_t dirent_file_count_i;
+            uint32_t dirent_file_count_i;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "getattr comp_fn [%p] "
@@ -648,19 +648,21 @@ static int getattr_object_getattr_comp_fn(
                 attr->u.dir.hint.dist_params_len,
                 llu(attr->u.dir.dirent_count),
                 attr->u.dir.dirent_file_count);
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-                "    dirent_handle = %lld\n",
-                lld(attr->u.dir.dirent_handle));
 /*
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "    dirent_handle = %llu\n",
+                llu(attr->u.dir.dirent_handle));
+*/
+
             for (dirent_file_count_i = 0;
                  dirent_file_count_i < attr->u.dir.dirent_file_count;
                  dirent_file_count_i++) {
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
-                    "    dirent_file_array[%d] = %lld\n",
+                    "    dirent_handle[%d] = %llu\n",
                     dirent_file_count_i,
-                    lld(attr->u.dir.dirent_file_array[dirent_file_count_i]));
+                    llu(attr->u.dir.dirent_handle[dirent_file_count_i]));
             }
-*/
+
             return 0;
         }
         case PVFS_TYPE_SYMLINK:

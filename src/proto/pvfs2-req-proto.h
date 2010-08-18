@@ -125,6 +125,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \
 ((dfile_count > 0) && (dfile_count < PVFS_REQ_LIMIT_DFILE_COUNT))
 #define PVFS_REQ_LIMIT_MIRROR_DFILE_COUNT 1024
+/* max count of dirent handles associated with a directory */
+#define PVFS_REQ_LIMIT_DIRENT_FILE_COUNT    1024
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT        512
 /* max number of perf metrics returned by mgmt perf mon op */
@@ -746,13 +748,22 @@ struct PVFS_servreq_mkdir
       a single extent with first = last should be used.
     */
     PVFS_handle_extent_array handle_extent_array;
+    int32_t num_dirent_files_req;
+    /* NOTE: leave layout as final field so that we can deal with encoding
+     * errors */
+    PVFS_sys_layout layout;
 };
-endecode_fields_4_struct(
+/* This should really use endecode_fields_6_struct, but it does not work correctly.
+   There is an extra skip4 to make it 7 fields long! */
+endecode_fields_7_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_object_attr, attr,
-    PVFS_handle_extent_array, handle_extent_array)
+    skip4,,
+    PVFS_handle_extent_array, handle_extent_array,
+    int32_t, num_dirent_files_req,
+    PVFS_sys_layout, layout)
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
@@ -761,6 +772,8 @@ endecode_fields_4_struct(
                                 __fs_id,               \
                                 __ext_array,           \
                                 __attr,                \
+                                __num_dirent_files_req,\
+                                __layout,              \
                                 __hints)               \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
@@ -772,6 +785,8 @@ do {                                                   \
         (__ext_array).extent_count;                    \
     (__req).u.mkdir.handle_extent_array.extent_array = \
         (__ext_array).extent_array;                    \
+    (__req).u.mkdir.num_dirent_files_req = (__num_dirent_files_req); \
+    (__req).u.mkdir.layout = __layout;                \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\

@@ -310,7 +310,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                 case PVFS_SERV_TREE_GET_FILE_SIZE:
                 {
 
-/* TODO: Need to pass along hints. */
                   PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                       msg_p->req,
                       s_op->req->credentials,
@@ -319,7 +318,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                       num_data_files_for_this_server,
                       &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
                       this_req->u.tree_get_file_size.retry_msgpair_at_leaf,
-                      NULL);
+                      s_op->req->hints);
                   msg_p->comp_fn = tree_get_file_size_comp_fn;
                   break;
                 }

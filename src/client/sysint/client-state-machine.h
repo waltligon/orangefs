@@ -110,6 +110,10 @@ struct PINT_client_mkdir_sm
     PVFS_handle metafile_handle;
     int dirent_file_count;
     PVFS_handle *dirent_handle;
+
+    PINT_dist *dist;
+    PVFS_sys_layout layout;
+    int num_dirent_files;
 };
 
 struct PINT_client_symlink_sm

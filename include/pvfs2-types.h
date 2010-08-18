@@ -284,6 +284,37 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
+#define PVFS_DS_TYPE_COUNT      7
+
+#define PVFS_ds_type_to_int(__type, __intp)         \
+do {                                                \
+    uint32_t r = 0;                                 \
+    PVFS_ds_type t = __type;                        \
+    if( t == 0 )                                    \
+    {                                               \
+        *((uint32_t *)__intp) = 0;                  \
+    }                                               \
+    else                                            \
+    {                                               \
+        while( t >>=1 )                             \
+        {                                           \
+            r++;                                    \
+        }                                           \
+        *((uint32_t *)__intp) = r+1;                  \
+    }                                               \
+} while( 0 )
+
+#define int_to_PVFS_ds_type(__i, __typep)           \
+do {                                                \
+    if( __i == 0 )                                  \
+    {                                               \
+        *((PVFS_ds_type *)__typep) = 0;             \
+    }                                               \
+    else                                            \
+    {                                               \
+        *((PVFS_ds_type *)__typep) = 1 << (__i - 1);\
+    }                                               \
+} while(0)
 
 #ifdef __KERNEL__
 #include <linux/fs.h>

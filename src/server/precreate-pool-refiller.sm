@@ -108,11 +108,18 @@ static PINT_sm_action wait_for_threshold_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
 
+    PVFS_ds_type_to_int(s_op->u.precreate_pool_refiller.type, &index);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: pool handle %llu, type (%u), "
+                 "int (%d)\n", __func__, 
+                 llu(s_op->u.precreate_pool_refiller.pool_handle),
+                 s_op->u.precreate_pool_refiller.type, index);
     return(job_precreate_pool_check_level(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
-        user_opts->precreate_low_threshold,
+        user_opts->precreate_low_threshold[index],
 	smcb,
 	0,
 	js_p,
@@ -130,12 +137,14 @@ static PINT_sm_action store_handles_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index );
 
     return(job_precreate_pool_fill(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         s_op->u.precreate_pool_refiller.precreate_handle_array,
-        user_opts->precreate_batch_size,
+        user_opts->precreate_batch_size[index],
 	smcb,
 	0,
 	js_p,
@@ -157,6 +166,7 @@ static PINT_sm_action setup_batch_create_fn(
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_credentials creds;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
         s_op->u.precreate_pool_refiller.host,
@@ -176,12 +186,14 @@ static PINT_sm_action setup_batch_create_fn(
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
     PINT_util_gen_credentials(&creds);
 
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index );
+
     PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
         creds,
         s_op->u.precreate_pool_refiller.fsid,
-        PVFS_TYPE_DATAFILE,
-        user_opts->precreate_batch_size,
+        s_op->u.precreate_pool_refiller.type,
+        user_opts->precreate_batch_size[index],
         s_op->u.precreate_pool_refiller.data_handle_extent_array,
         NULL);
 
@@ -206,15 +218,21 @@ static PINT_sm_action setup_fn(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+    int index = 0;
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter, type %u\n", __func__,
+                 s_op->u.precreate_pool_refiller.type);
+
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
-        malloc(user_opts->precreate_batch_size * sizeof(PVFS_handle));
+        malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return(SM_ACTION_COMPLETE);
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__ );
     js_p->error_code = 0;
     return(SM_ACTION_COMPLETE);
 }

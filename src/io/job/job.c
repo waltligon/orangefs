@@ -79,6 +79,7 @@ struct precreate_pool
     char* host;
     PVFS_handle pool_handle;
     uint32_t pool_count; 
+    PVFS_ds_type pool_type;
 };
 
 struct fs_pool
@@ -4603,8 +4604,8 @@ static void precreate_pool_fill_thread_mgr_callback(
             {
                 pool->pool_count += jd->u.precreate_pool.posted_count;
                 gossip_debug(GOSSIP_JOB_DEBUG, 
-                    "Pool count for handle %llu incremented to %d\n", 
-                    llu(pool->pool_handle), 
+                    "Pool count for handle %llu (type %u) incremented to %d\n",
+                    llu(pool->pool_handle), pool->pool_type, 
                     pool->pool_count);
                 break;
             }
@@ -5426,6 +5427,7 @@ int job_precreate_pool_fill(
  */
 int job_precreate_pool_lookup_server(
     const char* host, 
+    PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle* pool_handle)
 {
@@ -5443,7 +5445,7 @@ int job_precreate_pool_lookup_server(
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
-        if(!strcmp(pool->host, host))
+        if(!strcmp(pool->host, host) && (pool->pool_type == type) )
         {
             *pool_handle = pool->pool_handle;
             gen_mutex_unlock(&precreate_pool_mutex);
@@ -5518,6 +5520,7 @@ void job_precreate_pool_set_index(
  
 int job_precreate_pool_register_server(
     const char* host, 
+    PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle pool_handle, 
     int count)
@@ -5543,14 +5546,15 @@ int job_precreate_pool_register_server(
 
     tmp_pool->pool_handle = pool_handle;
     tmp_pool->pool_count = count;
+    tmp_pool->pool_type = type;
     gossip_debug(GOSSIP_JOB_DEBUG, 
-        "Pool count for handle %llu initially set to %d\n", 
-        llu(tmp_pool->pool_handle), 
+        "Pool count for handle %llu (type %u) initially set to %d\n", 
+        llu(tmp_pool->pool_handle), tmp_pool->pool_type, 
         tmp_pool->pool_count);
 
     gossip_debug(GOSSIP_JOB_DEBUG,
-        "Initial pool count for host %s, fsid %d: %d\n", host, (int)fsid,
-        count);
+        "Initial pool count for host %s, fsid %d, type %u: %d\n", host, 
+        (int)fsid, tmp_pool->pool_type, count);
 
     /* search through file systems to see if we have registered anything for
      * this fsid yet 
@@ -5616,7 +5620,8 @@ int job_precreate_pool_check_level(
                 /* handle count is below the low threshold */
                 out_status_p->error_code = 0;
                 gen_mutex_unlock(&precreate_pool_mutex);
-                gossip_debug(GOSSIP_JOB_DEBUG, "found pool count low.\n");
+                gossip_debug(GOSSIP_JOB_DEBUG, "found pool count low for "
+                             "for pool handle %llu.\n", llu(pool->pool_handle));
                 return(1);
             }
             else
@@ -5639,7 +5644,8 @@ int job_precreate_pool_check_level(
 
                 qlist_add(&jd->job_desc_q_link, &precreate_pool_check_level_list);
                 gen_mutex_unlock(&precreate_pool_mutex);
-                gossip_debug(GOSSIP_JOB_DEBUG, "found pool count high.\n");
+                gossip_debug(GOSSIP_JOB_DEBUG, "found pool count high for pool "
+                             "handle %llu.\n", llu(pool->pool_handle) );
                 return(0);
             }
             break;
@@ -5662,6 +5668,7 @@ int job_precreate_pool_check_level(
 int job_precreate_pool_get_handles(
     PVFS_fs_id fsid,
     int count,
+    PVFS_ds_type type,
     const char** servers,
     PVFS_handle* handle_array,
     PVFS_ds_flags flags,
@@ -5681,6 +5688,12 @@ int job_precreate_pool_get_handles(
         return(1);
     }
 
+    /* TODO:
+     * check that a handle with batch size of 0 wasn't requested. we'll call it
+     * an einval since asking for a type guaranteed to have 0 handles doesn't
+     * make sense */
+    gossip_debug(GOSSIP_JOB_DEBUG, "%s: requesting %d handles of type %u\n",
+                 __func__, count, type);
     jd = alloc_job_desc(JOB_PRECREATE_POOL);
     if (!jd)
     {
@@ -5698,6 +5711,7 @@ int job_precreate_pool_get_handles(
     jd->u.precreate_pool.servers = servers;
     jd->u.precreate_pool.trove_pending = 0;
     jd->u.precreate_pool.flags = flags;
+    jd->u.precreate_pool.type = type;
 
     /* rotate to use a different starting server in the pool next time */
     gen_mutex_lock(&precreate_pool_mutex);
@@ -5731,7 +5745,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     struct qlist_head* iterator;
     struct qlist_head* scratch;
     struct job_desc* jd_checker;
-    int i;
+    int i, total_pool_count=0, j=0;
     struct fs_pool* fs;
 
     gossip_debug(GOSSIP_JOB_DEBUG, "precreate_pool_get_handles_try_post\n");
@@ -5746,7 +5760,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
-        if(pool->pool_count < 1)
+        /* only queue up for the type the call is looking for. no reason to
+         * to wait on a type we don't need. it should get filled later */
+        if((pool->pool_count < 1) && 
+           (jd->u.precreate_pool.type == pool->pool_type) )
         {
             /* queue up until the count for this pool increases */
             qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
@@ -5794,7 +5811,11 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             {
                 pool = qlist_entry(iterator, struct precreate_pool,
                     list_link);
-                if(!strcmp(pool->host, jd->u.precreate_pool.servers[i]))
+                /* in addition to matching host name, now we also make
+                 * sure it's the correct type of pool for the specified
+                 * server */
+                if( (!strcmp(pool->host, jd->u.precreate_pool.servers[i])) &&
+                    (pool->pool_type == jd->u.precreate_pool.type) )
                 {
                     jd->u.precreate_pool.current_pool = iterator;
                     break;
@@ -5822,7 +5843,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         }
         else
         {
-            /* caller wants whatever we hand out */
+            /* caller wants whatever we hand out so we only need to check
+             * that the pool is of the correct type. use the original code
+             * to either start the process or move to the next. afterwards,
+             * we cycle until we get to the right type */
             if(jd->u.precreate_pool.current_pool == NULL ||
                 jd->u.precreate_pool.current_pool->next == &fs->precreate_pool_list)
             {
@@ -5835,11 +5859,58 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
                 jd->u.precreate_pool.current_pool =
                     jd->u.precreate_pool.current_pool->next;
             }
+
+            /* ensure we don't loop forever, we want to look through at most
+             * total_pool_count pools no matter the place in the list we start
+             * at. if we don't find a pool, then there isn't a pool with the
+             * requested type. we'll call that einval below.*/
+            j = 0;
+            total_pool_count = qlist_count( &fs->precreate_pool_list );
+            gossip_debug( GOSSIP_SERVER_DEBUG, "%s: total pool count %d\n",
+                         __func__, total_pool_count);
+
+            /* maybe too succinct? get the pool entry from the qlist, then
+             * if we haven't looked through too many items and we actually
+             * got a pool item, see if it matches types. if not, assign the next
+             * pool and do it again. */
+            do
+            {
+                pool = qlist_entry(jd->u.precreate_pool.current_pool, 
+                                   struct precreate_pool, list_link);
+            }
+            while( ( j++ < total_pool_count ) && ( pool != NULL ) && 
+                   ( pool->pool_type != jd->u.precreate_pool.type ) && 
+                   ( jd->u.precreate_pool.current_pool = 
+                     jd->u.precreate_pool.current_pool->next) );
+
+            /* either we got something null, we iterated through pool count 
+             * items or, hopefully, we found a pool of the correct type!
+             * check here to make sure, if not exit */
+            if(pool->pool_type != jd->u.precreate_pool.type)
+            {
+                gossip_err("Error %s : could not find pool of "
+                           "type %u\n", __func__, jd->u.precreate_pool.type);
+
+                free(tmp_trove_array);
+                gen_mutex_unlock(&precreate_pool_mutex);
+
+                gen_mutex_lock(&completion_mutex);        
+                jd->u.precreate_pool.error_code = -PVFS_EINVAL;
+                job_desc_q_add(completion_queue_array[jd->context_id], jd);
+                jd->completed_flag = 1;
+        #ifdef __PVFS2_JOB_THREADED__
+                /* wake up anyone waiting for completion */
+                pthread_cond_signal(&completion_cond);
+        #endif
+                gen_mutex_unlock(&completion_mutex);        
+                return;
+            }
         }
 
         tmp_trove_array[i].pool = qlist_entry(jd->u.precreate_pool.current_pool, 
             struct precreate_pool, list_link);
-
+        gossip_debug(GOSSIP_JOB_DEBUG, "%s: trove_array[%d].pool = %p\n",
+                     __func__, i, tmp_trove_array[i].pool);
         tmp_trove_array[i].jd = jd;
         tmp_trove_array[i].pos = PVFS_ITERATE_START;
         tmp_trove_array[i].count = 1;
@@ -5858,8 +5929,9 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         /* go ahead and decrement count to avoid races with other consumers */
         tmp_trove_array[i].pool->pool_count--;
         gossip_debug(GOSSIP_JOB_DEBUG, 
-            "Pool count for handle %llu decremented to %d\n", 
+            "Pool count for handle %llu (type %u) decremented to %d\n", 
             llu(tmp_trove_array[i].pool->pool_handle), 
+            tmp_trove_array[i].pool->pool_type,
             tmp_trove_array[i].pool->pool_count);
 
         /* is anyone waiting to check the count of this pool? */
@@ -5933,6 +6005,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
  * similar to the trove iterate handles function, but returns all handles
  * stored in the precreate pools, including the handles for the pool objects
  * themselves.
+ *
+ * mtmoore: todo: see how this is used and how we can expose type info here
  */
 int job_precreate_pool_iterate_handles(
     PVFS_fs_id fsid,
