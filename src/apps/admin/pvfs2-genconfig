@@ -211,8 +211,8 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
-    print $target "\tPrecreateBatchSize 512\n";
-    print $target "\tPrecreateLowThreshold 256\n";
+    print $target "\tPrecreateBatchSize 0,32,512,32,32,32,0\n";
+    print $target "\tPrecreateLowThreshold 0,16,256,16,16,16,0\n";
 
     if(defined($default_storage))
     {
