@@ -195,7 +195,7 @@ static PINT_sm_action mgmt_remove_dirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[0],
         sm_p->u.mgmt_remove_dirent.entry,
         sm_p->hints);
 

@@ -267,6 +267,25 @@ PVFS_dist_dir_hash_type PINT_encrypt_dirdata(const char *const name)
 	return *hash_val;
 }
 
+
+
+/* set server_no field and update branch_level if necessary */
+int PINT_dist_dir_set_serverno(const int server_no, 
+	PVFS_dist_dir_attr *ddattr, 
+	PVFS_dist_dir_bitmap ddbitmap)
+{
+	assert(ddattr != NULL && 
+			ddbitmap != NULL &&
+			server_no >= -1 &&
+			server_no < ddattr->num_servers);
+
+	ddattr->server_no = server_no;
+	
+	ddattr->branch_level = dist_dir_calc_branch_level(ddattr, ddbitmap);
+
+        return 0;
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

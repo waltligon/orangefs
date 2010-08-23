@@ -431,7 +431,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[0],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 

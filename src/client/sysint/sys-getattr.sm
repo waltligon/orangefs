@@ -635,32 +635,34 @@ static int getattr_object_getattr_comp_fn(
         {
             uint32_t dirent_file_count_i;
 
+            /* !!! change more later */
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "getattr comp_fn [%p] "
                 "dfile_count = %d "
                 "dist_name_len = %d "
                 "dist_params_len = %d "
                 "dirent_count = %llu "
-                "dirent_file_count = %d\n",
+                "dirdata_server_count = %d\n",
                 attr,
                 attr->u.dir.hint.dfile_count,
                 attr->u.dir.hint.dist_name_len,
                 attr->u.dir.hint.dist_params_len,
                 llu(attr->u.dir.dirent_count),
-                attr->u.dir.dirent_file_count);
+                attr->u.dir.dist_dir_attr.num_servers);
 /*
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "    dirent_handle = %llu\n",
                 llu(attr->u.dir.dirent_handle));
 */
 
+            /* !!! change more later */
             for (dirent_file_count_i = 0;
-                 dirent_file_count_i < attr->u.dir.dirent_file_count;
+                 dirent_file_count_i < attr->u.dir.dist_dir_attr.num_servers;
                  dirent_file_count_i++) {
                 gossip_debug(GOSSIP_CLIENT_DEBUG,
-                    "    dirent_handle[%d] = %llu\n",
+                    "    dirdata_handle[%d] = %llu\n",
                     dirent_file_count_i,
-                    llu(attr->u.dir.dirent_handle[dirent_file_count_i]));
+                    llu(attr->u.dir.dirdata_handles[dirent_file_count_i]));
             }
 
             return 0;

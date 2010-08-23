@@ -108,9 +108,14 @@ struct PINT_client_mkdir_sm
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
-    int dirent_file_count;
-    PVFS_handle *dirent_handle;
 
+    /* store the dist-dir-struct of the parent directory */
+    /* distributed directory parameters */
+    PVFS_dist_dir_attr dist_dir_attr;
+    PVFS_dist_dir_bitmap dist_dir_bitmap;
+    PVFS_handle *dirdata_handles;
+
+    /* keep first */
     PINT_dist *dist;
     PVFS_sys_layout layout;
     int num_dirent_files;

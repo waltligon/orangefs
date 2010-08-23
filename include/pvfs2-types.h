@@ -509,21 +509,30 @@ typedef struct {
 	/* global info */
 	int32_t tree_height; /* ceil(log2(num_servers)) */
 	int32_t num_servers; /* total number of servers */
-	int32_t bitmap_size; /* number of bytes of the bitmap tree stored under the key DIST_DIR_BITMAP,
-	should be a multiple of 4*/
+	int32_t bitmap_size; /* number of PVFS_dist_dir_bitmap_basetype stored under the key DIST_DIR_BITMAP */
 	int32_t split_size; /* maximum number of entries before a split */
 
 	/* local info */
 	int32_t server_no; /* 0 to num_servers-1, indicates which server is running this code */
 	int32_t branch_level; /* level of branching on this server */
 } PVFS_dist_dir_attr;
+endecode_fields_6(
+    PVFS_dist_dir_attr,
+    int32_t, tree_height,
+    int32_t, num_servers,
+    int32_t, bitmap_size,
+    int32_t, split_size,
+    int32_t, server_no,
+    int32_t, branch_level);
 
-/* bitmap type */
 typedef uint32_t PVFS_dist_dir_bitmap_basetype;
-typedef uint32_t* PVFS_dist_dir_bitmap;
+typedef uint32_t *PVFS_dist_dir_bitmap;
 typedef uint64_t PVFS_dist_dir_hash_type;
 
-
+#define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
+#define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
+#define encode_PVFS_dist_dir_hash_type encode_uint64_t
+#define decode_PVFS_dist_dir_hash_type decode_uint64_t
 
 /** Predefined server parameters that can be manipulated at run-time
  *  through the mgmt interface.

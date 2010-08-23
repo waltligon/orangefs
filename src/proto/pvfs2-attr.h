@@ -184,22 +184,31 @@ endecode_fields_7(PVFS_directory_hint,
 struct PVFS_directory_attr_s
 {
     /* list of files to hold directory entries */
-    PVFS_handle *dirent_handle;
-    uint32_t dirent_file_count;
+    /* 
+    PVFS_handle *dirent_handle; 
+    uint32_t dirent_file_count; 
+    */
     PVFS_size dirent_count;
     PVFS_directory_hint hint;
+
+    /* distributed directory parameters */
+    PVFS_dist_dir_attr dist_dir_attr;
+    PVFS_dist_dir_bitmap dist_dir_bitmap;
+    PVFS_handle *dirdata_handles;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_directory_attr(pptr, x) do { \
-    int dirent_files_i;\
-    encode_uint32_t(pptr, &(x)->dirent_file_count);\
-    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
-        encode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
-    encode_skip4(pptr,);\
+    int index_i;\
     encode_PVFS_size(pptr, &(x)->dirent_count);\
     encode_PVFS_directory_hint(pptr, &(x)->hint);\
+    encode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
+    for (index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+        encode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
+    encode_skip4(pptr,);\
+    for (index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+        encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
 
 #if 0
@@ -210,17 +219,19 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 #endif
 
 #define decode_PVFS_directory_attr(pptr, x) do { \
-    int dirent_files_i;\
-    decode_uint32_t(pptr, &(x)->dirent_file_count);\
-    (x)->dirent_handle = decode_malloc((x)->dirent_file_count \
-      * sizeof(*(x)->dirent_handle));\
-    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
-    { \
-        decode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
-    } \
-    decode_skip4(pptr,);\
+    int index_i;\
     decode_PVFS_size(pptr, &(x)->dirent_count);\
     decode_PVFS_directory_hint(pptr, &(x)->hint);\
+    decode_PVFS_dist_dir_attr(pptr, &(x)->dist_dir_attr);\
+    (x)->dist_dir_bitmap = decode_malloc((x)->dist_dir_attr.bitmap_size * \
+        sizeof(PVFS_dist_dir_bitmap_basetype));\
+    for(index_i=0; index_i<(x)->dist_dir_attr.bitmap_size; index_i++)\
+        decode_PVFS_dist_dir_bitmap_basetype(pptr, &(x)->dist_dir_bitmap[index_i]);\
+    decode_skip4(pptr,);\
+    (x)->dirdata_handles = decode_malloc((x)->dist_dir_attr.num_servers * \
+        sizeof(*(x)->dirdata_handles));\
+    for(index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
+        decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
 #endif
 

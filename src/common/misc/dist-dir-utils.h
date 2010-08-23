@@ -37,15 +37,6 @@
 /* dummy value of split size for now */
 #define PVFS_DIST_DIR_MAX_ENTRIES 16000
 
-/* set a fixed value for testing */
-#define PVFS_DIST_DIR_DEFAULT_TOTAL_DIRDATA_NUM 4
-#define PVFS_DIST_DIR_DEFAULT_INITIAL_DIRDATA_NUM 4
-
-
-static double my_log2(const double n);
-static int dist_dir_calc_branch_level(
-        const PVFS_dist_dir_attr *dist_dir_attr,
-        const PVFS_dist_dir_bitmap bitmap);
 int PINT_init_dist_dir_state(
 		PVFS_dist_dir_attr *dist_dir_attr, 
 		PVFS_dist_dir_bitmap *bitmap_ptr,
@@ -65,8 +56,20 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 		const PVFS_dist_dir_attr *from_dir_attr, 
 		const PVFS_dist_dir_bitmap from_dir_bitmap);
 PVFS_dist_dir_hash_type PINT_encrypt_dirdata(const char *const name);
+int PINT_dist_dir_set_serverno(const int server_no, 
+	PVFS_dist_dir_attr *ddattr, 
+	PVFS_dist_dir_bitmap ddbitmap);
 
-
+#define PINT_dist_dir_attr_copyto(to_attr, from_attr) \
+do { \
+	to_attr.tree_height = from_attr.tree_height; \
+	to_attr.num_servers = from_attr.num_servers; \
+	to_attr.bitmap_size = from_attr.bitmap_size; \
+	to_attr.split_size = from_attr.split_size; \
+	to_attr.server_no = from_attr.server_no; \
+	to_attr.branch_level = from_attr.branch_level; \
+} while(0)
+	
 
 
 #endif /* __DIST_DIR_UTILS_H */

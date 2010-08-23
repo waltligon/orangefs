@@ -305,7 +305,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirent_handle[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[0],
         sm_p->u.remove.object_name,
         sm_p->hints);
 
@@ -372,8 +372,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
     assert(attr);
 
     /* TODO: Need to find the correct dirent_handle */
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirent_handle: %llu\n",
-        llu(attr->u.dir.dirent_handle[0]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata_handle: %llu\n",
+        llu(attr->u.dir.dirdata_handles[0]));
  
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -384,7 +384,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
-        attr->u.dir.dirent_handle[0],
+        attr->u.dir.dirdata_handles[0],
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 

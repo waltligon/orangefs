@@ -748,6 +748,15 @@ struct PVFS_servreq_mkdir
       a single extent with first = last should be used.
     */
     PVFS_handle_extent_array handle_extent_array;
+
+    /* NOTE: not using these now, may add these fields upon discussion */
+    /* distributed directory request parameters */
+    /*
+       uint32_t num_total_dirdata_servers;
+       uint32_t num_initial_dirdata_servers;
+       */
+        
+    /* assume all num_dirent_files are active */
     int32_t num_dirent_files_req;
     /* NOTE: leave layout as final field so that we can deal with encoding
      * errors */

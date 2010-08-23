@@ -25,6 +25,7 @@
 #include "pvfs2-debug.h"
 #include <src/common/misc/pvfs2-internal.h>  /* lld(), llu() */
 #include "pvfs2-req-proto.h"
+#include "dist-dir-utils.h"
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -128,8 +129,14 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
         if (src->mask & PVFS_ATTR_DIR_DIRENT_FILES)
         {
+            PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr, src->u.dir.dist_dir_attr);
+            dest->u.dir.dist_dir_bitmap = src->u.dir.dist_dir_bitmap;
+            dest->u.dir.dirdata_handles = src->u.dir.dirdata_handles;
+
+            /*
             dest->u.dir.dirent_file_count = src->u.dir.dirent_file_count;
             dest->u.dir.dirent_handle = src->u.dir.dirent_handle;
+            */
 /*
             PVFS_size dirent_file_array_size = src->u.dir.dirent_file_count *
                 sizeof(PVFS_handle);
@@ -384,10 +391,15 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             }
             if (attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
             {
-                if (attr->u.dir.dirent_handle)
+                if (attr->u.dir.dist_dir_bitmap)
                 {
-                    free(attr->u.dir.dirent_handle);
-                    attr->u.dir.dirent_handle = NULL;
+                    free(attr->u.dir.dist_dir_bitmap);
+                    attr->u.dir.dist_dir_bitmap = NULL;
+                }
+                if (attr->u.dir.dirdata_handles)
+                {
+                    free(attr->u.dir.dirdata_handles);
+                    attr->u.dir.dirdata_handles = NULL;
                 }
             }
         }

@@ -171,9 +171,8 @@ enum
     METAFILE_LAYOUT_KEY  = 5,
     NUM_DFILES_REQ_KEY   = 6,
     DIST_DIR_ATTR_KEY	 = 7,
-    DIST_DIRDATA_HANDLES = 8,
-    DIST_DIRDATA_BITMAP	 = 9,
-    NUM_DIR_ENT_KEYS     =10
+    DIST_DIRDATA_HANDLES_KEY = 8,
+    DIST_DIRDATA_BITMAP_KEY	 = 9
 };
 
 /* optional; user-settable keys */
@@ -530,15 +529,25 @@ struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
-    PVFS_handle *dirent_handle;
-//    PVFS_handle *handle_array_local;
-//    PVFS_handle *handle_array_remote;
+    PVFS_size init_dirdata_size;
+
+    /* dist-dir-struct  
+     * not in resp, only return meta handle 
+     * should be in attr up-level, PINT_server_op*/
+
+    /* inherit from create_op */
+    /* not using these right now
+    const char **dirdata_servers;
+    const char **remote_dirdata_servers;
+    */
+    int num_dirdata_servers;
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
     int handle_array_local_count;
     int handle_array_remote_count;
-//    const char **meta_servers;
-//    const char **remote_meta_servers;
-    int num_meta_servers;
-    PVFS_size init_dirdata_size;
+    PVFS_error saved_error_code;
+    int handle_index;
+	
 };
 
 struct PINT_server_getattr_op
@@ -549,8 +558,10 @@ struct PINT_server_getattr_op
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
+    /* store them in resp.u.getattr.attr.u.dir
     int32_t num_dirent_handles;
     PVFS_handle *dirent_handle;
+    */
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
 };
