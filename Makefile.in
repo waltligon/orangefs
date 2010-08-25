@@ -187,7 +187,7 @@ SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LIBS += -lpvfs2 @LIBS@ 
+LIBS += -lpvfs2 -lm @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
@@ -984,6 +984,7 @@ distclean: cleaner docsclean
 	rm -f Makefile pvfs2-config.h
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
+	rm -f config.save include/pvfs2.h
 ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
 endif
