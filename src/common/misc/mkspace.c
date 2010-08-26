@@ -25,6 +25,7 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "dist-dir-utils.h"
 
 static char *lost_and_found_string = "lost+found";
 
@@ -121,19 +122,28 @@ int pvfs2_mkspace(
     int create_collection_only,
     int verbose)
 {
-    int ret = - 1, count = 0;
+    int ret = - 1, count = 0, keyval_count, i;
     TROVE_op_id op_id;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
+    TROVE_keyval_s *key_a = NULL, *val_a = NULL;
     TROVE_ds_attributes_s attr;
     TROVE_handle_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
-    char *merged_handle_ranges = NULL;
+    char *merged_handle_ranges = NULL, *c = NULL;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
+
+    /* distributed directory parameters */
+    PVFS_dist_dir_attr meta_dist_dir_attr;
+    PVFS_dist_dir_attr dirdata_dist_dir_attr;
+    PVFS_dist_dir_bitmap dist_dir_bitmap;
+    /* only one dirdata_handle for root and lost_and_found, not using arrays
+    PVFS_handle *dirdata_handles;
+    */
 
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
@@ -415,13 +425,102 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
-        key.buffer = DIRECTORY_ENTRY_KEYSTR;
-        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
-        val.buffer = &root_dirdata_handle;
-        val.buffer_sz = sizeof(TROVE_handle);
+        /* !!! set dist-dir-struct keyvals for root handle and its dirdata handle */
+        /* init meta handle dist_dir_struct, num_servers=1, server_no = -1, pre_dsg_num_server=1 */
+        /* should be reusable when init lost+found */
+        ret = PINT_init_dist_dir_state(&meta_dist_dir_attr,
+                &dist_dir_bitmap, 1, -1, 1);
+        assert(ret == 0);
 
-        ret = trove_keyval_write(
-            coll_id, new_root_handle, &key, &val, 
+        /* gossip dist_dir_attr and dist_dir_bitmap */
+        mkspace_print(verbose, "info: init dist_dir_attr for root handle %llu: \n"
+                "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                "split_size=%d, server_no=%d and branch_level=%d\n",
+                llu(new_root_handle),
+                meta_dist_dir_attr.tree_height,
+                meta_dist_dir_attr.num_servers,
+                meta_dist_dir_attr.bitmap_size,
+                meta_dist_dir_attr.split_size,
+                meta_dist_dir_attr.server_no,
+                meta_dist_dir_attr.branch_level);
+        mkspace_print(verbose, "info: init dist_dir_bitmap as:\n");
+        for(i = meta_dist_dir_attr.bitmap_size - 1;
+                i >= 0 ; i--)
+        {
+            c = (char *)&dist_dir_bitmap[i];
+            gossip_debug(GOSSIP_MKDIR_DEBUG,
+                    " %02x %02x %02x %02x",
+                    c[0],c[1],c[2],c[3]);
+        }
+        mkspace_print(verbose, "\n");
+
+        /* init dirdata_dist_dir_attr */
+        PINT_dist_dir_attr_copyto(dirdata_dist_dir_attr, meta_dist_dir_attr);
+        PINT_dist_dir_set_serverno(0, &dirdata_dist_dir_attr, dist_dir_bitmap);
+
+        mkspace_print(verbose, "info: init dist_dir_attr for root dirdata handle %llu: \n"
+                "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                "split_size=%d, server_no=%d and branch_level=%d\n",
+                llu(root_dirdata_handle),
+                dirdata_dist_dir_attr.tree_height,
+                dirdata_dist_dir_attr.num_servers,
+                dirdata_dist_dir_attr.bitmap_size,
+                dirdata_dist_dir_attr.split_size,
+                dirdata_dist_dir_attr.server_no,
+                dirdata_dist_dir_attr.branch_level);
+
+        keyval_count = 3;
+
+        key_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
+        if(!key_a)
+        {
+            gossip_err("keyval space create (for root and lost+found storage) failed.\n");
+            return -1;
+        }
+        memset(key_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
+
+        val_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
+        if(!val_a)
+        {
+            free(key_a);
+            gossip_err("keyval space create (for root and lost+found storage) failed.\n");
+            return -1;
+        }
+        memset(val_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
+
+        /* set keyval for root meta handle */
+        key_a[0].buffer = DIST_DIR_ATTR_KEYSTR;
+        key_a[0].buffer_sz = DIST_DIR_ATTR_KEYLEN;
+
+        val_a[0].buffer = &meta_dist_dir_attr;
+        val_a[0].buffer_sz =
+            sizeof(meta_dist_dir_attr);
+
+        key_a[1].buffer = DIST_DIRDATA_BITMAP_KEYSTR;
+        key_a[1].buffer_sz = DIST_DIRDATA_BITMAP_KEYLEN;
+
+        val_a[1].buffer_sz =
+            meta_dist_dir_attr.bitmap_size *  /* bitmap_size = 1 */
+            sizeof(PVFS_dist_dir_bitmap_basetype);
+        val_a[1].buffer = dist_dir_bitmap;
+
+        key_a[2].buffer = DIST_DIRDATA_HANDLES_KEYSTR;
+        key_a[2].buffer_sz = DIST_DIRDATA_HANDLES_KEYLEN;
+
+        val_a[2].buffer = &root_dirdata_handle; /* only one dirdata server */
+        val_a[2].buffer_sz = meta_dist_dir_attr.num_servers * 
+            sizeof(root_dirdata_handle);
+
+        mkspace_print(verbose, 
+                " info: writing dist-dir-struct keyvals for root handle: %llu "
+                " with server_no=%d and branch_level=%d \n", 
+                llu(new_root_handle),
+                meta_dist_dir_attr.server_no,
+                meta_dist_dir_attr.branch_level);
+
+        /* write to root meta handle keyval space */
+        ret = trove_keyval_write_list(
+            coll_id, new_root_handle, key_a, val_a, keyval_count,
             TROVE_SYNC, 0, NULL,
             trove_context, &op_id, NULL);
 
@@ -436,6 +535,37 @@ int pvfs2_mkspace(
         {
             gossip_err("error: keyval write for handle used to store "
                        "dirents failed; aborting!\n");
+            return -1;
+        }
+
+
+        /* adjust dist_dir_attr val_a */
+        val_a[0].buffer = &dirdata_dist_dir_attr;
+        
+        mkspace_print(verbose, 
+                " info: writing dist-dir-struct keyvals for root dirdata handle: %llu "
+                " with server_no=%d and branch_level=%d \n", 
+                llu(root_dirdata_handle),
+                dirdata_dist_dir_attr.server_no,
+                dirdata_dist_dir_attr.branch_level);
+
+        /* write to root dirdata handle keyval space */
+        ret = trove_keyval_write_list(
+            coll_id, root_dirdata_handle, key_a, val_a, keyval_count,
+            TROVE_SYNC, 0, NULL,
+            trove_context, &op_id, NULL);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: dist-dir-struct keyval write for root dirdata handle "
+                       "failed; aborting!\n");
             return -1;
         }
 
@@ -566,15 +696,27 @@ int pvfs2_mkspace(
             "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
-        key.buffer = DIRECTORY_ENTRY_KEYSTR;
-        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
-        val.buffer = &lost_and_found_dirdata_handle;
-        val.buffer_sz = sizeof(TROVE_handle);
+        /* set dist-dir-struct keyvals for lost+find handle and its dirdata handle 
+         * use 1 dirdata server now, just as root handle
+         * */
 
-        ret = trove_keyval_write(
-            coll_id, lost_and_found_handle, &key, &val, 
-            TROVE_SYNC,
-            0, NULL, trove_context, &op_id, NULL);
+        /* adjust keyval values, others should be the same as the root handle */
+        val_a[0].buffer = &meta_dist_dir_attr;
+        val_a[2].buffer = &lost_and_found_dirdata_handle;
+        /* bitmap should be the same as the root handle for now */
+
+        mkspace_print(verbose, 
+                " info: writing dist-dir-struct keyvals for lost+found handle: %llu "
+                " with server_no=%d and branch_level=%d \n", 
+                llu(lost_and_found_handle),
+                meta_dist_dir_attr.server_no,
+                meta_dist_dir_attr.branch_level);
+
+        /* write to lost+found meta handle keyval space */
+        ret = trove_keyval_write_list(
+            coll_id, lost_and_found_handle, key_a, val_a, keyval_count,
+            TROVE_SYNC, 0, NULL,
+            trove_context, &op_id, NULL);
 
         while (ret == 0)
         {
@@ -587,6 +729,36 @@ int pvfs2_mkspace(
         {
             gossip_err("error: keyval write for handle used to store "
                        "dirents failed; aborting!\n");
+            return -1;
+        }
+
+        /* adjust dist_dir_attr val */
+        val_a[0].buffer = &dirdata_dist_dir_attr;
+
+        mkspace_print(verbose, 
+                " info: writing dist-dir-struct keyvals for lost+found dirdata handle: %llu "
+                " with server_no=%d and branch_level=%d \n", 
+                llu(lost_and_found_dirdata_handle),
+                dirdata_dist_dir_attr.server_no,
+                dirdata_dist_dir_attr.branch_level);
+
+        /* write to lost+found dirdata handle keyval space */
+        ret = trove_keyval_write_list(
+                coll_id, lost_and_found_dirdata_handle, key_a, val_a, keyval_count,
+                TROVE_SYNC, 0, NULL,
+                trove_context, &op_id, NULL);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                    coll_id, op_id, trove_context, &count, NULL, NULL,
+                    &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: dist-dir-struct keyval write for lost+found dirdata handle "
+                    "failed; aborting!\n");
             return -1;
         }
 
@@ -637,6 +809,12 @@ int pvfs2_mkspace(
                   "\troot handle = %llu, coll id = %d, "
                   "root string = \"%s\"\n",
                   llu(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
+
+    /* free space */
+    free(dist_dir_bitmap);
+    free(key_a);
+    free(val_a);
+
     return 0;
 }
 

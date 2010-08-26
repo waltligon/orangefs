@@ -239,6 +239,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
+    /* !!! may use tree comm to gather all dirent */
     /* TODO: Need to find the correct dirent_handle */
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "%llu|%llu|%d | token is %llu | limit is %d\n",

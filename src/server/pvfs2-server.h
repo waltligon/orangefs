@@ -171,8 +171,8 @@ enum
     METAFILE_LAYOUT_KEY  = 5,
     NUM_DFILES_REQ_KEY   = 6,
     DIST_DIR_ATTR_KEY	 = 7,
-    DIST_DIRDATA_HANDLES_KEY = 8,
-    DIST_DIRDATA_BITMAP_KEY	 = 9
+    DIST_DIRDATA_BITMAP_KEY	 = 8,
+    DIST_DIRDATA_HANDLES_KEY = 9
 };
 
 /* optional; user-settable keys */

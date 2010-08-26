@@ -239,6 +239,8 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
     int ret = -1;
+    char *c;
+    int i;
 
     attr = (&s_op->attr);
 
@@ -271,7 +273,18 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
             attr->u.dir.dist_dir_attr.server_no,
             attr->u.dir.dist_dir_attr.branch_level);
 
-    /* !!! gossip bitmap */
+    /* gossip bitmap, may adjust later */
+    gossip_debug(GOSSIP_MKDIR_DEBUG,
+            "mkdir: Init dist_dir_bitmap as:\n");
+    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {
+        c = (char *)&attr->u.dir.dist_dir_bitmap[i];
+        gossip_debug(GOSSIP_MKDIR_DEBUG,
+                " %02x %02x %02x %02x",
+                c[0],c[1],c[2],c[3]);
+    }
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "\n");
 
     /* allocate dirdata handle space, similar to create.sm */
     attr->u.dir.dirdata_handles = malloc(
@@ -487,6 +500,7 @@ static PINT_sm_action mkdir_write_keyval_to_local_dirdata_handle(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(s_op->key_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
 
     s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->val_a)

@@ -24,6 +24,8 @@
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "dist-dir-utils.h"
+
 
 /*
   PVFS_{i}sys_remove takes the following steps:
@@ -287,6 +289,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
@@ -296,23 +300,37 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.remove.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* TODO: Need to find the correct dirent_handle */
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->u.remove.object_name,
         sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-                 "under %llu,%d\n", sm_p->u.remove.object_name,
+                 "under %llu,%d from dirdata server %llu\n", sm_p->u.remove.object_name,
                  llu(sm_p->parent_ref.handle),
-                 sm_p->parent_ref.fs_id);
+                 sm_p->parent_ref.fs_id,
+                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index])
+                 );
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;
@@ -360,6 +378,8 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
     PVFS_object_attr *attr = NULL;
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
@@ -371,9 +391,21 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
-    /* TODO: Need to find the correct dirent_handle */
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata_handle: %llu\n",
-        llu(attr->u.dir.dirdata_handles[0]));
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.remove.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.remove.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove: dirdata_handle: %llu\n",
+        llu(attr->u.dir.dirdata_handles[dirdata_server_index]));
  
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -384,16 +416,18 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
-        attr->u.dir.dirdata_handles[0],
+        attr->u.dir.dirdata_handles[dirdata_server_index],
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%llu,%d) "
-                 "under %llu,%d\n", sm_p->u.remove.object_name,
+                 "under %llu,%d with dirdata %llu\n", sm_p->u.remove.object_name,
                  llu(sm_p->object_ref.handle),
                  sm_p->object_ref.fs_id,
                  llu(sm_p->parent_ref.handle),
-                 sm_p->parent_ref.fs_id);
+                 sm_p->parent_ref.fs_id,
+                 llu(attr->u.dir.dirdata_handles[dirdata_server_index])
+                 );
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;

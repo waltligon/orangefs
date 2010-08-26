@@ -24,6 +24,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -185,8 +186,24 @@ static int mgmt_create_dirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     js_p->error_code = 0;
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.mgmt_create_dirent.entry);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.mgmt_create_dirent.entry,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -198,7 +215,6 @@ static int mgmt_create_dirent_setup_msgpair(
         llu(sm_p->u.mgmt_create_dirent.entry_handle),
         llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
 
-    /* TODO: Need to find the correct dirent_handle */
     /* TODO: Need to call PINT_free_object_attr? */
      PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -206,7 +222,7 @@ static int mgmt_create_dirent_setup_msgpair(
         sm_p->u.mgmt_create_dirent.entry,
         sm_p->u.mgmt_create_dirent.entry_handle,
         sm_p->parent_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 

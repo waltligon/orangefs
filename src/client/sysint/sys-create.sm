@@ -27,6 +27,7 @@
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-dist-varstrip.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -466,19 +467,34 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
-    /* TODO: Need to find the correct dirent_handle */
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.create.object_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.create.object_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create: %s: posting crdirent req: parent handle: %llu, "
-                 "name: %s, handle: %llu, dirent_handle: %llu\n",
+                 "name: %s, handle: %llu, dirdata_handle: %llu\n",
                  __func__,
                  llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
-                 llu(sm_p->u.create.metafile_handle), llu(sm_p->u.create.dirent_handle[0]));
+                 llu(sm_p->u.create.metafile_handle), 
+                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -489,7 +505,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->u.create.dirent_handle[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
@@ -696,6 +712,7 @@ static PINT_sm_action create_parent_getattr_inspect(
     }
         
     /* !!! need to talk to Elaine and revise this part, what to store in u.create */
+    /* may just use sm_p->getattr.attr.u.dir...
     sm_p->u.create.dirent_handle = malloc(
         sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
     if (!sm_p->u.create.dirent_handle)
@@ -706,6 +723,7 @@ static PINT_sm_action create_parent_getattr_inspect(
            attr->u.dir.dirdata_handles,
            sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
     sm_p->u.create.dirent_file_count = attr->u.dir.dist_dir_attr.num_servers;
+    */
 
     current_dist = sm_p->u.create.dist;
     /* We have an overriding distribution name for this directory.. honor that */

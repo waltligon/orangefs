@@ -23,6 +23,7 @@
 #include "pint-util.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -416,22 +417,39 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
 
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," symlink: posting crdirent req\n");
 
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(sm_p->u.sym.link_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.sym.link_name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink: dirdata_handle: %llu\n",
+        llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* TODO: Need to find the correct dirent_handle */
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[0],
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
