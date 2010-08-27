@@ -192,11 +192,11 @@ static PINT_sm_action setup_batch_create_fn(
         s_op->u.precreate_pool_refiller.fsid,
         s_op->u.precreate_pool_refiller.type,
         user_opts->precreate_batch_size[index],
-        s_op->u.precreate_pool_refiller.data_handle_extent_array,
+        s_op->u.precreate_pool_refiller.handle_extent_array,
         NULL);
 
     msg_p->fs_id = s_op->u.precreate_pool_refiller.fsid;
-    msg_p->handle = s_op->u.precreate_pool_refiller.data_handle_extent_array.extent_array[0].first;
+    msg_p->handle = s_op->u.precreate_pool_refiller.handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = batch_create_comp_fn;
 

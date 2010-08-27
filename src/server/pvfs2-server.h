@@ -471,7 +471,7 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_fs_id fsid;
     char* host;
     PVFS_BMI_addr_t host_addr;
-    PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_handle_extent_array handle_extent_array;
     PVFS_ds_type type;
 };
 

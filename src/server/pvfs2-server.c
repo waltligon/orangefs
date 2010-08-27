@@ -2247,6 +2247,7 @@ static int precreate_pool_initialize(int server_index)
     int server_type;
     int handle_count = 0;
     int fs_count = 0;
+    unsigned int types_to_pool = 0;
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
 
@@ -2282,9 +2283,9 @@ static int precreate_pool_initialize(int server_index)
             continue;
         }
 
-        /* how many I/O servers do we have? */
+        /* how many servers do we have? */
         ret = PINT_cached_config_count_servers(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL, &server_count);
         if(ret < 0)
         {
             gossip_err("Error: unable to count servers for fsid: %d\n", 
@@ -2302,7 +2303,7 @@ static int precreate_pool_initialize(int server_index)
 
         /* resolve addrs for each I/O server */
         ret = PINT_cached_config_get_server_array(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO,
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL,
             addr_array, &server_count);
         if(ret < 0)
         {
@@ -2319,10 +2320,44 @@ static int precreate_pool_initialize(int server_index)
             {
                 /* this is a peer server */
                 /* make sure a pool exists for that server,type, fsid pair */
-                for( j=0; j < PVFS_DS_TYPE_COUNT; j++ )
+
+                /* set ds type of handles to setup in the server's pool based
+                 * on the server type */
+                types_to_pool = PVFS_TYPE_NONE;
+                if( (server_type & PINT_SERVER_TYPE_IO) != 0 )
+                {
+                        types_to_pool |= PVFS_TYPE_DATAFILE; 
+                }
+                
+                if( (server_type & PINT_SERVER_TYPE_META) != 0 )
+                {
+                    types_to_pool |= (PVFS_TYPE_METAFILE | PVFS_TYPE_DIRECTORY |
+                                      PVFS_TYPE_SYMLINK | PVFS_TYPE_DIRDATA |
+                                      PVFS_TYPE_INTERNAL);
+                }
+
+                /* for each possible bit in the ds_type mask check if we should
+                 * create a pool for it */
+                for(j = 0; j < PVFS_DS_TYPE_COUNT; j++ )
                 {
                     PVFS_ds_type t;
                     int_to_PVFS_ds_type(j, &t);
+                    
+                    /* skip setting up a pool when it doesn't make sense i.e. 
+                     * when the remote host doesn't have handle types we want.
+                     * or in the special case that we don't get TYPE_NONE 
+                     * handles from  IO servers*/
+                    if(((t & types_to_pool) == 0 ) ||
+                       ((t == PVFS_TYPE_NONE) && 
+                        (server_type == PINT_SERVER_TYPE_IO)) )
+                    {
+                        continue;
+                    }
+
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
+                                 "%s, type: %u, fs_id: %llu, handle: %llu\n",
+                                 __func__, host, t, llu(cur_fs->coll_id), 
+                                 llu(pool_handle));
                     ret = precreate_pool_setup_server(host, t, 
                         cur_fs->coll_id, &pool_handle);
                     if(ret < 0)
@@ -2569,6 +2604,10 @@ static int precreate_pool_count(
  *    addr: the BMI addr of the remote host
  *    fsid: the filesystem ID of the fs the pool refiller is associated with
  *    pool_handle: the handle of the pool itself
+ *
+ *    This will only be called for a host/type that matches and needs a filler
+ *    so a remote server that is I/O only will only get refillers for datafile
+ *    handles.
  */
 static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
@@ -2605,9 +2644,13 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
         return(ret);
     }
 
-    ret = PINT_cached_config_get_server(
-        fsid, host, PINT_SERVER_TYPE_IO, 
-        &s_op->u.precreate_pool_refiller.data_handle_extent_array);
+    /* set this refillers handle range based on the type of handle it will 
+     * hold. If it's a datafile get an IO server range, otherwise get a meta
+     * range. */
+    ret = PINT_cached_config_get_server( fsid, host, 
+              ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
+                                              PINT_SERVER_TYPE_META),
+              &s_op->u.precreate_pool_refiller.handle_extent_array);
     if(ret < 0)
     {
         free(s_op->u.precreate_pool_refiller.host);
