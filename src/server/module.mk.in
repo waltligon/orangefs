@@ -6,6 +6,7 @@ ifdef BUILD_SERVER
 
         # automatically generated c files
         SERVER_SMCGEN := \
+		$(DIR)/pjmp-machines.c \
 		$(DIR)/setparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \

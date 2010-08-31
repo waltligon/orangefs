@@ -73,8 +73,8 @@ nested machine pvfs2_tree_remove_work_sm
     {
         pjmp tree_remove_setup
         {
-            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_remove_work_sm;
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_remove_work_sm;
         }
         default => tree_remove_work_cleanup;
     }
@@ -113,8 +113,8 @@ nested machine pvfs2_tree_get_file_size_work_sm
     {
         pjmp tree_get_file_size_setup
         {
-            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_get_attr_with_prelude_sm;
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_with_prelude_sm;
         }
         default => tree_get_file_size_work_cleanup;
     }

@@ -47,7 +47,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            success => pvfs2_get_attr_work_sm;
+            success => pvfs2_pjmp_get_attr_work_sm;
         }
         success => interpret_getattrs;
         default => final_response;
