@@ -1,0 +1,238 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ *
+ * Changes by Acxiom Corporation to add dirent_count field to attributes
+ * Copyright © Acxiom Corporation, 2005.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types.h"
+#include "pvfs2-types-debug.h"
+#include "pvfs2-util.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "pint-cached-config.h"
+
+%%
+machine pvfs2_pjmp_get_attr_work_sm
+{
+    state pjmp_get_attr_work_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_get_attr_work_sm;
+    }
+
+    state pjmp_call_get_attr_work_sm
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => pjmp_get_attr_work_execute_terminate;
+    }
+
+    state pjmp_get_attr_work_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
+
+machine pvfs2_pjmp_create_immutable_copies_sm
+{
+    state pjmp_create_immutable_copies_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_create_immutable_copies_sm;
+    }
+
+    state pjmp_call_create_immutable_copies_sm
+    {
+        jump pvfs2_create_immutable_copies_sm;
+        default => pjmp_create_immutable_copies_execute_terminate;
+    }
+
+    state pjmp_create_immutable_copies_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
+
+machine pvfs2_pjmp_mirror_work_sm
+{
+    state pjmp_mirror_work_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_mirror_work_sm;
+    }
+
+    state pjmp_call_mirror_work_sm
+    {
+        jump pvfs2_mirror_work_sm;
+        default => pjmp_mirror_work_execute_terminate;
+    }
+
+    state pjmp_mirror_work_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
+
+machine pvfs2_pjmp_remove_work_sm
+{
+    state pjmp_remove_work_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_remove_work_sm;
+    }
+
+    state pjmp_call_remove_work_sm
+    {
+        jump pvfs2_remove_work_sm;
+        default => pjmp_remove_work_execute_terminate;
+    }
+
+    state pjmp_remove_work_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    }
+}
+
+
+machine pvfs2_pjmp_get_attr_with_prelude_sm
+{
+    state pjmp_initialize
+    {
+        run pjmp_initialize;
+        default => pjmp_call_get_attr_with_prelude;
+    }
+
+    state pjmp_call_get_attr_with_prelude
+    {
+        jump pvfs2_get_attr_with_prelude_sm;
+        default => pjmp_execute_terminate;
+    }
+
+    state pjmp_execute_terminate
+    {
+        run pjmp_execute_terminate;
+        default => terminate;
+    } 
+}
+
+
+machine pvfs2_pjmp_call_msgpairarray_sm
+{
+   state call_msgpairarray
+    {
+        run call_msgpairarray;
+        success => transfer_msgpair;
+        default => cleanup_msgpairarray;
+    }
+
+   state transfer_msgpair
+    {
+         jump pvfs2_msgpairarray_sm;
+         default => cleanup_msgpairarray;
+    }
+
+   state cleanup_msgpairarray
+    {
+        run cleanup_msgpairarray;
+        default => terminate;
+    }
+} /*end state machine pvfs2_pjmp_call_msgpairarray_sm*/
+%%
+
+static PINT_sm_action pjmp_initialize( struct PINT_smcb *smcb
+                                     , job_status_s *js_p)
+{
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action pjmp_execute_terminate( struct PINT_smcb *smcb
+                                            , job_status_s *js_p)
+{
+    return SM_ACTION_TERMINATE;
+}
+
+/****************************************************************************/
+/* Actions for pvfs2_pjmp_call_msgpairarray_sm                              */
+/****************************************************************************/
+
+/*We use a separate nested state machine to call msgpairarray because */
+/*msgpairarray.sm is setup to work only with a "jump".  When "pjmp"   */
+/*is used, the frame stack gets corrupted.                            */
+static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
+                                        ,job_status_s *js_p)
+{   
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:"
+                                    "call_msgpairarray....\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tframe count is %d.\n",smcb->frame_count);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t base frame is %d.\n",smcb->base_frame);
+   struct PINT_server_op *mirror_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+   PINT_sm_msgarray_op *m_op = &(mirror_op->msgarray_op);
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op:%p\n",mirror_op);
+
+   js_p->error_code = 0;
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tm_op->msgpair.req.op:%d\n"
+                                    ,m_op->msgpair.req.op );
+
+   PINT_sm_push_frame(smcb,0,m_op);
+   
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAFTER PUSH:smcb->base_frame:%d"
+                                    "\tframe_count:%d\n"
+                                   ,smcb->base_frame,smcb->frame_count);
+
+   return SM_ACTION_COMPLETE;
+}/*end action call_msgpairarray*/
+
+static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
+                                           ,job_status_s *js_p)
+{   
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing IMM_COPIES:cleanup_msgpairarray"
+                                    "....\n");
+   struct PINT_server_op *mirror_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+   PINT_sm_msgarray_op *m_op = &(mirror_op->msgarray_op);
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op:%p\n",mirror_op);
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d\n"
+                                   ,js_p->error_code);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tBEFORE POP:smcb->frame_base:%d"
+                                    "\tframe_count:%d\n"
+                                   ,smcb->base_frame,smcb->frame_count);
+
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tm_op->msgpair.req.op:%d\n"
+                                    ,m_op->msgpair.req.op );
+
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op->resp.status:%d\n"
+                                   ,mirror_op->resp.status);
+
+   return SM_ACTION_TERMINATE;
+}/*end action cleanup_msgpairarray*/
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
