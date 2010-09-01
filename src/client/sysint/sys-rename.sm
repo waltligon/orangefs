@@ -758,7 +758,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
             js_p->error_code = -PVFS_EISDIR;
             return SM_ACTION_COMPLETE;
         }
-        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        if(sm_p->u.rename.types[0] == PVFS_TYPE_DIRECTORY)
         {
             js_p->error_code = -PVFS_ENOTDIR;
             return SM_ACTION_COMPLETE;

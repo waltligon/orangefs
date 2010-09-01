@@ -239,7 +239,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
     int ret = -1;
-    char *c;
+    unsigned char *c;
     int i;
 
     attr = (&s_op->attr);
@@ -279,10 +279,10 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
             i >= 0 ; i--)
     {
-        c = (char *)&attr->u.dir.dist_dir_bitmap[i];
+        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_MKDIR_DEBUG,
-                " %02x %02x %02x %02x",
-                c[0],c[1],c[2],c[3]);
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
     }
     gossip_debug(GOSSIP_MKDIR_DEBUG, "\n");
 
@@ -493,6 +493,8 @@ static PINT_sm_action mkdir_write_keyval_to_local_dirdata_handle(
 
     attr = &s_op->attr;
     PINT_dist_dir_attr_copyto(tmp_ddattr, attr->u.dir.dist_dir_attr);
+    /* local handle is the first handle, so has server_no=0 */
+    PINT_dist_dir_set_serverno(0, &tmp_ddattr, attr->u.dir.dist_dir_bitmap);
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
     if(!s_op->key_a)
@@ -533,8 +535,6 @@ static PINT_sm_action mkdir_write_keyval_to_local_dirdata_handle(
     s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
         sizeof(*attr->u.dir.dirdata_handles);
 
-    /* local handle is the first handle, so has server_no=0 */
-    PINT_dist_dir_set_serverno(0, &tmp_ddattr, attr->u.dir.dist_dir_bitmap);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, 
             " mkdir: writing dist-dir-struct keyvals for local dirdata handle: %llu "
