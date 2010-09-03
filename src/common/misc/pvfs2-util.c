@@ -1610,6 +1610,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_DIR_HINT;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_DISTDIR_ATTR)
+    {
+        attrmask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;

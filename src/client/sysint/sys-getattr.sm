@@ -1384,7 +1384,7 @@ static PINT_sm_action getattr_set_sys_response(
             sysresp->attr.mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
         }
 
-        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
+        if (sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
         {
 /* TODO: Do we need this? */
         }

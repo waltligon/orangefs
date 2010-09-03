@@ -57,7 +57,7 @@ machine pvfs2_lookup_sm
     {
         run lookup_verify_object_metadata;
         LOOKUP_CHECK_DIR_ACLS => read_directory_acls;
-        success => read_directory_entry_handle;
+        success => read_num_directory_entry_handles;
         default => setup_resp;
     }
 
@@ -70,13 +70,19 @@ machine pvfs2_lookup_sm
     state check_acls
     {
         run lookup_check_acls;
-        success => read_directory_entry_handle;
+        success => read_num_directory_entry_handles;
         default => setup_resp;
     }
 
-    state read_directory_entry_handle
+    state read_num_directory_entry_handles
     {
-        run lookup_read_directory_entry_handle;
+        run lookup_read_num_directory_entry_handles;
+        default => read_directory_entry_handles;
+    }
+
+    state read_directory_entry_handles
+    {
+        run lookup_read_directory_entry_handles;
         success => read_directory_entry;
         default => setup_resp;
     }
@@ -474,14 +480,13 @@ cleanup:
 }
 
 /*
- * Function: lookup_read_directory_entry_handle
+ * Function: lookup_read_num_directory_entry_handles
  *
- * Synopsis: Given a directory handle, look up the handle used to
- * store directory entries for this directory.
+ * Synopsis: Given a directory handle, determine how many handles are
+ * used to store directory entries for this directory.
  *
- * Initializes key and value structures to direct handle into
- * s_op->u.lookup.dirent_handle, which is where we always store the
- * handle used to read directory entries.  The handle to use for the
+ * Initializes key and value structures to direct num handles into
+ * s_op->u.lookup.num_dirent_handles. The handle to use for the
  * read is either:
  * - the starting handle from the req (if we haven't looked up a
  *   segment yet), or
@@ -489,7 +494,7 @@ cleanup:
  *
  * Posts the keyval read to trove.
  */
-static PINT_sm_action lookup_read_directory_entry_handle(
+static PINT_sm_action lookup_read_num_directory_entry_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -509,18 +514,146 @@ static PINT_sm_action lookup_read_directory_entry_handle(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading dirent handle value from handle %llu\n",
+		 "  reading distributed directory attributes from handle %llu\n",
 		 llu(handle));
 
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-    s_op->val.buffer = &s_op->u.lookup.dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    s_op->val.buffer = &s_op->u.lookup.attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(s_op->u.lookup.attr.u.dir.dist_dir_attr);
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
         0, 
         NULL, smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+/*
+ * Function: lookup_read_directory_entry_handles
+ *
+ * Synopsis: Given a directory handle, look up the handle used to
+ * store directory entries for this directory.
+ *
+ * Initializes key and value structures to direct handle into
+ * s_op->u.lookup.dirent_handle, which is where we always store the
+ * handle used to read directory entries.  The handle to use for the
+ * read is either:
+ * - the starting handle from the req (if we haven't looked up a
+ *   segment yet), or
+ * - the previous segment's handle (from response handle array).
+ *
+ * Posts the keyval read to trove.
+ */
+static PINT_sm_action lookup_read_directory_entry_handles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PVFS_handle handle = PVFS_HANDLE_NULL;
+    job_id_t j_id;
+    PVFS_object_attr *attr;
+    int keyval_count;
+
+    attr = &s_op->u.lookup.attr;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "lookup: no DIST_DIR_ATTR key present!\n");
+        attr->u.dir.dist_dir_bitmap = NULL;
+        attr->u.dir.dirdata_handles = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    assert(attr->u.dir.dist_dir_attr.num_servers > 0 &&
+        attr->u.dir.dist_dir_attr.bitmap_size > 0);
+
+    /* use the base handle if we haven't looked up a segment yet */
+    if (s_op->u.lookup.seg_nr == 0)
+    {
+        handle = s_op->req->u.lookup_path.handle;
+    }
+    else
+    {
+        handle = s_op->resp.u.lookup_path.handle_array[
+            s_op->u.lookup.seg_nr-1];
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "lookup: get dist-dir-attr for dir meta handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(handle),
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for bitmap and dirdata handles */
+    attr->u.dir.dist_dir_bitmap =
+        malloc(attr->u.dir.dist_dir_attr.bitmap_size *
+                sizeof(PVFS_dist_dir_bitmap_basetype));
+    attr->u.dir.dirdata_handles =
+        malloc(attr->u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle));
+    if(!attr->u.dir.dist_dir_bitmap ||
+            !attr->u.dir.dirdata_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+
+    /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
+    keyval_count = 2;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+
+    s_op->val_a[0].buffer_sz =
+        attr->u.dir.dist_dir_attr.bitmap_size *
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[0].buffer = attr->u.dir.dist_dir_bitmap;
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+
+    s_op->val_a[1].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.num_servers *
+        sizeof(PVFS_handle);
+
+    js_p->error_code = 0;
+    ret = job_trove_keyval_read_list(
+        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
+        s_op->key_a, s_op->val_a,
+        s_op->u.getattr.err_array,
+        keyval_count,
+        0,
+        NULL,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context, s_op->req->hints);
 
     return ret;
 }
@@ -538,9 +671,11 @@ static PINT_sm_action lookup_read_directory_entry(
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
+    /* TODO: Need to see if directory entry is on this server. If not we
+       can't continue processing the current segment. */
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  reading from dirent handle = "
-        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.dirent_handle),
+        GOSSIP_SERVER_DEBUG, "  need to read from dirent handle = "
+        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.attr.u.dir.dirdata_handles[0]),
         s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     s_op->key.buffer = s_op->u.lookup.segp;
@@ -556,7 +691,7 @@ static PINT_sm_action lookup_read_directory_entry(
     s_op->u.lookup.seg_nr++;
 
     ret = job_trove_keyval_read(
-        s_op->req->u.lookup_path.fs_id, s_op->u.lookup.dirent_handle,
+        s_op->req->u.lookup_path.fs_id, s_op->u.lookup.attr.u.dir.dirdata_handles[0],
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p, &j_id,
@@ -650,6 +785,9 @@ static PINT_sm_action lookup_cleanup(
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
     }
+
+    /* TODO: Need to free bitmap and handles arrays. */
+
     return(server_state_machine_complete(smcb));
 }
 

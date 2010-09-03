@@ -55,9 +55,9 @@
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
 #define PVFS_ATTR_DIR_HINT                  (1 << 20)
-#define PVFS_ATTR_DIR_DIRENT_FILES         (1 << 21)
+#define PVFS_ATTR_DIR_DISTDIR_ATTR         (1 << 21)
 #define PVFS_ATTR_DIR_ALL \
-(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | PVFS_ATTR_DIR_DIRENT_FILES)
+(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT | PVFS_ATTR_DIR_DISTDIR_ATTR)
 
 /* attributes that do not change once set */
 #define PVFS_STATIC_ATTR_MASK \
@@ -211,13 +211,6 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
         encode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
 
-#if 0
-    int dirent_files_i;\
-    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
-        encode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
-
-#endif
-
 #define decode_PVFS_directory_attr(pptr, x) do { \
     int index_i;\
     decode_PVFS_size(pptr, &(x)->dirent_count);\
@@ -233,17 +226,6 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
     for(index_i=0; index_i<(x)->dist_dir_attr.num_servers; index_i++)\
         decode_PVFS_handle(pptr, &(x)->dirdata_handles[index_i]);\
 } while(0)
-#endif
-
-#if 0
-    int dirent_files_i;\
-    (x)->dirent_handle = decode_malloc((x)->dirent_file_count \
-      * sizeof(*(x)->dirent_handle));\
-    for (dirent_files_i=0; dirent_files_i<(x)->dirent_file_count; dirent_files_i++)\
-    { \
-        decode_PVFS_handle(pptr, &(x)->dirent_handle[dirent_files_i]);\
-    } \
-
 #endif
 
 /* attributes specific to symlinks */
@@ -308,7 +290,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DIRENT_FILES) || \
+        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
@@ -339,7 +321,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
     if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || \
-        ((x)->mask & PVFS_ATTR_DIR_DIRENT_FILES) || \
+        ((x)->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) || \
         ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)

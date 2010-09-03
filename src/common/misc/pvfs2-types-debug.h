@@ -27,7 +27,12 @@ static inline void PINT_attrmask_print(int debug, uint32_t attrmask)
     if (attrmask & PVFS_ATTR_COMMON_TYPE) gossip_debug(debug, "\tPVFS_ATTR_COMMON_TYPE\n");
     if (attrmask & PVFS_ATTR_META_DIST) gossip_debug(debug, "\tPVFS_ATTR_META_DIST\n");
     if (attrmask & PVFS_ATTR_META_DFILES) gossip_debug(debug, "\tPVFS_ATTR_META_DFILES\n");
+    if (attrmask & PVFS_ATTR_META_MIRROR_DFILES) gossip_debug(debug, "\tPVFS_ATTR_META_MIRROR_DFILES\n");
     if (attrmask & PVFS_ATTR_DATA_SIZE) gossip_debug(debug, "\tPVFS_ATTR_DATA_SIZE\n");
+    if (attrmask & PVFS_ATTR_SYMLNK_TARGET) gossip_debug(debug, "\tPVFS_ATTR_SYMLINK_TARGET\n");
+    if (attrmask & PVFS_ATTR_DIR_DIRENT_COUNT) gossip_debug(debug, "\tPVFS_ATTR_DIR_DIRENT_COUNT\n");
+    if (attrmask & PVFS_ATTR_DIR_HINT) gossip_debug(debug, "\tPVFS_ATTR_DIR_HINT\n");
+    if (attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR) gossip_debug(debug, "\tPVFS_ATTR_DIR_DISTDIR_ATTR\n");
     if (attrmask & PVFS_ATTR_SYS_SIZE) gossip_debug(debug, "\tPVFS_ATTR_SYS_SIZE\n");
 }
 

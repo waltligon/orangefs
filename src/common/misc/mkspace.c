@@ -141,7 +141,7 @@ int pvfs2_mkspace(
     /* distributed directory parameters */
     PVFS_dist_dir_attr meta_dist_dir_attr;
     PVFS_dist_dir_attr dirdata_dist_dir_attr;
-    PVFS_dist_dir_bitmap dist_dir_bitmap;
+    PVFS_dist_dir_bitmap dist_dir_bitmap = NULL;
     /* only one dirdata_handle for root and lost_and_found, not using arrays
     PVFS_handle *dirdata_handles;
     */
@@ -812,9 +812,18 @@ int pvfs2_mkspace(
                   llu(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
 
     /* free space */
-    free(dist_dir_bitmap);
-    free(key_a);
-    free(val_a);
+    if (dist_dir_bitmap)
+    {
+        free(dist_dir_bitmap);
+    }
+    if (key_a)
+    {
+        free(key_a);
+    }
+    if (val_a)
+    {
+        free(val_a);
+    }
 
     return 0;
 }

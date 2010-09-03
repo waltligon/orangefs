@@ -418,12 +418,12 @@ static PINT_sm_action getattr_verify_attribs(
                 js_p->error_code = 0;
                 assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
             }
-            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
                              " getattr: dirent_handles needed.\n");
                 assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-                resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_FILES;
+                resp_attr->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
                 js_p->error_code = STATE_DIR;
             }
             else
@@ -1670,6 +1670,15 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     }
     memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
 
+    s_op->u.getattr.err_array = (PVFS_error*)calloc(keyval_count,
+        sizeof(PVFS_error));
+    if(s_op->u.getattr.err_array == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+
+    }
+
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
 
@@ -1720,10 +1729,8 @@ static PINT_sm_action getattr_get_dirent_count(
 
     attr = &s_op->resp.u.getattr.attr;
 
-    /* should return DIRENT_FILES always, already in resp.u.getattr.attr.u.dir.dirdata_handles */
-    /*
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_FILES)
-    */
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
 
     /* gossip bitmap */
     gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -1738,15 +1745,16 @@ static PINT_sm_action getattr_get_dirent_count(
     }
     gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, 
-            "\t getattr: dirdata handles array of directory %llu.\n",
-            llu(s_op->u.getattr.handle));
+        gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                "\t getattr: dirdata handles array of directory %llu.\n",
+                llu(s_op->u.getattr.handle));
 
-    for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
-    {
-        gossip_debug(GOSSIP_MKDIR_DEBUG, 
-                "\t\tdirdata server %d: %llu.\n",
-                i, llu(attr->u.dir.dirdata_handles[i]));
+        for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+        {
+            gossip_debug(GOSSIP_MKDIR_DEBUG, 
+                    "\t\tdirdata server %d: %llu.\n",
+                    i, llu(attr->u.dir.dirdata_handles[i]));
+        }
     }
 
 

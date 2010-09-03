@@ -668,7 +668,7 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
             *sm_p->cred_p,
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES, /* how to set mask? */
+            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DISTDIR_ATTR, /* how to set mask? */
             sm_p->hints);
 
         /* fill in msgpair structure components */
@@ -723,7 +723,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES, /* can remove PVFS_ATTR_DIR_DIRENT_FILES attr */
+            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DISTDIR_ATTR,
             sm_p->hints);
 
         /* fill in msgpair structure components */

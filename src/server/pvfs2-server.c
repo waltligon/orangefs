@@ -2591,9 +2591,14 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
         return(ret);
     }
 
+    /* set this refillers handle range based on the type of handle it will 
+     * hold. If it's a datafile get an IO server range, otherwise get a meta
+     * range. */
     ret = PINT_cached_config_get_server(
-        fsid, host, PINT_SERVER_TYPE_IO, 
-        &s_op->u.precreate_pool_refiller.data_handle_extent_array);
+        fsid, host, 
+        ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
+                                        PINT_SERVER_TYPE_META),
+        &s_op->u.precreate_pool_refiller.handle_extent_array);
     if(ret < 0)
     {
         free(s_op->u.precreate_pool_refiller.host);

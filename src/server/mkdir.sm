@@ -75,34 +75,20 @@ nested machine pvfs2_mkdir_work_sm
     state write_keyval_to_local_dirdata_handle
     {
         run mkdir_write_keyval_to_local_dirdata_handle;
-        /* uncomment when the msgpair is finished
         success => remote_dirdata_keyval_setup_msgpair;
-        */
-        success => write_keyval_to_meta_handle;
         default => err_msg;
     }
 
-/* msgpairarray? may lookat sys-rename */
-/* comment now, add later */
-/***************
-	state remote_dirdata_keyval_setup_msgpair
-	{
-		run mkdir_remote_dirdata_keyval_setup_msgpair;
-		success => remote_dirdata_keyval_xfer_msgpair;
-		default => err_msg;
-	}
-
-	state remote_dirdata_keyval_xfer_msgpair
-	{
-		jump pvfs2_msgpairarray_sm;
-		success => write_keyval_to_meta_handle;
-		default => err_msg;
-	}
-***************************/
-
-    state write_keyval_to_meta_handle
+    state remote_dirdata_keyval_setup_msgpair
     {
-        run mkdir_write_keyval_to_meta_handle;
+        run mkdir_remote_dirdata_keyval_setup_msgpair;
+        success => remote_dirdata_keyval_xfer_msgpair;
+        default => err_msg;
+    }
+
+    state remote_dirdata_keyval_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
         success => return;
         default => err_msg;
     }
@@ -305,7 +291,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
         return SM_ACTION_COMPLETE;
     }
 
-    return ret; 
+    return SM_ACTION_COMPLETE; 
 }
 
 
@@ -316,7 +302,6 @@ static PINT_sm_action mkdir_select_dirdata_servers(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     */
-    int ret = 0;
 
 /* not selecting servers now, suppose has dirdata on every metadata server */
 
@@ -336,7 +321,7 @@ int PINT_cached_config_get_server_list(
 ****************/
 
 
-        return ret;
+        return SM_ACTION_COMPLETE;
 
 }
 
@@ -468,7 +453,7 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
                 i, llu(attr->u.dir.dirdata_handles[i]));
     }
 
-    return 0;
+    return SM_ACTION_COMPLETE;
 }
 
 
@@ -557,83 +542,54 @@ static PINT_sm_action mkdir_write_keyval_to_local_dirdata_handle(
     return ret;
 }
 
-
-
-/* sending keys to remote dirdata server is next task! */
-
-
-
-static PINT_sm_action mkdir_write_keyval_to_meta_handle(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    int ret = -1;
-    job_id_t j_id;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr attr;
+    int ret;
 
-    /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
-    int keyval_count = 3;
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir state: send_remote_dir_data\n");
 
-    /* !!!! this is to set meta handle keyval,
-     * use dist_dir_attr in s_op->attr 
-     */
-    attr = &s_op->attr;
+    memset(&attr, 0, sizeof(attr));
+    attr.objtype = PVFS_TYPE_DIRDATA;
+    PINT_dist_dir_attr_copyto(attr.u.dir.dist_dir_attr,
+                              s_op->attr.u.dir.dist_dir_attr);
+    attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
+    attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
+    attr.mask = PVFS_ATTR_DIR_DISTDIR_ATTR;
 
-    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->key_a)
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->u.mkdir.fs_id);
+
+    PINT_SERVREQ_TREE_SETATTR_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        s_op->u.mkdir.fs_id,
+        PVFS_TYPE_DIRDATA,
+        attr,
+        s_op->attr.u.dir.dist_dir_attr.num_servers,
+        s_op->attr.u.dir.dirdata_handles,
+        NULL);
+
+    msg_p->fs_id = s_op->u.mkdir.fs_id;
+    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
     {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
     }
 
-    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->val_a)
-    {
-        free(s_op->key_a);
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-
-    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
-    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
-
-    s_op->val_a[0].buffer = &attr->u.dir.dist_dir_attr;
-    s_op->val_a[0].buffer_sz =
-         sizeof(attr->u.dir.dist_dir_attr);
-
-    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
-
-    s_op->val_a[1].buffer_sz =
-        attr->u.dir.dist_dir_attr.bitmap_size * 
-        sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
-
-    s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
-    s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-
-    s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
-        sizeof(*attr->u.dir.dirdata_handles);
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, 
-            "  writing dist-dir-struct keyvals for meta handle: %llu "
-            "\t with server_no=%d and branch_level=%d \n", 
-            llu(s_op->resp.u.mkdir.handle),
-            attr->u.dir.dist_dir_attr.server_no,
-            attr->u.dir.dist_dir_attr.branch_level);
-
-
-    ret = job_trove_keyval_write_list(
-            s_op->req->u.mkdir.fs_id,
-            s_op->resp.u.mkdir.handle, /* meta handle */
-            s_op->key_a, s_op->val_a,
-            keyval_count, TROVE_SYNC, NULL, smcb,
-            0, js_p, &j_id, server_job_context,
-            s_op->req->hints);
-
-    return ret;
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
 

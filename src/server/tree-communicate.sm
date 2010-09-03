@@ -46,6 +46,46 @@ static int tree_get_file_size_comp_fn(
 
 %%
 
+machine pvfs2_tree_setattr_sm
+{
+    state tree_setattr_do_work
+    {
+        jump pvfs2_tree_setattr_work_sm;
+        default => tree_setattr_final_response;
+    }
+
+    state tree_setattr_final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => tree_setattr_cleanup;
+    }
+
+    state tree_setattr_cleanup
+    {
+        run tree_setattr_cleanup;
+        default => terminate;
+    }
+}
+
+nested machine pvfs2_tree_setattr_work_sm
+{
+    state tree_setattr_work_do_work
+    {
+        pjmp tree_setattr_setup
+        {
+            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_set_attr_work_sm;
+        }
+        default => tree_setattr_work_cleanup;
+    }
+
+    state tree_setattr_work_cleanup
+    {
+        run tree_setattr_work_cleanup;
+        default => return;
+    }
+}
+
 machine pvfs2_tree_remove_sm
 {
     state tree_remove_do_work
@@ -191,6 +231,27 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
 
         switch (operation)
         {
+            case PVFS_SERV_TREE_SETATTR:
+            {
+                PVFS_sys_attr dummy_sys_attr;
+
+                memset(&dummy_sys_attr, 0, sizeof(PVFS_sys_attr));
+
+                PINT_SERVREQ_SETATTR_FILL(
+                    *req,
+                    s_op->req->credentials,
+                    fs_id,
+                    s_op->u.tree_communicate.handle_array_local[0],
+                    this_req->u.tree_setattr.objtype,
+                    dummy_sys_attr,
+                    0,
+                    s_op->req->hints);
+                PINT_copy_object_attr(&req->u.tree_setattr.attr,
+                    &this_req->u.tree_setattr.attr);
+
+                break;
+            }
+
             case PVFS_SERV_TREE_REMOVE:
             {
                 PINT_SERVREQ_REMOVE_FILL(
@@ -292,8 +353,25 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
 
             msg_p = &tree_communicate_s_op->msgarray_op.msgarray[i];
 
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
+
             switch (operation)
             {
+                case PVFS_SERV_TREE_SETATTR:
+                {
+                    PINT_SERVREQ_TREE_SETATTR_FILL(
+                        msg_p->req,
+                        s_op->req->credentials,
+                        fs_id,
+                        this_req->u.tree_setattr.objtype,
+                        this_req->u.tree_setattr.attr,
+                        num_data_files_for_this_server,
+                        &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
+                        s_op->req->hints);
+                    msg_p->comp_fn = NULL;
+                    break;
+                }
+    
                 case PVFS_SERV_TREE_REMOVE:
                 {
                     PINT_SERVREQ_TREE_REMOVE_FILL(
@@ -320,6 +398,27 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                       this_req->u.tree_get_file_size.retry_msgpair_at_leaf,
                       s_op->req->hints);
                   msg_p->comp_fn = tree_get_file_size_comp_fn;
+
+                  /* if the logical file is mirrored, then we want the mirroring logic
+                   * to handle retries, when we are processing the leaf of the tree, 
+                   * i.e., this tree request contains msgpairs having only one handle
+                   * each. Otherwise, we let msgpairarray handle retries.
+                  */
+                  if ( (this_req->u.tree_get_file_size.retry_msgpair_at_leaf) && 
+                       (num_files_per_server == 1))
+                  {
+                      gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
+                                                       "PVFS_MSGPAIR_NO_RETRY\n"
+                                                      ,__func__);
+                      msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+                  }
+                  else
+                  {
+                      gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
+                                                       "PVFS_MSGPAIR_RETRY\n"
+                                                      ,__func__);
+                      msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
+                  }
                   break;
                 }
 
@@ -329,27 +428,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             msg_p->fs_id = fs_id;
             msg_p->handle =
             s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server];
-
-            /* if the logical file is mirrored, then we want the mirroring logic
-             * to handle retries, when we are processing the leaf of the tree, 
-             * i.e., this tree request contains msgpairs having only one handle
-             * each. Otherwise, we let msgpairarray handle retries.
-            */
-            if ( (this_req->u.tree_get_file_size.retry_msgpair_at_leaf) && 
-                 (num_files_per_server == 1))
-            {
-                gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                                 "PVFS_MSGPAIR_NO_RETRY\n"
-                                                ,__func__);
-                msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
-            }
-            else
-            {
-                gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                                 "PVFS_MSGPAIR_RETRY\n"
-                                                ,__func__);
-                msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
-            }
 
             ret = PINT_cached_config_map_to_server(&msg_p->svr_addr
                                                   ,msg_p->handle
@@ -365,6 +443,45 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action tree_setattr_setup(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
+
+    return (tree_communicate_partition_handles(smcb, js_p, s_op->req->u.tree_setattr.num_servers,
+        s_op->req->u.tree_setattr.fs_id, PVFS_SERV_TREE_SETATTR,
+        s_op->req->u.tree_setattr.handle_array));
+}
+
+static int tree_setattr_work_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* get frame from bottom of stack */
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int i, task_id, error_code;
+    PINT_server_op *old_frame;
+
+    assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
+    /* for each state machine spawned, pop a frame */
+    for (i = 0; i < s_op->num_pjmp_frames; i++)
+    {
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        if (task_id == REMOTE_OPERATION) {
+           PINT_msgpairarray_destroy(&old_frame->msgarray_op);
+        }
+        free(old_frame);
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+ 
+static int tree_setattr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    return(server_state_machine_complete(smcb));
+}
+ 
 static PINT_sm_action tree_remove_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -665,6 +782,23 @@ static int tree_get_file_size_cleanup(
    return(server_state_machine_complete(smcb));
 }
 
+static inline int PINT_get_object_ref_tree_setattr(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.tree_setattr.fs_id;
+    *handle = req->u.tree_setattr.handle_array[0];
+    return 0;
+};
+
+struct PINT_server_req_params pvfs2_tree_setattr_params =
+{
+    .string_name = "tree_setattr",
+    .get_object_ref = PINT_get_object_ref_tree_setattr,
+    .perm = PINT_SERVER_CHECK_ATTR,
+    .access_type = PINT_server_req_modify,
+    .state_machine = &pvfs2_tree_setattr_sm
+};
+
 static inline int PINT_get_object_ref_tree_remove(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
@@ -694,7 +828,7 @@ struct PINT_server_req_params pvfs2_tree_get_file_size_params =
 {
     .string_name = "tree_get_file_size",
     .get_object_ref = PINT_get_object_ref_tree_get_file_size,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = PINT_SERVER_CHECK_ATTR,
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_tree_get_file_size_sm
 };

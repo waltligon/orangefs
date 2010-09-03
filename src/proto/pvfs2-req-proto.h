@@ -83,6 +83,7 @@ enum PVFS_server_op
     PVFS_SERV_IMM_COPIES = 40,
     PVFS_SERV_TREE_REMOVE = 41,
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
+    PVFS_SERV_TREE_SETATTR = 43,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -401,6 +402,44 @@ do {                                                  \
     (__req).u.mgmt_remove_dirent.handle = (__handle); \
     (__req).u.mgmt_remove_dirent.dirent_handle = (__dirent_handle); \
     (__req).u.mgmt_remove_dirent.entry = (__entry);   \
+} while (0)
+
+struct PVFS_servreq_tree_setattr
+{
+    PVFS_fs_id  fs_id;
+    PVFS_ds_type objtype;
+    PVFS_object_attr attr;      /* new attributes */
+    uint32_t num_servers;       /* # of servers to send setattr msg */
+    PVFS_handle *handle_array;  /* handles indicating where to send msgs */
+};
+endecode_fields_3a_struct(
+    PVFS_servreq_tree_setattr,
+    PVFS_fs_id, fs_id,
+    PVFS_ds_type, objtype,
+    PVFS_object_attr, attr,
+    uint32_t, num_servers,
+    PVFS_handle, handle_array)
+#define extra_size_PVFS_servreq_tree_setattr \
+  (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
+
+#define PINT_SERVREQ_TREE_SETATTR_FILL(__req,                            \
+                                 __creds,                                \
+                                 __fsid,                                 \
+                                 __objtype,                              \
+                                 __attr,                                 \
+                                 __num_servers,                          \
+                                 __handle_array,                         \
+                                 __hints)                                \
+do {                                                                     \
+    memset(&(__req), 0, sizeof(__req));                                  \
+    (__req).op = PVFS_SERV_TREE_SETATTR;                                 \
+    (__req).hints = (__hints);                                           \
+    (__req).credentials = (__creds);                                     \
+    (__req).u.tree_setattr.fs_id = (__fsid);                             \
+    (__req).u.tree_setattr.objtype = (__objtype);                        \
+    PINT_copy_object_attr(&(__req).u.tree_setattr.attr, &(__attr));      \
+    (__req).u.tree_setattr.num_servers = (__num_servers);                \
+    (__req).u.tree_setattr.handle_array = (__handle_array);              \
 } while (0)
 
 struct PVFS_servreq_tree_remove
@@ -1992,6 +2031,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
+        struct PVFS_servreq_tree_setattr tree_setattr;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

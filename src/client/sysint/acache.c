@@ -456,7 +456,7 @@ int PINT_acache_get_cached_entry(
             }
             attr->u.meta.dist_size = tmp_static_payload->dist_size;
         }
-        if(tmp_static_payload->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+        if(tmp_static_payload->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
         {
             uint32_t tmp_i;
             /* test if num_servers > 0 */
@@ -707,7 +707,7 @@ int PINT_acache_update(
             }
             tmp_static_payload->dist_size = attr->u.meta.dist_size;
         }
-        if(attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+        if(attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
         {
             uint32_t tmp_i;
 

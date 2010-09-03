@@ -127,45 +127,62 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.dirent_count;
         }
 
-        if (src->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+        if (src->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
         {
             PINT_dist_dir_attr_copyto(dest->u.dir.dist_dir_attr, src->u.dir.dist_dir_attr);
-            dest->u.dir.dist_dir_bitmap = src->u.dir.dist_dir_bitmap;
-            dest->u.dir.dirdata_handles = src->u.dir.dirdata_handles;
 
-            /*
-            dest->u.dir.dirent_file_count = src->u.dir.dirent_file_count;
-            dest->u.dir.dirent_handle = src->u.dir.dirent_handle;
-            */
-/*
-            PVFS_size dirent_file_array_size = src->u.dir.dirent_file_count *
-                sizeof(PVFS_handle);
-
-            if (dirent_file_array_size)
+            PVFS_size dist_dir_bitmap_size = src->u.dir.dist_dir_attr.bitmap_size *
+                sizeof(PVFS_dist_dir_bitmap_basetype);
+            if (dist_dir_bitmap_size)
             {
-                if ((dest->mask & PVFS_ATTR_DIR_DIRENT_FILES) &&
-                    dest->u.dir.dirent_file_count > 0)
+                if (dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
                 {
-                    if (dest->u.dir.dirent_file_array)
+                    if (dest->u.dir.dist_dir_bitmap)
                     {
-                        free(dest->u.dir.dirent_file_array);
-                        dest->u.dir.dirent_file_array = NULL;
+                        free(dest->u.dir.dist_dir_bitmap);
+                        dest->u.dir.dist_dir_bitmap = NULL;
                     }
                 }
-                dest->u.dir.dirent_file_array = malloc(dirent_file_array_size);
-                if (!dest->u.dir.dirent_file_array)
+                dest->u.dir.dist_dir_bitmap = malloc(dist_dir_bitmap_size);
+                if (!dest->u.dir.dist_dir_bitmap)
                 {
                     return ret;
                 }
-                memcpy(dest->u.dir.dirent_file_array,
-                       src->u.dir.dirent_file_array, dirent_file_array_size);
+                memcpy(dest->u.dir.dist_dir_bitmap,
+                       src->u.dir.dist_dir_bitmap, dist_dir_bitmap_size);
             }
             else
             {
-                dest->u.dir.dirent_file_array = NULL;
+                dest->u.dir.dist_dir_bitmap = NULL;
             }
-            dest->u.dir.dirent_file_count = src->u.dir.dirent_file_count;
-*/
+
+            PVFS_size dirent_handles_array_size = src->u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle);
+
+            if (dirent_handles_array_size)
+            {
+                if ((dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) &&
+                    dest->u.dir.dist_dir_attr.num_servers > 0)
+                {
+                    if (dest->u.dir.dirdata_handles)
+                    {
+                        free(dest->u.dir.dirdata_handles);
+                        dest->u.dir.dirdata_handles = NULL;
+                    }
+                }
+                dest->u.dir.dirdata_handles = malloc(dirent_handles_array_size);
+                if (!dest->u.dir.dirdata_handles)
+                {
+                    return ret;
+                }
+                memcpy(dest->u.dir.dirdata_handles,
+                       src->u.dir.dirdata_handles, dirent_handles_array_size);
+            }
+            else
+            {
+                dest->u.dir.dirdata_handles = NULL;
+            }
+            dest->u.dir.dist_dir_attr.num_servers = src->u.dir.dist_dir_attr.num_servers;
         }
 
         if((src->objtype == PVFS_TYPE_METAFILE) &&
@@ -389,7 +406,7 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                     attr->u.dir.hint.dist_params = NULL;
                 }
             }
-            if (attr->mask & PVFS_ATTR_DIR_DIRENT_FILES)
+            if (attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
             {
                 if (attr->u.dir.dist_dir_bitmap)
                 {

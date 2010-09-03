@@ -275,7 +275,7 @@ static PINT_sm_action mkdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_DIR_DIRENT_FILES),
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_DIR_DISTDIR_ATTR),
         PVFS_TYPE_DIRECTORY,
         0);
 

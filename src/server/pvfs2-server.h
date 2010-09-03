@@ -406,8 +406,8 @@ struct PINT_server_lookup_op
     char *segp;
     void *segstate;
 
-    PVFS_handle dirent_handle;
     PVFS_ds_attributes *ds_attr_array;
+    PVFS_object_attr attr;
 };
 
 struct PINT_server_readdir_op
@@ -474,7 +474,7 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_fs_id fsid;
     char* host;
     PVFS_BMI_addr_t host_addr;
-    PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_handle_extent_array handle_extent_array;
     PVFS_ds_type type;
 };
 
@@ -748,6 +748,8 @@ extern struct PINT_state_machine_s pvfs2_mirror_sm;
 
 
 /* nested state machines */
+extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_set_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
@@ -763,6 +765,7 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
