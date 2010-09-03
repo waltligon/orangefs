@@ -1407,7 +1407,8 @@ static PINT_sm_action getattr_setup_resp(
     else if ((resp_attr->objtype == PVFS_TYPE_DIRECTORY) &&
             (resp_attr->mask & PVFS_ATTR_DIR_HINT))
     {
-        uint32_t dirent_file_count_i, bcount;
+        uint32_t dirent_file_count_i;
+        int bcount;
         unsigned char *c;
 
         /* !!! may change later */
@@ -1493,19 +1494,6 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
     {
         free(s_op->u.getattr.mirror_dfile_status_array);
         s_op->u.getattr.mirror_dfile_status_array = NULL;
-    }
-    if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
-    {
-        if(s_op->resp.u.getattr.attr.u.dir.dist_dir_bitmap)
-        {
-            free(s_op->resp.u.getattr.attr.u.dir.dist_dir_bitmap);
-            s_op->resp.u.getattr.attr.u.dir.dist_dir_bitmap = NULL;
-        }
-        if(s_op->resp.u.getattr.attr.u.dir.dirdata_handles)
-        {
-            free(s_op->resp.u.getattr.attr.u.dir.dirdata_handles);
-            s_op->resp.u.getattr.attr.u.dir.dirdata_handles = NULL;
-        }
     }
     if(s_op->free_val)
     {

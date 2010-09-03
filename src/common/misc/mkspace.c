@@ -131,7 +131,8 @@ int pvfs2_mkspace(
     TROVE_handle_extent cur_extent;
     TROVE_handle_extent_array extent_array;
     TROVE_context_id trove_context = -1;
-    char *merged_handle_ranges = NULL, *c = NULL;
+    char *merged_handle_ranges = NULL;
+    unsigned char *c = NULL;
     TROVE_handle new_root_handle = TROVE_HANDLE_NULL;
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
@@ -447,10 +448,10 @@ int pvfs2_mkspace(
         for(i = meta_dist_dir_attr.bitmap_size - 1;
                 i >= 0 ; i--)
         {
-            c = (char *)&dist_dir_bitmap[i];
-            gossip_debug(GOSSIP_MKDIR_DEBUG,
-                    " %02x %02x %02x %02x",
-                    c[0],c[1],c[2],c[3]);
+            c = (unsigned char *)(dist_dir_bitmap + i);
+            mkspace_print(verbose,
+                    " i=%d : %02x %02x %02x %02x\n",
+                    i, c[3], c[2], c[1], c[0]);
         }
         mkspace_print(verbose, "\n");
 
