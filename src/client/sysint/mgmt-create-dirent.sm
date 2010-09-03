@@ -227,7 +227,9 @@ static int mgmt_create_dirent_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    /* send to dirdata server */
+    msg_p->handle = 
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_create_dirent_comp_fn;
 

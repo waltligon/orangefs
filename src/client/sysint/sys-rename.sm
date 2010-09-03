@@ -27,6 +27,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "ncache.h"
+#include "dist-dir-utils.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -54,7 +55,28 @@ machine pvfs2_client_rename_sm
     state init
     {
         run rename_init;
-        default => rename_lookups_setup_msgpair_array;
+        default => rename_parent_getattr_setup_msgpair_array;
+    }
+
+    /* similar to the lookup path, get the attr of parent directory and calculate dirdata handle */
+    /* 1. the setup function.
+     * 2. the complete function
+     * 3. the failure function
+     * 4. change the dirent-related requests, use dirdata handle (!!!, the crdirent.sm & rmdirent.sm need to be determined first. wait until discussion with Elaine). (2. sending crdirent requests need to have dirdata fs_id, which is not included in PVFS_object_attr, how to get fs_id? or just use the parent's fs_id? Elaine says fs_id is the same among all servers in the file system, defined in config file)
+     * 5. think of possible failure, retry, both dist-dir-struct and others
+     */
+    state rename_parent_getattr_setup_msgpair_array
+    {
+        run rename_parent_getattr_setup_msgpair_array;
+        success => rename_parent_getattr_xfer_msgpair_array;
+        default => rename_parent_getattr_failure;
+    }
+
+    state rename_parent_getattr_xfer_msgpair_array
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => rename_lookups_setup_msgpair_array;
+        default => rename_parent_getattr_failure;
     }
 
     state rename_lookups_setup_msgpair_array
@@ -89,6 +111,12 @@ machine pvfs2_client_rename_sm
     {
         jump pvfs2_client_getattr_sm;
         success => rename_chdirent_setup_msgpair;
+        default => cleanup;
+    }
+
+    state rename_parent_getattr_failure
+    {
+        run rename_parent_getattr_failure;
         default => cleanup;
     }
 
@@ -364,6 +392,95 @@ static PINT_sm_action rename_init(
     return SM_ACTION_COMPLETE;
 }
 
+static int rename_parent_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    PVFS_object_attr *attr;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index, i;
+    unsigned char *c;
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_parent_getattr_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+    assert((index > -1) && (index < 2));
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent getattr[%d] got response %d\n",
+                 index, resp_p->status);
+
+    if(resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+
+    /* SUCCESS! */
+
+    attr = &resp_p->u.getattr.attr;
+
+    /* gossip attr */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent getattr[%d] for parent dir handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            index,
+            llu(sm_p->u.rename.parent_refns[index].handle),
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
+
+    /* gossip bitmap, may adjust later */
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            " with dist_dir_bitmap as:\n");
+    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {
+        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "\n");
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, 
+            "\t dirdata handles array \n");
+
+    for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                "\t\tdirdata server %d: %llu.\n",
+                i, llu(attr->u.dir.dirdata_handles[i]));
+    }
+
+    /*
+      calculate the dirdata handle -- 'old' or 'new' based on index;
+    */
+    assert(attr->u.dir.dist_dir_attr.num_servers > 0);
+
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[index]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.rename.entries[index],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash, 
+            &attr->u.dir.dist_dir_attr, attr->u.dir.dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[index] =
+        attr->u.dir.dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: selecting dirdata_servers[%d]=%llu"
+            " as the dirent_handle for dirent %s.\n",
+            dirdata_index, llu(attr->u.dir.dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[index]);
+
+    return 0;
+}
+
 static int rename_lookups_comp_fn(
     void *v_p,
     struct PVFS_server_resp *resp_p,
@@ -411,9 +528,10 @@ static int rename_lookups_comp_fn(
     sm_p->u.rename.refns[index].fs_id =
         sm_p->u.rename.parent_refns[index].fs_id;
 
-    /* TODO: Need to find the correct dirent_handle */
+    /* dirent_handle retrieved already
     sm_p->u.rename.dirent_handle[index] =
         resp_p->u.lookup_path.attr_array[0].u.dir.dirdata_handles[0];
+        */
 
     if (index == 0)
     {
@@ -520,6 +638,60 @@ static int rename_chdirent_comp_fn(
     return 0;
 }
 
+static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL, i = 0;
+    PINT_sm_msgpair_state *msg_p;
+
+    js_p->error_code = 0;
+
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 2);
+    if(ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* prepare to post the getattr send/recv pairs for two parent dir*/
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "rename: posting parent directory getattr[%d] (%lld,%d)\n",
+                     i, llu(sm_p->u.rename.parent_refns[i].handle),
+                     sm_p->u.rename.parent_refns[i].fs_id);
+
+        PINT_SERVREQ_GETATTR_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.rename.parent_refns[i].fs_id,
+            sm_p->u.rename.parent_refns[i].handle,
+            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES, /* how to set mask? */
+            sm_p->hints);
+
+        /* fill in msgpair structure components */
+        msg_p->fs_id = sm_p->u.rename.parent_refns[i].fs_id;
+        msg_p->handle = sm_p->u.rename.parent_refns[i].handle;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = rename_parent_getattr_comp_fn;
+
+        ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+            break;
+        }
+    }
+
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action rename_lookups_setup_msgpair_array(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -551,7 +723,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES,
+            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_FILES, /* can remove PVFS_ATTR_DIR_DIRENT_FILES attr */
             sm_p->hints);
 
         /* fill in msgpair structure components */
@@ -572,6 +744,14 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_parent_getattr_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -614,7 +794,9 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
-    msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    /* send to dirdata handle */
+    msg_p->handle = 
+        sm_p->u.rename.dirent_handle[1];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
@@ -668,8 +850,9 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[
         sm_p->u.rename.rmdirent_index].fs_id;
-    msg_p->handle = sm_p->u.rename.parent_refns[
-        sm_p->u.rename.rmdirent_index].handle;
+    /* send to dirdata handle */
+    msg_p->handle = 
+        sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
 
@@ -798,7 +981,9 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
-    msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
+    /* send to dirdata handle */
+    msg_p->handle = 
+        sm_p->u.rename.dirent_handle[1];
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = rename_chdirent_comp_fn;
 
