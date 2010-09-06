@@ -69,14 +69,7 @@ nested machine pvfs2_mkdir_work_sm
     state fill_handles_to_dist_dir_struct
     {
         run mkdir_fill_handles_to_dist_dir_struct;
-        default => write_keyval_to_local_dirdata_handle;
-    }
-
-    state write_keyval_to_local_dirdata_handle
-    {
-        run mkdir_write_keyval_to_local_dirdata_handle;
-        success => remote_dirdata_keyval_setup_msgpair;
-        default => err_msg;
+        default => remote_dirdata_keyval_setup_msgpair;
     }
 
     state remote_dirdata_keyval_setup_msgpair
@@ -89,6 +82,13 @@ nested machine pvfs2_mkdir_work_sm
     state remote_dirdata_keyval_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
+        success => write_keyval_to_meta_handle;
+        default => err_msg;
+    }
+    
+    state write_keyval_to_meta_handle
+    {
+        run mkdir_write_keyval_to_meta_handle;
         success => return;
         default => err_msg;
     }
@@ -457,91 +457,6 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
 }
 
 
-/* write dist-dir-struct key/val to local dirdata handle
- * need to use a new attr struct and set the correct server_no
- */
-static PINT_sm_action mkdir_write_keyval_to_local_dirdata_handle(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    int ret = -1;
-    job_id_t j_id;
-    /* total 3 keyvals, DIST_DIR_ATTR, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
-    int keyval_count = 3;
-    PVFS_dist_dir_attr tmp_ddattr;
-
-    /* !!!! this is to set dirdata handle keyval,
-     * the dist_dir_attr in s_op->attr is for the meta handle
-     * thus needs to create a dist_dir_attr and set server_no correctly!!
-     */
-
-    attr = &s_op->attr;
-    PINT_dist_dir_attr_copyto(tmp_ddattr, attr->u.dir.dist_dir_attr);
-    /* local handle is the first handle, so has server_no=0 */
-    PINT_dist_dir_set_serverno(0, &tmp_ddattr, attr->u.dir.dist_dir_bitmap);
-
-    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->key_a)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    memset(s_op->key_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-
-    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->val_a)
-    {
-        free(s_op->key_a);
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
-
-    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
-    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
-
-    s_op->val_a[0].buffer = &tmp_ddattr;
-    s_op->val_a[0].buffer_sz =
-         sizeof(tmp_ddattr);
-
-    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
-    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
-
-    s_op->val_a[1].buffer_sz =
-        attr->u.dir.dist_dir_attr.bitmap_size * 
-        sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
-
-    s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
-    s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
-
-    s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
-    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
-        sizeof(*attr->u.dir.dirdata_handles);
-
-
-    gossip_debug(GOSSIP_MKDIR_DEBUG, 
-            " mkdir: writing dist-dir-struct keyvals for local dirdata handle: %llu "
-            "(parent dir %llu),\n"
-            "\t with server_no=%d and branch_level=%d \n", 
-            llu(attr->u.dir.dirdata_handles[0]),
-            llu(s_op->resp.u.mkdir.handle),
-            tmp_ddattr.server_no,
-            tmp_ddattr.branch_level);
-
-
-    ret = job_trove_keyval_write_list(
-            s_op->req->u.mkdir.fs_id,
-            attr->u.dir.dirdata_handles[0], /* dirdata handle */
-            s_op->key_a, s_op->val_a,
-            keyval_count, TROVE_SYNC, NULL, smcb,
-            0, js_p, &j_id, server_job_context,
-            s_op->req->hints);
-
-    return ret;
-}
-
 static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -593,7 +508,78 @@ static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job
 }
 
 
+static PINT_sm_action mkdir_write_keyval_to_meta_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    int ret = -1;
+    job_id_t j_id;
 
+    /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
+    int keyval_count = 3;
+
+    /* !!!! this is to set meta handle keyval,
+     * use dist_dir_attr in s_op->attr 
+     */
+    attr = &s_op->attr;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+
+    s_op->val_a[0].buffer = &attr->u.dir.dist_dir_attr;
+    s_op->val_a[0].buffer_sz =
+         sizeof(attr->u.dir.dist_dir_attr);
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+
+    s_op->val_a[1].buffer_sz =
+        attr->u.dir.dist_dir_attr.bitmap_size * 
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
+
+    s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+
+    s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
+        sizeof(*attr->u.dir.dirdata_handles);
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, 
+            "  writing dist-dir-struct keyvals for meta handle: %llu "
+            "\t with server_no=%d and branch_level=%d \n", 
+            llu(s_op->resp.u.mkdir.handle),
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
+
+
+    ret = job_trove_keyval_write_list(
+            s_op->req->u.mkdir.fs_id,
+            s_op->resp.u.mkdir.handle, /* meta handle */
+            s_op->key_a, s_op->val_a,
+            keyval_count, TROVE_SYNC, NULL, smcb,
+            0, js_p, &j_id, server_job_context,
+            s_op->req->hints);
+
+    return ret;
+}
 
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
