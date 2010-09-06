@@ -641,11 +641,19 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.num_servers *
         sizeof(PVFS_handle);
 
+    s_op->u.lookup.err_array = (PVFS_error*)calloc(keyval_count,
+        sizeof(PVFS_error));
+    if (s_op->u.lookup.err_array == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     js_p->error_code = 0;
     ret = job_trove_keyval_read_list(
-        s_op->u.getattr.fs_id, s_op->u.getattr.handle,
+        s_op->req->u.lookup_path.fs_id, handle,
         s_op->key_a, s_op->val_a,
-        s_op->u.getattr.err_array,
+        s_op->u.lookup.err_array,
         keyval_count,
         0,
         NULL,
@@ -690,6 +698,8 @@ static PINT_sm_action lookup_read_directory_entry(
     */
     s_op->u.lookup.seg_nr++;
 
+    /* TODO: Decide which dirdata_handle is correct. Do server-to-server
+       communication if necessary to read the entry. */
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, s_op->u.lookup.attr.u.dir.dirdata_handles[0],
         &s_op->key, &s_op->val, 
@@ -784,6 +794,12 @@ static PINT_sm_action lookup_cleanup(
     {
         free(s_op->u.lookup.ds_attr_array);
         s_op->u.lookup.ds_attr_array = NULL;
+    }
+
+    if (s_op->u.lookup.err_array)
+    {
+        free(s_op->u.lookup.err_array);
+        s_op->u.lookup.err_array = NULL;
     }
 
     /* TODO: Need to free bitmap and handles arrays. */

@@ -408,6 +408,8 @@ struct PINT_server_lookup_op
 
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
+
+    PVFS_error* err_array;
 };
 
 struct PINT_server_readdir_op
