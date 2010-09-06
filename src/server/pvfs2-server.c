@@ -2076,9 +2076,21 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: smcb op code (%d).\n"
+                                      ,s_op->op);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
+                                       "s_op->unexp_bmi_buff.buffer (%p) "
+                                       "\tNULL(%s).\n"
+                                      ,s_op->unexp_bmi_buff.buffer
+                                      ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
+
+    /* BMI_unexpected_free MUST execute BEFORE BMI_set_info, because BMI_set_info will */
+    /* remove the addr info from the cur_ref_list if BMI_DEC_ADDR_REF causes the ref   */
+    /* count to become zero.  The addr info holds the "unexpected-free" function       */
+    /* pointer.                                                                        */
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
     s_op->unexp_bmi_buff.buffer = NULL;
 
 
