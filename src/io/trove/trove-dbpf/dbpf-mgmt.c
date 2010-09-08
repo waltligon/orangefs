@@ -571,6 +571,51 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     return 1;
 }
 
+int dbpf_collection_deleattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
+{
+    int ret = -TROVE_EINVAL;
+    struct dbpf_storage *sto_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+    DBT db_key;
+
+    sto_p = my_storage_p;
+    if (sto_p == NULL)
+    {
+        return ret;
+    }
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return ret;
+    }
+
+    memset(&db_key, 0, sizeof(db_key));
+    db_key.data = key_p->buffer;
+    db_key.size = key_p->buffer_sz;
+
+    ret = coll_p->coll_attr_db->del(coll_p->coll_attr_db,
+                                    NULL, &db_key, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    return 1;
+}
+
 static int dbpf_initialize(char *data_path,
 			   char *meta_path,
                            TROVE_ds_flags flags)
@@ -2318,7 +2363,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
-    dbpf_collection_geteattr
+    dbpf_collection_geteattr,
+    dbpf_collection_deleattr
 };
 
 /* dbpf_mgmt_ops
@@ -2340,7 +2386,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
-    dbpf_collection_geteattr
+    dbpf_collection_geteattr,
+    dbpf_collection_deleattr
 };
 
 typedef struct

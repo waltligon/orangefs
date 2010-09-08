@@ -3791,6 +3791,87 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     return (0);
 }
 
+
+/* job_trove_fs_del_eattr()
+ *
+ * delete extended attribute for a file system
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_fs_deleattr(PVFS_fs_id coll_id,
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_flags flags,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id,
+                          PVFS_hint hints)
+{
+    /* post a trove collection del eattr.  If it completes (or fails)
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
+     * up a job_desc structure.  */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->hints = hints;
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_collection_deleattr(coll_id, key_p, flags,
+                                    user_ptr_internal, global_trove_context,
+                                    &(jd->u.trove.id));
+#else
+    gossip_err("%s: error: Trove support not enabled.\n", __func__);
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+
+    return (0);
+}
+
 /* job_null()
  *
  * post null job; can be used to trigger asynchronous state transitions

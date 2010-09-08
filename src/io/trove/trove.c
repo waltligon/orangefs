@@ -1195,6 +1195,31 @@ int trove_collection_seteattr(
            out_op_id_p);
 }
 
+int trove_collection_deleattr(
+    TROVE_coll_id coll_id,
+    TROVE_keyval_s* key_p,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+	return -TROVE_EINVAL;
+    }
+
+    return mgmt_method_table[method_id]->collection_deleattr(
+           coll_id,
+           key_p,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
 int trove_collection_getinfo(
     TROVE_coll_id coll_id,
     TROVE_context_id context_id,

@@ -521,6 +521,14 @@ int trove_collection_seteattr(
 			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p);
 
+int trove_collection_deleattr(
+			      TROVE_coll_id coll_id,
+			      TROVE_keyval_s *key_p,
+			      TROVE_ds_flags flags,
+			      void *user_ptr,
+			      TROVE_context_id context_id,
+			      TROVE_op_id *out_op_id_p);
+
 int trove_collection_getinfo(
 			     TROVE_coll_id coll_id,
 			     TROVE_context_id context_id,
