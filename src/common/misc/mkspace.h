@@ -18,6 +18,7 @@ int pvfs2_mkspace(
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
+    TROVE_ds_flags flags,
     char *meta_handle_ranges,
     char *data_handle_ranges,
     int create_collection_only,

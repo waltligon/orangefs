@@ -193,6 +193,7 @@ typedef struct server_configuration_s
     int db_cache_size_bytes;        /* cache size to use in berkeley db
                                        if zero, use defaults */
     char * db_cache_type;
+    int db_txn;                     /* enable transaction support in db */
     int trove_alt_aio_mode;         /* enables experimental alternative AIO
                                      * implementation for some types of 
                                      * operations 
@@ -298,6 +299,8 @@ int PINT_config_get_trove_sync_meta(
 int PINT_config_get_trove_sync_data(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
+int PINT_config_get_trove_flags( struct server_configuration_s *config, 
+    PVFS_ds_flags *flags );
 #endif
 
 /*

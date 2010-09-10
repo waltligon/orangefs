@@ -553,6 +553,7 @@ static int remove_one_handle(
      */
     ret = PINT_dbpf_keyval_iterate(
         coll_p->keyval_db,
+        coll_p->storage->sto_env,
         ref.handle,
         coll_p->pcache,
         NULL,
@@ -713,8 +714,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     void *tmp_ptr;
     void *tmp_handle;
     void *tmp_attr;
-    uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
+    uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE, db_flags = 0, txn_support = 0;
     TROVE_ds_attributes attr;
+    DB_TXN *txn_p = NULL;
 
     if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
     {
@@ -723,8 +725,38 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         return 1;
     }
 
+    if( op_p->coll_p->storage->sto_env )
+    {
+        ret = op_p->coll_p->storage->sto_env->get_flags(
+                op_p->coll_p->storage->sto_env, &db_flags);
+        if( ret != 0 )
+        {
+            gossip_err("%s: couldn't retrieve environment flags: %s\n",
+                       __func__, db_strerror(ret) );
+        }
+        else
+        {
+            if( db_flags & DB_AUTO_COMMIT )
+            {
+                txn_support = 1;
+            }
+        }   
+    }
+
+    if( txn_support == 1 )
+    {
+        ret = op_p->coll_p->storage->sto_env->txn_begin(
+                    op_p->coll_p->storage->sto_env, NULL, &txn_p, 0);
+        if (ret != 0 )
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+            gossip_err("failed to start transaction\n");
+            goto return_error;
+        }
+    }
+
     /* get a cursor */
-    ret = op_p->coll_p->ds_db->cursor(op_p->coll_p->ds_db, NULL, &dbc_p, 0);
+    ret = op_p->coll_p->ds_db->cursor(op_p->coll_p->ds_db, txn_p, &dbc_p, 0);
     if (ret != 0)
     {
         ret = -dbpf_db_error_to_trove_error(ret);
@@ -978,6 +1010,17 @@ return_ok:
         PINT_mem_aligned_free(multiples_buffer);
     }
 
+    if( (txn_support == 1 ) && (txn_p != NULL) )
+    {
+        ret = txn_p->commit(txn_p, 0);
+        if( ret != 0 )
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+            gossip_err("Failed commiting read-only transaction\n");
+            goto return_error;
+        }
+    }
+
     return 1;
 
 return_error:
@@ -992,6 +1035,12 @@ return_error:
     if(multiples_buffer)
     {
         PINT_mem_aligned_free(multiples_buffer);
+    }
+
+    if( ( txn_support == 1 ) && ( txn_p != NULL ) )
+    {
+       txn_p->abort(txn_p); 
+       gossip_err("Aborting read-only transaction\n");
     }
 
     return ret;

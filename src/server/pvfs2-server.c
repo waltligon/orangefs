@@ -769,12 +769,8 @@ static int server_initialize_subsystems(
     ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &shm_key_hint);
     assert(ret == 0);
 
-    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
-                                               "mmap")))
-    {
-        /* set db cache type to mmap rather than sys */
-        init_flags |= TROVE_DB_CACHE_MMAP;
-    }
+    /* only returns 0 */
+    ret = PINT_config_get_trove_flags( &server_config, &init_flags ); 
 
     /* Set the buffer size according to configuration file */
     BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
@@ -786,7 +782,7 @@ static int server_initialize_subsystems(
         server_config.trove_method, 
         trove_coll_to_method_callback,
         server_config.data_path,
-		server_config.meta_path,
+        server_config.meta_path,
         init_flags);
     if (ret < 0)
     {

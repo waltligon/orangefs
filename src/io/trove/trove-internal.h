@@ -399,7 +399,8 @@ struct TROVE_mgmt_ops
 			  char *data_path,
 			  char *meta_path,
 			  void *user_ptr,
-			  TROVE_op_id *out_op_id_p);
+			  TROVE_op_id *out_op_id_p,
+                          TROVE_ds_flags flags);
     
     int (*storage_remove)(
 			  char *data_path,

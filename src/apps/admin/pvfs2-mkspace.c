@@ -283,6 +283,7 @@ int main(int argc, char **argv)
     int ret = -1;
     options_t opts;
     memset(&opts, 0, sizeof(options_t));
+    TROVE_ds_flags flags = 0;
 
     if (parse_args(argc, argv, &opts))
     {
@@ -299,6 +300,7 @@ int main(int argc, char **argv)
         strncpy(opts.meta_ranges, default_meta_ranges, PATH_MAX);
         strncpy(opts.data_ranges, default_data_ranges, PATH_MAX);
         strncpy(opts.collection, default_collection, PATH_MAX);
+        flags |= TROVE_DB_TXN;
     }
 
     print_options(&opts);
@@ -339,7 +341,7 @@ int main(int argc, char **argv)
     {
         ret = pvfs2_mkspace(opts.data_space, opts.meta_space,
 			    opts.collection, opts.coll_id, 
-			    opts.root_handle, opts.meta_ranges, 
+			    opts.root_handle, flags, opts.meta_ranges, 
 			    opts.data_ranges, opts.collection_only, 
 			    opts.verbose);
     }

@@ -100,6 +100,7 @@ static DOTCONF_CB(get_file_stuffing);
 static DOTCONF_CB(get_db_cache_size_bytes);
 static DOTCONF_CB(get_trove_max_concurrent_io);
 static DOTCONF_CB(get_db_cache_type);
+static DOTCONF_CB(get_db_txn);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
@@ -924,6 +925,9 @@ static const configoption_t options[] =
      */
     {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
         CTX_STORAGEHINTS, "sys"},
+
+    {"DBTransactionSupport", ARG_STR, get_db_txn, NULL,
+        CTX_STORAGEHINTS, "yes"},
 
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -3135,6 +3139,27 @@ void PINT_config_release(struct server_configuration_s *config_s)
     }
 }
 
+DOTCONF_CB(get_db_txn)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if(!strcmp((char *)cmd->data.str, "yes"))
+    {
+        config_s->db_txn = 1;
+    }
+    else
+    {
+        config_s->db_txn = 0;
+    }
+
+    return NULL;
+}
+
 static int is_valid_alias(PINT_llist * host_aliases, char *str)
 {
     int ret = 0;
@@ -4494,6 +4519,7 @@ int PINT_config_pvfs2_mkspace(
     PINT_llist *cur = NULL;
     char *cur_meta_handle_range, *cur_data_handle_range = NULL;
     filesystem_configuration_s *cur_fs = NULL;
+    TROVE_ds_flags trove_flags = 0;
 
     if (config)
     {
@@ -4534,6 +4560,12 @@ int PINT_config_pvfs2_mkspace(
             root_handle = (is_root_handle_in_my_range(config, cur_fs) ?
                            cur_fs->root_handle : PVFS_HANDLE_NULL);
 
+            ret = PINT_config_get_trove_flags( config, &trove_flags );
+            if( ret != 0 )
+            {
+                gossip_err("%s: failed to set TROVE flags. empty flags will "
+                           "be used\n", __func__);
+            }
             /*
               for the first fs/collection we encounter, create the
               storage space if it doesn't exist.
@@ -4547,8 +4579,9 @@ int PINT_config_pvfs2_mkspace(
 
             ret = pvfs2_mkspace(
                 config->data_path, config->meta_path, cur_fs->file_system_name,
-                cur_fs->coll_id, root_handle, cur_meta_handle_range,
-                cur_data_handle_range, create_collection_only, 1);
+                cur_fs->coll_id, root_handle, trove_flags, 
+                cur_meta_handle_range, cur_data_handle_range, 
+                create_collection_only, 1);
 
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");
@@ -4646,6 +4679,27 @@ int PINT_config_get_trove_sync_data(
         fs_conf = PINT_config_find_fs_id(config, fs_id);
     }
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
+}
+
+/* returns the trove flags based on the configuration information in config.
+ * If no applicable configuration items exist 0 will be returned in *flags */
+int PINT_config_get_trove_flags( struct server_configuration_s *config, 
+    PVFS_ds_flags *flags )
+{
+    assert(config);
+    *flags = 0;
+    if(config->db_cache_type && (!strcmp(config->db_cache_type, "mmap")))
+    {
+        /* set db cache type to mmap rather than sys */
+        *flags |= TROVE_DB_CACHE_MMAP;
+    }
+
+    if(config->db_txn == 1)
+    {
+        /* set flag to enable transaction support */
+        *flags |= TROVE_DB_TXN;
+    }
+    return 0;
 }
 
 #endif

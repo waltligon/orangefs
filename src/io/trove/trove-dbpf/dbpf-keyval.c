@@ -891,6 +891,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     }
 
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
+                                   op_p->coll_p->storage->sto_env,
                                    op_p->handle,
                                    op_p->coll_p->pcache,
                                    op_p->u.k_iterate.key_array,
@@ -1050,6 +1051,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
     }
 
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
+                                   op_p->coll_p->storage->sto_env,
                                    op_p->handle,
                                    op_p->coll_p->pcache,
                                    (count != 0) ?
@@ -1483,6 +1485,7 @@ return_error:
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
+    DB_ENV *env_p,
     TROVE_handle handle,
     PINT_dbpf_keyval_pcache *pcache,    
     TROVE_keyval_s *keys_array,
@@ -1494,10 +1497,12 @@ int PINT_dbpf_keyval_iterate(
 
     int ret = -TROVE_EINVAL, i=0, get_key_count=0;
     DBC *dbc_p = NULL;
+    DB_TXN *txn_p = NULL;
     char keybuffer[PVFS_NAME_MAX];
     TROVE_keyval_s skey;
     TROVE_keyval_s *key;
     TROVE_keyval_s *val = NULL;
+    uint32_t db_flags = 0, txn_support = 0;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Entered: PINT_dpbf_keyval_iterate\n");
@@ -1505,6 +1510,37 @@ int PINT_dbpf_keyval_iterate(
     skey.buffer = keybuffer;
     skey.buffer_sz = PVFS_NAME_MAX;
     key = &skey;
+
+    /* TODO only if we are supposed to */
+
+    if( env_p )
+    {
+        ret = env_p->get_flags(env_p, &db_flags);
+        if( ret != 0 )
+        {
+            gossip_err("%s: couldn't retrieve environment flags: %s\n", 
+                       __func__, db_strerror(ret) );
+        }
+        else
+        {
+            if( db_flags & DB_AUTO_COMMIT )
+            {
+                txn_support = 1;
+            }
+        }
+    }
+
+    if( txn_support == 1 )
+    {
+        ret = env_p->txn_begin( env_p, NULL, &txn_p, 0);
+        if( ret != 0 )
+        {
+            gossip_debug( GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "%s: failed beginning txn\n", __func__);
+            *count = 0;
+            return -dbpf_db_error_to_trove_error(ret);
+        }
+    }
 
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0)
@@ -1514,9 +1550,14 @@ int PINT_dbpf_keyval_iterate(
 
         gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
         *count = 0;
-        return -dbpf_db_error_to_trove_error(ret);
-    }
 
+        if( txn_support == 1 )
+        {
+            txn_p->abort(txn_p);
+            return -dbpf_db_error_to_trove_error(ret);
+        }
+    }
+        
     if(pos == TROVE_ITERATE_START)
     {
         ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
@@ -1622,6 +1663,26 @@ return_error:
     if(dbc_p)
     {
         dbc_p->c_close(dbc_p);
+    }
+
+    if( ( txn_support == 1 ) && ( txn_p != NULL ) )
+    {
+        if( ret != 0 )
+        {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "%s: aborting txn from "
+                         "previous error\n", __func__);
+            txn_p->abort(txn_p);
+        }
+        else
+        {
+            ret = txn_p->commit(txn_p, 0);
+            if( ret != 0 )
+            {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "%s: failed to commit "
+                             "txn\n", __func__);
+                ret = -dbpf_db_error_to_trove_error(ret);
+            }
+        }
     }
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,

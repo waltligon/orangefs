@@ -76,7 +76,7 @@ static int src_get_version_0_0_1(
     char* ver_string, int ver_string_max);
 static int translate_0_0_1(
     char* data_storage_space, char* meta_storage_space, char* old_coll_path, 
-    char* coll_name, TROVE_coll_id coll_id);
+    char* coll_name, TROVE_coll_id coll_id, TROVE_ds_flags flags);
 static int translate_coll_eattr_0_0_1(
     char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
     TROVE_context_id trove_context);
@@ -226,6 +226,7 @@ int migrate_collection(void * config, void * sconfig)
     char old_coll_path[PATH_MAX];
     char version[256];
     int ret;
+    TROVE_ds_flags flags = 0;
 
     struct filesystem_configuration_s * fs_config = 
         (struct filesystem_configuration_s *) config;
@@ -295,12 +296,14 @@ int migrate_collection(void * config, void * sconfig)
             return -1;
         }
 
+        ret = PINT_config_get_trove_flags( server_config, &flags ); 
         ret = translate_0_0_1(
             server_config->data_path, 
 	    server_config->meta_path,
 	    old_coll_path, 
             fs_config->file_system_name, 
-            fs_config->coll_id);
+            fs_config->coll_id,
+            flags);
         if(ret < 0)
         {
             fprintf(stderr, 
@@ -682,7 +685,8 @@ static int translate_0_0_1(
     char* meta_storage_space, /**< path to metadata storage space */
     char* old_coll_path,   /**< path to old collection */
     char* coll_name,       /**< collection name */
-    TROVE_coll_id coll_id) /**< collection id in string format */
+    TROVE_coll_id coll_id, /**< collection id in string format */
+    TROVE_ds_flags flags)  /**< trove related flags from configuration file */
 {
     int ret = -1;
     /* choose a handle range big enough to encompass anything pvfs2-genconfig
@@ -733,6 +737,7 @@ static int translate_0_0_1(
         coll_name,
         coll_id, 
         TROVE_HANDLE_NULL,
+        flags,
         handle_range,
         NULL,
         1,

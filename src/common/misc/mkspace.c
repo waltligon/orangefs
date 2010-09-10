@@ -116,6 +116,7 @@ int pvfs2_mkspace(
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
+    TROVE_ds_flags flags,
     char *meta_handle_ranges,
     char *data_handle_ranges,
     int create_collection_only,
@@ -157,13 +158,15 @@ int pvfs2_mkspace(
     {
         /*
           try to initialize; fails if storage space isn't there, which
-          is exactly what we're expecting in this case.
-        */
+          is exactly what we're expecting in this case. 
+         */
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: following initialization "
+                     "and lookup is expected to fail\n", __func__);
         ret = trove_initialize(TROVE_METHOD_DBPF, 
 			       NULL, 
 			       data_path,
 			       meta_path,
-			       0);
+			       flags);
         if (ret > -1)
         {
             gossip_err("error: storage space %s or %s already "
@@ -171,7 +174,7 @@ int pvfs2_mkspace(
             return -1;
         }
 
-        ret = trove_storage_create(TROVE_METHOD_DBPF, data_path, meta_path, NULL, &op_id);
+        ret = trove_storage_create(TROVE_METHOD_DBPF, data_path, meta_path, NULL, &op_id, flags);
         if (ret != 1)
         {
             gossip_err("error: storage create failed; aborting!\n");
@@ -182,7 +185,7 @@ int pvfs2_mkspace(
     /* now that the storage space exists, initialize trove properly */
     ret = trove_initialize(
 	TROVE_METHOD_DBPF, NULL, 
-	data_path, meta_path, 0);
+	data_path, meta_path, flags);
     if (ret < 0)
     {
 	gossip_err("error: trove initialize failed; aborting!\n");
@@ -631,6 +634,7 @@ int pvfs2_mkspace(
     {
         trove_close_context(coll_id, trove_context);
     }
+    trove_collection_clear(TROVE_METHOD_DBPF, coll_id);
     trove_finalize(TROVE_METHOD_DBPF);
 
     mkspace_print(verbose, "collection created:\n"

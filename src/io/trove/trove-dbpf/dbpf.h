@@ -185,6 +185,7 @@ typedef int (* PINT_dbpf_keyval_iterate_callback)(
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
+    DB_ENV *db_envp,
     TROVE_handle handle,
     PINT_dbpf_keyval_pcache *pcache,    
     TROVE_keyval_s *keys_array,
@@ -204,6 +205,7 @@ struct dbpf_storage
     char *meta_path;   /* path to metadata storage directory */
     DB *sto_attr_db;
     DB *coll_db;
+    DB_ENV *sto_env;  /* move env to here so that all dbs have an env */
 };
 
 struct dbpf_collection
@@ -215,7 +217,6 @@ struct dbpf_collection
     DB *coll_attr_db;
     DB *ds_db;
     DB *keyval_db;
-    DB_ENV *coll_env;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -686,7 +687,7 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
+extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags,  TROVE_ds_flags *flags, int *err_p);
 extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
@@ -699,7 +700,8 @@ struct dbpf_storage *dbpf_storage_lookup(
 int dbpf_storage_create(char *data_path,
 			char *meta_path,
                         void *user_ptr,
-                        TROVE_op_id *out_op_id_p);
+                        TROVE_op_id *out_op_id_p,
+                        TROVE_ds_flags trove_flags);
 
 int dbpf_storage_remove(char *data_path,
 			char *meta_path,

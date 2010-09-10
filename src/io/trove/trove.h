@@ -61,7 +61,8 @@ enum
     TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_KEYVAL_HANDLE_COUNT    = 1 << 7,
     TROVE_BINARY_KEY             = 1 << 8, /* tell trove this is a binary key */
-    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9  /* tell trove to delete keyvals as it iterates */
+    TROVE_KEYVAL_ITERATE_REMOVE  = 1 << 9,  /* tell trove to delete keyvals as it iterates */
+    TROVE_DB_TXN                 = 1 << 10 /* tell trove to use transactions */
 };
 
 enum
@@ -125,7 +126,8 @@ int trove_storage_create(
     char *data_path,
     char *meta_path,
     void *user_ptr,
-    TROVE_op_id *out_op_id_p);
+    TROVE_op_id *out_op_id_p,
+    TROVE_ds_flags flags);
 
 int trove_storage_remove(
     TROVE_method_id method_id,
