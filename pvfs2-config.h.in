@@ -448,6 +448,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -456,6 +459,9 @@
 
 /* minor version number */
 #undef PVFS2_VERSION_MINOR
+
+/* release version number */
+#undef PVFS2_VERSION_RELEASE
 
 /* sub version number */
 #undef PVFS2_VERSION_SUB
