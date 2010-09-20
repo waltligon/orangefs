@@ -460,9 +460,6 @@
 /* minor version number */
 #undef PVFS2_VERSION_MINOR
 
-/* release version number */
-#undef PVFS2_VERSION_RELEASE
-
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
