@@ -20,12 +20,19 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "check.h"
+#include "pint-cached-config.h"
+#include "dist-dir-utils.h"
+
+static int lookup_get_dirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
 
 enum 
 {
     STATE_ENOTDIR = 22,
     STATE_NOMORESEGS = 23,
     LOOKUP_CHECK_DIR_ACLS = 24,
+    LOCAL_DIRENT = 25,
+    REMOTE_DIRENT = 26
 };
 
 %%
@@ -90,10 +97,32 @@ machine pvfs2_lookup_sm
     state read_directory_entry
     {
         run lookup_read_directory_entry;
-        success => read_object_metadata;
+        LOCAL_DIRENT => read_directory_entry_local;
+        REMOTE_DIRENT => read_directory_entry_remote;
         default => setup_resp;
     }
     
+    state read_directory_entry_local
+    {
+        run lookup_read_directory_entry_local;
+        success => read_object_metadata;
+        default => setup_resp;
+    }
+
+    state read_directory_entry_remote
+    {
+        run lookup_read_directory_entry_remote;
+        success => read_directory_entry_xfer_msgpair;
+        default => setup_resp;
+    }
+
+    state read_directory_entry_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => read_object_metadata;
+        default => setup_resp;
+    }
+
     state setup_resp 
     {
         run lookup_setup_resp;
@@ -294,6 +323,7 @@ static PINT_sm_action lookup_verify_object_metadata(
 
     assert(((a_p->objtype == PVFS_TYPE_DIRECTORY) ||
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
+/*            (a_p->objtype == PVFS_TYPE_DIRDATA)  || */
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
     gossip_debug(
@@ -676,15 +706,48 @@ static PINT_sm_action lookup_read_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    job_id_t j_id;
+    PVFS_dist_dir_hash_type dirdata_hash;
 
-    /* TODO: Need to see if directory entry is on this server. If not we
-       can't continue processing the current segment. */
+    /* Need to see if directory entry is on this server. If not prepare
+       to send a request to the server where it is located. */
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(s_op->u.lookup.segp);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "lookup: encrypt dirent %s into hash value %llu.\n",
+            s_op->u.lookup.segp, llu(dirdata_hash));
+
+    s_op->u.lookup.dirdata_server_index =
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &s_op->u.lookup.attr.u.dir.dist_dir_attr,
+            s_op->u.lookup.attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
+        s_op->u.lookup.dirdata_server_index);
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  need to read from dirent handle = "
-        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.attr.u.dir.dirdata_handles[0]),
+        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index]),
         s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
+
+    if (s_op->u.lookup.dirdata_server_index ==
+        s_op->u.lookup.attr.u.dir.dist_dir_attr.server_no)
+    {
+        js_p->error_code = LOCAL_DIRENT;
+    }
+    else
+    {
+        js_p->error_code = REMOTE_DIRENT;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action lookup_read_directory_entry_local(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t j_id;
+    int ret = -PVFS_EINVAL;
+
+    js_p->error_code = 0;
 
     s_op->key.buffer = s_op->u.lookup.segp;
     s_op->key.buffer_sz = strlen(s_op->u.lookup.segp) + 1;
@@ -698,18 +761,88 @@ static PINT_sm_action lookup_read_directory_entry(
     */
     s_op->u.lookup.seg_nr++;
 
-    /* TODO: Decide which dirdata_handle is correct. Do server-to-server
-       communication if necessary to read the entry. */
     ret = job_trove_keyval_read(
-        s_op->req->u.lookup_path.fs_id, s_op->u.lookup.attr.u.dir.dirdata_handles[0],
+        s_op->req->u.lookup_path.fs_id,
+        s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index],
         &s_op->key, &s_op->val, 
         0, 
         NULL, smcb, 0, js_p, &j_id,
         server_job_context, s_op->req->hints);
-
     return ret;
 }
 
+static PINT_sm_action lookup_read_directory_entry_remote(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret;
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup state: read_directory_entry_remote\n");
+
+    /*
+      NOTE: if this operation fails, seg_nr will indicate one too many
+      valid segments; this is addressed in lookup_send_response.
+    */
+    s_op->u.lookup.seg_nr++;
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.lookup_path.fs_id);
+
+    PINT_SERVREQ_MGMT_GET_DIRENT_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        s_op->req->u.lookup_path.fs_id,
+        s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index],
+        s_op->u.lookup.segp,
+        NULL);
+
+    msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
+    msg_p->handle =
+        s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = lookup_get_dirent_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+        "reading remote directory entry from handle %llu\n",
+        llu(msg_p->handle));
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static int lookup_get_dirent_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
+ 
+
+    assert(resp_p->op == PVFS_SERV_MGMT_GET_DIRENT);
+
+    if (resp_p->status == 0 && resp_p->u.mgmt_get_dirent.error == 0)
+    {
+        s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.seg_nr-1] =
+            resp_p->u.mgmt_get_dirent.handle;
+
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  lookup_get_dirent_comp_fn: "
+            "got dirent handle %llu\n",
+            llu(resp_p->u.mgmt_get_dirent.handle));
+    }
+    return resp_p->u.mgmt_get_dirent.error;
+}
 
 static PINT_sm_action lookup_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)

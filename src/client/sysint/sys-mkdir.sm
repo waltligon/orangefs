@@ -459,7 +459,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->object_ref.handle,
+        &msg_p->svr_addr, msg_p->handle,
         sm_p->object_ref.fs_id);
 
     if (ret)

@@ -410,6 +410,8 @@ struct PINT_server_lookup_op
     PVFS_object_attr attr;
 
     PVFS_error* err_array;
+
+    int dirdata_server_index;
 };
 
 struct PINT_server_readdir_op
@@ -600,6 +602,11 @@ struct PINT_server_tree_communicate_op
     int handle_index;
 };
 
+struct PINT_server_mgmt_get_dirent_op
+{
+    PVFS_handle handle;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -691,6 +698,7 @@ typedef struct PINT_server_op
         struct PINT_server_create_copies_op create_copies;
         struct PINT_server_mirror_op mirror;
         struct PINT_server_tree_communicate_op tree_communicate;
+        struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
     } u;
 
 } PINT_server_op;

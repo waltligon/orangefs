@@ -69,9 +69,13 @@ nested machine pvfs2_mkdir_work_sm
     state fill_handles_to_dist_dir_struct
     {
         run mkdir_fill_handles_to_dist_dir_struct;
+        default => write_keyval_to_meta_handle;
+/*
         default => remote_dirdata_keyval_setup_msgpair;
+*/
     }
 
+/*
     state remote_dirdata_keyval_setup_msgpair
     {
         run mkdir_remote_dirdata_keyval_setup_msgpair;
@@ -85,6 +89,7 @@ nested machine pvfs2_mkdir_work_sm
         success => write_keyval_to_meta_handle;
         default => err_msg;
     }
+*/
     
     state write_keyval_to_meta_handle
     {
@@ -238,11 +243,11 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     num_total_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
     num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
 
-    /* init meta handle dist_dir_struct, server_no = -1 */
+    /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
             &attr->u.dir.dist_dir_bitmap,
             num_total_dirdata_servers,
-            -1,
+            0,
             num_initial_dirdata_servers);
 
     assert(ret == 0);
@@ -457,6 +462,7 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
 }
 
 
+#if 0
 static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -506,6 +512,7 @@ static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
+#endif
 
 
 static PINT_sm_action mkdir_write_keyval_to_meta_handle(

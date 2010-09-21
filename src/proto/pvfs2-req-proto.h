@@ -84,6 +84,7 @@ enum PVFS_server_op
     PVFS_SERV_TREE_REMOVE = 41,
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
     PVFS_SERV_TREE_SETATTR = 43,
+    PVFS_SERV_MGMT_GET_DIRENT = 44,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1985,6 +1986,47 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+/* mgmt_get_dirent */
+/* - used to retrieve the handle of the specified directory entry */
+struct PVFS_servreq_mgmt_get_dirent
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    char *entry;               /* name of entry to retrieve */
+};
+endecode_fields_3_struct(
+    PVFS_servreq_mgmt_get_dirent,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    string, entry)
+#define extra_size_PVFS_servreq_mgmt_get_dirent \
+  roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
+
+#define PINT_SERVREQ_MGMT_GET_DIRENT_FILL(__req,   \
+                                          __creds, \
+                                          __fsid,  \
+                                          __handle,\
+                                          __entry,\
+                                          __hints) \
+do {                                                       \
+    memset(&(__req), 0, sizeof(__req));                    \
+    (__req).op = PVFS_SERV_MGMT_GET_DIRENT;                \
+    (__req).credentials = (__creds);                       \
+    (__req).hints = (__hints);                             \
+    (__req).u.mgmt_get_dirent.fs_id = (__fsid);            \
+    (__req).u.mgmt_get_dirent.handle = (__handle);         \
+    (__req).u.mgmt_get_dirent.entry = (__entry);           \
+} while (0)
+
+struct PVFS_servresp_mgmt_get_dirent
+{
+    PVFS_handle handle;
+    PVFS_error  error;
+};
+endecode_fields_2_struct(
+    PVFS_servresp_mgmt_get_dirent,
+    PVFS_handle, handle,
+    PVFS_error, error)
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -2032,6 +2074,7 @@ struct PVFS_server_req
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
         struct PVFS_servreq_tree_setattr tree_setattr;
+        struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2087,6 +2130,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
+        struct PVFS_servresp_mgmt_get_dirent mgmt_get_dirent;
     } u;
 };
 endecode_fields_2_struct(

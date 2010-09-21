@@ -426,11 +426,39 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
+        key.buffer = DIRECTORY_ENTRY_KEYSTR;
+        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
+        val.buffer = &root_dirdata_handle;
+        val.buffer_sz = sizeof(TROVE_handle);
+            
+        ret = trove_keyval_write(
+            coll_id, new_root_handle, &key, &val,
+            TROVE_SYNC, 0, NULL,
+            trove_context, &op_id, NULL);
+            
+        while (ret == 0)
+        {           
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+        
+        if (ret < 0)
+        {
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
+            return -1;
+        }   
+
+        mkspace_print(
+            verbose, "info: wrote attributes for root directory.\n");
+            
+
         /* !!! set dist-dir-struct keyvals for root handle and its dirdata handle */
         /* init meta handle dist_dir_struct, num_servers=1, server_no = -1, pre_dsg_num_server=1 */
         /* should be reusable when init lost+found */
         ret = PINT_init_dist_dir_state(&meta_dist_dir_attr,
-                &dist_dir_bitmap, 1, -1, 1);
+                &dist_dir_bitmap, 1, 0, 1);
         assert(ret == 0);
 
         /* gossip dist_dir_attr and dist_dir_bitmap */
@@ -539,7 +567,7 @@ int pvfs2_mkspace(
             return -1;
         }
 
-
+#if 0
         /* adjust dist_dir_attr val_a */
         val_a[0].buffer = &dirdata_dist_dir_attr;
         
@@ -572,6 +600,7 @@ int pvfs2_mkspace(
 
         mkspace_print(
             verbose, "info: wrote attributes for root directory.\n");
+#endif
 
         /****************************************************
           at this point we need to create and initialize the
@@ -697,6 +726,34 @@ int pvfs2_mkspace(
             "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
+        key.buffer = DIRECTORY_ENTRY_KEYSTR;
+        key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
+        val.buffer = &lost_and_found_dirdata_handle;
+        val.buffer_sz = sizeof(TROVE_handle);
+
+        ret = trove_keyval_write(
+            coll_id, lost_and_found_handle, &key, &val,
+            TROVE_SYNC,
+            0, NULL, trove_context, &op_id, NULL);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
+            return -1;
+        }
+
+        mkspace_print(verbose, "info: wrote attributes for "
+                      "lost+found directory.\n");
+
+
         /* set dist-dir-struct keyvals for lost+find handle and its dirdata handle 
          * use 1 dirdata server now, just as root handle
          * */
@@ -733,6 +790,7 @@ int pvfs2_mkspace(
             return -1;
         }
 
+#if 0
         /* adjust dist_dir_attr val */
         val_a[0].buffer = &dirdata_dist_dir_attr;
 
@@ -765,6 +823,7 @@ int pvfs2_mkspace(
 
         mkspace_print(verbose, "info: wrote attributes for "
                       "lost+found directory.\n");
+#endif
 
         /*
           finally, crdirent the lost+found directory into the root

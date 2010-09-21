@@ -283,6 +283,10 @@ static void lebf_initialize(void)
                 req.u.tree_setattr.handle_array = NULL;
                 reqsize = extra_size_PVFS_servreq_tree_setattr;
                 break;
+	    case PVFS_SERV_MGMT_GET_DIRENT:
+		req.u.mgmt_get_dirent.entry = tmp_name;
+		reqsize = extra_size_PVFS_servreq_mgmt_get_dirent;
+		break;
             case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
                 assert(0);
                 break;
@@ -453,6 +457,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+	CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -551,6 +556,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -667,6 +673,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+	CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -755,6 +762,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+	CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -925,6 +933,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
+	    case PVFS_SERV_MGMT_GET_DIRENT:
 
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
@@ -1088,6 +1097,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_REMOVE:
                 case PVFS_SERV_TREE_SETATTR:
+	        case PVFS_SERV_MGMT_GET_DIRENT:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:
