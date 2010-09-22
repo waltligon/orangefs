@@ -391,7 +391,8 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_fs_id fsid;
     char* host;
     PVFS_BMI_addr_t host_addr;
-    PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_handle_extent_array handle_extent_array;
+    PVFS_ds_type type;
     PVFS_capability capability;
 };
 
@@ -731,7 +732,12 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
-
+extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
@@ -745,10 +751,10 @@ extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
-extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

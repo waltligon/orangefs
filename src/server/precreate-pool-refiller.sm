@@ -109,11 +109,14 @@ static PINT_sm_action wait_for_threshold_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
+
+    PVFS_ds_type_to_int(s_op->u.precreate_pool_refiller.type, &index);
 
     return(job_precreate_pool_check_level(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
-        user_opts->precreate_low_threshold,
+        user_opts->precreate_low_threshold[index],
 	smcb,
 	0,
 	js_p,
@@ -131,12 +134,14 @@ static PINT_sm_action store_handles_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index );
 
     return(job_precreate_pool_fill(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         s_op->u.precreate_pool_refiller.precreate_handle_array,
-        user_opts->precreate_batch_size,
+        user_opts->precreate_batch_size[index],
 	smcb,
 	0,
 	js_p,
@@ -157,10 +162,13 @@ static PINT_sm_action setup_batch_create_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    int index = 0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
-        s_op->u.precreate_pool_refiller.host,
-        llu(s_op->u.precreate_pool_refiller.pool_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated "
+                 "handles from %s, of type %u, and put store them in %llu.\n",
+                s_op->u.precreate_pool_refiller.host,
+                s_op->u.precreate_pool_refiller.type,
+                llu(s_op->u.precreate_pool_refiller.pool_handle));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -175,17 +183,19 @@ static PINT_sm_action setup_batch_create_fn(
 
     msg_p->svr_addr = s_op->u.precreate_pool_refiller.host_addr;
 
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index );
+
     PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
         s_op->u.precreate_pool_refiller.capability,
         s_op->u.precreate_pool_refiller.fsid,
-        PVFS_TYPE_DATAFILE,
-        user_opts->precreate_batch_size,
-        s_op->u.precreate_pool_refiller.data_handle_extent_array,
+        s_op->u.precreate_pool_refiller.type,
+        user_opts->precreate_batch_size[index],
+        s_op->u.precreate_pool_refiller.handle_extent_array,
         NULL);
 
     msg_p->fs_id = s_op->u.precreate_pool_refiller.fsid;
-    msg_p->handle = s_op->u.precreate_pool_refiller.data_handle_extent_array.extent_array[0].first;
+    msg_p->handle = s_op->u.precreate_pool_refiller.handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = batch_create_comp_fn;
 
@@ -206,7 +216,10 @@ static PINT_sm_action setup_fn(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct server_configuration_s *user_opts = get_server_config_struct();
     PVFS_capability *cap = &s_op->u.precreate_pool_refiller.capability;
+    int index = 0;
     int ret;
+  
+    PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
 
     /* nlmills: TODO: ensure this is freed in all cases */
     ret = PINT_init_capability(cap);
@@ -229,7 +242,7 @@ static PINT_sm_action setup_fn(
     }
         
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
-        malloc(user_opts->precreate_batch_size * sizeof(PVFS_handle));
+        malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));
     if(!s_op->u.precreate_pool_refiller.precreate_handle_array)
     {
         js_p->error_code = -PVFS_ENOMEM;

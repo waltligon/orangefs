@@ -975,10 +975,11 @@ do {                                                         \
 #define remove_op_from_request_list(op)                      \
 do {                                                         \
     struct list_head *tmp = NULL;                            \
+    struct list_head *tmp_safe = NULL;                       \
     pvfs2_kernel_op_t *tmp_op = NULL;                        \
                                                              \
     spin_lock(&pvfs2_request_list_lock);                     \
-    list_for_each(tmp, &pvfs2_request_list) {                \
+    list_for_each_safe(tmp, tmp_safe, &pvfs2_request_list) { \
         tmp_op = list_entry(tmp, pvfs2_kernel_op_t, list);   \
         if (tmp_op && (tmp_op == op)) {                      \
             list_del(&tmp_op->list);                         \
@@ -1078,10 +1079,11 @@ do {                                                                 \
 #define remove_pvfs2_sb(sb)                                          \
 do {                                                                 \
     struct list_head *tmp = NULL;                                    \
+    struct list_head *tmp_safe = NULL;                               \
     pvfs2_sb_info_t *pvfs2_sb = NULL;                                \
                                                                      \
     spin_lock(&pvfs2_superblocks_lock);                              \
-    list_for_each(tmp, &pvfs2_superblocks) {                         \
+    list_for_each_safe(tmp, tmp_safe, &pvfs2_superblocks) {          \
         pvfs2_sb = list_entry(tmp, pvfs2_sb_info_t, list);           \
         if (pvfs2_sb && (pvfs2_sb->sb == sb)) {                      \
             gossip_debug(GOSSIP_SUPER_DEBUG, "Removing SB %p from pvfs2 superblocks\n",   \

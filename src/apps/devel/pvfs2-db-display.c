@@ -54,14 +54,17 @@ void print_dspace( DBT key, DBT val );
 void print_keyval( DBT key, DBT val );
 void print_collection_attr( DBT key, DBT val );
 void print_help(char *progname);
+void print_ds_type( PVFS_ds_type type );
 int process_args(int argc, char ** argv);
 
 int main( int argc, char **argv )
 {
     DB *db_p = NULL;
+    DB_ENV *dbe_p = NULL;
     char *path = NULL;
-    u_int32_t flags = DB_RDONLY;
-    u_int32_t type = DB_UNKNOWN;
+    u_int32_t db_flags = DB_RDONLY|DB_THREAD, 
+              env_flags = DB_CREATE | DB_INIT_MPOOL,
+              type = DB_UNKNOWN;
     int ret, path_len; 
 
     if( (ret = process_args( argc, argv)) != 0 )
@@ -79,22 +82,40 @@ int main( int argc, char **argv )
         return ENOMEM;
     }
 
+    ret = db_env_create(&dbe_p, 0);
+    if (ret != 0) 
+    {
+        printf("Error creating env handle: %s\n", db_strerror(ret));
+        return -1;
+    }
+
+    /* Open the environment. */
+    ret = dbe_p->open(dbe_p,
+                      opts.dbpath,
+                      env_flags,
+                      0);
+    if (ret != 0) 
+    {
+        printf("Environment open failed: %s", db_strerror(ret));
+        return -1;
+    } 
+
     /* open and print each database */
 
     /* collection database */
     sprintf(path, "%s/%s", opts.dbpath, COLLECTION_FILE );
-    ret = open_db( &db_p, path, type, flags);
+    ret = open_db( &db_p, path, type, db_flags);
     if (ret == 0) 
     {
         printf("Collection Database\n");
         iterate_database(db_p, &print_collection );
         close_db(db_p);
     }
-
+    
     /* storage database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s", opts.dbpath, STORAGE_FILE );
-    ret = open_db( &db_p, path, type, flags);
+    ret = open_db( &db_p, path, type, db_flags);
     if (ret == 0) 
     {
         printf("Storage Database\n");
@@ -105,7 +126,7 @@ int main( int argc, char **argv )
     /* dspace database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, DATASPACE_FILE );
-    ret = open_db( &db_p, path, type, flags);
+    ret = open_db( &db_p, path, type, db_flags);
     if (ret == 0) 
     {
         printf("Dataspace Database\n");
@@ -116,7 +137,7 @@ int main( int argc, char **argv )
     /* keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = open_db( &db_p, path, type, flags);
+    ret = open_db( &db_p, path, type, db_flags);
     if (ret == 0) 
     {
         printf("Keyval Database\n");
@@ -127,13 +148,15 @@ int main( int argc, char **argv )
     /* collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = open_db( &db_p, path, type, flags);
+    ret = open_db( &db_p, path, type, db_flags);
     if (ret == 0) 
     {
         printf("Collection Attributes Database\n");
         iterate_database(db_p, &print_collection_attr );
         close_db(db_p);
     }
+
+    dbe_p->close(dbe_p, 0);
 
     free(path);
     return 0;
@@ -185,7 +208,7 @@ void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) )
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if( ret != 0 )
     {
-        printf("Unable to open cursor to print collection: %s\n", 
+        printf("Unable to open cursor to print db: %s\n", 
                db_strerror(ret));
         return;
     }
@@ -197,6 +220,8 @@ void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) )
     while ((ret = dbc_p->c_get(dbc_p, &key, &val, DB_NEXT)) == 0)
     {
         print( key, val );
+        memset(key.data, 0, key.size);
+        memset(val.data, 0, val.size);
     }
 
     if( ret != DB_NOTFOUND )
@@ -238,34 +263,8 @@ void print_dspace( DBT key, DBT val )
     v = val.data;
 
     printf("(%llu)(%d) -> ", llu(k), key.size);
-
-    switch( v->type )
-    {
-        case PVFS_TYPE_NONE: 
-            printf("(type: none)");
-            break;
-        case PVFS_TYPE_METAFILE: 
-            printf("(type: metafile)");
-            break;
-        case PVFS_TYPE_DATAFILE: 
-            printf("(type: datafile)");
-            break;
-        case PVFS_TYPE_DIRECTORY: 
-            printf("(type: directory)");
-            break;
-        case PVFS_TYPE_SYMLINK:
-             printf("(type: symlink)");
-            break;
-        case PVFS_TYPE_DIRDATA: 
-            printf("(type: dirdata)");
-            break;
-        case PVFS_TYPE_INTERNAL: 
-            printf("(type: internal)");
-            break;
-        default: 
-            printf("type: unknown");
-            break;
-    }
+ 
+    print_ds_type( v->type );
 
     printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
@@ -279,7 +278,7 @@ void print_dspace( DBT key, DBT val )
 void print_keyval( DBT key, DBT val )
 {
     struct dbpf_keyval_db_entry *k;
-    uint64_t vh;
+    uint64_t vh, kh;
     uint32_t vi;
 
 
@@ -288,6 +287,11 @@ void print_keyval( DBT key, DBT val )
     if( key.size == 8 )
     {
         printf("()(%d) -> ", key.size);
+    }
+    else if( key.size == 16 )
+    {
+        kh = *(uint64_t *)k->key;
+        printf("(%llu)(%d) -> ", llu(kh), key.size);
     }
     else
     {
@@ -317,11 +321,10 @@ void print_keyval( DBT key, DBT val )
         printf("(%llu)(%d)\n", llu(vh), val.size );
     }
  
-    else if( key.size == 8 && val.size == 4 )
+    else if( (key.size == 8 || key.size == 16 ) && val.size == 4 )
     {
         vi = *(uint32_t *)val.data;
         printf("(%u)(%d)\n", vi, val.size );
-
     }
 /*
  * not implemented
@@ -444,6 +447,37 @@ void print_help(char *progname)
                     "contains\n\t\t\t\tcollection_attributes.db, "
                     "dataspace_attrbutes.db\n\t\t\t\tand keyval.db\n\n");
     return;
+}
+
+void print_ds_type( PVFS_ds_type type )
+{
+    switch( type )
+    {
+        case PVFS_TYPE_NONE: 
+            printf("(type: none)");
+            break;
+        case PVFS_TYPE_METAFILE: 
+            printf("(type: metafile)");
+            break;
+        case PVFS_TYPE_DATAFILE: 
+            printf("(type: datafile)");
+            break;
+        case PVFS_TYPE_DIRECTORY: 
+            printf("(type: directory)");
+            break;
+        case PVFS_TYPE_SYMLINK:
+             printf("(type: symlink)");
+            break;
+        case PVFS_TYPE_DIRDATA: 
+            printf("(type: dirdata)");
+            break;
+        case PVFS_TYPE_INTERNAL: 
+            printf("(type: internal)");
+            break;
+        default: 
+            printf("type: unknown");
+            break;
+    }
 }
 
 /*

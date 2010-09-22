@@ -53,6 +53,8 @@ dbpf_collection_seteattr()
 
 dbpf_collection_geteattr()
 
+dbpf_collection_deleattr()
+
 dbpf_initialize() -- called once before DBPF interface is used (?)
 
 dbpf_finalize()

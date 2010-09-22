@@ -290,6 +290,7 @@ static PINT_sm_action get_handles(
     ret = job_precreate_pool_get_handles(
         s_op->req->u.unstuff.fs_id,
         (s_op->u.unstuff.num_dfiles_req-1),
+        PVFS_TYPE_DATAFILE,
         NULL,
         &s_op->u.unstuff.dfile_array[1],
         0,
@@ -579,6 +580,10 @@ static int perm_unstuff(PINT_server_op *s_op)
 {
     int ret;
 
+    /* nlmills: TODO: current functionality in Orange-Branch is described
+     * in the log entry for changeset Orange-Branch:bligon:20100920181650.
+     * probably need to replicate this.
+     */
     if (s_op->req->capability.op_mask & PINT_CAP_WRITE)
     {
         ret = 0;

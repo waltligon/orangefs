@@ -268,6 +268,8 @@ machine pvfs2_get_attr_sm
 
 %%
 
+
+
 /* getattr_verify_attribs()
  *
  * We initialize the attribute mask that will be returned in this
