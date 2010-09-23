@@ -115,7 +115,6 @@ PVFS_error PVFS_isys_readdir(
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    int dirdata_index = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
 
@@ -160,29 +159,9 @@ PVFS_error PVFS_isys_readdir(
 
     sm_p->readdir.pos_token = sm_p->u.readdir.pos_token = token;
     sm_p->readdir.dirent_limit = sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
-    *(sm_p->readdir.dirent_outcount) = 0;
-
-    if(token != PVFS_READDIR_START) /* get dirdata_index from rcache */
-    {
-        ret = PINT_rcache_get_cached_index(&ref, token, &dirdata_index);
-        if(ret < 0)
-        {
-            gossip_err("invalid readdir cache content!! \n");
-            return ret;
-        }
-        gossip_debug(GOSSIP_READDIR_DEBUG, 
-                "*** get cached index from rcache, "
-                "[handle %llu, token %llu, dirdata_index %d]\n",
-                llu(ref.handle),
-                llu(token),
-                dirdata_index);
-    }
-
-    sm_p->readdir.dirdata_index = sm_p->u.readdir.dirdata_index = dirdata_index;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
-                 "%llu on fs %d, dirdata #%d\n", llu(ref.handle), 
-                 ref.fs_id, dirdata_index);
+                 "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -235,7 +214,37 @@ static PINT_sm_action readdir_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int dirdata_index = 0;
+    int ret = -1;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
+
+    *(sm_p->readdir.dirent_outcount) = 0;
+
+    if(sm_p->readdir.pos_token != PVFS_READDIR_START) /* get dirdata_index from rcache */
+    {
+        ret = PINT_rcache_get_cached_index(&sm_p->object_ref, 
+                sm_p->readdir.pos_token, &dirdata_index);
+        if(ret < 0)
+        {
+            gossip_err("invalid readdir cache content!! \n");
+            return ret;
+        }
+        gossip_debug(GOSSIP_READDIR_DEBUG, 
+                "*** get cached index from rcache, "
+                "[handle %llu, token %llu, dirdata_index %d]\n",
+                llu(sm_p->object_ref.handle),
+                llu(sm_p->readdir.pos_token),
+                dirdata_index);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_READDIR_DEBUG, 
+                "*** token=PVFS_READDIR_START, use dirdata_index=0\n");
+
+    }
+
+    sm_p->readdir.dirdata_index = sm_p->u.readdir.dirdata_index = dirdata_index;
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
