@@ -29,6 +29,7 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "rcache.h"
 
 PINT_smcb *g_smcb = NULL; 
 
@@ -51,7 +52,8 @@ typedef enum
     CLIENT_CONFIG_MGR_INIT = (1 << 7),
     CLIENT_REQ_SCHED_INIT  = (1 << 8),
     CLIENT_JOB_TIME_MGR_INIT = (1 << 9),
-    CLIENT_DIST_INIT       = (1 << 10)
+    CLIENT_DIST_INIT       = (1 << 10),
+    CLIENT_RCACHE_INIT       = (1 << 11)
 } PINT_client_status_flag;
 
 /* PVFS_sys_initialize()
@@ -218,6 +220,15 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }        
     client_status_flag |= CLIENT_CONFIG_MGR_INIT;
 
+    /* initialize the readdir/readdirplus cache and set the default timeout */
+    ret = PINT_rcache_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Error initializing name readdir cache\n");
+        goto error_exit;        
+    }        
+    client_status_flag |= CLIENT_RCACHE_INIT;
+
     /* initialize the handle mapping interface */
     ret = PINT_cached_config_initialize();
     if (ret < 0)
@@ -307,6 +318,11 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (client_status_flag & CLIENT_DIST_INIT)
     {
         PINT_dist_finalize();
+    }
+
+    if (client_status_flag & CLIENT_RCACHE_INIT)
+    {
+        PINT_rcache_finalize();
     }
 
     PINT_smcb_free(smcb);

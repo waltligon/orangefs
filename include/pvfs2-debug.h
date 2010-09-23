@@ -76,6 +76,7 @@
 #define GOSSIP_DIRECTIO_DEBUG          ((uint64_t)1 << 54)
 #define GOSSIP_MGMT_DEBUG              ((uint64_t)1 << 55)
 #define GOSSIP_MIRROR_DEBUG            ((uint64_t)1 << 56)
+#define GOSSIP_RCACHE_DEBUG            ((uint64_t)1 << 57)
 
 /* NOTE: if you want your gossip flag to be controllable from 
  * pvfs2-set-debugmask you have to add it in
@@ -222,6 +223,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "bstream", GOSSIP_BSTREAM_DEBUG },
     /* Debug trove in direct io mode */
     {"directio", GOSSIP_DIRECTIO_DEBUG},
+    /* Debug the client readdir/readdirplus cache.  Only useful on the client. */
+    { "rcache", GOSSIP_RCACHE_DEBUG },
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |

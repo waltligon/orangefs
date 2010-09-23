@@ -281,8 +281,9 @@ struct PINT_client_flush_sm
 
 struct PINT_client_readdir_sm
 {
-    PVFS_ds_position pos_token;         /* input parameter */
+    PVFS_ds_position pos_token;         /* in/out parameter */
     int dirent_limit;                   /* input parameter */
+    int dirdata_index;                  /* in/out parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
 };
 
@@ -556,6 +557,7 @@ typedef struct
     uint64_t         *directory_version;
     PVFS_ds_position pos_token;     /* input parameter */
     int32_t      dirent_limit;      /* input parameter */
+    int32_t      dirdata_index;      /* input parameter */
 } PINT_sm_readdir_state;
 
 typedef struct PINT_client_sm
