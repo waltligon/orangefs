@@ -1173,8 +1173,14 @@ NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/v
 ifeq ($(NUM_UTS_LINES),1)
     KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
 else
-    KERNEL_VERS := $(shell uname -r)
+    NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/utsrelease.h)
+    ifeq ($(NUM_UTS_LINES),1)
+        KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/utsrelease.h | cut -d\" -f2)
+    else
+        KERNEL_VERS := $(shell uname -r)
+    endif
 endif
+
 KMOD_DIR ?= $(DESTDIR)/${kmod_prefix}/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: just_kmod_install
