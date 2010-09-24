@@ -21,6 +21,12 @@
 
 #include <stdlib.h>
 
+#ifdef WIN32
+#define __inline__     _inline
+#define inline         _inline
+#define __func__       __FUNCTION__
+#endif
+
 struct qlist_head {
     struct qlist_head *next, *prev;
 };
