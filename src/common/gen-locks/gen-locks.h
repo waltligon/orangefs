@@ -26,8 +26,16 @@
 /* this is especially important for development in which case the locks
  * should really be enabled in order to verify proper operation 
  */
-#if !defined(__GEN_NULL_LOCKING__) && !defined(__GEN_POSIX_LOCKING__)
+#if !defined(__GEN_NULL_LOCKING__) 
+#ifdef WIN32
+#if !defined(__GEN_WIN_LOCKING__)
+#define __GEN_WIN_LOCKING__
+#endif
+#else
+#if !defined(__GEN_POSIX_LOCKING__)
 #define __GEN_POSIX_LOCKING__
+#endif
+#endif
 #endif
 
 #ifdef __GEN_POSIX_LOCKING__
@@ -68,6 +76,45 @@ typedef pthread_cond_t  gen_cond_t;
 #define gen_cond_timedwait(c, m, s) gen_posix_cond_timedwait(c, m, s)
 #define gen_cond_signal(c) gen_posix_cond_signal(c)
 #define gen_cond_broadcast(c) gen_posix_cond_broadcast(c)
+
+#elif defined (__GEN_WIN_LOCKING__)
+
+#include <Windows.h>
+
+int gen_win_mutex_lock(HANDLE *mut);
+int gen_win_mutex_unlock(HANDLE *mut);
+int gen_win_mutex_trylock(HANDLE *mut);
+HANDLE *gen_win_mutex_build(void);
+int gen_win_mutex_destroy(HANDLE *mut);
+int gen_win_mutex_init(HANDLE *mut);
+HANDLE gen_win_thread_self(void);
+
+int gen_win_cond_init(HANDLE *cond, void *attr);
+int gen_win_cond_destroy(HANDLE *cond);
+int gen_win_cond_wait(HANDLE *cond, HANDLE *mut);
+int gen_win_cond_timedwait(HANDLE *cond, HANDLE *mut,
+                             const struct timespec *abstime);
+int gen_win_cond_signal(HANDLE *cond);
+int gen_win_cond_broadcast(HANDLE *cond);
+
+typedef HANDLE gen_mutex_t;
+typedef HANDLE gen_thread_t;
+typedef HANDLE gen_cond_t;
+#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, false, NULL);
+#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
+#define gen_mutex_lock(m) gen_win_mutex_lock(m)
+#define gen_mutex_unlock(m) gen_win_mutex_unlock(m)
+#define gen_mutex_trylock(m) gen_win_mutex_trylock(m)
+#define gen_mutex_destroy(m) gen_win_mutex_destroy(m)
+#define gen_mutex_init(m) gen_win_mutex_init(m)
+#define gen_thread_self() gen_win_thread_self()
+
+#define gen_cond_init(c) gen_win_cond_init(c, NULL)
+#define gen_cond_destroy(c) gen_win_cond_destroy(c)
+#define gen_cond_wait(c, m) gen_win_cond_wait(c, m)
+#define gen_cond_timedwait(c, m, s) gen_win_cond_timedwait(c, m, s)
+#define gen_cond_signal(c) gen_win_cond_signal(c)
+#define gen_cond_broadcast(c) gen_win_cond_broadcast(c)
 
 #elif defined (__GEN_NULL_LOCKING__)
 	/* this stuff messes around just enough to prevent warnings */
@@ -132,7 +179,7 @@ static inline int gen_cond_broadcast(gen_cond_t *cond)
 }
 
 #else /* __GEN_NULL_LOCKING__ */
-#error "Must define either POSIX or NULL locking"
+#error "Must define either POSIX, Windows or NULL locking"
 #endif
 
 #endif /* __GEN_LOCKS_H */

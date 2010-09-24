@@ -18,7 +18,9 @@
 #else
 #include <stdint.h>
 #include <sys/stat.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <limits.h>
 #include <errno.h>
 #endif

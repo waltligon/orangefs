@@ -17,6 +17,7 @@
 #include <assert.h>
 //#include <sys/uio.h>
 #include <time.h>
+#include <stdint.h>
 //#include <sys/time.h>
 //#include <sys/socket.h>
 //#include <netinet/in.h>

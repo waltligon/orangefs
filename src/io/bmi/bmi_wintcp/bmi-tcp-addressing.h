@@ -12,7 +12,7 @@
 #define __BMI_TCP_ADDRESSING_H
 
 #include "bmi-types.h"
-#include <netinet/in.h>
+/* #include <netinet/in.h> */
 
 /*****************************************************************
  * Information specific to tcp/ip
