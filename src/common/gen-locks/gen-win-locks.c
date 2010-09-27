@@ -19,6 +19,14 @@
  */
 
 #ifndef __GEN_NULL_LOCKING__
+
+/* Global variables */
+/* TODO: may need to init and delete in DLL enter/exit functions */
+LPCRITICAL_SECTION cond_list_lock = NULL;
+
+pgen_cond_t cond_list_head = NULL;
+pgen_cond_t cond_list_tail = NULL;
+
 /*
  * gen_mutex_init()
  *
@@ -78,7 +86,28 @@ int gen_win_mutex_unlock(
 int gen_win_mutex_trylock(
     HANDLE *mut)
 {
-    return (pthread_mutex_trylock(mut));
+    DWORD dwWaitResult;
+    int rc;
+      
+    dwWaitResult = WaitForSingleObject(*mut, 0);
+    if (dwWaitResult == WAIT_OBJECT_0 || dwWaitResult == WAIT_ABANDONED)
+    {
+        rc = 0;
+    }
+    else
+    {
+        rc = -1;
+        if (dwWaitResult == WAIT_TIMEOUT)
+        {
+            errno = EBUSY;
+        }
+        else
+        {
+            errno = GetLastError();
+        }
+    }
+
+    return rc;
 }
 
 /*
@@ -94,8 +123,9 @@ int gen_win_mutex_destroy(
 
     if (!mut || *mut == INVALID_HANDLE_VALUE)
     {
-	return (-EINVAL);
+        return (-EINVAL);
     }
+    
     CloseHandle(*mut);
 
     return (0);
@@ -103,7 +133,7 @@ int gen_win_mutex_destroy(
 
 HANDLE gen_win_thread_self(void)
 {
-    return pthread_self();
+    return GetCurrentThread();
 }
 
 int gen_win_cond_destroy(HANDLE cond)
@@ -137,9 +167,95 @@ int gen_win_cond_broadcast(HANDLE cond)
     return pthread_cond_broadcast(cond);
 }
 
-int gen_win_cond_init(HANDLE cond, void *attr)
+int gen_win_cond_init(pgen_cond_t *cond)
 {
-    return pthread_cond_init(cond, attr);
+    int rc;
+    pgen_cond_t cv = NULL;
+
+    if (!cond)
+    {
+        return EINVAL;
+    }
+
+    /* Allocate condition variable */
+    cv = (pgen_cond_t) calloc(1, sizeof(*cv));
+    if (cv == NULL)
+    {
+        rc = ENOMEM;
+        goto DONE;
+    }
+
+    /* Create locking semaphore */
+    cv->semBlockLock = CreateSemaphore(NULL, 1, LONG_MAX, NULL);
+    if (cv->semBlockLock == NULL)
+    {
+        rc = (int) GetLastError();
+        goto FAIL0;
+    }
+
+    /* Create queue semaphore */
+    cv->semBlockQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
+    if (cv->semBlockQueue == NULL) 
+    {
+        rc = (int) GetLastError();
+        goto FAIL1;
+    }
+
+    /* Create unblock/lock mutex */
+    if ((rc = gen_mutex_init(&(cv->mtxUnblockLock))) != 0)
+    {
+        goto FAIL2;
+    }
+
+    rc = 0;
+
+    goto DONE;
+
+    /*
+     * Error conditions
+     */
+FAIL2:
+    CloseHandle(cv->semBlockQueue);
+
+FAIL1:
+    CloseHandle(cv->semBlockLock);
+
+FAIL0:
+    free(cv);
+    cv = NULL;
+
+DONE:
+    if (rc == 0)
+    {
+        if (cond_list_lock == NULL)
+        {
+            InitializeCriticalSection(cond_list_lock);
+        }
+
+        EnterCriticalSection(cond_list_lock);
+
+        cv->next = NULL;
+        cv->prev = cond_list_tail;
+
+        if (cond_list_tail != NULL) 
+        {
+            cond_list_tail->next = cv;
+        }
+
+        cond_list_tail = cv;
+
+        if (cond_list_head == NULL) 
+        {
+            cond_list_head = cv;
+        }
+
+        LeaveCriticalSection(cond_list_lock);
+
+    }
+
+    *cond = cv;
+
+    return rc;
 }
 
 #endif

@@ -81,6 +81,25 @@ typedef pthread_cond_t  gen_cond_t;
 
 #include <Windows.h>
 
+typedef HANDLE gen_mutex_t;
+typedef HANDLE gen_thread_t;
+
+/* Implementation based on Pthreads-win32 - POSIX Threads Library for Win32
+ * Copyright (C) 1998 John E. Bossom
+ * Copyright (C) 1999,2005 Pthreads-win32 contributors
+ */
+typedef struct gen_cond_t_ *pgen_cond_t;
+typedef struct gen_cond_t_ {
+    long nWaitersBlocked;    /* Number of threads blocked */
+    long nWaitersGone;       /* Number of threads timed out */
+    long nWaitersToUnblock;  /* Number of threads to unblock */
+    HANDLE semBlockQueue;    /* Queue up threads waiting for the condition to become signalled */
+    HANDLE semBlockLock;     /* Semaphore that guards access to waiters blocked count/block queue */
+    HANDLE mtxUnblockLock;   /* Mutex that guards access to waiters (to)unblock(ed) counts */
+    pgen_cond_t next;        /* Doubly linked list */
+    pgen_cond_t prev;
+} gen_cond_t;
+
 int gen_win_mutex_lock(HANDLE *mut);
 int gen_win_mutex_unlock(HANDLE *mut);
 int gen_win_mutex_trylock(HANDLE *mut);
@@ -89,7 +108,16 @@ int gen_win_mutex_destroy(HANDLE *mut);
 int gen_win_mutex_init(HANDLE *mut);
 HANDLE gen_win_thread_self(void);
 
-int gen_win_cond_init(HANDLE *cond, void *attr);
+#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, false, NULL);
+#define gen_mutex_lock(m) gen_win_mutex_lock(m)
+#define gen_mutex_unlock(m) gen_win_mutex_unlock(m)
+#define gen_mutex_trylock(m) gen_win_mutex_trylock(m)
+#define gen_mutex_destroy(m) gen_win_mutex_destroy(m)
+#define gen_mutex_init(m) gen_win_mutex_init(m)
+
+#define gen_thread_self() gen_win_thread_self()
+
+int gen_win_cond_init(HANDLE *cond);
 int gen_win_cond_destroy(HANDLE *cond);
 int gen_win_cond_wait(HANDLE *cond, HANDLE *mut);
 int gen_win_cond_timedwait(HANDLE *cond, HANDLE *mut,
@@ -97,19 +125,8 @@ int gen_win_cond_timedwait(HANDLE *cond, HANDLE *mut,
 int gen_win_cond_signal(HANDLE *cond);
 int gen_win_cond_broadcast(HANDLE *cond);
 
-typedef HANDLE gen_mutex_t;
-typedef HANDLE gen_thread_t;
-typedef HANDLE gen_cond_t;
-#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, false, NULL);
 #define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
-#define gen_mutex_lock(m) gen_win_mutex_lock(m)
-#define gen_mutex_unlock(m) gen_win_mutex_unlock(m)
-#define gen_mutex_trylock(m) gen_win_mutex_trylock(m)
-#define gen_mutex_destroy(m) gen_win_mutex_destroy(m)
-#define gen_mutex_init(m) gen_win_mutex_init(m)
-#define gen_thread_self() gen_win_thread_self()
-
-#define gen_cond_init(c) gen_win_cond_init(c, NULL)
+#define gen_cond_init(c) gen_win_cond_init(c)
 #define gen_cond_destroy(c) gen_win_cond_destroy(c)
 #define gen_cond_wait(c, m) gen_win_cond_wait(c, m)
 #define gen_cond_timedwait(c, m, s) gen_win_cond_timedwait(c, m, s)
