@@ -117,15 +117,15 @@ HANDLE gen_win_thread_self(void);
 
 #define gen_thread_self() gen_win_thread_self()
 
-int gen_win_cond_init(HANDLE *cond);
-int gen_win_cond_destroy(HANDLE *cond);
-int gen_win_cond_wait(HANDLE *cond, HANDLE *mut);
-int gen_win_cond_timedwait(HANDLE *cond, HANDLE *mut,
+int gen_win_cond_init(pgen_cond_t *cond);
+int gen_win_cond_destroy(pgen_cond_t *cond);
+int gen_win_cond_wait(pgen_cond_t *cond, HANDLE *mut);
+int gen_win_cond_timedwait(pgen_cond_t *cond, HANDLE *mut,
                              const struct timespec *abstime);
-int gen_win_cond_signal(HANDLE *cond);
-int gen_win_cond_broadcast(HANDLE *cond);
+int gen_win_cond_signal(pgen_cond_t *cond);
+int gen_win_cond_broadcast(pgen_cond_t *cond);
 
-#define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
+#define GEN_COND_INITIALIZER ((pgen_cond_t) -1)
 #define gen_cond_init(c) gen_win_cond_init(c)
 #define gen_cond_destroy(c) gen_win_cond_destroy(c)
 #define gen_cond_wait(c, m) gen_win_cond_wait(c, m)
