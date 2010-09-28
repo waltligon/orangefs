@@ -47,7 +47,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="devorange2"
+VFS_HOSTS="devorange2 jeffrey"
 
 #
 # Detect basic heap corruption
