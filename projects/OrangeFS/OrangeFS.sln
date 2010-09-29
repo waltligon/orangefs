@@ -5,6 +5,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_wintcp", "bmi_wintcp\bm
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks", "gen-locks\gen-locks.vcxproj", "{9138ABF9-041F-4A55-9E87-0F433719F4FC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks-test", "gen-locks-test\gen-locks-test.vcxproj", "{0217A4B0-3C9A-4892-9ACB-984653820AC3}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -12,13 +17,15 @@ Global
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}.Debug|Win32.ActiveCfg = Debug|Win32
-		{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}.Debug|Win32.Build.0 = Debug|Win32
 		{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}.Release|Win32.ActiveCfg = Release|Win32
-		{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}.Release|Win32.Build.0 = Release|Win32
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC}.Debug|Win32.ActiveCfg = Debug|Win32
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC}.Debug|Win32.Build.0 = Debug|Win32
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC}.Release|Win32.ActiveCfg = Release|Win32
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC}.Release|Win32.Build.0 = Release|Win32
+		{0217A4B0-3C9A-4892-9ACB-984653820AC3}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0217A4B0-3C9A-4892-9ACB-984653820AC3}.Debug|Win32.Build.0 = Debug|Win32
+		{0217A4B0-3C9A-4892-9ACB-984653820AC3}.Release|Win32.ActiveCfg = Release|Win32
+		{0217A4B0-3C9A-4892-9ACB-984653820AC3}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

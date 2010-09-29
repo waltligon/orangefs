@@ -88,8 +88,15 @@ typedef HANDLE gen_thread_t;
  * Copyright (C) 1998 John E. Bossom
  * Copyright (C) 1999,2005 Pthreads-win32 contributors
  */
+struct timespec
+{
+    time_t tv_sec;
+    long int tv_nsec;
+};
+
 typedef struct gen_cond_t_ *pgen_cond_t;
-typedef struct gen_cond_t_ {
+typedef struct gen_cond_t_ 
+{
     long nWaitersBlocked;    /* Number of threads blocked */
     long nWaitersGone;       /* Number of threads timed out */
     long nWaitersToUnblock;  /* Number of threads to unblock */
@@ -108,7 +115,7 @@ int gen_win_mutex_destroy(HANDLE *mut);
 int gen_win_mutex_init(HANDLE *mut);
 HANDLE gen_win_thread_self(void);
 
-#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, false, NULL);
+#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, FALSE, NULL);
 #define gen_mutex_lock(m) gen_win_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_win_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_win_mutex_trylock(m)

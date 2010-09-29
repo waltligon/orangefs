@@ -38,7 +38,7 @@ pgen_cond_t cond_list_tail = NULL;
 int gen_win_mutex_init(
     HANDLE *mut)
 {
-    *mut = CreateMutex(NULL, false, NULL);
+    *mut = CreateMutex(NULL, FALSE, NULL);
     return (*mut) ? 0 : -1;
 }
 
@@ -137,6 +137,34 @@ HANDLE gen_win_thread_self(void)
     return GetCurrentThread();
 }
 
+__inline int cond_check_need_init(pgen_cond_t *cond)
+{
+    int result = 0;
+
+    /* initialize critical section if necessary */
+    if (cond_test_init_lock == NULL)
+    {
+        cond_test_init_lock = (LPCRITICAL_SECTION) calloc(1, sizeof(CRITICAL_SECTION));
+        InitializeCriticalSection(cond_test_init_lock);
+    }
+
+    /* initialize condition variable created with GEN_COND_INITIALIZER */
+    EnterCriticalSection(cond_test_init_lock);
+    
+    if (*cond == GEN_COND_INITIALIZER)
+    {
+        result = gen_cond_init(cond);
+    }
+    else if (*cond == NULL)
+    {
+        result = EINVAL;
+    }
+
+    LeaveCriticalSection(cond_test_init_lock);
+
+    return result;
+}
+
 int gen_win_cond_destroy(pgen_cond_t *cond)
 {
     pgen_cond_t cv;
@@ -153,20 +181,20 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
 
         cv = *cond;
 
-        if (WaitForSingleObject(&(cv->semBlockLock), INFINITE) != WAIT_OBJECT_0)
+        if (WaitForSingleObject(cv->semBlockLock, INFINITE) != WAIT_OBJECT_0)
         {   
             return GetLastError();
         }
 
         if ((result = gen_mutex_trylock(&(cv->mtxUnblockLock))) != 0)
         {
-            ReleaseSemaphore(&(cv->semBlockLock), 1, NULL);
+            ReleaseSemaphore(cv->semBlockLock, 1, NULL);
             return result;
         }
 
         if (cv->nWaitersBlocked > cv->nWaitersGone)
         {
-            if (!ReleaseSemaphore(&(cv->semBlockLock), 1, NULL))
+            if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
             {
                 result = GetLastError();
             }
@@ -178,11 +206,11 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
             /* Now it is safe to destroy */
             *cond = NULL;
 
-            if (CloseHandle(&(cv->semBlockLock)) != 0)
+            if (CloseHandle(cv->semBlockLock) != 0)
             {
                 result = GetLastError();
             }
-            if (CloseHandle(&(cv->semBlockQueue)) != 0)
+            if (CloseHandle(cv->semBlockQueue) != 0)
             {
                 result1 = GetLastError();
             }
@@ -260,13 +288,13 @@ static void __cdecl cond_wait_cleanup(void *args)
     }
     else if (INT_MAX / 2 == ++(cv->nWaitersGone))
     {
-        if (WaitForSingleObject(&(cv->semBlockLock), INFINITE) != 0)
+        if (WaitForSingleObject(cv->semBlockLock, INFINITE) != WAIT_OBJECT_0)
         {
             *resultPtr = (int) GetLastError();
             return;
         }
         cv->nWaitersBlocked -= cv->nWaitersGone;
-        if (!ReleaseSemaphore(&(cv->semBlockLock), 1, NULL))
+        if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
         {
             *resultPtr = (int) GetLastError();
             return;
@@ -282,7 +310,7 @@ static void __cdecl cond_wait_cleanup(void *args)
 
     if (nSignalsWasLeft == 1) 
     {
-        if (!ReleaseSemaphore(&(cv->semBlockLock), 1, NULL))
+        if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
         {
             *resultPtr = (int) GetLastError();
             return;
@@ -320,14 +348,14 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
 
     cv = *cond;
 
-    if (WaitForSingleObject(&(cv->semBlockLock), INFINITE) != 0)
+    if (WaitForSingleObject(cv->semBlockLock, INFINITE) != 0)
     {
         return (int) GetLastError();
     }
 
     ++(cv->nWaitersBlocked);
 
-    if (!ReleaseSemaphore(&(cv->semBlockLock), 1, NULL))
+    if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
     {
         return (int) GetLastError();
     }
@@ -336,36 +364,130 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
     cleanup_args.cv = cv;
     cleanup_args.resultPtr = &result;
 
-    // TODO: pthread_cleanup_push(cond_wait_cleanup, (void*) &cleanup_args);
+#pragma inline_depth(0)
 
     /* Now we can release mutex and... */
     if ((result = gen_mutex_unlock(mutex)) == 0) 
     {
-
+        // convert timespec to milliseconds
+        DWORD ms = INFINITE;
+        if (abstime)
+        {
+            ms = abstime->tv_sec * 1000 + abstime->tv_nsec / 1000000L;
+        }
+        if (WaitForSingleObject(cv->semBlockQueue, ms) != WAIT_OBJECT_0)
+        {
+            result = GetLastError();
+        }
     }
+
+    cond_wait_cleanup(&cleanup_args);
+
+#pragma inline_depth()
 
     return result;
 }
 
 int gen_win_cond_wait(pgen_cond_t *cond, HANDLE *mut)
-{
-    return pthread_cond_wait(cond, mut);
+{    
+    return cond_timedwait(cond, mut, NULL);
 }
 
 int gen_win_cond_timedwait(pgen_cond_t *cond, HANDLE *mut,
                              const struct timespec *abstime)
+{    
+    return cond_timedwait(cond, mut, abstime);
+}
+
+static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
 {
-    return pthread_cond_timedwait(cond, mut, abstime);
+    int result;
+    pgen_cond_t cv;
+    int nSignalsToIssue;
+
+    if (cond == NULL || *cond == NULL)
+    {
+        return EINVAL;
+    }
+
+    cv = *cond;
+
+    /* uninitialized static cv */
+    if (cv == GEN_COND_INITIALIZER)
+    {
+        return 0;
+    }
+
+    if ((result = gen_mutex_lock(&(cv->mtxUnblockLock))) != 0)
+    {
+        return result;
+    }
+
+    if (cv->nWaitersToUnblock != 0)
+    {
+        if (cv->nWaitersBlocked == 0)
+        {
+            return gen_mutex_unlock(&(cv->mtxUnblockLock));
+        }
+        if (unblockAll)
+        {
+            cv->nWaitersToUnblock += (nSignalsToIssue = cv->nWaitersBlocked);
+            cv->nWaitersBlocked = 0;
+        }
+        else 
+        {
+            nSignalsToIssue = 1;
+            cv->nWaitersToUnblock++;
+            cv->nWaitersBlocked--;
+        }
+    }
+    else if (cv->nWaitersBlocked > cv->nWaitersGone)
+    {
+        if (WaitForSingleObject(cv->semBlockLock, INFINITE) != WAIT_OBJECT_0)
+        {
+            result = GetLastError();
+            gen_mutex_unlock(&(cv->mtxUnblockLock));
+            return result;
+        }
+        if (cv->nWaitersGone != 0)
+        {
+            cv->nWaitersBlocked -= cv->nWaitersGone;
+        }
+        if (unblockAll)
+        {
+            nSignalsToIssue = cv->nWaitersToUnblock = cv->nWaitersBlocked;
+            cv->nWaitersBlocked = 0;
+        }
+        else
+        {
+            nSignalsToIssue = cv->nWaitersToUnblock = 1;
+            cv->nWaitersBlocked--;
+        }
+    }
+    else 
+    {
+        return gen_mutex_unlock(&(cv->mtxUnblockLock));
+    }
+
+    if ((result = gen_mutex_unlock(&(cv->mtxUnblockLock))) == 0)
+    {
+        if (!ReleaseSemaphore(cv->semBlockQueue, nSignalsToIssue, NULL))
+        {
+            result = GetLastError();
+        }
+    }
+
+    return result;
 }
 
 int gen_win_cond_signal(pgen_cond_t *cond)
-{
-    return pthread_cond_signal(cond);
+{   
+    return cond_unblock(cond, FALSE);
 }
 
 int gen_win_cond_broadcast(pgen_cond_t *cond)
-{
-    return pthread_cond_broadcast(cond);
+{    
+    return cond_unblock(cond, TRUE);
 }
 
 int gen_win_cond_init(pgen_cond_t *cond)
@@ -430,6 +552,7 @@ DONE:
     {
         if (cond_list_lock == NULL)
         {
+            cond_list_lock = (LPCRITICAL_SECTION) calloc(1, sizeof(CRITICAL_SECTION));
             InitializeCriticalSection(cond_list_lock);
         }
 
