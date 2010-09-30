@@ -406,7 +406,7 @@ static PINT_sm_action lookup_check_acls_if_needed(
         &s_op->val,
         0,
         NULL,
-        s_op,
+        smcb,
         0,
         js_p,
         &i,
