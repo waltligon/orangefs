@@ -147,7 +147,8 @@ setup_pvfs2() {
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi
 	#turn on degging on each server
-	PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+        echo "....setting server-side debug mask"
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
