@@ -9,8 +9,12 @@
  * compile time.
  */
 
+#define _USE_32BIT_TIME_T
+
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/timeb.h>
 
 #include "gen-locks.h"
 
@@ -330,6 +334,8 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
     int result = 0;
     pgen_cond_t cv;
     cond_wait_cleanup_args_t cleanup_args;
+    struct _timeb curtime;
+    unsigned int nano_ms, ms_diff;
 
     if (cond == NULL || *cond == NULL) 
     {
@@ -369,16 +375,34 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
     /* Now we can release mutex and... */
     if ((result = gen_mutex_unlock(mutex)) == 0) 
     {
-        // convert timespec to milliseconds
+        /* convert difference in times to milliseconds */
         DWORD ms = INFINITE;
         if (abstime)
         {
-            ms = abstime->tv_sec * 1000 + abstime->tv_nsec / 1000000L;
+            nano_ms = abstime->tv_nsec / 1000000L;
+            _ftime_s(&curtime);
+            ms = (abstime->tv_sec - curtime.time) > 0 ? (abstime->tv_sec - curtime.time) * 1000 : 0;            
+            if (ms > 0) 
+            {
+                if (nano_ms >= curtime.millitm) 
+                {
+                    ms_diff = nano_ms - curtime.millitm; 
+                }
+                else 
+                {
+                    ms_diff = nano_ms + 1000 - curtime.millitm;
+                    ms -= 1000;
+                }
+            }
+            else 
+            {
+                ms_diff = (nano_ms >= curtime.millitm) ? nano_ms - curtime.millitm : 0;
+            }
+            ms += ms_diff;
         }
-        if (WaitForSingleObject(cv->semBlockQueue, ms) != WAIT_OBJECT_0)
-        {
-            result = GetLastError();
-        }
+        if (ms == 0) ms = 1;
+        
+        result = WaitForSingleObject(cv->semBlockQueue, ms);
     }
 
     cond_wait_cleanup(&cleanup_args);
