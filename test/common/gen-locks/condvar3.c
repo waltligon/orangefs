@@ -81,11 +81,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <errno.h>
 #include <sys/timeb.h>
 
 #include "gen-locks.h"
 
-static pgen_cond_t cv;
+static gen_cond_t cv;
 static gen_mutex_t mutex;
 static int shared = 0;
 

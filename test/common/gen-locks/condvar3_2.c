@@ -80,11 +80,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <errno.h>
 #include <sys/timeb.h>
 
 #include "gen-locks.h"
 
-static pgen_cond_t cv;
+static gen_cond_t cv;
 static gen_mutex_t mutex;
 static struct timespec abstime = { 0, 0 };
 static struct timespec abstime2 = { 0, 0 };
@@ -111,7 +112,7 @@ mythread(void * arg)
 
   result = gen_cond_timedwait(&cv, &mutex, &abstime2);
   assert(gen_mutex_unlock(&mutex) == 0);
-  if (result == WAIT_TIMEOUT)
+  if (result == ETIMEDOUT)
     {
       InterlockedIncrement((LPLONG)&timedout);
     }

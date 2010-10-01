@@ -11,9 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\test\common\gen-locks\condvar1.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-    </ClCompile>
+    <ClCompile Include="..\..\..\test\common\gen-locks\condvar1.c" />
     <ClCompile Include="..\..\..\test\common\gen-locks\condvar2_1.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
@@ -23,7 +21,9 @@
     <ClCompile Include="..\..\..\test\common\gen-locks\condvar3_1.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\..\..\test\common\gen-locks\condvar3_2.c" />
+    <ClCompile Include="..\..\..\test\common\gen-locks\condvar3_2.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+    </ClCompile>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{0217A4B0-3C9A-4892-9ACB-984653820AC3}</ProjectGuid>

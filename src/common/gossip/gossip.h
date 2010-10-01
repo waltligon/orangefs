@@ -20,10 +20,14 @@
 #ifndef __GOSSIP_H
 #define __GOSSIP_H
 
+#ifdef WIN32
+#include "wincommon.h"
+#endif
+
 #ifndef __KERNEL__
 #include <stdint.h>
 #include <stdarg.h>
-#include "syslog.h"
+/* #include "syslog.h" */
 #endif
 #include "pvfs2-config.h"
 
@@ -183,15 +187,24 @@ int gossip_err(
     ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
+#ifdef WIN32
+#define gossip_debug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
+#define gossip_ldebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
+#else
 #define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
+#endif
 #define gossip_debug_enabled(__m) 0
+#else
+#ifdef WIN32
+#define gossip_debug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
+#define gossip_ldebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #else
 #define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
+#endif
 #define gossip_debug_enabled(__m) \
             ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
-
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

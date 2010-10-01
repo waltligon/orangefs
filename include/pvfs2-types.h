@@ -18,7 +18,15 @@
 #else
 #include <stdint.h>
 #include <sys/stat.h>
-#ifndef WIN32
+#ifdef WIN32
+#include "wincommon.h"
+/* define struct timeval */
+struct timeval 
+{
+    long tv_sec;
+    long tv_usec;
+};
+#else
 #include <sys/time.h>
 #endif
 #include <limits.h>

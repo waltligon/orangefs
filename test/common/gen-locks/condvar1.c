@@ -1,9 +1,10 @@
 
 #include <stdlib.h>
 #include <assert.h>
+
 #include "gen-locks.h"
 
-static pgen_cond_t cv = NULL;
+static gen_cond_t cv = NULL;
 
 int main()
 {

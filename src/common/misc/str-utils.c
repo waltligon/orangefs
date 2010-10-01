@@ -11,6 +11,13 @@
 #include <ctype.h>
 #include <assert.h>
 
+#ifdef WIN32
+#include "wincommon.h"
+
+#define index(s, c)    strchr(s, c)
+#define snprintf(b, c, f, ...)    _snprintf(b, c, f, __VA_ARGS__)
+#endif
+
 #include "str-utils.h"
 
 /* PINT_string_count_segments()
@@ -219,7 +226,9 @@ int PINT_parse_handle_ranges(
        `\0' but **endptr is `\0' on return, the entire string  is
        valid.  */ 
     out_extent->first = out_extent->last =
-#ifdef HAVE_STRTOULL
+#if defined(WIN32)
+        (PVFS_handle)_strtoui64(p, &endchar, 16);
+#elif defined(HAVE_STRTOULL)
         (PVFS_handle)strtoull(p, &endchar, 0);
 #else
         (PVFS_handle)strtoul(p, &endchar, 0);
@@ -234,7 +243,9 @@ int PINT_parse_handle_ranges(
 
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
-#ifdef HAVE_STRTOULL
+#if defined(WIN32)
+        out_extent->last = (PVFS_handle)_strtoui64(p, &endchar, 16);
+#elif defined(HAVE_STRTOULL)
 	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
 #else
 	    out_extent->last = (PVFS_handle)strtoul(p, &endchar, 0);
@@ -335,7 +346,7 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
         return (-PVFS_EINVAL);
     }
 
-    *newpath = malloc(pathlen - delimiter1);
+    *newpath = (char *) malloc(pathlen - delimiter1);
     if (*newpath == NULL)
     {
         return (-PVFS_ENOMEM);

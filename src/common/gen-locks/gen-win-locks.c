@@ -29,8 +29,27 @@
 LPCRITICAL_SECTION cond_list_lock = NULL;
 LPCRITICAL_SECTION cond_test_init_lock = NULL;
 
-pgen_cond_t cond_list_head = NULL;
-pgen_cond_t cond_list_tail = NULL;
+gen_cond_t cond_list_head = NULL;
+gen_cond_t cond_list_tail = NULL;
+
+/* This macro sets the value of errno
+ * based on the Windows error code.
+ */
+#define SET_ERROR(winerr)    switch(winerr) { \
+                                 case ERROR_SUCCESS: errno = 0; \
+                                                     break; \
+                                 case ERROR_NOT_ENOUGH_MEMORY: \
+                                 case ERROR_OUTOFMEMORY: errno = ENOMEM; \
+                                                         break; \
+                                 case ERROR_ACCESS_DENIED: errno = EPERM; \
+                                                           break; \
+                                 case ERROR_INVALID_HANDLE: \
+                                 case ERROR_INVALID_PARAMETER: errno = EINVAL; \
+                                                               break; \
+                                 case WAIT_TIMEOUT: errno = ETIMEDOUT; \
+                                                    break; \
+                                 default: errno = winerr; \
+                             }
 
 /*
  * gen_mutex_init()
@@ -42,7 +61,19 @@ pgen_cond_t cond_list_tail = NULL;
 int gen_win_mutex_init(
     HANDLE *mut)
 {
+    if (mut == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    
     *mut = CreateMutex(NULL, FALSE, NULL);
+    if (*mut == NULL)
+    {
+        DWORD err = GetLastError();
+        SET_ERROR(err)
+    }
+    
     return (*mut) ? 0 : -1;
 }
 
@@ -57,10 +88,24 @@ int gen_win_mutex_lock(
     HANDLE *mut)
 {
     DWORD dwWaitResult;
+    int result = 0;
+
+    if (mut == NULL || *mut == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
 
     dwWaitResult = WaitForSingleObject(*mut, INFINITE);
 
-    return (dwWaitResult == WAIT_OBJECT_0 || dwWaitResult == WAIT_ABANDONED) ? 0 : -1;
+    if (dwWaitResult != WAIT_OBJECT_0 && dwWaitResult != WAIT_ABANDONED)
+    {
+        DWORD err = GetLastError();
+        result = -1;        
+        SET_ERROR(err)
+    }
+
+    return result;
 }
 
 
@@ -74,7 +119,20 @@ int gen_win_mutex_lock(
 int gen_win_mutex_unlock(
     HANDLE *mut)
 {
-    BOOL rc = ReleaseMutex(*mut);
+    BOOL rc;
+
+    if (mut == NULL || *mut == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    rc = ReleaseMutex(*mut);
+    if (!rc)
+    {
+        DWORD err = GetLastError();
+        SET_ERROR(err)
+    }
 
     return (rc) ? 0 : -1;
 }
@@ -93,7 +151,13 @@ int gen_win_mutex_trylock(
 {
     DWORD dwWaitResult;
     int rc;
-      
+    
+    if (mut == NULL || *mut == NULL)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
     dwWaitResult = WaitForSingleObject(*mut, 0);
     if (dwWaitResult == WAIT_OBJECT_0 || dwWaitResult == WAIT_ABANDONED)
     {
@@ -108,7 +172,8 @@ int gen_win_mutex_trylock(
         }
         else
         {
-            errno = GetLastError();
+            DWORD err = GetLastError();
+            SET_ERROR(err);
         }
     }
 
@@ -126,14 +191,15 @@ int gen_win_mutex_destroy(
     HANDLE *mut)
 {
 
-    if (!mut || *mut == INVALID_HANDLE_VALUE)
+    if (mut == NULL || *mut == NULL)
     {
+        errno = EINVAL;
         return (-EINVAL);
     }
     
     CloseHandle(*mut);
 
-    return (0);
+    return 0;
 }
 
 HANDLE gen_win_thread_self(void)
@@ -141,7 +207,7 @@ HANDLE gen_win_thread_self(void)
     return GetCurrentThread();
 }
 
-__inline int cond_check_need_init(pgen_cond_t *cond)
+__inline int cond_check_need_init(gen_cond_t *cond)
 {
     int result = 0;
 
@@ -169,14 +235,14 @@ __inline int cond_check_need_init(pgen_cond_t *cond)
     return result;
 }
 
-int gen_win_cond_destroy(pgen_cond_t *cond)
+int gen_win_cond_destroy(gen_cond_t *cond)
 {
-    pgen_cond_t cv;
+    gen_cond_t cv;
     int result = 0, result1 = 0, result2 = 0;
 
     if(!cond || !(*cond))
     {
-        return -EINVAL;
+        return EINVAL;
     }
     
     if (*cond != GEN_COND_INITIALIZER)
@@ -186,14 +252,14 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
         cv = *cond;
 
         if (WaitForSingleObject(cv->semBlockLock, INFINITE) != WAIT_OBJECT_0)
-        {   
-            return GetLastError();
+        {               
+            return errno;
         }
 
         if ((result = gen_mutex_trylock(&(cv->mtxUnblockLock))) != 0)
         {
             ReleaseSemaphore(cv->semBlockLock, 1, NULL);
-            return result;
+            return errno;
         }
 
         if (cv->nWaitersBlocked > cv->nWaitersGone)
@@ -201,6 +267,7 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
             if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
             {
                 result = GetLastError();
+                SET_ERROR(result)
             }
             result1 = gen_mutex_unlock(&(cv->mtxUnblockLock));
             result2 = EBUSY;
@@ -210,13 +277,17 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
             /* Now it is safe to destroy */
             *cond = NULL;
 
-            if (CloseHandle(cv->semBlockLock) != 0)
+            if (!CloseHandle(cv->semBlockLock))
             {
-                result = GetLastError();
+                DWORD err = GetLastError();
+                SET_ERROR(err)
+                result = errno;                
             }
-            if (CloseHandle(cv->semBlockQueue) != 0)
+            if (!CloseHandle(cv->semBlockQueue))
             {
-                result1 = GetLastError();
+                DWORD err = GetLastError();
+                SET_ERROR(err)
+                result1 = errno;                
             }
             if ((result2 = gen_mutex_unlock(&(cv->mtxUnblockLock))) == 0)
             {
@@ -268,14 +339,14 @@ int gen_win_cond_destroy(pgen_cond_t *cond)
 typedef struct
 {
     gen_mutex_t *mutexPtr;
-    pgen_cond_t cv;
+    gen_cond_t cv;
     int *resultPtr;
 } cond_wait_cleanup_args_t;
 
 static void __cdecl cond_wait_cleanup(void *args)
 {
     cond_wait_cleanup_args_t *cleanup_args = (cond_wait_cleanup_args_t *) args;
-    pgen_cond_t cv = cleanup_args->cv;
+    gen_cond_t cv = cleanup_args->cv;
     int *resultPtr = cleanup_args->resultPtr;
     int nSignalsWasLeft;
     int result;
@@ -328,11 +399,11 @@ static void __cdecl cond_wait_cleanup(void *args)
 
 }
 
-static __inline int cond_timedwait(pgen_cond_t *cond,
+static __inline int cond_timedwait(gen_cond_t *cond,
                                    HANDLE *mutex, const struct timespec *abstime)
 {
     int result = 0;
-    pgen_cond_t cv;
+    gen_cond_t cv;
     cond_wait_cleanup_args_t cleanup_args;
     struct _timeb curtime;
     unsigned int nano_ms, ms_diff;
@@ -354,16 +425,19 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
 
     cv = *cond;
 
-    if (WaitForSingleObject(cv->semBlockLock, INFINITE) != 0)
+    if ((result = WaitForSingleObject(cv->semBlockLock, INFINITE)) != 0)
     {
-        return (int) GetLastError();
+        SET_ERROR(result)
+        return errno;
     }
 
     ++(cv->nWaitersBlocked);
 
     if (!ReleaseSemaphore(cv->semBlockLock, 1, NULL))
     {
-        return (int) GetLastError();
+        DWORD err = GetLastError();
+        SET_ERROR(err)
+        return errno;
     }
 
     cleanup_args.mutexPtr = mutex;
@@ -400,9 +474,16 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
             }
             ms += ms_diff;
         }
+        /* always wait at least 1ms so we get WAIT_TIMEOUT result */
         if (ms == 0) ms = 1;
         
         result = WaitForSingleObject(cv->semBlockQueue, ms);
+        SET_ERROR(result)
+        result = errno;
+    }
+    else 
+    {
+        result = errno;
     }
 
     cond_wait_cleanup(&cleanup_args);
@@ -412,27 +493,29 @@ static __inline int cond_timedwait(pgen_cond_t *cond,
     return result;
 }
 
-int gen_win_cond_wait(pgen_cond_t *cond, HANDLE *mut)
+int gen_win_cond_wait(gen_cond_t *cond, HANDLE *mut)
 {    
     return cond_timedwait(cond, mut, NULL);
 }
 
-int gen_win_cond_timedwait(pgen_cond_t *cond, HANDLE *mut,
+int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mut,
                              const struct timespec *abstime)
 {    
     return cond_timedwait(cond, mut, abstime);
 }
 
-static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
+static __inline int cond_unblock(gen_cond_t *cond, int unblockAll)
 {
     int result;
-    pgen_cond_t cv;
+    gen_cond_t cv;
     int nSignalsToIssue;
 
     if (cond == NULL || *cond == NULL)
     {
         return EINVAL;
     }
+
+    errno = 0;
 
     cv = *cond;
 
@@ -444,14 +527,15 @@ static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
 
     if ((result = gen_mutex_lock(&(cv->mtxUnblockLock))) != 0)
     {
-        return result;
+        return errno;
     }
 
     if (cv->nWaitersToUnblock != 0)
     {
         if (cv->nWaitersBlocked == 0)
         {
-            return gen_mutex_unlock(&(cv->mtxUnblockLock));
+            result = gen_mutex_unlock(&(cv->mtxUnblockLock));
+            return (result == 0) ? 0 : errno;
         }
         if (unblockAll)
         {
@@ -470,8 +554,9 @@ static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
         if (WaitForSingleObject(cv->semBlockLock, INFINITE) != WAIT_OBJECT_0)
         {
             result = GetLastError();
+            SET_ERROR(result)
             gen_mutex_unlock(&(cv->mtxUnblockLock));
-            return result;
+            return errno;
         }
         if (cv->nWaitersGone != 0)
         {
@@ -490,7 +575,8 @@ static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
     }
     else 
     {
-        return gen_mutex_unlock(&(cv->mtxUnblockLock));
+        result = gen_mutex_unlock(&(cv->mtxUnblockLock));
+        return (result == 0) ? 0 : errno;
     }
 
     if ((result = gen_mutex_unlock(&(cv->mtxUnblockLock))) == 0)
@@ -498,26 +584,28 @@ static __inline int cond_unblock(pgen_cond_t *cond, int unblockAll)
         if (!ReleaseSemaphore(cv->semBlockQueue, nSignalsToIssue, NULL))
         {
             result = GetLastError();
+            SET_ERROR(result)
         }
     }
 
-    return result;
+
+    return errno;
 }
 
-int gen_win_cond_signal(pgen_cond_t *cond)
+int gen_win_cond_signal(gen_cond_t *cond)
 {   
     return cond_unblock(cond, FALSE);
 }
 
-int gen_win_cond_broadcast(pgen_cond_t *cond)
+int gen_win_cond_broadcast(gen_cond_t *cond)
 {    
     return cond_unblock(cond, TRUE);
 }
 
-int gen_win_cond_init(pgen_cond_t *cond)
+int gen_win_cond_init(gen_cond_t *cond)
 {
-    int rc;
-    pgen_cond_t cv = NULL;
+    DWORD err;
+    gen_cond_t cv = NULL;
 
     if (!cond)
     {
@@ -525,10 +613,10 @@ int gen_win_cond_init(pgen_cond_t *cond)
     }
 
     /* Allocate condition variable */
-    cv = (pgen_cond_t) calloc(1, sizeof(*cv));
+    cv = (gen_cond_t) calloc(1, sizeof(*cv));
     if (cv == NULL)
     {
-        rc = ENOMEM;
+        err = ENOMEM;
         goto DONE;
     }
 
@@ -536,7 +624,8 @@ int gen_win_cond_init(pgen_cond_t *cond)
     cv->semBlockLock = CreateSemaphore(NULL, 1, LONG_MAX, NULL);
     if (cv->semBlockLock == NULL)
     {
-        rc = (int) GetLastError();
+        err = GetLastError();
+        SET_ERROR(err)
         goto FAIL0;
     }
 
@@ -544,17 +633,19 @@ int gen_win_cond_init(pgen_cond_t *cond)
     cv->semBlockQueue = CreateSemaphore(NULL, 0, LONG_MAX, NULL);
     if (cv->semBlockQueue == NULL) 
     {
-        rc = (int) GetLastError();
+        err = GetLastError();
+        SET_ERROR(err)
         goto FAIL1;
     }
 
     /* Create unblock/lock mutex */
-    if ((rc = gen_mutex_init(&(cv->mtxUnblockLock))) != 0)
+    if ((err = gen_mutex_init(&(cv->mtxUnblockLock))) != 0)
     {
+        SET_ERROR(err)
         goto FAIL2;
     }
 
-    rc = 0;
+    err = 0;
 
     goto DONE;
 
@@ -572,7 +663,7 @@ FAIL0:
     cv = NULL;
 
 DONE:
-    if (rc == 0)
+    if (err == 0)
     {
         if (cond_list_lock == NULL)
         {
@@ -603,7 +694,7 @@ DONE:
 
     *cond = cv;
 
-    return rc;
+    return errno;
 }
 
 #endif

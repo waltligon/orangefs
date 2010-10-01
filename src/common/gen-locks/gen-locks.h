@@ -94,8 +94,8 @@ struct timespec
     long int tv_nsec;
 };
 
-typedef struct gen_cond_t_ *pgen_cond_t;
-typedef struct gen_cond_t_ 
+typedef struct gen_cond_t_ *gen_cond_t;
+struct gen_cond_t_ 
 {
     long nWaitersBlocked;    /* Number of threads blocked */
     long nWaitersGone;       /* Number of threads timed out */
@@ -103,9 +103,9 @@ typedef struct gen_cond_t_
     HANDLE semBlockQueue;    /* Queue up threads waiting for the condition to become signalled */
     HANDLE semBlockLock;     /* Semaphore that guards access to waiters blocked count/block queue */
     HANDLE mtxUnblockLock;   /* Mutex that guards access to waiters (to)unblock(ed) counts */
-    pgen_cond_t next;        /* Doubly linked list */
-    pgen_cond_t prev;
-} gen_cond_t;
+    gen_cond_t next;         /* Doubly linked list */
+    gen_cond_t prev;
+};
 
 int gen_win_mutex_lock(HANDLE *mut);
 int gen_win_mutex_unlock(HANDLE *mut);
@@ -124,15 +124,15 @@ HANDLE gen_win_thread_self(void);
 
 #define gen_thread_self() gen_win_thread_self()
 
-int gen_win_cond_init(pgen_cond_t *cond);
-int gen_win_cond_destroy(pgen_cond_t *cond);
-int gen_win_cond_wait(pgen_cond_t *cond, HANDLE *mut);
-int gen_win_cond_timedwait(pgen_cond_t *cond, HANDLE *mut,
+int gen_win_cond_init(gen_cond_t *cond);
+int gen_win_cond_destroy(gen_cond_t *cond);
+int gen_win_cond_wait(gen_cond_t *cond, HANDLE *mut);
+int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mut,
                              const struct timespec *abstime);
-int gen_win_cond_signal(pgen_cond_t *cond);
-int gen_win_cond_broadcast(pgen_cond_t *cond);
+int gen_win_cond_signal(gen_cond_t *cond);
+int gen_win_cond_broadcast(gen_cond_t *cond);
 
-#define GEN_COND_INITIALIZER ((pgen_cond_t) -1)
+#define GEN_COND_INITIALIZER ((gen_cond_t) -1)
 #define gen_cond_init(c) gen_win_cond_init(c)
 #define gen_cond_destroy(c) gen_win_cond_destroy(c)
 #define gen_cond_wait(c, m) gen_win_cond_wait(c, m)

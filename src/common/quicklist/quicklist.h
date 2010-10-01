@@ -22,9 +22,7 @@
 #include <stdlib.h>
 
 #ifdef WIN32
-#define __inline__     _inline
-#define inline         _inline
-#define __func__       __FUNCTION__
+#include "wincommon.h"
 #endif
 
 struct qlist_head {

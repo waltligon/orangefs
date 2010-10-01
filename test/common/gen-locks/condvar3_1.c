@@ -81,12 +81,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <errno.h>
 #include <sys/timeb.h>
 
 #include "gen-locks.h"
 
-static pgen_cond_t cv;
-static pgen_cond_t cv1;
+static gen_cond_t cv;
+static gen_cond_t cv1;
 static gen_mutex_t mutex;
 static gen_mutex_t mutex1;
 static struct timespec abstime = { 0, 0 };
@@ -111,7 +112,7 @@ mythread(void * arg)
 
   assert(gen_mutex_lock(&mutex) == 0);
   result = gen_cond_timedwait(&cv, &mutex, &abstime);
-  if (result == WAIT_TIMEOUT)
+  if (result == ETIMEDOUT)
     {
       timedout++;
     }
