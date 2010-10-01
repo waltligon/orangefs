@@ -511,6 +511,14 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     /* reset from jump to here with STATE_METAFILE */
     js_p->error_code = 0;
 
+    /* if we don't need to write the distr_dir struct, skip it */
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_DIR_DISTDIR_ATTR))
+    {
+        gossip_debug(GOSSIP_SETATTR_DEBUG,
+                     "skipping distr dir struct write\n");
+        return SM_ACTION_COMPLETE;
+    }
+
     /* verify that the requested number of servers is sane */
     num_servers = s_op->req->u.setattr.attr.u.dir.dist_dir_attr.num_servers;
     if ((num_servers < 1) || (num_servers > PVFS_REQ_LIMIT_DIRENT_FILE_COUNT))

@@ -71,19 +71,19 @@ nested machine pvfs2_mkdir_work_sm
         run mkdir_fill_handles_to_dist_dir_struct;
         default => write_keyval_to_meta_handle;
 /*
-        default => remote_dirdata_keyval_setup_msgpair;
+        default => remote_dirdata_attr_and_keyval_setup_msgpair;
 */
     }
 
 /*
-    state remote_dirdata_keyval_setup_msgpair
+    state remote_dirdata_attr_and_keyval_setup_msgpair
     {
-        run mkdir_remote_dirdata_keyval_setup_msgpair;
-        success => remote_dirdata_keyval_xfer_msgpair;
+        run mkdir_remote_dirdata_attr_and_keyval_setup_msgpair;
+        success => remote_dirdata_attr_and_keyval_xfer_msgpair;
         default => err_msg;
     }
 
-    state remote_dirdata_keyval_xfer_msgpair
+    state remote_dirdata_attr_and_keyval_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         success => write_keyval_to_meta_handle;
@@ -461,9 +461,8 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
-
 #if 0
-static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static int mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
@@ -472,13 +471,27 @@ static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir state: send_remote_dir_data\n");
 
-    memset(&attr, 0, sizeof(attr));
+    /* !!! set dirdata attr, set all the static component */
+    memcpy(&attr, &s_op->req->u.mkdir.attr, sizeof(attr));
     attr.objtype = PVFS_TYPE_DIRDATA;
     PINT_dist_dir_attr_copyto(attr.u.dir.dist_dir_attr,
                               s_op->attr.u.dir.dist_dir_attr);
     attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
     attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
-    attr.mask = PVFS_ATTR_DIR_DISTDIR_ATTR;
+    attr.mask = PVFS_ATTR_COMMON_ALL;
+    /* not writing DISTDIR_ATTR */ 
+    /*
+       attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+     */
+
+    gossip_debug(
+        GOSSIP_MKDIR_DEBUG,
+        "  SENDING attrs: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu ]\n",
+        attr.owner, attr.group, attr.perms,
+        attr.objtype, llu(attr.atime),
+        llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -513,7 +526,6 @@ static int mkdir_remote_dirdata_keyval_setup_msgpair(struct PINT_smcb *smcb, job
     return SM_ACTION_COMPLETE;
 }
 #endif
-
 
 static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)

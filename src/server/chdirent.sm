@@ -219,7 +219,7 @@ static PINT_sm_action chdirent_update_directory_attr(
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
     ret = job_trove_dspace_setattr(
-        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.handle,
+        s_op->req->u.chdirent.fs_id, s_op->req->u.chdirent.dirent_handle,
         ds_attr, 
         TROVE_SYNC |
         0,
@@ -272,12 +272,24 @@ static PINT_sm_action chdirent_cleanup(
     return (server_state_machine_complete(smcb));
 }
 
+/*
 PINT_GET_OBJECT_REF_DEFINE(chdirent);
+*/
+static inline int PINT_get_object_ref_chdirent(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.chdirent.fs_id;
+    *handle = req->u.chdirent.dirent_handle;
+    return 0;
+};
 
 struct PINT_server_req_params pvfs2_chdirent_params =
 {
     .string_name = "chdirent",
+/*
     .perm = PINT_SERVER_CHECK_WRITE,
+*/
+    .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_chdirent,

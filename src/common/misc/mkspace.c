@@ -426,6 +426,36 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
+#if 0
+        /* set root dirdata dspace attributes */
+        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.uid = getuid();
+        attr.gid = getgid();
+        attr.mode = 0777;
+        attr.type = PVFS_TYPE_DIRDATA;
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
+
+        ret = trove_dspace_setattr(
+            coll_id, root_dirdata_handle, &attr, TROVE_SYNC, NULL,
+            trove_context, &op_id, NULL);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: dspace setattr for root dirdata handle "
+                       "attributes failed; aborting!\n");
+            return -1;
+        }
+#endif
+
+
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
         key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
         val.buffer = &root_dirdata_handle;
@@ -725,6 +755,35 @@ int pvfs2_mkspace(
             verbose, "info: created dspace for dirents "
             "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
+
+#if 0
+        /* set lost+found dirdata dspace attributes */
+        memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
+        attr.uid = getuid();
+        attr.gid = getgid();
+        attr.mode = 0777;
+        attr.type = PVFS_TYPE_DIRDATA;
+	attr.atime = attr.ctime = PINT_util_get_current_time();
+        attr.mtime = PINT_util_mktime_version(attr.ctime);
+
+        ret = trove_dspace_setattr(
+            coll_id, lost_and_found_dirdata_handle, &attr, TROVE_SYNC, NULL,
+            trove_context, &op_id, NULL);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: dspace setattr for lost+found handle "
+                       "attributes failed; aborting!\n");
+            return -1;
+        }
+#endif
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
         key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;

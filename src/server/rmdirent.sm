@@ -165,8 +165,9 @@ static PINT_sm_action rmdirent_update_directory_attr(
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
+    /* setting dirent_handle dspace */
     ret = job_trove_dspace_setattr(
-        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.handle,
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.dirent_handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
@@ -240,12 +241,25 @@ static PINT_sm_action rmdirent_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+/*
 PINT_GET_OBJECT_REF_DEFINE(rmdirent);
+*/
+
+static inline int PINT_get_object_ref_rmdirent(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
+{
+    *fs_id = req->u.rmdirent.fs_id;
+    *handle = req->u.rmdirent.dirent_handle;
+    return 0;
+};
 
 struct PINT_server_req_params pvfs2_rmdirent_params =
 {
     .string_name = "rmdirent",
+/*
     .perm = PINT_SERVER_CHECK_WRITE,
+*/
+    .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_rmdirent,

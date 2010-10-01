@@ -74,7 +74,7 @@ nested machine pvfs2_tree_setattr_work_sm
         pjmp tree_setattr_setup
         {
             REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_set_attr_work_sm;
+            LOCAL_OPERATION => pvfs2_set_attr_work_sm; 
         }
         default => tree_setattr_work_cleanup;
     }
@@ -246,8 +246,13 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     dummy_sys_attr,
                     0,
                     s_op->req->hints);
-                PINT_copy_object_attr(&req->u.tree_setattr.attr,
+
+                /* copy to req->u.setattr.attr because of calling pvfs2_set_attr_work_sm next */
+                PINT_copy_object_attr(&req->u.setattr.attr,
                     &this_req->u.tree_setattr.attr);
+                req->u.setattr.attr.objtype = 
+                    this_req->u.tree_setattr.objtype;
+                req->u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
 
                 break;
             }

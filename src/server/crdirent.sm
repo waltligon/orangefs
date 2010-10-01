@@ -255,9 +255,7 @@ static PINT_sm_action crdirent_update_directory_attr(
         return SM_ACTION_COMPLETE;
     }
 
-/* TODO: For now bypassing the update of timestamps for the parent directory. */
-js_p->error_code = 0;
-return SM_ACTION_COMPLETE;
+    js_p->error_code = 0;
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->attr;
@@ -267,12 +265,15 @@ return SM_ACTION_COMPLETE;
     ds_attr = &(s_op->ds_attr);
     PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
 
+    /* update timestamps for the dirdata handle. */
     ret = job_trove_dspace_setattr(
-        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.handle,
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.dirent_handle,
         ds_attr, 
         TROVE_SYNC,
         smcb, 0, js_p, &j_id, server_job_context, s_op->req->hints);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
+                     ds_attr->type);
     return ret;
 }
 
@@ -318,6 +319,9 @@ static inline int PINT_get_object_ref_crdirent(
 struct PINT_server_req_params pvfs2_crdirent_params =
 {
     .string_name = "crdirent",
+/*
+    .perm = PINT_SERVER_CHECK_CRDIRENT,
+*/
     .perm = PINT_SERVER_CHECK_NONE,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
