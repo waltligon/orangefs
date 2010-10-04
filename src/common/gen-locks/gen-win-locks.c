@@ -207,7 +207,7 @@ HANDLE gen_win_thread_self(void)
     return GetCurrentThread();
 }
 
-__inline int cond_check_need_init(gen_cond_t *cond)
+_inline int cond_check_need_init(gen_cond_t *cond)
 {
     int result = 0;
 
@@ -399,7 +399,7 @@ static void __cdecl cond_wait_cleanup(void *args)
 
 }
 
-static __inline int cond_timedwait(gen_cond_t *cond,
+static _inline int cond_timedwait(gen_cond_t *cond,
                                    HANDLE *mutex, const struct timespec *abstime)
 {
     int result = 0;
@@ -504,7 +504,7 @@ int gen_win_cond_timedwait(gen_cond_t *cond, HANDLE *mut,
     return cond_timedwait(cond, mut, abstime);
 }
 
-static __inline int cond_unblock(gen_cond_t *cond, int unblockAll)
+static _inline int cond_unblock(gen_cond_t *cond, int unblockAll)
 {
     int result;
     gen_cond_t cv;

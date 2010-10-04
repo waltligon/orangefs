@@ -42,7 +42,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\include;..\..\..\src\common\misc;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\include;..\..\..\src\common\misc;..\..\..\src\common\windows;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -55,7 +55,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..;..\..\..\include;..\..\..\src\common\misc;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..;..\..\..\include;..\..\..\src\common\misc;..\..\..\src\common\windows;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
