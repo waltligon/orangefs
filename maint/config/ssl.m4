@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: ssl.m4,v 1.1.2.1 2009-08-25 17:55:46 nlmills Exp $
+# $Id: ssl.m4,v 1.1.2.2 2010-10-04 20:31:34 dbonnie Exp $
 #
 #
 # --with-ssl={directory}
@@ -63,12 +63,12 @@ AC_DEFUN([AX_OPENSSL],
 
 		if test "$ac_ssl_path" != ""; then
 			OPENSSL_CPPFLAGS="-I$ac_ssl_path/include"
-			OPENSSL_LDFLAGS="-L$ac_ssl_path/lib"
+			OPENSSL_LDFLAGS="-L$ac_ssl_path/lib64 -L$ac_ssl_path/lib"
 		else
 			for ac_ssl_path_tmp in /usr /usr/local /opt ; do
 				if test -d "$ac_ssl_path_tmp" && test -r "$ac_ssl_path_tmp/include/openssl/md5.h"; then
 					OPENSSL_CPPFLAGS="-I$ac_ssl_path_tmp/include"
-					OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib"
+					OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib64 -L$ac_ssl_path_tmp/lib"
 					break;
 				fi
 			done

@@ -1,5 +1,8 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
+/* Define if building universal (internal helper macro) */
+#undef AC_APPLE_UNIVERSAL_BUILD
+
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -245,6 +248,9 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
+
 /* Define if mount.h contains MNT_NOATIME flags */
 #undef HAVE_MNT_NOATIME
 
@@ -454,10 +460,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -475,6 +481,14 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
-/* Define to 1 if your processor stores words with the most significant byte
-   first (like Motorola and SPARC, unlike Intel and VAX). */
-#undef WORDS_BIGENDIAN
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+#  undef WORDS_BIGENDIAN
+# endif
+#endif
