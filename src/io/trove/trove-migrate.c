@@ -48,7 +48,7 @@ op=%lld context=%lld count=%d state=%d\n",                      \
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
-static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
+static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
 
@@ -67,10 +67,14 @@ struct migration_s
 		 const char* meta_path);
 };
 
+/* format: major, minor, incremental, function to migrate.
+ * NOTE: this defines the version to migratem *FROM*. In other words,
+ * if currently running the version defined in the table, run the
+ * associated function. */
 struct migration_s migration_table[] =
 {
     { 0, 1, 3, migrate_collection_0_1_3 },
-    { 0, 1, 5, migrate_collection_0_1_5 },
+    { 0, 1, 4, migrate_collection_0_1_4 },
     { 0, 0, 0, NULL }
 };
 
@@ -705,7 +709,7 @@ context=%lld\n",
 
 
 /*
- * migrate_collection_0_1_5
+ * migrate_collection_0_1_4
  *   coll_id   - collection id
  *   data_path - path to data storage
  *   meta_path - path to metadata storage
@@ -717,7 +721,7 @@ context=%lld\n",
  *
  * \return 0 on success, non-zero on failure
  */
-static int migrate_collection_0_1_5 (TROVE_coll_id coll_id, 
+static int migrate_collection_0_1_4 (TROVE_coll_id coll_id, 
 				     const char* data_path,
 				     const char* meta_path)
 {

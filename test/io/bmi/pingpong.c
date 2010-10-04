@@ -406,7 +406,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
         double                  avg             = 0.0;
         int                     offset;
 #ifdef HAVE_LIBZ
-        unsigned long           crc, rcrc;
+        unsigned long           crc=0, rcrc=0;
 #endif
 
         /* get a bmi_addr for the server */
@@ -536,7 +536,7 @@ static int do_client(struct options *opts, bmi_context_id *context)
                         if(opts->crc)
                         {
                             crc = adler32(0L, Z_NULL, 0);
-                            crc = adler32(crc, (send_buffer + offset), bytes);
+                            crc = adler32(crc, ((unsigned char *)send_buffer + (unsigned int)offset), bytes);
                         }
 #endif
 

@@ -47,7 +47,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="devorange2"
+VFS_HOSTS="devorange2 jeffrey"
 
 #
 # Detect basic heap corruption
@@ -147,6 +147,8 @@ setup_pvfs2() {
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi
 	#turn on degging on each server
+	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+        echo "....setting server-side debug mask"
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
