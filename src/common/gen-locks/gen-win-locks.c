@@ -28,6 +28,7 @@
 /* TODO: may need to init and delete in DLL enter/exit functions */
 LPCRITICAL_SECTION cond_list_lock = NULL;
 LPCRITICAL_SECTION cond_test_init_lock = NULL;
+LPCRITICAL_SECTION mutex_test_init_lock = NULL;
 
 gen_cond_t cond_list_head = NULL;
 gen_cond_t cond_list_tail = NULL;
@@ -90,6 +91,22 @@ int gen_win_mutex_lock(
     DWORD dwWaitResult;
     int result = 0;
 
+    if (*mut == GEN_MUTEX_INITIALIZER)
+    {
+        /* initialize default mutex */
+        if (mutex_test_init_lock == NULL)
+        {
+            mutex_test_init_lock = (LPCRITICAL_SECTION) calloc(1, sizeof(CRITICAL_SECTION));
+            InitializeCriticalSection(mutex_test_init_lock);
+        }
+
+        EnterCriticalSection(mutex_test_init_lock);
+
+        gen_mutex_init(mut);
+
+        LeaveCriticalSection(mutex_test_init_lock);
+    }
+
     if (mut == NULL || *mut == NULL)
     {
         errno = EINVAL;
@@ -151,7 +168,23 @@ int gen_win_mutex_trylock(
 {
     DWORD dwWaitResult;
     int rc;
-    
+
+    if (*mut == GEN_MUTEX_INITIALIZER)
+    {
+        /* initialize default mutex */
+        if (mutex_test_init_lock == NULL)
+        {
+            mutex_test_init_lock = (LPCRITICAL_SECTION) calloc(1, sizeof(CRITICAL_SECTION));
+            InitializeCriticalSection(mutex_test_init_lock);
+        }
+
+        EnterCriticalSection(mutex_test_init_lock);
+
+        gen_mutex_init(mut);
+
+        LeaveCriticalSection(mutex_test_init_lock);
+    }
+
     if (mut == NULL || *mut == NULL)
     {
         errno = EINVAL;

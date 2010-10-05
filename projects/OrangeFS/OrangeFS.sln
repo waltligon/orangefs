@@ -2,6 +2,11 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_wintcp", "bmi_wintcp\bmi_wintcp.vcxproj", "{62A89A5C-1B78-40B7-BB6A-6E5A06DB06E1}"
+	ProjectSection(ProjectDependencies) = postProject
+		{9C95DF0D-5B60-4E94-94ED-000861C651B4} = {9C95DF0D-5B60-4E94-94ED-000861C651B4}
+		{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D} = {A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}
+		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks", "gen-locks\gen-locks.vcxproj", "{9138ABF9-041F-4A55-9E87-0F433719F4FC}"
 EndProject
@@ -11,6 +16,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gen-locks-test", "gen-locks
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmi_misc", "bmi_misc\bmi_misc.vcxproj", "{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "gossip", "gossip\gossip.vcxproj", "{9C95DF0D-5B60-4E94-94ED-000861C651B4}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "id-generator", "id-generator\id-generator.vcxproj", "{0CBAD436-373C-4F35-A620-2D46C12D8FE0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,6 +41,14 @@ Global
 		{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}.Debug|Win32.Build.0 = Debug|Win32
 		{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}.Release|Win32.ActiveCfg = Release|Win32
 		{A7C0F968-DACA-4BFE-B36F-46FDAEB8EF1D}.Release|Win32.Build.0 = Release|Win32
+		{9C95DF0D-5B60-4E94-94ED-000861C651B4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9C95DF0D-5B60-4E94-94ED-000861C651B4}.Debug|Win32.Build.0 = Debug|Win32
+		{9C95DF0D-5B60-4E94-94ED-000861C651B4}.Release|Win32.ActiveCfg = Release|Win32
+		{9C95DF0D-5B60-4E94-94ED-000861C651B4}.Release|Win32.Build.0 = Release|Win32
+		{0CBAD436-373C-4F35-A620-2D46C12D8FE0}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0CBAD436-373C-4F35-A620-2D46C12D8FE0}.Debug|Win32.Build.0 = Debug|Win32
+		{0CBAD436-373C-4F35-A620-2D46C12D8FE0}.Release|Win32.ActiveCfg = Release|Win32
+		{0CBAD436-373C-4F35-A620-2D46C12D8FE0}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -6,6 +6,11 @@
 
 #include <stdlib.h>
 #include <assert.h>
+
+#ifdef WIN32
+#include "wincommon.h"
+#endif
+
 #include "id-generator.h"
 #include "quickhash.h"
 #include "gen-locks.h"

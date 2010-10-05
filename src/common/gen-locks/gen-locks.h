@@ -115,7 +115,7 @@ int gen_win_mutex_destroy(HANDLE *mut);
 int gen_win_mutex_init(HANDLE *mut);
 HANDLE gen_win_thread_self(void);
 
-#define GEN_MUTEX_INITIALIZER CreateMutex(NULL, FALSE, NULL);
+#define GEN_MUTEX_INITIALIZER ((gen_mutex_t) -1)
 #define gen_mutex_lock(m) gen_win_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_win_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_win_mutex_trylock(m)

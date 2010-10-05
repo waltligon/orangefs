@@ -50,7 +50,6 @@
 #endif
 #include "gen-locks.h"
 #include "pint-hint.h"
-#include "pint-event.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static gen_cond_t interface_cond = GEN_COND_INITIALIZER;
