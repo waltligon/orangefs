@@ -6119,12 +6119,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
  * similar to the trove iterate handles function, but returns all handles
  * stored in the precreate pools, including the handles for the pool objects
  * themselves.
-<<<<<<< job.c
- *
- * mtmoore: todo: see how this is used and how we can expose type info here
-=======
  * mtmoore: need to expose types through this interface
->>>>>>> 1.188.8.5
  */
 int job_precreate_pool_iterate_handles(
     PVFS_fs_id fsid,

@@ -2439,10 +2439,6 @@ static void precreate_pool_finalize(void)
 
 /* precreate_pool_setup_server()
  *  
-<<<<<<< pvfs2-server.c
- * This function makes sure that a pool is present for the specified server,
- * fsid, and type
-=======
  * This function makes sure that a pool is present for the specified server,
  * fsid, and type
  *
@@ -2450,7 +2446,6 @@ static void precreate_pool_finalize(void)
  *  type: DS type of handles to store in the pool
  *  fsid: fsid of the filesystem the pool is associated with
  *  handle: out value of the handle of the pool
->>>>>>> 1.269.4.5
  *
  */
 static int precreate_pool_setup_server(const char* host, PVFS_ds_type type, 
