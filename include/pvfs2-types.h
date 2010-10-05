@@ -102,8 +102,9 @@ enum PVFS_encoding_type
 {
     ENCODING_DIRECT = 1,
     ENCODING_LE_BFIELD = 2,
-    ENCODING_XDR = 3,
+    ENCODING_XDR = 3
 };
+
 /* these values must correspond to the defined encoding types above */
 #define ENCODING_INVALID_MIN                    0
 #define ENCODING_INVALID_MAX                    4
@@ -271,6 +272,9 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 #define PVFS_ALL_READ    (PVFS_U_READ|PVFS_G_READ|PVFS_O_READ)
 
 /** Object and attribute types. */
+/* If this enum is modified the server parameters related to the precreate pool
+ * batch and low threshold sizes may need to be modified  to reflect this 
+ * change. Also, the PVFS_DS_TYPE_COUNT #define below must be updated */
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
@@ -284,8 +288,12 @@ typedef enum
 
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
-#define PVFS_DS_TYPE_COUNT      7
+#define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
+                                        * the PVFS_ds_type enum */
+                                            
 
+/* helper to translate bit-shifted enum types to array index number in the 
+ * range (0-(PVFS_DS_TYPE_COUNT-1)) */
 #define PVFS_ds_type_to_int(__type, __intp)         \
 do {                                                \
     uint32_t r = 0;                                 \
@@ -300,10 +308,12 @@ do {                                                \
         {                                           \
             r++;                                    \
         }                                           \
-        *((uint32_t *)__intp) = r+1;                  \
+        *((uint32_t *)__intp) = r+1;                \
     }                                               \
 } while( 0 )
 
+/* helper to translate array index int to a proper PVFS_ds_type bit-shifted
+ * value */
 #define int_to_PVFS_ds_type(__i, __typep)           \
 do {                                                \
     if( __i == 0 )                                  \
@@ -570,11 +580,12 @@ struct PVFS_mgmt_setparam_value
         char *string_value;
     } u;
 };
+
 encode_enum_union_2_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING)
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
 
 enum PVFS_server_mode
 {

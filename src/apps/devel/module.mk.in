@@ -1,0 +1,4 @@
+DIR := src/apps/devel
+
+DEVELSRC := \
+	$(DIR)/pvfs2-db-display.c 

@@ -466,6 +466,14 @@ struct TROVE_mgmt_ops
 			       void *user_ptr,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p);
+
+    int (*collection_deleattr)(
+			       TROVE_coll_id coll_id,
+			       TROVE_keyval_s *key_p,
+			       TROVE_ds_flags flags,
+			       void *user_ptr,
+			       TROVE_context_id context_id,
+			       TROVE_op_id *out_op_id_p);
 };
 
 struct TROVE_context_ops

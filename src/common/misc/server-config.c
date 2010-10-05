@@ -34,6 +34,7 @@
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_logstamp);
+static DOTCONF_CB(get_storage_path);
 static DOTCONF_CB(get_data_path);
 static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
@@ -551,6 +552,27 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
 
+    /* DEPRECATED 
+     * Specifies the local path for the pvfs2 server to use as 
+     * storage space for data files and metadata files. This option should not
+     * be used in conjuction with DataStorageSpace or MetadataStorageSpace. 
+     * This option is only meant as a migration path for configurations where i
+     * users do not want (or don't expect to need to) modify their configuration
+     * to run this version.
+     *
+     * This option specifies the default path for all servers and will appear 
+     * in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * StorageSpace /tmp/pvfs-data.storage
+     * DEPRECATED.
+     */
+    {"StorageSpace",ARG_STR, get_storage_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
     /* Specifies the local path for the pvfs2 server to use as storage space 
      * for data files. This option specifies the default path for all servers 
      * and will appear in the Defaults context.
@@ -641,12 +663,29 @@ static const configoption_t options[] =
          CTX_DEFAULTS, "2000"},
 
      /* Specifies the number of handles to be preceated at a time from each
-      * server using the batch create request.
+      * server using the batch create request. One value is specified for each
+      * type of DS handle. Order is important, it matches the order the types 
+      * are defined in the PVFS_ds_type enum, which lives in 
+      * include/pvfs2-types.h. If that enum changes, it must be changed here 
+      * to match. Currently, this parameter follows the order:
+      *  
+      *  PVFS_TYPE_NONE
+      *  PVFS_TYPE_METAFILE
+      *  PVFS_TYPE_DATAFILE
+      *  PVFS_TYPE_DIRECTORY
+      *  PVFS_TYPE_SYMLINK
+      *  PVFS_TYPE_DIRDATA
+      *  PVFS_TYPE_INTERNAL
+      *
       */
      {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
  
-     /* Precreate pools will be "topped off" if they fall below this value */
+     /* Precreate pools will be "topped off" if they fall below this value. 
+      * One value is specified for each DS handle type. This parameter operates
+      * the same as the PrecreateBatchSize in that each count coorespends to 
+      * one DS handle type. The order of types is identical to the 
+      * PrecreateBatchSize defined above.  */
      {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 16, 256, 16, 16, 16, 0"},
 
@@ -709,7 +748,7 @@ static const configoption_t options[] =
      *
      * usec: [%H:%M:%S.%U]
      *
-     * datetime: [%m/%d %H:%M]
+     * datetime: [%m/%d/%Y %H:%M:%S]
      *
      * thread: [%H:%M:%S.%U (%lu)]
      *
@@ -1154,6 +1193,33 @@ DOTCONF_CB(get_logstamp)
 }
 
 
+DOTCONF_CB(get_storage_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+
+    if( config_s->data_path )
+    {
+        free(config_s->data_path);
+    }
+
+    if( config_s->meta_path )
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
 DOTCONF_CB(get_data_path)
 {
     struct server_configuration_s *config_s = 
@@ -1167,6 +1233,7 @@ DOTCONF_CB(get_data_path)
     {
         free(config_s->data_path);
     }
+
     config_s->data_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
@@ -1185,6 +1252,7 @@ DOTCONF_CB(get_meta_path)
     {
         free(config_s->meta_path);
     }
+
     config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
@@ -1542,7 +1610,7 @@ DOTCONF_CB(get_precreate_batch_size)
     /* so this seems silly but a config option of type ARG_LIST doesn't
      * split on commas (which is claimed to be the delimiter) but on white 
      * space. That could possibly be fixed. So, until it is we have to handle 
-     * the possibility of multiple argumentss with some number of values per 
+     * the possibility of multiple arguments with some number of values per 
      * argument. */
     for(i = 0; i < cmd->arg_count; i++)
     {

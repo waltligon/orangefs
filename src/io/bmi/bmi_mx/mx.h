@@ -15,6 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <mx_extensions.h>      /* needed for callback handler, etc. */
 #include <myriexpress.h>
@@ -53,11 +54,6 @@ typedef struct qlist_head list_t;       /* easier to type */
 #define BMX_MEM_TWEAK 1         /* use buffer list for mem[alloc|free] */
 #define BMX_DEBUG     1         /* enable debug (gossip) statements */
 #define BMX_MEM_ACCT  0         /* track number of bytes alloc's and freed */
-#define BMX_LOGGING   0         /* use MPE logging routines */
-
-#if BMX_LOGGING
-#include "mpe.h"
-#endif
 
 #if BMX_MEM_TWEAK
 /* Allocate 16 4MB buffers for use with BMI_mx_mem[alloc|free] */
@@ -165,11 +161,15 @@ struct bmx_data
         list_t              bmx_idle_rxs;       /* available for receiving */
         gen_mutex_t         bmx_idle_rxs_lock;  /* idle_rxs lock */
 
-        list_t              bmx_canceled;       /* canceled reqs waiting for test */
-        gen_mutex_t         bmx_canceled_lock;  /* canceled list lock */
+        gen_mutex_t         bmx_completion_lock; /* lock for test* functions */
+        int                 bmx_refcount;       /* try to avoid races between test*
+                                                   and cancel functions */
 
-        list_t              bmx_unex_txs;       /* completed unexpected sends */
-        gen_mutex_t         bmx_unex_txs_lock;  /* completed unexpected sends lock */
+                                                /* completed expected msgs
+                                                 * including unexpected sends */
+        list_t              bmx_done_q[BMI_MAX_CONTEXTS];
+        gen_mutex_t         bmx_done_q_lock[BMI_MAX_CONTEXTS];
+
         list_t              bmx_unex_rxs;       /* completed unexpected recvs */
         gen_mutex_t         bmx_unex_rxs_lock;  /* completed unexpected recvs lock */
 
@@ -277,6 +277,7 @@ struct bmx_ctx
         bmi_size_t          mxc_nob;        /* number of bytes (int64_t) */
         mx_request_t        mxc_mxreq;      /* MX request */
         mx_status_t         mxc_mxstat;     /* MX status */
+        bmi_error_code_t    mxc_error;      /* BMI error code */
 
         uint64_t            mxc_get;        /* # of times returned from idle list */
         uint64_t            mxc_put;        /* # of times returned to idle list */

@@ -597,6 +597,8 @@ struct PINT_server_tree_communicate_op
     int num_partitions;
     PVFS_handle* handle_array_local; 
     PVFS_handle* handle_array_remote; 
+    uint32_t *local_join_size;
+    uint32_t *remote_join_size;
     int handle_array_local_count;
     int handle_array_remote_count;
     int handle_index;
@@ -755,7 +757,13 @@ void PINT_server_access_debug(PINT_server_op * s_op,
 
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;
-
+extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;
@@ -771,11 +779,11 @@ extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
 extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
-extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
 extern struct PINT_state_machine_s pvfs2_tree_setattr_work_sm;
+extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

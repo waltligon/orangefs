@@ -168,9 +168,11 @@ static PINT_sm_action setup_batch_create_fn(
     struct server_configuration_s *user_opts = get_server_config_struct();
     int index = 0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated handles from %s and put store them in %llu.\n", 
-        s_op->u.precreate_pool_refiller.host,
-        llu(s_op->u.precreate_pool_refiller.pool_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "setting up msgpair to get precreated "
+                 "handles from %s, of type %u, and put store them in %llu.\n",
+                s_op->u.precreate_pool_refiller.host,
+                s_op->u.precreate_pool_refiller.type,
+                llu(s_op->u.precreate_pool_refiller.pool_handle));
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -220,9 +222,6 @@ static PINT_sm_action setup_fn(
     struct server_configuration_s *user_opts = get_server_config_struct();
     int index = 0;
     PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter, type %u\n", __func__,
-                 s_op->u.precreate_pool_refiller.type);
 
     s_op->u.precreate_pool_refiller.precreate_handle_array = 
         malloc(user_opts->precreate_batch_size[index] * sizeof(PVFS_handle));

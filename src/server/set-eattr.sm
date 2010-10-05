@@ -76,7 +76,7 @@ machine pvfs2_set_eattr_sm
     {
         pjmp setup_create_immutable_copies
         {
-           CREATE_IMM_COPIES => pvfs2_create_immutable_copies_sm;
+           CREATE_IMM_COPIES => pvfs2_pjmp_create_immutable_copies_sm;
         }
         success => inspect_imm_copies;
         default => final_response;

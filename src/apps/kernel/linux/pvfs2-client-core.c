@@ -130,9 +130,13 @@ typedef struct
   be serviced by our regular handlers.  to do both, we use a thread
   for the blocking ioctl.
 */
+#define REMOUNT_NOTCOMPLETED    0
+#define REMOUNT_COMPLETED       1
+#define REMOUNT_FAILED          2
 static pthread_t remount_thread;
 static pthread_mutex_t remount_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int remount_complete = 0;
+static int remount_complete = REMOUNT_NOTCOMPLETED;
+
 
 /* used for generating unique dynamic mount point names */
 static int dynamic_mount_id = 1;
@@ -235,6 +239,7 @@ static int set_acache_parameters(options_t* s_opts);
 static void set_device_parameters(options_t *s_opts);
 static void reset_ncache_timeout(void);
 static int set_ncache_parameters(options_t* s_opts);
+static void finalize_perf_items(int n, ... );
 inline static void fill_hints(PVFS_hint *hints, vfs_request_t *req);
 
 static PVFS_object_ref perform_lookup_on_create_error(
@@ -502,12 +507,17 @@ static void *exec_remount(void *ptr)
       will fill in our dynamic mount information by triggering mount
       upcalls for each fs mounted by the kernel at this point
      */
+
+    /* if PINT_dev_remount fails set remount_complete appropriately */
     if (PINT_dev_remount())
     {
         gossip_err("*** Failed to remount filesystems!\n");
+        remount_complete = REMOUNT_FAILED;
     }
-
-    remount_complete = 1;
+    else
+    {
+        remount_complete = REMOUNT_COMPLETED;
+    }
     pthread_mutex_unlock(&remount_mutex);
 
     return NULL;
@@ -2842,8 +2852,9 @@ static inline PVFS_error handle_unexp_vfs_request(
         goto repost_op;
     }
 
-    if (!remount_complete &&
-        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT))
+    if (remount_complete == REMOUNT_NOTCOMPLETED &&
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_FS_MOUNT) && 
+        (vfs_request->in_upcall.type != PVFS2_VFS_OP_CANCEL) )
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
@@ -3123,6 +3134,7 @@ static PVFS_error process_vfs_requests(void)
         for(i = 0; i < op_count; i++)
         {
             vfs_request = vfs_request_array[i];
+
             assert(vfs_request);
 /*             assert(vfs_request->op_id == op_id_array[i]); */
             if (vfs_request->num_ops == 1 &&
@@ -3269,6 +3281,29 @@ static PVFS_error process_vfs_requests(void)
                 vfs_request, "normal_completion");
             assert(ret == 0);
         }
+
+        /* The status of the remount thread needs to be checked in the event 
+         * the remount fails on client-core startup. If this is the initial 
+         * startup then any mount requests will fail as expected and the 
+         * client-core will behave normally. However, if a mount was 
+         * previously successful (in a previous client-core incarnation) 
+         * client-core doesn't check if the remount succeeded before 
+         * handling the mount request and fs_add. Then any subsequent requests
+         * cause this thread spins around PINT_dev_test_unexpected.
+         *
+         * With the current structure of process_vfs_request, creating the 
+         * remount thread before entering the while loop, it seems exiting 
+         * client-core on a failed remount attempt is the most staight forward 
+         * way to handle this case. Exiting will cause the parent to kickoff 
+         * another client-core and try the remount until it succeeds.
+         */
+        if( remount_complete == REMOUNT_FAILED )
+        {
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                         "%s: remount not completed successfully, no longer "
+                         "handling requests.\n", __func__);
+            return -PVFS_EAGAIN; 
+        }
     }
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
@@ -3284,7 +3319,9 @@ int main(int argc, char **argv)
     uint64_t debug_mask = GOSSIP_NO_DEBUG;
     PINT_client_sm *acache_timer_sm_p = NULL;
     PINT_client_sm *static_acache_timer_sm_p = NULL;
-    PINT_smcb *smcb = NULL;
+    PINT_smcb *acache_smcb = NULL;
+    PINT_smcb *acache_static_smcb = NULL;
+    PINT_smcb *ncache_smcb = NULL;
     PINT_client_sm *ncache_timer_sm_p = NULL;
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
@@ -3438,6 +3475,7 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
         gossip_err("Error: PINT_perf_set_info (history_size).\n");
+        finalize_perf_items( 0 );
         return(ret);
     }
 
@@ -3445,6 +3483,7 @@ int main(int argc, char **argv)
     if(!static_acache_pc)
     {
         gossip_err("Error: PINT_perf_initialize failure.\n");
+        finalize_perf_items( 0 );
         return(-PVFS_ENOMEM);
     }
     ret = PINT_perf_set_info(static_acache_pc, PINT_PERF_HISTORY_SIZE,
@@ -3452,6 +3491,7 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
         gossip_err("Error: PINT_perf_set_info (history_size).\n");
+        finalize_perf_items( 0 );
         return(ret);
     }
 
@@ -3462,6 +3502,7 @@ int main(int argc, char **argv)
     if(!ncache_pc)
     {
         gossip_err("Error: PINT_perf_initialize failure.\n");
+        finalize_perf_items( 0 );
         return(-PVFS_ENOMEM);
     }
     ret = PINT_perf_set_info(ncache_pc, PINT_PERF_HISTORY_SIZE,
@@ -3469,68 +3510,76 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
         gossip_err("Error: PINT_perf_set_info (history_size).\n");
+        finalize_perf_items( 0 );
         return(ret);
     }
     PINT_ncache_enable_perf_counter(ncache_pc);
 
     /* start a timer to roll over performance counters (acache) */
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+    PINT_smcb_alloc(&acache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
             sizeof(struct PINT_client_sm),
             client_op_state_get_machine,
             client_state_machine_terminate,
             s_client_dev_context);
-    if (!smcb)
+    if (!acache_smcb)
     {
+        finalize_perf_items( 0 );
         return(-PVFS_ENOMEM);
     }
-    acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    acache_timer_sm_p = PINT_sm_frame(acache_smcb, PINT_FRAME_CURRENT);
     acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
-    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    ret = PINT_client_state_machine_post(acache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting acache timer.\n");
+        finalize_perf_items( 1, acache_smcb );
         return(ret);
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+    PINT_smcb_alloc(&acache_static_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
             sizeof(struct PINT_client_sm),
             client_op_state_get_machine,
             client_state_machine_terminate,
             s_client_dev_context);
-    if (!smcb)
+    if (!acache_static_smcb)
     {
+        finalize_perf_items( 1, acache_smcb );
         return(-PVFS_ENOMEM);
     }
-    static_acache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    static_acache_timer_sm_p = PINT_sm_frame(acache_static_smcb, 
+        PINT_FRAME_CURRENT);
     static_acache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     static_acache_timer_sm_p->u.perf_count_timer.pc = static_acache_pc;
-    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    ret = PINT_client_state_machine_post(acache_static_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting acache timer.\n");
+        finalize_perf_items( 2, acache_smcb, acache_static_smcb );
         return(ret);
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
+    PINT_smcb_alloc(&ncache_smcb, PVFS_CLIENT_PERF_COUNT_TIMER,
             sizeof(struct PINT_client_sm),
             client_op_state_get_machine,
             client_state_machine_terminate,
             s_client_dev_context);
-    if (!smcb)
+    if (!ncache_smcb)
     {
+        finalize_perf_items( 2, acache_smcb, acache_static_smcb );
         return(-PVFS_ENOMEM);
     }
-    ncache_timer_sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    ncache_timer_sm_p = PINT_sm_frame(ncache_smcb, PINT_FRAME_CURRENT);
     ncache_timer_sm_p->u.perf_count_timer.interval_secs = 
         &s_opts.perf_time_interval_secs;
     ncache_timer_sm_p->u.perf_count_timer.pc = ncache_pc;
-    ret = PINT_client_state_machine_post(smcb, NULL, NULL);
+    ret = PINT_client_state_machine_post(ncache_smcb, NULL, NULL);
     if (ret < 0)
     {
         gossip_lerr("Error posting ncache timer.\n");
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
         return(ret);
     }
 
@@ -3538,6 +3587,7 @@ int main(int argc, char **argv)
     if (ret)
     {
 	PVFS_perror("initialize_ops_in_progress_table", ret);
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
         return ret;
     }   
 
@@ -3545,6 +3595,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
 	PVFS_perror("PINT_dev_initialize", ret);
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
 	return -PVFS_EDEVINIT;
     }
 
@@ -3554,6 +3605,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
 	return ret;
     }
 
@@ -3561,6 +3613,7 @@ int main(int argc, char **argv)
     if (ret < 0)
     {
 	PVFS_perror("device job_open_context failed", ret);
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
 	return ret;
     }
 
@@ -3573,17 +3626,18 @@ int main(int argc, char **argv)
     if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
     {
 	gossip_err("Cannot create remount thread!");
+        finalize_perf_items( 3, acache_smcb, acache_static_smcb, ncache_smcb );
         return -1;
     }
 
     ret = process_vfs_requests();
     if (ret)
     {
-	gossip_err("Failed to process vfs requests!");
+	gossip_err("Failed to process vfs requests!\n");
     }
 
     /* join remount thread; should be long done by now */
-    if (remount_complete)
+    if (remount_complete == REMOUNT_COMPLETED )
     {
         pthread_join(remount_thread, NULL);
     }
@@ -3618,10 +3672,18 @@ int main(int argc, char **argv)
     if (static_acache_timer_sm_p->sys_op_id)
        PINT_sys_release(static_acache_timer_sm_p->sys_op_id);
 
+    finalize_perf_items( 2, acache_smcb, ncache_smcb );
+
+    gossip_err("pvfs2-client-core shutting down.\n");
     if (PVFS_sys_finalize())
     {
-        gossip_err("Failed to finalize PVFS\n");
         return 1;
+    }
+
+    /* if failed remount tell the parent it's something we did wrong. */
+    if( remount_complete != REMOUNT_COMPLETED )
+    {
+        return(-PVFS_EAGAIN);
     }
 
     /* forward the signal on to the parent */
@@ -3630,7 +3692,6 @@ int main(int argc, char **argv)
         kill(0, s_client_signal);
     }
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s terminating\n", argv[0]);
     return 0;
 }
 
@@ -4000,6 +4061,41 @@ static void reset_ncache_timeout(void)
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
                      "unmounted. Not resetting the ncache.\n");
     }
+}
+
+static void finalize_perf_items(int n, ... )
+{
+
+    int i=0;
+    PINT_smcb *smcb;
+    va_list v_args;
+
+    va_start(v_args, n);
+    for( i=0; i < n; i++ )
+    {
+        smcb = va_arg(v_args, PINT_smcb *);
+        if( smcb )
+        {
+            PINT_client_state_machine_release( smcb );
+        }
+    }
+    va_end( v_args );
+
+    if( acache_pc != NULL )
+    {
+        PINT_perf_finalize( acache_pc );
+    }
+    
+    if( static_acache_pc != NULL )
+    {
+        PINT_perf_finalize( static_acache_pc );
+    }
+
+    if( ncache_pc != NULL )
+    {
+        PINT_perf_finalize( ncache_pc );
+    }
+    return;
 }
 
 #ifndef GOSSIP_DISABLE_DEBUG

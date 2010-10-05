@@ -41,11 +41,6 @@ int zoid_method_id;
    we are dealing with an unexpected message.  */
 static op_list_p zoid_ops;
 
-/* As a special feature, client-side ZOID method allows post timeouts.
-   If non-zero this enables combined post & test in order to reduce the
-   number of round-trip messages to the server.  */
-static int post_timeout = 0;
-
 
 static int zoid_err_to_bmi(int err);
 
@@ -55,7 +50,7 @@ zoid_post_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 		      const void*const* buffer_list,
 		      const bmi_size_t* size_list, int list_count,
 		      bmi_size_t total_size, enum bmi_buffer_type buffer_type,
-		      bmi_msg_tag_t tag, uint8_t class, void* user_ptr,
+		      bmi_msg_tag_t tag, void* user_ptr,
 		      bmi_context_id context_id, PVFS_hint hints,
 		      int unexpected)
 {
@@ -99,57 +94,53 @@ zoid_post_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 		size_list_cp[i] = size_list[i];
 	}
 
-	if (total_size <= ZOID_MAX_EAGER_MSG)
-	    ret = zbmi_send_eager((const void**)buffer_list, size_list_cp,
-				  list_count, tag, class, unexpected,
-				  post_timeout);
-	else
-	    ret = zbmi_send(buffer_list, size_list_cp, list_count, tag, class,
-			    unexpected, post_timeout);
-	err = __zoid_error();
-	if (total_size <= ZOID_MAX_EAGER_MSG ?
-	    (!err && ret == 0) : (err == ENOMEM))
+	ret = zbmi_send(buffer_list, size_list_cp, list_count, tag, unexpected);
+	if ((err = __zoid_error()))
 	{
-	    /* Indicates that there was no memory on the server side
-	       for the message.  Could happen if this is an expected
-	       message and no matching receive has been posted, or if
-	       we sent too many unexpected messages without the server-side
-	       receiving anything.  */
-
-	    if (!(new_op = bmi_alloc_method_op(0)))
-		return -BMI_ENOMEM;
-	    *id = new_op->op_id;
-	    new_op->addr = dest;
-	    new_op->send_recv = BMI_SEND;
-	    new_op->user_ptr = user_ptr;
-	    new_op->msg_tag = tag;
-	    new_op->class = class;
-	    new_op->list_count = list_count;
-	    new_op->actual_size = total_size;
-	    if (list_count == 1)
+	    if (err == ENOMEM)
 	    {
-		/* Our buffer_list and size_list pointers might be
-		   temporary (see, e.g., BMI_zoid_post_send), so we
-		   prefer to copy the data over to someplace more
-		   permanent.  */
-		new_op->buffer = (void*)buffer_list[0];
-		new_op->buffer_list = &new_op->buffer;
-		new_op->size_list = &new_op->actual_size;
+		/* Indicates that there was no memory on the server side
+		   for the message.  Could happen if this is an expected
+		   message and no matching receive has been posted, or if
+		   we sent too many unexpected messages without the server-side
+		   receiving anything.  */
+
+		if (!(new_op = bmi_alloc_method_op(0)))
+		    return -BMI_ENOMEM;
+		*id = new_op->op_id;
+		new_op->addr = dest;
+		new_op->send_recv = BMI_SEND;
+		new_op->user_ptr = user_ptr;
+		new_op->msg_tag = tag;
+		new_op->list_count = list_count;
+		new_op->actual_size = total_size;
+		if (list_count == 1)
+		{
+		    /* Our buffer_list and size_list pointers might be
+		       temporary (see, e.g., BMI_zoid_post_send), so we
+		       prefer to copy the data over to someplace more
+		       permanent.  */
+		    new_op->buffer = (void*)buffer_list[0];
+		    new_op->buffer_list = &new_op->buffer;
+		    new_op->size_list = &new_op->actual_size;
+		}
+		else
+		{
+		    new_op->buffer_list = (void*const*)buffer_list;
+		    new_op->size_list = size_list;
+		}
+		new_op->error_code = 0;
+		new_op->method_data = (void*)unexpected;
+
+		op_list_add(zoid_ops, new_op);
+
+		return 0; /* Non-immediate completion.  */
 	    }
 	    else
-	    {
-		new_op->buffer_list = (void*const*)buffer_list;
-		new_op->size_list = size_list;
-	    }
-	    new_op->error_code = 0;
-	    new_op->method_data = (void*)unexpected;
-
-	    op_list_add(zoid_ops, new_op);
-
-	    return 0; /* Non-immediate completion.  */
+		return zoid_err_to_bmi(err);
 	}
-	else if (err)
-	    return zoid_err_to_bmi(err);
+
+	assert (ret == 1);
 
 	return 1; /* Immediate completion.  */
     }
@@ -200,8 +191,7 @@ zoid_post_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 		size_list_cp[i] = size_list[i];
 	}
 
-	ret = zbmi_recv(buffer_list, size_list_cp, list_count, tag,
-			post_timeout);
+	ret = zbmi_recv(buffer_list, size_list_cp, list_count, tag);
 	if ((err = __zoid_error()))
 	    return zoid_err_to_bmi(err);
 
@@ -230,7 +220,6 @@ zoid_post_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 	new_op->send_recv = BMI_RECV;
 	new_op->user_ptr = user_ptr;
 	new_op->msg_tag = tag;
-	new_op->class = 0;
 	new_op->list_count = list_count;
 	new_op->expected_size = total_expected_size;
 	if (list_count == 1)
@@ -307,12 +296,6 @@ zoid_test_common(int incount, bmi_op_id_t* id_array, int outcount_max,
 	    incount_fwd++;
 	}
 
-	/* If we have canceled messages, then we don't need to wait.  We
-	   still check with the server to find about ready messages, but
-	   that's it.  */
-	if (canceled > 0)
-	    max_idle_time_ms = 0;
-
 	ret = zbmi_test(tags, ops, unexp_sizes, incount_fwd, ready,
 			max_idle_time_ms);
 	if ((err = __zoid_error()))
@@ -356,7 +339,7 @@ zoid_test_common(int incount, bmi_op_id_t* id_array, int outcount_max,
 		{
 		    ret = zbmi_send((const void*const*)op->buffer_list,
 				    size_list_cp, op->list_count, op->msg_tag,
-				    op->class, (int)op->method_data, 0);
+				    (int)op->method_data);
 		    if ((err = __zoid_error()))
 		    {
 #if 0
@@ -383,7 +366,7 @@ zoid_test_common(int incount, bmi_op_id_t* id_array, int outcount_max,
 		    int j;
 
 		    ret = zbmi_recv(op->buffer_list, size_list_cp,
-				    op->list_count, op->msg_tag, 0);
+				    op->list_count, op->msg_tag);
 		    if ((err = __zoid_error()))
 			return zoid_err_to_bmi(err);
 
@@ -499,11 +482,6 @@ BMI_zoid_set_info(int option, void* inout_parameter)
 		zoid_server_free_client_addr(inout_parameter);
 	    bmi_dealloc_method_addr(inout_parameter);
 	    break;
-
-	case BMI_ZOID_POST_TIMEOUT:
-	    if (zoid_node_type == CLIENT)
-		post_timeout = *(int*)inout_parameter;
-	    break;
     }
 
     return 0;
@@ -572,6 +550,41 @@ BMI_zoid_unexpected_free(void* buffer)
     }
     else
 	return BMI_zoid_server_unexpected_free(buffer);
+}
+
+/* Invoked on BMI_post_send.  */
+static int
+BMI_zoid_post_send(bmi_op_id_t* id, bmi_method_addr_p dest,
+		   const void* buffer, bmi_size_t size,
+		   enum bmi_buffer_type buffer_type, bmi_msg_tag_t tag,
+		   void* user_ptr, bmi_context_id context_id, PVFS_hint hints)
+{
+    return zoid_post_send_common(id, dest, &buffer, &size, 1, size, buffer_type,
+				 tag, user_ptr, context_id, hints, 0);
+}
+
+/* Invoked on BMI_post_sendunexpected.  We only support it on clients.  */
+static int
+BMI_zoid_post_sendunexpected(bmi_op_id_t* id, bmi_method_addr_p dest,
+			     const void* buffer, bmi_size_t size,
+			     enum bmi_buffer_type buffer_type,
+			     bmi_msg_tag_t tag, void* user_ptr,
+			     bmi_context_id context_id, PVFS_hint hints)
+{
+    return zoid_post_send_common(id, dest, &buffer, &size, 1, size, buffer_type,
+				 tag, user_ptr, context_id, hints, 1);
+}
+
+/* Invoked on BMI_post_recv.  */
+static int
+BMI_zoid_post_recv(bmi_op_id_t* id, bmi_method_addr_p src, void* buffer,
+		   bmi_size_t expected_size, bmi_size_t* actual_size,
+		   enum bmi_buffer_type buffer_type, bmi_msg_tag_t tag,
+		   void* user_ptr, bmi_context_id context_id, PVFS_hint hints)
+{
+    return zoid_post_recv_common(id, src, &buffer, &expected_size, 1,
+				 expected_size, actual_size, buffer_type, tag,
+				 user_ptr, context_id, hints);
 }
 
 /* Invoked on BMI_post_test.  */
@@ -644,18 +657,18 @@ BMI_zoid_testcontext(int incount, bmi_op_id_t* out_id_array, int* outcount,
 				   context_id);
 }
 
-/* Invoked on BMI_testunexpected_class.  We only support it on the server.  */
+/* Invoked on BMI_testunexpected.  We only support in on the server.  */
 static int
 BMI_zoid_testunexpected(int incount, int* outcount,
 			struct bmi_method_unexpected_info* info,
-			uint8_t class, int max_idle_time_ms)
+			int max_idle_time_ms)
 {
     if (zoid_node_type == CLIENT)
 	abort();
 
     /* Server code.  */
 
-    return BMI_zoid_server_testunexpected(incount, outcount, info, class,
+    return BMI_zoid_server_testunexpected(incount, outcount, info,
 					  max_idle_time_ms);
 }
 
@@ -695,7 +708,7 @@ BMI_zoid_post_send_list(bmi_op_id_t* id, bmi_method_addr_p dest,
 			bmi_context_id context_id, PVFS_hint hints)
 {
     return zoid_post_send_common(id, dest, buffer_list, size_list, list_count,
-				 total_size, buffer_type, tag, 0, user_ptr,
+				 total_size, buffer_type, tag, user_ptr,
 				 context_id, hints, 0);
 }
 
@@ -714,20 +727,18 @@ BMI_zoid_post_recv_list(bmi_op_id_t* id, bmi_method_addr_p src,
 				 buffer_type, tag, user_ptr, context_id, hints);
 }
 
-/* Invoked on BMI_post_sendunexpected_list_class.  We only support it on
-   clients.  */
+/* Invoked on BMI_post_sendunexpected_list.  We only support it on clients.  */
 static int
 BMI_zoid_post_sendunexpected_list(bmi_op_id_t* id, bmi_method_addr_p dest,
 				  const void*const* buffer_list,
 				  const bmi_size_t* size_list, int list_count,
 				  bmi_size_t total_size,
 				  enum bmi_buffer_type buffer_type,
-				  bmi_msg_tag_t tag, uint8_t class,
-				  void* user_ptr, bmi_context_id context_id,
-				  PVFS_hint hints)
+				  bmi_msg_tag_t tag, void* user_ptr,
+				  bmi_context_id context_id, PVFS_hint hints)
 {
     return zoid_post_send_common(id, dest, buffer_list, size_list, list_count,
-				 total_size, buffer_type, tag, class, user_ptr,
+				 total_size, buffer_type, tag, user_ptr,
 				 context_id, hints, 1);
 }
 
@@ -791,6 +802,10 @@ const struct bmi_method_ops bmi_zoid_ops =
     .memalloc = BMI_zoid_memalloc,
     .memfree = BMI_zoid_memfree,
     .unexpected_free = BMI_zoid_unexpected_free,
+
+    .post_send = BMI_zoid_post_send,
+    .post_sendunexpected = BMI_zoid_post_sendunexpected,
+    .post_recv = BMI_zoid_post_recv,
 
     .test = BMI_zoid_test,
     .testsome = BMI_zoid_testsome,

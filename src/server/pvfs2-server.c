@@ -19,7 +19,11 @@
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
+
+#ifndef __USE_GNU
 #define __USE_GNU
+#endif
+
 #include <ucontext.h>
 #endif
 
@@ -171,6 +175,7 @@ static int generate_shm_key_hint(int* server_index);
 
 static void precreate_pool_finalize(void);
 static int precreate_pool_initialize(int server_index);
+
 static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
     PVFS_fs_id fsid, PVFS_handle* pool_handle);
 static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type, 
@@ -231,12 +236,9 @@ int main(int argc, char **argv)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: Server aborting.\n");
-        free(s_server_options.server_alias);
         ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
-
-    free(s_server_options.server_alias);
 
     server_status_flag |= SERVER_CONFIG_INIT;
 
@@ -1446,6 +1448,8 @@ static int server_shutdown(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "*** server shutdown in progress ***\n");
 
+    free(s_server_options.server_alias);
+
     if (status & SERVER_PRECREATE_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting precreate pool "
@@ -2075,9 +2079,21 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: smcb op code (%d).\n"
+                                      ,s_op->op);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
+                                       "s_op->unexp_bmi_buff.buffer (%p) "
+                                       "\tNULL(%s).\n"
+                                      ,s_op->unexp_bmi_buff.buffer
+                                      ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
+
+    /* BMI_unexpected_free MUST execute BEFORE BMI_set_info, because BMI_set_info will */
+    /* remove the addr info from the cur_ref_list if BMI_DEC_ADDR_REF causes the ref   */
+    /* count to become zero.  The addr info holds the "unexpected-free" function       */
+    /* pointer.                                                                        */
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
     s_op->unexp_bmi_buff.buffer = NULL;
 
 
@@ -2246,6 +2262,9 @@ static int precreate_pool_initialize(int server_index)
     int server_type;
     int handle_count = 0;
     int fs_count = 0;
+    unsigned int types_to_pool = 0;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+    assert(user_opts);
 
     /* iterate through list of file systems */
     while(cur_f)
@@ -2279,9 +2298,9 @@ static int precreate_pool_initialize(int server_index)
             continue;
         }
 
-        /* how many I/O servers do we have? */
+        /* how many servers do we have? */
         ret = PINT_cached_config_count_servers(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL, &server_count);
         if(ret < 0)
         {
             gossip_err("Error: unable to count servers for fsid: %d\n", 
@@ -2299,7 +2318,7 @@ static int precreate_pool_initialize(int server_index)
 
         /* resolve addrs for each I/O server */
         ret = PINT_cached_config_get_server_array(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO,
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL,
             addr_array, &server_count);
         if(ret < 0)
         {
@@ -2316,10 +2335,44 @@ static int precreate_pool_initialize(int server_index)
             {
                 /* this is a peer server */
                 /* make sure a pool exists for that server,type, fsid pair */
-                for( j=0; j < PVFS_DS_TYPE_COUNT; j++ )
+
+                /* set ds type of handles to setup in the server's pool based
+                 * on the server type */
+                types_to_pool = PVFS_TYPE_NONE;
+                if( (server_type & PINT_SERVER_TYPE_IO) != 0 )
+                {
+                        types_to_pool |= PVFS_TYPE_DATAFILE; 
+                }
+                
+                if( (server_type & PINT_SERVER_TYPE_META) != 0 )
+                {
+                    types_to_pool |= (PVFS_TYPE_METAFILE | PVFS_TYPE_DIRECTORY |
+                                      PVFS_TYPE_SYMLINK | PVFS_TYPE_DIRDATA |
+                                      PVFS_TYPE_INTERNAL);
+                }
+
+                /* for each possible bit in the ds_type mask check if we should
+                 * create a pool for it */
+                for(j = 0; j < PVFS_DS_TYPE_COUNT; j++ )
                 {
                     PVFS_ds_type t;
                     int_to_PVFS_ds_type(j, &t);
+                    
+                    /* skip setting up a pool when it doesn't make sense i.e. 
+                     * when the remote host doesn't have handle types we want.
+                     * or in the special case that we don't get TYPE_NONE 
+                     * handles from  IO servers*/
+                    if(((t & types_to_pool) == 0 ) ||
+                       ((t == PVFS_TYPE_NONE) && 
+                        (server_type == PINT_SERVER_TYPE_IO)) )
+                    {
+                        continue;
+                    }
+
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
+                                 "%s, type: %u, fs_id: %llu, handle: %llu\n",
+                                 __func__, host, t, llu(cur_fs->coll_id), 
+                                 llu(pool_handle));
                     ret = precreate_pool_setup_server(host, t, 
                         cur_fs->coll_id, &pool_handle);
                     if(ret < 0)
@@ -2343,17 +2396,13 @@ static int precreate_pool_initialize(int server_index)
     
                     /* prepare the job interface to use this pool */
                     ret = job_precreate_pool_register_server(host, t,
-                        cur_fs->coll_id, pool_handle, handle_count);
-                    assert(ret != 0);
-                    if(ret < 0)
-                    {
-                        gossip_err("Error: precreate_pool_initialize failed to "
-                                   "register pool for %s\n", 
-                                   server_config.host_id);
-                        return(ret);
-                    }
+                        cur_fs->coll_id, pool_handle, handle_count,
+                        user_opts->precreate_batch_size);
     
                     /* launch sm to take care of refilling */
+                    /* the refiller will only actually launch if the batch count
+                     * for the specified type, t, is greater than 0. Otherwise,
+                     * there is no reason to have a refiller running. */
                     ret = precreate_pool_launch_refiller(host, t, addr_array[i],
                         cur_fs->coll_id, pool_handle);
                     if(ret < 0)
@@ -2370,6 +2419,7 @@ static int precreate_pool_initialize(int server_index)
         job_precreate_pool_set_index(server_index);
 
         cur_f = PINT_llist_next(cur_f);
+        free(addr_array); // local variable, malloc'd above to get BMI addrs
 
     }
 
@@ -2389,8 +2439,18 @@ static void precreate_pool_finalize(void)
 
 /* precreate_pool_setup_server()
  *  
+<<<<<<< pvfs2-server.c
  * This function makes sure that a pool is present for the specified server,
  * fsid, and type
+=======
+ * This function makes sure that a pool is present for the specified server,
+ * fsid, and type
+ *
+ *  host: hostname of server the pool is associated with
+ *  type: DS type of handles to store in the pool
+ *  fsid: fsid of the filesystem the pool is associated with
+ *  handle: out value of the handle of the pool
+>>>>>>> 1.269.4.5
  *
  */
 static int precreate_pool_setup_server(const char* host, PVFS_ds_type type, 
@@ -2556,6 +2616,19 @@ static int precreate_pool_count(
     return(0);
 }
 
+/*
+ * starts a precreate pool refiller state machine for the specified host and
+ * type of handle.
+ *    host: the remote host to get handles from
+ *    type: the DS type of handle the refiller will be refilling
+ *    addr: the BMI addr of the remote host
+ *    fsid: the filesystem ID of the fs the pool refiller is associated with
+ *    pool_handle: the handle of the pool itself
+ *
+ *    This will only be called for a host/type that matches and needs a filler
+ *    so a remote server that is I/O only will only get refillers for datafile
+ *    handles.
+ */
 static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
 {
@@ -2594,11 +2667,10 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     /* set this refillers handle range based on the type of handle it will 
      * hold. If it's a datafile get an IO server range, otherwise get a meta
      * range. */
-    ret = PINT_cached_config_get_server(
-        fsid, host, 
-        ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
-                                        PINT_SERVER_TYPE_META),
-        &s_op->u.precreate_pool_refiller.handle_extent_array);
+    ret = PINT_cached_config_get_server( fsid, host, 
+              ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
+                                              PINT_SERVER_TYPE_META),
+              &s_op->u.precreate_pool_refiller.handle_extent_array);
     if(ret < 0)
     {
         free(s_op->u.precreate_pool_refiller.host);

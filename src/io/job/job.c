@@ -79,13 +79,16 @@ struct precreate_pool
     char* host;
     PVFS_handle pool_handle;
     uint32_t pool_count; 
-    PVFS_ds_type pool_type;
+    PVFS_ds_type pool_type;     /* ds type of pool */
 };
 
 struct fs_pool
 {
     struct qlist_head list_link;
     PVFS_fs_id fsid;
+    /* store the batch count parameter inside the struct. this lets us
+     * return einval if we get called with a type that has a batch count of 0 */
+    uint32_t type_batch_count[PVFS_DS_TYPE_COUNT]; 
     struct qlist_head precreate_pool_list;
     struct qlist_head* precreate_pool_initial;
 };
@@ -130,7 +133,7 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp);
 static void trove_thread_mgr_callback(void* data,
     PVFS_error error_code);
-static void flow_callback(flow_descriptor* flow_d);
+static void flow_callback(flow_descriptor* flow_d, int cancel_path);
 #ifndef __PVFS2_JOB_THREADED__
 static gen_mutex_t work_cycle_mutex = GEN_MUTEX_INITIALIZER;
 static void do_one_work_cycle_all(int idle_time_ms);
@@ -3788,6 +3791,87 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     return (0);
 }
 
+
+/* job_trove_fs_del_eattr()
+ *
+ * delete extended attribute for a file system
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on
+ * failure
+ */
+int job_trove_fs_deleattr(PVFS_fs_id coll_id,
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_flags flags,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id,
+                          PVFS_hint hints)
+{
+    /* post a trove collection del eattr.  If it completes (or fails)
+     * immediately, then return and fill in the status structure.
+     * If it needs to be tested for completion later, then queue
+     * up a job_desc structure.  */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        out_status_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    jd->hints = hints;
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_collection_deleattr(coll_id, key_p, flags,
+                                    user_ptr_internal, global_trove_context,
+                                    &(jd->u.trove.id));
+#else
+    gossip_err("%s: error: Trove support not enabled.\n", __func__);
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        dealloc_job_desc(jd);
+        jd = NULL;
+        out_status_p->error_code = ret;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+
+    return (0);
+}
+
 /* job_null()
  *
  * post null job; can be used to trigger asynchronous state transitions
@@ -5267,7 +5351,7 @@ static void do_one_work_cycle_all(int idle_time_ms)
  *
  * no return value
  */
-static void flow_callback(flow_descriptor* flow_d)
+static void flow_callback(flow_descriptor* flow_d, int cancel_path)
 {
     struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr;
 
@@ -5281,7 +5365,12 @@ static void flow_callback(flow_descriptor* flow_d)
     gen_mutex_unlock(&initialized_mutex);
 
     /* set job descriptor fields and put into completion queue */
-    gen_mutex_lock(&completion_mutex);
+
+    /* if this is being triggered directly from PINT_flow_cancel(), then the
+     * completion mutex is already held by the caller; skip the mutex.
+     */
+    if(!cancel_path)
+        gen_mutex_lock(&completion_mutex);
     job_desc_q_add(completion_queue_array[tmp_desc->context_id],
                    tmp_desc);
     /* set completed flag while holding queue lock */
@@ -5295,7 +5384,8 @@ static void flow_callback(flow_descriptor* flow_d)
     /* wake up anyone waiting for completion */
     pthread_cond_signal(&completion_cond);
 #endif
-    gen_mutex_unlock(&completion_mutex);
+    if(!cancel_path)
+        gen_mutex_unlock(&completion_mutex);
 
     return;
 }
@@ -5445,6 +5535,7 @@ int job_precreate_pool_lookup_server(
     {
         pool = qlist_entry(iterator, struct precreate_pool,
             list_link);
+        /* only sleep for pools of the type we need to fulfill the request */
         if(!strcmp(pool->host, host) && (pool->pool_type == type) )
         {
             *pool_handle = pool->pool_handle;
@@ -5523,7 +5614,8 @@ int job_precreate_pool_register_server(
     PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle pool_handle, 
-    int count)
+    int count,
+    uint32_t *batch_count)
 {
     struct precreate_pool* tmp_pool;
     struct fs_pool* fs;
@@ -5572,6 +5664,19 @@ int job_precreate_pool_register_server(
         }
         memset(fs, 0, sizeof(*fs));
         fs->fsid = fsid;
+
+        /* copy batch counts we are given into fs_pool struct */
+        memcpy(fs->type_batch_count, batch_count, 
+               sizeof(uint32_t)*PVFS_DS_TYPE_COUNT);
+        int i = 0;
+        for( i=0; i < PVFS_DS_TYPE_COUNT; i++ )
+        {
+            gossip_debug(GOSSIP_JOB_DEBUG, "%s: fs_pool %p, storing batch "
+                         "count at index %d: %u\n", __func__, fs, i, 
+                         fs->type_batch_count[i]);
+        }
+
+
         fs->precreate_pool_initial = NULL;
         INIT_QLIST_HEAD(&fs->precreate_pool_list);
         qlist_add(&fs->list_link, &precreate_pool_fs_list);
@@ -5681,6 +5786,7 @@ int job_precreate_pool_get_handles(
 {
     struct job_desc *jd = NULL;
     struct fs_pool* fs;
+    int index = 0;
 
     if(count < 0)
     {
@@ -5688,10 +5794,6 @@ int job_precreate_pool_get_handles(
         return(1);
     }
 
-    /* TODO:
-     * check that a handle with batch size of 0 wasn't requested. we'll call it
-     * an einval since asking for a type guaranteed to have 0 handles doesn't
-     * make sense */
     gossip_debug(GOSSIP_JOB_DEBUG, "%s: requesting %d handles of type %u\n",
                  __func__, count, type);
     jd = alloc_job_desc(JOB_PRECREATE_POOL);
@@ -5717,6 +5819,18 @@ int job_precreate_pool_get_handles(
     gen_mutex_lock(&precreate_pool_mutex);
     fs = find_fs(fsid);
     assert(fs);
+
+    /* make sure the requested type is actually trying to get handles (i.e. has
+     * a batch count bigger than 0). if not, return einval */
+    PVFS_ds_type_to_int(type, &index);
+    assert(fs->type_batch_count);
+    if( fs->type_batch_count[index] < 1 )
+    {
+        gen_mutex_unlock(&precreate_pool_mutex);
+        out_status_p->error_code = -PVFS_EINVAL;
+        return 1;
+    }
+
     jd->u.precreate_pool.current_pool = fs->precreate_pool_initial;
     fs->precreate_pool_initial = fs->precreate_pool_initial->next;
     gen_mutex_unlock(&precreate_pool_mutex);
@@ -5767,8 +5881,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
         {
             /* queue up until the count for this pool increases */
             qlist_add(&jd->job_desc_q_link, &precreate_pool_get_handles_list);
-            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", llu(pool->pool_handle));
-            
+            gossip_debug(GOSSIP_JOB_DEBUG, "Found empty precreate pool %llu\n", 
+                         llu(pool->pool_handle));
             gen_mutex_unlock(&precreate_pool_mutex);
             return;
         }
@@ -5885,7 +5999,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
 
             /* either we got something null, we iterated through pool count 
              * items or, hopefully, we found a pool of the correct type!
-             * check here to make sure, if not exit */
+             * look at the pool's type, if it's wrong, exit */
             if(pool->pool_type != jd->u.precreate_pool.type)
             {
                 gossip_err("Error %s : could not find pool of "
@@ -5907,7 +6021,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             }
         }
 
-        tmp_trove_array[i].pool = qlist_entry(jd->u.precreate_pool.current_pool, 
+        tmp_trove_array[i].pool = qlist_entry(jd->u.precreate_pool.current_pool,
             struct precreate_pool, list_link);
         gossip_debug(GOSSIP_JOB_DEBUG, "%s: trove_array[%d].pool = %p\n",
                      __func__, i, tmp_trove_array[i].pool);
@@ -6005,8 +6119,12 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
  * similar to the trove iterate handles function, but returns all handles
  * stored in the precreate pools, including the handles for the pool objects
  * themselves.
+<<<<<<< job.c
  *
  * mtmoore: todo: see how this is used and how we can expose type info here
+=======
+ * mtmoore: need to expose types through this interface
+>>>>>>> 1.188.8.5
  */
 int job_precreate_pool_iterate_handles(
     PVFS_fs_id fsid,

@@ -73,8 +73,8 @@ nested machine pvfs2_tree_setattr_work_sm
     {
         pjmp tree_setattr_setup
         {
-            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_set_attr_work_sm; 
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_set_attr_work_sm; 
         }
         default => tree_setattr_work_cleanup;
     }
@@ -113,8 +113,8 @@ nested machine pvfs2_tree_remove_work_sm
     {
         pjmp tree_remove_setup
         {
-            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_remove_work_sm;
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_remove_work_sm;
         }
         default => tree_remove_work_cleanup;
     }
@@ -153,8 +153,8 @@ nested machine pvfs2_tree_get_file_size_work_sm
     {
         pjmp tree_get_file_size_setup
         {
-            REMOTE_OPERATION => pvfs2_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_get_attr_with_prelude_sm;
+            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
+            LOCAL_OPERATION => pvfs2_pjmp_get_attr_with_prelude_sm;
         }
         default => tree_get_file_size_work_cleanup;
     }
@@ -189,8 +189,15 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         num_data_files, sizeof(*s_op->u.tree_communicate.handle_array_local));
     s_op->u.tree_communicate.handle_array_remote = calloc(
         num_data_files, sizeof(*s_op->u.tree_communicate.handle_array_remote));
-    if (!s_op->u.tree_communicate.handle_array_local ||
-        !s_op->u.tree_communicate.handle_array_remote)
+    s_op->u.tree_communicate.local_join_size = calloc(
+        num_data_files, sizeof(*s_op->u.tree_communicate.local_join_size));
+    s_op->u.tree_communicate.remote_join_size = calloc(
+        num_data_files, sizeof(*s_op->u.tree_communicate.remote_join_size));
+
+    if (!s_op->u.tree_communicate.handle_array_local  ||
+        !s_op->u.tree_communicate.handle_array_remote ||
+        !s_op->u.tree_communicate.local_join_size     ||
+        !s_op->u.tree_communicate.remote_join_size)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -207,6 +214,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                      llu(handle_array[i]));
             s_op->u.tree_communicate.handle_array_local[
                  s_op->u.tree_communicate.handle_array_local_count] = handle_array[i];
+            s_op->u.tree_communicate.local_join_size[
+                 s_op->u.tree_communicate.handle_array_local_count] = i;
             s_op->u.tree_communicate.handle_array_local_count++;
         }
         else
@@ -216,17 +225,22 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                      llu(handle_array[i]));
             s_op->u.tree_communicate.handle_array_remote[
                  s_op->u.tree_communicate.handle_array_remote_count] = handle_array[i];
+            s_op->u.tree_communicate.remote_join_size[
+                 s_op->u.tree_communicate.handle_array_remote_count] = i;
             s_op->u.tree_communicate.handle_array_remote_count++;
         }
     }/*end for*/
 
     if (s_op->u.tree_communicate.handle_array_local_count > 0) {
+
+       for (i=0; i<s_op->u.tree_communicate.handle_array_local_count; i++)
+       {
         /* Create a stack frame for the local operation. */
         s_op->num_pjmp_frames++;
         js_p->error_code = LOCAL_OPERATION;
 
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb, tree_communicate_s_op,
-            s_op->u.tree_communicate.handle_array_local[0],
+            s_op->u.tree_communicate.handle_array_local[i],
             fs_id, js_p->error_code, req, LOCAL_OPERATION);
 
         switch (operation)
@@ -263,7 +277,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     *req,
                     s_op->req->credentials,
                     fs_id,
-                    s_op->u.tree_communicate.handle_array_local[0],
+                    s_op->u.tree_communicate.handle_array_local[i],
                     s_op->req->hints);
 
                 break;
@@ -275,16 +289,20 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     *req,
                     s_op->req->credentials,
                     fs_id,
-                    s_op->u.tree_communicate.handle_array_local[0],
+                    s_op->u.tree_communicate.handle_array_local[i],
                     PVFS_ATTR_DATA_SIZE,
                     s_op->req->hints);
+
+                /*this identifies which "local" frame is being populated.*/
+                tree_communicate_s_op->u.tree_communicate.handle_index=i;
 
                 break;
             }
 
             default:
                 break;
-        }
+        }/*end switch*/
+       }/*end for*/
     }/*end if local*/
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0) {
@@ -397,7 +415,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                       msg_p->req,
                       s_op->req->credentials,
                       fs_id,
-                      (i-1)*num_files_per_server+1,
+                      (i * num_files_per_server),
                       num_data_files_for_this_server,
                       &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
                       this_req->u.tree_get_file_size.retry_msgpair_at_leaf,
@@ -505,8 +523,19 @@ static int tree_remove_work_cleanup(
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i, task_id, error_code;
     PINT_server_op *old_frame;
+    int return_error_code;
+
+    if (js_p->error_code)
+    {
+        return_error_code = js_p->error_code;
+    }
+    else
+    {
+        return_error_code = 0;
+    }
 
     assert(s_op->req->op == PVFS_SERV_TREE_REMOVE);
+
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->num_pjmp_frames; i++)
     {
@@ -514,9 +543,34 @@ static int tree_remove_work_cleanup(
         if (task_id == REMOTE_OPERATION) {
            PINT_msgpairarray_destroy(&old_frame->msgarray_op);
         }
+
+        gossip_debug(GOSSIP_SERVER_DEBUG,"%s:frame #%d \ttype:%s \terror_code:%d\n"
+                                        ,__func__
+                                        ,i
+                                        ,(task_id==LOCAL_OPERATION ? "LOCAL" : "REMOTE")
+                                        ,error_code);
+        /*retain first error encountered.*/
+        if (error_code && !return_error_code)
+            return_error_code = error_code;
+
         free(old_frame);
     }
 
+    /*deallocate resources*/
+    if (s_op->u.tree_communicate.handle_array_local)
+       free(s_op->u.tree_communicate.handle_array_local);
+    if (s_op->u.tree_communicate.handle_array_remote)
+       free(s_op->u.tree_communicate.handle_array_remote);
+    if (s_op->u.tree_communicate.local_join_size)
+       free(s_op->u.tree_communicate.local_join_size);
+    if (s_op->u.tree_communicate.remote_join_size)
+       free(s_op->u.tree_communicate.remote_join_size);
+    s_op->u.tree_communicate.handle_array_local  = NULL;
+    s_op->u.tree_communicate.handle_array_remote = NULL;
+    s_op->u.tree_communicate.local_join_size     = NULL;
+    s_op->u.tree_communicate.remote_join_size    = NULL;
+
+    js_p->error_code = return_error_code;
     return SM_ACTION_COMPLETE;
 }
  
@@ -581,6 +635,8 @@ static int tree_get_file_size_comp_fn(
     struct PVFS_servresp_tree_get_file_size *m_tree  = &(m_resp->u.tree_get_file_size);
     struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate); 
     int i;
+    uint32_t size_array_index=0,
+             error_array_index=0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "tree_get_file_size_comp_fn[%d], caller_handle_index = %d\n",
@@ -600,22 +656,6 @@ static int tree_get_file_size_comp_fn(
                                     ,__func__
                                     ,m_resp->u.tree_get_file_size.handle_count);
 
-    //memset(&(s_op->resp), 0, sizeof(s_op->resp));
-    //s_op->resp.u.tree_get_file_size.caller_handle_index = 
-    //    resp_p->u.tree_get_file_size.caller_handle_index;
-    //s_op->resp.u.tree_get_file_size.handle_count = resp_p->u.tree_get_file_size.handle_count;
-
-    //s_op->resp.u.tree_get_file_size.error = (PVFS_error *)
-    //    calloc(resp_p->u.tree_get_file_size.handle_count, sizeof(PVFS_error));
-    //s_op->resp.u.tree_get_file_size.size = (PVFS_size *)
-    //    calloc(resp_p->u.tree_get_file_size.handle_count, sizeof(PVFS_size));
-    //if (! s_op->resp.u.tree_get_file_size.error ||
-    //    ! s_op->resp.u.tree_get_file_size.size)
-    //{
-    //    gossip_err("tree_get_file_size_comp_fn: failed to allocate arrays\n");
-    //    return(-PVFS_ENOMEM);
-    //}
-
     for (i = 0; i < m_tree->handle_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: size of datafile[%d] is %lld\n"
@@ -627,19 +667,18 @@ static int tree_get_file_size_comp_fn(
                                         ,__func__
                                         ,m_tree->caller_handle_index
                                         ,s_tree_comm->handle_array_local_count);
-        op_tree->size[m_tree->caller_handle_index 
-                     +i 
-                     +s_tree_comm->handle_array_local_count] 
-           = m_tree->size[i];
-
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: error code for datafile %d is %d\n"
                                         ,__func__
                                         ,i
                                         ,m_tree->error[i]);
-        op_tree->error[m_tree->caller_handle_index
-                      +i
-                      +s_tree_comm->handle_array_local_count] 
-           = m_tree->error[i];
+
+        size_array_index = s_op->u.tree_communicate.remote_join_size[ i +
+                              resp_p->u.tree_get_file_size.caller_handle_index];
+        error_array_index = size_array_index;
+
+        op_tree->size[size_array_index]   = m_tree->size[i];
+
+        op_tree->error[error_array_index] = m_tree->error[i];
     }
 
     return 0;
@@ -652,6 +691,7 @@ static int tree_get_file_size_work_cleanup(
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_servresp_tree_get_file_size *s_tree = &(s_op->resp.u.tree_get_file_size);
     int i, j, k, task_id, error_code;
+    uint32_t size_array_index=0, error_array_index=0;
     PINT_server_op *old_frame;
     struct PVFS_servresp_tree_get_file_size *tree_resp = NULL;
     struct PVFS_servreq_tree_get_file_size *tree_req = NULL;
@@ -725,15 +765,18 @@ static int tree_get_file_size_work_cleanup(
             PINT_msgpairarray_destroy(&old_frame->msgarray_op);
         }
         else { /* LOCAL OPERATION */
-/* TODO: Determine correct location to store result if there is more than one local file. */
             gossip_debug(GOSSIP_SERVER_DEBUG,
                          "%s: size of local datafile is %lld\n"
                          ,__func__
                          ,lld(old_frame->resp.u.getattr.attr.u.data.size));
-            //s_op->resp.u.tree_get_file_size.caller_handle_index = 0;
-            s_op->resp.u.tree_get_file_size.size[0] = old_frame->resp.u.getattr.attr.u.data.size;
-            s_op->resp.u.tree_get_file_size.error[0] = error_code;
-            PINT_free_object_attr(&old_frame->resp.u.getattr.attr);
+            gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
+                                            ,__func__
+                                            ,old_frame->u.tree_communicate.handle_index);
+            size_array_index = s_op->u.tree_communicate.local_join_size[
+                                     old_frame->u.tree_communicate.handle_index];
+            error_array_index=size_array_index;
+            s_op->resp.u.tree_get_file_size.size[size_array_index]   = old_frame->resp.u.getattr.attr.u.data.size;
+            s_op->resp.u.tree_get_file_size.error[error_array_index] = error_code;
         }
         free(old_frame);
     }/*end for*/
@@ -767,6 +810,14 @@ static int tree_get_file_size_work_cleanup(
        free(s_tree_comm->handle_array_local);
     if (s_tree_comm->handle_array_remote)
        free(s_tree_comm->handle_array_remote);
+    if (s_tree_comm->local_join_size)
+       free(s_tree_comm->local_join_size);
+    if (s_tree_comm->remote_join_size)
+       free(s_tree_comm->remote_join_size);
+    s_tree_comm->handle_array_local  = NULL;
+    s_tree_comm->handle_array_remote = NULL;
+    s_tree_comm->local_join_size     = NULL;
+    s_tree_comm->remote_join_size    = NULL;
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

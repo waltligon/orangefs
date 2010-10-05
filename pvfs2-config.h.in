@@ -33,6 +33,12 @@
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
 
+/* Define if kernel backing_dev_info struct has a name field */
+#undef HAVE_BACKING_DEV_INFO_NAME
+
+/* Define if bdi_init function is present */
+#undef HAVE_BDI_INIT
+
 /* Define if struct backing_dev_info in kernel has memory_backed */
 #undef HAVE_BDI_MEMORY_BACKED
 
@@ -124,6 +130,9 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
+
+/* Define if pwd.h exists */
+#undef HAVE_GETPWUID
 
 /* Define if struct super_operations in kernel has get_fs_key callback */
 #undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
@@ -264,7 +273,10 @@
 #undef HAVE_OPENSSL_EVP_H
 
 /* Define if sysctl proc handlers have 6th argument */
-#undef HAVE_PROC_HANDLER_SIX_ARG
+#undef HAVE_PROC_HANDLER_FILE_ARG
+
+/* Define if sysctl proc handlers have ppos argument */
+#undef HAVE_PROC_HANDLER_PPOS_ARG
 
 /* Define if have PtlACEntry with jid argument. */
 #undef HAVE_PTLACENTRY_JID
@@ -303,6 +315,9 @@
 /* Define if kernel address_space struct has a rw_lock_t member named
    tree_lock */
 #undef HAVE_RW_LOCK_TREE_ADDR_SPACE_STRUCT
+
+/* Define if struct super_block has s_dirty list */
+#undef HAVE_SB_DIRTY_LIST
 
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
@@ -432,6 +447,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION

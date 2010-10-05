@@ -30,7 +30,7 @@ extern "C" {
  * Major versions aren't either, but refer to architectural storage format changes.
  */
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.1.4"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.1.5"   
 
 #define LAST_HANDLE_STRING                                  "last_handle"
 
@@ -753,6 +753,13 @@ int dbpf_collection_seteattr(TROVE_coll_id coll_id,
 int dbpf_collection_geteattr(TROVE_coll_id coll_id,
                              TROVE_keyval_s *key_p,
                              TROVE_keyval_s *val_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p);
+
+int dbpf_collection_deleattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
                              TROVE_ds_flags flags,
                              void *user_ptr,
                              TROVE_context_id context_id,

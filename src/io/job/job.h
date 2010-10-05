@@ -619,6 +619,17 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
                           job_context_id context_id,
                           PVFS_hint hints);
 
+/* delete extended attributes for a file system */
+int job_trove_fs_deleattr(PVFS_fs_id coll_id,
+                          PVFS_ds_keyval * key_p,
+                          PVFS_ds_flags flags,
+                          void *user_ptr,
+                          job_aint status_user_tag,
+                          job_status_s * out_status_p,
+                          job_id_t * id,
+                          job_context_id context_id,
+                          PVFS_hint hints);
+
 int job_null(
     int error_code,
     void *user_ptr,
@@ -692,7 +703,8 @@ int job_precreate_pool_register_server(
     PVFS_ds_type type,
     PVFS_fs_id fsid, 
     PVFS_handle pool_handle, 
-    int count);
+    int count,
+    uint32_t *batch_count);
  
 int job_precreate_pool_lookup_server(
     const char* host, 

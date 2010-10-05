@@ -129,6 +129,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         gossip_lerr("Error initializing distributions.\n");
         goto error_exit;
     }
+    client_status_flag |= CLIENT_DIST_INIT;
     
     /* initlialize the protocol encoder */
     ret = PINT_encode_initialize();

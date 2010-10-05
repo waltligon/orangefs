@@ -1,6 +1,12 @@
 #!/bin/sh
 
 cd ${EXTRA_TESTS}/iozone3_239/src/current  || exit 1
+patch -p5 < ${VFS_SCRIPTS}/iozone.patch
+if [ $? != 0 ]
+then
+   echo "Attemp to patch iozone software failed."
+   exit 1
+fi
 make linux  || exit 1
 # -y min record size
 # -q max record size

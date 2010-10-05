@@ -66,8 +66,37 @@ static void PINT_event_tau_init(void);
 static void PINT_event_tau_fini(void);
 static void PINT_event_tau_thread_init(char* gname);
 static void PINT_event_tau_thread_fini(void);
+static void PINT_event_free( struct PINT_event *p );
+static void PINT_group_free( strcut PINT_group *g );
 
 #endif /* HAVE_TAU */
+
+static void PINT_event_free( struct PINT_event *p )
+{
+    if( p != NULL )
+    {
+        if( p->name != NULL )
+        {
+            free( p->name );
+        }
+        free( p );
+    }
+    return;
+}
+
+static void PINT_group_free( struct PINT_group *g )
+{
+    if( g != NULL )
+    {
+        if( g->name != NULL )
+        {
+            free( g->name );
+        }
+        free( g );
+    }
+    return;
+}
+
 
 static int PINT_group_compare(void *key, struct qhash_head *link)
 {
@@ -104,15 +133,19 @@ int PINT_event_init(enum PINT_event_method method)
     groups_table = qhash_init(PINT_group_compare, quickhash_string_hash, 1024);
     if(!groups_table)
     {
-        qhash_finalize(events_table);
+        qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+            PINT_event_free);
         return -PVFS_ENOMEM;
     }
 
     ret = PINT_event_define_group("defaults", &default_group);
     if(ret < 0)
     {
-        qhash_finalize(events_table);
-        qhash_finalize(groups_table);
+        qhash_destroy_and_finalize( groups_table, struct PINT_group, link, 
+            PINT_group_free );
+        qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+            PINT_event_free);
+
         return ret;
     }
 
@@ -171,31 +204,16 @@ void PINT_event_free_bucket_resources(struct qhash_table *qht, unsigned long dis
 
 void PINT_event_finalize(void)
 {
-    unsigned long distance_from_link = 0;
 #if defined(HAVE_TAU)
     PINT_event_tau_fini();
 #endif
-    /*calculate the number of bytes from the top of a PINT_group structure to
-     *the beginning of the link member. The link member ties the group into the
-     *list of entries within one bucket of the groups table.
-    */
-    distance_from_link = (unsigned long)((&((struct PINT_group *)0)->link));
-    PINT_event_free_bucket_resources(groups_table,distance_from_link);
-
-
-
-    /*calculate the number of bytes from the top of a PINT_event structure to
-     *the beginning of the link member.  The link member ties the event into the
-     *list of entries within one bucket of the events table.
-    */
-    distance_from_link = (unsigned long)((&((struct PINT_event *)0)->link));
-    PINT_event_free_bucket_resources(events_table,distance_from_link);
-
-
 
     /*free the buckets in the tables and the tables themselves*/
-    qhash_finalize(groups_table);
-    qhash_finalize(events_table);
+    /* need to free contents as well */
+    qhash_destroy_and_finalize( groups_table, struct PINT_group, link, 
+        PINT_group_free );
+    qhash_destroy_and_finalize( events_table, struct PINT_event, link, 
+        PINT_event_free);
     return;
 }
 

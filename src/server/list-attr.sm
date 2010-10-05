@@ -24,6 +24,9 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 
+#define GETATTR 100
+
+
 %%
 
 
@@ -47,7 +50,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            success => pvfs2_get_attr_work_sm;
+            GETATTR => pvfs2_pjmp_get_attr_work_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -171,7 +174,7 @@ static PINT_sm_action listattr_setup_getattr(
         getattr_op->u.getattr.handle = s_op->req->u.listattr.handles[i];
         getattr_op->u.getattr.attrmask = s_op->req->u.listattr.attrmask;
 
-        ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+        ret = PINT_sm_push_frame(smcb, GETATTR, getattr_op);
         if(ret < 0)
         {
             s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
@@ -206,7 +209,7 @@ static PINT_sm_action listattr_setup_getattr(
 static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb, 
     job_status_s *js_p)
 {    
-    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *getattr_op = NULL;
     /* note: this gives us a pointer to the base frame (list_attr), 
      * _not_ the getattr frames that were previously pushed.
      */
@@ -228,7 +231,9 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
     {
         getattr_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, 
             &remaining);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr_op is %s.\n",(getattr_op ? "okay" : "NULL"));
         gossip_debug(GOSSIP_SERVER_DEBUG, "listattr: nested sm returned error code: %d\n", tmp_err);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "s_op is %p \t getattr_op is %p",s_op,getattr_op );
         /* match it up with the correct array entry */
         for(j=0; j<s_op->req->u.listattr.nhandles; j++)
         {

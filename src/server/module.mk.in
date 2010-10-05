@@ -6,6 +6,7 @@ ifdef BUILD_SERVER
 
         # automatically generated c files
         SERVER_SMCGEN := \
+		$(DIR)/pjmp-machines.c \
 		$(DIR)/setparam.c \
 		$(DIR)/lookup.c \
 		$(DIR)/create.c \
@@ -52,9 +53,6 @@ ifdef BUILD_SERVER
 	# c files that should be added to server library
 	SERVERSRC += \
 		$(SERVER_SMCGEN)
-
-	# server only file
-	SERVERSRC += $(DIR)/check.c
 
 	# track generate .c files to remove during dist clean, etc. 
 		SMCGEN += $(SERVER_SMCGEN)
