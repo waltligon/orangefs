@@ -22,9 +22,10 @@
 #ifndef SOCKIO_H
 #define SOCKIO_H
 
+#include <WinSock2.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+/* #include <sys/socket.h> */
+/* #include <netinet/in.h> */
 #include <stdio.h>
 
 #include "bmi-types.h"
@@ -48,7 +49,7 @@ int BMI_sockio_nbsend(int s,
 		      void *buf,
 		      int len);
 int BMI_sockio_nbvector(int s,
-			struct iovec* vector,
+			LPWSABUF vector,
 			int count,
 			int recv_flag);
 int BMI_sockio_get_sockopt(int s,
@@ -91,17 +92,30 @@ int BMI_sockio_nbsendfile(int s,
 
 /* BLOCKING / NONBLOCKING MACROS */
 
-#define SET_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, O_NONBLOCK | \
-   fcntl((x_fd), F_GETFL, 0))
+/* Windows uses ioctlsocket */
+/* #define SET_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, O_NONBLOCK | \
+   fcntl((x_fd), F_GETFL, 0)) */
+#define SET_NONBLOCK(x_fd) \
+do { \
+    u_long enable = 1; \
+    ioctlsocket((x_fd), FIONBIO, &enable); \
+} while (0)
 
-#define SET_NONBLOCK_AND_SIGIO(x_fd) \
+/* There is no equivalent for FASYNC on Windows, so just set blocking mode */
+/*#define SET_NONBLOCK_AND_SIGIO(x_fd) \
 do { \
     fcntl((x_fd), F_SETOWN, getpid()); \
     fcntl((x_fd), F_SETFL, FASYNC | O_NONBLOCK | fcntl((x_fd), F_GETFL, 0)); \
-} while (0)
+} while (0) */
+#define SET_NONBLOCK_AND_SIGIO(x_fd) SET_NONBLOCK(x_fd)
 
-#define CLR_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, fcntl((x_fd), F_GETFL, 0) & \
-   (~O_NONBLOCK))
+/* #define CLR_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, fcntl((x_fd), F_GETFL, 0) & \
+   (~O_NONBLOCK)) */
+#define CLR_NONBLOCK(x_fd) \
+do { \
+    u_long enable = 0; \
+    ioctlsocket((x_fd), FIONBIO, &enable); \
+} while (0)
 
 #endif
 

@@ -33,13 +33,12 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
     int ret;
     void *ptr;
 
-#ifdef WIN32
-    /* Windows doesn't support specific alignments */
+#ifdef WIN32    
     ret = 0;
-    ptr = malloc(size);
+    ptr = _aligned_malloc(size, alignment);
     if (ptr == NULL)
     {
-        errno = ret = ENOMEM;
+        ret = ENOMEM;
     }
 #else
     ret = posix_memalign(&ptr, alignment, size);

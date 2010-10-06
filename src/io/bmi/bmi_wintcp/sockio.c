@@ -6,28 +6,32 @@
 
 #include "pvfs2-config.h"
 
-#include <unistd.h>
+#include <WinSock2.h>
+/* #include <unistd.h> */
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/time.h>
+/* #include <sys/socket.h> */
+/* #include <sys/time.h> */
 #include <fcntl.h>
-#include <netinet/in.h>
+/* #include <netinet/in.h>
 #include <netinet/tcp.h>
+*/
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
-#include <sys/poll.h>
-#include <sys/uio.h>
+/* #include <sys/poll.h>
+#include <sys/uio.h> */
 #include <assert.h>
 
 #include "sockio.h"
 #include "gossip.h"
+
+typedef unsigned int socklen_t;
 
 /* if the platform provides a MSG_NOSIGNAL option (which disables the
  * generation of signals on broken pipe), then use it
@@ -44,20 +48,20 @@ int BMI_sockio_new_sock()
 }
 
 int BMI_sockio_bind_sock(int sockd,
-	      int service)
+              int service)
 {
     struct sockaddr_in saddr;
 
-    bzero((char *) &saddr, sizeof(saddr));
+    memset((char *) &saddr, 0, sizeof(saddr));
     saddr.sin_family = AF_INET;
     saddr.sin_port = htons((u_short) service);
     saddr.sin_addr.s_addr = INADDR_ANY;
   bind_sock_restart:
     if (bind(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
-	if (errno == EINTR)
-	    goto bind_sock_restart;
-	return (-1);
+        if (WSAGetLastError() == WSAEINTR)
+            goto bind_sock_restart;
+        return (-1);
     }
     return (sockd);
 }
@@ -65,19 +69,19 @@ int BMI_sockio_bind_sock(int sockd,
 /* NOTE: this function returns BMI error codes */
 int BMI_sockio_bind_sock_specific(int sockd,
               const char *name,
-	      int service)
+              int service)
 {
     struct sockaddr saddr;
     int ret;
 
     if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
-	return (ret); /* converted to PVFS error code below */
+        return (ret); /* converted to PVFS error code below */
 
   bind_sock_restart:
     if (bind(sockd, &saddr, sizeof(saddr)) < 0)
     {
-	if (errno == EINTR)
-	    goto bind_sock_restart;
+        if (WSAGetLastError() == WSAEINTR)
+            goto bind_sock_restart;
         return(bmi_errno_to_pvfs(-errno));
     }
     return (sockd);
@@ -86,19 +90,19 @@ int BMI_sockio_bind_sock_specific(int sockd,
 
 /* NOTE: this function returns BMI error codes */
 int BMI_sockio_connect_sock(int sockd,
-		 const char *name,
-		 int service)
+                 const char *name,
+                 int service)
 {
     struct sockaddr saddr;
     int ret;
 
     if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
-	return (ret);
+        return (ret);
   connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
-	if (errno == EINTR)
-	    goto connect_sock_restart;
+        if (WSAGetLastError() == WSAEINTR)
+            goto connect_sock_restart;
         return(bmi_errno_to_pvfs(-errno));
     }
     return (sockd);
@@ -109,13 +113,13 @@ static int conv_h_errno(int herr)
 {   
     switch (herr)
     {
-    case HOST_NOT_FOUND :
+    case WSAHOST_NOT_FOUND :
         return BMI_EHOSTNTFD;
-    case NO_ADDRESS :
+    case WSANO_ADDRESS :
         return BMI_EADDRNTFD;
-    case NO_RECOVERY :
+    case WSANO_RECOVERY :
         return BMI_ENORECVR;
-    case TRY_AGAIN :
+    case WSATRY_AGAIN :
         return BMI_ETRYAGAIN;
     default :
         return herr;
@@ -124,34 +128,34 @@ static int conv_h_errno(int herr)
 
 /* gethostbyname version */
 int BMI_sockio_init_sock(struct sockaddr *saddrp,
-			 const char *name,
-			 int service)
+                         const char *name,
+                         int service)
 {
     struct hostent *hep;
 
-    bzero((char *) saddrp, sizeof(struct sockaddr_in));
+    memset((char *) saddrp, 0, sizeof(struct sockaddr_in));
     if (name == NULL)
     {
-	if ((hep = gethostbyname("localhost")) == NULL)
-	{
-	    return (-conv_h_errno(h_errno));
-	}
+        if ((hep = gethostbyname("localhost")) == NULL)
+        {
+            return (-conv_h_errno(WSAGetLastError()));
+        }
     }
     else if ((hep = gethostbyname(name)) == NULL)
     {
-	return (-conv_h_errno(h_errno));
+        return (-conv_h_errno(WSAGetLastError()));
     }
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
     memcpy((char *) &(((struct sockaddr_in *) saddrp)->sin_addr), hep->h_addr, 
-	  hep->h_length);
+          hep->h_length);
     return (0);
 }
 #else
 /* inet_aton version */
 int BMI_sockio_init_sock(struct sockaddr *saddrp,
-			 const char *name,
-			 int service)
+                         const char *name,
+                         int service)
 {
     int ret;
     struct in_addr addr;
@@ -159,11 +163,11 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
     bzero((char *) saddrp, sizeof(struct sockaddr_in));
     if (name == NULL)
     {
-	ret = inet_aton("127.0.0.1", &addr);
+        ret = inet_aton("127.0.0.1", &addr);
     }
     else
     {
-	ret = inet_aton(name, &addr);
+        ret = inet_aton(name, &addr);
     }
 
     if (ret == 0) return -1;
@@ -171,7 +175,7 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
     memcpy((char *) &(((struct sockaddr_in *) saddrp)->sin_addr), &addr, 
-	  sizeof(addr));
+          sizeof(addr));
 
     return 0;
 }
@@ -180,37 +184,39 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
 
 /* nonblocking receive */
 int BMI_sockio_nbrecv(int s,
-	   void *buf,
-	   int len)
+           void *buf,
+           int len)
 {
-    int ret, comp = len;
+    int ret, comp = len, err;
 
-    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
+    /* We can't read the blocking state on Windows */
+    /* assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK); */
 
     while (comp)
     {
       nbrecv_restart:
-	ret = recv(s, buf, comp, DEFAULT_MSG_FLAGS);
+        ret = recv(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
+        err = WSAGetLastError();
         if (ret == 0) /* socket closed */
         {
             errno = EPIPE;
             return (-1);
         }
-	if (ret == -1 && errno == EINTR) 
-	{
-	    goto nbrecv_restart;
-	}
-        else if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        if (ret == -1 && err == WSAEINTR) 
+        {
+            goto nbrecv_restart;
+        }
+        else if (ret == -1 && err == WSAEWOULDBLOCK)
         {
             /* return what we got so far, this is a nonblocking call */
             return(len-comp);
         }
-	else if (ret == -1)
-	{
-	    return (-1);
-	}
-	comp -= ret;
-	buf = (char *)buf + ret;
+        else if (ret == -1)
+        {
+            return (-1);
+        }
+        comp -= ret;
+        buf = (char *)buf + ret;
     }
     return (len - comp);
 }
@@ -225,21 +231,24 @@ int BMI_sockio_nbrecv(int s,
  */
 int BMI_sockio_nbpeek(int s, void* buf, int len)
 {
-    int ret;
-    assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK);
+    int ret, err;
+    
+    /* We can't read the blocking state on Windows */
+    /* assert(fcntl(s, F_GETFL, 0) & O_NONBLOCK); */
 
   nbpeek_restart:
-    ret = recv(s, buf, len, (MSG_PEEK|DEFAULT_MSG_FLAGS));
+    ret = recv(s, (char *) buf, len, (MSG_PEEK|DEFAULT_MSG_FLAGS));
+    err = WSAGetLastError();
     if(ret == 0)
     {
         errno = EPIPE;
         return (-1);
     }
-    else if (ret == -1 && errno == EWOULDBLOCK)
+    else if (ret == -1 && err == WSAEWOULDBLOCK)
     {
         return(0);
     }
-    else if (ret == -1 && errno == EINTR)
+    else if (ret == -1 && err == WSAEINTR)
     {
         goto nbpeek_restart;
     }
@@ -255,36 +264,38 @@ int BMI_sockio_nbpeek(int s, void* buf, int len)
 /* nonblocking send */
 /* should always return 0 when nothing gets done! */
 int BMI_sockio_nbsend(int s,
-	   void *buf,
-	   int len)
+           void *buf,
+           int len)
 {
-    int ret, comp = len;
+    int ret, comp = len, err;
 
     while (comp)
     {
       nbsend_restart:
-	ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
-	if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
-	    return (len - comp);	/* return amount completed */
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbsend_restart;
-	}
-	else if (ret == -1)
-	    return (-1);
-	comp -= ret;
-	buf = (char *)buf + ret;
+        ret = send(s, (char *) buf, comp, DEFAULT_MSG_FLAGS);
+        err = WSAGetLastError();
+        if (ret == 0 || (ret == -1 && err == WSAEWOULDBLOCK))
+            return (len - comp);        /* return amount completed */
+        if (ret == -1 && err == WSAEINTR)
+        {
+            goto nbsend_restart;
+        }
+        else if (ret == -1)
+            return (-1);
+        comp -= ret;
+        buf = (char *)buf + ret;
     }
     return (len - comp);
 }
 
 /* nonblocking vector send */
 int BMI_sockio_nbvector(int s,
-	    struct iovec* vector,
-	    int count, 
-	    int recv_flag)
+            LPWSABUF vector,
+            int count, 
+            int recv_flag)
 {
-    int ret;
+    int ret, err;
+    DWORD bytes, flags;
 
     /* NOTE: this function is different from the others that will
      * keep making the I/O system call until EWOULDBLOCK is encountered; we 
@@ -294,22 +305,28 @@ int BMI_sockio_nbvector(int s,
     /* loop over if interrupted */
     do
     {
-	if(recv_flag)
-	{
-	    ret = readv(s, vector, count);
-	}
-	else
-	{
-	    ret = writev(s, vector, count);
-	}
-    }while(ret == -1 && errno == EINTR);
+        if (recv_flag)
+        {
+            /* ret = readv(s, vector, count); */
+            flags = MSG_PARTIAL;
+            ret = WSARecv(s, vector, count, &bytes, &flags, NULL, NULL);
+            err = WSAGetLastError();
+        }
+        else
+        {
+            /* ret = writev(s, vector, count); */
+            flags = 0;
+            ret = WSASend(s, vector, count, &bytes, flags, NULL, NULL);
+            err = WSAGetLastError();
+        }
+    } while ((ret == 0 && flags & MSG_PARTIAL) || (ret == -1 && err == WSAEINTR));
 
     /* return zero if can't do any work at all */
-    if(ret == -1 && errno == EWOULDBLOCK)
-	return(0);
+    if (ret == -1 && err == WSAEWOULDBLOCK)
+        return(0);
 
     /* if data transferred or an error */
-    return(ret);
+    return ret == -1 ? -1 : bytes;
 }
 
 #ifdef __USE_SENDFILE__
@@ -329,27 +346,27 @@ int BMI_sockio_nbvector(int s,
  * Returns -1 on error, amount of data written to socket on success.
  */
 int BMI_sockio_nbsendfile(int s,
-	       int f,
-	       int off,
-	       int len)
+               int f,
+               int off,
+               int len)
 {
     int ret, comp = len, myoff;
 
     while (comp)
     {
       nbsendfile_restart:
-	myoff = off;
-	ret = sendfile(s, f, &myoff, comp);
-	if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
-	    return (len - comp);	/* return amount completed */
-	if (ret == -1 && errno == EINTR)
-	{
-	    goto nbsendfile_restart;
-	}
-	else if (ret == -1)
-	    return (-1);
-	comp -= ret;
-	off += ret;
+        myoff = off;
+        ret = sendfile(s, f, &myoff, comp);
+        if (ret == 0 || (ret == -1 && errno == EWOULDBLOCK))
+            return (len - comp);        /* return amount completed */
+        if (ret == -1 && errno == EINTR)
+        {
+            goto nbsendfile_restart;
+        }
+        else if (ret == -1)
+            return (-1);
+        comp -= ret;
+        off += ret;
     }
     return (len - comp);
 }
@@ -357,35 +374,35 @@ int BMI_sockio_nbsendfile(int s,
 
 /* routines to get and set socket options */
 int BMI_sockio_get_sockopt(int s,
-		int optname)
+                int optname)
 {
     int val;
     socklen_t len = sizeof(val);
 
-    if (getsockopt(s, SOL_SOCKET, optname, &val, &len) == -1)
-	return (-1);
+    if (getsockopt(s, SOL_SOCKET, optname, (char *) &val, (int *) &len) == -1)
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
 int BMI_sockio_set_tcpopt(int s,
-	       int optname,
-	       int val)
+               int optname,
+               int val)
 {
-    if (setsockopt(s, IPPROTO_TCP, optname, &val, sizeof(val)) == -1)
-	return (-1);
+    if (setsockopt(s, IPPROTO_TCP, optname, (char *) &val, sizeof(val)) == -1)
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
 int BMI_sockio_set_sockopt(int s,
-		int optname,
-		int val)
+                int optname,
+                int val)
 {
-    if (setsockopt(s, SOL_SOCKET, optname, &val, sizeof(val)) == -1)
-	return (-1);
+    if (setsockopt(s, SOL_SOCKET, optname, (char *) &val, sizeof(val)) == -1)
+        return (-1);
     else
-	return (val);
+        return (val);
 }
 
 /*

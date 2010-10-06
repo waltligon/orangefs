@@ -224,7 +224,7 @@ struct tcp_op
  * this because BMI serializes module calls
  */
 #define BMI_TCP_IOV_COUNT 10
-static struct iovec stat_io_vector[BMI_TCP_IOV_COUNT+1];
+static WSABUF stat_io_vector[BMI_TCP_IOV_COUNT+1];
 
 /* internal utility functions */
 static int tcp_server_init(void);
@@ -298,30 +298,31 @@ static void bmi_set_sock_buffers(int socket);
 
 /* exported method interface */
 const struct bmi_method_ops bmi_tcp_ops = {
-    .method_name = BMI_tcp_method_name,
-    .initialize = BMI_tcp_initialize,
-    .finalize = BMI_tcp_finalize,
-    .set_info = BMI_tcp_set_info,
-    .get_info = BMI_tcp_get_info,
-    .memalloc = BMI_tcp_memalloc,
-    .memfree  = BMI_tcp_memfree,
-    .unexpected_free = BMI_tcp_unexpected_free,
-    .post_send = BMI_tcp_post_send,
-    .post_sendunexpected = BMI_tcp_post_sendunexpected,
-    .post_recv = BMI_tcp_post_recv,
-    .test = BMI_tcp_test,
-    .testsome = BMI_tcp_testsome,
-    .testcontext = BMI_tcp_testcontext,
-    .testunexpected = BMI_tcp_testunexpected,
-    .method_addr_lookup = BMI_tcp_method_addr_lookup,
-    .post_send_list = BMI_tcp_post_send_list,
-    .post_recv_list = BMI_tcp_post_recv_list,
-    .post_sendunexpected_list = BMI_tcp_post_sendunexpected_list,
-    .open_context = BMI_tcp_open_context,
-    .close_context = BMI_tcp_close_context,
-    .cancel = BMI_tcp_cancel,
-    .rev_lookup_unexpected = BMI_tcp_addr_rev_lookup_unexpected,
-    .query_addr_range = BMI_tcp_query_addr_range,
+    BMI_tcp_method_name,
+    0, /* flags */
+    BMI_tcp_initialize, 
+    BMI_tcp_finalize,
+    BMI_tcp_set_info,
+    BMI_tcp_get_info,
+    BMI_tcp_memalloc,
+    BMI_tcp_memfree,
+    BMI_tcp_unexpected_free,
+    BMI_tcp_post_send,
+    BMI_tcp_post_sendunexpected,
+    BMI_tcp_post_recv,
+    BMI_tcp_test,
+    BMI_tcp_testsome,
+    BMI_tcp_testcontext,
+    BMI_tcp_testunexpected,
+    BMI_tcp_method_addr_lookup,
+    BMI_tcp_post_send_list,
+    BMI_tcp_post_recv_list,
+    BMI_tcp_post_sendunexpected_list,
+    BMI_tcp_open_context,
+    BMI_tcp_close_context,
+    BMI_tcp_cancel,
+    BMI_tcp_addr_rev_lookup_unexpected,
+    BMI_tcp_query_addr_range
 };
 
 /* module parameters */
