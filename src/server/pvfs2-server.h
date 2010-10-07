@@ -409,8 +409,6 @@ struct PINT_server_lookup_op
     PVFS_ds_attributes *ds_attr_array;
     PVFS_object_attr attr;
 
-    PVFS_error* err_array;
-
     int dirdata_server_index;
 };
 
@@ -560,7 +558,6 @@ struct PINT_server_getattr_op
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
-    PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     /* store them in resp.u.getattr.attr.u.dir
     int32_t num_dirent_handles;

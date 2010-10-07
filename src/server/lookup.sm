@@ -670,9 +670,9 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     s_op->val_a[1].buffer_sz = attr->u.dir.dist_dir_attr.num_servers *
         sizeof(PVFS_handle);
 
-    s_op->u.lookup.err_array = (PVFS_error*)calloc(keyval_count,
+    s_op->error_a = (PVFS_error*)calloc(keyval_count,
         sizeof(PVFS_error));
-    if (s_op->u.lookup.err_array == NULL)
+    if (s_op->error_a == NULL)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -682,7 +682,7 @@ static PINT_sm_action lookup_read_directory_entry_handles(
     ret = job_trove_keyval_read_list(
         s_op->req->u.lookup_path.fs_id, handle,
         s_op->key_a, s_op->val_a,
-        s_op->u.lookup.err_array,
+        s_op->error_a,
         keyval_count,
         0,
         NULL,
@@ -928,13 +928,19 @@ static PINT_sm_action lookup_cleanup(
         s_op->u.lookup.ds_attr_array = NULL;
     }
 
-    if (s_op->u.lookup.err_array)
+    PINT_free_object_attr(&s_op->u.lookup.attr);
+    if (s_op->key_a)
     {
-        free(s_op->u.lookup.err_array);
-        s_op->u.lookup.err_array = NULL;
+        free(s_op->key_a);
     }
-
-    /* TODO: Need to free bitmap and handles arrays. */
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+    }
 
     return(server_state_machine_complete(smcb));
 }

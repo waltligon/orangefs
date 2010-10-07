@@ -643,18 +643,7 @@ static PINT_sm_action mkdir_cleanup(
         free(s_op->val_a);
     }
 
-    /* not sure s_op->attr should be released here */
-    if(s_op->attr.u.dir.dist_dir_bitmap)
-    {
-        free(s_op->attr.u.dir.dist_dir_bitmap);
-        s_op->attr.u.dir.dist_dir_bitmap = NULL;
-    }
-
-    if(s_op->attr.u.dir.dirdata_handles)
-    {
-        free(s_op->attr.u.dir.dirdata_handles);
-        s_op->attr.u.dir.dirdata_handles = NULL;
-    }
+    PINT_free_object_attr(&s_op->attr);
 
     if(s_op->u.mkdir.handle_array_local)
     {

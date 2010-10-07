@@ -908,7 +908,6 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
 
    /* allocate space for keys and values */
    s_op->keyval_count = 2;
-   s_op->free_val = 1;
    s_op->key_a = s_op->val_a = NULL;
    s_op->error_a = NULL;
    
@@ -1492,11 +1491,6 @@ static void free_nested_getattr_data(struct PINT_server_op *s_op)
         free(s_op->key_a);
         s_op->key_a = NULL;
     }
-    if(s_op->u.getattr.err_array)
-    {
-        free(s_op->u.getattr.err_array);
-        s_op->u.getattr.err_array = NULL;
-    }
     if (s_op->u.getattr.mirror_dfile_status_array)
     {
         free(s_op->u.getattr.mirror_dfile_status_array);
@@ -1520,6 +1514,19 @@ static PINT_sm_action getattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+    if (s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+    if (s_op->error_a)
+    {
+        free(s_op->error_a);
+    }
 
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(smcb));
@@ -1622,10 +1629,9 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
+    int ret, i;
     job_id_t tmp_id;
     PVFS_object_attr *attr;
-    int keyval_count;
     
     attr = &s_op->resp.u.getattr.attr;
 
@@ -1666,33 +1672,37 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
         return SM_ACTION_COMPLETE;
     }
 
-
     /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
-    keyval_count = 2;
 
-    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->key_a)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
 
-    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
-    if(!s_op->val_a)
-    {
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+        free(s_op->val_a);
+    if (s_op->key_a)
         free(s_op->key_a);
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+    if (s_op->error_a)
+       free(s_op->error_a);
+    s_op->free_val = 0;
 
-    s_op->u.getattr.err_array = (PVFS_error*)calloc(keyval_count,
-        sizeof(PVFS_error));
-    if(s_op->u.getattr.err_array == NULL)
+   /* allocate space for keys and values */
+   s_op->keyval_count = 2;
+   s_op->key_a = s_op->val_a = NULL;
+   s_op->error_a = NULL;
+
+    s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
+    s_op->error_a = calloc(s_op->keyval_count, sizeof(PVFS_error));
+    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
     {
+        gossip_lerr("Cannot allocate memory for key/val/error.\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
-
     }
 
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
@@ -1714,8 +1724,8 @@ static PINT_sm_action getattr_get_bitmap_and_dirdata_handles(
     ret = job_trove_keyval_read_list(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         s_op->key_a, s_op->val_a,
-        s_op->u.getattr.err_array,
-        keyval_count,
+        s_op->error_a,
+        s_op->keyval_count,
         0,
         NULL,
         smcb,
@@ -1733,6 +1743,45 @@ static PINT_sm_action getattr_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
+    PVFS_object_attr *attr;
+    int i;
+    unsigned char *c;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting dirent_count! \n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    attr = &s_op->resp.u.getattr.attr;
+
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
+
+        /* gossip bitmap */
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "getattr: dist_dir_bitmap as:\n");
+        for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+                i >= 0 ; i--)
+        {
+            c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    " i=%d : %02x %02x %02x %02x\n",
+                    i, c[3], c[2], c[1], c[0]);
+        }
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
+
+        gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                "\t getattr: dirdata handles array of directory %llu.\n",
+                llu(s_op->u.getattr.handle));
+
+        for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
+        {
+            gossip_debug(GOSSIP_MKDIR_DEBUG, 
+                    "\t\tdirdata server %d: %llu.\n",
+                    i, llu(attr->u.dir.dirdata_handles[i]));
+        }
+    }
 
 
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
@@ -1869,27 +1918,32 @@ static PINT_sm_action getattr_get_dir_hint(
     s_op->resp.u.getattr.attr.u.dir.hint.dist_name_len   = 
         PVFS_REQ_LIMIT_DIST_NAME;
 
+    if (s_op->free_val)
+       free(s_op->val.buffer);
+    memset(&(s_op->key),0,sizeof(s_op->key));
+    memset(&(s_op->val),0,sizeof(s_op->val));
+
+    for (i=0; i<s_op->keyval_count; i++)
+        if (s_op->val_a && s_op->val_a[i].buffer && s_op->free_val)
+            free(s_op->val_a[i].buffer);
+    if (s_op->val_a)
+        free(s_op->val_a);
+    if (s_op->key_a)
+        free(s_op->key_a);
+    if (s_op->error_a)
+       free(s_op->error_a);
+    s_op->free_val = 0;
+
     s_op->key_a = 
         (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS, sizeof(PVFS_ds_keyval));
-    if (s_op->key_a == NULL)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
     s_op->val_a = (PVFS_ds_keyval *) calloc(NUM_SPECIAL_KEYS
                                            ,sizeof(PVFS_ds_keyval));
-    if (s_op->val_a == NULL)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
-    }
-    s_op->u.getattr.err_array = (PVFS_error*)calloc(NUM_SPECIAL_KEYS,
+    s_op->error_a = (PVFS_error*)calloc(NUM_SPECIAL_KEYS,
         sizeof(PVFS_error));
-    if(s_op->u.getattr.err_array == NULL)
+    if(! s_op->key_a || ! s_op->val_a || ! s_op->error_a)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
-
     }
 
     s_op->free_val = 0;
@@ -1926,7 +1980,7 @@ static PINT_sm_action getattr_get_dir_hint(
     ret = job_trove_keyval_read_list(
         s_op->u.getattr.fs_id, 
         s_op->u.getattr.handle,
-        s_op->key_a, s_op->val_a, s_op->u.getattr.err_array, NUM_SPECIAL_KEYS,
+        s_op->key_a, s_op->val_a, s_op->error_a, NUM_SPECIAL_KEYS,
         0, NULL, smcb, 0, js_p, &tmp_id,
         server_job_context, s_op->req->hints);
 
@@ -1952,7 +2006,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
     {
         long int dfile_count = 0;
 
-        if (s_op->u.getattr.err_array[DIST_NAME_KEY] == 0)
+        if (s_op->error_a[DIST_NAME_KEY] == 0)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                 "val_a[DIST_NAME_KEY] %p read_sz = %d dist_name = %s\n", 
@@ -1968,7 +2022,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
         }            
         s_op->val_a[DIST_NAME_KEY].buffer = NULL;
 
-        if (s_op->u.getattr.err_array[DIST_PARAMS_KEY] == 0)
+        if (s_op->error_a[DIST_PARAMS_KEY] == 0)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                 "val_a[DIST_PARAMS_KEY] %p read_sz = %d dist_params = %s\n", 
@@ -1987,9 +2041,7 @@ static PINT_sm_action getattr_interpret_dir_hint(
            s_op->val_a[DIST_PARAMS_KEY].buffer = NULL;
         }
 
-
-
-        if (s_op->u.getattr.err_array[NUM_DFILES_KEY] == 0)
+        if (s_op->error_a[NUM_DFILES_KEY] == 0)
         {
             char *endptr = NULL;
             gossip_debug(GOSSIP_SERVER_DEBUG, "val_a[NUM_DFILES_KEY] %p "
