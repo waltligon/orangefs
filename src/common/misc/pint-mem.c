@@ -61,7 +61,7 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
  */
 inline void PINT_mem_aligned_free(void *ptr)
 {
-    free(ptr);
+    _aligned_free(ptr);
     return;
 }
 

@@ -57,7 +57,7 @@ void BMI_socket_collection_queue(socket_collection_p scp,
 /* write a byte on the pipe_fd[1] so that poll breaks out in case it is idling */
 #define BMI_socket_collection_add(s, m) \
 do { \
-    struct tcp_addr* tcp_data = (m)->method_data; \
+    struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     if(tcp_data->socket > -1){ \
         char c; \
 	gen_mutex_lock(&((s)->queue_mutex)); \
@@ -80,25 +80,25 @@ do { \
 #define BMI_socket_collection_add_write_bit(s, m) \
 do { \
     char c;\
-    struct tcp_addr* tcp_data = (m)->method_data; \
+    struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     assert(tcp_data->socket > -1); \
     gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count++; \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
-    write(s->pipe_fd[1], &c, 1);\
+    _write(s->pipe_fd[1], &c, 1);\
 } while(0)
 
 #define BMI_socket_collection_remove_write_bit(s, m) \
 do { \
     char c;\
-    struct tcp_addr* tcp_data = (m)->method_data; \
+    struct tcp_addr* tcp_data = (struct tcp_addr *) (m)->method_data; \
     gen_mutex_lock(&((s)->queue_mutex)); \
     tcp_data->write_ref_count--; \
     assert(tcp_data->write_ref_count > -1); \
     BMI_socket_collection_queue((s),(m), &((s)->add_queue)); \
     gen_mutex_unlock(&((s)->queue_mutex)); \
-    write(s->pipe_fd[1], &c, 1);\
+    _write(s->pipe_fd[1], &c, 1);\
 } while(0)
 
 void BMI_socket_collection_finalize(socket_collection_p scp);

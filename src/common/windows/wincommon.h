@@ -20,8 +20,6 @@
 
 /*
  * gettimeofday
- * note: you must include a file before wincommon.h that defines struct timeval
- *       and struct timezone (e.g. windows.h)
  */
 static int gettimeofday(struct timeval *tv, struct timezone *tz)
 {
