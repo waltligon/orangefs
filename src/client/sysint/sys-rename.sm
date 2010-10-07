@@ -58,13 +58,8 @@ machine pvfs2_client_rename_sm
         default => rename_parent_getattr_setup_msgpair_array;
     }
 
-    /* similar to the lookup path, get the attr of parent directory and calculate dirdata handle */
-    /* 1. the setup function.
-     * 2. the complete function
-     * 3. the failure function
-     * 4. change the dirent-related requests, use dirdata handle (!!!, the crdirent.sm & rmdirent.sm need to be determined first. wait until discussion with Elaine). (2. sending crdirent requests need to have dirdata fs_id, which is not included in PVFS_object_attr, how to get fs_id? or just use the parent's fs_id? Elaine says fs_id is the same among all servers in the file system, defined in config file)
-     * 5. think of possible failure, retry, both dist-dir-struct and others
-     */
+    /* similar to the lookup path, get the attr of parent directory and calculate dirdata handle, 
+     * might merge into lookup if lookup returns dist_dir_attr in its attr array. */
     state rename_parent_getattr_setup_msgpair_array
     {
         run rename_parent_getattr_setup_msgpair_array;
@@ -668,7 +663,7 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
             *sm_p->cred_p,
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DISTDIR_ATTR, /* how to set mask? */
+            PVFS_ATTR_DIR_DISTDIR_ATTR, /* only need dist_dir_struct */
             sm_p->hints);
 
         /* fill in msgpair structure components */
@@ -701,6 +696,9 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
 
     js_p->error_code = 0;
 
+    /* destroy the previous used msgarray */
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 2);
     if(ret != 0)
     {
@@ -723,7 +721,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DISTDIR_ATTR,
+            PVFS_ATTR_COMMON_ALL,
             sm_p->hints);
 
         /* fill in msgpair structure components */

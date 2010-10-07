@@ -557,7 +557,7 @@ typedef struct
     uint32_t      *dirent_outcount;
     PVFS_ds_position *token;
     uint64_t         *directory_version;
-    PVFS_ds_position pos_token;     /* input parameter */
+    PVFS_ds_position pos_token;     /* input/output parameter */
     int32_t      dirent_limit;      /* input parameter */
     int32_t      dirdata_index;      /* input parameter */
 } PINT_sm_readdir_state;

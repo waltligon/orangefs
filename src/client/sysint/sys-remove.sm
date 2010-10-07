@@ -365,7 +365,7 @@ static PINT_sm_action remove_getattr_setup(
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
-        sm_p->object_ref,
+        sm_p->parent_ref,
         PVFS_ATTR_DIR_DISTDIR_ATTR,
         PVFS_TYPE_DIRECTORY,
         0);

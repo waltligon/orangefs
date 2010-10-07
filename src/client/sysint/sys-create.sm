@@ -713,7 +713,6 @@ static PINT_sm_action create_parent_getattr_inspect(
                      tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
     }
         
-    /* !!! need to talk to Elaine and revise this part, what to store in u.create */
     /* may just use sm_p->getattr.attr.u.dir...
     sm_p->u.create.dirent_handle = malloc(
         sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);

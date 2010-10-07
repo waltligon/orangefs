@@ -51,6 +51,7 @@ enum
     STATE_DIR_HINT  = 11,
     STATE_DONE      = 12,
     SKIP_NEXT_STATE = 13,
+    STATE_DIRDATA   = 14,
 };
 
 static void free_nested_getattr_data(struct PINT_server_op *s_op);
@@ -65,6 +66,7 @@ nested machine pvfs2_get_attr_work_sm
         STATE_SYMLINK => read_symlink_target;
         STATE_METAFILE => read_metafile_hint;
         STATE_DIR => get_dist_dir_attr;
+        STATE_DIRDATA => get_dirent_count;
         default => setup_resp;
     }
 
@@ -157,27 +159,28 @@ nested machine pvfs2_get_attr_work_sm
     state get_dist_dir_attr
     {
         run getattr_get_dist_dir_attr;
+        STATE_DIR_HINT => get_dir_hint;
         default => get_bitmap_and_dirdata_handles;
     }
 
     state get_bitmap_and_dirdata_handles
     {
         run getattr_get_bitmap_and_dirdata_handles;
-        success => get_dirent_count;
+        success => get_dir_hint;
         default => setup_resp;
     }
 
     state get_dirent_count
     {
         run getattr_get_dirent_count;
-        STATE_DIR_HINT => get_dir_hint;
+        STATE_DONE => setup_resp;
         default => interpret_dirent_count;
     }
 
     state interpret_dirent_count
     {
         run getattr_interpret_dirent_count;
-        default => get_dir_hint;
+        default => setup_resp;
     }
 
     state get_dir_hint
@@ -405,21 +408,6 @@ static PINT_sm_action getattr_verify_attribs(
             break;
         case PVFS_TYPE_DIRECTORY:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
-            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: dirent_count needed.\n");
-                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-                resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-                js_p->error_code = STATE_DIR;
-            }
-            else
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: dirent_count not needed.\n");
-                js_p->error_code = 0;
-                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
-            }
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -452,11 +440,28 @@ static PINT_sm_action getattr_verify_attribs(
             break;
         case PVFS_TYPE_DIRDATA:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
+            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_count needed.\n");
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+                resp_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+                js_p->error_code = STATE_DIRDATA;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                             " getattr: dirent_count not needed.\n");
+                js_p->error_code = 0;
+                assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+            }
+/*
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
                 "a dirdata object. doing nothing special\n",
                 llu(s_op->u.getattr.handle));
             assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
+*/
             break;
         case PVFS_TYPE_SYMLINK:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
@@ -1579,6 +1584,15 @@ static PINT_sm_action getattr_get_dist_dir_attr(
     int ret;
     job_id_t tmp_id;
 
+    if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR))
+    {
+         /* the caller didn't really want the dist_dir_attr; 
+          * skip to DIR_HINT! 
+          */
+         js_p->error_code = STATE_DIR_HINT;
+         return SM_ACTION_COMPLETE;
+    }
+
     s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
     if(s_op->free_val)
@@ -1719,61 +1733,21 @@ static PINT_sm_action getattr_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
-    PVFS_object_attr *attr;
-    int i;
-    unsigned char *c;
-
-    if(js_p->error_code == -TROVE_ENOENT)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting dirent_count! \n");
-        return SM_ACTION_COMPLETE;
-    }
-
-    attr = &s_op->resp.u.getattr.attr;
-
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
-    {
-
-    /* gossip bitmap */
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-            "getattr: dist_dir_bitmap as:\n");
-    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
-            i >= 0 ; i--)
-    {
-        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                " i=%d : %02x %02x %02x %02x\n",
-                i, c[3], c[2], c[1], c[0]);
-    }
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
-
-        gossip_debug(GOSSIP_GETATTR_DEBUG, 
-                "\t getattr: dirdata handles array of directory %llu.\n",
-                llu(s_op->u.getattr.handle));
-
-        for(i=0; i < attr->u.dir.dist_dir_attr.num_servers; i++)
-        {
-            gossip_debug(GOSSIP_MKDIR_DEBUG, 
-                    "\t\tdirdata server %d: %llu.\n",
-                    i, llu(attr->u.dir.dirdata_handles[i]));
-        }
-    }
 
 
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
     {
-         /* the caller didn't really want the dirent count; skip to get
-          * directory hints
+         /* the caller didn't really want the dirent count; 
+          * getattr done!
           */
-         js_p->error_code = STATE_DIR_HINT;
+         js_p->error_code = STATE_DONE;
          return SM_ACTION_COMPLETE;
     }
 
-    /* TODO: Have to gather counts from all dirent handles. */
-    /* only get dirent of local dirdata servers, later, should let TYPE_DIRDATA do these */
+    /* get dirent_count of incoming dirdata handle. */
     ret = job_trove_keyval_get_handle_info(
         s_op->u.getattr.fs_id,
-        attr->u.dir.dirdata_handles[0],
+        s_op->u.getattr.handle,
         TROVE_KEYVAL_HANDLE_COUNT |
         0,
         &s_op->u.getattr.keyval_handle_info,
@@ -1816,6 +1790,44 @@ static PINT_sm_action getattr_get_dir_hint(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i;
     job_id_t tmp_id;
+    PVFS_object_attr *attr_p;
+    unsigned char *c;
+
+    /* wrapping up get_bitmap_and_dirdata_handles */
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: no DIST_DIR_ATTR key present, not getting DIR_HINTS! \n");
+        return SM_ACTION_COMPLETE; 
+    }
+
+    attr_p = &s_op->resp.u.getattr.attr;
+
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
+        /* gossip bitmap */
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                "getattr: dist_dir_bitmap as:\n");
+        for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+                i >= 0 ; i--)
+        {
+            c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+            gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    " i=%d : %02x %02x %02x %02x\n",
+                    i, c[3], c[2], c[1], c[0]);
+        }
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
+
+        gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                "\t getattr: dirdata handles array of directory %llu.\n",
+                llu(s_op->u.getattr.handle));
+
+        for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
+        {
+            gossip_debug(GOSSIP_MKDIR_DEBUG, 
+                    "\t\tdirdata server %d: %llu.\n",
+                    i, llu(attr_p->u.dir.dirdata_handles[i]));
+        }
+    }
 
     /* NOTE: memory allocations are released in the getattr_cleanup()
      * function 
