@@ -314,7 +314,7 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server -llibdb-4.8 @LIBS@ @DB_LIB@ -lpthread 
+SERVERLIBS = -lpvfs2-server -ldb-4.8 @LIBS@ @DB_LIB@ -lpthread 
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
