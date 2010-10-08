@@ -241,7 +241,7 @@ int BMI_sockio_nbpeek(int s, void* buf, int len)
     err = WSAGetLastError();
     if(ret == 0)
     {
-        errno = EPIPE;
+        /* errno = EPIPE; */
         return (-1);
     }
     else if (ret == -1 && err == WSAEWOULDBLOCK)

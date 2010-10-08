@@ -2057,8 +2057,8 @@ static int tcp_server_init(void)
     tcp_addr_data = (struct tcp_addr *) tcp_method_params.listen_addr->method_data;
     if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
-        tmp_errno = errno;
-        gossip_err("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
+        tmp_errno = WSAGetLastError();
+        gossip_err("Error: BMI_sockio_new_sock: %d\n", tmp_errno);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -2096,16 +2096,16 @@ static int tcp_server_init(void)
     
     if (ret < 0)
     {
-        tmp_errno = errno;
-        gossip_err("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
+        tmp_errno = WSAGetLastError();
+        gossip_err("Error: BMI_sockio_bind_sock: %d\n", tmp_errno);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* go ahead and listen to the socket */
     if (listen(tcp_addr_data->socket, TCP_BACKLOG) != 0)
     {
-        tmp_errno = errno;
-        gossip_err("Error: listen: %s\n", strerror(tmp_errno));
+        tmp_errno = WSAGetLastError();
+        gossip_err("Error: listen: %s\n", tmp_errno);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -2217,16 +2217,8 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
            ret = select(1, NULL, &writefds, NULL, (const struct timeval *) &timeout);
            if (ret == SOCKET_ERROR)
            {
-               int err = WSAGetLastError();
-               switch (err) 
-               {
-               case WSAEINVAL: tmp_errno = EINVAL;
-                   break;
-               case WSAEINTR: tmp_errno = EINTR;
-                   break;
-               default: tmp_errno = err;
-               }
-               gossip_lerr("Error: select (tcp_sock_init): %d\n", err);
+               tmp_errno = WSAGetLastError();
+               gossip_lerr("Error: select (tcp_sock_init): %d\n", tmp_errno);
                return (bmi_tcp_errno_to_pvfs(-tmp_errno));
            }
            if (FD_ISSET(tcp_addr_data->socket, &writefds))
@@ -2250,7 +2242,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
     /* make a socket */
     if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
-        tmp_errno = errno;
+        tmp_errno = WSAGetLastError();
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -2270,7 +2262,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
     /* turn off Nagle's algorithm */
     if (BMI_sockio_set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
     {
-        tmp_errno = errno;
+        tmp_errno = WSAGetLastError();
         gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
         close(tcp_addr_data->socket);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
@@ -3150,7 +3142,7 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
                             new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
-        tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-errno));
+        tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-WSAGetLastError()));
         return (0);
     }
 
@@ -3201,8 +3193,8 @@ static int tcp_do_work_recv(bmi_method_addr_p map, int* stall_flag)
                            new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < TCP_ENC_HDR_SIZE)
     {
-        tmp_errno = errno;
-        gossip_err("Error: BMI_sockio_nbrecv: %s\n", strerror(tmp_errno));
+        tmp_errno = WSAGetLastError();
+        gossip_err("Error: BMI_sockio_nbrecv: %d\n", tmp_errno);
         tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
         return (0);
     }
@@ -3371,8 +3363,8 @@ static int work_on_send_op(method_op_p my_method_op,
                            int *blocked_flag, int* stall_flag)
 {
     int ret = -1;
-    struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
-    struct tcp_op *tcp_op_data = my_method_op->method_data;
+    struct tcp_addr *tcp_addr_data = (struct tcp_addr *) my_method_op->addr->method_data;
+    struct tcp_op *tcp_op_data = (struct tcp_op *) my_method_op->method_data;
 
     *blocked_flag = 1;
     *stall_flag = 0;
@@ -3456,8 +3448,8 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 {
 
     int ret = -1;
-    struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
-    struct tcp_op *tcp_op_data = my_method_op->method_data;
+    struct tcp_addr *tcp_addr_data = (struct tcp_addr *) my_method_op->addr->method_data;
+    struct tcp_op *tcp_op_data = (struct tcp_op *) my_method_op->method_data;
 
     *stall_flag = 1;
 
@@ -3537,17 +3529,17 @@ static int tcp_do_work_error(bmi_method_addr_p map)
     int ret;
     int tmp_errno;
 
-    tcp_addr_data = map->method_data;
+    tcp_addr_data = (struct tcp_addr *) map->method_data;
 
     /* perform a read on the socket so that we can get a real errno */
     ret = read(tcp_addr_data->socket, &buf, sizeof(int));
     if (ret == 0)
         tmp_errno = EPIPE;  /* report other side closed socket with this */
     else
-        tmp_errno = errno;
+        tmp_errno = WSAGetLastError();
 
-    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Error: bmi_tcp: %s\n",
-      strerror(tmp_errno));
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Error: bmi_tcp: %d\n",
+      tmp_errno);
 
     if (tcp_addr_data->server_port)
     {
@@ -3707,7 +3699,7 @@ static int tcp_accept_init(int *socket, char** peer)
 
     int ret = -1;
     int tmp_errno = 0;
-    struct tcp_addr *tcp_addr_data = tcp_method_params.listen_addr->method_data;
+    struct tcp_addr *tcp_addr_data = (struct tcp_addr *) tcp_method_params.listen_addr->method_data;
     int oldfl = 0;
     struct sockaddr_in peer_sockaddr;
     int peer_sockaddr_size = sizeof(struct sockaddr_in);
@@ -3724,35 +3716,36 @@ static int tcp_accept_init(int *socket, char** peer)
     }
 
     *socket = accept(tcp_addr_data->socket, (struct sockaddr*)&peer_sockaddr,
-              (socklen_t *)&peer_sockaddr_size);
+              (int *)&peer_sockaddr_size);
 
     if (*socket < 0)
     {
-        if ((errno == EAGAIN) ||
-            (errno == EWOULDBLOCK) ||
-            (errno == ENETDOWN) ||
-            (errno == EPROTO) ||
-            (errno == ENOPROTOOPT) ||
-            (errno == EHOSTDOWN) ||
-            (errno == ENONET) ||
-            (errno == EHOSTUNREACH) ||
-            (errno == EOPNOTSUPP) ||
-            (errno == ENETUNREACH) ||
-            (errno == ENFILE) ||
-            (errno == EMFILE))
+        tmp_errno = WSAGetLastError();
+        if ((tmp_errno == WSATRY_AGAIN) ||
+            (tmp_errno == WSAEWOULDBLOCK) ||
+            (tmp_errno == WSAENETDOWN) ||
+            /* (tmp_errno == EPROTO) || */
+            (tmp_errno == WSAENOPROTOOPT) ||
+            /* (tmp_errno == EHOSTDOWN) || */
+            /* (tmp_errno == ENONET) || */
+            (tmp_errno == WSAEHOSTUNREACH) ||
+            (tmp_errno == WSAEOPNOTSUPP) ||
+            (tmp_errno == WSAENETUNREACH) ||
+            /* (tmp_errno == WSAENFILE) || */
+            (tmp_errno == WSAEMFILE))
         {
             /* try again later */
-            if ((errno == ENFILE) || (errno == EMFILE))
+            if (tmp_errno == EMFILE)
             {
-                gossip_err("Error: accept: %s (continuing)\n",strerror(errno));
+                gossip_err("Error: accept: %d (continuing)\n", tmp_errno);
                 bmi_method_addr_drop_callback(BMI_tcp_method_name);
             }
             return (0);
         }
         else
         {
-            gossip_err("Error: accept: %s\n", strerror(errno));
-            return (bmi_tcp_errno_to_pvfs(-errno));
+            gossip_err("Error: accept: %d\n", tmp_errno);
+            return (bmi_tcp_errno_to_pvfs(-tmp_errno));
         }
     }
 
@@ -3771,18 +3764,19 @@ static int tcp_accept_init(int *socket, char** peer)
     /* we accepted a new connection.  turn off Nagle's algorithm. */
     if (BMI_sockio_set_tcpopt(*socket, TCP_NODELAY, 1) < 0)
     {
-        tmp_errno = errno;
+        tmp_errno = WSAGetLastError();
         gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
         close(*socket);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* set it to non-blocking operation */
-    oldfl = fcntl(*socket, F_GETFL, 0);
+    /*oldfl = fcntl(*socket, F_GETFL, 0);
     if (!(oldfl & O_NONBLOCK))
     {
         fcntl(*socket, F_SETFL, oldfl | O_NONBLOCK);
-    }
+    }*/
+    SET_NONBLOCK(*socket);
 
     /* allocate ip address string */
     tmp_peer = inet_ntoa(peer_sockaddr.sin_addr);
@@ -3847,7 +3841,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
                                  bmi_context_id context_id,
                                  PVFS_hint hints)
 {
-    struct tcp_addr *tcp_addr_data = dest->method_data;
+    struct tcp_addr *tcp_addr_data = (struct tcp_addr *) dest->method_data;
     method_op_p query_op = NULL;
     int ret = -1;
     bmi_size_t total_size = 0;
@@ -3947,7 +3941,7 @@ static int tcp_post_send_generic(bmi_op_id_t * id,
         return (ret);
     }
 
-    tcp_addr_data = dest->method_data;
+    tcp_addr_data = (struct tcp_addr *) dest->method_data;
 
 #if 0
     /* TODO: this is a hack for testing! */
@@ -4068,38 +4062,38 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     /* do we need to send any of the header? */
     if(send_recv == BMI_SEND && *env_amt_complete < TCP_ENC_HDR_SIZE)
     {
-        stat_io_vector[vector_index].iov_base = &enc_hdr[*env_amt_complete];
-        stat_io_vector[vector_index].iov_len = TCP_ENC_HDR_SIZE - *env_amt_complete;
+        stat_io_vector[vector_index].buf = &enc_hdr[*env_amt_complete];
+        stat_io_vector[vector_index].len = TCP_ENC_HDR_SIZE - *env_amt_complete;
         count++;
         vector_index++;
         header_flag = 1;
     }
 
     /* setup vector */
-    stat_io_vector[vector_index].iov_base = 
+    stat_io_vector[vector_index].buf = 
         (char*)buffer_list[*list_index] + *current_index_complete;
     count++;
     if(final_index == 0)
     {
-        stat_io_vector[vector_index].iov_len = final_size - *current_index_complete;
+        stat_io_vector[vector_index].len = final_size - *current_index_complete;
     }
     else
     {
-        stat_io_vector[vector_index].iov_len = 
+        stat_io_vector[vector_index].len = 
             size_list[*list_index] - *current_index_complete;
         for(i = (*list_index + 1); i < list_count; i++)
         {
             vector_index++;
             count++;
-            stat_io_vector[vector_index].iov_base = buffer_list[i];
+            stat_io_vector[vector_index].buf = (CHAR *) buffer_list[i];
             if(i == final_index)
             {
-                stat_io_vector[vector_index].iov_len = final_size;
+                stat_io_vector[vector_index].len = final_size;
                 break;
             }
             else
             {
-                stat_io_vector[vector_index].iov_len = size_list[i];
+                stat_io_vector[vector_index].len = size_list[i];
             }
         }
     }
@@ -4119,7 +4113,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     if(ret == 0)
         return(0);
     if(ret <= 0)
-        return(bmi_tcp_errno_to_pvfs(-errno));
+        return(bmi_tcp_errno_to_pvfs(-WSAGetLastError()));
 
     completed = ret;
     if(header_flag && (completed >= 0))
@@ -4137,9 +4131,9 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     while(completed > 0)
     {
         /* take care of completed data payload */
-        if(completed >= stat_io_vector[i].iov_len)
+        if(completed >= stat_io_vector[i].len)
         {
-            completed -= stat_io_vector[i].iov_len;
+            completed -= stat_io_vector[i].len;
             *current_index_complete = 0;
             (*list_index)++;
             i++;
@@ -4156,15 +4150,15 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
 
 static void bmi_set_sock_buffers(int socket){
         //Set socket buffer sizes:
-        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Default socket buffers send:%d receive:%d\n",
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Default socket buffers send:%d receive:%d\n",
                 GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
-        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Setting socket buffer size for send:%d receive:%d \n",
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Setting socket buffer size for send:%d receive:%d \n",
                 tcp_buffer_size_send, tcp_buffer_size_receive);
     if( tcp_buffer_size_receive != 0)
          SET_RECVBUFSIZE(socket,tcp_buffer_size_receive);
     if( tcp_buffer_size_send != 0)
          SET_SENDBUFSIZE(socket,tcp_buffer_size_send);
-        gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Reread socket buffers send:%d receive:%d\n",
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Reread socket buffers send:%d receive:%d\n",
                 GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
 }
 
