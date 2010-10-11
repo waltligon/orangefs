@@ -706,6 +706,8 @@ static PINT_sm_action lookup_read_directory_entry(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_dist_dir_hash_type dirdata_hash;
+    server_configuration_s *config = get_server_config_struct();
+    char dirdata_server_name[1024];
 
     /* Need to see if directory entry is on this server. If not prepare
        to send a request to the server where it is located. */
@@ -727,13 +729,21 @@ static PINT_sm_action lookup_read_directory_entry(
         "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index]),
         s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
-    if (s_op->u.lookup.dirdata_server_index ==
-        s_op->u.lookup.attr.u.dir.dist_dir_attr.server_no)
+    /* find the server name of the dirdata handle */
+    PINT_cached_config_get_server_name(dirdata_server_name, 1024, 
+            s_op->u.lookup.attr.u.dir.dirdata_handles[s_op->u.lookup.dirdata_server_index], 
+            s_op->req->u.lookup_path.fs_id);
+
+    if ( !strcmp(dirdata_server_name, config->host_id) )
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "lookup: local server !!!\n");
         js_p->error_code = LOCAL_DIRENT;
     }
     else
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "lookup: remote server !!!\n");
         js_p->error_code = REMOTE_DIRENT;
     }
     return SM_ACTION_COMPLETE;
