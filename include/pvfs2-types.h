@@ -20,12 +20,6 @@
 #include <sys/stat.h>
 #ifdef WIN32
 #include "wincommon.h"
-/* define struct timeval */
-struct timeval 
-{
-    long tv_sec;
-    long tv_usec;
-};
 #else
 #include <sys/time.h>
 #endif

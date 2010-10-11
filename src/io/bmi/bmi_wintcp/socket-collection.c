@@ -15,9 +15,7 @@
  * will always check to see if there is data to be read on a socket.
  */
 #include <stdio.h>
-#include <sys/poll.h>
 #include <string.h>
-#include <unistd.h>
 #include <errno.h>
 
 #include "gossip.h"

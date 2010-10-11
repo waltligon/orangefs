@@ -2389,7 +2389,7 @@ static int enqueue_operation(op_list_p target_list,
     }
 
     tcp_op_data = (struct tcp_op *) new_method_op->method_data;
-    tcp_op_data->tcp_op_state = (bmi_tcp_state) tcp_op_state;
+    tcp_op_data->tcp_op_state = (enum bmi_tcp_state) tcp_op_state;
     tcp_op_data->env = header;
 
     /* if there is only one item in the list, then keep the list stored

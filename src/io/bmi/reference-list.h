@@ -19,6 +19,12 @@
 #include "quicklist.h"
 #include "quickhash.h"
 
+#ifdef WIN32
+/* interface is a macro on Windows */
+#undef  interface
+#define interface    _interface
+#endif
+
 typedef struct qlist_head *ref_list_p;
 
 /**********************************************************************/

@@ -30,7 +30,7 @@ static int gettimeofday(struct timeval *tv, struct timezone *tz)
     ret = _ftime_s(&timebuffer);
     if (ret == 0)
     {
-        tv->tv_sec = timebuffer.time;
+        tv->tv_sec = (long) timebuffer.time;
         tv->tv_usec = timebuffer.millitm * 1000;
     }
 
