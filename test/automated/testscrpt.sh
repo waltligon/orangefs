@@ -10,7 +10,7 @@
 # you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
-export EXTRA_TESTS=${HOME}/src/benchmarks
+export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
 #export EXTRA_TESTS=/tmp/src/benchmarks
 export URL=http://devorange.clemson.edu/pvfs
 export BENCHMARKS=benchmarks-20060512.tar.gz
