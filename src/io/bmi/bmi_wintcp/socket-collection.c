@@ -14,9 +14,13 @@
  * NOTE:  I am making read bits implicit in the implementation.  A poll
  * will always check to see if there is data to be read on a socket.
  */
+
+#include <WinSock2.h>
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <io.h>
 
 #include "gossip.h"
 #include "socket-collection.h"
@@ -56,30 +60,27 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
     gen_mutex_init(&tmp_scp->queue_mutex);
 
     tmp_scp->pollfd_array = (struct
-	pollfd*)malloc(POLLFD_ARRAY_START*sizeof(struct pollfd));
-    if(!tmp_scp->pollfd_array)
-    {
-	free(tmp_scp);
-	return(NULL);
-    }
+	pollfd*)malloc(POLLFD_ARRAY_START*sizeof(WSAPOLLFD));
+    
     tmp_scp->addr_array =
 	(bmi_method_addr_p*)malloc(POLLFD_ARRAY_START*sizeof(bmi_method_addr_p));
     if(!tmp_scp->addr_array)
     {
-	free(tmp_scp->pollfd_array);
-	free(tmp_scp);
+        free(tmp_scp->pollfd_array);
+        free(tmp_scp);
         return NULL;
     }
-    if (pipe(tmp_scp->pipe_fd) < 0)
+    /*if (pipe(tmp_scp->pipe_fd) < 0)*/
+    if (!CreatePipe(&(tmp_scp->pipe_fd[0]), 
+                    &(tmp_scp->pipe_fd[1]),
+                    NULL, 0))
     {
         perror("pipe failed:");
-        free(tmp_scp->addr_array);
-	free(tmp_scp->pollfd_array);
-	free(tmp_scp);
+        BMI_socket_collection_finalize(tmp_scp);
         return NULL;
     }
 
-    tmp_scp->array_max = POLLFD_ARRAY_START;
+    tmp_scp->array_max = POLLFD_ARRAY_START;    
     tmp_scp->array_count = 0;
     INIT_QLIST_HEAD(&tmp_scp->remove_queue);
     INIT_QLIST_HEAD(&tmp_scp->add_queue);
@@ -94,10 +95,12 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
     }
 
     /* Add the pipe_fd[0] fd to the poll in set always */
+    /* -- must be handled separately on Windows 
     tmp_scp->pollfd_array[tmp_scp->array_count].fd = tmp_scp->pipe_fd[0];
     tmp_scp->pollfd_array[tmp_scp->array_count].events = POLLIN;
     tmp_scp->addr_array[tmp_scp->array_count] = NULL;
-    tmp_scp->array_count++;
+    tmp_scp->array_count++;    
+    */
 
     return (tmp_scp);
 }
@@ -154,8 +157,8 @@ void BMI_socket_collection_queue(socket_collection_p scp,
  */
 void BMI_socket_collection_finalize(socket_collection_p scp)
 {
-    free(scp->pollfd_array);
     free(scp->addr_array);
+    free(scp->pollfd_array);
     free(scp);
     return;
 }
@@ -181,7 +184,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     struct qlist_head* scratch = NULL;
     struct tcp_addr* tcp_addr_data = NULL;
     struct tcp_addr* shifted_tcp_addr_data = NULL;
-    struct pollfd* tmp_pollfd_array = NULL;
+    WSAPOLLFD* tmp_pollfd_array = NULL;
     bmi_method_addr_p* tmp_addr_array = NULL;
     int ret = -1;
     int old_errno;
@@ -246,8 +249,8 @@ do_again:
 	    if(scp->array_count == scp->array_max)
 	    {
 		/* we must enlarge the poll arrays */
-		tmp_pollfd_array = (struct pollfd*)malloc(
-		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(struct pollfd)); 
+		tmp_pollfd_array = (WSAPOLLFD*)malloc(
+		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(WSAPOLLFD)); 
 		/* TODO: handle this */
 		assert(tmp_pollfd_array);
 		tmp_addr_array = (bmi_method_addr_p*)malloc(
@@ -255,7 +258,7 @@ do_again:
 		/* TODO: handle this */
 		assert(tmp_addr_array);
 		memcpy(tmp_pollfd_array, scp->pollfd_array,
-		    scp->array_max*sizeof(struct pollfd));
+		    scp->array_max*sizeof(WSAPOLLFD));
 		free(scp->pollfd_array);
 		scp->pollfd_array = tmp_pollfd_array;
 		memcpy(tmp_addr_array, scp->addr_array,
@@ -280,9 +283,29 @@ do_again:
     /* actually do the poll() work */
     do
     {
-	ret = poll(scp->pollfd_array, scp->array_count, allowed_poll_time);
-    } while(ret < 0 && errno == EINTR);
-    old_errno = errno;
+        DWORD bytes;
+
+        /* poll for 1ms */
+	ret = WSAPoll(scp->pollfd_array, scp->array_count, 1);
+        old_errno = WSAGetLastError();
+        allowed_poll_time--;
+
+        if (ret == 0) 
+        {
+            /* check our pipe */
+            if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
+            {
+                if (bytes)
+                {
+                    pipe_notify = 1;
+                }
+            }
+            else
+            {
+                ret = -1;
+            }
+        }
+    } while(ret == 0 && !pipe_notify && allowed_poll_time > 0);    
 
     if(ret < 0)
     {
@@ -295,6 +318,14 @@ do_again:
 	return(0);
     }
 
+    if (pipe_notify)
+    {
+        char c;
+        DWORD count;
+        /* drain the pipe */
+        ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
+    }
+
     tmp_count = ret;
 
     for(i=0; i<scp->array_count; i++)
@@ -305,16 +336,16 @@ do_again:
 	    break;
 	}
         /* make sure we dont return the pipe fd as being ready */
-        if (scp->pollfd_array[i].fd == scp->pipe_fd[0])
+        /* if (scp->pollfd_array[i].fd == scp->pipe_fd[0])
         {
             if (scp->pollfd_array[i].revents) {
                 char c;
                 /* drain the pipe */
-                read(scp->pipe_fd[0], &c, 1);
+        /*        _read(scp->pipe_fd[0], &c, 1);
                 pipe_notify = 1;
             }
             continue;
-        }
+        } */
 	/* anything ready on this socket? */
 	if (scp->pollfd_array[i].revents)
 	{

@@ -1988,7 +1988,7 @@ static void dealloc_tcp_method_addr(bmi_method_addr_p map)
     {
         if (tcp_addr_data->socket > -1)
         {
-            close(tcp_addr_data->socket);
+            closesocket(tcp_addr_data->socket);
         }
     }
 
@@ -2264,7 +2264,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
     {
         tmp_errno = WSAGetLastError();
         gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
-        close(tcp_addr_data->socket);
+        closesocket(tcp_addr_data->socket);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -2792,7 +2792,7 @@ static int tcp_shutdown_addr(bmi_method_addr_p map)
     struct tcp_addr *tcp_addr_data = (struct tcp_addr *) map->method_data;
     if (tcp_addr_data->socket > -1)
     {
-        close(tcp_addr_data->socket);
+        closesocket(tcp_addr_data->socket);
     }
     tcp_addr_data->socket = -1;
     tcp_addr_data->not_connected = 1;
@@ -3532,7 +3532,7 @@ static int tcp_do_work_error(bmi_method_addr_p map)
     tcp_addr_data = (struct tcp_addr *) map->method_data;
 
     /* perform a read on the socket so that we can get a real errno */
-    ret = read(tcp_addr_data->socket, &buf, sizeof(int));
+    ret = recv(tcp_addr_data->socket, &buf, sizeof(int), 0);
     if (ret == 0)
         tmp_errno = EPIPE;  /* report other side closed socket with this */
     else
@@ -3766,7 +3766,7 @@ static int tcp_accept_init(int *socket, char** peer)
     {
         tmp_errno = WSAGetLastError();
         gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
-        close(*socket);
+        closesocket(*socket);
         return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -3783,7 +3783,7 @@ static int tcp_accept_init(int *socket, char** peer)
     *peer = (char*)malloc(strlen(tmp_peer)+1);
     if(!(*peer))
     {
-        close(*socket);
+        closesocket(*socket);
         return(bmi_tcp_errno_to_pvfs(-BMI_ENOMEM));
     }
     strcpy(*peer, tmp_peer);

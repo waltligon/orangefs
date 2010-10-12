@@ -14,6 +14,10 @@
 
 #ifdef WIN32
 #include "wincommon.h"
+
+/* do not declare inline on Windows (can't be exported)*/
+#undef inline
+#define inline
 #endif
 
 /* prototype definitions */
