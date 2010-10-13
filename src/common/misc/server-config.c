@@ -681,8 +681,8 @@ static const configoption_t options[] =
       *  PVFS_TYPE_INTERNAL
       *
       */
-     {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "512"},
+     {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
 
      /* Precreate pools will be "topped off" if they fall below this value. 
       * One value is specified for each DS handle type. This parameter operates
