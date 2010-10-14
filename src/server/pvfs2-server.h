@@ -462,6 +462,16 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+
+    /* for dirdata rebuild */
+    int saved_error_code;
+    int need_rebuild_dirdata_local;
+    int local_dirdata_index;
+    int num_rebuild_dirdata_remote;
+    int *rebuild_dirdata_index_array_remote;
+    PVFS_handle handle_local;
+    PVFS_handle* handle_array_remote;
+
 };
 
 struct PINT_server_mgmt_remove_dirent_op

@@ -336,7 +336,7 @@ static PINT_sm_action mkdir_create_local_dirdata_dspace(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-	PVFS_object_attr *attr;
+    PVFS_object_attr *attr;
     int ret = -PVFS_ENOMEM;
     job_id_t tmp_id;
     PVFS_handle_extent_array extent_array;

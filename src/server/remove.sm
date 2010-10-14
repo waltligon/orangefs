@@ -38,16 +38,25 @@
  * 5) final_response
  * 6) cleanup
  *
- * For a directory that has (or at one time had) entries, the path is:
+ * For dirdata, the path is:
+ * 1) prelude
+ * 2) check_object_type
+ * 3) getattr_of_dirdata_handle
+ * 4) check_dirdata_entries
+ * 5) remove_dspace
+ * 5) final_response
+ * 7) cleanup
+ *
+ * For a directory, the path is:
  * 1) prelude
  * 2) check_object_type
  * 3) verify_object_metadata
- * 4) try_to_read_dirdata_handle
- * 5) remove_dirdata_keyvals
- * 6) remove_dirdata_dspace
- * 7) remove_dspace
- * 8) final_response
- * 9) cleanup
+ * 4) nested machine: remove_dirdata_handles
+ *    (remove_dirdata_handles can rebuild dirdata handles if any dirdata_remove fails.)
+ * 5) remove_dspace
+ * 6) final_response
+ * 7) cleanup
+ *
  *
  * A directory that never had entries will skip step (5), as there
  * would be no dirdata dspace.
@@ -70,6 +79,12 @@ enum
 %%
 nested machine pvfs2_remove_dirdata_handles_work_sm
 {
+    state remove_dirdata_init
+    {
+        run remove_dirdata_init;
+        default => get_dist_dir_attr;
+    }
+
     state get_dist_dir_attr
     {
         run remove_get_dist_dir_attr;
@@ -108,10 +123,27 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     state remove_dirdata_handles_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-/* later ...
-        default => rebuild_dirdata_handles_setup_msgpair_array;
         success => remove_dirdata_handles_cleanup;
-*/
+        default => rebuild_dirdata_handle_local;
+    }
+
+    state rebuild_dirdata_handle_local
+    {
+        run remove_rebuild_dirdata_handle_local;
+        success => rebuild_dirdata_handle_remote;
+        default => remove_dirdata_handles_cleanup;
+    }
+
+    state rebuild_dirdata_handle_remote
+    {
+        run remove_rebuild_dirdata_handle_remote;
+        success => write_dirdata_keyval;
+        default => remove_dirdata_handles_cleanup;
+    }
+
+    state write_dirdata_keyval
+    {
+        run remove_rebuild_write_dirdata_keyval;
         default => remove_dirdata_handles_cleanup;
     }
 
@@ -124,6 +156,7 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
 
 nested machine pvfs2_remove_work_sm
 {
+
     state check_object_type
     {
         run remove_check_object_type;
@@ -207,6 +240,7 @@ machine pvfs2_remove_sm
 }
 
 %%
+
 
 /*
  * Function: remove_check_object_type
@@ -354,6 +388,23 @@ static PINT_sm_action remove_check_dirdata_entries(
     return SM_ACTION_COMPLETE;
 }
 
+
+
+static PINT_sm_action remove_dirdata_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    s_op->u.remove.saved_error_code = 0;
+    s_op->u.remove.need_rebuild_dirdata_local = 0;
+    s_op->u.remove.local_dirdata_index = -1;
+    s_op->u.remove.num_rebuild_dirdata_remote = 0;
+    s_op->u.remove.rebuild_dirdata_index_array_remote = NULL;
+    s_op->u.remove.handle_array_remote = NULL;
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
 
 
 static PINT_sm_action remove_get_dist_dir_attr(
@@ -579,6 +630,16 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
     attr_p = &s_op->attr;
     assert(attr_p);
 
+    /* initialize rebuild array */
+    s_op->u.remove.rebuild_dirdata_index_array_remote = 
+        malloc(sizeof(int) * 
+                attr_p->u.dir.dist_dir_attr.num_servers);
+    if(!s_op->u.remove.rebuild_dirdata_index_array_remote )
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* cleanup previous msgpair array */
     PINT_msgpairarray_destroy(&s_op->msgarray_op);
     /* initialize msgpair array */
@@ -632,6 +693,9 @@ static PINT_sm_action remove_remove_dirdata_handles_setup_msgpair_array(
 static int remove_remove_dirdata_handles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
+    PINT_smcb *smcb = v_p;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
+
     gossip_debug(
             GOSSIP_SERVER_DEBUG, "  remove_remove_dirdata_handles_comp_fn: "
             "response from dirdata[%d]: %d.\n",
@@ -639,7 +703,248 @@ static int remove_remove_dirdata_handles_comp_fn(
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
 
+    if(resp_p->status == 0)
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  success! "
+                "logging removed dirdata index!.\n");
+        if(index == 0) /* local dirdata */
+        {
+            s_op->u.remove.need_rebuild_dirdata_local = 1;
+            s_op->u.remove.local_dirdata_index = 0;
+        }
+        else
+        {
+            s_op->u.remove.rebuild_dirdata_index_array_remote[s_op->u.remove.num_rebuild_dirdata_remote] = index;
+            ++s_op->u.remove.num_rebuild_dirdata_remote;
+        }
+    }
+    else /* if there's error, rebuild deleted dirdata handles */
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  Failed! dirdata [%d] returns error!"
+                "need to rebuild dirdata handles!!!\n", index);
+    }
+
     return resp_p->status;
+}
+
+
+static PINT_sm_action remove_rebuild_dirdata_handle_local(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_ENOMEM;
+    job_id_t tmp_id;
+    PVFS_handle_extent_array extent_array;
+    server_configuration_s *user_opts = get_server_config_struct();
+
+    /* save error_code */
+    gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  remove_rebuild_dirdata: saving error_code %d\n",
+            js_p->error_code);
+    s_op->u.remove.saved_error_code = js_p->error_code;
+    js_p->error_code = 0;
+
+    if(!s_op->u.remove.need_rebuild_dirdata_local)
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  No need to rebuild local dirdata handle! "
+                "move to remote dirdata rebuild !\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug( GOSSIP_SERVER_DEBUG, 
+            "  remove_rebuild_dirdata: rebuilding local dirdata handle! \n");
+
+    ret = PINT_config_get_meta_handle_extent_array(
+        user_opts, s_op->req->u.remove.fs_id, &extent_array);
+    assert(ret == 0);
+    assert(extent_array.extent_count > 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " local dirdata handle(s) will "
+                 "be in starting hrange[0] %llu-%llu\n",
+                 llu(extent_array.extent_array[0].first),
+                 llu(extent_array.extent_array[0].last));
+
+    ret = job_trove_dspace_create_list(
+        s_op->req->u.remove.fs_id,
+        &extent_array,
+        &s_op->u.remove.handle_local,
+        1, /* dirdata_count_local = 1 */
+        PVFS_TYPE_DIRDATA, 
+        NULL,
+        TROVE_SYNC,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, 
+        s_op->req->hints);
+
+    return(ret);
+}
+
+
+static PINT_sm_action remove_rebuild_dirdata_handle_remote(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t j_id;
+    int ret = -PVFS_ENOMEM, i;
+    char **io_servers_remote = NULL;
+    char *string_buffer = NULL;
+
+    if(s_op->u.remove.need_rebuild_dirdata_local)
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  rebuilt local dirdata handle (%llu)\n",
+                llu(s_op->u.remove.handle_local));
+    }
+
+    if(s_op->u.remove.num_rebuild_dirdata_remote == 0)
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  No need to rebuild remote dirdata handle! "
+                "move to write keyval !\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* allocate space */
+    io_servers_remote =
+        malloc( sizeof(char*) *
+                s_op->u.remove.num_rebuild_dirdata_remote);
+    string_buffer = malloc(sizeof(char) * 1024 * 
+                s_op->u.remove.num_rebuild_dirdata_remote);
+    s_op->u.remove.handle_array_remote =
+        malloc( sizeof(PVFS_handle) *
+                s_op->u.remove.num_rebuild_dirdata_remote);
+    if(!io_servers_remote || !string_buffer ||
+            !s_op->u.remove.handle_array_remote)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* find server strings */
+    for(i = 0; i < s_op->u.remove.num_rebuild_dirdata_remote; i++)
+    {
+        io_servers_remote[i] = string_buffer + i * 1024;
+        PINT_cached_config_get_server_name(io_servers_remote[i], 1024, 
+                s_op->attr.u.dir.dirdata_handles[s_op->u.remove.rebuild_dirdata_index_array_remote[i]], 
+                s_op->req->u.remove.fs_id);
+    }
+
+    /* request remote dirdata handles */
+    gossip_debug(
+            GOSSIP_SERVER_DEBUG, "  rebuilding local %d remote dirdata handles! \n",
+            s_op->u.remove.num_rebuild_dirdata_remote);
+
+    ret = job_precreate_pool_get_handles(
+        s_op->req->u.remove.fs_id,
+        s_op->u.remove.num_rebuild_dirdata_remote,
+        PVFS_TYPE_DIRDATA,
+        (const char **)io_servers_remote, 
+        s_op->u.remove.handle_array_remote,
+        0,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        s_op->req->hints);
+
+    free(string_buffer);
+    free(io_servers_remote);
+
+    return ret;
+}
+
+
+static PINT_sm_action remove_rebuild_write_dirdata_keyval(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_ENOMEM, i;
+    job_id_t j_id;
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "  remove_rebuild_write_dirdata_keyval: \n");
+
+    if(!s_op->u.remove.need_rebuild_dirdata_local && 
+            (s_op->u.remove.num_rebuild_dirdata_remote == 0))
+    {
+        gossip_debug(
+                GOSSIP_SERVER_DEBUG, "  no dirdata handles got rebuilt! "
+                "no need to write keyval.  "
+                "move to dirdata cleanup !\n");
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "\t remove_rebuild: ORIGINAL dirdata handles array of directory %llu.\n",
+            llu(s_op->req->u.remove.handle));
+
+    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "\t\tdirdata server [%d]: %llu.\n",
+                i, llu(s_op->attr.u.dir.dirdata_handles[i]));
+    }
+
+    /* fill in rebuilt dirdata handles */
+    if(s_op->u.remove.need_rebuild_dirdata_local)
+    {
+        s_op->attr.u.dir.dirdata_handles[0] = s_op->u.remove.handle_local;
+    }
+
+    for(i = 0; i < s_op->u.remove.num_rebuild_dirdata_remote; i++)
+    {
+        s_op->attr.u.dir.dirdata_handles[s_op->u.remove.rebuild_dirdata_index_array_remote[i]] = 
+            s_op->u.remove.handle_array_remote[i];
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "\t remove_rebuild: REBUILT dirdata handles array of directory %llu.\n",
+            llu(s_op->req->u.remove.handle));
+
+    for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "\t\tdirdata server [%d]: %llu.\n",
+                i, llu(s_op->attr.u.dir.dirdata_handles[i]));
+    }
+
+    /* set up key and value structures for writing dirdata handles */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = s_op->attr.u.dir.dirdata_handles;
+    s_op->val.buffer_sz = s_op->attr.u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle);
+    s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  trying to write dirdata handles (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.remove.fs_id, llu(s_op->req->u.remove.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_write(
+        s_op->req->u.remove.fs_id, s_op->req->u.remove.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+
 }
 
 
@@ -649,6 +954,21 @@ static PINT_sm_action remove_remove_dirdata_handles_cleanup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_msgpairarray_destroy(&s_op->msgarray_op);
+
+    if(s_op->u.remove.rebuild_dirdata_index_array_remote)
+    {
+        free(s_op->u.remove.rebuild_dirdata_index_array_remote);
+    }
+    if(s_op->u.remove.handle_array_remote)
+    {
+        free(s_op->u.remove.handle_array_remote);
+    }
+
+    /* restoring js_p->error_code  */
+    if(s_op->u.remove.saved_error_code)
+    {
+        js_p->error_code = s_op->u.remove.saved_error_code;
+    }
 
     return SM_ACTION_COMPLETE;
 }
