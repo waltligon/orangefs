@@ -16,16 +16,23 @@ run_nightly_scripts="pvfs2/test/run-nightly pvfs2/maint/build pvfs2/test/automat
 
 #remove existing files
 cd $PATH_SUFFIX
-sudo /bin/rm -rf ~+/pvfs2
+#sudo /bin/rm -rf ~+/pvfs2
 
 #checkout needed directories and files to run the nightly process
-cvs -Q -d $cvsroot co -rOrange-Branch $run_nightly_scripts
-if [ $? != 0 ]
-then
-   echo "Failed to retrieve scripts from CVS"
-   exit 1
-fi
+#cvs -Q -d $cvsroot co -rOrange-Branch $run_nightly_scripts
+#if [ $? != 0 ]
+#then
+#   echo "Failed to retrieve scripts from CVS"
+#   exit 1
+#fi
 
+# run tests with files in current directory, not from CVS
+mkdir -p ~+/pvfs2/maint/build
+mkdir -p ~+/pvfs2/test/automated
+
+cp -r $PATH_SUFFIX/automated/* ~+/pvfs2/test/automated/
+cp -r $PATH_SUFFIX/run-nightly ~+/pvfs2/test/
+cp -r $PATH_SUFFIX/../maint/build/* ~+/pvfs2/maint/build/
 
 cd ~+/pvfs2/test
 ./run-nightly $CVSTAGS
