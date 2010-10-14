@@ -994,7 +994,7 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_deleattr(
-        vfs_request->in_upcall.req.removexattr.refn
+        vfs_request->in_upcall.req.removexattr.refn,
         &vfs_request->in_upcall.credentials,
         &vfs_request->key,
         &vfs_request->op_id, 
