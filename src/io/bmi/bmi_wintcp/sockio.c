@@ -82,7 +82,7 @@ int BMI_sockio_bind_sock_specific(int sockd,
     {
         if (WSAGetLastError() == WSAEINTR)
             goto bind_sock_restart;
-        return(bmi_errno_to_pvfs(-errno));
+        return(bmi_errno_to_pvfs(-WSAGetLastError()));
     }
     return (sockd);
 }
@@ -103,7 +103,7 @@ int BMI_sockio_connect_sock(int sockd,
     {
         if (WSAGetLastError() == WSAEINTR)
             goto connect_sock_restart;
-        return(bmi_errno_to_pvfs(-errno));
+        return(bmi_errno_to_pvfs(-WSAGetLastError()));
     }
     return (sockd);
 }

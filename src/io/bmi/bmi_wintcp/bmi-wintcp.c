@@ -2189,29 +2189,28 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
         if (tcp_addr_data->not_connected)
         {
             /* this is a little weird, but we complete the nonblocking
-             * connection by polling */
-            /*
+             * connection by polling */            
             poll_conn.fd = tcp_addr_data->socket;
             poll_conn.events = POLLOUT;
-            ret = poll(&poll_conn, 1, 2);
+            ret = WSAPoll(&poll_conn, 1, 2);
             if ((ret < 0) || (poll_conn.revents & POLLERR))
             {
-                tmp_errno = errno;
-                gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
+                tmp_errno = WSAGetLastError();
+                gossip_lerr("Error: poll: %d\n", tmp_errno);
                 return (bmi_tcp_errno_to_pvfs(-tmp_errno));
             }
             if (poll_conn.revents & POLLOUT)
             {
                 tcp_addr_data->not_connected = 0;
             }
-            */
+
             /* use select on Windows */
-           fd_set writefds;
+           /*fd_set writefds;
            struct timeval timeout;
 
            timeout.tv_sec = 0;
            timeout.tv_usec = 2000;   /* 2ms */
-
+/*
            FD_ZERO(&writefds);
            FD_SET(tcp_addr_data->socket, &writefds);
            ret = select(1, NULL, &writefds, NULL, (const struct timeval *) &timeout);
@@ -2225,6 +2224,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
            {
                tcp_addr_data->not_connected = 0;
            }
+*/
         }
         /* return.  the caller should check the "not_connected" flag to
          * see if the socket is usable yet. */
@@ -2287,7 +2287,7 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
 
     if (ret < 0)
     {
-        if (ret == -EINPROGRESS)
+        if (ret == -WSAEWOULDBLOCK)
         {
             tcp_addr_data->not_connected = 1;
             /* this will have to be connected later with a poll */

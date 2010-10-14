@@ -313,7 +313,7 @@ do_again:
     }
 
     /* nothing ready, just return */
-    if(ret == 0)
+    if(ret == 0 && !pipe_notify)
     {
 	return(0);
     }
