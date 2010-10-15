@@ -197,6 +197,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     gettimeofday(&start, NULL);
 do_again:
+    pipe_notify = 0;
     /* init the outgoing arguments for safety */
     *outcount = 0;
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
