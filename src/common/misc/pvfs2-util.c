@@ -176,6 +176,11 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     int filedes[2];
     int ret;
 
+    if (!keypath && getenv("PVFS2KEY_FILE"))
+    {
+        keypath = getenv("PVFS2KEY_FILE");
+    }
+
     memset(&newsa, 0, sizeof(newsa));
     newsa.sa_handler = SIG_DFL;
     sigaction(SIGCHLD, &newsa, &oldsa);
