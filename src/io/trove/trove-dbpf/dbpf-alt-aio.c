@@ -124,6 +124,9 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
 
             free(tmp_item);
             free(tids);
+            gossip_debug(GOSSIP_BSTREAM_DEBUG, 
+                        "[alt-aio]: pthread_create returned %d\n",
+                        ret);
             errno = ret;
             return(-1);
         }
