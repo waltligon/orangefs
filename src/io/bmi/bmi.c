@@ -561,6 +561,12 @@ int BMI_finalize(void)
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
 
+#ifdef WIN32
+    /* Windows Sockets finalize 
+       This must be done here rather than bmi_wintcp--after all addresses
+       have been destroyed */
+    WSACleanup();
+#endif
     /* shut down id generator */
     id_gen_safe_finalize();
 

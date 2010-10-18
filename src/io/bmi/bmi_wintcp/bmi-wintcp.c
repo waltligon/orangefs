@@ -624,9 +624,6 @@ int BMI_tcp_finalize(void)
         tcp_socket_collection_p = NULL;
     }
 
-    /* Windows Sockets finalize */
-    WSACleanup();
-
     /* NOTE: we are trusting the calling BMI layer to deallocate 
      * all of the method addresses (this will close any open sockets)
      */
@@ -1604,9 +1601,12 @@ int BMI_tcp_open_context(bmi_context_id context_id)
  */
 void BMI_tcp_close_context(bmi_context_id context_id)
 {
+    op_list_p iterator = NULL;
+    op_list_p scratch = NULL;
+    method_op_p tmp_method_op = NULL;
     
     gen_mutex_lock(&interface_mutex);
-
+    
     /* tear down completion queue for this context */
     op_list_cleanup(completion_array[context_id]);
 
@@ -1988,6 +1988,7 @@ static void dealloc_tcp_method_addr(bmi_method_addr_p map)
     {
         if (tcp_addr_data->socket > -1)
         {
+            shutdown(tcp_addr_data->socket, SD_BOTH);
             closesocket(tcp_addr_data->socket);
         }
     }
@@ -2792,6 +2793,7 @@ static int tcp_shutdown_addr(bmi_method_addr_p map)
     struct tcp_addr *tcp_addr_data = (struct tcp_addr *) map->method_data;
     if (tcp_addr_data->socket > -1)
     {
+        shutdown(tcp_addr_data->socket, SD_BOTH);
         closesocket(tcp_addr_data->socket);
     }
     tcp_addr_data->socket = -1;

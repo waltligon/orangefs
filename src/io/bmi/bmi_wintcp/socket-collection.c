@@ -194,6 +194,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int pipe_notify = 0;
     struct timeval start, end;
     int allowed_poll_time = poll_timeout;
+    DWORD bytes;
 
     gettimeofday(&start, NULL);
 do_again:
@@ -282,37 +283,42 @@ do_again:
     gen_mutex_unlock(&scp->queue_mutex);
 
     /* actually do the poll() work */
+    /*
     do
     {
         DWORD bytes;
 
         /* poll for 1ms */
-	ret = WSAPoll(scp->pollfd_array, scp->array_count, 1);
+   /*	ret = WSAPoll(scp->pollfd_array, scp->array_count, 1);
         old_errno = WSAGetLastError();
         allowed_poll_time--;
 
-        if (ret == 0) 
-        {
-            /* check our pipe */
-            if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
-            {
-                if (bytes)
-                {
-                    pipe_notify = 1;
-                }
-            }
-            else
-            {
-                ret = -1;
-            }
-        }
-    } while(ret == 0 && !pipe_notify && allowed_poll_time > 0);    
+    } while(ret == 0 && allowed_poll_time > 0);    
+    */
+    ret = WSAPoll(scp->pollfd_array, scp->array_count, allowed_poll_time);
+    old_errno = WSAGetLastError();
 
     if(ret < 0)
     {
 	return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
+    /* check our pipe if nothing else is ready */
+    if (ret == 0)
+    {
+        if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
+        {
+            if (bytes)
+            {
+                pipe_notify = 1;
+            }
+        }
+        else
+        {
+            return(bmi_tcp_errno_to_pvfs(GetLastError()));
+        }
+    }
+    
     /* nothing ready, just return */
     if(ret == 0 && !pipe_notify)
     {
@@ -373,6 +379,17 @@ do_again:
 		status[*outcount] |= SC_READ_BIT;
 	    if(scp->pollfd_array[i].revents & POLLOUT)
 		status[*outcount] |= SC_WRITE_BIT;
+
+            /* Special case--POLLHUP has been received but data 
+               is available. A graceful close has been initiated.
+               Clear the error flag so data is read/sent normally. */
+            if ((scp->pollfd_array[i].revents & POLLHUP) &&
+                (!(scp->pollfd_array[i].revents & POLLERR+POLLNVAL)) &&
+                ((scp->pollfd_array[i].revents & POLLIN) ||
+                 (scp->pollfd_array[i].revents & POLLOUT)))
+            {
+                status[*outcount] &= ~SC_ERROR_BIT;
+            }
 
 	    if(scp->addr_array[i] == NULL)
 	    {
