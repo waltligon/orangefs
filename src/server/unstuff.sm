@@ -397,7 +397,7 @@ static PINT_sm_action get_capability_setup(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
 
-    if (s_op->resp.u.unstuff.attr.mask & PVFS_ATTR_CAPABILITY)
+    if (s_op->req->u.unstuff.attrmask & PVFS_ATTR_CAPABILITY)
     {
         struct PINT_server_op *getattr_op;
 
@@ -410,7 +410,7 @@ static PINT_sm_action get_capability_setup(
         memset(getattr_op, 0, sizeof(*getattr_op));
 
         getattr_op->req = s_op->req;
-        getattr_op->attr = s_op->attr;
+        getattr_op->attr = s_op->resp.u.unstuff.attr;
         getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
         getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
         getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
