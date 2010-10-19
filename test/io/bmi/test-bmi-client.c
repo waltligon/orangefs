@@ -296,8 +296,6 @@ int main(
     free(user_opts->hostid);
     free(user_opts);
 
-    getchar();
-
     return (0);
 }
 

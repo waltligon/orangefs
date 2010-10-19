@@ -28,6 +28,8 @@
 #include "bmi-tcp-addressing.h"
 #include "gen-locks.h"
 
+#include "pvfs2-debug.h"
+
 /* errors that can occur on a poll socket */
 #define ERRMASK (POLLERR+POLLHUP+POLLNVAL)
 
@@ -49,10 +51,10 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
     socket_collection_p tmp_scp = NULL;
 
     tmp_scp = (struct socket_collection*) malloc(sizeof(struct
-	socket_collection));
+        socket_collection));
     if(!tmp_scp)
     {
-	return(NULL);
+        return(NULL);
     }
 
     memset(tmp_scp, 0, sizeof(struct socket_collection));
@@ -60,10 +62,10 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
     gen_mutex_init(&tmp_scp->queue_mutex);
 
     tmp_scp->pollfd_array = (struct
-	pollfd*)malloc(POLLFD_ARRAY_START*sizeof(WSAPOLLFD));
+        pollfd*)malloc(POLLFD_ARRAY_START*sizeof(WSAPOLLFD));
     
     tmp_scp->addr_array =
-	(bmi_method_addr_p*)malloc(POLLFD_ARRAY_START*sizeof(bmi_method_addr_p));
+        (bmi_method_addr_p*)malloc(POLLFD_ARRAY_START*sizeof(bmi_method_addr_p));
     if(!tmp_scp->addr_array)
     {
         free(tmp_scp->pollfd_array);
@@ -88,10 +90,10 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 
     if(new_server_socket > -1)
     {
-	tmp_scp->pollfd_array[tmp_scp->array_count].fd = new_server_socket;
-	tmp_scp->pollfd_array[tmp_scp->array_count].events = POLLIN;
-	tmp_scp->addr_array[tmp_scp->array_count] = NULL;
-	tmp_scp->array_count++;
+        tmp_scp->pollfd_array[tmp_scp->array_count].fd = new_server_socket;
+        tmp_scp->pollfd_array[tmp_scp->array_count].events = POLLIN;
+        tmp_scp->addr_array[tmp_scp->array_count] = NULL;
+        tmp_scp->array_count++;
     }
 
     /* Add the pipe_fd[0] fd to the poll in set always */
@@ -112,7 +114,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
  * returns 0 on success, -errno on failure.
  */
 void BMI_socket_collection_queue(socket_collection_p scp,
-			   bmi_method_addr_p map, struct qlist_head* queue)
+                           bmi_method_addr_p map, struct qlist_head* queue)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -121,21 +123,21 @@ void BMI_socket_collection_queue(socket_collection_p scp,
     /* make sure that this address isn't already slated for addition/removal */
     qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
     {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	if(tcp_addr_data->map == map)
-	{
-	    qlist_del(&tcp_addr_data->sc_link);
-	    break;
-	}
+        tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
+        if(tcp_addr_data->map == map)
+        {
+            qlist_del(&tcp_addr_data->sc_link);
+            break;
+        }
     }
     qlist_for_each_safe(iterator, scratch, &scp->add_queue)
     {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	if(tcp_addr_data->map == map)
-	{
-	    qlist_del(&tcp_addr_data->sc_link);
-	    break;
-	}
+        tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
+        if(tcp_addr_data->map == map)
+        {
+            qlist_del(&tcp_addr_data->sc_link);
+            break;
+        }
     }
 
     /* add it on to the appropriate queue */
@@ -174,11 +176,11 @@ void BMI_socket_collection_finalize(socket_collection_p scp)
  * returns 0 on success, -errno on failure.
  */
 int BMI_socket_collection_testglobal(socket_collection_p scp,
-				 int incount,
-				 int *outcount,
-				 bmi_method_addr_p * maps,
-				 int * status,
-				 int poll_timeout)
+                                 int incount,
+                                 int *outcount,
+                                 bmi_method_addr_p * maps,
+                                 int * status,
+                                 int poll_timeout)
 {
     struct qlist_head* iterator = NULL;
     struct qlist_head* scratch = NULL;
@@ -191,6 +193,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int tmp_count;
     int i;
     int skip_flag;
+    int out_flag;
     int pipe_notify = 0;
     struct timeval start, end;
     int allowed_poll_time = poll_timeout;
@@ -209,76 +212,76 @@ do_again:
     /* look for addresses slated for removal */
     qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
     {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-	/* take out of poll array, shift last entry into its place */
-	if(tcp_addr_data->sc_index > -1)
-	{
-	    scp->pollfd_array[tcp_addr_data->sc_index] = 
-		scp->pollfd_array[scp->array_count-1];
-	    scp->addr_array[tcp_addr_data->sc_index] = 
-		scp->addr_array[scp->array_count-1];
-	    shifted_tcp_addr_data =
-		scp->addr_array[tcp_addr_data->sc_index]->method_data;
-	    shifted_tcp_addr_data->sc_index = tcp_addr_data->sc_index;
-	    scp->array_count--;
-	    tcp_addr_data->sc_index = -1;
-	    tcp_addr_data->write_ref_count = 0;
-	}
+        tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
+        qlist_del(&tcp_addr_data->sc_link);
+        /* take out of poll array, shift last entry into its place */
+        if(tcp_addr_data->sc_index > -1)
+        {
+            scp->pollfd_array[tcp_addr_data->sc_index] = 
+                scp->pollfd_array[scp->array_count-1];
+            scp->addr_array[tcp_addr_data->sc_index] = 
+                scp->addr_array[scp->array_count-1];
+            shifted_tcp_addr_data =
+                scp->addr_array[tcp_addr_data->sc_index]->method_data;
+            shifted_tcp_addr_data->sc_index = tcp_addr_data->sc_index;
+            scp->array_count--;
+            tcp_addr_data->sc_index = -1;
+            tcp_addr_data->write_ref_count = 0;
+        }
     }
 
     /* look for addresses slated for addition */
     qlist_for_each_safe(iterator, scratch, &scp->add_queue)
     {
-	tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-	qlist_del(&tcp_addr_data->sc_link);
-	if(tcp_addr_data->sc_index > -1)
-	{
-	    /* update existing entry */
+        tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
+        qlist_del(&tcp_addr_data->sc_link);
+        if(tcp_addr_data->sc_index > -1)
+        {
+            /* update existing entry */
 #if 0
-	    gossip_err("HELLO: updating addr: %p, index: %d, ref: %d.\n",
-		scp->addr_array[tcp_addr_data->sc_index],
-		tcp_addr_data->sc_index,
-		tcp_addr_data->write_ref_count);
+            gossip_err("HELLO: updating addr: %p, index: %d, ref: %d.\n",
+                scp->addr_array[tcp_addr_data->sc_index],
+                tcp_addr_data->sc_index,
+                tcp_addr_data->write_ref_count);
 #endif
-	    scp->pollfd_array[tcp_addr_data->sc_index].events = POLLIN;
-	    if(tcp_addr_data->write_ref_count > 0)
-		scp->pollfd_array[tcp_addr_data->sc_index].events |= POLLOUT;
-	}
-	else
-	{
-	    /* new entry */
-	    if(scp->array_count == scp->array_max)
-	    {
-		/* we must enlarge the poll arrays */
-		tmp_pollfd_array = (WSAPOLLFD*)malloc(
-		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(WSAPOLLFD)); 
-		/* TODO: handle this */
-		assert(tmp_pollfd_array);
-		tmp_addr_array = (bmi_method_addr_p*)malloc(
-		    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(bmi_method_addr_p)); 
-		/* TODO: handle this */
-		assert(tmp_addr_array);
-		memcpy(tmp_pollfd_array, scp->pollfd_array,
-		    scp->array_max*sizeof(WSAPOLLFD));
-		free(scp->pollfd_array);
-		scp->pollfd_array = tmp_pollfd_array;
-		memcpy(tmp_addr_array, scp->addr_array,
-		    scp->array_max*sizeof(bmi_method_addr_p));
-		free(scp->addr_array);
-		scp->addr_array = tmp_addr_array;
-		scp->array_max = scp->array_max+POLLFD_ARRAY_INC;
-	    }
-	    /* add into pollfd array */
-	    tcp_addr_data->sc_index = scp->array_count;
-	    scp->array_count++;
-	    scp->addr_array[tcp_addr_data->sc_index] = tcp_addr_data->map;
-	    scp->pollfd_array[tcp_addr_data->sc_index].fd =
-		tcp_addr_data->socket;
-	    scp->pollfd_array[tcp_addr_data->sc_index].events = POLLIN;
-	    if(tcp_addr_data->write_ref_count > 0)
-		scp->pollfd_array[tcp_addr_data->sc_index].events |= POLLOUT;
-	}
+            scp->pollfd_array[tcp_addr_data->sc_index].events = POLLIN;
+            if(tcp_addr_data->write_ref_count > 0)
+                scp->pollfd_array[tcp_addr_data->sc_index].events |= POLLOUT;
+        }
+        else
+        {
+            /* new entry */
+            if(scp->array_count == scp->array_max)
+            {
+                /* we must enlarge the poll arrays */
+                tmp_pollfd_array = (WSAPOLLFD*)malloc(
+                    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(WSAPOLLFD)); 
+                /* TODO: handle this */
+                assert(tmp_pollfd_array);
+                tmp_addr_array = (bmi_method_addr_p*)malloc(
+                    (scp->array_max+POLLFD_ARRAY_INC)*sizeof(bmi_method_addr_p)); 
+                /* TODO: handle this */
+                assert(tmp_addr_array);
+                memcpy(tmp_pollfd_array, scp->pollfd_array,
+                    scp->array_max*sizeof(WSAPOLLFD));
+                free(scp->pollfd_array);
+                scp->pollfd_array = tmp_pollfd_array;
+                memcpy(tmp_addr_array, scp->addr_array,
+                    scp->array_max*sizeof(bmi_method_addr_p));
+                free(scp->addr_array);
+                scp->addr_array = tmp_addr_array;
+                scp->array_max = scp->array_max+POLLFD_ARRAY_INC;
+            }
+            /* add into pollfd array */
+            tcp_addr_data->sc_index = scp->array_count;
+            scp->array_count++;
+            scp->addr_array[tcp_addr_data->sc_index] = tcp_addr_data->map;
+            scp->pollfd_array[tcp_addr_data->sc_index].fd =
+                tcp_addr_data->socket;
+            scp->pollfd_array[tcp_addr_data->sc_index].events = POLLIN;
+            if(tcp_addr_data->write_ref_count > 0)
+                scp->pollfd_array[tcp_addr_data->sc_index].events |= POLLOUT;
+        }
     }
     gen_mutex_unlock(&scp->queue_mutex);
 
@@ -289,7 +292,7 @@ do_again:
         DWORD bytes;
 
         /* poll for 1ms */
-   /*	ret = WSAPoll(scp->pollfd_array, scp->array_count, 1);
+   /*        ret = WSAPoll(scp->pollfd_array, scp->array_count, 1);
         old_errno = WSAGetLastError();
         allowed_poll_time--;
 
@@ -300,7 +303,7 @@ do_again:
 
     if(ret < 0)
     {
-	return(bmi_tcp_errno_to_pvfs(-old_errno));
+        return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
     /* check our pipe if nothing else is ready */
@@ -310,7 +313,12 @@ do_again:
         {
             if (bytes)
             {
+                char c;
+                DWORD count;
+
                 pipe_notify = 1;
+                /* drain the pipe */
+                ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
             }
         }
         else
@@ -319,66 +327,52 @@ do_again:
         }
     }
     
-    /* nothing ready, just return */
+    /* nothing ready, just return 
+       -- there may actually be an error: see below */
+    /*
     if(ret == 0 && !pipe_notify)
     {
-	return(0);
+        return(0);
     }
+    */
 
-    if (pipe_notify)
-    {
-        char c;
-        DWORD count;
-        /* drain the pipe */
-        ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
-    }
-
-    tmp_count = ret;
+    /* tmp_count = ret; */
 
     for(i=0; i<scp->array_count; i++)
     {
-	/* short out if we hit count limit */
-	if(*outcount == incount || *outcount == tmp_count)
-	{
-	    break;
-	}
-        /* make sure we dont return the pipe fd as being ready */
-        /* if (scp->pollfd_array[i].fd == scp->pipe_fd[0])
+        /* short out if we hit count limit */
+        if(*outcount == incount /* || *outcount == tmp_count */)
         {
-            if (scp->pollfd_array[i].revents) {
-                char c;
-                /* drain the pipe */
-        /*        _read(scp->pipe_fd[0], &c, 1);
-                pipe_notify = 1;
+            break;
+        }
+
+        skip_flag = out_flag = 0;
+
+        /* make sure that this addr hasn't been removed */
+        gen_mutex_lock(&scp->queue_mutex);
+        qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
+        {
+            tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
+            if(tcp_addr_data->map == scp->addr_array[i])
+            {
+                skip_flag = 1;
+                break;
             }
+        }
+        gen_mutex_unlock(&scp->queue_mutex);
+        if(skip_flag)
             continue;
-        } */
-	/* anything ready on this socket? */
-	if (scp->pollfd_array[i].revents)
-	{
-	    skip_flag = 0;
 
-	    /* make sure that this addr hasn't been removed */
-	    gen_mutex_lock(&scp->queue_mutex);
-	    qlist_for_each_safe(iterator, scratch, &scp->remove_queue)
-	    {
-		tcp_addr_data = qlist_entry(iterator, struct tcp_addr, sc_link);
-		if(tcp_addr_data->map == scp->addr_array[i])
-		{
-		    skip_flag = 1;
-		    break;
-		}
-	    }
-	    gen_mutex_unlock(&scp->queue_mutex);
-	    if(skip_flag)
-		continue;
+        /* anything ready on this socket? */
+        if (scp->pollfd_array[i].revents)
+        {
 
-	    if(scp->pollfd_array[i].revents & ERRMASK)
-		status[*outcount] |= SC_ERROR_BIT;
-	    if(scp->pollfd_array[i].revents & POLLIN)
-		status[*outcount] |= SC_READ_BIT;
-	    if(scp->pollfd_array[i].revents & POLLOUT)
-		status[*outcount] |= SC_WRITE_BIT;
+            if(scp->pollfd_array[i].revents & ERRMASK)
+                status[*outcount] |= SC_ERROR_BIT;
+            if(scp->pollfd_array[i].revents & POLLIN)
+                status[*outcount] |= SC_READ_BIT;
+            if(scp->pollfd_array[i].revents & POLLOUT)
+                status[*outcount] |= SC_WRITE_BIT;
 
             /* Special case--POLLHUP has been received but data 
                is available. A graceful close has been initiated.
@@ -391,25 +385,54 @@ do_again:
                 status[*outcount] &= ~SC_ERROR_BIT;
             }
 
-	    if(scp->addr_array[i] == NULL)
-	    {
-		/* server socket */
-		maps[*outcount] = alloc_tcp_method_addr();
-		/* TODO: handle this */
-		assert(maps[*outcount]);
-		tcp_addr_data = (maps[*outcount])->method_data;
-		tcp_addr_data->server_port = 1;
-		tcp_addr_data->socket = scp->server_socket;
-		tcp_addr_data->port = -1;
-	    }
-	    else
-	    {
-		/* normal case */
-		maps[*outcount] = scp->addr_array[i];
-	    }
+            out_flag = 1;
+        }
+        else
+        {
+            /* on Windows there may be an error on the socket that WSAPoll 
+               doesn't report--use getsockopt to find */        
+            int rc, optval, optlen = sizeof(int);
 
-	    *outcount = (*outcount) + 1;
-	}
+            rc = getsockopt(scp->pollfd_array[i].fd, SOL_SOCKET, SO_ERROR, (char *) &optval, &optlen);
+
+            if (rc != 0)
+            {
+                return(bmi_tcp_errno_to_pvfs(-WSAGetLastError()));
+            }
+           
+            if (optval)
+            {
+                gossip_ldebug(GOSSIP_BMI_DEBUG_TCP, 
+                              "Socket %d error: %d\n",
+                              scp->pollfd_array[i].fd,
+                              optval);
+                status[*outcount] |= SC_ERROR_BIT;
+
+                out_flag = 1;
+            }
+        }
+        
+        if (out_flag)
+        {
+            if(scp->addr_array[i] == NULL)
+            {
+                /* server socket */
+                maps[*outcount] = alloc_tcp_method_addr();
+                /* TODO: handle this */
+                assert(maps[*outcount]);
+                tcp_addr_data = (maps[*outcount])->method_data;
+                tcp_addr_data->server_port = 1;
+                tcp_addr_data->socket = scp->server_socket;
+                tcp_addr_data->port = -1;
+            }
+            else
+            {
+                /* normal case */
+                maps[*outcount] = scp->addr_array[i];
+            }
+
+            *outcount = (*outcount) + 1;
+        }
     }
 
     /* Under the following conditions (i.e. all of them must be true) we go back to redoing poll
