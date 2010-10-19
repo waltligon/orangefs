@@ -123,6 +123,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
             }
 
             free(tmp_item);
+            assert(1==0); /* temporary measure for nightly test debugging */
             free(tids);
             gossip_debug(GOSSIP_BSTREAM_DEBUG, 
                         "[alt-aio]: pthread_create returned %d\n",
