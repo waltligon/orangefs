@@ -1244,6 +1244,10 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
     assert(attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR);
 
+    /* initialize size_array, used to store the dirent_count of every dirdata handle */
+    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
+            attr->u.dir.dist_dir_attr.num_servers);
+
     /* initialize msgpair array */
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 
             attr->u.dir.dist_dir_attr.num_servers);
@@ -1329,6 +1333,7 @@ static int getattr_dirdata_getattr_comp_fn(
             llu(resp_attr_p->ctime));
 
     /* update timestamp and dirent_count */
+    sm_p->getattr.size_array[index] = resp_attr_p->u.dir.dirent_count; 
     attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
     if(attr_p->atime < resp_attr_p->atime)
     {
@@ -1438,9 +1443,15 @@ static PINT_sm_action getattr_cleanup(
 
     sm_p->error_code = js_p->error_code;
 
-    /* cleanup size array; is only allocated if datafile sizes are retrieved */
-    if (getattr->size_array)
-       free(getattr->size_array);
+    /* cleanup size array if not asked to keep; is allocated if datafile sizes or dirent_count are retrieved */
+    /* keep_size_array is initialized outside the state machine, now only used in sys-readdir.sm */
+    if (!getattr->keep_size_array && getattr->size_array)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "getattr_cleanup: freeint getattr->size_array. \n");
+        free(getattr->size_array);
+        getattr->size_array = NULL;
+    }
 
     /* cleanup getattr when an error occurs */
     if (js_p->error_code)

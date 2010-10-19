@@ -28,7 +28,7 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    READDIR_NEXT_DIRDATA_SERVER = 1,
+    READDIR_DONE = 2,
 };
 
 static int readdir_msg_comp_fn(
@@ -54,6 +54,7 @@ nested machine pvfs2_client_readdir_sm
     state readdir_msg_setup_msgpair
     {
         run readdir_msg_setup_msgpair;
+        READDIR_DONE => readdir_msg_done;
         success => readdir_msg_xfer_msgpair;
         default => readdir_msg_failure;
     }
@@ -61,9 +62,14 @@ nested machine pvfs2_client_readdir_sm
     state readdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        READDIR_NEXT_DIRDATA_SERVER => readdir_msg_setup_msgpair;
-        success => cleanup;
+        success => readdir_msg_setup_msgpair;
         default => readdir_msg_failure;
+    }
+
+    state readdir_msg_done
+    {
+        run readdir_msg_done;
+        default => cleanup;
     }
 
     state readdir_msg_failure
@@ -220,6 +226,7 @@ static PINT_sm_action readdir_init(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
     *(sm_p->readdir.dirent_outcount) = 0;
+    sm_p->u.readdir.num_dirdata_needed = 0;
 
     if(sm_p->readdir.pos_token != PVFS_READDIR_START) /* get dirdata_index from rcache */
     {
@@ -253,6 +260,9 @@ static PINT_sm_action readdir_init(
         PVFS_TYPE_DIRECTORY,
         0);
     
+    /* keep dirent_count of all dirdata server in sm_p->getattr.size_array */
+    sm_p->getattr.keep_size_array = 1;
+
     assert(js_p->error_code == 0);
 
     return SM_ACTION_COMPLETE;
@@ -262,64 +272,231 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i;
+    int tmp_index = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    int tmp_dirent_limit_needed = 0;
+    int readdir_reentry = 0;
+    int *tmp_dirent_limit_array = NULL;
+    PVFS_ds_position *token_array = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
                  "readdir_msg_setup_msgpair\n");
 
-/* for multiple dirdata servers, readdir_msg_xfer may return error code 190, 
- * let it go through here, see whether it's causing any problem. */
+    /* for multiple dirdata servers, readdir_msg_xfer may return error code 190, 
+     * let it go through here, see whether it's causing any problem. */
     if (js_p->error_code < 0)
     {
         return SM_ACTION_COMPLETE;
     }
     js_p->error_code = 0;
 
+    /* re-entering msg_setup? */
+    if(sm_p->u.readdir.num_dirdata_needed > 0)
+    {
+        readdir_reentry = 1;
+        /* update dirdata_index, the comp_fn is not updating the dirdata_index */
+        sm_p->u.readdir.dirdata_index += 
+            (sm_p->u.readdir.num_dirdata_needed - 1);
+        gossip_debug(GOSSIP_READDIR_DEBUG, "readdir: "
+                "re-entering msg_array_setup! update dirdata_index to %d !\n", 
+                sm_p->u.readdir.dirdata_index);
+    }
+
+    if( sm_p->readdir.dirent_limit <= *(sm_p->readdir.dirent_outcount) )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir: "
+                "enough dirent fetched, exiting.\n");
+        js_p->error_code = READDIR_DONE;
+        return SM_ACTION_COMPLETE;
+    }
+
+
+    /* print out the dirent_count distribution, for debugging purpose */
+    assert(sm_p->getattr.size_array);
+    gossip_debug(GOSSIP_READDIR_DEBUG, "readdir getattr: "
+            "dirent_count of all dirdata handle \n");
+    for(i = 0; i < sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers; i++)
+    {
+        gossip_debug(GOSSIP_READDIR_DEBUG, 
+                "dirent_count[%d]: %llu\n", i,
+                llu(sm_p->getattr.size_array[i]));
+    }
+
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
+                 "readdir_msg_setup_msgpair\n");
+
+    /* calculate dirent_count fetch distribution */
+    tmp_dirent_limit_needed = sm_p->readdir.dirent_limit - *(sm_p->readdir.dirent_outcount);
+
+    /* allocate space */
+    sm_p->u.readdir.num_dirdata_needed = 0;
+    token_array = malloc( sizeof(PVFS_ds_position) *
+            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+    tmp_dirent_limit_array = malloc( sizeof(int) *
+            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+    if(!token_array || !tmp_dirent_limit_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* fill the first dirdata request parameters */
+   assert( sm_p->u.readdir.dirdata_index < 
+           sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+
+   if( ((sm_p->u.readdir.pos_token == PVFS_READDIR_START) &&
+               (sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index] > 0)) ||
+           ( (sm_p->u.readdir.pos_token != PVFS_READDIR_START) &&
+            (sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index] > 
+              (sm_p->u.readdir.pos_token & 0xffffffff) ) ) )
+   {  
+       /* need to use dirdata_index server */
+       token_array[tmp_index] = sm_p->u.readdir.pos_token;
+
+       if(sm_p->u.readdir.pos_token == PVFS_READDIR_START)
+       {
+           if(tmp_dirent_limit_needed > 
+                   sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index]) 
+           {
+               tmp_dirent_limit_array[tmp_index] = 
+                   sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index]; 
+           }
+           else
+           {
+               tmp_dirent_limit_array[tmp_index] = tmp_dirent_limit_needed; 
+           }
+       }
+       else
+       {
+           tmp_dirent_limit_array[tmp_index] = 
+               sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index] - 
+               (sm_p->u.readdir.pos_token & 0xffffffff);
+           if( tmp_dirent_limit_array[tmp_index] > tmp_dirent_limit_needed )
+           { 
+               tmp_dirent_limit_array[tmp_index] = tmp_dirent_limit_needed;
+           }
+       }
+
+    tmp_dirent_limit_needed -= tmp_dirent_limit_array[tmp_index];
+    tmp_index++;
+   }
+   else /* nothing left on the current dirdata_index server */
+   {
+       sm_p->u.readdir.dirdata_index++;
+   }
+
+   if(tmp_index > 0)
+   {
+       i = sm_p->u.readdir.dirdata_index + 1; 
+   }
+   else
+   {
+       i = sm_p->u.readdir.dirdata_index; 
+   }
+
+   /* fill the rest if necessary */
+    for( ; i < sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers;
+            i++)
+    {
+        if(tmp_dirent_limit_needed <= 0) /* enough dirents */
+        { 
+            break;
+        }
+
+       token_array[tmp_index] = PVFS_READDIR_START;
+
+       if(tmp_dirent_limit_needed > 
+               sm_p->getattr.size_array[i]) 
+       {
+           tmp_dirent_limit_array[tmp_index] = 
+               sm_p->getattr.size_array[i]; 
+       }
+       else
+       {
+           tmp_dirent_limit_array[tmp_index] = tmp_dirent_limit_needed; 
+       }
+
+       tmp_dirent_limit_needed -= tmp_dirent_limit_array[tmp_index];
+       tmp_index++;
+    }
+
+    /* total number of dirdata server need to contact */
+    sm_p->u.readdir.num_dirdata_needed = tmp_index;
+
+    if(tmp_index == 0)
+    {
+        gossip_debug(GOSSIP_READDIR_DEBUG," readdir: no dirent left in the remain dirdata servers. setting pos and return.\n");
+
+        *(sm_p->readdir.token) = PVFS_READDIR_END;
+        js_p->error_code = READDIR_DONE;
+        goto readdir_msg_return;
+    }
+
+    /* prevent memory leak */
+    if(readdir_reentry)
+    {
+        /* cleanup tree request */
+        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    }
+
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
-
-    /* !!! may use tree comm to gather all dirent */
-    /* use dirent_limit - dirent_outcount as the desired num of dirent */
-    assert(sm_p->readdir.dirent_limit > *(sm_p->readdir.dirent_outcount));
-    gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%llu(#%d)|%d | token is %llu | limit is %d\n",
-        llu(sm_p->object_ref.handle),
-        llu(sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index]),
-        sm_p->u.readdir.dirdata_index,
-        sm_p->object_ref.fs_id,
-        llu(sm_p->u.readdir.pos_token),
-        sm_p->readdir.dirent_limit - *(sm_p->readdir.dirent_outcount));
-
-    PINT_msgpair_init(&sm_p->msgarray_op);
-    msg_p = &sm_p->msgarray_op.msgpair;
-
-    PINT_SERVREQ_READDIR_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index],
-        sm_p->u.readdir.pos_token,
-        sm_p->u.readdir.dirent_limit - *(sm_p->readdir.dirent_outcount), /* another option is to update sm_p->u.readdir.dirent_limit */
-        sm_p->hints);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index]; /* send to dirdata server */
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = readdir_msg_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle,
-        msg_p->fs_id);
-
-    if (ret)
+    /* initialize msgpair array */
+    ret = PINT_msgpairarray_init(&sm_p->msgarray_op, tmp_index);
+    if(ret != 0)
     {
-        gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
+        goto readdir_msg_return;
+    }
+
+    /* prepare to post the readdir send/recv pairs for all dirdata*/
+    foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
+    {
+
+        gossip_debug(
+                GOSSIP_READDIR_DEBUG, 
+                "readdir: posting dirdata readdir[%d]  ""%llu|%llu(#%d)|%d | token is %llu | limit is %d\n",
+                i, llu(sm_p->object_ref.handle),
+                llu(sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i]),
+                (sm_p->u.readdir.dirdata_index + i),
+                sm_p->object_ref.fs_id,
+                llu(token_array[i]),
+                tmp_dirent_limit_array[i]);
+
+        PINT_SERVREQ_READDIR_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->object_ref.fs_id,
+                sm_p->object_ref.handle,
+                sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i],
+                token_array[i],
+                tmp_dirent_limit_array[i],
+                sm_p->hints);
+
+        /* fill in msgpair structure components */
+        msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
+        msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i];
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+        msg_p->comp_fn = readdir_msg_comp_fn;
+
+        ret = PINT_cached_config_map_to_server(
+                &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+        if (ret)
+        {
+            gossip_err("Failed to map meta server address\n");
+            js_p->error_code = ret;
+            break;
+        }
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+
+readdir_msg_return:
+    free(token_array);
+    free(tmp_dirent_limit_array);
     return SM_ACTION_COMPLETE;
 }
 
@@ -331,22 +508,35 @@ static int readdir_msg_comp_fn(void *v_p,
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir_msg_comp_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata readdir[%d] got response %d\n",
+                 index, resp_p->status);
 
     assert(resp_p->op == PVFS_SERV_READDIR);
+    assert(index < sm_p->u.readdir.num_dirdata_needed);
 
     if (resp_p->status != 0)
     {
 	return resp_p->status;
     }
 
-    /* convert servresp_readdir response to a sysresp_readdir obj */
+    /* if it's from the last dirdata of the msg_array */
+    if(index == (sm_p->u.readdir.num_dirdata_needed - 1))
+    {
+        /* convert servresp_readdir response to a sysresp_readdir obj */
+        *(sm_p->readdir.token) = resp_p->u.readdir.token;
+        sm_p->readdir.pos_token = resp_p->u.readdir.token;
+        sm_p->u.readdir.pos_token = resp_p->u.readdir.token;
+        *(sm_p->readdir.directory_version) =
+            resp_p->u.readdir.directory_version;
 
-    *(sm_p->readdir.token) = resp_p->u.readdir.token;
-    sm_p->readdir.pos_token = resp_p->u.readdir.token;
-    *(sm_p->readdir.directory_version) =
-        resp_p->u.readdir.directory_version;
+        gossip_debug(GOSSIP_READDIR_DEBUG, 
+                "*** update token value to %llu from dirdata readdir[%d]\n", 
+                llu(sm_p->u.readdir.pos_token), index);
+    }
 
-    gossip_debug(GOSSIP_READDIR_DEBUG, "*** receiving readdir response with resp->dirent_count=%d when dirent_outcount = %d\n",  resp_p->u.readdir.dirent_count, *(sm_p->readdir.dirent_outcount));
+    gossip_debug(GOSSIP_READDIR_DEBUG, 
+            "*** receiving readdir response [%d] with resp->dirent_count=%d when dirent_outcount = %d\n", 
+            index,  resp_p->u.readdir.dirent_count, *(sm_p->readdir.dirent_outcount));
 
     if (resp_p->u.readdir.dirent_count > 0)
     {
@@ -359,7 +549,6 @@ static int readdir_msg_comp_fn(void *v_p,
             *(sm_p->readdir.dirent_array) =
                 (PVFS_dirent *) malloc(dirent_array_len_total);
             assert(*(sm_p->readdir.dirent_array));
-
         }
 
         int dirent_array_offset =
@@ -377,26 +566,23 @@ static int readdir_msg_comp_fn(void *v_p,
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
                  "[version %lld, dirdata_index = %d, dirent_outcount = %d]\n",
                  resp_p->u.readdir.dirent_count,
-                 lld(*(sm_p->readdir.directory_version)),
-                 sm_p->u.readdir.dirdata_index,
+                 lld(resp_p->u.readdir.directory_version),
+                 (sm_p->u.readdir.dirdata_index + index),
                  *(sm_p->readdir.dirent_outcount) );
 
-    if( (*(sm_p->readdir.dirent_outcount) < sm_p->readdir.dirent_limit) &&
-        (sm_p->u.readdir.dirdata_index < 
-         (sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers - 1)))
-    {
-        /* move to the next dirdata server */
-        ++sm_p->u.readdir.dirdata_index;
-        sm_p->u.readdir.pos_token = PVFS_READDIR_START;
-
-        gossip_debug(GOSSIP_READDIR_DEBUG, "*** need more dirent, "
-                "move to next dirdata server #%d\n", 
-                sm_p->u.readdir.dirdata_index);
-
-        return READDIR_NEXT_DIRDATA_SERVER;
-    }
-
     return 0;
+}
+
+static PINT_sm_action readdir_msg_done(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "readdir state: readdir_msg_done\n");
+    /* main reason for this state is to clear error_code 
+     * otherwise cleanup will return with error 2 (READDIR_DONE)
+     */
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action readdir_msg_failure(
@@ -445,6 +631,18 @@ static PINT_sm_action readdir_cleanup(
         }
 
     }
+
+    /* deliberately free sm_p->getattr.size_array */
+    if (sm_p->getattr.keep_size_array && sm_p->getattr.size_array)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                "readdir_cleanup: freeing sm_p->getattr.size_array. \n");
+        free(sm_p->getattr.size_array);
+        sm_p->getattr.size_array = NULL;
+    }
+
+    /* cleanup tree request */
+    PINT_msgpairarray_destroy(&sm_p->msgarray_op);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

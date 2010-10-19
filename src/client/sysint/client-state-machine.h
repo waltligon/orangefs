@@ -285,6 +285,8 @@ struct PINT_client_readdir_sm
     int dirent_limit;                   /* input parameter */
     int dirdata_index;                  /* in/out parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
+
+    int num_dirdata_needed; /* tmp parameter */
 };
 
 struct handle_to_index {
@@ -470,6 +472,11 @@ typedef struct PINT_sm_getattr_state
 
     PVFS_ds_type ref_type;
 
+    /* used with sys-readdir to get dirent_count of all dirdata handles, 
+     * will be set to 0 in PINT_SM_GETATTR_STATE_FILL, 
+     * now only used with sys-readdir.sm */
+    int keep_size_array; 
+
     PVFS_size * size_array;
     PVFS_size size;
 
@@ -485,6 +492,7 @@ typedef struct PINT_sm_getattr_state
         (_state).req_attrmask = _mask; \
         (_state).ref_type = _reftype; \
         (_state).flags = _flags; \
+        (_state).keep_size_array = 0; \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
