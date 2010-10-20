@@ -1099,6 +1099,12 @@ AC_TRY_COMPILE(
     AC_MSG_RESULT(no)
 )
 
+dnl
+dnl Configure jni, if --enable-jni or a variant given.
+dnl
+AX_JNI
+
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel \
@@ -1147,6 +1153,7 @@ src/io/flow/flowproto-bmi-cache/module.mk
 src/io/buffer/module.mk
 src/io/job/module.mk
 src/io/dev/module.mk
+src/jni/module.mk
 src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
@@ -1262,6 +1269,12 @@ else
 fi
 
 fi # end of BMI/PVFS config display
+
+if test "x$BUILD_LIBJNI" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 configured to build jni library             : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build jni library             :  no])
+fi
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)

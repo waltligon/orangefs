@@ -84,6 +84,7 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
+BUILD_LIBJNI = @BUILD_LIBJNI@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -505,6 +506,13 @@ LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a
 LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
+#####################################
+# enable LIBJNI if configure requested it
+
+ifdef BUILD_LIBJNI
+    LIBRARIES_JNI = lib/libpvfs2-jni.so
+endif
+
 ################################################################
 # Default target forward pointer, to avoid other targets in make stubs
 all::
@@ -531,6 +539,13 @@ LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+
+# LIBJNIOBJS is a list of objects to put in the jni client lib
+LIBJNIOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBJNISRC)))
+# LIBJNIPICOBJS are the same, but compiled for use in a jni shared library
+LIBJNIPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBJNISRC)))
+# LIBJNIDEPENDS is a list of dependency files for the jni client lib
+LIBJNIDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBJNISRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -634,6 +649,7 @@ else
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
     $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
+    $(LIBJNIDEPENDS) \
     $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
 endif
 
@@ -644,7 +660,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(FUSE) $(LIBRARIES_JNI)
 endif
 
 # target for building admin tools
@@ -740,6 +756,12 @@ lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
+
+# rule for building the pvfs2-jni library
+lib/libpvfs2-jni.so: $(LIBPICOBJS) $(LIBJNIPICOBJS)
+	$(Q) "  LDSO            $@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-jni.so -o $@ $(LIBPICOBJS) $(LIBJNIPICOBJS) $(DEPLIBS)
 
 # rule for building the pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
@@ -923,6 +945,7 @@ clean::
 		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
 		$(STATECOMP) $(STATECOMPOBJS) \
+		$(LIBJNIOBJS) $(LIBJNIPICOBJS) $(LIBJNIDEPENDS) lib/libpvfs2-jni.so\
 		src/server/pvfs2-server-server.o \
 		src/apps/karma/karma src/apps/fuse/pvfs2fuse
 ifndef DIST_RELEASE

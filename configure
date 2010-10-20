@@ -596,6 +596,8 @@ LIBOBJS
 VISLIBS
 VISCFLAGS
 BUILD_VIS
+_ACJNI_JAVAC
+BUILD_LIBJNI
 GOSSIP_ENABLE_BACKTRACE
 SERVER_LDFLAGS
 ZOID_SRCDIR
@@ -1438,6 +1440,7 @@ Optional Features:
                           Disables back traces in segfault signal handler
   --enable-shared         Build shared client library
   --enable-static-server  Builds the server static
+  --disable-jni           Disable jni (jni is enabled by default)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -10828,12 +10831,279 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+
+JAVAC="javac"
+# Check whether --enable-jni was given.
+if test "${enable_jni+set}" = set; then
+    enableval=$enable_jni;
+    if test "x$enableval" = "xyes"; then
+	
+	
+	
+	JNI_INCLUDE_DIRS=""
+	
+	test "x$JAVAC" = x && { { echo "$as_me:$LINENO: error: '\$JAVAC' undefined" >&5
+		echo "$as_me: error: '\$JAVAC' undefined" >&2;}
+	    { (exit 1); exit 1; }; }
+# Extract the first word of "$JAVAC", so it can be a program name with args.
+	set dummy $JAVAC; ac_word=$2
+	{ echo "$as_me:$LINENO: checking for $ac_word" >&5
+	    echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
+	if test "${ac_cv_path__ACJNI_JAVAC+set}" = set; then
+	    echo $ECHO_N "(cached) $ECHO_C" >&6
+	else
+	    case $_ACJNI_JAVAC in
+		[\\/]* | ?:[\\/]*)
+		    ac_cv_path__ACJNI_JAVAC="$_ACJNI_JAVAC" # Let the user override the test with a path.
+		    ;;
+		*)
+		    as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+		    for as_dir in $PATH
+		    do
+			IFS=$as_save_IFS
+			test -z "$as_dir" && as_dir=.
+			for ac_exec_ext in '' $ac_executable_extensions; do
+			    if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+				ac_cv_path__ACJNI_JAVAC="$as_dir/$ac_word$ac_exec_ext"
+				echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+				break 2
+			    fi
+			done
+		    done
+
+		    IFS=$as_save_IFS
+		    
+		    test -z "$ac_cv_path__ACJNI_JAVAC" && ac_cv_path__ACJNI_JAVAC="no"
+		    ;;
+	    esac
+	fi
+	_ACJNI_JAVAC=$ac_cv_path__ACJNI_JAVAC
+	if test -n "$_ACJNI_JAVAC"; then
+	    { echo "$as_me:$LINENO: result: $_ACJNI_JAVAC" >&5
+		echo "${ECHO_T}$_ACJNI_JAVAC" >&6; }
+	else
+	    { echo "$as_me:$LINENO: result: no" >&5
+		echo "${ECHO_T}no" >&6; }
+	fi
+	
+
+	test "x$_ACJNI_JAVAC" = xno && { { echo "$as_me:$LINENO: error: $JAVAC could not be found in path" >&5
+		echo "$as_me: error: $JAVAC could not be found in path" >&2;}
+	    { (exit 1); exit 1; }; }
+
+
+# find the include directory relative to the javac executable
+	_cur=""$_ACJNI_JAVAC""
+	while ls -ld "$_cur" 2>/dev/null | grep " -> " >/dev/null; do
+            { echo "$as_me:$LINENO: checking symlink for $_cur" >&5
+		echo $ECHO_N "checking symlink for $_cur... $ECHO_C" >&6; }
+            _slink=`ls -ld "$_cur" | sed 's/.* -> //'`
+            case "$_slink" in
+		/*) _cur="$_slink";;
+        # 'X' avoids triggering unwanted echo options.
+		*) _cur=`echo "X$_cur" | sed -e 's/^X//' -e 's:[^/]*$::'`"$_slink";;
+            esac
+            { echo "$as_me:$LINENO: result: $_cur" >&5
+		echo "${ECHO_T}$_cur" >&6; }
+	done
+	_ACJNI_FOLLOWED="$_cur"
+	
+	_JTOPDIR=`echo "$_ACJNI_FOLLOWED" | sed -e 's://*:/:g' -e 's:/[^/]*$::'`
+	case "$host_os" in
+            darwin*)        _JTOPDIR=`echo "$_JTOPDIR" | sed -e 's:/[^/]*$::'`
+                _JINC="$_JTOPDIR/Headers";;
+            *)              _JINC="$_JTOPDIR/include";;
+	esac
+	{ echo "$as_me:$LINENO: checking for jni.h" >&5
+	    echo $ECHO_N "checking for jni.h... $ECHO_C" >&6; }
+	if test -f "$_JINC/jni.h"; then
+            JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JINC"
+            { echo "$as_me:$LINENO: result: yes, $_JINC" >&5
+		echo "${ECHO_T}yes, $_JINC" >&6; }
+	else
+            _JTOPDIR=`echo "$_JTOPDIR" | sed -e 's:/[^/]*$::'`
+            if test -f "$_JTOPDIR/include/jni.h"; then
+                JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include"
+                { echo "$as_me:$LINENO: result: yes, $_JTOPDIR/include" >&5
+		    echo "${ECHO_T}yes, $_JTOPDIR/include" >&6; }
+            else
+                { echo "$as_me:$LINENO: result: no" >&5
+		    echo "${ECHO_T}no" >&6; }
+                { { echo "$as_me:$LINENO: error: cannot find java include files" >&5
+			echo "$as_me: error: cannot find java include files" >&2;}
+		    { (exit 1); exit 1; }; }
+            fi
+	fi
+	
+# get the likely subdirectories for system specific java includes
+	case "$host_os" in
+	    bsdi*)          _JNI_INC_SUBDIRS="bsdos";;
+	    linux*)         _JNI_INC_SUBDIRS="linux genunix";;
+	    osf*)           _JNI_INC_SUBDIRS="alpha";;
+	    solaris*)       _JNI_INC_SUBDIRS="solaris";;
+	    mingw*)_JNI_INC_SUBDIRS="win32";;
+	    cygwin*)_JNI_INC_SUBDIRS="win32";;
+	    *)              _JNI_INC_SUBDIRS="genunix";;
+	esac
+	
+# add any subdirectories that are present
+	for JINCSUBDIR in $_JNI_INC_SUBDIRS
+	do
+            { echo "$as_me:$LINENO: checking for system specific java includes ($JINCSUBDIR)" >&5
+		echo $ECHO_N "checking for system specific java includes ($JINCSUBDIR)... $ECHO_C" >&6; }
+            if test -d "$_JTOPDIR/include/$JINCSUBDIR"; then
+                JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include/$JINCSUBDIR"
+                { echo "$as_me:$LINENO: result: yes" >&5
+		    echo "${ECHO_T}yes" >&6; }
+            else
+                { echo "$as_me:$LINENO: result: no" >&5
+		    echo "${ECHO_T}no" >&6; }
+            fi
+	done
+	
+        for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS
+        do
+            CPPFLAGS="$CPPFLAGS -I$JNI_INCLUDE_DIR"
+        done
+        BUILD_LIBJNI=1
+    fi
+else
+    
+
+    
+
+JNI_INCLUDE_DIRS=""
+
+test "x$JAVAC" = x && { { echo "$as_me:$LINENO: error: '\$JAVAC' undefined" >&5
+echo "$as_me: error: '\$JAVAC' undefined" >&2;}
+    { (exit 1); exit 1; }; }
+# Extract the first word of "$JAVAC", so it can be a program name with args.
+set dummy $JAVAC; ac_word=$2
+{ echo "$as_me:$LINENO: checking for $ac_word" >&5
+    echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6; }
+if test "${ac_cv_path__ACJNI_JAVAC+set}" = set; then
+    echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+    case $_ACJNI_JAVAC in
+	[\\/]* | ?:[\\/]*)
+	    ac_cv_path__ACJNI_JAVAC="$_ACJNI_JAVAC" # Let the user override the test with a path.
+	    ;;
+	*)
+	    as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+	    for as_dir in $PATH
+	    do
+		IFS=$as_save_IFS
+		test -z "$as_dir" && as_dir=.
+		for ac_exec_ext in '' $ac_executable_extensions; do
+		    if { test -f "$as_dir/$ac_word$ac_exec_ext" && $as_test_x "$as_dir/$ac_word$ac_exec_ext"; }; then
+			ac_cv_path__ACJNI_JAVAC="$as_dir/$ac_word$ac_exec_ext"
+			echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+			break 2
+		    fi
+		done
+	    done
+	    IFS=$as_save_IFS
+	    
+	    test -z "$ac_cv_path__ACJNI_JAVAC" && ac_cv_path__ACJNI_JAVAC="no"
+	    ;;
+    esac
+fi
+_ACJNI_JAVAC=$ac_cv_path__ACJNI_JAVAC
+if test -n "$_ACJNI_JAVAC"; then
+    { echo "$as_me:$LINENO: result: $_ACJNI_JAVAC" >&5
+	echo "${ECHO_T}$_ACJNI_JAVAC" >&6; }
+else
+    { echo "$as_me:$LINENO: result: no" >&5
+	echo "${ECHO_T}no" >&6; }
+fi
+
+test "x$_ACJNI_JAVAC" = xno && { { echo "$as_me:$LINENO: error: $JAVAC could not be found in path" >&5
+echo "$as_me: error: $JAVAC could not be found in path" >&2;}
+    { (exit 1); exit 1; }; }
+
+
+# find the include directory relative to the javac executable
+_cur=""$_ACJNI_JAVAC""
+while ls -ld "$_cur" 2>/dev/null | grep " -> " >/dev/null; do
+    { echo "$as_me:$LINENO: checking symlink for $_cur" >&5
+	echo $ECHO_N "checking symlink for $_cur... $ECHO_C" >&6; }
+    _slink=`ls -ld "$_cur" | sed 's/.* -> //'`
+    case "$_slink" in
+        /*) _cur="$_slink";;
+        # 'X' avoids triggering unwanted echo options.
+        *) _cur=`echo "X$_cur" | sed -e 's/^X//' -e 's:[^/]*$::'`"$_slink";;
+    esac
+    { echo "$as_me:$LINENO: result: $_cur" >&5
+	echo "${ECHO_T}$_cur" >&6; }
+done
+_ACJNI_FOLLOWED="$_cur"
+
+_JTOPDIR=`echo "$_ACJNI_FOLLOWED" | sed -e 's://*:/:g' -e 's:/[^/]*$::'`
+case "$host_os" in
+    darwin*)        _JTOPDIR=`echo "$_JTOPDIR" | sed -e 's:/[^/]*$::'`
+        _JINC="$_JTOPDIR/Headers";;
+    *)              _JINC="$_JTOPDIR/include";;
+esac
+{ echo "$as_me:$LINENO: checking for jni.h" >&5
+echo $ECHO_N "checking for jni.h... $ECHO_C" >&6; }
+if test -f "$_JINC/jni.h"; then
+    JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JINC"
+    { echo "$as_me:$LINENO: result: yes, $_JINC" >&5
+	echo "${ECHO_T}yes, $_JINC" >&6; }
+else
+    _JTOPDIR=`echo "$_JTOPDIR" | sed -e 's:/[^/]*$::'`
+    if test -f "$_JTOPDIR/include/jni.h"; then
+        JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include"
+        { echo "$as_me:$LINENO: result: yes, $_JTOPDIR/include" >&5
+	    echo "${ECHO_T}yes, $_JTOPDIR/include" >&6; }
+    else
+        { echo "$as_me:$LINENO: result: no" >&5
+	    echo "${ECHO_T}no" >&6; }
+        { { echo "$as_me:$LINENO: error: cannot find java include files" >&5
+		echo "$as_me: error: cannot find java include files" >&2;}
+	    { (exit 1); exit 1; }; }
+    fi
+fi
+
+# get the likely subdirectories for system specific java includes
+case "$host_os" in
+    bsdi*)          _JNI_INC_SUBDIRS="bsdos";;
+    linux*)         _JNI_INC_SUBDIRS="linux genunix";;
+    osf*)           _JNI_INC_SUBDIRS="alpha";;
+    solaris*)       _JNI_INC_SUBDIRS="solaris";;
+    mingw*)_JNI_INC_SUBDIRS="win32";;
+    cygwin*)_JNI_INC_SUBDIRS="win32";;
+    *)              _JNI_INC_SUBDIRS="genunix";;
+esac
+
+# add any subdirectories that are present
+for JINCSUBDIR in $_JNI_INC_SUBDIRS
+do
+        { echo "$as_me:$LINENO: checking for system specific java includes ($JINCSUBDIR)" >&5
+	    echo $ECHO_N "checking for system specific java includes ($JINCSUBDIR)... $ECHO_C" >&6; }
+        if test -d "$_JTOPDIR/include/$JINCSUBDIR"; then
+            JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include/$JINCSUBDIR"
+            { echo "$as_me:$LINENO: result: yes" >&5
+		echo "${ECHO_T}yes" >&6; }
+        else
+            { echo "$as_me:$LINENO: result: no" >&5
+		echo "${ECHO_T}no" >&6; }
+        fi
+done
+
+for JNI_INCLUDE_DIR in $JNI_INCLUDE_DIRS
+do
+    CPPFLAGS="$CPPFLAGS -I$JNI_INCLUDE_DIR"
+done
+BUILD_LIBJNI=1
+fi
+
 for d in src/apps src/io src/common src/client src/kernel \
        doc src/apps/kernel test; do
        install -d $d;
 done
 
-ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/bmi/bmi_zoid/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/kernel/linux/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/jni/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -11559,6 +11829,7 @@ do
     "src/io/buffer/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/buffer/module.mk" ;;
     "src/io/job/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/job/module.mk" ;;
     "src/io/dev/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/dev/module.mk" ;;
+    "src/jni/module.mk") CONFIG_FILES="$CONFIG_FILES src/jni/module.mk" ;;
     "src/proto/module.mk") CONFIG_FILES="$CONFIG_FILES src/proto/module.mk" ;;
     "src/server/module.mk") CONFIG_FILES="$CONFIG_FILES src/server/module.mk" ;;
     "src/server/request-scheduler/module.mk") CONFIG_FILES="$CONFIG_FILES src/server/request-scheduler/module.mk" ;;
@@ -12280,6 +12551,14 @@ $as_echo "$PKGSTR configured for using trusted connections    : yes" >&6; }
 fi
 
 fi # end of BMI/PVFS config display
+
+if test "x$BUILD_LIBJNI" = "x1" ; then
+   { echo "$as_me:$LINENO: result: PVFS2 configured to build jni library             : yes" >&5
+echo "${ECHO_T}PVFS2 configured to build jni library             : yes" >&6; }
+else
+   { echo "$as_me:$LINENO: result: PVFS2 configured to build jni library             :  no" >&5
+echo "${ECHO_T}PVFS2 configured to build jni library             :  no" >&6; }
+fi
 
 if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION." >&5
