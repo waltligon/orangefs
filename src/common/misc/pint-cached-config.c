@@ -318,7 +318,8 @@ int PINT_cached_config_get_server(
         return(-PVFS_EINVAL);
     }
 
-    if(type != PINT_SERVER_TYPE_META && type != PINT_SERVER_TYPE_IO)
+    if(type != PINT_SERVER_TYPE_META && type != PINT_SERVER_TYPE_IO &&
+        type != PINT_SERVER_TYPE_ALL)
     {
         return(-PVFS_EINVAL);
     }
@@ -508,7 +509,8 @@ int PINT_cached_config_map_servers(
     int *inout_num_datafiles,
     PVFS_sys_layout *layout,
     PVFS_BMI_addr_t *addr_array,
-    PVFS_handle_extent_array *handle_extent_array)
+    PVFS_handle_extent_array *handle_extent_array,
+    char *node_name)
 {
     struct qhash_head *hash_link;
     struct PINT_llist *server_list;
@@ -536,6 +538,8 @@ int PINT_cached_config_map_servers(
 
     server_list = cur_config_cache->fs->data_handle_ranges;
     num_io_servers = PINT_llist_count(server_list);
+    if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
+        num_io_servers = 1;
 
     switch(layout->algorithm)
     {
@@ -569,8 +573,60 @@ int PINT_cached_config_map_servers(
             }
             break;
 
+        case PVFS_SYS_LAYOUT_LOCAL:
+            for(i = 0; i < cur_config_cache->io_server_count; ++i)
+            {
+                cur_mapping = PINT_llist_head(server_list);
+                assert(cur_mapping);
+                server_list = PINT_llist_next(server_list);
+
+                index = 0; /* always = 0 */
+
+                if(strstr(cur_mapping->alias_mapping->host_alias, node_name))
+                {
+                    ret = BMI_addr_lookup(
+                        &addr_array[index],
+                        cur_mapping->alias_mapping->bmi_address);
+                    if (ret)
+                    {
+                        return ret;
+                    }
+                }
+
+                if(handle_extent_array)
+                {
+                    handle_extent_array[index].extent_count =
+                        cur_mapping->handle_extent_array.extent_count;
+                    handle_extent_array[index].extent_array =
+                        cur_mapping->handle_extent_array.extent_array;
+                }
+            }
+            break;
+        case PVFS_SYS_LAYOUT_LOCAL_RR:
+        case PVFS_SYS_LAYOUT_LOCAL_RR0:
+        case PVFS_SYS_LAYOUT_LOCAL_RR1:
+        case PVFS_SYS_LAYOUT_REMOTE_RR:
         case PVFS_SYS_LAYOUT_NONE:
-            start_index = 0;
+            if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR ||
+                layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR0 ||
+                layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR1 ||
+                layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+            {
+                for(i=0; i < cur_config_cache->io_server_count; i++)
+                    if(strstr(cur_config_cache->io_server_array[i].addr_string, 
+                              node_name))
+                    {
+                        if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR0 || layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+                            start_index = (i+1)%cur_config_cache->io_server_count;
+                        else if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR1)
+                            start_index = (i+2)%cur_config_cache->io_server_count;
+                        else
+                            start_index = i;
+                        break;
+                    }
+            }
+            else if (layout->algorithm == PVFS_SYS_LAYOUT_NONE)
+                start_index = 0;
             /* fall through */
 
         case PVFS_SYS_LAYOUT_ROUND_ROBIN:
@@ -582,8 +638,12 @@ int PINT_cached_config_map_servers(
 
             if(start_index == -1)
             {
-                start_index = rand() % *inout_num_datafiles;
+                if(layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN)
+                    start_index = rand() % *inout_num_datafiles;
             }
+            
+            if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+                goto remote_rr;
 
             for(i = 0; i < *inout_num_datafiles; ++i)
             {
@@ -591,7 +651,17 @@ int PINT_cached_config_map_servers(
                 assert(cur_mapping);
                 server_list = PINT_llist_next(server_list);
 
-                index = (i + start_index) % *inout_num_datafiles;
+                if(layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN ||
+                    layout->algorithm == PVFS_SYS_LAYOUT_NONE)
+                    index = (i + start_index) % *inout_num_datafiles;
+                else {
+                    int temp_index = (i - start_index);
+                    if (temp_index >= 0)
+                        index = (i - start_index) % *inout_num_datafiles;
+                    else
+                        index = ((i - start_index) + *inout_num_datafiles) % *inout_num_datafiles;
+                }
+
                 ret = BMI_addr_lookup(
                     &addr_array[index],
                     cur_mapping->alias_mapping->bmi_address);
@@ -608,6 +678,41 @@ int PINT_cached_config_map_servers(
                         cur_mapping->handle_extent_array.extent_array;
                 }
             }
+            goto next;
+
+    remote_rr:
+            for(i = 0; i < num_io_servers; ++i)
+            {
+                cur_mapping = PINT_llist_head(server_list);
+                assert(cur_mapping);
+                server_list = PINT_llist_next(server_list);
+
+                int temp_index = (i - start_index);
+                if (temp_index >= 0)
+                    index = (i - start_index) % num_io_servers;
+                else
+                    index = ((i - start_index) + num_io_servers) % num_io_servers;
+
+                if(strstr(cur_mapping->alias_mapping->host_alias, node_name))
+                    continue;
+
+                ret = BMI_addr_lookup(
+                    &addr_array[index],
+                    cur_mapping->alias_mapping->bmi_address);
+                if (ret)
+                {
+                    return ret;
+                }
+
+                if(handle_extent_array)
+                {
+                    handle_extent_array[index].extent_count =
+                        cur_mapping->handle_extent_array.extent_count;
+                    handle_extent_array[index].extent_array =
+                        cur_mapping->handle_extent_array.extent_array;
+                }
+            }
+    next:
             break;
 
         case PVFS_SYS_LAYOUT_RANDOM:
@@ -674,6 +779,7 @@ int PINT_cached_config_map_servers(
                 }
             }
             break;
+
         default:
             gossip_err("Unknown datafile mapping algorithm\n");
             return -PVFS_EINVAL;
@@ -1321,13 +1427,26 @@ int PINT_cached_config_get_handle_timeout(
     return ret;
 }
 
+static int start_server_index = -1;
+
+int PINT_cached_config_get_start_sever_index(void)
+{
+    return start_server_index;
+}
+
+void PINT_cached_config_set_start_server_index(int index)
+{
+    start_server_index = index;
+}
+
 int PINT_cached_config_get_server_list(
     PVFS_fs_id fs_id,
     PINT_dist *dist,
     int num_dfiles_req,
     PVFS_sys_layout *layout,
     const char ***server_names,
-    int *server_count)
+    int *server_count,
+    char *node_name)
 {
     int num_io_servers, ret, i;
     PVFS_BMI_addr_t *server_addrs;
@@ -1344,6 +1463,11 @@ int PINT_cached_config_get_server_list(
         gossip_err("Failed to get number of data servers\n");
         return ret;
     }
+
+    if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
+        num_io_servers = 1;
+    else if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+        num_io_servers = num_io_servers - 1;
 
     if(num_io_servers > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
@@ -1364,7 +1488,8 @@ int PINT_cached_config_get_server_list(
         &num_io_servers,
         layout,
         server_addrs,
-        NULL);
+        NULL,
+        node_name);
     if(ret != 0)
     {
         gossip_err("Failed to get IO server addrs from layout\n");

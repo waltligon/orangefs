@@ -1735,12 +1735,12 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(bmi_method_addr_p map)
      * Otherwise we leave it at ip address 
      */
     gossip_get_debug_mask(&debug_on, &mask);
-
+#if 0
     if(!debug_on || (!(mask & GOSSIP_ACCESS_HOSTNAMES)))
     {
         return(tcp_addr_data->peer);
     }
-
+#endif
     peerlen = sizeof(struct sockaddr_in);
 
     if(tcp_addr_data->peer_type == BMI_TCP_PEER_HOSTNAME)

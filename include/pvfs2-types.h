@@ -195,7 +195,12 @@ enum PVFS_sys_layout_algorithm
     PVFS_SYS_LAYOUT_RANDOM = 3,
 
     /* order the datafiles based on the list specified */
-    PVFS_SYS_LAYOUT_LIST = 4
+    PVFS_SYS_LAYOUT_LIST = 4,
+    PVFS_SYS_LAYOUT_LOCAL = 5,
+    PVFS_SYS_LAYOUT_LOCAL_RR = 6,  /* org file */
+    PVFS_SYS_LAYOUT_LOCAL_RR0 = 7, /* 1st replica */
+    PVFS_SYS_LAYOUT_LOCAL_RR1 = 8,  /* 2nd replica */
+    PVFS_SYS_LAYOUT_REMOTE_RR = 9 /* a single file with blocks from each copy */
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 

@@ -236,6 +236,11 @@ int PVFS_sys_fs_remove(
 int PVFS_sys_finalize(
     void);
 
+
+void PVFS_sys_set_local_hostname(char *name);
+char *PVFS_sys_get_local_hostname(void);
+
+
 /*
   NOTE: the following values are to be used by
   PVFS_sys(.*)_lookup as the "follow_link" argument.

@@ -84,7 +84,8 @@ int PINT_cached_config_map_servers(
     int *inout_num_datafiles,
     PVFS_sys_layout *layout,
     PVFS_BMI_addr_t *addr_array,
-    PVFS_handle_extent_array *handle_extent_array);
+    PVFS_handle_extent_array *handle_extent_array,
+    char *node_name);
 
 int PINT_cached_config_get_num_dfiles(
     PVFS_fs_id fsid,
@@ -130,7 +131,8 @@ int PINT_cached_config_get_server_list(
     int num_dfiles_req,
     PVFS_sys_layout *layout,
     const char ***server_names,
-    int *server_count);
+    int *server_count,
+    char *node_name);
 
 int PINT_cached_config_reinitialize(
     struct server_configuration_s *config);

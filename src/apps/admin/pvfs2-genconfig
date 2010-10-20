@@ -68,6 +68,8 @@ my $IO_ENDPOINT   = 0x2;
 my $OUT = undef;
 my $term = undef;
 
+my $opt_dist = '';
+
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 my $num_unexp_reqs = 50;
 
@@ -367,6 +369,16 @@ sub emit_filesystem
         print $target "\tFlowBuffersPerFlow $default_flow_buffer_count\n";
     }
 
+    if($opt_dist)
+    {
+        my @opt_dist_list = split(/:/, $opt_dist);
+        print $target "\t<Distribution>\n";
+        print $target "\t\tName $opt_dist_list[0]\n"; # simple_stripe
+        print $target "\t\tParam $opt_dist_list[1]\n"; # strip_size
+        print $target "\t\tValue $opt_dist_list[2]\n"; # 64MB?
+        print $target "\t</Distribution>\n";
+    }
+
     print $target "</Filesystem>\n";
 }
 
@@ -555,6 +567,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --flow-buffer-size <NUM>          set flowbuffersize in bytes            
      --flow-buffer-count <NUM>         set flow buffers per flow
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
+     --distribution <STRING>           file distribution
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
 
@@ -1408,7 +1421,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'metaspec=s'   => \$opt_metaspec, 
     'spec-usage!'  => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
-    '-'           => \$using_stdout)
+    '-'           => \$using_stdout,
+    'distribution=s' => \$opt_dist)
     or die "Could not parse arguments.  See -h for help.\n";
 
 if($opt_quiet)

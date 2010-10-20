@@ -214,6 +214,11 @@ PVFS_error PVFS_isys_create(
             case PVFS_SYS_LAYOUT_ROUND_ROBIN:
             case PVFS_SYS_LAYOUT_RANDOM:
             case PVFS_SYS_LAYOUT_LIST:
+            case PVFS_SYS_LAYOUT_LOCAL:
+            case PVFS_SYS_LAYOUT_LOCAL_RR:
+            case PVFS_SYS_LAYOUT_LOCAL_RR0:
+            case PVFS_SYS_LAYOUT_LOCAL_RR1:
+            case PVFS_SYS_LAYOUT_REMOTE_RR:
                 break;
             /* anything else is not */
             default:
@@ -407,6 +412,7 @@ static PINT_sm_action create_create_setup_msgpair(
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     int server_type;
+    char *myhn;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
                  "dspace_create_setup_msgpair\n");
@@ -417,6 +423,19 @@ static PINT_sm_action create_create_setup_msgpair(
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
+
+    if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL ||
+       sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL_RR ||
+       sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL_RR0 ||
+       sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL_RR1 ||
+       sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+    {
+        /* user requested file be placed locally */
+        /* first check that local client node is in metadata server list */
+        myhn = PVFS_sys_get_local_hostname();
+
+        PVFS_hint_add(&sm_p->hints, "first_node", sizeof(myhn), &myhn);
+    }
 
     ret = PINT_cached_config_get_next_meta(
         sm_p->object_ref.fs_id, &msg_p->svr_addr, &meta_handle_extent_array);
@@ -839,6 +858,8 @@ static PINT_sm_action create_parent_getattr_inspect(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+    if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL)
+        sm_p->u.create.num_data_files = 1;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
         sm_p->u.create.num_data_files, num_dfiles_requested);

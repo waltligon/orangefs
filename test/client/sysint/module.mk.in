@@ -15,6 +15,8 @@ TESTSRC += \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
 	$(DIR)/create-with-dist.c\
+	$(DIR)/create-local.c \
+	$(DIR)/create-local0.c \
 	$(DIR)/symlink.c\
 	$(DIR)/flush-1.c\
 	$(DIR)/flush-2.c\

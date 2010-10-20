@@ -38,6 +38,8 @@ PINT_event_id PINT_client_sys_event_id;
 
 int pint_client_pid;
 
+char *PVFS_client_my_hostname = NULL;
+
 typedef enum
 {
     CLIENT_NO_INIT         =      0,
@@ -312,7 +314,26 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     PINT_smcb_free(smcb);
 
+    if(PVFS_client_my_hostname)
+    {
+        free(PVFS_client_my_hostname);
+        PVFS_client_my_hostname = NULL;
+    }
     return ret;
+}
+
+void PVFS_sys_set_local_hostname(char *name)
+{
+    PVFS_client_my_hostname = strdup(name);
+}
+
+char *PVFS_sys_get_local_hostname(void)
+{
+    if(PVFS_client_my_hostname == NULL)
+    {
+        PVFS_client_my_hostname = PINT_util_guess_alias();
+    }
+    return PVFS_client_my_hostname;
 }
 
 /*
