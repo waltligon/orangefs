@@ -1,0 +1,8 @@
+ifdef BUILD_LIBJNI
+
+DIR := src/jni
+
+LIBJNISRC := \
+	$(DIR)/org_apache_hadoop_fs_pvfs2_PVFS2JNI.c
+endif
+
