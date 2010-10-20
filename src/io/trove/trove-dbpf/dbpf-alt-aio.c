@@ -122,10 +122,8 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
                 }
             }
 
-/*
             free(tmp_item);
             free(tids);
-*/
             errno = ret;
             return(-1);
         }
