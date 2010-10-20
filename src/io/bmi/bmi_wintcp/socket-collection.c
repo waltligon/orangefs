@@ -306,25 +306,22 @@ do_again:
         return(bmi_tcp_errno_to_pvfs(-old_errno));
     }
 
-    /* check our pipe if nothing else is ready */
-    if (ret == 0)
+    /* check our pipe */
+    if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
     {
-        if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
+        if (bytes)
         {
-            if (bytes)
-            {
-                char c;
-                DWORD count;
+            char c;
+            DWORD count;
 
-                pipe_notify = 1;
-                /* drain the pipe */
-                ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
-            }
+            pipe_notify = 1;
+            /* drain the pipe */
+            ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
         }
-        else
-        {
-            return(bmi_tcp_errno_to_pvfs(GetLastError()));
-        }
+    }
+    else
+    {
+        return(bmi_tcp_errno_to_pvfs(GetLastError()));
     }
     
     /* nothing ready, just return 

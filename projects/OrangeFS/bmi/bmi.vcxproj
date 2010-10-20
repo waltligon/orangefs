@@ -42,7 +42,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..;..\..\..\include;..\..\..\src\common\gen-locks;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\misc;..\..\..\src\common\quickhash;..\..\..\src\common\quicklist;..\..\..\src\common\windows</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;__STATIC_METHOD_BMI_TCP__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;__STATIC_METHOD_BMI_TCP__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
