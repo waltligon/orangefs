@@ -858,8 +858,10 @@ static PINT_sm_action create_parent_getattr_inspect(
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+    /*
     if(sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_LOCAL)
         sm_p->u.create.num_data_files = 1;
+    */
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Setting number of datafiles to %d [requested %d]\n", 
         sm_p->u.create.num_data_files, num_dfiles_requested);

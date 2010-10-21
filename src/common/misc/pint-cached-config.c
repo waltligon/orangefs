@@ -520,6 +520,7 @@ int PINT_cached_config_map_servers(
     int start_index = -1;
     int index;
     int random_attempts;
+    int found = 0;
 
     assert(inout_num_datafiles);
 
@@ -538,8 +539,10 @@ int PINT_cached_config_map_servers(
 
     server_list = cur_config_cache->fs->data_handle_ranges;
     num_io_servers = PINT_llist_count(server_list);
+    /*
     if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
         num_io_servers = 1;
+    */
 
     switch(layout->algorithm)
     {
@@ -578,7 +581,7 @@ int PINT_cached_config_map_servers(
             {
                 cur_mapping = PINT_llist_head(server_list);
                 assert(cur_mapping);
-                server_list = PINT_llist_next(server_list);
+                //server_list = PINT_llist_next(server_list);
 
                 index = 0; /* always = 0 */
 
@@ -587,6 +590,7 @@ int PINT_cached_config_map_servers(
                     ret = BMI_addr_lookup(
                         &addr_array[index],
                         cur_mapping->alias_mapping->bmi_address);
+                    found = 1;
                     if (ret)
                     {
                         return ret;
@@ -601,6 +605,19 @@ int PINT_cached_config_map_servers(
                         cur_mapping->handle_extent_array.extent_array;
                 }
             }
+            /* none is found, then select the 1st node and return it */
+            if (!found)
+            {
+                cur_mapping = PINT_llist_head(server_list);
+                assert(cur_mapping);
+                ret = BMI_addr_lookup(&addr_array[index], 
+                                      cur_mapping->alias_mapping->bmi_address);
+                if (ret)
+                {
+                    return ret;
+                }
+            }
+
             break;
         case PVFS_SYS_LAYOUT_LOCAL_RR:
         case PVFS_SYS_LAYOUT_LOCAL_RR0:
@@ -1464,10 +1481,13 @@ int PINT_cached_config_get_server_list(
         return ret;
     }
 
+    /* TODO: need to double-check it */
+    /* 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
         num_io_servers = 1;
     else if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
         num_io_servers = num_io_servers - 1;
+    */
 
     if(num_io_servers > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
