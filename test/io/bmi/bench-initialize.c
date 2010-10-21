@@ -6,7 +6,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -15,7 +17,9 @@
 #include "bmi.h"
 #include "bench-initialize.h"
 #include "bench-args.h"
+#ifndef WIN32
 #include <strings.h>
+#endif
 
 int bench_init(
     struct bench_options *opts,
@@ -107,6 +111,7 @@ int bench_init(
 						    *num_clients,
 						    *bmi_peer_array,
 						    local_proc_name);
+        printf("server error %d\n", ret);
     }
     else
     {
@@ -115,6 +120,7 @@ int bench_init(
 						    *bmi_peer_array,
 						    opts->method_name,
 						    *context);
+        printf("client error %d\n", ret);
     }
     if (ret < 0)
     {
@@ -239,7 +245,11 @@ int bench_initialize_mpi_params(
     MPI_Get_processor_name(local_proc_name, &proc_namelen);
 
     /* trim off all but hostname portion */
+#ifdef WIN32
+    trunc_point = strchr(local_proc_name, '.');
+#else
     trunc_point = index(local_proc_name, '.');
+#endif
     if (trunc_point)
     {
 	trunc_point[0] = '\0';
@@ -311,6 +321,8 @@ int bench_initialize_bmi_addresses_client(
     {
 	ret = MPI_Recv(server_name, 256, MPI_BYTE, i, 0, MPI_COMM_WORLD,
 		       &status_foo);
+        printf("MPI_Recv returns %s\n", server_name);
+
 	if (ret != MPI_SUCCESS)
 	{
 	    return (-1);
@@ -337,6 +349,7 @@ int bench_initialize_bmi_addresses_client(
 	    return (-1);
 	}
 	ret = BMI_addr_lookup(&server_array[i], bmi_server_name);
+        printf("BMI_addr_lookup returns %d\n", ret);
 	if (ret < 0)
 	{
 	    return (-1);
@@ -361,6 +374,7 @@ int bench_initialize_bmi_addresses_client(
 	}
 	if (ret < 0 || error_code != 0)
 	{
+            printf("ret = %d   error_code = %d\n", ret, error_code);
 	    return (-1);
 	}
     }

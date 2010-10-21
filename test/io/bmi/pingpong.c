@@ -71,7 +71,10 @@ struct options
         int  crc;
 };
 
-
+#ifdef WIN32
+/* performance counter frequency */
+LARGE_INTEGER freq;
+#endif
 /**************************************************************
  * Internal utility functions
  */
@@ -109,6 +112,11 @@ int main(int argc, char **argv)
         /* set debugging stuff */
         gossip_enable_stderr();
         gossip_set_debug_mask(0, GOSSIP_BMI_DEBUG_ALL);
+
+#ifdef WIN32
+        /* get performance counter frequency */
+        QueryPerformanceFrequency(&freq);
+#endif
 
         /* initialize local interface (default options) */
         if (opts->which == SERVER)
@@ -404,8 +412,13 @@ static int do_client(struct options *opts, bmi_context_id *context)
         int                     iterations      = 0;
         int                     msg_len         = 0;
         int                     run             = 0;
+#ifdef WIN32
+        LARGE_INTEGER           start;
+        LARGE_INTEGER           end;
+#else
         struct timeval          start;
         struct timeval          end;
+#endif
         double                  *val            = NULL;
         double                  lat             = 0.0;
         double                  min             = 99999.9;
@@ -544,7 +557,11 @@ static int do_client(struct options *opts, bmi_context_id *context)
 #else
                         offset = random() % (max_bytes - bytes - 1);
 #endif
+#ifdef WIN32
+                        QueryPerformanceCounter(&start);
+#else
                         gettimeofday(&start, NULL);
+#endif
 
 #ifdef HAVE_LIBZ
                         if(opts->crc)
@@ -620,13 +637,21 @@ static int do_client(struct options *opts, bmi_context_id *context)
                             }
                         }
 #endif
+#ifdef WIN32
+                        QueryPerformanceCounter(&end);
+#else
                         gettimeofday(&end, NULL);
+#endif
 
                         if (!warmup) {
+#ifdef WIN32
+                                val[i] = ((double) end.QuadPart - (double) start.QuadPart) / (double) freq.QuadPart;
+#else
                                 val[i] =  (double) end.tv_sec + 
                                           (double) end.tv_usec * 0.000001;
                                 val[i] -= (double) start.tv_sec + 
                                           (double) start.tv_usec * 0.000001;
+#endif
                                 lat += val[i];
                         }
                 }

@@ -6,10 +6,15 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <math.h>
+#ifndef WIN32
 #include <getopt.h>
+#endif
 #include "gossip.h"
 #include <mpi.h>
 #include "bmi.h"
@@ -20,8 +25,12 @@ int bench_args(
     int argc,
     char **argv)
 {
+#ifdef WIN32
+    int argi = 1;
+#else
     char flags[] = "L:pm:t:l:s:r";
     int one_opt = ' ';
+#endif
     int got_method = 0;
 
     int ret = -1;
@@ -35,6 +44,50 @@ int bench_args(
     user_opts->list_io_factor = 1;
 
     /* look at command line arguments */
+#ifdef WIN32
+    while (argi < argc)
+    {
+        ret = 1;
+        if (strcmp(argv[argi], "-s") == 0)
+        {
+            ret = sscanf(argv[++argi], "%d", &user_opts->num_servers);
+        }
+        else if (strcmp(argv[argi], "-l") == 0)
+        {
+            ret = sscanf(argv[++argi], "%d", &user_opts->message_len);
+        }
+        else if (strcmp(argv[argi], "-L") == 0)
+        {
+            ret = sscanf(argv[++argi], "%d", &user_opts->list_io_factor);
+        }
+        else if (strcmp(argv[argi], "-t") == 0)
+        {
+            ret = sscanf(argv[++argi], "%d", &user_opts->total_len);
+        }
+        else if (strcmp(argv[argi], "-m") == 0)
+        {
+            got_method = 1;
+            ret = sscanf(argv[++argi], "%s", user_opts->method_name);
+        }
+        else if (strcmp(argv[argi], "-p") == 0)
+        {
+            user_opts->flags |= BMI_ALLOCATE_MEMORY;
+        }
+        else if (strcmp(argv[argi], "-r") == 0)
+        {
+            user_opts->flags |= REUSE_BUFFERS;
+        }
+
+        if (ret < 1)
+        {
+            return -1;
+        }
+
+        argi++;
+    }
+    
+
+#else
     while ((one_opt = getopt(argc, argv, flags)) != EOF)
     {
 	switch (one_opt)
@@ -85,7 +138,7 @@ int bench_args(
 	    break;
 	}
     }
-
+#endif
     if (!got_method)
     {
 	printf("Must specify method!\n");
