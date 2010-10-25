@@ -204,6 +204,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         dup(filedes[1]);
         close(STDIN_FILENO);
 
+        *ptr++ = BINDIR"/pvfs2-gencred";
+
         if (user)
         {
             *ptr++ = "-u";
