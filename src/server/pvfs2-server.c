@@ -677,7 +677,7 @@ static int server_initialize_subsystems(
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
-    PVFS_fs_id orig_fsid;
+    PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
     int shm_key_hint;
@@ -873,10 +873,9 @@ static int server_initialize_subsystems(
             gossip_err("Error setting directio threads num\n");
         }
 
-        orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
             cur_fs->trove_method,
-            cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
+            cur_fs->file_system_name, &(orig_fsid), NULL, NULL);
 
         if (ret < 0)
         {
@@ -888,8 +887,8 @@ static int server_initialize_subsystems(
         if(orig_fsid != cur_fs->coll_id)
         {
             gossip_err("Error: configuration file does not match storage collection.\n");
-            gossip_err("   config file fs_id: %d\n", (int)orig_fsid);
-            gossip_err("   storage fs_id: %d\n", (int)cur_fs->coll_id);
+            gossip_err("   storage file fs_id: %d\n", (int)orig_fsid);
+            gossip_err("   config  file fs_id: %d\n", (int)cur_fs->coll_id);
             gossip_err("Warning: This most likely means that the configuration\n");
             gossip_err("   files have been regenerated without destroying and\n");
             gossip_err("   recreating the corresponding storage collection.\n");
