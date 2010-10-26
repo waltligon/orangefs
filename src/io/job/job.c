@@ -7,8 +7,10 @@
 /* this file contains a skeleton implementation of the job interface */
 
 #include <errno.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>

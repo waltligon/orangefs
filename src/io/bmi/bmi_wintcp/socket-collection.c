@@ -72,15 +72,17 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         free(tmp_scp);
         return NULL;
     }
-    /*if (pipe(tmp_scp->pipe_fd) < 0)*/
+    /* not used on Windows
+    if (pipe(tmp_scp->pipe_fd) < 0)
     if (!CreatePipe(&(tmp_scp->pipe_fd[0]), 
                     &(tmp_scp->pipe_fd[1]),
-                    NULL, 0))
+                    NULL, 128*1024))
     {
         perror("pipe failed:");
         BMI_socket_collection_finalize(tmp_scp);
         return NULL;
     }
+    */
 
     tmp_scp->array_max = POLLFD_ARRAY_START;    
     tmp_scp->array_count = 0;
@@ -190,18 +192,20 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     bmi_method_addr_p* tmp_addr_array = NULL;
     int ret = -1;
     int old_errno;
-    int tmp_count;
+    /* int tmp_count; */
     int i;
     int skip_flag;
     int out_flag;
-    int pipe_notify = 0;
-    struct timeval start, end;
+    /* int pipe_notify = 0; 
+    struct timeval start, end; */
     int allowed_poll_time = poll_timeout;
-    DWORD bytes;
+    /* DWORD bytes; */
 
+/*
     gettimeofday(&start, NULL);
 do_again:
-    pipe_notify = 0;
+*/
+    /* pipe_notify = 0; */
     /* init the outgoing arguments for safety */
     *outcount = 0;
     memset(maps, 0, (sizeof(bmi_method_addr_p) * incount));
@@ -307,6 +311,7 @@ do_again:
     }
 
     /* check our pipe */
+    /*
     if (PeekNamedPipe(scp->pipe_fd[0], NULL, 0, NULL, &bytes, NULL))
     {
         if (bytes)
@@ -316,14 +321,16 @@ do_again:
 
             pipe_notify = 1;
             /* drain the pipe */
-            ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
+    /*      ReadFile(scp->pipe_fd[0], &c, 1, &count, NULL);
+    
         }
     }
     else
     {
         return(bmi_tcp_errno_to_pvfs(GetLastError()));
     }
-    
+    */
+
     /* nothing ready, just return 
        -- there may actually be an error: see below */
     /*
@@ -437,6 +444,7 @@ do_again:
      * b) There was a pipe notification that our socket sets have changed
      * c) we havent exhausted our allotted time
      */
+    /*
     if (*outcount == 0 && pipe_notify == 1)
     {
         gettimeofday(&end, NULL);
@@ -445,6 +453,7 @@ do_again:
         if (allowed_poll_time > 0)
             goto do_again;
     }
+    */
 
     return (0);
 }

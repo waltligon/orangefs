@@ -111,7 +111,6 @@ int bench_init(
 						    *num_clients,
 						    *bmi_peer_array,
 						    local_proc_name);
-        printf("server error %d\n", ret);
     }
     else
     {
@@ -120,7 +119,6 @@ int bench_init(
 						    *bmi_peer_array,
 						    opts->method_name,
 						    *context);
-        printf("client error %d\n", ret);
     }
     if (ret < 0)
     {
@@ -177,7 +175,7 @@ int bench_initialize_bmi_interface(
 
     if (flags & BMI_INIT_SERVER)
     {
-	ret = BMI_initialize(NULL, NULL, 0);
+	ret = BMI_initialize(method, local_address, flags);
     }
     else
     {
@@ -321,7 +319,6 @@ int bench_initialize_bmi_addresses_client(
     {
 	ret = MPI_Recv(server_name, 256, MPI_BYTE, i, 0, MPI_COMM_WORLD,
 		       &status_foo);
-        printf("MPI_Recv returns %s\n", server_name);
 
 	if (ret != MPI_SUCCESS)
 	{
@@ -349,7 +346,6 @@ int bench_initialize_bmi_addresses_client(
 	    return (-1);
 	}
 	ret = BMI_addr_lookup(&server_array[i], bmi_server_name);
-        printf("BMI_addr_lookup returns %d\n", ret);
 	if (ret < 0)
 	{
 	    return (-1);
@@ -374,7 +370,6 @@ int bench_initialize_bmi_addresses_client(
 	}
 	if (ret < 0 || error_code != 0)
 	{
-            printf("ret = %d   error_code = %d\n", ret, error_code);
 	    return (-1);
 	}
     }

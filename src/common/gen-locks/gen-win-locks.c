@@ -9,7 +9,9 @@
  * compile time.
  */
 
+#ifndef _WIN64
 #define _USE_32BIT_TIME_T
+#endif
 
 #include <stdlib.h>
 #include <errno.h>
