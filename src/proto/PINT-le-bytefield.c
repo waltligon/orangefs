@@ -886,6 +886,22 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		    decode_free(req->u.setattr.attr.u.meta.dist);
 		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
 		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
+                if (req->u.setattr.attr.mask 
+                        & PVFS_ATTR_DIR_DISTDIR_ATTR) 
+                {
+                    if(req->u.setattr.attr.u.dir.dist_dir_bitmap)
+                    {
+                        decode_free
+                            (req->u.setattr.attr.u.dir.dist_dir_bitmap);
+                        req->u.setattr.attr.u.dir.dist_dir_bitmap = NULL;
+                    }
+                    if(req->u.setattr.attr.u.dir.dirdata_handles)
+                    {
+                        decode_free
+                            (req->u.setattr.attr.u.dir.dirdata_handles);
+                        req->u.setattr.attr.u.dir.dirdata_handles = NULL;
+                    }
+                }
 		break;
 
 	    case PVFS_SERV_TREE_REMOVE:
