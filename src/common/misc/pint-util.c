@@ -151,7 +151,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 sizeof(PVFS_dist_dir_bitmap_basetype);
             if (dist_dir_bitmap_size)
             {
-                if (dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+                if ((dest->mask & PVFS_ATTR_DIR_DISTDIR_ATTR) &&
+                    dest->u.dir.dist_dir_attr.num_servers > 0)
                 {
                     if (dest->u.dir.dist_dir_bitmap)
                     {
@@ -368,72 +369,60 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
-        if (attr->objtype == PVFS_TYPE_METAFILE)
+        if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            if (attr->mask & PVFS_ATTR_META_DFILES)
+            if (attr->u.meta.dfile_array)
             {
-                if (attr->u.meta.dfile_array)
-                {
-                    free(attr->u.meta.dfile_array);
-                    attr->u.meta.dfile_array = NULL;
-                }
-            }
-            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
-            {
-                if (attr->u.meta.mirror_dfile_array)
-                {
-                    free(attr->u.meta.mirror_dfile_array);
-                    attr->u.meta.mirror_dfile_array = NULL;
-                }
-            }
-            if (attr->mask & PVFS_ATTR_META_DIST)
-            {
-                if (attr->u.meta.dist)
-                {
-                    PINT_dist_free(attr->u.meta.dist);
-                    attr->u.meta.dist = NULL;
-                }
+                free(attr->u.meta.dfile_array);
+                attr->u.meta.dfile_array = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_SYMLINK)
+        if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
-            if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+            if (attr->u.meta.mirror_dfile_array)
             {
-                if ((attr->u.sym.target_path_len > 0) &&
+                free(attr->u.meta.mirror_dfile_array);
+                attr->u.meta.mirror_dfile_array = NULL;
+            }
+        }
+        if (attr->mask & PVFS_ATTR_META_DIST)
+        {
+            if (attr->u.meta.dist)
+            {
+                PINT_dist_free(attr->u.meta.dist);
+                attr->u.meta.dist = NULL;
+            }
+        }
+        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+        {
+            if ((attr->u.sym.target_path_len > 0) &&
                     attr->u.sym.target_path)
-                {
-                    free(attr->u.sym.target_path);
-                    attr->u.sym.target_path = NULL;
-                }
+            {
+                free(attr->u.sym.target_path);
+                attr->u.sym.target_path = NULL;
             }
         }
-        else if (attr->objtype == PVFS_TYPE_DIRECTORY)
+        if (attr->mask & PVFS_ATTR_DIR_HINT)
         {
-            if (attr->mask & PVFS_ATTR_DIR_HINT)
+            if (attr->u.dir.hint.dist_name)
             {
-                if (attr->u.dir.hint.dist_name)
-                {
-                    free(attr->u.dir.hint.dist_name);
-                    attr->u.dir.hint.dist_name = NULL;
-                }
-                if (attr->u.dir.hint.dist_params)
-                {
-                    free(attr->u.dir.hint.dist_params);
-                    attr->u.dir.hint.dist_params = NULL;
-                }
+                free(attr->u.dir.hint.dist_name);
+                attr->u.dir.hint.dist_name = NULL;
             }
-            if (attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+            if (attr->u.dir.hint.dist_params)
             {
-                if (attr->u.dir.dist_dir_bitmap)
-                {
-                    free(attr->u.dir.dist_dir_bitmap);
-                    attr->u.dir.dist_dir_bitmap = NULL;
-                }
-                if (attr->u.dir.dirdata_handles)
-                {
-                    free(attr->u.dir.dirdata_handles);
-                    attr->u.dir.dirdata_handles = NULL;
-                }
+                free(attr->u.dir.hint.dist_params);
+                attr->u.dir.hint.dist_params = NULL;
+            }
+            if (attr->u.dir.dist_dir_bitmap)
+            {
+                free(attr->u.dir.dist_dir_bitmap);
+                attr->u.dir.dist_dir_bitmap = NULL;
+            }
+            if (attr->u.dir.dirdata_handles)
+            {
+                free(attr->u.dir.dirdata_handles);
+                attr->u.dir.dirdata_handles = NULL;
             }
         }
     }

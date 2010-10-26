@@ -70,14 +70,6 @@ struct static_payload
     uint32_t dfile_count;
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
-    /*
-    PVFS_handle *dirent_handle;
-    uint32_t dirent_file_count;
-    */
-    /* distributed directory parameters */
-    PVFS_dist_dir_attr dist_dir_attr;
-    PVFS_dist_dir_bitmap dist_dir_bitmap;
-    PVFS_handle *dirdata_handles;
 };
   
 static struct PINT_tcache* acache = NULL;
@@ -456,59 +448,6 @@ int PINT_acache_get_cached_entry(
             }
             attr->u.meta.dist_size = tmp_static_payload->dist_size;
         }
-        if(tmp_static_payload->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
-        {
-            uint32_t tmp_i;
-            /* test if num_servers > 0 */
-
-            if(attr->u.dir.dist_dir_bitmap)
-            {
-                free(attr->u.dir.dist_dir_bitmap);
-                attr->u.dir.dist_dir_bitmap = NULL;
-            }
-            if(attr->u.dir.dirdata_handles)
-            {
-                free(attr->u.dir.dirdata_handles);
-                attr->u.dir.dirdata_handles = NULL;
-            }
-
-            if(tmp_static_payload->dist_dir_attr.num_servers == 0)
-            { /* no dirdata servers, for debug */
-                gen_mutex_unlock(&acache_mutex);
-                return(0); /* ??? not sure */
-            }
-
-            /* copy dist_dir_attr */
-            PINT_dist_dir_attr_copyto(attr->u.dir.dist_dir_attr,
-                tmp_static_payload->dist_dir_attr);
-
-            attr->u.dir.dist_dir_bitmap =
-                malloc(tmp_static_payload->dist_dir_attr.bitmap_size * 
-                        sizeof(PVFS_dist_dir_bitmap_basetype));
-            attr->u.dir.dirdata_handles =
-                malloc(tmp_static_payload->dist_dir_attr.num_servers *
-                        sizeof(PVFS_handle));
-            if (!attr->u.dir.dist_dir_bitmap || !attr->u.dir.dirdata_handles)
-            {
-                gen_mutex_unlock(&acache_mutex);
-                return(-PVFS_ENOMEM);
-            }
-            memcpy(attr->u.dir.dist_dir_bitmap,
-                   tmp_static_payload->dist_dir_bitmap,
-                   tmp_static_payload->dist_dir_attr.bitmap_size * 
-                   sizeof(PVFS_dist_dir_bitmap_basetype));
-            memcpy(attr->u.dir.dirdata_handles,
-                   tmp_static_payload->dirdata_handles,
-                   tmp_static_payload->dist_dir_attr.num_servers * 
-                   sizeof(PVFS_handle));
-
-/* !!! change later */
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): dirdata_count=%d\n", attr->u.dir.dist_dir_attr.num_servers);
-            for (tmp_i=0; tmp_i < attr->u.dir.dist_dir_attr.num_servers; tmp_i++)
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG, "                           dirdata_handle[%d]=%llu\n", tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
-            }
-        }
 
         *attr_status = 0;
     }
@@ -707,46 +646,6 @@ int PINT_acache_update(
             }
             tmp_static_payload->dist_size = attr->u.meta.dist_size;
         }
-        if(attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
-        {
-            uint32_t tmp_i;
-
-            if(attr->u.dir.dist_dir_attr.num_servers == 0)
-            { /* empty dist-dir structure, not going to store, only in development phase */
-                ret = -PVFS_ENOMEM; /* temporarily */
-                goto err;
-            }
-
-            /* change gossip format later */
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): dirdata_count=%d\n", 
-                    attr->u.dir.dist_dir_attr.num_servers);
-            for (tmp_i=0; tmp_i < attr->u.dir.dist_dir_attr.num_servers; tmp_i++)
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG, "                  dirdata_handle[%d]=%llu\n", tmp_i, llu(attr->u.dir.dirdata_handles[tmp_i]));
-            }
- 
-            PINT_dist_dir_attr_copyto(tmp_static_payload->dist_dir_attr, 
-                    attr->u.dir.dist_dir_attr);
-
-           tmp_static_payload->dist_dir_bitmap =
-                malloc(attr->u.dir.dist_dir_attr.bitmap_size * 
-                        sizeof(PVFS_dist_dir_bitmap_basetype));
-           tmp_static_payload->dirdata_handles =
-                malloc(attr->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
-           if (!tmp_static_payload->dirdata_handles ||
-               !tmp_static_payload->dist_dir_bitmap )
-           {
-                ret = -PVFS_ENOMEM;
-                goto err;
-           }
-           memcpy(tmp_static_payload->dirdata_handles,
-                 attr->u.dir.dirdata_handles,
-                 attr->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
-           memcpy(tmp_static_payload->dist_dir_bitmap,
-                 attr->u.dir.dist_dir_bitmap,
-                 attr->u.dir.dist_dir_attr.bitmap_size * 
-                 sizeof(PVFS_dist_dir_bitmap_basetype));
-        }
     }
 
     /* do we have size or other non-static fields? */
@@ -815,10 +714,6 @@ err:
             free(tmp_static_payload->dfile_array);
         if(tmp_static_payload->mirror_dfile_array)
             free(tmp_static_payload->mirror_dfile_array);
-        if(tmp_static_payload->dist_dir_bitmap)
-            free(tmp_static_payload->dist_dir_bitmap);
-        if(tmp_static_payload->dirdata_handles)
-            free(tmp_static_payload->dirdata_handles);
         if(tmp_static_payload->dist)
             PINT_dist_free(tmp_static_payload->dist);
         free(tmp_static_payload);
@@ -917,14 +812,6 @@ static int static_free_payload(void* payload)
     if(tmp_static_payload->mirror_dfile_array)
     {
         free(tmp_static_payload->mirror_dfile_array);
-    }
-    if(tmp_static_payload->dist_dir_bitmap)
-    {
-        free(tmp_static_payload->dist_dir_bitmap);
-    }
-    if(tmp_static_payload->dirdata_handles)
-    {
-        free(tmp_static_payload->dirdata_handles);
     }
     if(tmp_static_payload->dist)
     {

@@ -423,8 +423,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
 
     dirdata_server_index = 
         PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->u.mkdir.dist_dir_attr,
-            sm_p->u.mkdir.dist_dir_bitmap);
+            &sm_p->getattr.attr.u.dir.dist_dir_attr,
+            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: selecting bucket No.%d from dist_dir_bitmap.\n",
             dirdata_server_index);
 
@@ -435,7 +435,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
                  sm_p->u.mkdir.object_name,
                  llu(sm_p->u.mkdir.metafile_handle),
                  llu(sm_p->object_ref.handle),
-                 llu(sm_p->u.mkdir.dirdata_handles[dirdata_server_index]),
+                 llu(sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]),
                  dirdata_server_index);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
@@ -447,14 +447,14 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
-        sm_p->u.mkdir.dirdata_handles[dirdata_server_index],
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index],
         sm_p->object_ref.fs_id,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     /* send to dirdata server */
     msg_p->handle = 
-        sm_p->u.mkdir.dirdata_handles[dirdata_server_index];
+        sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index];
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_crdirent_comp_fn;
 
@@ -593,18 +593,6 @@ static PINT_sm_action mkdir_cleanup(
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
-    if(sm_p->u.mkdir.dist_dir_bitmap)
-    {
-        free(sm_p->u.mkdir.dist_dir_bitmap);
-        sm_p->u.mkdir.dist_dir_bitmap = NULL;
-    }
-
-    if(sm_p->u.mkdir.dirdata_handles)
-    {
-        free(sm_p->u.mkdir.dirdata_handles);
-        sm_p->u.mkdir.dirdata_handles = NULL;
-    }
-
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
 }
@@ -646,25 +634,6 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
         sm_p->u.mkdir.sys_attr.perms |= PVFS_G_SGID;
         /* note that permission checking is left to server even in this case */
     }
-
-    /* ??? necessary? can we use the sm_p->getattr.attr directly? */
-    PINT_dist_dir_attr_copyto(sm_p->u.mkdir.dist_dir_attr, attr->u.dir.dist_dir_attr);
-
-    sm_p->u.mkdir.dist_dir_bitmap = malloc(
-        sizeof(PVFS_dist_dir_bitmap_basetype) * attr->u.dir.dist_dir_attr.bitmap_size);
-    sm_p->u.mkdir.dirdata_handles = malloc(
-        sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
-    if (!sm_p->u.mkdir.dist_dir_bitmap || 
-            !sm_p->u.mkdir.dirdata_handles)
-    {
-        return -PVFS_ENOMEM;
-    }
-    memcpy(sm_p->u.mkdir.dist_dir_bitmap,
-            attr->u.dir.dist_dir_bitmap,
-            sizeof(PVFS_dist_dir_bitmap_basetype) * attr->u.dir.dist_dir_attr.bitmap_size);
-    memcpy(sm_p->u.mkdir.dirdata_handles,
-           attr->u.dir.dirdata_handles,
-           sizeof(*attr->u.dir.dirdata_handles) * attr->u.dir.dist_dir_attr.num_servers);
 
     /* Determine the number of dirent files. For now just assume we will use
      * all the metadata servers.

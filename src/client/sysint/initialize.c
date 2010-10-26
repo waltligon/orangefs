@@ -225,7 +225,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     ret = PINT_rcache_initialize();
     if (ret < 0)
     {
-        gossip_lerr("Error initializing name readdir cache\n");
+        gossip_lerr("Error initializing readdir cache\n");
         goto error_exit;        
     }        
     client_status_flag |= CLIENT_RCACHE_INIT;

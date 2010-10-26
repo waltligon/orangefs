@@ -999,10 +999,18 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(resp->u.getattr.attr.u.meta.dist);
                     if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
                        decode_free(resp->u.getattr.attr.u.meta.dfile_array);
-                    if (   resp->u.getattr.attr.mask 
+                    if (resp->u.getattr.attr.mask 
                          & PVFS_ATTR_META_MIRROR_DFILES ) 
                        decode_free
                         (resp->u.getattr.attr.u.meta.mirror_dfile_array);
+                    if (resp->u.getattr.attr.mask 
+                         & PVFS_ATTR_DIR_DISTDIR_ATTR) 
+                    {
+                       decode_free
+                        (resp->u.getattr.attr.u.dir.dist_dir_bitmap);
+                       decode_free
+                        (resp->u.getattr.attr.u.dir.dirdata_handles);
+                    }
                     break;
 
                 case PVFS_SERV_UNSTUFF:
