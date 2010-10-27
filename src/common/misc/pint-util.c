@@ -13,6 +13,14 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef WIN32
+#include <io.h>
+#include "wincommon.h"
+
+/* uid and gid types */
+typedef unsigned int uid_t, gid_t;
+
+#else
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
@@ -20,6 +28,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <sys/types.h>
+#endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
@@ -42,12 +51,31 @@ static int PINT_check_group(uid_t uid, gid_t gid);
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
+#ifdef WIN32
+    FILETIME creation, exit, system, user;
+    ULARGE_INTEGER li_system, li_user;
+#else
     struct rusage usage;
+#endif
 
     gettimeofday(&out_marker->wtime, NULL);
+#ifdef WIN32
+    GetProcessTimes(GetCurrentProcess(), &creation, &exit, &system, &user);
+    li_system.LowPart = system.dwLowDateTime;
+    li_system.HighPart = system.dwHighDateTime;
+    li_user.LowPart = user.dwLowDateTime;
+    li_user.HighPart = user.dwHighDateTime;
+
+    /* FILETIME is in 100-nanosecond increments */
+    out_marker->stime.tv_sec = li_system.QuadPart / 10000000;
+    out_marker->stime.tv_usec = (li_system.QuadPart % 10000000) / 10;
+    out_marker->utime.tv_sec = li_system.QuadPart / 10000000;
+    out_marker->utime.tv_usec = (li_system.QuadPart % 10000000) / 10;
+#else
     getrusage(RUSAGE_SELF, &usage);
     out_marker->utime = usage.ru_utime;
     out_marker->stime = usage.ru_stime;
+#endif
 }
 
 void PINT_time_diff(PINT_time_marker mark1, 
@@ -957,6 +985,107 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+#ifdef WIN32
+int PINT_statfs_lookup(const char *path, struct statfs *buf)
+{
+    char *abs_path, *root_path; 
+    int rc, start, index, slash_max, slash_count;
+    DWORD sect_per_cluster, bytes_per_sect, free_clusters, total_clusters;
+
+    if (path == NULL || buf == NULL) 
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    
+    /* allocate a buffer to get an absolute path */
+    abs_path = (char *) malloc(MAX_PATH + 1);
+    if (_fullpath(abs_path, path, MAX_PATH) == NULL)
+    {
+        free(abs_path);
+        errno = ENOENT;
+        return -1;
+    }
+
+    /* allocate buffer for root path */
+    root_path = (char *) malloc(strlen(abs_path) + 1);
+
+    /* parse out the root directory--it will be in
+       \\MyServer\MyFolder\ form or C:\ form */
+    if (abs_path[0] == '\\' && abs_path[1] == '\\')
+    {
+        start = 2;
+        slash_max = 2;
+    }
+    else 
+    {
+        start = 0;
+        slash_max = 1;
+    }
+
+    slash_count = 0;
+    index = start;
+
+    while (abs_path[index] && slash_count < slash_max)
+    {
+        if (abs_path[index++] == '\\')
+            slash_count++;
+    }
+
+    /* copy root path */
+    strncpy_s(root_path, strlen(abs_path)+1, abs_path, index);
+
+    rc = 0;
+    if (GetDiskFreeSpace(root_path, &sect_per_cluster, &bytes_per_sect,
+                          &free_clusters, &total_clusters))
+    {
+        buf->f_type = 0;  /* not used by PVFS */
+        buf->f_bsize = (uint64_t) sect_per_cluster * bytes_per_sect;
+        buf->f_bavail = buf->f_bfree = (uint64_t) free_clusters;
+        buf->f_blocks = (uint64_t) total_clusters;
+        buf->f_fsid = 0;  /* no meaningful definition on Windows */
+    }
+    else
+    {
+        errno = GetLastError();
+        rc = -1;
+    }
+
+    free(root_path);
+    free(abs_path);
+
+    return rc;
+
+}
+
+int PINT_statfs_fd_lookup(int fd, struct statfs *buf)
+{
+    HANDLE handle;
+    char *path;
+    int rc;
+
+    /* get handle from fd */
+    handle = (HANDLE) _get_osfhandle(fd);
+
+    /* get file path from handle */
+    path = (char *) malloc(MAX_PATH + 1);
+    /* Note: only available on Vista/WS2008 and later */
+    if (GetFinalPathNameByHandle(handle, path, MAX_PATH, 0) != 0)
+    {
+        free(path);
+        errno = GetLastError();
+        return -1;
+    }
+
+    rc = PINT_statfs_lookup(path, buf);
+
+    free(path);
+
+    return rc;
+
+}
+
+#endif
 /*
  * Local variables:
  *  c-indent-level: 4

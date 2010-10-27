@@ -9,7 +9,11 @@
 #ifndef __JOB_H
 #define __JOB_H
 
+#ifdef WIN32
+#include "wincommon.h"
+#else
 #include <inttypes.h>
+#endif
 
 #include "src/io/flow/flow.h"
 #include "bmi.h"
