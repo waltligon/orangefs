@@ -90,8 +90,16 @@ void dbpf_sync_context_destroy(int context_index)
                  context_index);	
     for(c=0; c < COALESCE_CONTEXT_LAST; c++)
     {
+        /* grab lock...should be the last one, since we are shutting down */
         gen_mutex_lock(&sync_array[c][context_index].mutex);
+      
+        /* we have to unlock the mutex before we can destroy it */
+        gen_mutex_unlock(&sync_array[c][context_index].mutex);
+
+        /* destroy the mutex */
         gen_mutex_destroy(&sync_array[c][context_index].mutex);
+
+        /* cleanup the op queue */
         dbpf_op_queue_cleanup(sync_array[c][context_index].sync_queue);
     }
 }
