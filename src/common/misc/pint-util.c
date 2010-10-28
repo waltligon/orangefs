@@ -464,7 +464,17 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     gettimeofday(&now, NULL);
     add.tv_sec = (microsecs / 1e6);
     add.tv_usec = (microsecs % 1000000);
+#ifdef WIN32
+    result.tv_sec = add.tv_sec + now.tv_sec;
+    result.tv_usec = add.tv_usec + now.tv_usec;
+    if (result.tv_usec >= 1000000)
+    {
+        result.tv_usec -= 1000000;
+        result.tv_sec++;
+    }
+#else
     timeradd(&now, &add, &result);
+#endif
     tv.tv_sec = result.tv_sec;
     tv.tv_nsec = result.tv_usec * 1e3;
     return tv;
@@ -476,8 +486,11 @@ void PINT_util_gen_credentials(
     assert(credentials);
 
     memset(credentials, 0, sizeof(PVFS_credentials));
+#ifndef WIN32
+    /* TODO */
     credentials->uid = geteuid();
     credentials->gid = getegid();
+#endif
 }
 
 inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)

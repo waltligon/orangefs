@@ -47,6 +47,10 @@
   #elif INTPTR_MIN == INT64_MIN
     #define PVFS2_SIZEOF_VOIDP 64
   #endif
+#elif defined(_WIN64)
+  #define PVFS2_SIZEOF_VOIDP 64
+#elif defined(WIN32)
+  #define PVFS2_SIZEOF_VOIDP 32
 #else
   #error "Unhandled size of void pointer"
 #endif
@@ -468,6 +472,9 @@ typedef struct
 /** Credentials (stubbed for future authentication methods). */
 typedef struct
 {
+#ifdef WIN32
+    /* TODO - store username string? */
+#endif
     PVFS_uid uid;
     PVFS_gid gid;
 } PVFS_credentials;

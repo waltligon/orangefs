@@ -9,8 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 
 #include "gossip.h"
 #include "quicklist.h"

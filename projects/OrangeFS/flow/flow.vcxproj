@@ -19,8 +19,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{C0F175D2-0285-4C14-8362-98CEBF0C306F}</ProjectGuid>
-    <RootNamespace>job</RootNamespace>
+    <ProjectGuid>{9B1C78DC-D1F2-4857-85D0-A649D9515B40}</ProjectGuid>
+    <RootNamespace>flow</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -66,8 +66,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\src\common\quicklist;..\..\..\src\common\windows;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\description;..\..\..\src\io\trove;..\..\..\src\common\misc;..\..\..\src\common\gossip;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\src\proto;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -77,6 +77,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\src\common\quicklist;..\..\..\src\common\windows;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\description;..\..\..\src\io\trove;..\..\..\src\common\misc;..\..\..\src\common\gossip;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\src\proto;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -89,8 +90,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\src\common\quicklist;..\..\..\src\common\windows;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\description;..\..\..\src\io\trove;..\..\..\src\common\misc;..\..\..\src\common\gossip;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\src\proto;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -104,6 +105,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>..\..\..\src\common\quicklist;..\..\..\src\common\windows;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\description;..\..\..\src\io\trove;..\..\..\src\common\misc;..\..\..\src\common\gossip;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\src\proto;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -112,16 +115,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\io\job\job-desc-queue.c" />
-    <ClCompile Include="..\..\..\src\io\job\job-time-mgr.c" />
-    <ClCompile Include="..\..\..\src\io\job\job.c" />
-    <ClCompile Include="..\..\..\src\io\job\thread-mgr.c" />
+    <ClCompile Include="..\..\..\src\io\flow\flow-ref.c" />
+    <ClCompile Include="..\..\..\src\io\flow\flow.c" />
+    <ClCompile Include="..\..\..\src\io\flow\flowproto-bmi-trove\flowproto-multiqueue.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\io\job\job-desc-queue.h" />
-    <ClInclude Include="..\..\..\src\io\job\job-time-mgr.h" />
-    <ClInclude Include="..\..\..\src\io\job\job.h" />
-    <ClInclude Include="..\..\..\src\io\job\thread-mgr.h" />
+    <ClInclude Include="..\..\..\src\io\flow\flow-ref.h" />
+    <ClInclude Include="..\..\..\src\io\flow\flow.h" />
+    <ClInclude Include="..\..\..\src\io\flow\flowproto-support.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

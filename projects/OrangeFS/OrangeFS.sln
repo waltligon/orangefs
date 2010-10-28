@@ -67,6 +67,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "job", "job\job.vcxproj", "{
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "misc", "misc\misc.vcxproj", "{7506190B-64BE-4D64-95A4-4C22D48E0994}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "flow", "flow\flow.vcxproj", "{9B1C78DC-D1F2-4857-85D0-A649D9515B40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -166,6 +168,13 @@ Global
 		{7506190B-64BE-4D64-95A4-4C22D48E0994}.Release|Win32.ActiveCfg = Release|Win32
 		{7506190B-64BE-4D64-95A4-4C22D48E0994}.Release|Win32.Build.0 = Release|Win32
 		{7506190B-64BE-4D64-95A4-4C22D48E0994}.Release|x64.ActiveCfg = Release|Win32
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Debug|Win32.Build.0 = Debug|Win32
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Debug|x64.ActiveCfg = Debug|x64
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Debug|x64.Build.0 = Debug|x64
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Release|Win32.ActiveCfg = Release|Win32
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Release|Win32.Build.0 = Release|Win32
+		{9B1C78DC-D1F2-4857-85D0-A649D9515B40}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

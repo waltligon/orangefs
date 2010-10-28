@@ -14,6 +14,13 @@
 
 #include "src/io/bmi/bmi-byteswap.h"
 #include <stdint.h>
+#ifdef WIN32
+typedef uint32_t u_int32_t;
+typedef uint64_t u_int64_t;
+
+/* typeof not available on Windows */
+#define typeof(t)   t
+#endif
 #include <assert.h>
 
 /*
