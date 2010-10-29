@@ -213,6 +213,15 @@ static PINT_dist_methods simple_stripe_methods = {
     params_string
 };
 
+#ifdef WIN32
+PINT_dist simple_stripe_dist = {
+    PVFS_DIST_SIMPLE_STRIPE_NAME,
+    roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE), /* name size */
+    roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
+    &simple_stripe_params,
+    &simple_stripe_methods
+};
+#else
 PINT_dist simple_stripe_dist = {
     .dist_name = PVFS_DIST_SIMPLE_STRIPE_NAME,
     .name_size = roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE), /* name size */
@@ -220,6 +229,7 @@ PINT_dist simple_stripe_dist = {
     .params = &simple_stripe_params,
     .methods = &simple_stripe_methods
 };
+#endif
 
 
 /*

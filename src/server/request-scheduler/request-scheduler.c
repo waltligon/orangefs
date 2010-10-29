@@ -25,7 +25,9 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <assert.h>
 
 #include "request-scheduler.h"

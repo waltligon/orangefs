@@ -547,6 +547,15 @@ static PINT_dist_methods twod_stripe_methods = {
     params_string
 };
 
+#ifdef WIN32
+PINT_dist twod_stripe_dist = {
+    PVFS_DIST_TWOD_STRIPE_NAME,
+    roundup8(PVFS_DIST_TWOD_STRIPE_NAME_SIZE), /* name size */
+    roundup8(sizeof(PVFS_twod_stripe_params)), /* param size */
+    &twod_stripe_params,
+    &twod_stripe_methods
+};
+#else
 PINT_dist twod_stripe_dist = {
     .dist_name = PVFS_DIST_TWOD_STRIPE_NAME,
     .name_size = roundup8(PVFS_DIST_TWOD_STRIPE_NAME_SIZE), /* name size */
@@ -554,6 +563,7 @@ PINT_dist twod_stripe_dist = {
     .params = &twod_stripe_params,
     .methods = &twod_stripe_methods
 };
+#endif
 
 /*
  * Local variables:
