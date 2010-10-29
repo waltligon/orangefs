@@ -267,7 +267,7 @@ int trove_migrate (TROVE_method_id method_id, const char* stoname)
     s = wtime();
 #endif
 
-    count          = 10;
+    count          = 1;
     pos            = TROVE_ITERATE_START;
     name.buffer    = malloc(PATH_MAX);
     name.buffer_sz = PATH_MAX;

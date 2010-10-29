@@ -1410,7 +1410,8 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
         if (sizeof(recno) < name_array[0].buffer_sz)
         {
             key.data = name_array[0].buffer;
-            key.size = key.ulen = name_array[0].buffer_sz;
+            key.size = sizeof(db_recno_t);
+            key.ulen = name_array[0].buffer_sz;
         }
         else
         {
