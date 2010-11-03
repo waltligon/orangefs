@@ -22,7 +22,11 @@
 
 static int needcomma = 1;
 
+#ifdef WIN32
+static void gen_state_decl(struct state *s, char *state_name);
+#else
 static void gen_state_decl(char *state_name);
+#endif
 static void gen_runfunc_decl(char *func_name);
 static void gen_state_start(char *state_name, char *machine_name);
 static void gen_state_action(
@@ -48,13 +52,23 @@ void gen_machine(char *machine_name)
     {
         if(s->action == ACTION_RUN || s->action == ACTION_PJMP)
             gen_runfunc_decl(s->function_or_machine);
+#ifdef WIN32
+        gen_state_decl(s, s->name);
+#else
         gen_state_decl(s->name);
+#endif
     }
 
     /* delcare the machine start point */
     fprintf(out_file, "\nstruct PINT_state_machine_s %s = {\n", machine_name);
+#ifdef WIN32
+    /* Windows (VC++) does not support field names in structs */
+    fprintf(out_file, "\t\"%s\",  /* name */\n", machine_name);
+    fprintf(out_file, "\t&ST_%s  /* first_state */\n", states->name);
+#else
     fprintf(out_file, "\t.name = \"%s\",\n", machine_name);
     fprintf(out_file, "\t.first_state = &ST_%s\n", states->name);
+#endif
     fprintf(out_file, "};\n\n");
 
     /* generate all output */
@@ -167,22 +181,53 @@ static void gen_runfunc_decl(char *func_name)
     }
 }
 
+#ifdef WIN32
+static void gen_state_decl(struct state *s, char *state_name)
+#else
 static void gen_state_decl(char *state_name)
+#endif
 {
+#ifdef WIN32
+    struct task *task;
+    struct transition *t;
+    int count;
+#endif
     fprintf(out_file, "static struct PINT_state_s ST_%s;\n", state_name);
+#ifdef WIN32
+    /* determine PJMP count for array declaration */
+    if (s->action == ACTION_PJMP)
+    {
+        for (task = s->task, count = 0; task; task = task->next, ++count) ;
+        fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[%d];\n", 
+                state_name, count);
+    }
+    /* determine transition count for array declaration */
+    for (t = s->transition, count = 0; t; t = t->next, ++count) ;
+    fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[%d];\n",
+            state_name, count);
+#else
     fprintf(out_file, "static struct PINT_pjmp_tbl_s ST_%s_pjtbl[];\n", 
             state_name);
     fprintf(out_file, "static struct PINT_tran_tbl_s ST_%s_trtbl[];\n",
             state_name);
+#endif
 }
 
 void gen_state_start(char *state_name, char *machine_name)
 {
+#ifdef WIN32
+    fprintf(out_file,
+            "static struct PINT_state_s ST_%s = {\n"
+            "\t \"%s\" ,  /* state_name */\n"
+            "\t &%s , /* parent_machine */\n",
+            state_name, state_name, machine_name);
+#else
     fprintf(out_file,
             "static struct PINT_state_s ST_%s = {\n"
             "\t .state_name = \"%s\" ,\n"
             "\t .parent_machine = &%s ,\n",
             state_name, state_name, machine_name);
+#endif
 }
 
 /** generates first two lines in the state machine (I think),
@@ -196,22 +241,44 @@ void gen_state_action(enum state_action action,
 {
     switch (action) {
 	case ACTION_RUN:
+#ifdef WIN32
+	    fprintf(out_file, "\t SM_RUN ,  /* flag */\n");
+            fprintf(out_file, "\t { %s } ,  /* action.func */\n", run_func);
+            fprintf(out_file,"\t NULL ,  /* pjtbl */\n");
+            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+#else
 	    fprintf(out_file, "\t .flag = SM_RUN ,\n");
             fprintf(out_file, "\t .action.func = %s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = NULL ,\n");
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+#endif
 	    break;
 	case ACTION_PJMP:
+#ifdef WIN32
+       	    fprintf(out_file, "\t SM_PJMP ,  /* flag */\n");
+            fprintf(out_file, "\t { &%s },  /* action.func */\n", run_func);
+            fprintf(out_file,"\t ST_%s_pjtbl ,  /* pjtbl */\n", state_name);
+            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+
+#else
 	    fprintf(out_file, "\t .flag = SM_PJMP ,\n");
             fprintf(out_file, "\t .action.func = &%s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = ST_%s_pjtbl ,\n", state_name);
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+#endif
 	    break;
 	case ACTION_JUMP:
+#ifdef WIN32
+       	    fprintf(out_file, "\t SM_JUMP ,  /* flag */\n");
+            fprintf(out_file, "\t { &%s }, /* action.nested */\n", run_func);
+            fprintf(out_file,"\t NULL ,  /* pjtbl */\n");
+            fprintf(out_file,"\t ST_%s_trtbl  /* trtbl */", state_name);
+#else
 	    fprintf(out_file, "\t .flag = SM_JUMP ,\n");
             fprintf(out_file, "\t .action.nested = &%s ,\n", run_func);
             fprintf(out_file,"\t .pjtbl = NULL ,\n");
             fprintf(out_file,"\t .trtbl = ST_%s_trtbl ", state_name);
+#endif
 	    break;
     }
     /* generate the end of the state struct with refs to jump tbls */
@@ -239,7 +306,11 @@ static void gen_return_code(char *return_code)
     {
         fprintf(out_file,",\n");
     }
+#ifdef WIN32
+    fprintf(out_file, "\t{ %s ", return_code);
+#else
     fprintf(out_file, "\t{ .return_value = %s ", return_code);
+#endif
     needcomma = 1;
 }
 
@@ -251,18 +322,39 @@ static void gen_next_state(enum transition_type type, char *new_state)
     }
     switch (type) {
 	case TRANS_PJMP:
+#ifdef WIN32
+            fprintf(out_file, "\t SM_NONE ,\n");  /* flag */
+            fprintf(out_file, "\n\t &%s }", new_state);
+#else
 	    fprintf(out_file, "\n\t .state_machine = &%s }", new_state);
+#endif
 	    break;
 	case TRANS_NEXT_STATE:
+#ifdef WIN32
+            fprintf(out_file, "\t SM_NONE ,\n");  /* flag */
+       	    fprintf(out_file, "\t &ST_%s }", new_state);
+#else
 	    fprintf(out_file, "\t .next_state = &ST_%s }", new_state);
+#endif
 	    break;
 	case TRANS_RETURN:
 	    terminate_path_flag = 1;
+#ifdef WIN32
+            fprintf(out_file, "\t SM_RETURN ,\n"); /* flag */
+            fprintf(out_file, "\t NULL }");  /* next_state/state_machine */
+
+#else
 	    fprintf(out_file, "\t .flag = SM_RETURN }");
+#endif
 	    break;
 	case TRANS_TERMINATE:
 	    terminate_path_flag = 1;
+#ifdef WIN32
+            fprintf(out_file, "\t SM_TERM ,\n"); /* flag */
+            fprintf(out_file, "\t NULL }");  /* next_state/state_machine */
+#else
 	    fprintf(out_file, "\n\t .flag = SM_TERM }");
+#endif
 	    break;
     }
     needcomma = 1;

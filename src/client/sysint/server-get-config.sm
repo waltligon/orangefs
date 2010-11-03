@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"

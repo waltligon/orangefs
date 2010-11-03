@@ -172,6 +172,10 @@ do {                                               \
 } while(0)
 #else /* ! __GNUC__ */
 
+extern int gossip_debug_on;
+extern int gossip_facility;
+extern uint64_t gossip_debug_mask;
+
 int __gossip_debug(
     uint64_t mask,
     char prefix,

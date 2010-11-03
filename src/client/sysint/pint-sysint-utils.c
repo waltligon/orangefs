@@ -4,7 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 #include "pvfs2-sysint.h"
