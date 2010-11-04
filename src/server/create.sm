@@ -260,15 +260,13 @@ static int check_stuffed(
     }
 
     /* file will not be stuffed; need to allocate all datafiles */
-    /*
+    s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
+    
     if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
         s_op->u.create.num_io_servers = 1;
     else if (layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
         s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req - 1;
-    else
-    */
-        s_op->u.create.num_io_servers = s_op->req->u.create.num_dfiles_req;
-    
+
     s_op->resp.u.create.datafile_handles = malloc(
         sizeof(*s_op->resp.u.create.datafile_handles) *
         s_op->u.create.num_io_servers);

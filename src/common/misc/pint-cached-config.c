@@ -539,10 +539,11 @@ int PINT_cached_config_map_servers(
 
     server_list = cur_config_cache->fs->data_handle_ranges;
     num_io_servers = PINT_llist_count(server_list);
-    /*
+
     if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
         num_io_servers = 1;
-    */
+    else if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
+        num_io_servers -= 1;
 
     switch(layout->algorithm)
     {
@@ -581,7 +582,7 @@ int PINT_cached_config_map_servers(
             {
                 cur_mapping = PINT_llist_head(server_list);
                 assert(cur_mapping);
-                //server_list = PINT_llist_next(server_list);
+                server_list = PINT_llist_next(server_list);
 
                 index = 0; /* always = 0 */
 
@@ -591,7 +592,7 @@ int PINT_cached_config_map_servers(
                         &addr_array[index],
                         cur_mapping->alias_mapping->bmi_address);
                     found = 1;
-                    if (ret)
+                    if (ret < 0)
                     {
                         return ret;
                     }
@@ -608,11 +609,12 @@ int PINT_cached_config_map_servers(
             /* none is found, then select the 1st node and return it */
             if (!found)
             {
+                server_list = cur_config_cache->fs->data_handle_ranges;
                 cur_mapping = PINT_llist_head(server_list);
                 assert(cur_mapping);
                 ret = BMI_addr_lookup(&addr_array[index], 
                                       cur_mapping->alias_mapping->bmi_address);
-                if (ret)
+                if (ret < 0)
                 {
                     return ret;
                 }
@@ -643,6 +645,9 @@ int PINT_cached_config_map_servers(
                     }
             }
             else if (layout->algorithm == PVFS_SYS_LAYOUT_NONE)
+                start_index = 0;
+            
+            if ((start_index == -1) && (layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR))
                 start_index = 0;
             /* fall through */
 
@@ -698,6 +703,8 @@ int PINT_cached_config_map_servers(
             goto next;
 
     remote_rr:
+            if(found == 0)
+                start_index = 1;
             for(i = 0; i < num_io_servers; ++i)
             {
                 cur_mapping = PINT_llist_head(server_list);
@@ -1481,13 +1488,11 @@ int PINT_cached_config_get_server_list(
         return ret;
     }
 
-    /* TODO: need to double-check it */
-    /* 
+    /* TODO: redundantly setting this? */
     if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL)
         num_io_servers = 1;
     else if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
-        num_io_servers = num_io_servers - 1;
-    */
+        num_io_servers -= 1;
 
     if(num_io_servers > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
