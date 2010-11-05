@@ -798,7 +798,7 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 # already in libs.
 $(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
 	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb-4.8 $(call modldflags,$<)
+	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
