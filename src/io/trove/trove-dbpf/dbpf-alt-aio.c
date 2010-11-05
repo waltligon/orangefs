@@ -48,7 +48,7 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
     for(i = 0; i < nent; ++i)
     {
 	int spawnmode= PTHREAD_CREATE_JOINABLE;
-        tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item)*nent);
+        tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item));
         if(!tmp_item)
         {
             return (-1);
