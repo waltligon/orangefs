@@ -66,7 +66,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -77,7 +77,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -90,7 +90,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -105,7 +105,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -116,6 +116,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\common\misc\pint-util.c" />
+    <ClCompile Include="..\..\..\src\common\misc\pvfs2-util.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\common\misc\pint-util.h" />

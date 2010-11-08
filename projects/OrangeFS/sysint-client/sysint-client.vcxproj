@@ -50,7 +50,7 @@
     </Link>
     <CustomBuild>
       <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
-      <Outputs>%(FileName).c</Outputs>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
       <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
     </CustomBuild>
   </ItemDefinitionGroup>
@@ -71,7 +71,7 @@
     </Link>
     <CustomBuild>
       <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
-      <Outputs>%(FileName).c</Outputs>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
       <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
     </CustomBuild>
   </ItemDefinitionGroup>
@@ -134,8 +134,6 @@
     <CustomBuild Include="..\..\..\src\client\sysint\client-job-timer.sm">
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(FileName).c</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FileName).c</Outputs>
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>

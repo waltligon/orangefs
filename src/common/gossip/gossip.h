@@ -176,6 +176,17 @@ extern int gossip_debug_on;
 extern int gossip_facility;
 extern uint64_t gossip_debug_mask;
 
+#define gossip_perf_log(format, ...)                     \
+do {                                                      \
+    if ((gossip_debug_on) &&                              \
+        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
+        (gossip_facility))                                \
+    {                                                     \
+        __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
+            format, __VA_ARGS__);                         \
+    }                                                     \
+} while(0)
+
 int __gossip_debug(
     uint64_t mask,
     char prefix,
