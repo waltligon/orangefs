@@ -535,6 +535,93 @@ int PINT_remove_base_dir(
     return ret;
 }
 
+#ifdef WIN32
+/* PINT_remove_dir_prefix()
+ * 
+ * Strips prefix directory out of the path, output includes beginning
+ * backslash
+ *
+ * path and prefix must start with \\path or X:\
+ *
+ * Parameters:
+ * pathname     - pointer to directory string (absolute)
+ * prefix       - pointer to prefix dir string (absolute)
+ * out_path     - pointer to output dir string
+ * max_out_len  - max length of out_base_dir buffer
+ *
+ * All incoming arguments must be valid and non-zero
+ *
+ * Returns 0 on success; -errno on failure
+ *
+ * Example inputs and outputs/return values:
+ *
+ * pathname: \\mnt\pvfs2\foo, prefix: \\mnt\pvfs2
+ *     out_path: \foo, returns 0
+ * pathname: \\mnt\pvfs2\foo, prefix: \\mnt\pvfs2\
+ *     out_path: \foo, returns 0
+ * pathname: \\mnt\pvfs2\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: \foo\bar, returns 0
+ * pathname: X:\mnt\pvfs2\foo\bar, prefix: X:\
+ *     out_path: \mnt\pvfs2\foo\bar, returns 0
+ *
+ * invalid pathname input examples:
+ * pathname: \\mnt\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_ENOENT
+ * pathname: \\mnt\pvfs2fake\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_ENOENT
+ * pathname: \\mnt\foo\bar, prefix: mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_EINVAL
+ * pathname: mnt\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_EINVAL
+ * out_max_len not large enough for buffer, returns -PVFS_ENAMETOOLONG
+ */
+int PINT_remove_dir_prefix(
+    const char *pathname,
+    const char *prefix,
+    char *out_path,
+    int out_max_len)
+{
+    int ret = -PVFS_EINVAL;
+    int valid, letter_flag = 0;
+    int prefix_len, pathname_len;
+    int cut_index;
+
+    if (!pathname || !prefix || strlen(pathname) < 2 || strlen(prefix) < 2 ||
+        !out_path || !out_max_len)
+    {
+        return ret;
+    }
+
+    /* make sure we are given absolute paths */
+    valid = pathname[0] >= 'A' && pathname[0] <= 'z' &&
+            pathname[1] == ':' &&
+            prefix[0] >= 'A' && prefix[0] <= 'z' &&
+            prefix[1] == ':';
+    letter_flag = valid;
+    if (!valid)
+    {
+        valid = strncmp(pathname, "\\\\", 2) &&
+                strncmp(prefix, "\\\\", 2);
+    }
+
+    if (!valid)
+    {
+        return ret;
+    }
+
+    prefix_len = strlen(prefix);
+    pathname_len = strlen(pathname);
+
+    /* account for trailing slashes on prefix */
+    while (prefix[prefix_len - 1] == '\\')
+    {
+        prefix_len--;
+    }
+
+    return 0;
+}
+
+#else
 /* PINT_remove_dir_prefix()
  *
  * Strips prefix directory out of the path, output includes beginning
@@ -656,6 +743,7 @@ int PINT_remove_dir_prefix(
 
     return (0);
 }
+#endif
 
 char *PINT_merge_handle_range_strs(char *range1, char *range2)
 {
