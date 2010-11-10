@@ -406,9 +406,9 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     /* 
      * Open specified file
      */
-    if(file_list[i])
+    if(file_list[0])
     {
-        PINT_fstab_open(mnt_fp, file_list[i]);
+        PINT_fstab_open(mnt_fp, file_list[0]);
         if (mnt_fp)
         {
             while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
@@ -423,7 +423,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
                 if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
                 {
-                    targetfile = file_list[i];
+                    targetfile = file_list[0];
                     tmp_mntent_count++;
                 }
 
@@ -1028,6 +1028,75 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
     return -PVFS_EINVAL;
 }
 
+/* basename()
+ * 
+ * Return the portion of a path after the last non-trailing slash 
+ */
+char *basename(char *path)
+{
+    int path_len;
+    char *last_slash;
+
+    if (path == NULL || path[0] == '\0')
+        return ".";
+
+    if (strcmp(path, "/") == 0 ||
+        strchr(path, '/') == NULL)
+        return path;
+
+    /* remove trailing slashes */
+    path_len = strlen(path);
+    while (path[path_len - 1] == '/')
+        path[--path_len] = '\0';
+
+    /* find last_slash */
+    last_slash = strrchr(path, '/');
+
+    /* return base */
+    if (last_slash)
+        return last_slash + 1;
+
+    return path;
+}
+
+/* dirname()
+ * 
+ * Return the portion of a path before the last non-trailing slash 
+ */
+char *dirname(char *path)
+{
+    int path_len;
+    char *last_slash;
+
+    if (path == NULL || path[0] == '\0' ||
+        strchr(path, '/') == NULL ||
+        strcmp(path, "..") == 0)
+        return ".";
+    
+    if (strcmp(path, "/") == 0)
+        return path;
+
+    /* remove trailing slashes */
+    path_len = strlen(path);
+    while (path[path_len - 1] == '/')
+        path[--path_len] = '\0';
+
+    /* find last_slash */
+    last_slash = strrchr(path, '/');
+
+    /* truncate string */
+    if (last_slash)
+    {
+        /* last slash is first character */
+        if (last_slash == path)        
+            last_slash[1] = '\0';
+        else
+            last_slash[0] = '\0';
+    }
+
+    return path;
+}
+
 /* PVFS_util_resolve()
  *
  * given a local path of a file that resides on a pvfs2 volume,
@@ -1087,7 +1156,7 @@ int PVFS_util_resolve(
                 return(-PVFS_ENOMEM);
             }
             /* find size of basename so we can reserve space for it */
-            /* note: basename() and dirname() modifiy args, thus the strcpy */
+            /* note: basename() and dirname() modify args, thus the strcpy */
             strcpy(parent_path, local_path);
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
@@ -1338,7 +1407,7 @@ static int parse_flowproto_string(
     }
 
     /* chop it off at any trailing comma */
-    comma = index(flow, ',');
+    comma = strchr(flow, ',');
     if (comma)
     {
         comma[0] = '\0';

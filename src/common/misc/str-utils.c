@@ -535,7 +535,8 @@ int PINT_remove_base_dir(
     return ret;
 }
 
-#ifdef WIN32
+#if 0
+/* Initial Windows version -- not yet sure about file path format */
 /* PINT_remove_dir_prefix()
  * 
  * Strips prefix directory out of the path, output includes beginning
@@ -561,7 +562,7 @@ int PINT_remove_base_dir(
  *     out_path: \foo, returns 0
  * pathname: \\mnt\pvfs2\foo\bar, prefix: \\mnt\pvfs2
  *     out_path: \foo\bar, returns 0
- * pathname: X:\mnt\pvfs2\foo\bar, prefix: X:\
+ * pathname: X:\mnt\pvfs2\foo\bar, prefix: X:\ (or X:)
  *     out_path: \mnt\pvfs2\foo\bar, returns 0
  *
  * invalid pathname input examples:
@@ -582,7 +583,7 @@ int PINT_remove_dir_prefix(
     int out_max_len)
 {
     int ret = -PVFS_EINVAL;
-    int valid, letter_flag = 0;
+    int valid;
     int prefix_len, pathname_len;
     int cut_index;
 
@@ -597,11 +598,10 @@ int PINT_remove_dir_prefix(
             pathname[1] == ':' &&
             prefix[0] >= 'A' && prefix[0] <= 'z' &&
             prefix[1] == ':';
-    letter_flag = valid;
     if (!valid)
     {
-        valid = strncmp(pathname, "\\\\", 2) &&
-                strncmp(prefix, "\\\\", 2);
+        valid = (strncmp(pathname, "\\\\", 2) == 0) &&
+                (strncmp(prefix, "\\\\", 2) == 0);
     }
 
     if (!valid)
@@ -612,16 +612,63 @@ int PINT_remove_dir_prefix(
     prefix_len = strlen(prefix);
     pathname_len = strlen(pathname);
 
-    /* account for trailing slashes on prefix */
+        /* account for trailing slashes on prefix */
     while (prefix[prefix_len - 1] == '\\')
     {
         prefix_len--;
     }
 
+    /* if prefix_len is now zero, then prefix must have been root
+     * directory; return copy of entire pathname
+     */
+    if (prefix_len == 0)
+    {
+        cut_index = 0;
+    }
+    else
+    {
+        /* make sure prefix would fit in pathname */
+        if (prefix_len > (pathname_len + 1))
+            return (-PVFS_ENOENT);
+    
+        if (strncmp(prefix, pathname, prefix_len) == 0)
+        {
+            /* apparent match; see if next element is a slash */
+            if ((pathname[prefix_len] != '\\') &&
+                (pathname[prefix_len] != '\0'))
+               return (-PVFS_ENOENT);
+
+            /* this was indeed a match */
+            /* in the case of no trailing slash cut_index will point to the end
+             * of "prefix" (NULL).   */
+            cut_index = prefix_len;
+        }
+        else 
+        {
+            return (-PVFS_ENOENT);
+        }
+    }
+
+    /* if we hit this point, then we were successful */
+
+    /* is the buffer large enough? */
+    if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
+        return (-PVFS_ENAMETOOLONG);
+
+    /* try to handle the case of no trailing slash */
+    if (pathname[cut_index] == '\0')
+    {
+        out_path[0] = '\\';
+        out_path[1] = '\0';
+    }
+    else
+        /* copy out appropriate part of pathname */
+        strcpy(out_path, &(pathname[cut_index]));
+
     return 0;
 }
 
-#else
+#endif
 /* PINT_remove_dir_prefix()
  *
  * Strips prefix directory out of the path, output includes beginning
@@ -743,7 +790,6 @@ int PINT_remove_dir_prefix(
 
     return (0);
 }
-#endif
 
 char *PINT_merge_handle_range_strs(char *range1, char *range2)
 {
