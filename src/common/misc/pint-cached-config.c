@@ -586,7 +586,7 @@ int PINT_cached_config_map_servers(
 
                 index = 0; /* always = 0 */
 
-                if(strstr(cur_mapping->alias_mapping->host_alias, node_name))
+                if(strcmp(node_name, cur_mapping->alias_mapping->host_alias) == 0)
                 {
                     ret = BMI_addr_lookup(
                         &addr_array[index],
@@ -632,8 +632,7 @@ int PINT_cached_config_map_servers(
                 layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
             {
                 for(i=0; i < cur_config_cache->io_server_count; i++)
-                    if(strstr(cur_config_cache->io_server_array[i].addr_string, 
-                              node_name))
+                    if(strcmp(node_name, cur_config_cache->io_server_array[i].addr_string) == 0)
                     {
                         if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR0 || layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
                             start_index = (i+1)%cur_config_cache->io_server_count;
@@ -717,7 +716,7 @@ int PINT_cached_config_map_servers(
                 else
                     index = ((i - start_index) + num_io_servers) % num_io_servers;
 
-                if(strstr(cur_mapping->alias_mapping->host_alias, node_name))
+                if(strcmp(node_name, cur_mapping->alias_mapping->host_alias) == 0)
                     continue;
 
                 ret = BMI_addr_lookup(
