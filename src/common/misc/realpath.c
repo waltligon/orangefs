@@ -30,7 +30,9 @@
 #ifndef PATH_MAX
 #define PATH_MAX 8192
 #endif
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -39,6 +41,34 @@
 
 #define MAX_READLINKS 32
 
+#ifdef WIN32
+/* PINT_realpath()
+ *
+ * canonicalizes path and places the result into resolved_path.  Includes
+ * cleaning of symbolic links, trailing slashes, and .. or . components.
+ * maxreslth is the maximum length allowed in resolved_path.
+ *
+ * returns 0 on success, -PVFS_error on failure.
+ */
+int PINT_realpath(
+    const char *path,
+    char *resolved_path,
+    int maxreslth)
+{
+    char *ret_path;
+
+    if (resolved_path == NULL || path == NULL)
+        return -PVFS_EINVAL;
+
+    /* just use CRT version for now */
+    ret_path = _fullpath(resolved_path, path, maxreslth);
+
+    if (ret_path == NULL)
+        return -PVFS_EINVAL;
+    
+    return 0;
+}
+#else
 /* PINT_realpath()
  *
  * canonicalizes path and places the result into resolved_path.  Includes
@@ -179,6 +209,7 @@ int PINT_realpath(
         free(buf);
     return ret;
 }
+#endif /* WIN32 */
 
 /*
  * Local variables:

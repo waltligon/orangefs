@@ -68,7 +68,11 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
          /* base frame will not be processed */
 
          gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"[SM Terminating Child]: my_frame:%p\n",my_frame);
+#ifdef WIN32
+         qlist_for_each_entry(f, &smcb->parent_smcb->frames, link, struct PINT_frame_s *)
+#else
          qlist_for_each_entry(f, &smcb->parent_smcb->frames, link)
+#endif
          {
              if(my_frame == f->frame)
              {

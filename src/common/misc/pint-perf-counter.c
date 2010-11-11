@@ -6,7 +6,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <time.h>
@@ -484,6 +486,9 @@ char* PINT_perf_generate_text(
     struct timeval tv;
     time_t tmp_time_t;
     struct tm tmp_tm;
+#ifdef WIN32
+    struct tm *ptmp_tm;
+#endif
     int ret;
 
     gen_mutex_lock(&pc->mutex);
@@ -517,7 +522,12 @@ char* PINT_perf_generate_text(
         if(pc->start_time_array_ms[i])
         {
             tmp_time_t = pc->start_time_array_ms[i]/1000;
+#ifdef WIN32
+            ptmp_tm = localtime(&tmp_time_t);
+            tmp_tm = *ptmp_tm;
+#else
             localtime_r(&tmp_time_t, &tmp_tm);
+#endif
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", 
@@ -549,7 +559,11 @@ char* PINT_perf_generate_text(
         if(pc->interval_array_ms[i])
         {
             tmp_time_t = pc->interval_array_ms[i]/1000;
+#ifdef WIN32
+            gmtime_s(&tmp_tm, &tmp_time_t);
+#else
             gmtime_r(&tmp_time_t, &tmp_tm);
+#endif
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", 
@@ -583,7 +597,11 @@ char* PINT_perf_generate_text(
         position += 25;
         for(j=0; j<pc->history_size; j++)
         {
+#ifdef WIN32
+            ret = _snprintf(position, 15, " %13Ld", lld(pc->value_matrix[i][j]));
+#else
             ret = snprintf(position, 15, " %13Ld", lld(pc->value_matrix[i][j]));
+#endif
             if(ret >= 15)
             {
                 sprintf(position, "%14.14s", "Overflow!");

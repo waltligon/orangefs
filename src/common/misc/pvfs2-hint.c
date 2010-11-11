@@ -12,12 +12,13 @@
 /* Size: 4 for sentinel at the end, 8 + string size for each element,
  * type + length*/
 int32_t PINT_hint_calc_size(const PVFS_hint * hint){
+    int count = 4;
+    PVFS_hint * act;
+
 #ifdef NO_PVFS_HINT_SUPPORT
     return 0;
 #endif
 
-    int count = 4;
-    PVFS_hint * act;
     for( act = (PVFS_hint *) hint ; act != NULL ; act = act->next_hint){
         if (hint_types[act->type].transfer_to_server){
             /* length + type + act. string + 8-byte alignment*/
