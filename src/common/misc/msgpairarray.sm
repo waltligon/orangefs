@@ -572,6 +572,17 @@ static PINT_sm_action msgpairarray_completion_fn(
              * completion function. -- RobR
              */
         }
+        else if( (msg_p->op_status != 0) && (resp_p == NULL) )
+        {
+            /* before we reference resp_p we need to catch the case where 
+             * PINT_serv_decode_resp didn't give us a struct. We error out
+             * the same without referencing resp_p */
+            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                         "%s: error code %d from PINT_serv_decode_resp, "
+                         "from server %d\n", __func__, msg_p->op_status, i);
+            js_p->error_code = msg_p->op_status;
+            break;
+        }
         else if (resp_p->status != 0)
         {
             /* no comp_fn specified and status non-zero */
