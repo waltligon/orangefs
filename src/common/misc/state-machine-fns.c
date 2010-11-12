@@ -69,7 +69,7 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
 
          gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"[SM Terminating Child]: my_frame:%p\n",my_frame);
 #ifdef WIN32
-         qlist_for_each_entry(f, &smcb->parent_smcb->frames, link, struct PINT_frame_s *)
+         qlist_for_each_entry(f, &smcb->parent_smcb->frames, link, struct PINT_frame_s)
 #else
          qlist_for_each_entry(f, &smcb->parent_smcb->frames, link)
 #endif
@@ -559,7 +559,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"PINT_smcb_free: smcb:%p\n",smcb);
 
+#ifdef WIN32
+    qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link, struct PINT_frame_s, struct PINT_frame_s)
+#else
     qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link)
+#endif
     {
         if (frame_entry->frame)
         {
@@ -799,7 +803,11 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      * the first one immediately completes it will mistakenly believe it is
      * the last one and signal the parent.
      */
+#ifdef WIN32
+    qlist_for_each_entry(f, &smcb->frames, link, struct PINT_frame_s)
+#else
     qlist_for_each_entry(f, &smcb->frames, link)
+#endif
     {
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)
@@ -815,8 +823,11 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      * complete before we leave this function.
      */
     *children_started = smcb->children_running;
-
+#ifdef WIN32
+    qlist_for_each_entry(f, &smcb->frames, link, struct PINT_frame_s)
+#else
     qlist_for_each_entry(f, &smcb->frames, link)
+#endif
     {
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)

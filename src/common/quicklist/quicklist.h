@@ -213,12 +213,19 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @head:	the head for your list.
  * @member:	the name of the list_struct within the struct.
  */
+#ifdef WIN32
+#define qlist_for_each_entry_safe(pos, n, head, member, pos_type, n_type) \
+    for (pos = qlist_entry((head)->next, pos_type, member),	\
+         n = qlist_entry(pos->member.next, pos_type, member);	\
+         &pos->member != (head); 					\
+         pos = n, n = qlist_entry(n->member.next, n_type, member))
+#else
 #define qlist_for_each_entry_safe(pos, n, head, member)			\
     for (pos = qlist_entry((head)->next, typeof(*pos), member),	\
          n = qlist_entry(pos->member.next, typeof(*pos), member);	\
          &pos->member != (head); 					\
          pos = n, n = qlist_entry(n->member.next, typeof(*n), member))
-
+#endif
 static inline int qlist_exists(struct qlist_head *list, struct qlist_head *qlink)
 {
     struct qlist_head *pos;

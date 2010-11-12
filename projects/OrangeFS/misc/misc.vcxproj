@@ -67,11 +67,22 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\common\id-generator;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\io\dev;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\src\server;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -91,13 +102,24 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <AdditionalIncludeDirectories>..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\job;..\..\..\src\common\gossip;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\common\id-generator;..\..\..\src\proto;..\..\..\src\io\trove;..\..\..\src\io\description;..\..\..\src\io\dev;..\..\..\src\common\windows;..\..\..\src\client\sysint;..\..\..\src\server;..\..\..\;..\..\..\include</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;__PVFS2_CLIENT__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -115,10 +137,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\src\common\dotconf\dotconf.c" />
+    <ClCompile Include="..\..\..\src\common\llist\llist.c" />
     <ClCompile Include="..\..\..\src\common\misc\digest.c" />
     <ClCompile Include="..\..\..\src\common\misc\extent-utils.c" />
-    <ClCompile Include="..\..\..\src\common\misc\mkspace.c" />
     <ClCompile Include="..\..\..\src\common\misc\mmap-ra-cache.c" />
+    <ClCompile Include="..\..\..\src\common\misc\msgpairarray.c" />
     <ClCompile Include="..\..\..\src\common\misc\pint-cached-config.c" />
     <ClCompile Include="..\..\..\src\common\misc\pint-eattr.c" />
     <ClCompile Include="..\..\..\src\common\misc\pint-hint.c" />
@@ -131,12 +155,16 @@
     <ClCompile Include="..\..\..\src\common\misc\server-config.c" />
     <ClCompile Include="..\..\..\src\common\misc\state-machine-fns.c" />
     <ClCompile Include="..\..\..\src\common\misc\tcache.c" />
+    <ClCompile Include="..\..\..\src\common\misc\void.c" />
     <ClCompile Include="..\..\..\src\common\misc\xattr-utils.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\common\dotconf\dotconf.h" />
+    <ClInclude Include="..\..\..\src\common\llist\llist.h" />
     <ClInclude Include="..\..\..\src\common\misc\extent-utils.h" />
     <ClInclude Include="..\..\..\src\common\misc\mkspace.h" />
     <ClInclude Include="..\..\..\src\common\misc\mmap-ra-cache.h" />
+    <ClInclude Include="..\..\..\src\common\misc\msgpairarray.h" />
     <ClInclude Include="..\..\..\src\common\misc\pint-cached-config.h" />
     <ClInclude Include="..\..\..\src\common\misc\pint-eattr.h" />
     <ClInclude Include="..\..\..\src\common\misc\pint-hint.h" />
@@ -153,8 +181,12 @@
     <ClInclude Include="..\..\..\src\common\misc\xattr-utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\..\src\common\misc\msgpairarray.sm" />
-    <None Include="..\..\..\src\common\misc\void.sm" />
+    <CustomBuild Include="..\..\..\src\common\misc\msgpairarray.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\common\misc\void.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

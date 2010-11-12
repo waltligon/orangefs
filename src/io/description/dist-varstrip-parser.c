@@ -71,7 +71,11 @@ static int strips_parse_elem(
     s_size = strtok(NULL, ";");
     if (s_size != NULL)
     {
+#ifdef WIN32
+        i_size = _atoi64(s_size);
+#else
         i_size = atoll(s_size);
+#endif
         if (i_size > 0)
         {
             if (strlen(s_size) > 1)

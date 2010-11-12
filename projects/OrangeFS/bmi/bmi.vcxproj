@@ -119,6 +119,7 @@
     <ClCompile Include="..\..\..\src\io\bmi\bmi.c" />
     <ClCompile Include="..\..\..\src\io\bmi\op-list.c" />
     <ClCompile Include="..\..\..\src\io\bmi\reference-list.c" />
+    <ClCompile Include="..\..\..\src\proto\endecode-funcs.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\io\bmi\bmi-byteswap.h" />
@@ -128,6 +129,7 @@
     <ClInclude Include="..\..\..\src\io\bmi\bmi.h" />
     <ClInclude Include="..\..\..\src\io\bmi\op-list.h" />
     <ClInclude Include="..\..\..\src\io\bmi\reference-list.h" />
+    <ClInclude Include="..\..\..\src\proto\endecode-funcs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

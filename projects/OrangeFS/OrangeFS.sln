@@ -112,6 +112,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-client", "test-client\
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proto", "proto\proto.vcxproj", "{2F406AB6-D010-4196-A523-FAE6F2B1585F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -258,6 +260,12 @@ Global
 		{59933D52-BFFA-404B-9613-B2474CB863E1}.Release|Win32.ActiveCfg = Release|Win32
 		{59933D52-BFFA-404B-9613-B2474CB863E1}.Release|Win32.Build.0 = Release|Win32
 		{59933D52-BFFA-404B-9613-B2474CB863E1}.Release|x64.ActiveCfg = Release|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|Win32.Build.0 = Debug|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Debug|x64.ActiveCfg = Debug|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|Win32.ActiveCfg = Release|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|Win32.Build.0 = Release|Win32
+		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

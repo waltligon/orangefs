@@ -1006,6 +1006,7 @@ struct PVFS_servreq_mirror
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servreq_mirror(pptr,x) do {      \
+   int i;                                            \
    encode_PVFS_handle(pptr,&(x)->src_handle);        \
    encode_PVFS_fs_id(pptr,&(x)->fs_id);              \
    encode_PINT_dist(pptr,&(x)->dist);                \
@@ -1014,7 +1015,6 @@ struct PVFS_servreq_mirror
    encode_uint32_t(pptr,&(x)->dst_count);            \
    encode_enum(pptr,&(x)->flow_type);                \
    encode_enum(pptr,&(x)->encoding);                 \
-   int i;                                            \
    for (i=0; i<(x)->dst_count; i++)                  \
    {                                                 \
        encode_PVFS_handle(pptr,&(x)->dst_handle[i]); \
@@ -1023,6 +1023,7 @@ struct PVFS_servreq_mirror
 } while (0)
 
 #define decode_PVFS_servreq_mirror(pptr,x) do {          \
+   int i;                                                \
    decode_PVFS_handle(pptr,&(x)->src_handle);            \
    decode_PVFS_fs_id(pptr,&(x)->fs_id);                  \
    decode_PINT_dist(pptr,&(x)->dist);                    \
@@ -1035,7 +1036,6 @@ struct PVFS_servreq_mirror
                                    sizeof(PVFS_handle)); \
    (x)->wcIndex = decode_malloc((x)->dst_count *         \
                                sizeof(uint32_t));        \
-   int i;                                                \
    for (i=0; i<(x)->dst_count; i++)                      \
    {                                                     \
        decode_PVFS_handle(pptr,&(x)->dst_handle[i]);     \
@@ -1062,10 +1062,10 @@ struct PVFS_servresp_mirror
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servresp_mirror(pptr,x) do {         \
+   int i;                                                \
    encode_PVFS_handle(pptr,&(x)->src_handle);            \
    encode_uint32_t(pptr,&(x)->src_server_nr);            \
    encode_uint32_t(pptr,&(x)->dst_count);                \
-   int i;                                                \
    for (i=0; i<(x)->dst_count; i++)                      \
    {                                                     \
        encode_uint32_t(pptr,&(x)->bytes_written[i]);     \
@@ -1074,6 +1074,7 @@ struct PVFS_servresp_mirror
 } while (0)
 
 #define decode_PVFS_servresp_mirror(pptr,x) do {            \
+  int i;                                                    \
   decode_PVFS_handle(pptr,&(x)->src_handle);                \
   decode_uint32_t(pptr,&(x)->src_server_nr);                \
   decode_uint32_t(pptr,&(x)->dst_count);                    \
@@ -1081,7 +1082,6 @@ struct PVFS_servresp_mirror
                                          sizeof(uint32_t)); \
   (x)->write_status_code = decode_malloc((x)->dst_count *   \
                                          sizeof(uint32_t)); \
-  int i;                                                    \
   for (i=0; i<(x)->dst_count; i++ )                         \
   {                                                         \
       decode_uint32_t(pptr,&(x)->bytes_written[i]);         \

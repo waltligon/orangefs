@@ -54,11 +54,18 @@
 #include <time.h>
 #include <sys/stat.h>
 
+#ifndef WIN32
 #include <dirent.h>
 #include <unistd.h>
+#endif
 
 #include <ctype.h>
 #include "./dotconf.h"
+
+#ifdef WIN32
+#define snprintf    _snprintf
+#define strcasecmp  stricmp
+#endif
 
 #ifndef MIN
 #define MIN(a,b) ((a)<(b)?(a):(b))
