@@ -278,7 +278,6 @@ static int print_dspaces(TROVE_coll_id coll_id,
 	if (ret != 1) return -1;
 
 	if (count > 0) {
-            printf("%s:value of count is %d.\n",__func__,count);
 	    int i;
 	    for (i = 0; i < count; i++) {
 		ret = print_dspace(coll_id, harray[i], trove_context);
