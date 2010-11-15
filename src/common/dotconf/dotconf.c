@@ -31,6 +31,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Windows support added by Sam Sampson <sampson@omnibond.com> */
+#ifdef WIN32
+#include <Windows.h>
+#endif
+
 /* Added by Stephen W. Boyer <sboyer@caldera.com>
  * for wildcard support in Include file paths
  */
@@ -871,7 +876,11 @@ configfile_t *PINT_dotconf_create(
     PINT_dotconf_register_options(new, options);
 
     if (new->flags & CASE_INSENSITIVE)
+#ifdef WIN32
+        new->cmp_func = strnicmp;
+#else
 	new->cmp_func = strncasecmp;
+#endif
     else
 	new->cmp_func = strncmp;
 
@@ -1137,9 +1146,16 @@ int PINT_dotconf_handle_question_mark(
     char *ext)
 {
     configfile_t *included;
+#ifdef WIN32
+    HANDLE dh, hfile;
+    WIN32_FIND_DATA find_data;
+#else
     DIR *dh = 0;
     struct dirent *dirptr = 0;
+#endif
     int i;
+
+    char d_name[CFG_MAX_FILENAME];
 
     char new_pre[CFG_MAX_FILENAME];
     char already_matched[CFG_MAX_FILENAME];
@@ -1159,15 +1175,30 @@ int PINT_dotconf_handle_question_mark(
 
     pre_len = strlen(pre);
 
+#ifdef WIN32
+    if ((dh = FindFirstFile(path, &find_data)) != INVALID_HANDLE_VALUE)
+#else
     if ((dh = opendir(path)) != NULL)
+#endif
     {
+#ifdef WIN32
+        do
+#else
 	while ((dirptr = readdir(dh)) != NULL)
-	{
-	    match_state = PINT_dotconf_question_mark_match(dirptr->d_name, pre, ext);
+#endif
+        {
+#ifdef WIN32
+            if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+                continue;
 
+            strcpy(d_name, find_data.cFileName);
+#else
+            strcpy(d_name, dirptr->d_name);
+#endif
+	    match_state = PINT_dotconf_question_mark_match(d_name, pre, ext);
 	    if (match_state >= 0)
 	    {
-		name_len = strlen(dirptr->d_name);
+		name_len = strlen(d_name);
 		new_path_len = strlen(path) + name_len + strlen(ext) + 1;
 
 		if (!alloced)
@@ -1196,9 +1227,8 @@ int PINT_dotconf_handle_question_mark(
 		}
 
 		if (match_state == 1)
-		{
-
-		    strncpy(new_pre, dirptr->d_name,
+		{                    
+		    strncpy(new_pre, d_name,
 			    (name_len > pre_len) ? (pre_len + 1) : pre_len);
 		    new_pre[(name_len > pre_len) ? (pre_len + 1) : pre_len] =
 			'\0';
@@ -1239,15 +1269,32 @@ int PINT_dotconf_handle_question_mark(
 
 		}
 
-		sprintf(new_path, "%s%s", path, dirptr->d_name);
+		sprintf(new_path, "%s%s", path, d_name);
 
+#ifdef WIN32
+                hfile = CreateFile(new_path,
+                                   GENERIC_READ,
+                                   FILE_SHARE_READ,
+                                   NULL,
+                                   OPEN_EXISTING,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+                if (hfile != INVALID_HANDLE_VALUE)
+                {
+                    CloseHandle(hfile);
+                }
+                else 
+#else
 		if (access(new_path, R_OK))
+#endif
 		{
 		    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 				    ERR_INCLUDE_ERROR,
 				    "Cannot open %s for inclusion.\n"
 				    "IncludePath is '%s'\n", new_path,
 				    cmd->configfile->includepath);
+                    free(new_path);
+
 		    return -1;
 		}
 
@@ -1270,8 +1317,13 @@ int PINT_dotconf_handle_question_mark(
 	    }
 
 	}
+#ifdef WIN32
+        while (FindNextFile(dh, &find_data));
 
+        FindClose(dh);
+#else
 	closedir(dh);
+#endif
 	free(new_path);
 
     }
@@ -1288,8 +1340,14 @@ int PINT_dotconf_handle_star(
     char *ext)
 {
     configfile_t *included;
+#ifdef WIN32
+    HANDLE dh, hfile;
+    WIN32_FIND_DATA find_data;
+#else
     DIR *dh = 0;
     struct dirent *dirptr = 0;
+#endif
+    char d_name[CFG_MAX_FILENAME];
 
     char new_pre[CFG_MAX_FILENAME];
     char new_ext[CFG_MAX_FILENAME];
@@ -1333,18 +1391,34 @@ int PINT_dotconf_handle_star(
     strncpy(new_ext, s_ext, t_ext_count);
     new_ext[t_ext_count] = '\0';
 
+#ifdef WIN32
+    if ((dh = FindFirstFile(path, &find_data)) != INVALID_HANDLE_VALUE)
+#else    
     if ((dh = opendir(path)) != NULL)
+#endif
     {
+#ifdef WIN32
+        do
+#else
 	while ((dirptr = readdir(dh)) != NULL)
+#endif
 	{
-	    sub_count = 0;
+#ifdef WIN32
+            if ((find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+                continue;
+
+            strcpy(d_name, find_data.cFileName);
+#else
+            strcpy(d_name, dirptr->d_name);
+#endif
+            sub_count = 0;
 	    t_ext_count = 0;
 
-	    match_state = PINT_dotconf_star_match(dirptr->d_name, pre, s_ext);
+	    match_state = PINT_dotconf_star_match(d_name, pre, s_ext);
 
 	    if (match_state >= 0)
 	    {
-		name_len = strlen(dirptr->d_name);
+		name_len = strlen(d_name);
 		new_path_len = strlen(path) + name_len + strlen(s_ext) + 1;
 
 		if (!alloced)
@@ -1376,12 +1450,12 @@ int PINT_dotconf_handle_star(
 		{
 
 		    if ((sub =
-			 strstr((dirptr->d_name + pre_len), new_ext)) == NULL)
+			 strstr((d_name + pre_len), new_ext)) == NULL)
 		    {
 			continue;
 		    }
 
-		    while (sub != dirptr->d_name)
+		    while (sub != d_name)
 		    {
 			sub--;
 			sub_count++;
@@ -1392,7 +1466,7 @@ int PINT_dotconf_handle_star(
 			continue;
 		    }
 
-		    strncpy(new_pre, dirptr->d_name, (sub_count + t_ext_count));
+		    strncpy(new_pre, d_name, (sub_count + t_ext_count));
 		    new_pre[sub_count + t_ext_count] = '\0';
 		    strcat(new_pre, new_ext);
 
@@ -1432,15 +1506,32 @@ int PINT_dotconf_handle_star(
 
 		}
 
-		sprintf(new_path, "%s%s", path, dirptr->d_name);
+		sprintf(new_path, "%s%s", path, d_name);
 
+#ifdef WIN32
+                hfile = CreateFile(new_path,
+                                   GENERIC_READ,
+                                   FILE_SHARE_READ,
+                                   NULL,
+                                   OPEN_EXISTING,
+                                   FILE_ATTRIBUTE_NORMAL,
+                                   NULL);
+                if (hfile != INVALID_HANDLE_VALUE)
+                {
+                    CloseHandle(hfile);
+                }
+                else 
+#else
 		if (access(new_path, R_OK))
+#endif
 		{
 		    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 				    ERR_INCLUDE_ERROR,
 				    "Cannot open %s for inclusion.\n"
 				    "IncludePath is '%s'\n", new_path,
 				    cmd->configfile->includepath);
+                    free(new_path);
+
 		    return -1;
 		}
 
@@ -1459,8 +1550,13 @@ int PINT_dotconf_handle_star(
 	    }
 
 	}
+#ifdef WIN32
+        while (FindNextFile(dh, &find_data));
 
+        FindClose(dh);
+#else
 	closedir(dh);
+#endif
 	free(new_path);
 
     }
@@ -1473,6 +1569,10 @@ DOTCONF_CB(dotconf_cb_include)
 {
     char *filename = 0;
     configfile_t *included;
+
+#ifdef WIN32
+    HANDLE hfile;
+#endif
 
     char wild_card;
     char *path = 0;
@@ -1526,8 +1626,22 @@ DOTCONF_CB(dotconf_cb_include)
 	free(filename);
 	return NULL;
     }
-
+#ifdef WIN32
+    hfile = CreateFile(filename,
+                       GENERIC_READ,
+                       FILE_SHARE_READ,
+                       NULL,
+                       OPEN_EXISTING,
+                       FILE_ATTRIBUTE_NORMAL,
+                       NULL);
+    if (hfile != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(hfile);
+    }
+    else 
+#else
     if (access(filename, R_OK))
+#endif
     {
 	PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
 			"Cannot open %s for inclusion.\n"

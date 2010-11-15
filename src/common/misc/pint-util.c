@@ -493,7 +493,12 @@ void PINT_util_gen_credentials(
 #endif
 }
 
-inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
+/* Windows - inline functions can't be exported to other libraries */
+
+#ifndef WIN32
+inline
+#endif
+void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
 
@@ -502,21 +507,29 @@ inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 }
 
 /* determines how much protocol space a BMI_addr_t encoding will consume */
-inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
+#ifndef WIN32
+inline
+#endif
+int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
     addr_str = BMI_addr_rev_lookup(*x);
     return(encode_string_size_check(&addr_str));
 }
-
-inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
+#ifndef WIN32
+inline
+#endif
+void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
     BMI_addr_lookup(x, addr_string);
 }
 
-inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
+#ifndef WIN32
+inline
+#endif
+void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
 {
     int tmp_size;
     int i;
@@ -551,7 +564,10 @@ inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *
     }
 }
 
-inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
+#ifndef WIN32
+inline
+#endif
+void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
 {
     int i;
 

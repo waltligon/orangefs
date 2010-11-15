@@ -852,5 +852,8 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
     }                                                                         \
 };
 
+#ifdef WIN32
+#endif
+
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 
