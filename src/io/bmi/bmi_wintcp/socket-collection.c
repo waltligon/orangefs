@@ -302,8 +302,16 @@ do_again:
 
     } while(ret == 0 && allowed_poll_time > 0);    
     */
-    ret = WSAPoll(scp->pollfd_array, scp->array_count, allowed_poll_time);
-    old_errno = WSAGetLastError();
+    /* ignore the request if no sockets are available */
+    if (scp->array_count > 0)
+    {
+        ret = WSAPoll(scp->pollfd_array, scp->array_count, allowed_poll_time);
+        old_errno = WSAGetLastError();
+    }
+    else
+    {
+        ret = old_errno = 0;
+    }
 
     if(ret < 0)
     {

@@ -4013,13 +4013,21 @@ static int cache_config_files(
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
+#ifdef WIN32
+    char working_dir[MAX_PATH+1];
+#else
     char *working_dir = NULL;
+#endif
     char *my_global_fn = NULL;
     char buf[512] = {0};
 
     assert(config_s);
 
+#ifdef WIN32
+    GetCurrentDirectory(MAX_PATH+1, working_dir);
+#else
     working_dir = getenv("PWD");
+#endif
 
     /* pick some filenames if not provided */
     my_global_fn = ((global_config_filename != NULL) ?
@@ -4048,7 +4056,7 @@ open_global_config:
     {
         assert(working_dir);
 #ifdef WIN32
-        _snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
+        _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
 #else
         snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
 #endif

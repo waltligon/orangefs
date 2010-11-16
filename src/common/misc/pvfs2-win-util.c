@@ -436,10 +436,13 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     if (!targetfile)
     {
         gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
-        gossip_err("Error: tried the following tabfiles:\n");
-        for (i = 0; i < file_count; i++)
+        if (file_list[0])
         {
-            gossip_err("       %s\n", file_list[i]);
+            gossip_err("Error: tabfile: %s\n", file_list[0]);
+        }
+        else
+        {
+            gossip_err("Error: no tabfile specified\n");
         }
         gen_mutex_unlock(&s_stat_tab_mutex);
         return (NULL);
