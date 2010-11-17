@@ -64,8 +64,13 @@ PINT_llist *PINT_create_extent_list(char *extent_str)
  */
 int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 {
+    /*
     return ((handle > ext->first-1) &&
-            (handle < ext->last+1));
+            (handle < ext->last+1)); 
+    */
+    /* ext->last may be max, 2^64 - 1 */
+    return ((handle >= ext->first) &&
+            (handle <= ext->last));
 }
 
 /* PINT_handle_in_extent_array()
