@@ -209,6 +209,9 @@ static int server_parse_config(
     assert(!fs_config_buf[fs_config_buf_size - 1]);
 
     rc = WriteFile(hFile, fs_config_buf, fs_config_buf_size - 1, &bytes, NULL);
+    
+    CloseHandle(hFile);
+    
     if (rc && (bytes == fs_config_buf_size - 1))
     {
         ret = PINT_parse_config(config, temp_file, NULL);
@@ -217,9 +220,7 @@ static int server_parse_config(
     {
         gossip_err("Failed to write fs.conf buffer to temp file: %s: %d\n",
                    temp_file, GetLastError());
-    }
-
-    CloseHandle(hFile);
+    }    
 
     DeleteFile(temp_file);
 

@@ -48,7 +48,8 @@ int main(
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
-    int pvfs_dirent_incount;
+    int pvfs_dirent_incount,
+        pvfs_dirent_outcount;
 
     PVFS_handle lk_handle;
     PVFS_handle lk_fsid;
@@ -479,22 +480,28 @@ int main(
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;
 
-    // call readdir 
-    ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
+    do
+    {
+        // call readdir 
+        ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
 			   &credentials, resp_readdir, NULL);
-    if (ret < 0)
-    {
-	printf("readdir failed with errcode = %d\n", ret);
-	return (-1);
-    }
+        if (ret < 0)
+        {
+	    printf("readdir failed with errcode = %d\n", ret);
+	    return (-1);
+        }
 
-    // print the handle 
-    printf("--readdir--\n");
-    printf("Token:%ld\n", (long int) resp_readdir->token);
-    for (i = 0; i < resp_readdir->pvfs_dirent_outcount; i++)
-    {
-	printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
-    }
+        // print the handle 
+        printf("--readdir--\n");
+        printf("Token:%ld\n", (long int) resp_readdir->token);
+        for (i = 0; i < resp_readdir->pvfs_dirent_outcount; i++)
+        {
+	    printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
+        }
+        token = resp_readdir->token;
+        pvfs_dirent_outcount = resp_readdir->pvfs_dirent_outcount;
+    } 
+    while (pvfs_dirent_outcount == 6);
 #if 0
 
     // test the rmdir function 
@@ -593,6 +600,7 @@ void gen_rand_str(
     int newchar = 0;
     gettimeofday(&poop, NULL);
 
+    srand(poop.tv_sec);
     *gen_str = malloc(len + 1);
     for (i = 0; i < len; i++)
     {
