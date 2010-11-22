@@ -10,7 +10,7 @@
 # you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
-export EXTRA_TESTS=/tmp/${USER}/benchmarks
+export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
 #export EXTRA_TESTS=/tmp/src/benchmarks
 export URL=http://devorange.clemson.edu/pvfs
 export BENCHMARKS=benchmarks-20060512.tar.gz
@@ -47,7 +47,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-#VFS_HOSTS="devorange2 jeffrey"
+VFS_HOSTS="devorange2 jeffrey"
 
 #
 # Detect basic heap corruption
@@ -62,19 +62,14 @@ pull_and_build_pvfs2 () {
 
 	mkdir -p $PVFS2_DEST
 	with_kernel=""
-        with_security=""
 	if  [ $do_vfs -eq 1 ] ; then
 		with_kernel="-k /lib/modules/`uname -r`/build"
 	fi
-        if [ $do_security -eq 1 ] ; then
-            with_security="-s"
-        fi
-
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
 	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -t -v $1 \
-		$with_kernel $with_security -r $PVFS2_DEST
+		$with_kernel -r $PVFS2_DEST
 	
 }
 
@@ -117,7 +112,7 @@ setup_vfs() {
 #		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
-        sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client  -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log --keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/pvfs2credkey.pri
+        sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client  -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
@@ -130,53 +125,11 @@ setup_pvfs2() {
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
-		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log \
-                --keystore=${PVFS2_DEST}/_ALIAS_.keystore.out \
-                --serverkey=${PVFS2_DEST}/_ALIAS_.serverkey.pem \
-                --quiet
+		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
 	# clean up any artifacts from earlier runs
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* $failure_logs"
-
-        # if do_security requires a bunch of private keys
-        if [ ${do_security} -eq 1 ]
-        then
-            # per alias private key
-            for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`
-            do
-                openssl genrsa -out ${PVFS2_DEST}/${alias}.serverkey.pem \
-                    2048 >/dev/null 2>&1
-                pub=`openssl rsa -in ${PVFS2_DEST}/${alias}.serverkey.pem \
-                     -pubout`
-                echo $pub >> ${PVFS2_DEST}/${alias}.keystore.out
-            done
-
-            mkdir -p INSTALL-pvfs2-${CVS_TAG}/etc/
-            # a single client key (since the clients are on this host)
-            # create a single client key that VFS and lib will use
-            openssl genrsa -out INSTALL-pvfs2-${CVS_TAG}/etc/pvfs2credkey.pri \
-                1024 >/dev/null 2>&1
-            pub_client=`openssl rsa -in \
-                INSTALL-pvfs2-${CVS_TAG}/etc/pvfs2credkey.pri -pubout`
-
-            # yes, there must be a better way to do this
-	    for alias_k in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`
-            do
-	        for alias_p in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`
-                do
-                    if [ "$alias_k" != "$alias_p" ]
-                    then
-                        pub=`openssl rsa -in \
-                            ${PVFS2_DEST}/${alias_p}.serverkey.pem -pubout`
-                        echo $pub >> ${PVFS2_DEST}/${alias_k}.keystore.out
-                    fi
-                done
-
-                echo $pub_client >> ${PVFS2_DEST}/${alias_k}.keystore.out
-            done
-        fi
-
 	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${alias}.pid \
@@ -290,21 +243,19 @@ run_one() {
 # show that we're doing something
 ${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 
-# will we be able to do VFS-related tests? Don't do it based on hostname
+# will we be able to do VFS-related tests?
 do_vfs=0
-#for s in $(echo $VFS_HOSTS); do
-#	if [ `hostname -s` = $s ] ; then
-#		do_vfs=1
-#		break
-#	fi
-#done
-
-do_security=1
+for s in $(echo $VFS_HOSTS); do
+	if [ `hostname -s` = $s ] ; then
+		do_vfs=1
+		break
+	fi
+done
 
 # "install" benchmark software, if EXTRA_TESTS is not null
 if [ $EXTRA_TESTS ] 
 then
-   echo "Installing benchmark software to ${EXTRA_TESTS}...."
+   echo "Installing benchmark software...."
    my_cwd=`pwd`
 
    #create directory, if not already there
@@ -317,7 +268,7 @@ then
 
    #remove existing tar file and/or subdirectories
    cd $EXTRA_TESTS/..
-   #sudo /bin/rm -rf *
+   sudo /bin/rm -rf *
 
    #get new tar file
    wget ${URL}/${BENCHMARKS}

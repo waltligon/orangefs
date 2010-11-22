@@ -509,9 +509,12 @@ static int issue_or_delay_io_operation(
             dbpf_open_cache_put(&cur_op->op.u.b_rw_list.open_ref);
             return -trove_errno_to_trove_error(errno);
         }
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %llu, ret %d)\n", __func__, cur_op,
-                     llu(cur_op->op.handle), ret);
+        if ( cur_op )
+        {
+           gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
+                        "(handle %llu, ret %d)\n", __func__, cur_op,
+                        llu(cur_op->op.handle), ret);
+        }
     }
     return 0;
 }

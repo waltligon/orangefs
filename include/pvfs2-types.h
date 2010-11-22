@@ -355,6 +355,11 @@ do {                                                \
 
 #endif
 
+#define ALL_FS_META_HINT_FLAGS \
+   (PVFS_IMMUTABLE_FL |        \
+    PVFS_APPEND_FL    |        \
+    PVFS_NOATIME_FL )
+
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */
 /* a Key/Value pair.  A key or a value is simply */

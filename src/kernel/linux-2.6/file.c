@@ -511,7 +511,7 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
           {
               gossip_err(
                     "%s: error in %s handle %llu, "
-                    "FILE: %s\n  -- returning %ld\n",
+                    "FILE: %s, returning %ld\n",
                     rw->fnstr, 
                     rw->type == IO_READV ? "vectored read from" : "vectored write to",
                     llu(get_handle_from_ino(rw->inode)),

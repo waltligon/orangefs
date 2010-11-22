@@ -4860,7 +4860,13 @@ static void trove_thread_mgr_callback(
         /* set completed flag while holding queue lock */
         tmp_desc->completed_flag = 1;
 
+/* the value of trove_pending_count is only used in the non-threaded
+ * situation. so, to prevent reported data races from helgrind, we
+ * will only modify it's value in the non-threaded case.
+*/
+#ifndef __PVFS2_JOB_THREADED__
         trove_pending_count--;
+#endif
 
 #ifdef __PVFS2_JOB_THREADED__
         /* wake up anyone waiting for completion */

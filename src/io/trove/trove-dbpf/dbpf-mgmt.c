@@ -1491,7 +1491,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
                             TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
-    db_recno_t recno;
+    db_recno_t recno = {0};
     DB *db_p = NULL;
     DBC *dbc_p = NULL;
     DBT key, data;
@@ -1524,18 +1524,12 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
          * we get back.  here we make sure that the key is big
          * enough to hold the position that we need to pass in.
          */
+       
         memset(&key, 0, sizeof(key));
-        if (sizeof(recno) < name_array[0].buffer_sz)
-        {
-            key.data = name_array[0].buffer;
-            key.size = key.ulen = name_array[0].buffer_sz;
-        }
-        else
-        {
-            key.data = &recno;
-            key.size = key.ulen = sizeof(recno);
-        }
-        *(TROVE_ds_position *) key.data = *inout_position_p;
+        key.data = name_array[0].buffer;
+        key.ulen = name_array[0].buffer_sz;
+        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p;
+        key.size = sizeof(db_recno_t);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));

@@ -670,7 +670,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         entry_ref.fs_id  = cur_fs;
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
-                         PVFS_ATTR_SYS_ALL,
+                         PVFS_ATTR_SYS_TYPE,
                          creds, &getattr_resp, NULL);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
@@ -690,6 +690,8 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
                     fmt_string = "\t%s: %llu (server internal use)\n";
                 else if(getattr_resp.attr.objtype == PVFS_TYPE_DATAFILE)
                     fmt_string = "\t%s: %llu (datafile, probably preallocated)\n";
+                else if(getattr_resp.attr.objtype == PVFS_TYPE_METAFILE)
+                    fmt_string = "\t%s: %llu (metafile, probably preallocated)\n";
                 else
                     fmt_string = "\t%s: %llu (unknown)\n";
 
