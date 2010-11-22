@@ -15,6 +15,10 @@
 #include "str-utils.h"
 #include "pvfs2-internal.h"
 
+#ifdef WIN32
+#define snprintf    _snprintf
+#endif
+
 #define MAX_NUM_DIRENTS    32
 
 void print_entry_attr( 
