@@ -480,8 +480,10 @@ int main(
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;
 
+    /*
     do
     {
+    */
         // call readdir 
         ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
 			   &credentials, resp_readdir, NULL);
@@ -500,8 +502,10 @@ int main(
         }
         token = resp_readdir->token;
         pvfs_dirent_outcount = resp_readdir->pvfs_dirent_outcount;
+    /*
     } 
     while (pvfs_dirent_outcount == 6);
+    */
 #if 0
 
     // test the rmdir function 

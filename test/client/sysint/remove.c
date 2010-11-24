@@ -5,7 +5,9 @@
  */
 
 #include <stdio.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 #include "client.h"

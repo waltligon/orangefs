@@ -68,7 +68,7 @@ int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
     return ((handle > ext->first-1) &&
             (handle < ext->last+1)); 
     */
-    /* ext->last may be max, 2^64 - 1 */
+    /* ext->last may be max, 2^64 - 1 */    
     return ((handle >= ext->first) &&
             (handle <= ext->last));
 }

@@ -6,8 +6,10 @@
 
 #include <time.h>
 #include "client.h"
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,6 +17,11 @@
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
+
+#ifdef WIN32
+#define snprintf    _snprintf
+#define rindex      strrchr
+#endif
 
 #define DEFAULT_IO_SIZE 8*1024*1024
 

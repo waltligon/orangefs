@@ -10,10 +10,14 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <time.h>
+#ifndef WIN32
 #include <pwd.h>
 #include <grp.h>
+#endif
 #include <assert.h>
 #include <getopt.h>
 
@@ -25,6 +29,9 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#ifdef WIN32
+#define snprintf    _snprintf
+#endif
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations

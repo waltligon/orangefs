@@ -520,13 +520,15 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     }
 
     /* TODO: attempting to free this frame causes heap fault.
-       Make a copy 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op); */
+       Make a copy */
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    /*
     {
         PINT_sm_msgarray_op *copy = malloc(sizeof(PINT_sm_msgarray_op));
         memcpy(copy, &sm_p->msgarray_op, sizeof(PINT_sm_msgarray_op));
         PINT_sm_push_frame(smcb, 0, copy);
     }
+    */
 
     return SM_ACTION_COMPLETE;
 }
