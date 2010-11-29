@@ -883,9 +883,10 @@ static PINT_sm_action lookup_setup_resp(
         js_p->error_code = -PVFS_ENOENT;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  sending '%s' response with %d "
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  sending '%s[%d]' response with %d "
                  "handle(s) and %d attr(s)\n",
                  (js_p->error_code ? "error" : "success"),
+                 js_p->error_code,
                  s_op->resp.u.lookup_path.handle_count,
                  s_op->resp.u.lookup_path.attr_count);
 

@@ -48,6 +48,7 @@ struct PVFS_sys_attr_s
     PVFS_size size;
     PVFS2_ALIGN_VAR(char *, link_target);/* NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+    PVFS2_ALIGN_VAR(int32_t, dirdata_count); /* Changed to int32_t so that size of structure does not change */
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
     PVFS2_ALIGN_VAR(char*, dist_name);   /* NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(char*, dist_params); /* NOTE: caller must free if valid */

@@ -239,9 +239,29 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     s_op->u.mkdir.num_dirdata_servers =
         s_op->req->u.mkdir.num_dirent_files_req;
 
-    /* make all dirdata servers active */
+/*
     num_total_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
+*/
+
+    /* use total # of meta servers as the num_total_dirdata_servers */
+    ret = PINT_cached_config_get_num_meta(s_op->u.mkdir.fs_id,
+                                            &num_total_dirdata_servers);
+    if(ret < 0)
+    {
+        gossip_err("Error: failed to get number of metadata servers\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+
     num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
+
+    /* will do the same check in PINT_init_dist_dir_state, 
+     * but can also add here */
+    if(num_initial_dirdata_servers > num_total_dirdata_servers)
+    {
+        num_initial_dirdata_servers = num_total_dirdata_servers;
+    }
 
     /* init meta handle dist_dir_struct */
     ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,

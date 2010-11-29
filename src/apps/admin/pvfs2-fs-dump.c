@@ -58,6 +58,12 @@ int descend(PVFS_fs_id cur_fs,
 	    PVFS_credentials *creds,
 	    struct options *opts_p);
 
+void verify_dirdatahandles(PVFS_fs_id cur_fs,
+        PVFS_object_ref mf_ref,
+        int dh_count,
+        PVFS_credentials *creds,
+        struct options *opts_p);
+
 void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_object_ref mf_ref,
 		      int df_count,
@@ -477,6 +483,12 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 		     opts_p->dot_format,
 		     opts_p->fontname);
 
+    verify_dirdatahandles(cur_fs,
+            pref,
+            getattr_resp.attr.dirdata_count,
+            creds,
+            opts_p);
+
     descend(cur_fs, pref, creds, opts_p);
 
     handlelist_remove_handle(pref.handle, server_idx);
@@ -555,6 +567,11 @@ int descend(PVFS_fs_id cur_fs,
                                      opts_p);
                     break;
                 case PVFS_TYPE_DIRECTORY:
+                    verify_dirdatahandles(cur_fs,
+                                     entry_ref,
+                                     getattr_resp.attr.dirdata_count,
+                                     creds,
+                                     opts_p);
                     descend(cur_fs, entry_ref, creds, opts_p);
                     break;
                 default:
@@ -578,6 +595,58 @@ int descend(PVFS_fs_id cur_fs,
     }
     return 0;
 }
+
+/* verify_dirdatahandles()
+ *
+ * Discovers the dirdata handles for a given directory,
+ * verifies that they exist, and removes them from the handlelist.
+ */
+void verify_dirdatahandles(PVFS_fs_id cur_fs,
+		      PVFS_object_ref mf_ref,
+		      int dh_count,
+		      PVFS_credentials *creds,
+		      struct options *opts_p)
+{
+    int ret, i, server_idx;
+    PVFS_handle *dh_handles;
+
+    dh_handles = (PVFS_handle *) malloc(dh_count * sizeof(PVFS_handle));
+    if (dh_handles == NULL)
+    {
+        printf("invalid value of number of dirdatahandles = %d\n", dh_count);
+	assert(0);
+    }
+    ret = PVFS_mgmt_get_dirdata_array(mf_ref, creds, dh_handles, dh_count, NULL);
+    if (ret != 0)
+    {
+	assert(0);
+    }
+
+    for (i = 0; i < dh_count; i++)
+    {
+	ret = handlelist_find_handle(dh_handles[i], &server_idx);
+	if (ret != 0)
+	{
+            printf("Dirdata Handle %llu appears to be missing; "
+                   "skipping!\n", llu(dh_handles[i]));
+            continue;
+	}
+
+	print_entry(NULL,
+		    dh_handles[i],
+		    mf_ref.handle,
+		    PVFS_TYPE_DIRDATA,
+		    server_idx,
+		    0,
+		    opts_p->dot_format,
+		    opts_p->fontname);
+
+	handlelist_remove_handle(dh_handles[i], server_idx);
+    }
+
+    free(dh_handles);
+}
+
 
 /* verify_datafiles()
  *
@@ -920,6 +989,8 @@ static void print_entry(char *name,
 		       llu(handle), llu(handle), server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
+		printf("\tH%llu [shape = ellipse, fillcolor = violet, style = filled, label =\"%llu (%d)\"];\n",
+		       llu(handle), llu(handle), server_idx);
 		break;
 	    case PVFS_TYPE_SYMLINK:
 		break;
@@ -932,6 +1003,12 @@ static void print_entry(char *name,
 	switch (objtype)
         {
 	    case PVFS_TYPE_DATAFILE:
+		printf("  handle = %llu, type = %s, server = %d\n",
+		       llu(handle),
+		       get_type_str(objtype),
+		       server_idx);
+		break;
+	    case PVFS_TYPE_DIRDATA:
 		printf("  handle = %llu, type = %s, server = %d\n",
 		       llu(handle),
 		       get_type_str(objtype),
