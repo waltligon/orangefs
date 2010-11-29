@@ -115,6 +115,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test-client", "test-client\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "proto", "proto\proto.vcxproj", "{2F406AB6-D010-4196-A523-FAE6F2B1585F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pvfs2-ls", "pvfs2-ls\pvfs2-ls.vcxproj", "{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -271,6 +273,12 @@ Global
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|Win32.Build.0 = Release|Win32
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|x64.ActiveCfg = Release|x64
 		{2F406AB6-D010-4196-A523-FAE6F2B1585F}.Release|x64.Build.0 = Release|x64
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Debug|Win32.ActiveCfg = Debug|Win32
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Debug|Win32.Build.0 = Debug|Win32
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Debug|x64.ActiveCfg = Debug|Win32
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Release|Win32.ActiveCfg = Release|Win32
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Release|Win32.Build.0 = Release|Win32
+		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
