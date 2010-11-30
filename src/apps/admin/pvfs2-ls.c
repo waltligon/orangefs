@@ -259,22 +259,38 @@ void print_entry_attr(
         atime = (time_t)attr->atime;
         ctime = (time_t)attr->ctime;
 
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%F %H:%M:%S %z",time );
+#endif
         strncpy(scratch_big_time,scratch_time,num_bytes);
 
         time = localtime(&atime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
         strncat(scratch_big_time,scratch_time,num_bytes);
 
         time = localtime(&ctime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
         strncat(scratch_big_time,scratch_time,num_bytes);
 
         format_size_string(scratch_big_time,strlen(scratch_big_time),&formatted_time,0,1);
     }
     else
     {
+#ifdef WIN32
+        strftime( scratch_time,17,"%Y-%m-%d %H:%M",time );
+#else
         strftime( scratch_time,17,"%F %H:%M",time );
+#endif
         format_size_string(scratch_time,16,&formatted_time,0,1);
     }
 
@@ -779,7 +795,6 @@ static struct options* parse_args(int argc, char* argv[])
         else if (strcmp(cur_option, "--si") == 0)
         {
             tmp_opts->list_use_si_units = 1;
-            break;
         }
         else if (strcmp(cur_option, "--version") == 0)
         {
