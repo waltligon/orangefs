@@ -27,6 +27,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 int match_dirdata(struct handlelist *hl,
 		  struct handlelist *alt_hl,
 		  PVFS_object_ref dir_ref,
+                  int dh_count,
 		  PVFS_credentials *creds);
 
 int descend(PVFS_fs_id cur_fs,

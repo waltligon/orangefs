@@ -553,6 +553,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     ret = match_dirdata(hl,
 			NULL /* optional second handle list */,
 			pref,
+                        getattr_resp.attr.dirdata_count,
 			creds);
     if (ret != 0) {
 	assert(0);
@@ -566,37 +567,85 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 int match_dirdata(struct handlelist *hl,
 		  struct handlelist *alt_hl,
 		  PVFS_object_ref dir_ref,
+                  int dh_count,
 		  PVFS_credentials *creds)
 {
-    int ret, idx;
-    PVFS_handle dirdata_handle;
+    int ret, i, server_idx = 0, error = 0;
+    PVFS_handle *dh_handles;
 
-    printf("# looking for dirdata match to %llu.\n",
+    dh_handles = (PVFS_handle *) malloc(dh_count * sizeof(PVFS_handle));
+    if (dh_handles == NULL)
+    {
+	assert(0);
+    }
+
+/*
+    printf("# looking for dirdata array for %llu.\n",
 	   llu(dir_ref.handle));
+*/
 
-    ret = PVFS_mgmt_get_dirdata_handle(dir_ref,
-				       &dirdata_handle,
-				       creds, NULL);
+    ret = PVFS_mgmt_get_dirdata_array(dir_ref, creds, dh_handles, dh_count, NULL);
     if (ret != 0)
     {
         PVFS_perror("match_dirdata", ret);
+        free(dh_handles);
 	return -1;
     }
 
-    printf("# mgmt_get_dirdata returned %llu.\n", llu(dirdata_handle));
-
-    if (handlelist_find_handle(hl, dirdata_handle, &idx) == 0)
+    for (i = 0; i < dh_count; i++)
     {
-	handlelist_remove_handle(hl, dirdata_handle, idx);
-	return 0;
-    }
-    if (alt_hl && handlelist_find_handle(alt_hl, dirdata_handle, &idx) == 0)
-    {
-	handlelist_remove_handle(alt_hl, dirdata_handle, idx);
-	return 0;
+	int in_main_list = 0, in_alt_list = 0;
+
+	if (handlelist_find_handle(hl, dh_handles[i], &server_idx) == 0)
+	{
+	    in_main_list = 1;
+	}
+	else if (alt_hl &&
+		 (handlelist_find_handle(alt_hl,
+					 dh_handles[i],
+					 &server_idx) == 0))
+	{
+	    in_alt_list = 1;
+	}
+
+	if ((!in_main_list) && (!in_alt_list))
+	{
+	    printf("# dirdata handle %llu missing from list\n",
+		   llu(dh_handles[i]));
+	    /* if possible, rebuild the dirdata handle. */
+	    /* otherwise delete dirdata, return error to get 
+	     * directory and dirent removed.
+	     */
+	    dh_handles[i] = PVFS_HANDLE_NULL;
+	    error++;
+	}
+
     }
 
-    return -1;
+    for (i = 0; i < dh_count; i++)
+    {
+	if (dh_handles[i] != PVFS_HANDLE_NULL) {
+	    /* TODO: THIS IS A HACK; NEED BETTER WAY TO REMOVE FROM
+	     * ONE OF TWO LISTS...
+	     */
+
+	    if (handlelist_find_handle(hl, dh_handles[i], &server_idx) == 0)
+	    {
+		handlelist_remove_handle(hl,
+					 dh_handles[i],
+					 server_idx);
+	    }
+	    else {
+		handlelist_remove_handle(alt_hl,
+					 dh_handles[i],
+					 server_idx);
+	    }
+	}
+    }
+
+    free(dh_handles);
+    return (error) ? -1 : 0;
+
 }
 
 int descend(PVFS_fs_id cur_fs,
@@ -703,6 +752,7 @@ int descend(PVFS_fs_id cur_fs,
                         ret = match_dirdata(hl,
                                             alt_hl,
                                             entry_ref,
+                                            getattr_resp.attr.dirdata_count,
                                             creds);
                         if (ret != 0)
                         {
@@ -906,7 +956,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 		break;
 	    case PVFS_TYPE_DIRECTORY:
 		/* add to directory list */
-		printf("# looking for dirdata match to %llu.\n", llu(handle));
+		printf("# looking for dirdata array for %llu.\n", llu(handle));
 
 		descend(cur_fs,
 			hl_all,
@@ -1012,6 +1062,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 		if (match_dirdata(hl_all,
 				    alt_hl,
 				    handle_ref,
+                                    getattr_resp.attr.dirdata_count,
 				    creds)  != 0)
                 {
                     ret = remove_object(handle_ref, 
