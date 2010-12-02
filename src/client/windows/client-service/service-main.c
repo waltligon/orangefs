@@ -1,6 +1,6 @@
 /* Copyright (C) 2010 Omnibond, Inc. */
 
-/* Dokan Client Service - service control functions */
+/* Client Service - service control functions */
 
 #include <Windows.h>
 #include <stdlib.h>
@@ -10,6 +10,15 @@
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
 
+/* globals */
+SERVICE_STATUS_HANDLE hstatus;
+SERVICE_STATUS service_status;
+
+/* externs */
+extern int fs_initialize();
+extern int fs_finalize();
+
+void main_loop();
 
 DWORD service_install()
 {
@@ -17,7 +26,7 @@ DWORD service_install()
     SC_HANDLE sch_manager;
     char *exe_path, *command;
     size_t size;
-    int rc, err;
+    int err;
 
     /* Get location of executable */
     size = 512;
@@ -47,7 +56,7 @@ DWORD service_install()
     } while (err == ERROR_INSUFFICIENT_BUFFER);
 
     /* append -service option to command */
-    command = (char *) malloc(strlen(exe_path) + 8);
+    command = (char *) malloc(strlen(exe_path) + 16);
     if (!command)
     {
         fprintf(stderr, "Insufficient memory\n");
@@ -86,6 +95,8 @@ DWORD service_install()
             fprintf(stderr, "Error: CreateService (%u)\n", GetLastError());
             return -1;
         }
+
+        CloseServiceHandle(sch_manager);
     }
     else
     {
@@ -101,11 +112,107 @@ DWORD service_install()
 
 DWORD service_remove()
 {
+    SC_HANDLE sch_service;
+    SC_HANDLE sch_manager;
 
+    /* open service manager */
+    sch_manager = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+
+    if (sch_manager != NULL)
+    {
+        /* open service */
+        sch_service = OpenService(sch_manager, WIN32ServiceName, 
+                        SERVICE_ALL_ACCESS | DELETE);
+        if (sch_service != NULL)
+        {
+            /* attempt to stop service */
+            if (ControlService(sch_service, SERVICE_CONTROL_STOP,
+                  &service_status)) 
+            {
+                Sleep(1000);
+
+                while (QueryServiceStatus(sch_service, &service_status))
+                {
+                    if (service_status.dwCurrentState == SERVICE_STOP_PENDING)                    
+                        Sleep(1000);
+                    else
+                        break;
+                }
+
+                if (DeleteService(sch_service))                
+                    printf("%s removed\n", WIN32ServiceDisplayName);
+                else
+                    fprintf(stderr, "Error: DeleteService (%u)\n", 
+                      GetLastError());
+
+                CloseServiceHandle(sch_service);
+            }
+        }
+        else
+        {
+            fprintf(stderr, "Error: OpenService (%u)\n", GetLastError());
+            return -1;
+        }
+
+        CloseServiceHandle(sch_manager);
+    }
+    else
+    {
+        fprintf(stderr, "Error: OpenSCManager (%u)\n", GetLastError());
+        return -1;
+    }
+
+    return 0;
+
+}
+
+/* service control handler */
+void WINAPI service_ctrl(DWORD ctrl_code)
+{
+    switch (ctrl_code)
+    {
+    case SERVICE_CONTROL_STOP:
+    case SERVICE_CONTROL_SHUTDOWN:
+        service_status.dwCurrentState = SERVICE_STOP_PENDING;
+        Sleep(1000);
+        SetServiceStatus(hstatus, &service_status);
+    }
+}
+
+void WINAPI service_main(DWORD argc, char *argv[])
+{
+    /* register our control handler routine */
+    if ((hstatus = RegisterServiceCtrlHandler(WIN32ServiceName, service_ctrl))
+           != 0)
+    {
+        /* run the service */
+        service_status.dwCurrentState = SERVICE_RUNNING;
+        service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
+        service_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+        service_status.dwWin32ExitCode = NO_ERROR;
+        service_status.dwServiceSpecificExitCode = 0;
+
+        /* execute service main loop */
+        if (SetServiceStatus(hstatus, &service_status))
+            main_loop();
+        
+        /* shut down service */
+        service_status.dwCurrentState = SERVICE_STOPPED;
+        SetServiceStatus(hstatus, &service_status);
+    }
+    /* TODO: error reporting */
 }
 
 void main_loop()
 {
+
+    /* init file systems */
+    fs_initialize();
+
+    /* loop */
+
+    /* close file systems */
+    fs_finalize();
 
 }
 
