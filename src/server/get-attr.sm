@@ -808,8 +808,6 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tNumber of mirrored copies cannot "
                                          "be retrieved.\n");
-        gossip_lerr("Mirror handles requested, but number of mirrored copies "
-                    "cannot be retrieved.\n");
         if (resp->u.getattr.attr.mask & (PVFS_ATTR_META_DFILES |
                                          PVFS_ATTR_META_DIST) )
         {
