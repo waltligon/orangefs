@@ -235,14 +235,6 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
 
     attr = (&s_op->attr);
 
-    /* get num_dirdata_servers */
-    s_op->u.mkdir.num_dirdata_servers =
-        s_op->req->u.mkdir.num_dirent_files_req;
-
-/*
-    num_total_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
-*/
-
     /* use total # of meta servers as the num_total_dirdata_servers */
     ret = PINT_cached_config_get_num_meta(s_op->u.mkdir.fs_id,
                                             &num_total_dirdata_servers);
@@ -253,7 +245,11 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
         return SM_ACTION_COMPLETE;
     }
 
+    /* set num_dirdata_servers for pre-allocation of dirdata handles */
+    s_op->u.mkdir.num_dirdata_servers =
+        num_total_dirdata_servers;
 
+    /* TODO: initial active # of dirdata servers = max(client_req, config_files) */
     num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
 
     /* will do the same check in PINT_init_dist_dir_state, 
