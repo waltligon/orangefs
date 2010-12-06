@@ -14,6 +14,8 @@
 SERVICE_STATUS_HANDLE hstatus;
 SERVICE_STATUS service_status;
 
+int is_running = 0;
+
 /* externs */
 extern int fs_initialize();
 extern int fs_finalize();
@@ -176,6 +178,7 @@ void WINAPI service_ctrl(DWORD ctrl_code)
         service_status.dwCurrentState = SERVICE_STOP_PENDING;
         Sleep(1000);
         SetServiceStatus(hstatus, &service_status);
+        is_running = 0;
     }
 }
 
@@ -194,7 +197,10 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
         /* execute service main loop */
         if (SetServiceStatus(hstatus, &service_status))
+        {
+            is_running = 1;
             main_loop();
+        }
         
         /* shut down service */
         service_status.dwCurrentState = SERVICE_STOPPED;
@@ -210,6 +216,10 @@ void main_loop()
     fs_initialize();
 
     /* loop */
+    while (is_running)
+    {
+        Sleep(1000);
+    }
 
     /* close file systems */
     fs_finalize();
@@ -253,6 +263,7 @@ int main(int argc, char **argv, char **envp)
   } 
   else 
   {    
+      is_running = 1;
       main_loop();
   }
 
