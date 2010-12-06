@@ -110,6 +110,7 @@ static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_precreate_batch_size);
 static DOTCONF_CB(get_precreate_low_threshold);
+static DOTCONF_CB(get_init_num_dirdata_handles);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_secret_key);
@@ -688,6 +689,12 @@ static const configoption_t options[] =
       * PrecreateBatchSize defined above.  */
      {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 16, 256, 16, 16, 16, 0"},
+
+     /* Initial number of dirdata handles when creating a new directory.
+      * TODO: determine the default value, use 2 as a start
+      */
+     {"InitNumDirdataHandles",ARG_INT, get_init_num_dirdata_handles,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "2"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
@@ -1696,6 +1703,25 @@ DOTCONF_CB(get_precreate_low_threshold)
 
     return NULL;
 }
+
+DOTCONF_CB(get_init_num_dirdata_handles)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if(cmd->data.value <= 0)
+    {
+        return "InitNumDirdataHandles has to be a positive integer!\n";
+    }
+    config_s->init_num_dirdata_handles = cmd->data.value;
+    return NULL;
+}
+
+
 
 DOTCONF_CB(get_server_job_flow_timeout)
 {

@@ -213,6 +213,7 @@ sub emit_defaults
     print $target "\tClientRetryDelayMilliSecs 2000\n";
     print $target "\tPrecreateBatchSize 0,32,512,32,32,32,0\n";
     print $target "\tPrecreateLowThreshold 0,16,256,16,16,16,0\n";
+    print $target "\tInitNumDirdataHandles 2\n";
 
     if(defined($default_storage))
     {

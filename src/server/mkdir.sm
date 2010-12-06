@@ -229,6 +229,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr;
     int num_total_dirdata_servers, num_initial_dirdata_servers;
+    server_configuration_s *user_opts = get_server_config_struct();
     int ret = -1;
     unsigned char *c;
     int i;
@@ -249,8 +250,15 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     s_op->u.mkdir.num_dirdata_servers =
         num_total_dirdata_servers;
 
-    /* TODO: initial active # of dirdata servers = max(client_req, config_files) */
-    num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
+    /* TODO: if received >0, use; else use config_file value,*/
+    if(s_op->req->u.mkdir.num_dirent_files_req > 0)
+    {
+        num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
+    }
+    else
+    {
+        num_initial_dirdata_servers = user_opts->init_num_dirdata_handles;
+    }
 
     /* will do the same check in PINT_init_dist_dir_state, 
      * but can also add here */
