@@ -9,6 +9,8 @@
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
+#define PVFS2_DOKAN_CHECKFLAG(val, flag) if (val&flag) { DbgPrint("\t" #flag "\n"); }
+
 static void DbgPrint(LPCSTR format, ...)
 {
     if (g_DebugMode) 
@@ -42,7 +44,46 @@ GetFilePath(
     strncat(filePath, FileName, strlen(FileName));
 }
 
-#define PVFS2_DOKAN_CHECKFLAG(val, flag) if (val&flag) { DbgPrint("\t" #flag "\n"); }
+/* convert string from wide char (Unicode) to multi-byte string */
+static char *convert_string(const wchar_t *wcstr)
+{
+    errno_t err;
+    size_t ret, mb_size;
+    char *mbstr;
+    
+    /* get size of buffer */
+    err = wcstombs_s(&ret, NULL, 0, wcstr, 0);
+
+    if (err != 0)
+    {
+        DbgPrint("convert_string: %d\n", err);
+        return NULL;
+    }
+
+    /* allocate buffer */
+    mb_size = ret;
+    mbstr = (char *) malloc(mb_size);
+    if (mbstr == NULL)
+    {
+        DbgPrint("convert_string: no memory\n");
+    }
+
+    /* convert string */
+    err = wcstombs_s(&ret, mbstr, mb_size, wcstr, wcslen(wcstr));
+
+    if (err != 0)
+    {
+        DbgPrint("convert_string 2: %d\n", err);
+        free(mbstr);
+
+        return NULL;
+    }
+
+    return mbstr;
+
+}
+
+#define cleanup_string(str)    free(str)
 
 static int
 PVFS2_Dokan_create_file(
@@ -53,11 +94,14 @@ PVFS2_Dokan_create_file(
     DWORD                    FlagsAndAttributes,
     PDOKAN_FILE_INFO         DokanFileInfo)
 {
-    char filePath[MAX_PATH];
-    HANDLE handle;
+    char *file_path;
     DWORD fileAttr;
 
-    GetFilePath(filePath, FileName);
+    file_path = convert_string(FileName);
+    if (file_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
 
     DbgPrint("CreateFile : %s\n", filePath);
     
@@ -109,11 +153,13 @@ PVFS2_Dokan_create_file(
     PVFS2_DOKAN_CHECKFLAG(AccessMode, STANDARD_RIGHTS_EXECUTE);
 
     // When filePath is a directory, needs to change the flag so that the file can be opened.
+    /*
     fileAttr = GetFileAttributes(filePath);
     if (fileAttr && fileAttr & FILE_ATTRIBUTE_DIRECTORY) {
         FlagsAndAttributes |= FILE_FLAG_BACKUP_SEMANTICS;
         //AccessMode = 0;
     }
+    */
     DbgPrint("\tFlagsAndAttributes = 0x%x\n", FlagsAndAttributes);
 
     PVFS2_DOKAN_CHECKFLAG(FlagsAndAttributes, FILE_ATTRIBUTE_ARCHIVE);
@@ -143,20 +189,7 @@ PVFS2_Dokan_create_file(
     PVFS2_DOKAN_CHECKFLAG(FlagsAndAttributes, SECURITY_EFFECTIVE_ONLY);
     PVFS2_DOKAN_CHECKFLAG(FlagsAndAttributes, SECURITY_SQOS_PRESENT);
 
-    handle = CreateFile(
-        filePath,
-        AccessMode,//GENERIC_READ|GENERIC_WRITE|GENERIC_EXECUTE,
-        ShareMode,
-        NULL, // security attribute
-        CreationDisposition,
-        FlagsAndAttributes,// |FILE_FLAG_NO_BUFFERING,
-        NULL); // template file handle
 
-    if (handle == INVALID_HANDLE_VALUE) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1; // error codes are negated value of Windows System Error codes
-    }
 
     DbgPrint("\n");
 
