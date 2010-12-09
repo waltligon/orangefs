@@ -6,10 +6,15 @@
 #include "dokan.h"
 /* TODO: needed? #include <fileinfo.h> */
 
+#include "pvfs2.h"
+
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
 #define PVFS2_DOKAN_CHECKFLAG(val, flag) if (val&flag) { DbgPrint("\t" #flag "\n"); }
+
+/* TODO */
+#define MALLOC_CHECK(ptr)
 
 static void DbgPrint(LPCSTR format, ...)
 {
@@ -94,8 +99,10 @@ PVFS2_Dokan_create_file(
     DWORD                    FlagsAndAttributes,
     PDOKAN_FILE_INFO         DokanFileInfo)
 {
-    char *file_path;
+    char *file_path, *fs_path;
     DWORD fileAttr;
+    int ret, found;
+    PVFS_handle handle;
 
     file_path = convert_string(FileName);
     if (file_path == NULL)
@@ -189,12 +196,64 @@ PVFS2_Dokan_create_file(
     PVFS2_DOKAN_CHECKFLAG(FlagsAndAttributes, SECURITY_EFFECTIVE_ONLY);
     PVFS2_DOKAN_CHECKFLAG(FlagsAndAttributes, SECURITY_SQOS_PRESENT);
 
-
-
     DbgPrint("\n");
 
-    // save the file handle in Context
-    DokanFileInfo->Context = (ULONG64)handle;
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(file_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(fs_path);
+        return -1;
+    }
+
+    /* look up the file */
+    found = 0;
+    ret = fs_lookup(fs_path, &handle);
+    /* TODO
+    if (ret == {PVFS_file_not_found})
+    {
+    
+    }
+    else */
+    if (ret != 0)
+    {
+        free(fs_path);
+        return -1;
+    }
+    else
+    {
+        found = 1;
+    }
+
+    switch (CreationDisposition)
+    {
+    case CREATE_ALWAYS:
+        if (found)
+            /* remove file */;
+        /* create file */
+        break;
+    case CREATE_NEW:
+        if (found)
+            /* return error */;
+        /* create file */
+        break;
+    case OPEN_ALWAYS:
+        if (!found)
+            /* create file */;
+        break;
+    case OPEN_EXISTING:
+        if (!found)
+            /* return error */;
+        break;
+    case TRUNCATE_EXISTING:
+        if (!found)
+            /* return error */;
+    }
+
+    // save the file handle in context
+    DokanFileInfo->Context = handle;
     return 0;
 }
 

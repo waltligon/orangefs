@@ -2,13 +2,36 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "pvfs2.h"
+#include "str-utils.h"
 
 const PVFS_util_tab *tab;
 
 /* TODO: global credentials for now */
 const PVFS_credentials credentials;
+
+/* split path into base dir and entry name components */
+int split_path(char *fs_path, 
+               char *base_dir,
+               int base_dir_len,
+               char *entry_name,
+               int entry_name_len)
+{
+    int ret;
+
+    /* get base dir */
+    ret = PINT_get_base_dir(fs_path, base_dir, base_dir_len);
+
+    if (ret != 0)
+        return ret;
+
+    /* get entry name */
+    ret = PINT_remove_base_dir(fs_path, entry_name, entry_name_len);
+
+    return ret;
+}
 
 /* initialize file systems */
 int fs_initialize()
@@ -144,12 +167,93 @@ int fs_lookup(char *fs_path,
       returns 0 and handle on success */
 int fs_create(char *fs_path,
               PVFS_handle *handle)
-{
+{    
+    char *base_dir, *entry_name;
+    int len;
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_object_ref parent_ref;
+    int ret;
+    PVFS_sys_attr attr;
+    PVFS_sysresp_create resp_create;
+
+    if (fs_path == NULL || strlen(fs_path) == 0)
+        return -1;
+    
+    /* cannot be only a dir */
+    if (fs_path[strlen(fs_path)-1] == '/')
+        return -1;
+
     /* split path into path and file components */
+    len = strlen(fs_path) + 1;
+    base_dir = (char *) malloc(len);    
+    entry_name = (char *) malloc(len);
+    ret = split_path(fs_path, base_dir, len, entry_name, len);
+    if (ret != 0)
+        goto fs_create_exit;
 
     /* lookup parent path */
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_create_exit;
+
+    parent_ref.fs_id = resp_lookup.ref.fs_id;
+    parent_ref.handle = resp_lookup.ref.handle;
 
     /* create file */
+    memset(&attr, 0, sizeof(PVFS_sys_attr));
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime = time(NULL);
+
+    ret = PVFS_sys_create(entry_name, parent_ref, attr,
+			  &credentials, NULL, &resp_create, NULL, NULL);
+    if (ret)
+        goto fs_create_exit;
+
+    *handle = resp_create.ref.handle;
+
+fs_create_exit:
+    free(entry_name);
+    free(base_dir);
+
+    return ret;
+}
+
+/* remove specified directory or file */
+int fs_remove(char *fs_path)
+{
+    char *base_dir, *entry_name;
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int len, ret;
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_object_ref parent_ref;
+
+    if (fs_path == NULL || strlen(fs_path) == 0)
+        return -1;
+
+    /* split path into path and file components */
+    ret = split_path(fs_path, base_dir, len, entry_name, len);
+
+    /* lookup parent entry */
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_remove_exit;
+
+    parent_ref.fs_id = resp_lookup.ref.fs_id;
+    parent_ref.handle = resp_lookup.ref.handle;
+
+    ret = PVFS_sys_remove(entry_name, parent_ref, &credentials, NULL);
+
+fs_remove_exit:
+    free(entry_name);
+    free(base_dir);
+
+    return ret;
 }
 
 int fs_finalize()
