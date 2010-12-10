@@ -277,6 +277,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     PINT_sm_msgpair_state *msg_p = NULL;
     int tmp_dirent_limit_needed = 0;
     int readdir_reentry = 0;
+    int *tmp_dirdata_index_array = NULL;
     int *tmp_dirent_limit_array = NULL;
     PVFS_ds_position *token_array = NULL;
 
@@ -295,12 +296,15 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     if(sm_p->u.readdir.num_dirdata_needed > 0)
     {
         readdir_reentry = 1;
+
+#if 0
         /* update dirdata_index, the comp_fn is not updating the dirdata_index */
         sm_p->u.readdir.dirdata_index += 
             (sm_p->u.readdir.num_dirdata_needed - 1);
         gossip_debug(GOSSIP_READDIR_DEBUG, "readdir: "
                 "re-entering msg_array_setup! update dirdata_index to %d !\n", 
                 sm_p->u.readdir.dirdata_index);
+#endif
     }
 
     if( sm_p->readdir.dirent_limit <= *(sm_p->readdir.dirent_outcount) )
@@ -311,6 +315,15 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
+   if( sm_p->u.readdir.dirdata_index >= 
+           sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir: "
+                "all dirdata servers have been traversed,  setting pos and return.\n");
+        *(sm_p->readdir.token) = PVFS_READDIR_END;
+        js_p->error_code = READDIR_DONE;
+        return SM_ACTION_COMPLETE;
+    }
 
     /* print out the dirent_count distribution, for debugging purpose */
     assert(sm_p->getattr.size_array);
@@ -336,15 +349,15 @@ static PINT_sm_action readdir_msg_setup_msgpair(
             sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
     tmp_dirent_limit_array = malloc( sizeof(int) *
             sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
-    if(!token_array || !tmp_dirent_limit_array)
+    tmp_dirdata_index_array = malloc( sizeof(int) *
+            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
+    if(!token_array || !tmp_dirent_limit_array || !tmp_dirdata_index_array)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* fill the first dirdata request parameters */
-   assert( sm_p->u.readdir.dirdata_index < 
-           sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers);
 
    if( ((sm_p->u.readdir.pos_token == PVFS_READDIR_START) &&
                (sm_p->getattr.size_array[sm_p->u.readdir.dirdata_index] > 0)) ||
@@ -353,6 +366,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
               (sm_p->u.readdir.pos_token & 0xffffffff) ) ) )
    {  
        /* need to use dirdata_index server */
+       tmp_dirdata_index_array[tmp_index] = sm_p->u.readdir.dirdata_index;
        token_array[tmp_index] = sm_p->u.readdir.pos_token;
 
        if(sm_p->u.readdir.pos_token == PVFS_READDIR_START)
@@ -382,44 +396,49 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     tmp_dirent_limit_needed -= tmp_dirent_limit_array[tmp_index];
     tmp_index++;
    }
-   else /* nothing left on the current dirdata_index server */
+
+   if(tmp_dirent_limit_needed > 0)
    {
+       /* proceed to the next dirdata server */
        sm_p->u.readdir.dirdata_index++;
    }
 
-   if(tmp_index > 0)
-   {
-       i = sm_p->u.readdir.dirdata_index + 1; 
-   }
-   else
-   {
-       i = sm_p->u.readdir.dirdata_index; 
-   }
-
    /* fill the rest if necessary */
-    for( ; i < sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers;
-            i++)
+   while( (tmp_dirent_limit_needed > 0) && 
+           (sm_p->u.readdir.dirdata_index < 
+            sm_p->getattr.attr.u.dir.dist_dir_attr.num_servers) )
     {
-        if(tmp_dirent_limit_needed <= 0) /* enough dirents */
-        { 
-            break;
+        int cur_index = sm_p->u.readdir.dirdata_index;
+
+        if(sm_p->getattr.size_array[cur_index] > 0)
+        {
+            tmp_dirdata_index_array[tmp_index] = cur_index;
+            token_array[tmp_index] = PVFS_READDIR_START;
+
+            if(tmp_dirent_limit_needed > 
+                    sm_p->getattr.size_array[cur_index]) 
+            {
+                tmp_dirent_limit_array[tmp_index] = 
+                    sm_p->getattr.size_array[cur_index]; 
+            }
+            else
+            {
+                tmp_dirent_limit_array[tmp_index] = tmp_dirent_limit_needed; 
+            }
+
+            tmp_dirent_limit_needed -= tmp_dirent_limit_array[tmp_index];
+            tmp_index++;
         }
 
-       token_array[tmp_index] = PVFS_READDIR_START;
-
-       if(tmp_dirent_limit_needed > 
-               sm_p->getattr.size_array[i]) 
-       {
-           tmp_dirent_limit_array[tmp_index] = 
-               sm_p->getattr.size_array[i]; 
-       }
-       else
-       {
-           tmp_dirent_limit_array[tmp_index] = tmp_dirent_limit_needed; 
-       }
-
-       tmp_dirent_limit_needed -= tmp_dirent_limit_array[tmp_index];
-       tmp_index++;
+        if(tmp_dirent_limit_needed > 0) /* need more dirents */
+        {
+            /* proceed to next dirdata */
+            sm_p->u.readdir.dirdata_index++;
+        }
+        else
+        {
+            break;
+        }
     }
 
     /* total number of dirdata server need to contact */
@@ -459,8 +478,8 @@ static PINT_sm_action readdir_msg_setup_msgpair(
                 GOSSIP_READDIR_DEBUG, 
                 "readdir: posting dirdata readdir[%d]  ""%llu|%llu(#%d)|%d | token is %llu | limit is %d\n",
                 i, llu(sm_p->object_ref.handle),
-                llu(sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i]),
-                (sm_p->u.readdir.dirdata_index + i),
+                llu(sm_p->getattr.attr.u.dir.dirdata_handles[tmp_dirdata_index_array[i]]),
+                (tmp_dirdata_index_array[i]),
                 sm_p->object_ref.fs_id,
                 llu(token_array[i]),
                 tmp_dirent_limit_array[i]);
@@ -470,14 +489,14 @@ static PINT_sm_action readdir_msg_setup_msgpair(
                 *sm_p->cred_p,
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
-                sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i],
+                sm_p->getattr.attr.u.dir.dirdata_handles[tmp_dirdata_index_array[i]],
                 token_array[i],
                 tmp_dirent_limit_array[i],
                 sm_p->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-        msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[sm_p->u.readdir.dirdata_index + i];
+        msg_p->handle = sm_p->getattr.attr.u.dir.dirdata_handles[tmp_dirdata_index_array[i]];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdir_msg_comp_fn;
 
@@ -497,6 +516,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 readdir_msg_return:
     free(token_array);
     free(tmp_dirent_limit_array);
+    free(tmp_dirdata_index_array);
     return SM_ACTION_COMPLETE;
 }
 
@@ -567,7 +587,7 @@ static int readdir_msg_comp_fn(void *v_p,
                  "[version %lld, dirdata_index = %d, dirent_outcount = %d]\n",
                  resp_p->u.readdir.dirent_count,
                  lld(resp_p->u.readdir.directory_version),
-                 (sm_p->u.readdir.dirdata_index + index),
+                 (sm_p->u.readdir.dirdata_index),
                  *(sm_p->readdir.dirent_outcount) );
 
     return 0;
