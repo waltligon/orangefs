@@ -15,6 +15,9 @@
     <ClCompile Include="..\..\..\src\client\windows\client-service\fs.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-service\service-main.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\src\client\windows\client-service\fs.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61019A9A-D6E0-4E04-B163-EADB88766C9E}</ProjectGuid>
     <RootNamespace>dokanservice</RootNamespace>

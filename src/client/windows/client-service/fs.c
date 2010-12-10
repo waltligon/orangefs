@@ -236,7 +236,12 @@ int fs_remove(char *fs_path)
         return -1;
 
     /* split path into path and file components */
+    len = strlen(fs_path) + 1;
+    base_dir = (char *) malloc(len);    
+    entry_name = (char *) malloc(len);
     ret = split_path(fs_path, base_dir, len, entry_name, len);
+    if (ret != 0)
+        goto fs_remove_exit;
 
     /* lookup parent entry */
     ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
@@ -250,6 +255,111 @@ int fs_remove(char *fs_path)
     ret = PVFS_sys_remove(entry_name, parent_ref, &credentials, NULL);
 
 fs_remove_exit:
+    free(entry_name);
+    free(base_dir);
+
+    return ret;
+}
+
+int fs_truncate(char *fs_path,
+                PVFS_size size)
+{
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int ret;
+    PVFS_sysresp_lookup resp_lookup;
+
+    /* lookup file */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_truncate_exit;
+
+    ret = PVFS_sys_truncate(resp_lookup.ref, size, &credentials, NULL);
+
+fs_truncate_exit:
+
+    return ret;
+}
+
+int fs_getattr(char *fs_path,
+               PVFS_sys_attr *attr)
+{
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int ret;
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_sysresp_getattr resp_getattr;
+
+    if (fs_path == NULL || strlen(fs_path) == 0 ||
+        attr == NULL)
+        return -PVFS_EINVAL;
+
+    /* lookup file */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_getattr_exit;
+
+    /* read all attributes */
+    ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
+                           &credentials, &resp_getattr, NULL);
+    if (ret != 0)
+        goto fs_getattr_exit;
+
+    memcpy(attr, &resp_getattr.attr, sizeof(PVFS_sys_attr));
+
+fs_getattr_exit:
+
+    return ret;
+}
+
+int fs_mkdir(char *fs_path,
+             PVFS_handle *handle)
+{
+    char *base_dir, *entry_name;
+    int len;
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_object_ref parent_ref;
+    PVFS_sys_attr attr;
+    PVFS_sysresp_mkdir resp_mkdir;
+    int ret;
+
+    if (fs_path == NULL || strlen(fs_path) == 0)
+        return -1;
+    
+    /* split path into path and file components */
+    len = strlen(fs_path) + 1;
+    base_dir = (char *) malloc(len);    
+    entry_name = (char *) malloc(len);
+    ret = split_path(fs_path, base_dir, len, entry_name, len);
+    if (ret != 0)
+        goto fs_mkdir_exit;
+
+    /* lookup parent path */
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+                          TRUE, NULL);
+
+    if (ret != 0)
+        goto fs_mkdir_exit;
+
+    parent_ref.fs_id = resp_lookup.ref.fs_id;
+    parent_ref.handle = resp_lookup.ref.handle;
+
+    /* create file */
+    memset(&attr, 0, sizeof(PVFS_sys_attr));
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
+    attr.perms = 1877;
+    attr.atime = attr.mtime = attr.ctime = time(NULL);
+
+    ret = PVFS_sys_mkdir(entry_name, parent_ref, attr, &credentials,
+                         &resp_mkdir, NULL);
+
+    if (ret == 0)
+        *handle = resp_mkdir.ref.handle;
+
+fs_mkdir_exit:
     free(entry_name);
     free(base_dir);
 

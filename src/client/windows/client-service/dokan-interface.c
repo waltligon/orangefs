@@ -7,6 +7,7 @@
 /* TODO: needed? #include <fileinfo.h> */
 
 #include "pvfs2.h"
+#include "fs.h"
 
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
@@ -92,25 +93,21 @@ static char *convert_string(const wchar_t *wcstr)
 
 static int
 PVFS2_Dokan_create_file(
-    LPCWSTR                  FileName,
-    DWORD                    AccessMode,
-    DWORD                    ShareMode,
-    DWORD                    CreationDisposition,
-    DWORD                    FlagsAndAttributes,
-    PDOKAN_FILE_INFO         DokanFileInfo)
+    LPCWSTR          FileName,
+    DWORD            AccessMode,
+    DWORD            ShareMode,
+    DWORD            CreationDisposition,
+    DWORD            FlagsAndAttributes,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *file_path, *fs_path;
+    char *local_path, *fs_path;
     DWORD fileAttr;
-    int ret, found;
+    int ret, found, err;
     PVFS_handle handle;
+    PVFS_sys_attr attr;
 
-    file_path = convert_string(FileName);
-    if (file_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
 
-    DbgPrint("CreateFile : %s\n", filePath);
+    DbgPrint("CreateFile : %s\n", FileName);
     
     if (CreationDisposition == CREATE_NEW)
         DbgPrint("\tCREATE_NEW\n");
@@ -198,10 +195,16 @@ PVFS2_Dokan_create_file(
 
     DbgPrint("\n");
 
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
+
     /* resolve the path */
     fs_path = (char *) malloc(MAX_PATH);
     MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(file_path, fs_path, MAX_PATH);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
     if (ret != 0)
     {
         free(fs_path);
@@ -210,14 +213,12 @@ PVFS2_Dokan_create_file(
 
     /* look up the file */
     found = 0;
-    ret = fs_lookup(fs_path, &handle);
-    /* TODO
-    if (ret == {PVFS_file_not_found})
+    ret = fs_lookup(fs_path, &handle);    
+    if (ret == -PVFS_ENOENT)
     {
-    
+        found = 0;
     }
-    else */
-    if (ret != 0)
+    else if (ret != 0)
     {
         free(fs_path);
         return -1;
@@ -231,48 +232,125 @@ PVFS2_Dokan_create_file(
     {
     case CREATE_ALWAYS:
         if (found)
-            /* remove file */;
-        /* create file */
+        {
+            fs_remove(fs_path);
+        }
+        ret = fs_create(fs_path, &handle);
         break;
     case CREATE_NEW:
-        if (found)
-            /* return error */;
-        /* create file */
+        if (found) 
+        {
+            /* set error */
+            ret = -PVFS_EEXIST;
+        }
+        else
+        {
+            /* create file */
+            ret = fs_create(fs_path, &handle);
+        }
         break;
     case OPEN_ALWAYS:
         if (!found)
-            /* create file */;
+        {    
+            /* create file */
+            ret = fs_create(fs_path, &handle);
+        }
         break;
     case OPEN_EXISTING:
         if (!found)
+        {
             /* return error */;
+            ret = -PVFS_ENOENT;
+        }
         break;
     case TRUNCATE_EXISTING:
         if (!found)
-            /* return error */;
+        {
+            ret = -PVFS_ENOENT;
+        }
+        else
+        {   
+            ret = fs_truncate(fs_path, 0);
+        }
     }
 
-    // save the file handle in context
-    DokanFileInfo->Context = handle;
-    return 0;
+    switch (ret)
+    {
+    case 0:
+        err = 0;
+        /* save the file handle in context */
+        DokanFileInfo->Context = handle;
+        /* determine whether this is a directory */
+        ret = fs_getattr(fs_path, &attr);
+        if (ret == 0)
+        {
+            DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
+        }
+        else
+            /* TODO */ ;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    case -PVFS_EEXIST:
+        err = -ERROR_ALREADY_EXISTS;
+        break;
+    default: 
+        /* TODO: default error */
+        err = -1;
+    }
+        
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_create_directory(
-    LPCWSTR                    FileName,
-    PDOKAN_FILE_INFO        DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char filePath[MAX_PATH];
-    GetFilePath(filePath, FileName);
+    char *local_path, *fs_path;
+    int ret, err;
+    PVFS_handle handle;
 
-    DbgPrint("CreateDirectory : %s\n", filePath);
-    if (!CreateDirectory(filePath, NULL)) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1; // error codes are negated value of Windows System Error codes
+    DbgPrint("CreateDirectory : %s\n", FileName);
+
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
-    return 0;
+
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(fs_path);
+        return -1;
+    }
+
+    ret = fs_mkdir(fs_path, &handle);
+
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        DokanFileInfo->IsDirectory = TRUE;
+        DokanFileInfo->Context = handle;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    case -PVFS_EEXIST:
+        err = -ERROR_ALREADY_EXISTS;    
+        break;
+    default:
+        err = -1;
+    }
+
+    return err;
 }
 
 
