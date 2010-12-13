@@ -31,6 +31,18 @@ int fs_getattr(char *fs_path,
 int fs_mkdir(char *fs_path,
              PVFS_handle *handle);
 
+int fs_read(char *fs_path, 
+            void *buffer,
+            size_t buffer_len,
+            uint64_t offset,
+            size_t *read_len);
+
+int fs_write(char *fs_path,
+             void *buffer,
+             size_t buffer_len,
+             uint64_t offset,
+             size_t *write_len);
+
 int fs_finalize();
 
 #endif

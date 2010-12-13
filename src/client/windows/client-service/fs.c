@@ -366,6 +366,58 @@ fs_mkdir_exit:
     return ret;
 }
 
+int fs_io(PVFS_io_type io_type,
+          char *fs_path,
+          void *buffer,
+          size_t buffer_len,
+          uint64_t offset,
+          size_t *op_len)
+{
+    PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_object_ref object_ref;
+    int ret;
+
+    if (fs_path == NULL || strlen(fs_path) == 0 ||
+        buffer == NULL)
+        return -PVFS_EINVAL;
+
+    /* lookup file */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_io_exit;
+
+    /* copy object ref */
+    object_ref.fs_id = resp_lookup.ref.fs_id;
+    object_ref.handle = resp_lookup.ref.handle;
+
+
+
+fs_io_exit:
+
+
+    return 0;
+}
+
+int fs_read(char *fs_path, 
+            void *buffer,
+            size_t buffer_len,
+            uint64_t offset,
+            size_t *read_len)
+{
+    return fs_io(PVFS_IO_READ, fs_path, buffer, buffer_len, offset, read_len);
+}
+
+int fs_write(char *fs_path,
+             void *buffer,
+             size_t buffer_len,
+             uint64_t offset,
+             size_t *write_len)
+{
+    return fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len);
+}
+
 int fs_finalize()
 {
     /* TODO */

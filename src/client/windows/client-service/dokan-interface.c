@@ -107,7 +107,7 @@ PVFS2_Dokan_create_file(
     PVFS_sys_attr attr;
 
 
-    DbgPrint("CreateFile : %s\n", FileName);
+    DbgPrint("CreateFile : %S\n", FileName);
     
     if (CreationDisposition == CREATE_NEW)
         DbgPrint("\tCREATE_NEW\n");
@@ -274,12 +274,17 @@ PVFS2_Dokan_create_file(
         }
     }
 
+    DbgPrint("Return code: %d\n", ret);
+
     switch (ret)
     {
     case 0:
         err = 0;
         /* save the file handle in context */
         DokanFileInfo->Context = handle;
+
+        DbgPrint("Context: %llx\n", DokanFileInfo->Context);
+
         /* determine whether this is a directory */
         ret = fs_getattr(fs_path, &attr);
         if (ret == 0)
@@ -299,6 +304,9 @@ PVFS2_Dokan_create_file(
         /* TODO: default error */
         err = -1;
     }
+
+    free(local_path);
+    free(fs_path);
         
     return err;
 }
@@ -313,7 +321,7 @@ PVFS2_Dokan_create_directory(
     int ret, err;
     PVFS_handle handle;
 
-    DbgPrint("CreateDirectory : %s\n", FileName);
+    DbgPrint("CreateDirectory : %S\n", FileName);
 
     local_path = convert_string(FileName);
     if (local_path == NULL)
@@ -327,6 +335,7 @@ PVFS2_Dokan_create_directory(
     ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
     if (ret != 0)
     {
+        free(local_path);
         free(fs_path);
         return -1;
     }
@@ -350,114 +359,119 @@ PVFS2_Dokan_create_directory(
         err = -1;
     }
 
+    free(local_path);
+    free(fs_path);
+
     return err;
 }
 
 
 static int
 PVFS2_Dokan_open_directory(
-    LPCWSTR                    FileName,
-    PDOKAN_FILE_INFO        DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char filePath[MAX_PATH];
-    HANDLE handle;
-    DWORD attr;
+    char *local_path, *fs_path;
+    int ret, err;
+    PVFS_handle handle;
+    PVFS_sys_attr attr;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("OpenDirectory : %S\n", FileName);
 
-    DbgPrint("OpenDirectory : %s\n", filePath);
-
-    attr = GetFileAttributes(filePath);
-    if (attr == INVALID_FILE_ATTRIBUTES) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1;
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
-    if (!(attr & FILE_ATTRIBUTE_DIRECTORY)) {
+
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
         return -1;
     }
 
-    handle = CreateFile(
-        filePath,
-        0,
-        FILE_SHARE_READ|FILE_SHARE_WRITE,
-        NULL,
-        OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS,
-        NULL);
+    /* lookup the file */
+    ret = fs_lookup(fs_path, &handle);    
 
-    if (handle == INVALID_HANDLE_VALUE) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1;
+    if (ret == 0)
+    {
+        ret = fs_getattr(fs_path, &attr);
+        if (ret == 0)
+        {
+            if (!(attr.objtype & PVFS_TYPE_DIRECTORY))
+            {
+                ret = -PVFS_ENOTDIR;
+            }
+        }
     }
 
-    DbgPrint("\n");
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        DokanFileInfo->Context = handle;    
+        DokanFileInfo->IsDirectory = TRUE;
+        break;
+    case -PVFS_ENOTDIR:
+        err = -ERROR_DIRECTORY;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    default: 
+        err = -1;  /* TODO */
+    }
 
-    DokanFileInfo->Context = (ULONG64)handle;
-
-    return 0;
+    free(local_path);
+    free(fs_path);
+    
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_close_file(
-    LPCWSTR                    FileName,
-    PDOKAN_FILE_INFO        DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char filePath[MAX_PATH];
-    GetFilePath(filePath, FileName);
+    DbgPrint("CloseFile: %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    if (DokanFileInfo->Context) {
-        DbgPrint("CloseFile: %s\n", filePath);
-        DbgPrint("\terror : not cleanuped file\n\n");
-        CloseHandle((HANDLE)DokanFileInfo->Context);
-        DokanFileInfo->Context = 0;
-    } else {
-        //DbgPrint("Close: %s\n\tinvalid handle\n\n", filePath);
-        DbgPrint("Close: %s\n\n", filePath);
-        return 0;
-    }
+    /* PVFS doesn't have a close-file semantic.
+       Simply clear the handle and return success */
+    DokanFileInfo->Context = 0;
 
-    //DbgPrint("\n");
     return 0;
 }
 
 
 static int
 PVFS2_Dokan_cleanup(
-    LPCWSTR                    FileName,
-    PDOKAN_FILE_INFO        DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char filePath[MAX_PATH];
-    GetFilePath(filePath, FileName);
+    DbgPrint("Cleanup: %S\n", FileName);
+    DbgPrint("  Context: %llx\n", DokanFileInfo->Context);
 
     if (DokanFileInfo->Context) {
-        DbgPrint("Cleanup: %s\n\n", filePath);
-        CloseHandle((HANDLE)DokanFileInfo->Context);
-        DokanFileInfo->Context = 0;
-
+        /**** TODO
         if (DokanFileInfo->DeleteOnClose) {
             DbgPrint("\tDeleteOnClose\n");
             if (DokanFileInfo->IsDirectory) {
                 DbgPrint("  DeleteDirectory ");
-                if (!RemoveDirectory(filePath)) {
-                    DbgPrint("error code = %d\n\n", GetLastError());
-                } else {
-                    DbgPrint("success\n\n");
-                }
             } else {
                 DbgPrint("  DeleteFile ");
-                if (DeleteFile(filePath) == 0) {
-                    DbgPrint(" error code = %d\n\n", GetLastError());
-                } else {
-                    DbgPrint("success\n\n");
-                }
             }
         }
-
+        */ 
     } else {
-        DbgPrint("Cleanup: %s\n\tinvalid handle\n\n", filePath);
+        DbgPrint("  Cleanup: invalid handle\n");
         return -1;
     }
 
@@ -467,60 +481,21 @@ PVFS2_Dokan_cleanup(
 
 static int
 PVFS2_Dokan_read_file(
-    LPCWSTR                FileName,
-    LPVOID                Buffer,
-    DWORD                BufferLength,
-    LPDWORD                ReadLength,
-    LONGLONG            Offset,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    LPVOID           Buffer,
+    DWORD            BufferLength,
+    LPDWORD          ReadLength,
+    LONGLONG         Offset,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
-    ULONG    offset = (ULONG)Offset;
-    BOOL    opened = FALSE;
+    PVFS_handle handle = DokanFileInfo->Context;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("ReadFile: %S\n", FileName);
+    DbgPrint("   Context: %llx\n", handle);
 
-    DbgPrint("ReadFile : %s\n", filePath);
-
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle, cleanuped?\n");
-        handle = CreateFile(
-            filePath,
-            GENERIC_READ,
-            FILE_SHARE_READ,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-        if (handle == INVALID_HANDLE_VALUE) {
-            DbgPrint("\tCreateFile error : %d\n\n", GetLastError());
-            return -1;
-        }
-        opened = TRUE;
-    }
     
-    if (SetFilePointer(handle, offset, NULL, FILE_BEGIN) == 0xFFFFFFFF) {
-        DbgPrint("\tseek error, offset = %d\n\n", offset);
-        if (opened)
-            CloseHandle(handle);
-        return -1;
-    }
 
-        
-    if (!ReadFile(handle, Buffer, BufferLength, ReadLength,NULL)) {
-        DbgPrint("\tread error = %u, buffer length = %d, read length = %d\n\n",
-            GetLastError(), BufferLength, *ReadLength);
-        if (opened)
-            CloseHandle(handle);
-        return -1;
 
-    } else {
-        DbgPrint("\tread %d, offset %d\n\n", *ReadLength, offset);
-    }
-
-    if (opened)
-        CloseHandle(handle);
 
     return 0;
 }
