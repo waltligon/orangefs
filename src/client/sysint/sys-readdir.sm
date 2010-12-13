@@ -296,15 +296,6 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     if(sm_p->u.readdir.num_dirdata_needed > 0)
     {
         readdir_reentry = 1;
-
-#if 0
-        /* update dirdata_index, the comp_fn is not updating the dirdata_index */
-        sm_p->u.readdir.dirdata_index += 
-            (sm_p->u.readdir.num_dirdata_needed - 1);
-        gossip_debug(GOSSIP_READDIR_DEBUG, "readdir: "
-                "re-entering msg_array_setup! update dirdata_index to %d !\n", 
-                sm_p->u.readdir.dirdata_index);
-#endif
     }
 
     if( sm_p->readdir.dirent_limit <= *(sm_p->readdir.dirent_outcount) )

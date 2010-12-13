@@ -136,6 +136,30 @@ int PINT_init_dist_dir_state(
 	return 0;
 }
 
+/* functions to test whether a dirdata server is active or not. 
+ * will return 0 if server_no is out of bound or server is inactive.
+ */
+int PINT_is_dist_dir_bucket_active(
+		const PVFS_dist_dir_attr *dist_dir_attr_p, 
+		const PVFS_dist_dir_bitmap bitmap,
+		const int server_no)
+{
+    if((server_no < 0) ||
+            (server_no >= dist_dir_attr_p->num_servers))
+    {
+        return 0;
+    }
+
+    if(TST_BIT(bitmap, server_no))
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
+
+}
 
 /*
  * client uses this function to find the server that should hold

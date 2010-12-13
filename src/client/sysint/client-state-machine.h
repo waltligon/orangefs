@@ -476,6 +476,7 @@ typedef struct PINT_sm_getattr_state
      * will be set to 0 in PINT_SM_GETATTR_STATE_FILL, 
      * now only used with sys-readdir.sm */
     int keep_size_array; 
+    int *active_dirdata_index;
 
     PVFS_size * size_array;
     PVFS_size size;

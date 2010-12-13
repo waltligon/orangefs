@@ -414,6 +414,9 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 free(attr->u.dir.hint.dist_params);
                 attr->u.dir.hint.dist_params = NULL;
             }
+        }
+        if (attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+        {
             if (attr->u.dir.dist_dir_bitmap)
             {
                 free(attr->u.dir.dist_dir_bitmap);

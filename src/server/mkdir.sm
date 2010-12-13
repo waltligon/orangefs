@@ -41,13 +41,6 @@ nested machine pvfs2_mkdir_work_sm
     state create_dist_dir_struct
     {
         run mkdir_create_dist_dir_struct;
-        success => select_dirdata_servers;
-        default => err_msg;
-    }
-
-    state select_dirdata_servers
-    {
-        run mkdir_select_dirdata_servers;
         success => create_local_dirdata_dspace;
         default => err_msg;
     }
@@ -250,7 +243,7 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
     s_op->u.mkdir.num_dirdata_servers =
         num_total_dirdata_servers;
 
-    /* TODO: if received >0, use; else use config_file value,*/
+    /* if received >0, use; else use config_file value,*/
     if(s_op->req->u.mkdir.num_dirent_files_req > 0)
     {
         num_initial_dirdata_servers = s_op->req->u.mkdir.num_dirent_files_req;
@@ -322,38 +315,6 @@ static PINT_sm_action mkdir_create_dist_dir_struct(
 
     return SM_ACTION_COMPLETE; 
 }
-
-
-static PINT_sm_action mkdir_select_dirdata_servers(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    /*
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr;
-    */
-
-/* not selecting servers now, suppose has dirdata on every metadata server */
-
-	/******** if use the function in create.sm to get server list:
-*
-int PINT_cached_config_get_server_list(
-    PVFS_fs_id fs_id,
-    PINT_dist *dist,
-    int num_dfiles_req,
-    PVFS_sys_layout *layout,
-    const char ***server_names,
-    int *server_count)
-
-1. need to provide dist & layout
-2. server_count might be different from num_dfiles_req, then better put create dist-dir-struct after the servers selection function.
-
-****************/
-
-
-        return SM_ACTION_COMPLETE;
-
-}
-
 
 
 static PINT_sm_action mkdir_create_local_dirdata_dspace(

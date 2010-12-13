@@ -24,6 +24,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-types-debug.h"
+#include "dist-dir-utils.h"
 
 /* pvfs2_client_getattr_sm
  *
@@ -704,27 +705,50 @@ static int getattr_object_getattr_comp_fn(
         case PVFS_TYPE_DIRECTORY:
         {
             uint32_t dirent_file_count_i;
+            int tmp_i;
+            unsigned char *c;
 
             /* dirent_count will be collected later */
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                 "getattr comp_fn [%p] "
                 "dfile_count = %d "
                 "dist_name_len = %d "
-                "dist_params_len = %d ",
-                /* "dirent_count = %llu ", */
+                "dist_params_len = %d\n ",
                 attr,
                 attr->u.dir.hint.dfile_count,
                 attr->u.dir.hint.dist_name_len,
                 attr->u.dir.hint.dist_params_len);
-                /* llu(attr->u.dir.dirent_count) */
 
             if(attr->mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                        "dirdata_server_count = %d\n",
-                        attr->u.dir.dist_dir_attr.num_servers);
 
-                /* !!! change more later */
+                gossip_debug(GOSSIP_CLIENT_DEBUG, 
+                        "sys-getattr: dist-dir-attr "
+                        "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+                        "split_size=%d, server_no=%d and branch_level=%d\n",
+                        attr->u.dir.dist_dir_attr.tree_height,
+                        attr->u.dir.dist_dir_attr.num_servers,
+                        attr->u.dir.dist_dir_attr.bitmap_size,
+                        attr->u.dir.dist_dir_attr.split_size,
+                        attr->u.dir.dist_dir_attr.server_no,
+                        attr->u.dir.dist_dir_attr.branch_level);
+
+                /* gossip bitmap */
+                gossip_debug(GOSSIP_CLIENT_DEBUG,
+                        "sys-getattr: dist_dir_bitmap as:\n");
+                for(tmp_i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+                        tmp_i >= 0 ; tmp_i--)
+                {
+                    c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + tmp_i);
+                    gossip_debug(GOSSIP_MKDIR_DEBUG,
+                            " i=%d : %02x %02x %02x %02x\n",
+                            tmp_i, c[3], c[2], c[1], c[0]);
+                }
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "\n");
+
+                /* gossip dirdata handles */
+                gossip_debug(GOSSIP_CLIENT_DEBUG,
+                        "sys-getattr: dirdata_handles as:\n");
                 for (dirent_file_count_i = 0;
                         dirent_file_count_i < 
                         attr->u.dir.dist_dir_attr.num_servers;
@@ -1236,6 +1260,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     int i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    int tmp_index, cur_index;
 
     js_p->error_code = 0;
 
@@ -1248,9 +1273,33 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
             attr->u.dir.dist_dir_attr.num_servers);
 
+    sm_p->getattr.active_dirdata_index = (int *)malloc(
+            sizeof(*sm_p->getattr.active_dirdata_index) *
+            attr->u.dir.dist_dir_attr.num_servers);
+
+    if(!sm_p->getattr.active_dirdata_index)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+
+    /* find out active dirdata handles */
+    tmp_index = 0;
+    for(i=0; i<attr->u.dir.dist_dir_attr.num_servers; i++)
+    {
+        if(PINT_is_dist_dir_bucket_active(&attr->u.dir.dist_dir_attr,
+                    attr->u.dir.dist_dir_bitmap, i))
+        {
+            sm_p->getattr.active_dirdata_index[tmp_index] = i;
+            tmp_index++;
+        }
+    }
+    assert(tmp_index > 0);
+
     /* initialize msgpair array */
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, 
-            attr->u.dir.dist_dir_attr.num_servers);
+            tmp_index);
     if(ret != 0)
     {
         js_p->error_code = ret;
@@ -1260,23 +1309,25 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     /* prepare to post the getattr send/recv pairs for all dirdata*/
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
+        cur_index = sm_p->getattr.active_dirdata_index[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "getattr: posting dirdata getattr[%d] (%lld,%d)\n",
-                     i, llu(attr->u.dir.dirdata_handles[i]),
+                     "getattr: posting dirdata getattr[%d] ([%d]:%lld,%d)\n",
+                     i, cur_index,
+                     llu(attr->u.dir.dirdata_handles[cur_index]),
                      sm_p->getattr.object_ref.fs_id);
 
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->getattr.object_ref.fs_id,
-            attr->u.dir.dirdata_handles[i],
+            attr->u.dir.dirdata_handles[cur_index],
             PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT, /* only interested in timestamp and dirent_count */
             sm_p->hints);
 
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-        msg_p->handle = attr->u.dir.dirdata_handles[i];
+        msg_p->handle = attr->u.dir.dirdata_handles[cur_index];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = getattr_dirdata_getattr_comp_fn;
 
@@ -1304,6 +1355,7 @@ static int getattr_dirdata_getattr_comp_fn(
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PVFS_object_attr *attr_p = NULL;
     PVFS_object_attr *resp_attr_p = NULL;
+    int cur_index;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "getattr_dirdata_getattr_comp_fn called\n");
@@ -1319,21 +1371,24 @@ static int getattr_dirdata_getattr_comp_fn(
 
     attr_p = &sm_p->getattr.attr;
     resp_attr_p = &resp_p->u.getattr.attr;
+    cur_index = sm_p->getattr.active_dirdata_index[index];
 
     assert(resp_attr_p->objtype == PVFS_TYPE_DIRDATA);
     /* also assert timestamp? */
     assert(resp_attr_p->mask & PVFS_ATTR_DIR_DIRENT_COUNT);
+    assert( (cur_index >= 0) && 
+            (cur_index < attr_p->u.dir.dist_dir_attr.num_servers));
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata getattr[%d] returns attrs: "
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "dirdata getattr[%d] (#[%d]) returns attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
-            index, 
+            index, cur_index,
             llu(resp_attr_p->u.dir.dirent_count),
             llu(resp_attr_p->atime),
             llu(resp_attr_p->mtime),
             llu(resp_attr_p->ctime));
 
     /* update timestamp and dirent_count */
-    sm_p->getattr.size_array[index] = resp_attr_p->u.dir.dirent_count; 
+    sm_p->getattr.size_array[cur_index] = resp_attr_p->u.dir.dirent_count; 
     attr_p->u.dir.dirent_count += resp_attr_p->u.dir.dirent_count;
     if(attr_p->atime < resp_attr_p->atime)
     {
@@ -1366,6 +1421,11 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
     
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+
+    if(sm_p->getattr.active_dirdata_index)
+    {
+        free(sm_p->getattr.active_dirdata_index);
+    }
 
     return SM_ACTION_COMPLETE;
 }

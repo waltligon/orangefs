@@ -43,6 +43,10 @@ int PINT_init_dist_dir_state(
 		const int num_servers, 
 		const int server_no, 
 		const int pre_dsg_num_server);
+int PINT_is_dist_dir_bucket_active(
+		const PVFS_dist_dir_attr *dist_dir_attr_p, 
+		const PVFS_dist_dir_bitmap bitmap,
+		const int server_no); 
 int PINT_find_dist_dir_bucket(
 		const PVFS_dist_dir_hash_type hash, 
 		const PVFS_dist_dir_attr *const dist_dir_attr,
