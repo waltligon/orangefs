@@ -34,15 +34,17 @@ int fs_mkdir(char *fs_path,
 int fs_read(char *fs_path, 
             void *buffer,
             size_t buffer_len,
-            uint64_t offset,
+            PVFS_offset offset,
             size_t *read_len);
 
 int fs_write(char *fs_path,
              void *buffer,
              size_t buffer_len,
-             uint64_t offset,
+             PVFS_offset offset,
              size_t *write_len);
 
+int fs_flush(char *fs_path);
+             
 int fs_finalize();
 
 #endif

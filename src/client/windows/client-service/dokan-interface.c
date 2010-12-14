@@ -488,172 +488,192 @@ PVFS2_Dokan_read_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    PVFS_handle handle = DokanFileInfo->Context;
+    char *local_path, *fs_path;
+    int ret, err;
 
     DbgPrint("ReadFile: %S\n", FileName);
-    DbgPrint("   Context: %llx\n", handle);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
+
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
+        return -1;
+    }
     
+    /* perform the read operation */
+    ret = fs_read(fs_path, Buffer, BufferLength, Offset, (size_t *) ReadLength);
 
+    DbgPrint("   fs_read returns %d\n", ret);
 
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        break;
+    default:
+        err = -1;
+    }
 
-    return 0;
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_write_file(
-    LPCWSTR        FileName,
-    LPCVOID        Buffer,
-    DWORD        NumberOfBytesToWrite,
-    LPDWORD        NumberOfBytesWritten,
-    LONGLONG            Offset,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    LPCVOID          Buffer,
+    DWORD            NumberOfBytesToWrite,
+    LPDWORD          NumberOfBytesWritten,
+    LONGLONG         Offset,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
-    ULONG    offset = (ULONG)Offset;
-    BOOL    opened = FALSE;
+    char *local_path, *fs_path;
+    int ret, err;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("WriteFile: %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    DbgPrint("WriteFile : %s, offset %I64d, length %d\n", filePath, Offset, NumberOfBytesToWrite);
-
-    // reopen the file
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle, cleanuped?\n");
-        handle = CreateFile(
-            filePath,
-            GENERIC_WRITE,
-            FILE_SHARE_WRITE,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-        if (handle == INVALID_HANDLE_VALUE) {
-            DbgPrint("\tCreateFile error : %d\n\n", GetLastError());
-            return -1;
-        }
-        opened = TRUE;
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
 
-    if (DokanFileInfo->WriteToEndOfFile) {
-        if (SetFilePointer(handle, 0, NULL, FILE_END) == INVALID_SET_FILE_POINTER) {
-            DbgPrint("\tseek error, offset = EOF, error = %d\n", GetLastError());
-            return -1;
-        }
-    } else if (SetFilePointer(handle, offset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER) {
-        DbgPrint("\tseek error, offset = %d, error = %d\n", offset, GetLastError());
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
         return -1;
     }
+    
+    /* perform the read operation */
+    ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
+                   (size_t *) NumberOfBytesWritten);
 
-        
-    if (!WriteFile(handle, Buffer, NumberOfBytesToWrite, NumberOfBytesWritten, NULL)) {
-        DbgPrint("\twrite error = %u, buffer length = %d, write length = %d\n",
-            GetLastError(), NumberOfBytesToWrite, *NumberOfBytesWritten);
-        return -1;
+    DbgPrint("   fs_write returns %d\n", ret);
 
-    } else {
-        DbgPrint("\twrite %d, offset %d\n\n", *NumberOfBytesWritten, offset);
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        break;
+    default:
+        err = -1;
     }
 
-    // close the file when it is reopened
-    if (opened)
-        CloseHandle(handle);
-
-    return 0;
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_flush_file_buffers(
-    LPCWSTR        FileName,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
+    char *local_path, *fs_path;
+    int ret, err;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("FlushFileBuffers : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    DbgPrint("FlushFileBuffers : %s\n", filePath);
-
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle\n\n");
-        return 0;
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
 
-    if (FlushFileBuffers(handle)) {
-        return 0;
-    } else {
-        DbgPrint("\tflush error code = %d\n", GetLastError());
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
         return -1;
     }
 
+    /* flush the file */
+    ret = fs_flush(fs_path);
+
+    DbgPrint("   fs_flush returns %d\n", ret);
+
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        break;
+    default:
+        err = -1;
+    }
+
+    free(fs_path);
+    free(local_path);
+
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_get_file_information(
-    LPCWSTR                            FileName,
-    LPBY_HANDLE_FILE_INFORMATION    HandleFileInformation,
-    PDOKAN_FILE_INFO                DokanFileInfo)
+    LPCWSTR                      FileName,
+    LPBY_HANDLE_FILE_INFORMATION HandleFileInformation,
+    PDOKAN_FILE_INFO             DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
-    BOOL    opened = FALSE;
+    char *local_path, *fs_path;
+    int ret, err;
+    PVFS_sys_attr attr;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("GetFileInfo : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    DbgPrint("GetFileInfo : %s\n", filePath);
-
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle\n\n");
-
-        // If CreateDirectory returned FILE_ALREADY_EXISTS and 
-        // it is called with FILE_OPEN_IF, that handle must be opened.
-        handle = CreateFile(filePath, 0, FILE_SHARE_READ, NULL, OPEN_EXISTING,
-            FILE_FLAG_BACKUP_SEMANTICS, NULL);
-        if (handle == INVALID_HANDLE_VALUE)
-            return -1;
-        opened = TRUE;
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
 
-    if (!GetFileInformationByHandle(handle,HandleFileInformation)) {
-        DbgPrint("\terror code = %d\n", GetLastError());
-
-        // FileName is a root directory
-        // in this case, FindFirstFile can't get directory information
-        if (wcslen(FileName) == 1) {
-            DbgPrint("  root dir\n");
-            HandleFileInformation->dwFileAttributes = GetFileAttributes(filePath);
-
-        } else {
-            WIN32_FIND_DATAW find;
-            ZeroMemory(&find, sizeof(WIN32_FIND_DATAW));
-            handle = FindFirstFile(filePath, &find);
-            if (handle == INVALID_HANDLE_VALUE) {
-                DbgPrint("\tFindFirstFile error code = %d\n\n", GetLastError());
-                return -1;
-            }
-            HandleFileInformation->dwFileAttributes = find.dwFileAttributes;
-            HandleFileInformation->ftCreationTime = find.ftCreationTime;
-            HandleFileInformation->ftLastAccessTime = find.ftLastAccessTime;
-            HandleFileInformation->ftLastWriteTime = find.ftLastWriteTime;
-            HandleFileInformation->nFileSizeHigh = find.nFileSizeHigh;
-            HandleFileInformation->nFileSizeLow = find.nFileSizeLow;
-            DbgPrint("\tFindFiles OK, file size = %d\n", find.nFileSizeLow);
-            FindClose(handle);
-        }
-    } else {
-        DbgPrint("\tGetFileInformationByHandle success, file size = %d\n",
-            HandleFileInformation->nFileSizeLow);
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
+        return -1;
     }
 
+    ret = fs_getattr(fs_path, &attr);
+
+    HandleFileInformation->dwFileAttributes = find.dwFileAttributes;
+    HandleFileInformation->ftCreationTime = find.ftCreationTime;
+    HandleFileInformation->ftLastAccessTime = find.ftLastAccessTime;
+    HandleFileInformation->ftLastWriteTime = find.ftLastWriteTime;
+    HandleFileInformation->nFileSizeHigh = find.nFileSizeHigh;
+    HandleFileInformation->nFileSizeLow = find.nFileSizeLow;
+        
     DbgPrint("\n");
 
-    if (opened) {
-        CloseHandle(handle);
-    }
 
     return 0;
 }

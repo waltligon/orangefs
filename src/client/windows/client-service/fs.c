@@ -376,6 +376,8 @@ int fs_io(PVFS_io_type io_type,
     PVFS_sys_mntent *mntent = fs_get_mntent(0);
     PVFS_sysresp_lookup resp_lookup;
     PVFS_object_ref object_ref;
+    PVFS_Request file_req, mem_req;
+    PVFS_sysresp_io resp_io;
     int ret;
 
     if (fs_path == NULL || strlen(fs_path) == 0 ||
@@ -392,18 +394,32 @@ int fs_io(PVFS_io_type io_type,
     object_ref.fs_id = resp_lookup.ref.fs_id;
     object_ref.handle = resp_lookup.ref.handle;
 
+    /* get memory buffer */
+    file_req = PVFS_BYTE;
 
+    ret = PVFS_Request_contiguous(buffer_len, PVFS_BYTE, &(mem_req));
+    if (ret != 0)
+        goto fs_io_exit;
+
+    /* perform io operation */
+    ret = PVFS_sys_io(object_ref, file_req, offset, buffer, mem_req,
+                      &credentials, &resp_io, io_type, NULL);
+    if (ret == 0 && op_len != NULL)
+    {
+        *op_len = resp_io.total_completed;
+    }
+
+    PVFS_Request_free(&mem_req);
 
 fs_io_exit:
 
-
-    return 0;
+    return ret;
 }
 
 int fs_read(char *fs_path, 
             void *buffer,
             size_t buffer_len,
-            uint64_t offset,
+            PVFS_offset offset,
             size_t *read_len)
 {
     return fs_io(PVFS_IO_READ, fs_path, buffer, buffer_len, offset, read_len);
@@ -412,10 +428,33 @@ int fs_read(char *fs_path,
 int fs_write(char *fs_path,
              void *buffer,
              size_t buffer_len,
-             uint64_t offset,
+             PVFS_offset offset,
              size_t *write_len)
 {
     return fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len);
+}
+
+int fs_flush(char *fs_path)
+{
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int ret;
+    PVFS_sysresp_lookup resp_lookup;
+
+    if (fs_path == NULL || strlen(fs_path) == 0)
+        return -PVFS_EINVAL;
+
+    /* lookup file */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_flush_exit;
+
+    /* flush file */
+    ret = PVFS_sys_flush(resp_lookup.ref, &credentials, NULL);
+
+fs_flush_exit:
+
+    return ret;
 }
 
 int fs_finalize()
