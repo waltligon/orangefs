@@ -234,7 +234,12 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     s_op->req->hints);
 
                 /*this identifies which "local" frame is being populated.*/
-                tree_communicate_s_op->u.tree_communicate.handle_index=i;
+                /* we need to store this int in a location not in the union.
+                 * it will be accessed as u.getattr in the state machine
+                 * so we can't rely on a value in u.tree_communicate here.
+                 * All we need is an int, I'm loathe to do a malloc instead of
+                 * just re-purposing one of the existing ints in the s_op. */
+                tree_communicate_s_op->keyval_count = i;
 
                 break;
             }
@@ -657,9 +662,9 @@ static int tree_get_file_size_work_cleanup(
                          ,lld(old_frame->resp.u.getattr.attr.u.data.size));
             gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
                                             ,__func__
-                                            ,old_frame->u.tree_communicate.handle_index);
+                                            ,old_frame->keyval_count);
             size_array_index = s_op->u.tree_communicate.local_join_size[
-                                     old_frame->u.tree_communicate.handle_index];
+                                     old_frame->keyval_count];
             error_array_index=size_array_index;
             s_op->resp.u.tree_get_file_size.size[size_array_index]   = old_frame->resp.u.getattr.attr.u.data.size;
             s_op->resp.u.tree_get_file_size.error[error_array_index] = error_code;
