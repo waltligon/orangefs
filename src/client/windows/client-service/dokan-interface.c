@@ -7,6 +7,7 @@
 /* TODO: needed? #include <fileinfo.h> */
 
 #include "pvfs2.h"
+#include "str-utils.h"
 #include "fs.h"
 
 BOOL g_UseStdErr;
@@ -87,6 +88,17 @@ static char *convert_string(const wchar_t *wcstr)
 
     return mbstr;
 
+}
+
+/* convert PVFS time to Windows FILETIME 
+   (from MSDN Knowledgebase) */
+void convert_time(time_t t, LPFILETIME pft)
+{
+    LONGLONG ll;
+
+    ll = Int32x32To64(t, 10000000) + 116444736000000000;
+    pft->dwLowDateTime = (DWORD) ll;
+    pft->dwHighDateTime = ll >> 32;
 }
 
 #define cleanup_string(str)    free(str)
@@ -638,9 +650,10 @@ PVFS2_Dokan_get_file_information(
     LPBY_HANDLE_FILE_INFORMATION HandleFileInformation,
     PDOKAN_FILE_INFO             DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *local_path, *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
+    bool attr_set = FALSE;    
 
     DbgPrint("GetFileInfo : %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -663,39 +676,98 @@ PVFS2_Dokan_get_file_information(
         return -1;
     }
 
+    /* get file attributes */
     ret = fs_getattr(fs_path, &attr);
 
-    HandleFileInformation->dwFileAttributes = find.dwFileAttributes;
-    HandleFileInformation->ftCreationTime = find.ftCreationTime;
-    HandleFileInformation->ftLastAccessTime = find.ftLastAccessTime;
-    HandleFileInformation->ftLastWriteTime = find.ftLastWriteTime;
-    HandleFileInformation->nFileSizeHigh = find.nFileSizeHigh;
-    HandleFileInformation->nFileSizeLow = find.nFileSizeLow;
+    if (ret == 0)
+    {
+        /* convert to Windows attributes */
+        HandleFileInformation->dwFileAttributes = 0;
+        if (attr.objtype & PVFS_TYPE_DIRECTORY) 
+            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
+
+        /* check for hidden file */
+        filename = (char *) malloc(strlen(fs_path) + 1);
+        MALLOC_CHECK(filename);
+        ret = PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);
+        if (ret == 0 && filename[0] == '.')
+            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+        free(filename);
+        ret = 0;
         
-    DbgPrint("\n");
+        /* TODO
+           Check perms for READONLY */
+        
+        /* check for temporary file */
+        if (DokanFileInfo->DeleteOnClose)
+            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
 
+        /* normal file */
+        if (HandleFileInformation->dwFileAttributes == 0)
+            HandleFileInformation->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+        
+        /* file times */
+        convert_time(attr.ctime, &HandleFileInformation->ftCreationTime);
+        convert_time(attr.atime, &HandleFileInformation->ftLastAccessTime);
+        convert_time(attr.mtime, &HandleFileInformation->ftLastWriteTime);
 
-    return 0;
+        /* file size */
+        HandleFileInformation->nFileSizeHigh = (attr.size & 0x7FFFFFFF00000000LL) >> 32;
+        HandleFileInformation->nFileSizeLow = (attr.size & 0xFFFFFFFFLL);
+
+    }    
+    
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        break;
+    default:
+        err = -1;
+    }
+
+    cleanup_string(local_path);
+    free(fs_path);
+
+    DbgPrint("   fs_getattr returns %d\n", ret);
+
+    return err;
 }
 
 
 static int
 PVFS2_Dokan_find_files(
-    LPCWSTR                FileName,
-    PFillFindData        FillFindData, // function pointer
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    PFillFindData    FillFindData, // function pointer
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char                filePath[MAX_PATH];
-    HANDLE                hFind;
-    WIN32_FIND_DATAW    findData;
-    DWORD                error;
-    char                yenStar = "\\*";
-    int count = 0;
+    char *local_path, *fs_path, *filename;
+    int ret, err;
+    PVFS_sys_attr attr;
+    bool attr_set = FALSE;    
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("FindFiles : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    wcscat(filePath, yenStar);
-    DbgPrint("FindFiles :%s\n", filePath);
+    /* convert from Unicode */
+    local_path = convert_string(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
+
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        free(local_path);
+        free(fs_path);
+        return -1;
+    }
+
+
 
     hFind = FindFirstFile(filePath, &findData);
 

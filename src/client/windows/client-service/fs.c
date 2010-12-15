@@ -416,23 +416,18 @@ fs_io_exit:
     return ret;
 }
 
-int fs_read(char *fs_path, 
-            void *buffer,
-            size_t buffer_len,
-            PVFS_offset offset,
-            size_t *read_len)
-{
-    return fs_io(PVFS_IO_READ, fs_path, buffer, buffer_len, offset, read_len);
-}
+#define fs_read(fs_path, \
+                buffer, \
+                buffer_len, \
+                offset, \
+                read_len)  fs_io(PVFS_IO_READ, fs_path, buffer, buffer_len, offset, read_len)
 
-int fs_write(char *fs_path,
-             void *buffer,
-             size_t buffer_len,
-             PVFS_offset offset,
-             size_t *write_len)
-{
-    return fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len);
-}
+
+#define fs_write(fs_path, \
+                 buffer, \
+                 buffer_len, \
+                 offset, \
+                 write_len)  fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len)
 
 int fs_flush(char *fs_path)
 {
@@ -453,6 +448,66 @@ int fs_flush(char *fs_path)
     ret = PVFS_sys_flush(resp_lookup.ref, &credentials, NULL);
 
 fs_flush_exit:
+
+    return ret;
+}
+
+int fs_read_first_file(char *fs_path,
+                       PVFS_ds_position *token,
+                       char *filename,
+                       size_t max_name_len)
+{
+    if (token == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+   *token = PVFS_READDIR_START;
+   return fs_read_next_file(fs_path, token, filename, max_name_len);
+}
+
+int fs_read_next_file(char *fs_path, 
+                      PVFS_ds_position *token,
+                      char *filename,
+                      size_t max_name_len)
+{
+    int ret;
+
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int ret;
+    PVFS_sysresp_lookup resp_lookup;
+    PVFS_sysresp_readdir resp_readdir;
+
+    if (fs_path == NULL || strlen(fs_path) == 0 ||
+        token == NULL || filename == NULL || max_name_len == 0)
+        return -PVFS_EINVAL;
+
+    /* lookup file */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_readdir_exit;
+
+    /* read one entry, starting with token */
+    ret = PVFS_sys_readdir(resp_lookup.ref, *token, 1, &credentials, 
+                           &resp_readdir, NULL);
+    if (ret != 0)
+        goto fs_readdir_exit;
+
+    /* copy output results */
+    if (resp_readdir.pvfs_dirent_outcount != 0)
+    {
+        *token = resp_readdir.token;
+        
+        strncpy(filename, resp_readdir.dirent_array[0].d_name, max_name_len);
+    }
+    else
+    {
+        /* return empty string on end */
+        filename[0] = '\0';
+    }
+
+fs_readdir_exit:
 
     return ret;
 }

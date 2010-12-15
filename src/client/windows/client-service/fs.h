@@ -44,7 +44,17 @@ int fs_write(char *fs_path,
              size_t *write_len);
 
 int fs_flush(char *fs_path);
-             
+
+int fs_read_first_file(char *fs_path,
+                       PVFS_ds_position *token,
+                       char *filename,
+                       size_t max_name_len);
+
+int fs_read_next_file(char *fs_path, 
+                      PVFS_ds_position *token,
+                      char *filename,
+                      size_t max_name_len);
+
 int fs_finalize();
 
 #endif
