@@ -2471,7 +2471,7 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=2
+PVFS2_VERSION_SUB=3
 #PVFS2_VERSION_RELEASE="orangefs-20100920"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
@@ -5752,13 +5752,21 @@ if test "${with_kernel+set}" = set; then :
     if ! test -r $withval/include/linux/version.h ; then
        as_fn_error "The kernel source tree must have been configured." "$LINENO" 5
     fi
-    vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
-    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-    	# 2.6.18 moves UTS_RELEASE into its own header
-	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
-	       as_fn_error "The kernel source tree does not appear to be 2.6" "$LINENO" 5
-	fi
+
+    if ! test -r $withval/include/linux/utsrelease.h && ! test -r $withval/include/generated/utsrelease.h; then
+        as_fn_error "The kernel source tree does not contain a known utsrelease.h file." "$LINENO" 5
     fi
+
+    if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    elif test -r $withval/include/linux/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    else
+        as_fn_error "The kernel source tree does not appear to be 2.6" "$LINENO" 5
+    fi
+
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
