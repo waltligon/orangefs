@@ -312,6 +312,30 @@ fs_getattr_exit:
     return ret;
 }
 
+int fs_setattr(char *fs_path,
+               PVFS_sys_attr *attr)
+{
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int ret;
+    PVFS_sysresp_lookup resp_lookup;
+
+    if (fs_path == NULL || strlen(fs_path) == 0 ||
+        attr == NULL)
+        return -PVFS_EINVAL;
+
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_setattr_exit;
+
+    /* set attributes */
+    ret = PVFS_sys_setattr(resp_lookup.ref, *attr, &credentials, NULL);
+
+fs_setattr_exit:
+
+    return ret;
+}
+
 int fs_mkdir(char *fs_path,
              PVFS_handle *handle)
 {
@@ -452,7 +476,7 @@ fs_flush_exit:
     return ret;
 }
 
-int fs_read_first_file(char *fs_path,
+int fs_find_first_file(char *fs_path,
                        PVFS_ds_position *token,
                        char *filename,
                        size_t max_name_len)
@@ -463,10 +487,10 @@ int fs_read_first_file(char *fs_path,
     }
 
    *token = PVFS_READDIR_START;
-   return fs_read_next_file(fs_path, token, filename, max_name_len);
+   return fs_find_next_file(fs_path, token, filename, max_name_len);
 }
 
-int fs_read_next_file(char *fs_path, 
+int fs_find_next_file(char *fs_path, 
                       PVFS_ds_position *token,
                       char *filename,
                       size_t max_name_len)
@@ -503,7 +527,7 @@ int fs_read_next_file(char *fs_path,
     }
     else
     {
-        /* return empty string on end */
+        /* return empty string when done */
         filename[0] = '\0';
     }
 

@@ -52,7 +52,7 @@ GetFilePath(
 }
 
 /* convert string from wide char (Unicode) to multi-byte string */
-static char *convert_string(const wchar_t *wcstr)
+static char *convert_wstring(const wchar_t *wcstr)
 {
     errno_t err;
     size_t ret, mb_size;
@@ -63,24 +63,21 @@ static char *convert_string(const wchar_t *wcstr)
 
     if (err != 0)
     {
-        DbgPrint("convert_string: %d\n", err);
+        DbgPrint("convert_wstring: %d\n", err);
         return NULL;
     }
 
     /* allocate buffer */
     mb_size = ret;
     mbstr = (char *) malloc(mb_size);
-    if (mbstr == NULL)
-    {
-        DbgPrint("convert_string: no memory\n");
-    }
+    MALLOC_CHECK(mbstr);
 
     /* convert string */
     err = wcstombs_s(&ret, mbstr, mb_size, wcstr, wcslen(wcstr));
 
     if (err != 0)
     {
-        DbgPrint("convert_string 2: %d\n", err);
+        DbgPrint("convert_wstring 2: %d\n", err);
         free(mbstr);
 
         return NULL;
@@ -89,6 +86,41 @@ static char *convert_string(const wchar_t *wcstr)
     return mbstr;
 
 }
+
+static wchar_t *convert_mbstring(const char *mbstr)
+{
+    errno_t err;
+    size_t ret, w_size;
+    wchar_t *wstr;
+
+    /* get size of buffer */
+    err = mbstowcs_s(&ret, NULL, 0, mbstr, 0);
+
+    if (err != 0)
+    {
+        DbgPrint("convert_mbstring: %d\n", err);
+        return NULL;
+    }
+
+    w_size = ret;
+    wstr = (wchar_t *) malloc(w_size * sizeof(wchar_t));
+    MALLOC_CHECK(wstr);
+
+    /* convert string */
+    err = mbstowcs_s(&ret, wstr, w_size, mbstr, strlen(mbstr));
+
+    if (err != 0)
+    {
+        DbgPrint("convert_mbstring 2: %d\n", err);
+        free(wstr);
+
+        return NULL;
+    }
+
+    return wstr;
+}
+
+#define cleanup_string(str)    free(str)
 
 /* convert PVFS time to Windows FILETIME 
    (from MSDN Knowledgebase) */
@@ -101,7 +133,6 @@ void convert_time(time_t t, LPFILETIME pft)
     pft->dwHighDateTime = ll >> 32;
 }
 
-#define cleanup_string(str)    free(str)
 
 static int
 PVFS2_Dokan_create_file(
@@ -207,7 +238,7 @@ PVFS2_Dokan_create_file(
 
     DbgPrint("\n");
 
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -335,7 +366,7 @@ PVFS2_Dokan_create_directory(
 
     DbgPrint("CreateDirectory : %S\n", FileName);
 
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -391,7 +422,7 @@ PVFS2_Dokan_open_directory(
     DbgPrint("OpenDirectory : %S\n", FileName);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -507,7 +538,7 @@ PVFS2_Dokan_read_file(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -558,7 +589,7 @@ PVFS2_Dokan_write_file(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -606,7 +637,7 @@ PVFS2_Dokan_flush_file_buffers(
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -653,13 +684,12 @@ PVFS2_Dokan_get_file_information(
     char *local_path, *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
-    bool attr_set = FALSE;    
 
     DbgPrint("GetFileInfo : %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -736,21 +766,20 @@ PVFS2_Dokan_get_file_information(
 
 
 static int
-PVFS2_Dokan_find_files(
+PVFS2_Dokan_set_file_attributes(
     LPCWSTR          FileName,
-    PFillFindData    FillFindData, // function pointer
+    DWORD            FileAttributes,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *local_path, *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
-    bool attr_set = FALSE;    
 
-    DbgPrint("FindFiles : %S\n", FileName);
+    DbgPrint("SetFileAttributes : %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /* convert from Unicode */
-    local_path = convert_string(FileName);
+    local_path = convert_wstring(FileName);
     if (local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -767,48 +796,130 @@ PVFS2_Dokan_find_files(
         return -1;
     }
 
+    /* convert attributes to PVFS */
+    ret = fs_getattr(fs_path, &attr);
+    if (ret != 0)
+    {
+        if (FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            attr.objtype |= PVFS_TYPE_DIRECTORY;
 
-
-    hFind = FindFirstFile(filePath, &findData);
-
-    if (hFind == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid file handle. Error is %u\n\n", GetLastError());
-        return -1;
     }
 
-    FillFindData(&findData, DokanFileInfo);
-    count++;
 
-    while (FindNextFile(hFind, &findData) != 0) {
-         FillFindData(&findData, DokanFileInfo);
-        count++;
-    }
-    
-    error = GetLastError();
-    FindClose(hFind);
-
-    if (error != ERROR_NO_MORE_FILES) {
-        DbgPrint("\tFindNextFile error. Error is %u\n\n", error);
-        return -1;
-    }
-
-    DbgPrint("\tFindFiles return %d entries in %s\n\n", count, filePath);
-
+    DbgPrint("SetFileAttributes exit: %d\n", err);
     return 0;
 }
 
 
 static int
-PVFS2_Dokan_delete_file(
-    LPCWSTR                FileName,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+PVFS2_Dokan_find_files(
+    LPCWSTR          FileName,
+    PFillFindData    FillFindData, // function pointer
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
+    char *local_path, *fs_path;
+    char filename[PVFS_NAME_MAX];
+    int ret, err, count = 0;
+    PVFS_sys_attr attr;
+    PVFS_ds_position token;
+    WIN32_FIND_DATAW find_data;
+    wchar_t *wfilename;
+    BY_HANDLE_FILE_INFORMATION hfile_info;
+    
+    DbgPrint("FindFiles : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    GetFilePath(filePath, FileName);
+    /* convert from Unicode */
+    local_path = convert_wstring(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
 
-    DbgPrint("DeleteFile %s\n", filePath);
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+        goto find_files_exit;
+
+    /* find the first file */
+    ret = fs_find_first_file(fs_path, &token, filename, PVFS_NAME_MAX);
+    if (ret != 0)
+        goto find_files_exit;
+
+    while (strlen(filename) > 0)
+    {        
+        DbgPrint("   File found: %s\n", filename);
+        count++;
+        /* get file information */
+        memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
+        wfilename = convert_mbstring(filename);
+        ret = PVFS2_Dokan_get_file_information(wfilename, &hfile_info, DokanFileInfo);
+        if (ret != 0) 
+        {
+            cleanup_string(wfilename);
+            goto find_files_exit;
+        }
+        find_data.dwFileAttributes = hfile_info.dwFileAttributes;
+        memcpy(&find_data.ftCreationTime, &hfile_info.ftCreationTime, 
+               sizeof(FILETIME));
+        memcpy(&find_data.ftLastAccessTime, &hfile_info.ftLastAccessTime,
+               sizeof(FILETIME));
+        memcpy(&find_data.ftLastWriteTime, &hfile_info.ftLastWriteTime,
+               sizeof(FILETIME));
+        find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
+        find_data.nFileSizeLow = hfile_info.nFileSizeLow;
+        
+        /* copy filename */
+        wcscpy(find_data.cFileName, wfilename);
+
+        /* Dokan callback function */
+        FillFindData(&find_data, DokanFileInfo);
+
+        cleanup_string(wfilename);
+
+        /* find next file */
+        ret = fs_find_next_file(fs_path, &token, filename, PVFS_NAME_MAX);
+
+        if (ret != 0)
+            goto find_files_exit;
+    }
+
+find_files_exit:
+
+    cleanup_string(local_path);
+    free(fs_path);
+
+    switch (ret)
+    {
+    case 0: 
+        err = 0;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    default: 
+        err = -1;
+    }
+
+    DbgPrint("FindFiles exit: %d (%d files)\n", err, count);
+
+    return err;
+}
+
+
+static int
+PVFS2_Dokan_delete_file(
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
+{
+    DbgPrint("DeleteFile : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    
+    /*** TODO ***/
+    
+    DbgPrint("DeleteFile exit: %d\n", 0);
 
     return 0;
 }
@@ -816,20 +927,15 @@ PVFS2_Dokan_delete_file(
 
 static int
 PVFS2_Dokan_delete_directory(
-    LPCWSTR                FileName,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle = (HANDLE)DokanFileInfo->Context;
-    HANDLE    hFind;
-    WIN32_FIND_DATAW    findData;
-    ULONG    fileLen;
+    DbgPrint("DeleteDirectory : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    ZeroMemory(filePath, sizeof(filePath));
-    GetFilePath(filePath, FileName);
+    /*** TODO ***/
 
-    DbgPrint("DeleteDirectory %s\n", filePath);
-
+#if 0
     fileLen = wcslen(filePath);
     if (filePath[fileLen-1] != L'\\') {
         filePath[fileLen++] = L'\\';
@@ -855,25 +961,27 @@ PVFS2_Dokan_delete_directory(
     } else {
         return -1;
     }
+#endif 
+
+    DbgPrint("DeleteDirectory exit: %d\n", 0);
+
+    return 0;
 }
 
 
 static int
 PVFS2_Dokan_move_file(
-    LPCWSTR                FileName, // existing file name
-    LPCWSTR                NewFileName,
-    BOOL                ReplaceIfExisting,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName, // existing file name
+    LPCWSTR          NewFileName,
+    BOOL             ReplaceIfExisting,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char            filePath[MAX_PATH];
-    char            newFilePath[MAX_PATH];
-    BOOL            status;
+    DbgPrint("MoveFile : %S -> %S\n", FileName, NewFileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    GetFilePath(filePath, FileName);
-    GetFilePath(newFilePath, NewFileName);
+    /*** TODO ***/
 
-    DbgPrint("MoveFile %s -> %s\n\n", filePath, newFilePath);
-
+#if 0
     if (DokanFileInfo->Context) {
         // should close? or rename at closing?
         CloseHandle((HANDLE)DokanFileInfo->Context);
@@ -892,40 +1000,28 @@ PVFS2_Dokan_move_file(
     } else {
         return 0;
     }
+#endif
+
+    DbgPrint("MoveFile exit: %d\n", 0);
+
+    return 0;
 }
 
 static int
 PVFS2_Dokan_lock_file(
-    LPCWSTR                FileName,
-    LONGLONG            ByteOffset,
-    LONGLONG            Length,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    LONGLONG         ByteOffset,
+    LONGLONG         Length,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char    filePath[MAX_PATH];
-    HANDLE    handle;
-    LARGE_INTEGER offset;
-    LARGE_INTEGER length;
+    DbgPrint("LockFile : %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    GetFilePath(filePath, FileName);
+    /* PVFS does not currently have a locking mechanism */
 
-    DbgPrint("LockFile %s\n", filePath);
+    DbgPrint("LockFile exit: %d\n", 0);
 
-    handle = (HANDLE)DokanFileInfo->Context;
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle\n\n");
-        return -1;
-    }
-
-    length.QuadPart = Length;
-    offset.QuadPart = ByteOffset;
-
-    if (LockFile(handle, offset.HighPart, offset.LowPart, length.HighPart, length.LowPart)) {
-        DbgPrint("\tsuccess\n\n");
-        return 0;
-    } else {
-        DbgPrint("\tfail\n\n");
-        return -1;
-    }
+    return 0;
 }
 
 
@@ -939,28 +1035,12 @@ PVFS2_Dokan_set_end_of_file(
     HANDLE            handle;
     LARGE_INTEGER    offset;
 
-    GetFilePath(filePath, FileName);
+    DbgPrint("SetEndOfFile %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    DbgPrint("SetEndOfFile %s, %I64d\n", filePath, ByteOffset);
+    /* PVFS doesn't open file handles, so this function is not needed (?) */
 
-    handle = (HANDLE)DokanFileInfo->Context;
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle\n\n");
-        return -1;
-    }
-
-    offset.QuadPart = ByteOffset;
-    if (!SetFilePointerEx(handle, offset, NULL, FILE_BEGIN)) {
-        DbgPrint("\tSetFilePointer error: %d, offset = %I64d\n\n",
-                GetLastError(), ByteOffset);
-        return GetLastError() * -1;
-    }
-
-    if (!SetEndOfFile(handle)) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1;
-    }
+    DbgPrint("SetEndOfFile exit: %d\n", 0);
 
     return 0;
 }
@@ -968,68 +1048,21 @@ PVFS2_Dokan_set_end_of_file(
 
 static int
 PVFS2_Dokan_set_allocation_size(
-    LPCWSTR                FileName,
-    LONGLONG            AllocSize,
-    PDOKAN_FILE_INFO    DokanFileInfo)
+    LPCWSTR          FileName,
+    LONGLONG         AllocSize,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char            filePath[MAX_PATH];
-    HANDLE            handle;
-    LARGE_INTEGER    fileSize;
+    DbgPrint("SetAllocationSize %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    GetFilePath(filePath, FileName);
+    /* function not needed (?) */
 
-    DbgPrint("SetAllocationSize %s, %I64d\n", filePath, AllocSize);
+    DbgPrint("SetAllocationSize exit: %d\n", 0);
 
-    handle = (HANDLE)DokanFileInfo->Context;
-    if (!handle || handle == INVALID_HANDLE_VALUE) {
-        DbgPrint("\tinvalid handle\n\n");
-        return -1;
-    }
-
-    if (GetFileSizeEx(handle, &fileSize)) {
-        if (AllocSize < fileSize.QuadPart) {
-            fileSize.QuadPart = AllocSize;
-            if (!SetFilePointerEx(handle, fileSize, NULL, FILE_BEGIN)) {
-                DbgPrint("\tSetAllocationSize: SetFilePointer eror: %d, "
-                    "offset = %I64d\n\n", GetLastError(), AllocSize);
-                return GetLastError() * -1;
-            }
-            if (!SetEndOfFile(handle)) {
-                DWORD error = GetLastError();
-                DbgPrint("\terror code = %d\n\n", error);
-                return error * -1;
-            }
-        }
-    } else {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1;
-    }
     return 0;
 }
 
 
-static int
-PVFS2_Dokan_set_file_attributes(
-    LPCWSTR                FileName,
-    DWORD                FileAttributes,
-    PDOKAN_FILE_INFO    DokanFileInfo)
-{
-    char    filePath[MAX_PATH];
-    
-    GetFilePath(filePath, FileName);
-
-    DbgPrint("SetFileAttributes %s\n", filePath);
-
-    if (!SetFileAttributes(filePath, FileAttributes)) {
-        DWORD error = GetLastError();
-        DbgPrint("\terror code = %d\n\n", error);
-        return error * -1;
-    }
-
-    DbgPrint("\n");
-    return 0;
-}
 
 
 static int
