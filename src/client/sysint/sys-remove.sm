@@ -280,12 +280,19 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
 
     js_p->error_code = 0;
 
+    /* keep a copy of the parent's capability */
+    PINT_copy_capability(&sm_p->getattr.attr.capability,
+                         &sm_p->u.remove.parent_capability);
+
+    /* clear the attrs for future nested getattr calls */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.remove.parent_capability,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
         sm_p->u.remove.object_name,
@@ -333,7 +340,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.remove.parent_capability,
         sm_p->u.remove.object_name,
         sm_p->object_ref.handle,
         sm_p->parent_ref.handle,
@@ -445,6 +452,8 @@ static PINT_sm_action remove_cleanup(
     sm_p->error_code = (sm_p->u.remove.stored_error_code ?
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
+
+    PINT_cleanup_capability(&sm_p->u.remove.parent_capability);
 
     /* NOTE: acache is invalidated by remove_helper now */
     

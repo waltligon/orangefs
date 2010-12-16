@@ -162,6 +162,7 @@ struct PINT_client_remove_sm
     char *object_name;   /* input parameter */
     int stored_error_code;
     int	retry_count;
+    PVFS_capability parent_capability;
 };
 
 struct PINT_client_create_sm
