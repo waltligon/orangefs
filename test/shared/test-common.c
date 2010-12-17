@@ -315,7 +315,7 @@ int stat_file(
    PVFS_sysresp_getattr getattr_response;
    PVFS_credential      credentials;
    PVFS_fs_id           fs_id;
-  
+ 
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
    
     if(use_pvfs2_lib)
@@ -331,8 +331,13 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
 
-        PVFS_util_gen_credential_defaults(&credentials);
- 
+        ret = PVFS_util_gen_credential_defaults(&credentials);
+        if( ret < 0 )
+        {
+            print_error("Error: could not get credentials (%d)\n", ret);
+            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+            return(TEST_COMMON_FAIL);
+        }
         if(followLink)
         {
             ret = PVFS_sys_lookup(fs_id, 
@@ -398,6 +403,55 @@ int stat_file(
             }
             return(TEST_COMMON_FAIL);
         }
+    }
+
+    return(TEST_COMMON_SUCCESS);  
+}
+
+
+/*
+ * \retval TEST_COMMON_SUCCESS Success
+ * \retval TEST_COMMON_FAIL Failure 
+ */
+int stat_file2(
+    const char  * fileName,      /**< File Name */
+    const int     followLink,    /**< Determines whether to stat link or link target */
+    const int     use_pvfs2_lib, /**< determines use of pvfs2 library */
+    const int     verbose)       /**< Turns on verbose prints if set to non-zero value */
+{
+   int  ret=0;
+   char cmd[PATH_MAX] = "";
+   char szPvfsPath[PVFS_NAME_MAX] = "";
+   PVFS_sysresp_lookup  lk_response;
+   PVFS_object_ref      ref;
+   PVFS_sysresp_getattr getattr_response;
+   PVFS_credential      credentials;
+   PVFS_fs_id           fs_id;
+ 
+    if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
+   
+    if(use_pvfs2_lib)
+    {    
+        if( verbose )
+        {
+            snprintf(cmd, sizeof(cmd), "%spvfs2-stat %s", pvfsEXELocation, fileName);
+        }
+        else
+        {
+            snprintf(cmd, sizeof(cmd), "%spvfs2-stat %s >/dev/null 2>&1", pvfsEXELocation, fileName);
+        }
+
+        ret = system(cmd);
+        if(ret < 0)
+        {
+            PVFS_perror("PVFS_sys_lookup", ret);
+            return(TEST_COMMON_FAIL);
+        }
+    }
+    else
+    {
+        print_error("Can't call this stat_file unless with use_pvfs2_lib\n"); 
+        return(TEST_COMMON_FAIL);
     }
     return(TEST_COMMON_SUCCESS);  
 }
