@@ -131,7 +131,7 @@ int main(int argc, char **argv)
 
     if(commonOpts.use_pvfs2_lib)
     {
-        ret = stat_file(filename,
+        ret = stat_file(testDir,
                          NULL,
                          0, /* Don't follow link */
                          commonOpts.use_pvfs2_lib,
