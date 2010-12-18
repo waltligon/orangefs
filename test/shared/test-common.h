@@ -118,11 +118,6 @@ int stat_file(const char  * fileName,
               const int     use_pvfs2_lib, 
               const int     verbose);
 
-int stat_file2(const char  * fileName,
-              const int     followLink,
-              const int     use_pvfs2_lib, 
-              const int     verbose);
-
 int pvfs2_open(const char      * fileName, 
                const int         accessFlags, 
                const int         mode,
