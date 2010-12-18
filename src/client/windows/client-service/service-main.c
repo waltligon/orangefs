@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "fs.h"
+
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
 
@@ -17,8 +19,7 @@ SERVICE_STATUS service_status;
 int is_running = 0;
 
 /* externs */
-extern int fs_initialize();
-extern int fs_finalize();
+extern int __cdecl dokan_loop();
 
 void main_loop();
 
@@ -211,14 +212,15 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
 void main_loop()
 {
+    int ret;
 
     /* init file systems */
-    fs_initialize();
+    ret = fs_initialize();
 
-    /* loop */
-    while (is_running)
+    /* run dokan operations */
+    if (ret == 0)
     {
-        Sleep(1000);
+        dokan_loop();
     }
 
     /* close file systems */

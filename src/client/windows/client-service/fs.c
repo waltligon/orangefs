@@ -133,9 +133,15 @@ int fs_resolve_path(const char *local_path,
     
     /* prepend mount directory to path */
     strcpy(full_path, mntent->mnt_dir);
+    printf("   full_path: %s\n", full_path);
+    /* append path */
     if (full_path[strlen(full_path)-1] != '/')
         strcat(full_path, "/");
-    strcat(full_path, trans_path);
+    if (trans_path[0] == '/')
+        strcat(full_path, trans_path+1);
+    else
+        strcat(full_path, trans_path);
+    strncpy(fs_path, full_path, fs_path_max);
 
     /* resolve the path against PVFS */
     ret = PVFS_util_resolve(full_path, &fs_id, fs_path, fs_path_max);
@@ -390,14 +396,14 @@ fs_mkdir_exit:
     return ret;
 }
 
-int fs_io(PVFS_io_type io_type,
+int fs_io(enum PVFS_io_type io_type,
           char *fs_path,
           void *buffer,
           size_t buffer_len,
           uint64_t offset,
-          size_t *op_len)
+          PVFS_size *op_len)
 {
-    PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     PVFS_sysresp_lookup resp_lookup;
     PVFS_object_ref object_ref;
     PVFS_Request file_req, mem_req;
@@ -440,19 +446,6 @@ fs_io_exit:
     return ret;
 }
 
-#define fs_read(fs_path, \
-                buffer, \
-                buffer_len, \
-                offset, \
-                read_len)  fs_io(PVFS_IO_READ, fs_path, buffer, buffer_len, offset, read_len)
-
-
-#define fs_write(fs_path, \
-                 buffer, \
-                 buffer_len, \
-                 offset, \
-                 write_len)  fs_io(PVFS_IO_WRITE, fs_path, buffer, buffer_len, offset, write_len)
-
 int fs_flush(char *fs_path)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
@@ -476,27 +469,11 @@ fs_flush_exit:
     return ret;
 }
 
-int fs_find_first_file(char *fs_path,
-                       PVFS_ds_position *token,
-                       char *filename,
-                       size_t max_name_len)
-{
-    if (token == NULL)
-    {
-        return -PVFS_EINVAL;
-    }
-
-   *token = PVFS_READDIR_START;
-   return fs_find_next_file(fs_path, token, filename, max_name_len);
-}
-
 int fs_find_next_file(char *fs_path, 
                       PVFS_ds_position *token,
                       char *filename,
                       size_t max_name_len)
 {
-    int ret;
-
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     int ret;
     PVFS_sysresp_lookup resp_lookup;
@@ -534,6 +511,20 @@ int fs_find_next_file(char *fs_path,
 fs_readdir_exit:
 
     return ret;
+}
+
+int fs_find_first_file(char *fs_path,
+                       PVFS_ds_position *token,
+                       char *filename,
+                       size_t max_name_len)
+{
+    if (token == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
+
+   *token = PVFS_READDIR_START;
+   return fs_find_next_file(fs_path, token, filename, max_name_len);
 }
 
 int fs_finalize()
