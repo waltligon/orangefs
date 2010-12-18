@@ -26,6 +26,9 @@
 static char pvfsEXELocation[PATH_MAX]; /* Used to prefix the command line 
                                         * utilities for pvfs2 utils 
                                         */
+static void copy_pvfs2_to_stat(
+    const PVFS_sys_attr * attr,
+    struct stat         * fileStats);
 static void display_common_usage(char* exeName);
  
 
@@ -307,22 +310,82 @@ int stat_file(
 {
     int  ret=0;
     char cmd[PATH_MAX] = { 0 };
+    char szPvfsPath[PVFS_NAME_MAX] = { 0 };
+    PVFS_sysresp_lookup  lk_response;
+    PVFS_object_ref      ref;
+    PVFS_sysresp_getattr getattr_response;
+    PVFS_credential      credentials;
+    PVFS_fs_id           fs_id;
 
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
    
-    if(use_pvfs2_lib)
+    if(use_pvfs2_lib && (fileStats == NULL) )
     {
         snprintf(cmd, sizeof(cmd), "%spvfs2-stat %s %s %s",
                  pvfsEXELocation,
-                 (followLink ? " -L " : ""),
+                 (followLink ? "-L" : ""),
                  fileName, 
                  (verbose ? " >/dev/null 2>&1" : ""));
-
+        if( verbose ) { printf("\tExecuting [%s]\n", cmd); }
         ret = system(cmd);
         if(ret < 0)
         {
             return(TEST_COMMON_FAIL);
         }
+    }
+    else if( use_pvfs2_lib && (fileStats != NULL) )
+    {
+        /* calling this with a stat structure we assume that the caller
+         * knows this will use the library's ncache. If they use this
+         * and call other functions in this file that use system() calls 
+         * they may get failures due to bad ncache entries */
+        ret = PVFS_util_resolve(fileName,
+                                &fs_id,
+                                szPvfsPath,
+                                sizeof(szPvfsPath));
+
+        if (ret < 0)
+        {
+            print_error("Error: could not find file system for [%s] "
+                        "in pvfstab\n", fileName);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ret = PVFS_util_gen_credential_defaults(&credentials);
+        if( ret < 0 )
+        {
+            print_error("Error: could not get credentials (%d)\n", ret);
+            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ret = PVFS_sys_lookup(fs_id,
+                              szPvfsPath,
+                              &credentials,
+                              &lk_response,
+                              (followLink ? PVFS2_LOOKUP_LINK_FOLLOW :
+                                            PVFS2_LOOKUP_LINK_NO_FOLLOW),
+                              NULL);
+        if(ret < 0)
+        {
+            PVFS_perror("PVFS_sys_lookup", ret);
+            return(TEST_COMMON_FAIL);
+        }
+
+        ref.handle = lk_response.ref.handle;
+        ref.fs_id  = fs_id;
+
+        ret = PVFS_sys_getattr(ref,
+                               PVFS_ATTR_SYS_ALL,
+                               &credentials,
+                               &getattr_response,
+                               NULL);
+        if(ret < 0)
+        {
+            PVFS_perror("PVFS_sys_getattr", ret);
+            return(TEST_COMMON_FAIL);
+        }
+        copy_pvfs2_to_stat(&getattr_response.attr, fileStats);
     }
     else
     {
@@ -1085,6 +1148,20 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
     pstFileRef->handle = resp_create.ref.handle;
    
     return(ret);
+}
+
+void copy_pvfs2_to_stat(const PVFS_sys_attr * attr,
+                        struct stat         * fileStats)
+{
+    /* We blindly say we have all the data in the attr struct without checking
+    * for validity against the masks
+    */
+    memcpy(&fileStats->st_atime, &attr->atime, sizeof(fileStats->st_atime));
+    memcpy(&fileStats->st_mtime, &attr->mtime, sizeof(fileStats->st_mtime));
+    memcpy(&fileStats->st_ctime, &attr->ctime, sizeof(fileStats->st_ctime));
+    memcpy(&fileStats->st_uid,   &attr->owner, sizeof(fileStats->st_uid));
+    memcpy(&fileStats->st_gid,   &attr->group, sizeof(fileStats->st_gid));
+    memcpy(&fileStats->st_mode,  &attr->perms, sizeof(fileStats->st_mode));
 }
 
 /**
