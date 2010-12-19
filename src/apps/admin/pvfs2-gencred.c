@@ -251,7 +251,7 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
 static int write_credential(const PVFS_credential *cred, 
     const struct passwd *pwd)
 {
-    char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
+    char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential] = { 0 };
     char *pptr = buf;
     int ret;
 
