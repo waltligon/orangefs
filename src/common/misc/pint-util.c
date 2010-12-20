@@ -307,6 +307,10 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
             attr->capability.signature = NULL;
             free(attr->capability.handle_array);
             attr->capability.handle_array = NULL;
+            if( attr->capability.issuer )
+            {
+                free( attr->capability.issuer );
+            }
         }
 
         if (attr->objtype == PVFS_TYPE_METAFILE)
