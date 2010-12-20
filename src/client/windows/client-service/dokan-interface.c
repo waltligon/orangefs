@@ -24,32 +24,22 @@ BOOL g_DebugMode;
 
 static void DbgInit()
 {
-    char temp_path[MAX_PATH];
+    char exe_path[MAX_PATH], *p;
     int ret;
 
-    ret = GetTempPath(MAX_PATH, temp_path);
+    /* create log file in exe directory */
+    ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
     if (ret != 0)
     {
-        strcat(temp_path, "pvfs.log");
+        /* get directory */
+        p = strrchr(exe_path, '\\');
+        if (p)
+            *p = '\0';
 
-        g_DebugFile = fopen(temp_path, "w");
+        strcat(exe_path, "\\pvfs.log");
+
+        g_DebugFile = fopen(exe_path, "w");
     }
-
-#if 0
-    char temp_path[MAX_PATH], temp_file[MAX_PATH];
-    int err;
-
-    /* Create log in temporary directory */
-    err = GetTempPath(MAX_PATH, temp_path);
-    if (err != 0)
-    {
-        err = GetTempFileName(temp_path, "OFS", 0, temp_file);
-        if (err != 0) 
-        {
-            g_DebugFile = fopen(temp_file, "w");
-        }
-    }
-#endif
 
 }
 
@@ -77,7 +67,7 @@ static void DbgPrint(LPCSTR format, ...)
         if (g_DebugFile != NULL)
         {
             GetLocalTime(&sys_time);
-            fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%u) %s", 
+            fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%4u) %s", 
                     sys_time.wYear, sys_time.wMonth, sys_time.wDay, 
                     sys_time.wHour, sys_time.wMinute, sys_time.wSecond, sys_time.wMilliseconds,
                     GetThreadId(GetCurrentThread()),
