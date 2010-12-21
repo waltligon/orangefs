@@ -1174,7 +1174,7 @@ ifeq ($(NUM_UTS_LINES),1)
     KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
 else
     # multiple locations of utsrelease.h, just find and grep so we don't have to change again
-    NUM_UTS_LINES := $(shell find ${LINUX_KERNEL_SRC}/include -name utsrelease.h -exec grep UTS_RELEASE '{}' \; | cut -d \" -f2 )
+    KERNEL_VERS := $(shell find ${LINUX_KERNEL_SRC}/include -name utsrelease.h -exec grep UTS_RELEASE '{}' \; | cut -d \" -f2 )
 endif
 
 KMOD_DIR ?= $(DESTDIR)/${kmod_prefix}/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
