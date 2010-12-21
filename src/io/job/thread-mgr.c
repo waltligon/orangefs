@@ -528,8 +528,8 @@ int PINT_thread_mgr_dev_stop(void)
     {
 	assert(dev_thread_ref_count == 0); /* sanity check */
 	dev_thread_running = 0;
-#ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&dev_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(dev_thread_id, NULL);
 #endif
     }
@@ -619,8 +619,8 @@ int PINT_thread_mgr_trove_stop(void)
     {
 	assert(trove_thread_ref_count == 0); /* sanity check */
 	trove_thread_running = 0;
-#ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&trove_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(trove_thread_id, NULL);
 #endif
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -653,8 +653,8 @@ int PINT_thread_mgr_bmi_stop(void)
         gen_mutex_lock(&bmi_thread_running_mutex);
 	bmi_thread_running = 0;
         gen_mutex_unlock(&bmi_thread_running_mutex);
-#ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&bmi_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(bmi_thread_id, NULL);
 #endif
 	BMI_close_context(global_bmi_context);
