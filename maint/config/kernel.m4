@@ -15,7 +15,14 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+
+	dnl kernels > 2.6.32 now use generated/autoconf.h
+	if test -f $lk_src/include/generated/autoconf.h ; then
+		CFLAGS="$CFLAGS -imacros $lk_src/include/generated/autoconf.h"
+	else
+		CFLAGS="$CFLAGS -imacros $lk_src/include/linux/autoconf.h"
+	fi
 
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
@@ -1283,6 +1290,84 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         )
         CFLAGS=$tmp_cflags
 
+
+	dnl 2.6.33 API change,
+	dnl Removed .ctl_name from struct ctl_table.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING([whether struct ctl_table has ctl_name])
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .ctl_name = 0, };
+	],[ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_CTL_NAME, 1, Define if struct ctl_table has ctl_name member),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Removed .strategy from struct ctl_table.
+	AC_MSG_CHECKING([whether struct ctl_table has strategy])
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .strategy = 0, };
+	], [ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_STRATEGY_NAME, 1, Define if struct ctl_table has strategy member),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl 2.6.33 changed the parameter signature of xattr_handler get 
+	dnl member functions to have a fifth argument and changed the first
+	dnl parameter from struct inode to struct dentry. if the test fails
+	dnl assume the old 4 param with struct inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for five-param xattr_handler.get)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int get_xattr_h( struct dentry *d, const char *n, 
+					void *b, size_t s, int h)
+		{ return 0; }
+	], 
+	[ 
+	    x.get = get_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANLDER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.33 changed the parameter signature of xattr_handler set 
+	dnl member functions to have a sixth argument and changed the first
+	dnl parameter from struct inode to struct dentry. if the test fails
+	dnl assume the old 5 param with struct inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for six-param xattr_handler.set)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int set_xattr_h( struct dentry *d, const char *n, 
+					const void *b, size_t s, int f, int h)
+		{ return 0; }
+	], 
+	[ 
+	    x.set = set_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANLDER_SET_SIX_PARAM, 1, [Define if kernel xattr_handle set function has dentry as first parameter and a sixth parameter]),
+	AC_MSG_RESULT(no)
+	)
+
+        CFLAGS=$tmp_cflags
 
 	CFLAGS=$oldcflags
 
