@@ -62,6 +62,9 @@ typedef struct PINT_dist_methods_s
 
     /* Called when the distribution is registered */
     void (*registration_init)(void* params);
+
+    /* Called when the distribution is unregisterd */
+    void (*unregister)(void);
     
     char *(*params_string)(void *params);
 } PINT_dist_methods;

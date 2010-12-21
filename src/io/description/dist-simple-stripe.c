@@ -178,6 +178,11 @@ static void registration_init(void* params)
 
 }
 
+static void unregister(void)
+{
+    PINT_dist_unregister_param(PVFS_DIST_SIMPLE_STRIPE_NAME, "strip_size");
+}
+
 static char *params_string(void *params)
 {
     char param_string[1024];
@@ -210,6 +215,7 @@ static PINT_dist_methods simple_stripe_methods = {
     encode_lebf,
     decode_lebf,
     registration_init,
+    unregister,
     params_string
 };
 

@@ -508,6 +508,14 @@ static void registration_init(void* params)
                              PVFS_twod_stripe_params, group_strip_factor);
 }
 
+static void unregister(void)
+{
+    PINT_dist_unregister_param(PVFS_DIST_TWOD_STRIPE_NAME, "num_groups");
+    PINT_dist_unregister_param(PVFS_DIST_TWOD_STRIPE_NAME, "strip_size");
+    PINT_dist_unregister_param(PVFS_DIST_TWOD_STRIPE_NAME, 
+                               "group_strip_factor");
+}
+
 static char *params_string(void *params)
 {
     char param_string[1024];
@@ -544,6 +552,7 @@ static PINT_dist_methods twod_stripe_methods = {
     encode_params,
     decode_params,
     registration_init,
+    unregister,
     params_string
 };
 
