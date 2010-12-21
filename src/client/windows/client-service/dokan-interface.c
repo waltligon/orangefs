@@ -209,15 +209,15 @@ PVFS_Dokan_create_file(
     DbgPrint("CreateFile: %S\n", FileName);
     
     if (CreationDisposition == CREATE_NEW)
-        DbgPrint("\tCREATE_NEW\n");
+        DbgPrint("   CREATE_NEW\n");
     if (CreationDisposition == OPEN_ALWAYS)
-        DbgPrint("\tOPEN_ALWAYS\n");
+        DbgPrint("   OPEN_ALWAYS\n");
     if (CreationDisposition == CREATE_ALWAYS)
-        DbgPrint("\tCREATE_ALWAYS\n");
+        DbgPrint("   CREATE_ALWAYS\n");
     if (CreationDisposition == OPEN_EXISTING)
-        DbgPrint("\tOPEN_EXISTING\n");
+        DbgPrint("   OPEN_EXISTING\n");
     if (CreationDisposition == TRUNCATE_EXISTING)
-        DbgPrint("\tTRUNCATE_EXISTING\n");
+        DbgPrint("   TRUNCATE_EXISTING\n");
 
     /*
     if (ShareMode == 0 && AccessMode & FILE_WRITE_DATA)
@@ -226,13 +226,13 @@ PVFS_Dokan_create_file(
         ShareMode = FILE_SHARE_READ;
     */
 
-    DbgPrint("\tShareMode = 0x%x\n", ShareMode);
+    DbgPrint("   ShareMode = 0x%x\n", ShareMode);
 
     DEBUG_FLAG(ShareMode, FILE_SHARE_READ);
     DEBUG_FLAG(ShareMode, FILE_SHARE_WRITE);
     DEBUG_FLAG(ShareMode, FILE_SHARE_DELETE);
 
-    DbgPrint("\tAccessMode = 0x%x\n", AccessMode);
+    DbgPrint("   AccessMode = 0x%x\n", AccessMode);
 
     DEBUG_FLAG(AccessMode, GENERIC_READ);
     DEBUG_FLAG(AccessMode, GENERIC_WRITE);
@@ -582,7 +582,7 @@ PVFS_Dokan_cleanup(
     if (DokanFileInfo->Context) {
         /**** TODO
         if (DokanFileInfo->DeleteOnClose) {
-            DbgPrint("\tDeleteOnClose\n");
+            DbgPrint("DeleteOnClose\n");
             if (DokanFileInfo->IsDirectory) {
                 DbgPrint("  DeleteDirectory ");
             } else {
@@ -1121,7 +1121,7 @@ PVFS_Dokan_move_file(
 
     if (status == FALSE) {
         DWORD error = GetLastError();
-        DbgPrint("\tMoveFile failed status = %d, code = %d\n", status, error);
+        DbgPrint("MoveFile failed status = %d, code = %d\n", status, error);
         return -(int)error;
     } else {
         return 0;
@@ -1297,6 +1297,10 @@ int __cdecl dokan_loop()
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
     dokanOptions->ThreadCount = 0; /* use default */
+
+#ifdef _DEBUG
+	DokanSetDebugMode(TRUE);
+#endif
 
     DbgInit();
 
