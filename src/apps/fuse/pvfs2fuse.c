@@ -9,13 +9,13 @@
  *   Author: John A. Chandy
  *           Sumit Narayan
  *
- *   $Date: 2010-04-30 20:00:42 $
- *   $Revision: 1.3.8.1 $
+ *   $Date: 2010-12-21 15:34:13 $
+ *   $Revision: 1.3.8.2 $
  *
  *   Documentation: http://www.engr.uconn.edu/~sun03001/docs/pvfs2fuse-rpt.pdf
  */
 
-/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.3.8.1 2010-04-30 20:00:42 bligon Exp $"; */
+/* char *pvfs2fuse_version = "$Id: pvfs2fuse.c,v 1.3.8.2 2010-12-21 15:34:13 mtmoore Exp $"; */
 char *pvfs2fuse_version = "0.01";
 
 #define FUSE_USE_VERSION 27
@@ -1183,7 +1183,7 @@ int main(int argc, char *argv[])
 	  me->flowproto = FLOWPROTO_DEFAULT;
 
 	  /* FIXME encoding should be an option */
-	  me->encoding = ENCODING_DEFAULT;
+	  me->encoding = PVFS2_ENCODING_DEFAULT;
 
 	  /* FIXME default_num_dfiles should be an option */
 

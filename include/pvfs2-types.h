@@ -116,7 +116,7 @@ enum PVFS_encoding_type
 #define ENCODING_IS_SUPPORTED(enc_type)  \
 ((enc_type >= ENCODING_SUPPORTED_MIN) && \
  (enc_type <= ENCODING_SUPPORTED_MAX))
-#define ENCODING_DEFAULT ENCODING_LE_BFIELD
+#define PVFS2_ENCODING_DEFAULT ENCODING_LE_BFIELD
 
 /* basic types used by storage subsystem */
 

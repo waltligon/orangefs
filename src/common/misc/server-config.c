@@ -1329,7 +1329,7 @@ DOTCONF_CB(enter_filesystem_context)
 
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
-    fs_conf->encoding = ENCODING_DEFAULT;
+    fs_conf->encoding = PVFS2_ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
     fs_conf->trove_sync_data = TROVE_SYNC;
     fs_conf->fp_buffer_size = -1;

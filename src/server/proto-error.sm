@@ -52,7 +52,7 @@ static PINT_sm_action proto_error_init(
 		      PINT_ENCODE_RESP,
 		      &(s_op->encoded),
 		      s_op->addr,
-		      ENCODING_DEFAULT);
+		      PVFS2_ENCODING_DEFAULT);
     if (ret < 0)
     {
 	gossip_lerr("Error: PINT_encode() failure.\n");

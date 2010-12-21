@@ -1160,7 +1160,7 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
         GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",
         mntent->pvfs_fs_name, (int)strlen(mntent->pvfs_fs_name));
                                                               
-    mntent->encoding = ENCODING_DEFAULT;                      
+    mntent->encoding = PVFS2_ENCODING_DEFAULT;                      
     mntent->flowproto = FLOWPROTO_DEFAULT;                   
                                                            
     /* also fill in the fs_id for umount */               
