@@ -610,11 +610,15 @@ PVFS_Dokan_read_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
-    int ret, err;
+    char *local_path, *fs_path, *buf;
+	PVFS_size len64;
+    int ret, err, i;
+	char sbuf[256], byte[16];
 
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+	DbgPrint("   BufferLength: %lu\n", BufferLength);
+	DbgPrint("   Offset: %llu\n", Offset);
 
     if (FileName == NULL || wcslen(FileName) == 0 ||
         Buffer == NULL || BufferLength == 0 || 
@@ -642,13 +646,27 @@ PVFS_Dokan_read_file(
     DEBUG_PATH(fs_path);
     
     /* perform the read operation */
-    ret = fs_read(fs_path, Buffer, BufferLength, Offset, (PVFS_size *) ReadLength);
+    ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64);
+	*ReadLength = (DWORD) len64;
+	/* for testing */
+	/*
+	memset(Buffer, 0, BufferLength);
+	*ReadLength = BufferLength;
+	ret = 0;
+	*/
 
     DbgPrint("   fs_read returns: %d\n", ret);
 
     switch (ret)
     {
     case 0: 
+		strcpy(sbuf, "   Buffer bytes: ");
+		for (i = 0, buf = (char *) Buffer; i < (*ReadLength > 8 ? 8 : *ReadLength); i++)
+		{
+			sprintf(byte, "%02X ", buf[i]);
+		    strcat(sbuf, byte);
+		}
+		DbgPrint("%s\n", sbuf);
         err = 0;
         break;
     default:
@@ -671,6 +689,7 @@ PVFS_Dokan_write_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *local_path, *fs_path;
+	PVFS_size len64;
     int ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
@@ -698,7 +717,8 @@ PVFS_Dokan_write_file(
     
     /* perform the read operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
-                   (PVFS_size *) NumberOfBytesWritten);
+                   &len64);
+	*NumberOfBytesWritten = (DWORD) len64;
 
     DbgPrint("   fs_write returns: %d\n", ret);
 
