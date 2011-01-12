@@ -527,6 +527,30 @@ int fs_find_first_file(char *fs_path,
    return fs_find_next_file(fs_path, token, filename, max_name_len);
 }
 
+int fs_get_diskfreespace(PVFS_size *free_bytes, 
+	                     PVFS_size *total_bytes)
+{
+	struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+	PVFS_sysresp_statfs resp_statfs;
+	int ret;
+
+	if (free_bytes == NULL || total_bytes == NULL)
+	{
+		return -PVFS_EINVAL;
+	}
+
+	ret = PVFS_sys_statfs(mntent->fs_id, &credentials, &resp_statfs, NULL);
+
+	if (ret == 0)
+	{
+		*free_bytes = resp_statfs.statfs_buf.bytes_available;
+		*total_bytes = resp_statfs.statfs_buf.bytes_total;
+	}
+
+	return ret;
+}
+
+
 int fs_finalize()
 {
     /* TODO */

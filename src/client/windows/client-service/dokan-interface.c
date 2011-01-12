@@ -660,6 +660,7 @@ PVFS_Dokan_read_file(
     switch (ret)
     {
     case 0: 
+		/*
 		strcpy(sbuf, "   Buffer bytes: ");
 		for (i = 0, buf = (char *) Buffer; i < (*ReadLength > 8 ? 8 : *ReadLength); i++)
 		{
@@ -667,6 +668,7 @@ PVFS_Dokan_read_file(
 		    strcat(sbuf, byte);
 		}
 		DbgPrint("%s\n", sbuf);
+		*/
         err = 0;
         break;
     default:
@@ -1060,14 +1062,51 @@ PVFS_Dokan_delete_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+	char *local_path, *fs_path;
+	int ret, err;
+
     DbgPrint("DeleteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
     
-    /*** TODO ***/
-    
-    DbgPrint("DeleteFile exit: %d\n", 0);
+    /* convert from Unicode */
+    local_path = convert_wstring(FileName);
+    if (local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
 
-    return 0;
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(fs_path);
+    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+    if (ret != 0)
+        goto delete_exit;
+
+    DEBUG_PATH(fs_path);
+
+	/* remove the file */
+	ret = fs_remove(fs_path);
+
+	switch (ret)
+	{
+	case 0:
+		err = 0;
+		break;
+	case -PVFS_ENOENT:
+		err = ERROR_FILE_NOT_FOUND;
+		break;
+	default:
+		err = -1;
+	}
+
+delete_exit:
+
+	cleanup_string(local_path);
+	free(fs_path);
+
+    DbgPrint("DeleteFile exit: %d (%d)\n", err, ret);
+
+    return ret;
 }
 
 
@@ -1076,10 +1115,13 @@ PVFS_Dokan_delete_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+	int ret;
+
     DbgPrint("DeleteDirectory: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /*** TODO ***/
+	ret = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
 #if 0
     fileLen = wcslen(filePath);
@@ -1109,9 +1151,9 @@ PVFS_Dokan_delete_directory(
     }
 #endif 
 
-    DbgPrint("DeleteDirectory exit: %d\n", 0);
+    DbgPrint("DeleteDirectory exit: %d\n", ret);
 
-    return 0;
+    return ret;
 }
 
 
@@ -1300,6 +1342,39 @@ PVFS_Dokan_unmount(
     return 0;
 }
 
+
+static int __stdcall
+PVFS_Dokan_get_disk_free_space(
+    PULONGLONG FreeBytesAvailable,
+	PULONGLONG TotalNumberOfBytes,
+	PULONGLONG TotalNumberOfFreeBytes,
+	PDOKAN_FILE_INFO DokanFileInfo)
+{
+	int ret, err;
+
+    DbgPrint("GetDiskFreeSpace\n");
+	DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+	ret = fs_get_diskfreespace((PVFS_size *) FreeBytesAvailable, 
+		                       (PVFS_size *) TotalNumberOfBytes);
+
+	switch (ret)
+	{
+	case 0: 
+		*TotalNumberOfFreeBytes = *FreeBytesAvailable;
+		err = 0;
+		break;
+	default: 
+		err = -1;
+	}
+
+	/* TODO */
+	DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
+
+	return err;
+}
+
+
 int __cdecl dokan_loop()
 {
 
@@ -1356,7 +1431,7 @@ int __cdecl dokan_loop()
     dokanOperations->SetAllocationSize = PVFS_Dokan_set_allocation_size;
     dokanOperations->LockFile = PVFS_Dokan_lock_file;
     dokanOperations->UnlockFile = PVFS_Dokan_unlock_file;
-    dokanOperations->GetDiskFreeSpace = NULL;
+    dokanOperations->GetDiskFreeSpace = PVFS_Dokan_get_disk_free_space;
     dokanOperations->GetVolumeInformation = NULL;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
 
