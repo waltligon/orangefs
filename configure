@@ -1398,7 +1398,7 @@ ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=2
+PVFS2_VERSION_SUB=3
 #PVFS2_VERSION_RELEASE="orangefs-20100920"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="-orangefs-$CONFIGURE_TIME"
@@ -6981,15 +6981,19 @@ echo "$as_me: error: The --with-kernel path $withval is not a directory." >&2;}
 echo "$as_me: error: The kernel source tree must have been configured." >&2;}
    { (exit 1); exit 1; }; }
     fi
-    vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
-    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-    	# 2.6.18 moves UTS_RELEASE into its own header
-	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
-	       { { echo "$as_me:$LINENO: error: The kernel source tree does not appear to be 2.6" >&5
+
+    if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    elif test -r $withval/include/linux/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    else
+        { { echo "$as_me:$LINENO: error: The kernel source tree does not appear to be 2.6" >&5
 echo "$as_me: error: The kernel source tree does not appear to be 2.6" >&2;}
    { (exit 1); exit 1; }; }
-	fi
     fi
+
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
@@ -7074,7 +7078,13 @@ if test -n "$lk_src" ; then
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+
+		if test -f $lk_src/include/generated/autoconf.h ; then
+		CFLAGS="$CFLAGS -imacros $lk_src/include/generated/autoconf.h"
+	else
+		CFLAGS="$CFLAGS -imacros $lk_src/include/linux/autoconf.h"
+	fi
 
                 	if test -n "${ARCH}" ; then
 		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
@@ -12170,6 +12180,267 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
         CFLAGS=$tmp_cflags
 
+
+		        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+	echo "$as_me:$LINENO: checking whether struct ctl_table has ctl_name" >&5
+echo $ECHO_N "checking whether struct ctl_table has ctl_name... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .ctl_name = 0, };
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_CTL_NAME 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+		echo "$as_me:$LINENO: checking whether struct ctl_table has strategy" >&5
+echo $ECHO_N "checking whether struct ctl_table has strategy... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .strategy = 0, };
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_STRATEGY_NAME 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+					tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	echo "$as_me:$LINENO: checking for five-param xattr_handler.get" >&5
+echo $ECHO_N "checking for five-param xattr_handler.get... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int get_xattr_h( struct dentry *d, const char *n,
+					void *b, size_t s, int h)
+		{ return 0; }
+
+int
+main ()
+{
+
+	    x.get = get_xattr_h;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_XATTR_HANLDER_GET_FIVE_PARAM 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+					tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	echo "$as_me:$LINENO: checking for six-param xattr_handler.set" >&5
+echo $ECHO_N "checking for six-param xattr_handler.set... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int set_xattr_h( struct dentry *d, const char *n,
+					const void *b, size_t s, int f, int h)
+		{ return 0; }
+
+int
+main ()
+{
+
+	    x.set = set_xattr_h;
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_XATTR_HANLDER_SET_SIX_PARAM 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+        CFLAGS=$tmp_cflags
 
 	CFLAGS=$oldcflags
 

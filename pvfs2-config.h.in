@@ -52,6 +52,9 @@
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
+/* Define if struct ctl_table has ctl_name member */
+#undef HAVE_CTL_NAME
+
 /* Define if cred.h contains current_fsuid */
 #undef HAVE_CURRENT_FSUID
 
@@ -348,6 +351,9 @@
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
 
+/* Define if struct ctl_table has strategy member */
+#undef HAVE_STRATEGY_NAME
+
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
 
@@ -429,6 +435,14 @@
 
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR
+
+/* Define if kernel xattr_handle get function has dentry as first parameter
+   and a fifth parameter */
+#undef HAVE_XATTR_HANLDER_GET_FIVE_PARAM
+
+/* Define if kernel xattr_handle set function has dentry as first parameter
+   and a sixth parameter */
+#undef HAVE_XATTR_HANLDER_SET_SIX_PARAM
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT

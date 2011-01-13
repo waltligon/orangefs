@@ -344,6 +344,13 @@ static PINT_sm_action create_init(
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
 
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+
     if (js_p->error_code == CREATE_RETRY)
     {
         js_p->error_code = 0;
@@ -351,14 +358,7 @@ static PINT_sm_action create_init(
         return job_req_sched_post_timer(
             sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
-    }
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
+    }    
 
    return SM_ACTION_COMPLETE;
 }

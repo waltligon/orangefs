@@ -964,11 +964,11 @@ static PINT_sm_action rename_cleanup(
             "ref.handle=%llu ref.fsid=%d\n",
             sm_p->u.rename.entries[1],
             llu(sm_p->u.rename.refns[0].handle),
-            sm_p->u.rename.parent_refns[0].fs_id);
+            sm_p->u.rename.parent_refns[1].fs_id);
 
         PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
             (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
-            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

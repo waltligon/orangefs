@@ -272,7 +272,7 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
     TROVE_ds_position pos;
     TROVE_coll_id     coll_id;
     TROVE_op_id       op_id;
-    TROVE_keyval_s    name;
+    TROVE_keyval_s    name = {0};
     struct migration_s *migrate_p;
     int               count;
     int               ret = 0;
@@ -286,7 +286,7 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
     s = wtime();
 #endif
 
-    count          = 10;
+    count          = 1;
     pos            = TROVE_ITERATE_START;
     name.buffer    = malloc(PATH_MAX);
     name.buffer_sz = PATH_MAX;
@@ -297,6 +297,7 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
         gossip_err("malloc failed: errno=%d\n", errno);
         goto complete;
     }
+    memset(name.buffer,0,PATH_MAX);
 
     while (count > 0)
     {

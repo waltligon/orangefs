@@ -73,19 +73,21 @@ int PINT_dist_initialize(server_configuration_s* server_config)
     /* Register the twod stripe distribution */
     PINT_register_distribution(&twod_stripe_dist);
 
+    /* add an associated unregister to any new distributions */
     return ret;
 }
 
 /* PINT_dist_finalize implementation */
 void PINT_dist_finalize(void)
 {
-    int i;
-    for (i = 0; i < PINT_dist_param_table_entries; i++)
-    {
-        free(PINT_dist_param_table[i].dist_name);
-        free(PINT_dist_param_table[i].param_name);
-    }
+    PINT_unregister_distribution(basic_dist.dist_name);
+    PINT_unregister_distribution(varstrip_dist.dist_name);
+    PINT_unregister_distribution(simple_stripe_dist.dist_name);
+    PINT_unregister_distribution(twod_stripe_dist.dist_name);
+
     free(PINT_dist_param_table);
+    PINT_dist_param_table = 0;
+    PINT_dist_param_table_size = 0;
 }
 
 /*  PINT_dist_default_get_num_dfiles implementation */
@@ -187,6 +189,46 @@ int PINT_dist_register_param_offset(const char* dist_name,
     PINT_dist_param_table[PINT_dist_param_table_entries].offset = offset;
     PINT_dist_param_table[PINT_dist_param_table_entries].size = field_size;
     PINT_dist_param_table_entries += 1;
+    return 0;
+}
+
+int PINT_dist_unregister_param_offset(const char *dist_name, 
+                                      const char *param_name)
+{
+    int i = 0;
+
+    if( !dist_name || !param_name )
+    {
+        return -EINVAL;
+    }
+
+    int dlen = strlen(dist_name) + 1;
+    int plen = strlen(param_name) + 1;
+
+    for( i = 0; i < PINT_dist_param_table_entries; i++ )
+    {
+        if((strncmp(PINT_dist_param_table[i].dist_name, dist_name, dlen)==0) && 
+           (strncmp(PINT_dist_param_table[i].param_name, param_name, plen)==0))
+        {
+            /* found dist and param to unregister */
+            if( PINT_dist_param_table[i].dist_name )
+            {
+                free(PINT_dist_param_table[i].dist_name);
+            }
+            if( PINT_dist_param_table[i].param_name )
+            {
+                free(PINT_dist_param_table[i].param_name);
+            }
+            
+            /* bubble up, not sure I like this but it is just an array */
+            --PINT_dist_param_table_entries;
+            for( ; i < PINT_dist_param_table_entries; i++ )
+            {
+                PINT_dist_param_table[i] = PINT_dist_param_table[i+1];
+            }
+        }
+    }
+
     return 0;
 }
 

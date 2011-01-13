@@ -57,13 +57,17 @@ int PINT_unregister_distribution(char *dist_name)
         return -1;
     for (d = 0; d < PINT_Dist_count && PINT_Dist_table[d]; d++)
     {
-        if (!strncmp(dist_name, PINT_Dist_table[d]->dist_name,
-                     PINT_DIST_NAME_SZ))
+        if (strncmp(dist_name, PINT_Dist_table[d]->dist_name,
+                    PINT_DIST_NAME_SZ) == 0)
         {
+            PINT_Dist_table[d]->methods->unregister();
             /* bubble up */
             --PINT_Dist_count;
             for (; d<PINT_Dist_count; d++)
                 PINT_Dist_table[d] = PINT_Dist_table[d+1];
+
+            /* clean out the last entry we just moved up */
+            PINT_Dist_table[d] = NULL;
             return (0);
         }
     }

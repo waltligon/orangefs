@@ -146,7 +146,7 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     }
 
     tmp_ent->flowproto = FLOWPROTO_DEFAULT;
-    tmp_ent->encoding = ENCODING_DEFAULT;
+    tmp_ent->encoding = PVFS2_ENCODING_DEFAULT;
 
     return(tmp_ent);
 }
@@ -445,7 +445,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         mntent->pvfs_fs_name = strdup(rindex(mntent->the_pvfs_config_server, '/'));
         mntent->pvfs_fs_name++;
         mntent->flowproto = FLOWPROTO_DEFAULT;
-        mntent->encoding = ENCODING_DEFAULT;
+        mntent->encoding = PVFS2_ENCODING_DEFAULT;
         mntent->mnt_dir = strdup(epenv);
         tmp = index(mntent->mnt_dir, '=');
         *tmp = 0;
@@ -693,7 +693,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* pick an encoding to use with the server */
             current_tab->mntent_array[i].encoding =
-                ENCODING_DEFAULT;
+                PVFS2_ENCODING_DEFAULT;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
@@ -1634,8 +1634,8 @@ static int parse_encoding_string(
         const char *name;
         enum PVFS_encoding_type val;
     } enc_str[] =
-        { { "default", ENCODING_DEFAULT },
-          { "defaults", ENCODING_DEFAULT },
+        { { "default", PVFS2_ENCODING_DEFAULT },
+          { "defaults", PVFS2_ENCODING_DEFAULT },
           { "direct", ENCODING_DIRECT },
           { "le_bfield", ENCODING_LE_BFIELD },
           { "xdr", ENCODING_XDR } };

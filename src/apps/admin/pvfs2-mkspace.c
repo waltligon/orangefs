@@ -95,11 +95,13 @@ static int parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("data-space", cur_option) == 0)
                 {
                     strncpy(opts->data_space, optarg, PATH_MAX);
+                    break;
                 }
-				else if (strcmp("meta-space", cur_option) == 0)
-				{
-		    		strncpy(opts->meta_space, optarg, PATH_MAX);
-				}
+                else if (strcmp("meta-space", cur_option) == 0)
+		{
+                    strncpy(opts->meta_space, optarg, PATH_MAX);
+                    break;
+                }
                 else if (strcmp("coll-id", cur_option) == 0)
                 {
                     goto do_collection_id;
@@ -206,30 +208,30 @@ static void print_options(options_t *opts)
 {
     if (opts)
     {
-        printf("\tuse all defaults    : %s\n",
+        printf("\t   use all defaults    : %s\n",
                (opts->use_defaults ? "yes" : "no"));
-        printf("\tdelete storage      : %s\n",
+        printf("\t   delete storage      : %s\n",
                (opts->delete_storage ? "yes" : "no"));
-        printf("\tverbose             : %s\n",
+        printf("\t   verbose             : %s\n",
                (opts->verbose ? "ON" : "OFF"));
-        printf("\troot handle         : %llu\n", llu(opts->root_handle));
-        printf("\tcollection-only mode: %s\n",
+        printf("\t   root handle         : %llu\n", llu(opts->root_handle));
+        printf("\t   collection-only mode: %s\n",
                (opts->collection_only ? "ON" : "OFF"));
-        printf("\tcollection id       : %d\n", opts->coll_id);
-        printf("\tcollection name     : %s\n",
+        printf("\t   collection id       : %d\n", opts->coll_id);
+        printf("\t   collection name     : %s\n",
                (strlen(opts->collection) ?
                 opts->collection : "None specified"));
-        printf("\tmeta handle ranges  : %s\n",
+        printf("\t   meta handle ranges  : %s\n",
                (strlen(opts->meta_ranges) ?
                 opts->meta_ranges : "None specified"));
-        printf("\tdata handle ranges  : %s\n",
+        printf("\t   data handle ranges  : %s\n",
                (strlen(opts->data_ranges) ?
                 opts->data_ranges : "None specified"));
-        printf("\tdata storage space       : %s\n",
+        printf("\t   data storage space       : %s\n",
                (strlen(opts->data_space) ?
                 opts->data_space : "None specified"));
-		printf("metadata storage space : %s\n",
-	       		(strlen(opts->meta_space) ?
+        printf("\tmetadata storage space : %s\n",
+	       	(strlen(opts->meta_space) ?
 		opts->meta_space : "None specified"));
     }
 }
@@ -337,6 +339,7 @@ int main(int argc, char **argv)
     }
     else
     {
+        printf("opts.collection_only(%d).\n",opts.collection_only);
         ret = pvfs2_mkspace(opts.data_space, opts.meta_space,
 			    opts.collection, opts.coll_id, 
 			    opts.root_handle, opts.meta_ranges, 

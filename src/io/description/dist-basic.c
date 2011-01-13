@@ -78,6 +78,10 @@ static void registration_init(void* params)
 {
 }
 
+static void unregister(void)
+{
+}
+
 static char *params_string(void *params)
 {
     return strdup("none");
@@ -98,6 +102,7 @@ static PINT_dist_methods basic_methods = {
     encode_lebf,
     decode_lebf,
     registration_init,
+    unregister,
     params_string
 };
 
