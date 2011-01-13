@@ -410,15 +410,8 @@ int main(int argc, char **argv)
     ret = create_credential(pwd, groups, ngroups, &credential);
     if (ret != EXIT_SUCCESS)
     {
-        if( credential.issuer )
-        {
-            free( credential.issuer );
-        }
-
-        if( credential.group_array )
-        {
-            free( credential.group_array);
-        }
+        free(credential.issuer);
+        free(credential.group_array);
         return ret;
     }
 
@@ -427,39 +420,21 @@ int main(int argc, char **argv)
                           opts.keypath : DEFAULT_CREDENTIAL_KEYPATH));
     if (ret != EXIT_SUCCESS)
     {
-        if( credential.issuer )
-        {
-            free( credential.issuer );
-        }
-        if( credential.group_array )
-        {
-            free( credential.group_array );
-        }
+        free(credential.issuer);
+        free(credential.group_array);
         return ret;
     }
 
     ret = write_credential(&credential,  pwd);
     if (ret != EXIT_SUCCESS)
     {
-        if( credential.issuer )
-        {
-            free( credential.issuer );
-        }
-        if( credential.group_array )
-        {
-            free( credential.group_array );
-        }
+        free(credential.issuer);
+        free(credential.group_array);
         return ret;
     }
    
-    if( credential.issuer )
-    {
-        free( credential.issuer );
-    }
-    if( credential.group_array )
-    {
-        free( credential.group_array );
-    }
+    free(credential.issuer);
+    free(credential.group_array);
     return EXIT_SUCCESS;
 }
 
