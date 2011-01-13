@@ -10,7 +10,7 @@
 const PVFS_util_tab *tab;
 
 /* TODO: global credentials for now */
-const PVFS_credentials credentials;
+PVFS_credentials credentials;
 
 /* split path into base dir and entry name components */
 int split_path(char *fs_path, 
@@ -265,6 +265,67 @@ fs_remove_exit:
     free(base_dir);
 
     return ret;
+}
+
+int fs_rename(char *old_path, 
+	          char *new_path)
+{
+    char *old_base_dir, *old_entry_name,
+		 *new_base_dir, *new_entry_name;
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    int len, ret;
+    PVFS_sysresp_lookup old_resp_lookup, new_resp_lookup;
+    PVFS_object_ref old_parent_ref, new_parent_ref;
+
+    if (old_path == NULL || strlen(old_path) == 0 ||
+		new_path == NULL || strlen(new_path) == 0)
+        return -1;
+
+    /* split paths into path and file components */
+    len = strlen(old_path) + 1;
+    old_base_dir = (char *) malloc(len);    
+    old_entry_name = (char *) malloc(len);
+    ret = split_path(old_path, old_base_dir, len, old_entry_name, len);
+    if (ret != 0)
+        goto fs_rename_exit;
+
+    /* lookup parent entry */
+    ret = PVFS_sys_lookup(mntent->fs_id, old_base_dir, &credentials, &old_resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_rename_exit;
+
+    old_parent_ref.fs_id = old_resp_lookup.ref.fs_id;
+    old_parent_ref.handle = old_resp_lookup.ref.handle;
+
+    len = strlen(new_path) + 1;
+    new_base_dir = (char *) malloc(len);    
+    new_entry_name = (char *) malloc(len);
+    ret = split_path(new_path, new_base_dir, len, new_entry_name, len);
+    if (ret != 0)
+        goto fs_rename_exit;
+
+    /* lookup parent entry */
+    ret = PVFS_sys_lookup(mntent->fs_id, new_base_dir, &credentials, &new_resp_lookup,
+                          TRUE, NULL);
+    if (ret != 0)
+        goto fs_rename_exit;
+
+    new_parent_ref.fs_id = new_resp_lookup.ref.fs_id;
+    new_parent_ref.handle = new_resp_lookup.ref.handle;
+
+	/* rename/move the file */
+	ret = PVFS_sys_rename(old_entry_name, old_parent_ref, new_entry_name,
+		                  new_parent_ref, &credentials, NULL);
+
+fs_rename_exit:
+	
+	free(new_entry_name);
+	free(new_base_dir);
+	free(old_entry_name);
+	free(old_base_dir);
+
+	return ret;
 }
 
 int fs_truncate(char *fs_path,

@@ -180,7 +180,7 @@ static void convert_pvfstime(time_t t, LPFILETIME pft)
 }
 
 
-static void convert_filetime(LPFILETIME pft, PVFS_time *t)
+static void convert_filetime(CONST LPFILETIME pft, PVFS_time *t)
 {
     LONGLONG ll;
 
@@ -377,7 +377,7 @@ PVFS_Dokan_create_file(
         }
     }
 
-    DbgPrint("    fs_create/fs_truncate returns: %d\n", ret);
+    DbgPrint("   fs_create/fs_truncate returns: %d\n", ret);
 
     switch (ret)
     {
@@ -407,6 +407,15 @@ PVFS_Dokan_create_file(
         /* TODO: default error */
         err = -1;
     }
+
+	/* assign nonzero context on error so cleanup works */
+	/* TODO: use linked list to make sure context is not in use */
+	if (err != 0) {		
+	    /* DokanFileInfo->Context = (ULONG64) ((double) rand() / (double) RAND_MAX) * (double) _UI64_MAX; */
+		DokanFileInfo->Context = rand();
+		/*if (!strcmp(local_path, "\\testdir3"))
+			DebugBreak(); */
+	}
 
     free(local_path);
     free(fs_path);
@@ -610,11 +619,10 @@ PVFS_Dokan_read_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path, *buf;
+    char *local_path, *fs_path;
 	PVFS_size len64;
-    int ret, err, i;
-	char sbuf[256], byte[16];
-
+    int ret, err;
+	
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 	DbgPrint("   BufferLength: %lu\n", BufferLength);
@@ -1093,7 +1101,7 @@ PVFS_Dokan_delete_file(
 		err = 0;
 		break;
 	case -PVFS_ENOENT:
-		err = ERROR_FILE_NOT_FOUND;
+		err = -ERROR_FILE_NOT_FOUND;
 		break;
 	default:
 		err = -1;
@@ -1164,35 +1172,72 @@ PVFS_Dokan_move_file(
     BOOL             ReplaceIfExisting,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+	char *old_local_path, *old_fs_path,
+		 *new_local_path, *new_fs_path;
+	int ret, err;
+
     DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /*** TODO ***/
-
-#if 0
-    if (DokanFileInfo->Context) {
-        // should close? or rename at closing?
-        CloseHandle((HANDLE)DokanFileInfo->Context);
-        DokanFileInfo->Context = 0;
+    /* convert from Unicode */
+    old_local_path = convert_wstring(FileName);
+    if (old_local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
+    }
+	new_local_path = convert_wstring(NewFileName);
+    if (new_local_path == NULL)
+    {
+        return -ERROR_INVALID_DATA;
     }
 
-    if (ReplaceIfExisting)
-        status = MoveFileEx(filePath, newFilePath, MOVEFILE_REPLACE_EXISTING);
-    else
-        status = MoveFile(filePath, newFilePath);
+    /* resolve the paths */
+    old_fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(old_fs_path);
+    ret = fs_resolve_path(old_local_path, old_fs_path, MAX_PATH);
+    if (ret != 0)
+        goto move_exit;
+    DEBUG_PATH(old_fs_path);
+    
+    new_fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK(new_fs_path);
+    ret = fs_resolve_path(new_local_path, new_fs_path, MAX_PATH);
+    if (ret != 0)
+        goto move_exit;
+    DEBUG_PATH(new_fs_path);
 
-    if (status == FALSE) {
-        DWORD error = GetLastError();
-        DbgPrint("MoveFile failed status = %d, code = %d\n", status, error);
-        return -(int)error;
-    } else {
-        return 0;
-    }
-#endif
+	/* rename/move the file */
+	ret = fs_rename(old_fs_path, new_fs_path);
 
-    DbgPrint("MoveFile exit: %d\n", 0);
+	switch (ret)
+	{
+	case 0:
+		err = 0;
+		/*
+        if (DokanFileInfo->Context) {
+           // should close? or rename at closing?
+           CloseHandle((HANDLE)DokanFileInfo->Context);
+           DokanFileInfo->Context = 0;
+        }
+		*/
+		break;
+	case -PVFS_ENOENT:
+		err = -ERROR_FILE_NOT_FOUND;
+		break;
+	default:
+		err = -1;
+	}
 
-    return 0;
+move_exit:
+
+	cleanup_string(old_local_path);
+	cleanup_string(new_local_path);
+	free(old_fs_path);
+	free(new_fs_path);
+
+    DbgPrint("MoveFile exit: %d (%d)\n", err, ret);
+
+    return err;
 }
 
 static int __stdcall
@@ -1289,9 +1334,9 @@ PVFS_Dokan_set_file_time(
 
     if (ret == 0)
     {
-        convert_filetime(CreationTime, &attr.ctime);
-        convert_filetime(LastAccessTime, &attr.atime);
-        convert_filetime(LastWriteTime, &attr.mtime);
+        convert_filetime((LPFILETIME) CreationTime, &attr.ctime);
+        convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
+        convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
 
         ret = fs_setattr(fs_path, &attr);        
 
@@ -1394,10 +1439,14 @@ int __cdecl dokan_loop()
     dokanOptions->ThreadCount = 0; /* use default */
 
 #ifdef _DEBUG
-	DokanSetDebugMode(TRUE);
+	/* removed in 0.6.0
+	DokanSetDebugMode(TRUE); */
 #endif
 
     DbgInit();
+
+	/* initialize randomizer for random context */
+	srand(GetTickCount());
 
     if (g_DebugMode)
         dokanOptions->Options |= DOKAN_OPTION_DEBUG;
@@ -1407,7 +1456,7 @@ int __cdecl dokan_loop()
     dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
 
     /* Hard coded for now */
-    dokanOptions->DriveLetter = L'Z';
+    dokanOptions->MountPoint = L"Z:";
 
     /* assign file operations */
     ZeroMemory(dokanOperations, sizeof(DOKAN_OPERATIONS));
@@ -1471,6 +1520,6 @@ int __cdecl dokan_loop()
 
     DbgClose();
 
-    return 0;
+    return status;
 
 }

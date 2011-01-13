@@ -22,6 +22,9 @@ int fs_create(char *fs_path,
 
 int fs_remove(char *fs_path);
 
+int fs_rename(char *old_path, 
+	          char *new_path);
+
 int fs_truncate(char *fs_path, 
                 PVFS_size size);
 
