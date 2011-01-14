@@ -1455,6 +1455,7 @@ int __cdecl dokan_loop()
 
     dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
 
+    dokanOptions->Version = 600;
     /* Hard coded for now */
     dokanOptions->MountPoint = L"Z:";
 
