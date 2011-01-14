@@ -917,8 +917,9 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-    char *absolute_symlink_target = NULL;
+    char absolute_symlink_target[PVFS_NAME_MAX] = {0};
     PVFS_object_ref root_refn;
+    PVFS_fs_id fs_id;
 
     /*
       NOTE: if we have an absolute link, we need to essentially
@@ -935,7 +936,18 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    absolute_symlink_target = cur_seg->seg_attr.u.sym.target_path;
+    ret = PVFS_util_resolve(cur_seg->seg_attr.u.sym.target_path,
+                            &fs_id,
+                            absolute_symlink_target,
+                            PVFS_NAME_MAX);
+    if (ret < 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "PVFS_util_resolve returned %d on %s\n",
+                     ret, cur_seg->seg_attr.u.sym.target_path);
+        js_p->error_code = 1;
+        return SM_ACTION_COMPLETE;
+    }
 
     sm_p->u.lookup.current_context++;
 
@@ -952,7 +964,7 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     assert(ret == 0);
 
     ret = initialize_context(&sm_p->u.lookup,
-                             absolute_symlink_target,
+                             absolute_symlink_target+1,
                              root_refn);
     if (ret)
     {
