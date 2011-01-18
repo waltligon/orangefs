@@ -205,7 +205,6 @@ PVFS_Dokan_create_file(
     PVFS_handle handle;
     PVFS_sys_attr attr;
 
-
     DbgPrint("CreateFile: %S\n", FileName);
     
     if (CreationDisposition == CREATE_NEW)
@@ -408,14 +407,14 @@ PVFS_Dokan_create_file(
         err = -1;
     }
 
-	/* assign nonzero context on error so cleanup works */
-	/* TODO: use linked list to make sure context is not in use */
-	if (err != 0) {		
-	    /* DokanFileInfo->Context = (ULONG64) ((double) rand() / (double) RAND_MAX) * (double) _UI64_MAX; */
-		DokanFileInfo->Context = rand();
-		/*if (!strcmp(local_path, "\\testdir3"))
-			DebugBreak(); */
-	}
+    /* assign nonzero context on error so cleanup works */
+    /* TODO: use linked list to make sure context is not in use */
+    if (err != 0) {        
+        /* DokanFileInfo->Context = (ULONG64) ((double) rand() / (double) RAND_MAX) * (double) _UI64_MAX; */
+        DokanFileInfo->Context = rand();
+        /*if (!strcmp(local_path, "\\testdir3"))
+            DebugBreak(); */
+    }
 
     free(local_path);
     free(fs_path);
@@ -567,16 +566,64 @@ PVFS_Dokan_close_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+    char *local_path = NULL, *fs_path = NULL;
+    int ret = 0, err;
+
     DbgPrint("CloseFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* delete the file/dir if DeleteOnClose specified */
+    if (DokanFileInfo->DeleteOnClose)
+    {
+        /* convert from Unicode */
+        local_path = convert_wstring(FileName);
+        if (local_path == NULL)
+        {
+            return -ERROR_INVALID_DATA;
+        }
+
+        /* resolve the path */
+        fs_path = (char *) malloc(MAX_PATH);
+        MALLOC_CHECK(fs_path);
+        ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
+        if (ret != 0)
+            goto close_exit;
+
+        DEBUG_PATH(fs_path);
+
+        /* remove the file/dir */
+        ret = fs_remove(fs_path);
+    }
+
     /* PVFS doesn't have a close-file semantic.
-       Simply clear the handle and return success */
+       Simply clear the handle. */
     DokanFileInfo->Context = 0;
 
-    DbgPrint("CloseFile exit: %d\n", 0);
+close_exit:
 
-    return 0;
+    if (local_path != NULL)
+        cleanup_string(local_path);
+    if (fs_path != NULL)
+        free(fs_path);
+
+    switch (ret)
+    {
+    case 0:
+        err = 0;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    case -PVFS_ENOTEMPTY:
+        err = -ERROR_DIR_NOT_EMPTY;
+        break;
+    default:
+        err = -1;
+    }
+
+    DbgPrint("CloseFile exit: %d (%d)\n", err, ret);
+
+    return err;
 }
 
 
@@ -620,13 +667,13 @@ PVFS_Dokan_read_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *local_path, *fs_path;
-	PVFS_size len64;
+    PVFS_size len64;
     int ret, err;
-	
+    
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-	DbgPrint("   BufferLength: %lu\n", BufferLength);
-	DbgPrint("   Offset: %llu\n", Offset);
+    DbgPrint("   BufferLength: %lu\n", BufferLength);
+    DbgPrint("   Offset: %llu\n", Offset);
 
     if (FileName == NULL || wcslen(FileName) == 0 ||
         Buffer == NULL || BufferLength == 0 || 
@@ -655,28 +702,28 @@ PVFS_Dokan_read_file(
     
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64);
-	*ReadLength = (DWORD) len64;
-	/* for testing */
-	/*
-	memset(Buffer, 0, BufferLength);
-	*ReadLength = BufferLength;
-	ret = 0;
-	*/
+    *ReadLength = (DWORD) len64;
+    /* for testing */
+    /*
+    memset(Buffer, 0, BufferLength);
+    *ReadLength = BufferLength;
+    ret = 0;
+    */
 
     DbgPrint("   fs_read returns: %d\n", ret);
 
     switch (ret)
     {
     case 0: 
-		/*
-		strcpy(sbuf, "   Buffer bytes: ");
-		for (i = 0, buf = (char *) Buffer; i < (*ReadLength > 8 ? 8 : *ReadLength); i++)
-		{
-			sprintf(byte, "%02X ", buf[i]);
-		    strcat(sbuf, byte);
-		}
-		DbgPrint("%s\n", sbuf);
-		*/
+        /*
+        strcpy(sbuf, "   Buffer bytes: ");
+        for (i = 0, buf = (char *) Buffer; i < (*ReadLength > 8 ? 8 : *ReadLength); i++)
+        {
+            sprintf(byte, "%02X ", buf[i]);
+            strcat(sbuf, byte);
+        }
+        DbgPrint("%s\n", sbuf);
+        */
         err = 0;
         break;
     default:
@@ -699,7 +746,7 @@ PVFS_Dokan_write_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *local_path, *fs_path;
-	PVFS_size len64;
+    PVFS_size len64;
     int ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
@@ -728,7 +775,7 @@ PVFS_Dokan_write_file(
     /* perform the read operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
                    &len64);
-	*NumberOfBytesWritten = (DWORD) len64;
+    *NumberOfBytesWritten = (DWORD) len64;
 
     DbgPrint("   fs_write returns: %d\n", ret);
 
@@ -970,12 +1017,12 @@ PVFS_Dokan_find_files(
     PFillFindData    FillFindData, // function pointer
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
-    char filename[PVFS_NAME_MAX];
+    char *local_path, *fs_path,
+         filename[PVFS_NAME_MAX], *full_path;
     int ret, err, count = 0;
     PVFS_ds_position token;
     WIN32_FIND_DATAW find_data;
-    wchar_t *wfilename;
+    wchar_t *wpath, *wfilename;
     BY_HANDLE_FILE_INFORMATION hfile_info;
     
     DbgPrint("FindFiles: %S\n", FileName);
@@ -1006,12 +1053,24 @@ PVFS_Dokan_find_files(
     {        
         DbgPrint("   File found: %s\n", filename);
         count++;
+        /* append the filename to the dir path */
+        full_path = (char *) malloc(strlen(fs_path) + strlen(filename) + 2);
+        MALLOC_CHECK(full_path);
+        strcpy(full_path, fs_path);
+        if (full_path[strlen(full_path)-1] != '/') 
+            strcat(full_path, "/");
+        strcat(full_path, filename);
+        DbgPrint("   Full path: %s\n", full_path);
+
         /* get file information */
         memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
+        wpath = convert_mbstring(full_path);
         wfilename = convert_mbstring(filename);
-        ret = PVFS_Dokan_get_file_information(wfilename, &hfile_info, DokanFileInfo);
+        ret = PVFS_Dokan_get_file_information(wpath, &hfile_info, DokanFileInfo);
         if (ret != 0) 
         {
+            free(full_path);
+            cleanup_string(wpath);
             cleanup_string(wfilename);
             goto find_files_exit;
         }
@@ -1025,12 +1084,14 @@ PVFS_Dokan_find_files(
         find_data.nFileSizeHigh = hfile_info.nFileSizeHigh;
         find_data.nFileSizeLow = hfile_info.nFileSizeLow;
         
-        /* copy filename */
+        /* copy filename */        
         wcscpy(find_data.cFileName, wfilename);
 
         /* Dokan callback function */
         FillFindData(&find_data, DokanFileInfo);
 
+        free(full_path);
+        cleanup_string(wpath);
         cleanup_string(wfilename);
 
         /* find next file */
@@ -1070,8 +1131,8 @@ PVFS_Dokan_delete_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-	char *local_path, *fs_path;
-	int ret, err;
+    char *local_path, *fs_path;         
+    int ret, err;
 
     DbgPrint("DeleteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1087,34 +1148,35 @@ PVFS_Dokan_delete_file(
     fs_path = (char *) malloc(MAX_PATH);
     MALLOC_CHECK(fs_path);
     ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-        goto delete_exit;
 
     DEBUG_PATH(fs_path);
 
-	/* remove the file */
-	ret = fs_remove(fs_path);
+    /* Do not actually remove the file here, just return
+       success if file is found. Note that directories
+       will be removed even if they contain files.
+       The file/dir will be deleted in close_file(). */
 
-	switch (ret)
-	{
-	case 0:
-		err = 0;
-		break;
-	case -PVFS_ENOENT:
-		err = -ERROR_FILE_NOT_FOUND;
-		break;
-	default:
-		err = -1;
-	}
+    switch (ret)
+    {
+    case 0:
+        err = 0;
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    case -PVFS_ENOTEMPTY:
+        err = -ERROR_DIR_NOT_EMPTY;
+        break;
+    default:
+        err = -1;
+    }
 
-delete_exit:
-
-	cleanup_string(local_path);
-	free(fs_path);
+    cleanup_string(local_path);
+    free(fs_path);
 
     DbgPrint("DeleteFile exit: %d (%d)\n", err, ret);
 
-    return ret;
+    return err;
 }
 
 
@@ -1123,13 +1185,13 @@ PVFS_Dokan_delete_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-	int ret;
+    int ret;
 
     DbgPrint("DeleteDirectory: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     /*** TODO ***/
-	ret = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
+    ret = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
 #if 0
     fileLen = wcslen(filePath);
@@ -1172,9 +1234,9 @@ PVFS_Dokan_move_file(
     BOOL             ReplaceIfExisting,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-	char *old_local_path, *old_fs_path,
-		 *new_local_path, *new_fs_path;
-	int ret, err;
+    char *old_local_path, *old_fs_path,
+         *new_local_path, *new_fs_path;
+    int ret, err;
 
     DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1185,7 +1247,7 @@ PVFS_Dokan_move_file(
     {
         return -ERROR_INVALID_DATA;
     }
-	new_local_path = convert_wstring(NewFileName);
+    new_local_path = convert_wstring(NewFileName);
     if (new_local_path == NULL)
     {
         return -ERROR_INVALID_DATA;
@@ -1206,34 +1268,34 @@ PVFS_Dokan_move_file(
         goto move_exit;
     DEBUG_PATH(new_fs_path);
 
-	/* rename/move the file */
-	ret = fs_rename(old_fs_path, new_fs_path);
+    /* rename/move the file */
+    ret = fs_rename(old_fs_path, new_fs_path);
 
-	switch (ret)
-	{
-	case 0:
-		err = 0;
-		/*
+    switch (ret)
+    {
+    case 0:
+        err = 0;
+        /*
         if (DokanFileInfo->Context) {
            // should close? or rename at closing?
            CloseHandle((HANDLE)DokanFileInfo->Context);
            DokanFileInfo->Context = 0;
         }
-		*/
-		break;
-	case -PVFS_ENOENT:
-		err = -ERROR_FILE_NOT_FOUND;
-		break;
-	default:
-		err = -1;
-	}
+        */
+        break;
+    case -PVFS_ENOENT:
+        err = -ERROR_FILE_NOT_FOUND;
+        break;
+    default:
+        err = -1;
+    }
 
 move_exit:
 
-	cleanup_string(old_local_path);
-	cleanup_string(new_local_path);
-	free(old_fs_path);
-	free(new_fs_path);
+    cleanup_string(old_local_path);
+    cleanup_string(new_local_path);
+    free(old_fs_path);
+    free(new_fs_path);
 
     DbgPrint("MoveFile exit: %d (%d)\n", err, ret);
 
@@ -1391,32 +1453,32 @@ PVFS_Dokan_unmount(
 static int __stdcall
 PVFS_Dokan_get_disk_free_space(
     PULONGLONG FreeBytesAvailable,
-	PULONGLONG TotalNumberOfBytes,
-	PULONGLONG TotalNumberOfFreeBytes,
-	PDOKAN_FILE_INFO DokanFileInfo)
+    PULONGLONG TotalNumberOfBytes,
+    PULONGLONG TotalNumberOfFreeBytes,
+    PDOKAN_FILE_INFO DokanFileInfo)
 {
-	int ret, err;
+    int ret, err;
 
     DbgPrint("GetDiskFreeSpace\n");
-	DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-	ret = fs_get_diskfreespace((PVFS_size *) FreeBytesAvailable, 
-		                       (PVFS_size *) TotalNumberOfBytes);
+    ret = fs_get_diskfreespace((PVFS_size *) FreeBytesAvailable, 
+                               (PVFS_size *) TotalNumberOfBytes);
 
-	switch (ret)
-	{
-	case 0: 
-		*TotalNumberOfFreeBytes = *FreeBytesAvailable;
-		err = 0;
-		break;
-	default: 
-		err = -1;
-	}
+    switch (ret)
+    {
+    case 0: 
+        *TotalNumberOfFreeBytes = *FreeBytesAvailable;
+        err = 0;
+        break;
+    default: 
+        err = -1;
+    }
 
-	/* TODO */
-	DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
+    /* TODO */
+    DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
 
-	return err;
+    return err;
 }
 
 
@@ -1439,14 +1501,11 @@ int __cdecl dokan_loop()
     dokanOptions->ThreadCount = 0; /* use default */
 
 #ifdef _DEBUG
-	/* removed in 0.6.0
-	DokanSetDebugMode(TRUE); */
+    /* removed in 0.6.0
+    DokanSetDebugMode(TRUE); */
 #endif
 
     DbgInit();
-
-	/* initialize randomizer for random context */
-	srand(GetTickCount());
 
     if (g_DebugMode)
         dokanOptions->Options |= DOKAN_OPTION_DEBUG;

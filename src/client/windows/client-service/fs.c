@@ -216,7 +216,7 @@ int fs_create(char *fs_path,
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
-			  &credentials, NULL, &resp_create, NULL, NULL);
+              &credentials, NULL, &resp_create, NULL, NULL);
     if (ret)
         goto fs_create_exit;
 
@@ -268,17 +268,17 @@ fs_remove_exit:
 }
 
 int fs_rename(char *old_path, 
-	          char *new_path)
+              char *new_path)
 {
     char *old_base_dir, *old_entry_name,
-		 *new_base_dir, *new_entry_name;
+         *new_base_dir, *new_entry_name;
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     int len, ret;
     PVFS_sysresp_lookup old_resp_lookup, new_resp_lookup;
     PVFS_object_ref old_parent_ref, new_parent_ref;
 
     if (old_path == NULL || strlen(old_path) == 0 ||
-		new_path == NULL || strlen(new_path) == 0)
+        new_path == NULL || strlen(new_path) == 0)
         return -1;
 
     /* split paths into path and file components */
@@ -314,18 +314,18 @@ int fs_rename(char *old_path,
     new_parent_ref.fs_id = new_resp_lookup.ref.fs_id;
     new_parent_ref.handle = new_resp_lookup.ref.handle;
 
-	/* rename/move the file */
-	ret = PVFS_sys_rename(old_entry_name, old_parent_ref, new_entry_name,
-		                  new_parent_ref, &credentials, NULL);
+    /* rename/move the file */
+    ret = PVFS_sys_rename(old_entry_name, old_parent_ref, new_entry_name,
+                          new_parent_ref, &credentials, NULL);
 
 fs_rename_exit:
-	
-	free(new_entry_name);
-	free(new_base_dir);
-	free(old_entry_name);
-	free(old_base_dir);
+    
+    free(new_entry_name);
+    free(new_base_dir);
+    free(old_entry_name);
+    free(old_base_dir);
 
-	return ret;
+    return ret;
 }
 
 int fs_truncate(char *fs_path,
@@ -589,26 +589,26 @@ int fs_find_first_file(char *fs_path,
 }
 
 int fs_get_diskfreespace(PVFS_size *free_bytes, 
-	                     PVFS_size *total_bytes)
+                         PVFS_size *total_bytes)
 {
-	struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
-	PVFS_sysresp_statfs resp_statfs;
-	int ret;
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    PVFS_sysresp_statfs resp_statfs;
+    int ret;
 
-	if (free_bytes == NULL || total_bytes == NULL)
-	{
-		return -PVFS_EINVAL;
-	}
+    if (free_bytes == NULL || total_bytes == NULL)
+    {
+        return -PVFS_EINVAL;
+    }
 
-	ret = PVFS_sys_statfs(mntent->fs_id, &credentials, &resp_statfs, NULL);
+    ret = PVFS_sys_statfs(mntent->fs_id, &credentials, &resp_statfs, NULL);
 
-	if (ret == 0)
-	{
-		*free_bytes = resp_statfs.statfs_buf.bytes_available;
-		*total_bytes = resp_statfs.statfs_buf.bytes_total;
-	}
+    if (ret == 0)
+    {
+        *free_bytes = resp_statfs.statfs_buf.bytes_available;
+        *total_bytes = resp_statfs.statfs_buf.bytes_total;
+    }
 
-	return ret;
+    return ret;
 }
 
 

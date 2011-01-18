@@ -23,7 +23,7 @@ int fs_create(char *fs_path,
 int fs_remove(char *fs_path);
 
 int fs_rename(char *old_path, 
-	          char *new_path);
+              char *new_path);
 
 int fs_truncate(char *fs_path, 
                 PVFS_size size);
@@ -70,7 +70,7 @@ int fs_find_next_file(char *fs_path,
                       size_t max_name_len);
 
 int fs_get_diskfreespace(PVFS_size *free_bytes, 
-	                     PVFS_size *total_bytes);
+                         PVFS_size *total_bytes);
 
 int fs_finalize();
 
