@@ -1,6 +1,8 @@
 /* TODO: Copyright (C) Omnibond, LLC 2010 */
 
-#include <windows.h>
+#include <Windows.h>
+#include <AccCtrl.h>
+#include <AclAPI.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "dokan.h"
@@ -1421,6 +1423,191 @@ PVFS_Dokan_set_file_time(
 
 
 static int __stdcall
+PVFS_Dokan_get_file_security(
+    LPCWSTR               FileName,
+    PSECURITY_INFORMATION SecurityInformation, 
+    PSECURITY_DESCRIPTOR  SecurityDescriptor,
+    ULONG                 BufferLength,
+    PULONG                LengthNeeded,
+    PDOKAN_FILE_INFO      DokanFileInfo)
+{
+    SID_IDENTIFIER_AUTHORITY sid_auth_world = SECURITY_WORLD_SID_AUTHORITY;
+    PSID everyone_sid = NULL, guest_sid = NULL;
+    EXPLICIT_ACCESS ea;
+    PACL acl = NULL;
+    PSECURITY_DESCRIPTOR desc;
+    DWORD sd_len;
+    int err = 1;
+
+    DbgPrint("GetFileSecurity: %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    DbgPrint("   BufferLength: %u\n", BufferLength);
+
+    /* debug flags */
+    DbgPrint("   Flags:\n");
+    if (*SecurityInformation & DACL_SECURITY_INFORMATION)
+        DbgPrint("      DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & GROUP_SECURITY_INFORMATION)
+        DbgPrint("      GROUP_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & LABEL_SECURITY_INFORMATION)
+        DbgPrint("      LABEL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
+        DbgPrint("      OWNER_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & PROTECTED_DACL_SECURITY_INFORMATION)
+        DbgPrint("      PROTECTED_DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & PROTECTED_SACL_SECURITY_INFORMATION)
+        DbgPrint("      PROTECTED_SACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & SACL_SECURITY_INFORMATION)
+        DbgPrint("      SACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & UNPROTECTED_DACL_SECURITY_INFORMATION)
+        DbgPrint("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & UNPROTECTED_SACL_SECURITY_INFORMATION)
+        DbgPrint("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
+    
+    /* TODO: return all access rights for everyone for now */
+    
+    /* get SID for Everyone group */
+    if (!AllocateAndInitializeSid(&sid_auth_world, 1, SECURITY_WORLD_RID,
+               0, 0, 0, 0, 0, 0, 0, &everyone_sid))
+    {   
+        DbgPrint("   Could not allocate SID for Everyone\n");
+        goto get_file_security_exit;
+    }
+
+    /* get SID for Guest account */
+    if (!AllocateAndInitializeSid(&sid_auth_world, 1, DOMAIN_USER_RID_GUEST,
+               0, 0, 0, 0, 0, 0, 0, &guest_sid))
+    {
+        DbgPrint("   Could not allocate SID for Guest\n");
+        goto get_file_security_exit;
+    }
+
+    /* Specify ACE with all rights for everyone */
+    ZeroMemory(&ea, sizeof(EXPLICIT_ACCESS));
+    ea.grfAccessPermissions = KEY_ALL_ACCESS;
+    ea.grfAccessMode = SET_ACCESS;
+    ea.grfInheritance = NO_INHERITANCE;
+    ea.Trustee.TrusteeForm = TRUSTEE_IS_SID;
+    ea.Trustee.TrusteeType = TRUSTEE_IS_WELL_KNOWN_GROUP;
+    ea.Trustee.ptstrName = (LPTSTR) everyone_sid;
+
+    /* add entry to the ACL */
+    if (SetEntriesInAcl(1, &ea, NULL, &acl) != ERROR_SUCCESS)
+    {
+        DbgPrint("   Could not add ACE to ACL\n");
+        goto get_file_security_exit;
+    }
+
+
+    /* initialize the descriptor */
+    desc = (PSECURITY_DESCRIPTOR) LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
+    MALLOC_CHECK(desc);
+    if (!InitializeSecurityDescriptor(desc, 
+                SECURITY_DESCRIPTOR_REVISION))
+    {
+        DbgPrint("   Could not initialize descriptor\n");
+        goto get_file_security_exit;
+    }
+
+    /* set primary owner to Guest */
+    if (!SetSecurityDescriptorOwner(desc, guest_sid, FALSE))
+    {
+        DbgPrint("   Could not set descriptor owner\n");
+        goto get_file_security_exit;
+    }
+
+    /* set primary group to Everyone group */
+    if (!SetSecurityDescriptorGroup(desc, everyone_sid, FALSE))
+    {
+        DbgPrint("   Could not set descriptor group\n");
+        goto get_file_security_exit;
+    }
+
+    /* add the ACL to the security descriptor */
+    if (!SetSecurityDescriptorDacl(desc, TRUE, acl, FALSE))
+    {
+        DbgPrint("   Could not set descriptor DACL\n");
+        goto get_file_security_exit;
+    }
+
+    sd_len = GetSecurityDescriptorLength(desc);
+
+    if (BufferLength >= sd_len)
+    {
+        ZeroMemory(SecurityDescriptor, BufferLength);
+        CopyMemory(SecurityDescriptor, desc, sd_len);
+    }
+    else
+    {
+        err = -ERROR_INSUFFICIENT_BUFFER;
+        *LengthNeeded = sd_len;
+    }
+
+get_file_security_exit:
+    
+    if (desc)
+        LocalFree(desc);
+    if (acl)
+        LocalFree(acl);
+    if (guest_sid)
+        FreeSid(guest_sid);
+    if (everyone_sid)
+        FreeSid(everyone_sid);
+
+    if (err == 1)
+        err = GetLastError() * -1;
+
+    DbgPrint("GetFileSecurity exit: %d\n", err);
+
+    return err;
+}
+
+
+static int __stdcall
+PVFS_Dokan_set_file_security(
+    LPCWSTR               FileName,
+    PSECURITY_INFORMATION SecurityInformation,
+    PSECURITY_DESCRIPTOR  SecurityDescriptor,
+    ULONG                 BufferLength, // SecurityDescriptor length
+    PDOKAN_FILE_INFO      DokanFileInfo)
+{
+    int err;
+
+    DbgPrint("SetFileSecurity: %S\n", FileName);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* debug flags */
+    DbgPrint("   Flags:\n");
+    if (*SecurityInformation & DACL_SECURITY_INFORMATION)
+        DbgPrint("      DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & GROUP_SECURITY_INFORMATION)
+        DbgPrint("      GROUP_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & LABEL_SECURITY_INFORMATION)
+        DbgPrint("      LABEL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
+        DbgPrint("      OWNER_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & PROTECTED_DACL_SECURITY_INFORMATION)
+        DbgPrint("      PROTECTED_DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & PROTECTED_SACL_SECURITY_INFORMATION)
+        DbgPrint("      PROTECTED_SACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & SACL_SECURITY_INFORMATION)
+        DbgPrint("      SACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & UNPROTECTED_DACL_SECURITY_INFORMATION)
+        DbgPrint("      UNPROTECTED_DACL_SECURITY_INFORMATION\n");
+    if (*SecurityInformation & UNPROTECTED_SACL_SECURITY_INFORMATION)
+        DbgPrint("      UNPROTECTED_SACL_SECURITY_INFORMATION\n");
+
+    /* TODO: no effect for now */
+
+    err = 0;
+
+    DbgPrint("SetFileSecurity exit: %d\n", err);
+
+    return err;
+}
+
+
+static int __stdcall
 PVFS_Dokan_unlock_file(
     LPCWSTR          FileName,
     LONGLONG         ByteOffset,
@@ -1542,6 +1729,8 @@ int __cdecl dokan_loop()
     dokanOperations->UnlockFile = PVFS_Dokan_unlock_file;
     dokanOperations->GetDiskFreeSpace = PVFS_Dokan_get_disk_free_space;
     dokanOperations->GetVolumeInformation = NULL;
+    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security;
+    dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
 
     DbgPrint("Entering DokanMain\n");
