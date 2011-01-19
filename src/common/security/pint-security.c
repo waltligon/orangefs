@@ -201,6 +201,40 @@ int PINT_init_capability(PVFS_capability *cap)
     return ret;
 }
 
+/* nlmills: temporary function to help gather statistics */
+static void hash_capability(const PVFS_capability *cap, char *mdstr)
+{
+    EVP_MD_CTX mdctx;
+    unsigned char md[SHA_DIGEST_LENGTH];
+    int i;
+
+    EVP_MD_CTX_init(&mdctx);
+    EVP_DigestInit_ex(&mdctx, EVP_sha1(), NULL);
+    EVP_DigestUpdate(&mdctx, cap->issuer, strlen(cap->issuer));
+    EVP_DigestUpdate(&mdctx, &cap->fsid, sizeof(cap->fsid));
+    EVP_DigestUpdate(&mdctx, &cap->sig_size, sizeof(cap->sig_size));
+    if (cap->sig_size)
+    {
+        EVP_DigestUpdate(&mdctx, cap->signature, cap->sig_size);
+    }
+    EVP_DigestUpdate(&mdctx, &cap->timeout, sizeof(cap->timeout));
+    EVP_DigestUpdate(&mdctx, &cap->op_mask, sizeof(cap->op_mask));
+    EVP_DigestUpdate(&mdctx, &cap->num_handles, sizeof(cap->num_handles));
+    if (cap->num_handles)
+    {
+        EVP_DigestUpdate(&mdctx, cap->handle_array,
+                         cap->num_handles*sizeof(*cap->handle_array));
+    }
+    EVP_DigestFinal_ex(&mdctx, md, NULL);
+    EVP_MD_CTX_cleanup(&mdctx);
+
+    memset(mdstr, 0, 2*SHA_DIGEST_LENGTH+1);
+    for (i = 0; i < SHA_DIGEST_LENGTH; i++)
+    {
+        sprintf(mdstr+2*i, "%02x", (unsigned int)md[i]);
+    }
+}
+
 /*  PINT_sign_capability
  *
  *  Digitally signs the capability with this server's private key.
@@ -214,6 +248,7 @@ int PINT_sign_capability(PVFS_capability *cap)
     EVP_MD_CTX mdctx;
     char buf[256];
     const EVP_MD *md = NULL;
+    char mdstr[2*SHA_DIGEST_LENGTH+1];
     int ret;
 
     assert(security_privkey);
@@ -294,6 +329,9 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     EVP_MD_CTX_cleanup(&mdctx);
 
+    hash_capability(cap, mdstr);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "CAPSIGN: %s\n", mdstr);
+
     return 0;
 }
 
@@ -308,6 +346,7 @@ int PINT_sign_capability(PVFS_capability *cap)
  */
 int PINT_verify_capability(const PVFS_capability *cap)
 {
+    char mdstr[2*SHA_DIGEST_LENGTH+1];
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
@@ -328,6 +367,9 @@ int PINT_verify_capability(const PVFS_capability *cap)
     {
         return 0;
     }
+
+    hash_capability(cap, mdstr);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "CAPVRFY: %s\n", mdstr);
     
     pubkey = SECURITY_lookup_pubkey(cap->issuer);
     if (pubkey == NULL)
@@ -420,6 +462,39 @@ int PINT_init_credential(PVFS_credential *cred)
     return ret;
 }
 
+/* nlmills: temporary function to help gather statistics */
+static void hash_credential(const PVFS_credential *cred, char *mdstr)
+{
+    EVP_MD_CTX mdctx;
+    unsigned char md[SHA_DIGEST_LENGTH];
+    int i;
+
+    EVP_MD_CTX_init(&mdctx);
+    EVP_DigestInit_ex(&mdctx, EVP_sha1(), NULL);
+    EVP_DigestUpdate(&mdctx, &cred->userid, sizeof(cred->userid));
+    EVP_DigestUpdate(&mdctx, &cred->num_groups, sizeof(cred->num_groups));
+    if (cred->num_groups)
+    {
+        EVP_DigestUpdate(&mdctx, cred->group_array,
+                         cred->num_groups*sizeof(*cred->group_array));
+    }
+    EVP_DigestUpdate(&mdctx, cred->issuer, strlen(cred->issuer));
+    EVP_DigestUpdate(&mdctx, &cred->timeout, sizeof(cred->timeout));
+    EVP_DigestUpdate(&mdctx, &cred->sig_size, sizeof(cred->sig_size));
+    if (cred->sig_size)
+    {
+        EVP_DigestUpdate(&mdctx, cred->signature, cred->sig_size);
+    }    
+    EVP_DigestFinal_ex(&mdctx, md, NULL);
+    EVP_MD_CTX_cleanup(&mdctx);
+
+    memset(mdstr, 0, 2*SHA_DIGEST_LENGTH+1);
+    for (i = 0; i < SHA_DIGEST_LENGTH; i++)
+    {
+        sprintf(mdstr+2*i, "%02x", (unsigned int)md[i]);
+    }
+}
+
 /* PINT_sign_credential
  *
  * Digitally signs a credential with the server private key.
@@ -433,6 +508,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     EVP_MD_CTX mdctx;
     char buf[256];
     const EVP_MD *md = NULL;
+    char mdstr[2*SHA_DIGEST_LENGTH+1];
     int ret;
     
     assert(security_privkey);
@@ -500,6 +576,9 @@ int PINT_sign_credential(PVFS_credential *cred)
 		     "%s\n", buf);
         return -1;
     }
+
+    hash_credential(cred, mdstr);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "CREDSIGN: %s\n", mdstr);
     
     return 0;
 }
@@ -514,6 +593,7 @@ int PINT_sign_credential(PVFS_credential *cred)
  */
 int PINT_verify_credential(const PVFS_credential *cred)
 {
+    char mdstr[2*SHA_DIGEST_LENGTH+1];
     EVP_MD_CTX mdctx;
     const EVP_MD *md = NULL;
     EVP_PKEY *pubkey;
@@ -529,6 +609,9 @@ int PINT_verify_credential(const PVFS_credential *cred)
     {
         return 0;
     }
+
+    hash_credential(cred, mdstr);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "CREDVRFY: %s\n", mdstr);
 
     pubkey = SECURITY_lookup_pubkey(cred->issuer);
     if (pubkey == NULL)
