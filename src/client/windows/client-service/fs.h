@@ -72,6 +72,10 @@ int fs_find_next_file(char *fs_path,
 int fs_get_diskfreespace(PVFS_size *free_bytes, 
                          PVFS_size *total_bytes);
 
+PVFS_fs_id fs_get_id(int fs_num);
+
+char *fs_get_name(int fs_num);
+
 int fs_finalize();
 
 #endif

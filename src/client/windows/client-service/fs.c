@@ -611,6 +611,21 @@ int fs_get_diskfreespace(PVFS_size *free_bytes,
     return ret;
 }
 
+PVFS_fs_id fs_get_id(int fs_num)
+{
+    /* TODO: ignore fs_num for now */
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+
+    return mntent ? mntent->fs_id : 0;
+}
+
+char *fs_get_name(int fs_num)
+{
+    /* TODO: ignore fs_num for now */
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+
+    return mntent ? mntent->pvfs_fs_name : "PVFS2";
+}
 
 int fs_finalize()
 {

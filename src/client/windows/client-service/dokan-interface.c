@@ -220,13 +220,6 @@ PVFS_Dokan_create_file(
     if (CreationDisposition == TRUNCATE_EXISTING)
         DbgPrint("   TRUNCATE_EXISTING\n");
 
-    /*
-    if (ShareMode == 0 && AccessMode & FILE_WRITE_DATA)
-        ShareMode = FILE_SHARE_WRITE;
-    else if (ShareMode == 0)
-        ShareMode = FILE_SHARE_READ;
-    */
-
     DbgPrint("   ShareMode = 0x%x\n", ShareMode);
 
     DEBUG_FLAG(ShareMode, FILE_SHARE_READ);
@@ -256,14 +249,6 @@ PVFS_Dokan_create_file(
     DEBUG_FLAG(AccessMode, STANDARD_RIGHTS_WRITE);
     DEBUG_FLAG(AccessMode, STANDARD_RIGHTS_EXECUTE);
 
-    // When filePath is a directory, needs to change the flag so that the file can be opened.
-    /*
-    fileAttr = GetFileAttributes(filePath);
-    if (fileAttr && fileAttr & FILE_ATTRIBUTE_DIRECTORY) {
-        FlagsAndAttributes |= FILE_FLAG_BACKUP_SEMANTICS;
-        //AccessMode = 0;
-    }
-    */
     DbgPrint("   FlagsAndAttributes = 0x%x\n", FlagsAndAttributes);
 
     DEBUG_FLAG(FlagsAndAttributes, FILE_ATTRIBUTE_ARCHIVE);
@@ -292,6 +277,8 @@ PVFS_Dokan_create_file(
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_CONTEXT_TRACKING);
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_EFFECTIVE_ONLY);
     DEBUG_FLAG(FlagsAndAttributes, SECURITY_SQOS_PRESENT);
+
+    DokanFileInfo->Context = 0;
 
     /* convert from Unicode */
     local_path = convert_wstring(FileName);
@@ -411,12 +398,11 @@ PVFS_Dokan_create_file(
 
     /* assign nonzero context on error so cleanup works */
     /* TODO: use linked list to make sure context is not in use */
+    /* TODO: needed?
     if (err != 0) {        
-        /* DokanFileInfo->Context = (ULONG64) ((double) rand() / (double) RAND_MAX) * (double) _UI64_MAX; */
         DokanFileInfo->Context = rand();
-        /*if (!strcmp(local_path, "\\testdir3"))
-            DebugBreak(); */
     }
+    */
 
     free(local_path);
     free(fs_path);
@@ -637,21 +623,14 @@ PVFS_Dokan_cleanup(
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("  Context: %llx\n", DokanFileInfo->Context);
 
-    if (DokanFileInfo->Context) {
-        /**** TODO
-        if (DokanFileInfo->DeleteOnClose) {
-            DbgPrint("DeleteOnClose\n");
-            if (DokanFileInfo->IsDirectory) {
-                DbgPrint("  DeleteDirectory ");
-            } else {
-                DbgPrint("  DeleteFile ");
-            }
-        }
-        */ 
-    } else {
+    /* needed?
+    if (DokanFileInfo->Context == 0) {
+    }
+    else {
         DbgPrint("  Cleanup: invalid handle\n");
         return -1;
     }
+    */
 
     DbgPrint("Cleanup exit: %d\n", 0);
 
@@ -1192,36 +1171,7 @@ PVFS_Dokan_delete_directory(
     DbgPrint("DeleteDirectory: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /*** TODO ***/
     ret = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
-
-#if 0
-    fileLen = wcslen(filePath);
-    if (filePath[fileLen-1] != L'\\') {
-        filePath[fileLen++] = L'\\';
-    }
-    filePath[fileLen] = L'*';
-
-    hFind = FindFirstFile(filePath, &findData);
-    while (hFind != INVALID_HANDLE_VALUE) {
-        if (wcscmp(findData.cFileName, "..") != 0 &&
-            wcscmp(findData.cFileName, ".") != 0) {
-            FindClose(hFind);
-            DbgPrint("  Directory is not empty: %s\n", findData.cFileName);
-            return -(int)ERROR_DIR_NOT_EMPTY;
-        }
-        if (!FindNextFile(hFind, &findData)) {
-            break;
-        }
-    }
-    FindClose(hFind);
-
-    if (GetLastError() == ERROR_NO_MORE_FILES) {
-        return 0;
-    } else {
-        return -1;
-    }
-#endif 
 
     DbgPrint("DeleteDirectory exit: %d\n", ret);
 
@@ -1436,7 +1386,6 @@ PVFS_Dokan_get_file_security(
     EXPLICIT_ACCESS ea;
     PACL acl = NULL;
     PSECURITY_DESCRIPTOR desc;
-    DWORD sd_len;
     int err = 1;
 
     DbgPrint("GetFileSecurity: %S\n", FileName);
@@ -1498,7 +1447,6 @@ PVFS_Dokan_get_file_security(
         goto get_file_security_exit;
     }
 
-
     /* initialize the descriptor */
     desc = (PSECURITY_DESCRIPTOR) LocalAlloc(LPTR, SECURITY_DESCRIPTOR_MIN_LENGTH);
     MALLOC_CHECK(desc);
@@ -1510,37 +1458,46 @@ PVFS_Dokan_get_file_security(
     }
 
     /* set primary owner to Guest */
-    if (!SetSecurityDescriptorOwner(desc, guest_sid, FALSE))
+    if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
     {
-        DbgPrint("   Could not set descriptor owner\n");
-        goto get_file_security_exit;
+        if (!SetSecurityDescriptorOwner(desc, guest_sid, FALSE))
+        {
+            DbgPrint("   Could not set descriptor owner\n");
+            goto get_file_security_exit;
+        }
     }
 
     /* set primary group to Everyone group */
-    if (!SetSecurityDescriptorGroup(desc, everyone_sid, FALSE))
+    if (*SecurityInformation & GROUP_SECURITY_INFORMATION)
     {
-        DbgPrint("   Could not set descriptor group\n");
-        goto get_file_security_exit;
+        if (!SetSecurityDescriptorGroup(desc, everyone_sid, FALSE))
+        {
+            DbgPrint("   Could not set descriptor group\n");
+            goto get_file_security_exit;
+        }
     }
 
     /* add the ACL to the security descriptor */
-    if (!SetSecurityDescriptorDacl(desc, TRUE, acl, FALSE))
+    if (*SecurityInformation & DACL_SECURITY_INFORMATION)
     {
-        DbgPrint("   Could not set descriptor DACL\n");
-        goto get_file_security_exit;
+       if (!SetSecurityDescriptorDacl(desc, TRUE, acl, FALSE))
+       {
+           DbgPrint("   Could not set descriptor DACL\n");
+           goto get_file_security_exit;
+       }
     }
 
-    sd_len = GetSecurityDescriptorLength(desc);
+    *LengthNeeded = GetSecurityDescriptorLength(desc);
 
-    if (BufferLength >= sd_len)
+    if (BufferLength >= *LengthNeeded)
     {
         ZeroMemory(SecurityDescriptor, BufferLength);
-        CopyMemory(SecurityDescriptor, desc, sd_len);
+        CopyMemory(SecurityDescriptor, desc, *LengthNeeded);
     }
     else
     {
-        err = -ERROR_INSUFFICIENT_BUFFER;
-        *LengthNeeded = sd_len;
+        DbgPrint("   Length Needed: %u\n", *LengthNeeded);
+        err = -ERROR_INSUFFICIENT_BUFFER;        
     }
 
 get_file_security_exit:
@@ -1639,9 +1596,9 @@ PVFS_Dokan_unmount(
 
 static int __stdcall
 PVFS_Dokan_get_disk_free_space(
-    PULONGLONG FreeBytesAvailable,
-    PULONGLONG TotalNumberOfBytes,
-    PULONGLONG TotalNumberOfFreeBytes,
+    PULONGLONG       FreeBytesAvailable,
+    PULONGLONG       TotalNumberOfBytes,
+    PULONGLONG       TotalNumberOfFreeBytes,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int ret, err;
@@ -1662,10 +1619,51 @@ PVFS_Dokan_get_disk_free_space(
         err = -1;
     }
 
-    /* TODO */
     DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
 
     return err;
+}
+
+
+static int __stdcall
+PVFS_Dokan_get_volume_information(
+    LPWSTR           VolumeNameBuffer,
+    DWORD            VolumeNameSize,
+    LPDWORD          VolumeSerialNumber,
+    LPDWORD          MaximumComponentLength,
+    LPDWORD          FileSystemFlags,
+    LPWSTR           FileSystemNameBuffer,
+    DWORD            FileSystemNameSize,
+    PDOKAN_FILE_INFO DokanFileInfo)
+{
+    char *vol_name;
+    wchar_t *wvol_name;
+
+    DbgPrint("GetVolumeInformation\n");
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* volume name */
+    vol_name = fs_get_name(0);
+    wvol_name = convert_mbstring(vol_name);
+    /* bug in volume.c -- use length of wvol_name */
+    wcsncpy(VolumeNameBuffer, wvol_name, wcslen(wvol_name));
+    free(wvol_name);
+
+    /* serial number, comp. length and flags */
+    *VolumeSerialNumber = fs_get_id(0);
+    *MaximumComponentLength = PVFS_NAME_MAX;
+    *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
+                       FILE_CASE_PRESERVED_NAMES | 
+                       FILE_SUPPORTS_REMOTE_STORAGE |
+                       FILE_PERSISTENT_ACLS;
+
+    /* File System Name */
+    /* bug in volume.c -- see above */
+    wcsncpy(FileSystemNameBuffer, L"OrangeFS", 8);
+
+    DbgPrint("GetVolumeInformation exit: 0\n");
+
+    return 0;
 }
 
 
@@ -1686,11 +1684,6 @@ int __cdecl dokan_loop()
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
     dokanOptions->ThreadCount = 0; /* use default */
-
-#ifdef _DEBUG
-    /* removed in 0.6.0
-    DokanSetDebugMode(TRUE); */
-#endif
 
     DbgInit();
 
@@ -1728,7 +1721,7 @@ int __cdecl dokan_loop()
     dokanOperations->LockFile = PVFS_Dokan_lock_file;
     dokanOperations->UnlockFile = PVFS_Dokan_unlock_file;
     dokanOperations->GetDiskFreeSpace = PVFS_Dokan_get_disk_free_space;
-    dokanOperations->GetVolumeInformation = NULL;
+    dokanOperations->GetVolumeInformation = PVFS_Dokan_get_volume_information;
     dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security;
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
