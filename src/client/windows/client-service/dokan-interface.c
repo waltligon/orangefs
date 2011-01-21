@@ -21,6 +21,8 @@ BOOL g_DebugMode;
 /* TODO */
 #define MALLOC_CHECK(ptr)   if (ptr == NULL) \
                                 return -ERROR_NOT_ENOUGH_MEMORY
+#define MALLOC_CHECK_N(ptr) if (ptr == NULL) \
+                                return NULL
 
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
@@ -85,16 +87,134 @@ static void DbgClose()
         fclose(g_DebugFile);
 }
 
-static char RootDirectory[MAX_PATH] = "C:";
-
-static void
-GetFilePath(
-    char   *filePath,
-    LPCSTR FileName)
+/* map a file system error code to a Dokan/Windows code 
+   -1 is used as a default error */
+static int error_map(int fs_err)
 {
-    RtlZeroMemory(filePath, MAX_PATH);
-    strncpy(filePath, RootDirectory, strlen(RootDirectory));
-    strncat(filePath, FileName, strlen(FileName));
+    switch (fs_err)
+    {
+    case 0:
+        return ERROR_SUCCESS;         /* 0 */
+    case -PVFS_EPERM:          /* Operation not permitted */
+        return -ERROR_ACCESS_DENIED;  /* 5 */
+    case -PVFS_ENOENT:         /* No such file or directory */
+        return -ERROR_FILE_NOT_FOUND;  /* 2 */
+    case -PVFS_EINTR:          /* Interrupted system call */
+        return -1;
+    case -PVFS_EIO:            /* I/O error */
+        return -1;
+    case -PVFS_ENXIO:          /* No such device or address */
+        return -ERROR_DEV_NOT_EXIST;  /* 110 */
+    case -PVFS_EBADF:          /* Bad file number */
+        return -ERROR_INVALID_HANDLE; /* 6 */
+    case -PVFS_EAGAIN:         /* Try again */
+        return -1;
+    case -PVFS_ENOMEM:         /* Out of memory */
+        return -ERROR_NOT_ENOUGH_MEMORY;  /* 8 */
+    case -PVFS_EFAULT:         /* Bad address */
+        return -ERROR_INVALID_ADDRESS;  /* 487 */
+    case -PVFS_EBUSY:          /* Device or resource busy */
+        return -ERROR_BUSY;              /* 170 */
+    case -PVFS_EEXIST:         /* File exists */
+        return -ERROR_ALREADY_EXISTS;    /* 183 */
+    case -PVFS_ENODEV:         /* No such device */
+        return -ERROR_DEV_NOT_EXIST;     /* 55 */
+    case -PVFS_ENOTDIR:        /* Not a directory */
+        return -ERROR_DIRECTORY;         /* 267 */
+    case -PVFS_EISDIR:         /* Is a directory */
+        return -ERROR_DIRECTORY;         /* 267 */
+    case -PVFS_EINVAL:         /* Invalid argument */
+        return -ERROR_INVALID_PARAMETER; /* 87 */
+    case -PVFS_EMFILE:         /* Too many open files */
+        return -ERROR_TOO_MANY_OPEN_FILES;  /* 4 */
+    case -PVFS_EFBIG:          /* File too large */
+        return -ERROR_FILE_TOO_LARGE;       /* 223 */
+    case -PVFS_ENOSPC:         /* No space left on device */
+        return -ERROR_HANDLE_DISK_FULL;     /* 39 */
+    case -PVFS_EROFS:          /* Read-only file system */
+        return -ERROR_NOT_SUPPORTED;        /* 50 */
+    case -PVFS_EMLINK:         /* Too many links */
+        return -ERROR_TOO_MANY_LINKS;       /* 1142 */
+    case -PVFS_EPIPE:          /* Broken pipe */
+        return -ERROR_BROKEN_PIPE;          /* 109 */
+    case -PVFS_EDEADLK:        /* Resource deadlock would occur */
+        return -ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+    case -PVFS_ENAMETOOLONG:   /* File name too long */
+        return -ERROR_BUFFER_OVERFLOW;      /* 111 */
+    case -PVFS_ENOLCK:         /* No record locks available */
+        return -ERROR_LOCK_FAILED;          /* 167 */
+    case -PVFS_ENOSYS:         /* Function not implemented */
+        return -ERROR_CALL_NOT_IMPLEMENTED; /* 120 */
+    case -PVFS_ENOTEMPTY:      /* Directory not empty */
+        return -ERROR_DIR_NOT_EMPTY;        /* 145 */
+    case -PVFS_ELOOP:          /* Too many symbolic links encountered */
+        return -ERROR_TOO_MANY_LINKS;       /* 1142 */
+    case -PVFS_EWOULDBLOCK:    /* Operation would block */
+        return -WSAEWOULDBLOCK;             /* 10035 */
+    case -PVFS_ENOMSG:         /* No message of desired type */
+        return -ERROR_INVALID_MESSAGE;      /* 1002 */
+    case -PVFS_EUNATCH:        /* Protocol driver not attached */
+        return -ERROR_FS_DRIVER_REQUIRED;   /* 588 */
+    case -PVFS_EBADR:          /* Invalid request descriptor */
+    case -PVFS_EDEADLOCK:      /* Deadlock would result */
+        return -ERROR_POSSIBLE_DEADLOCK;    /* 1131 */
+    case -PVFS_ENODATA:        /* No data available */
+        return -ERROR_NO_DATA;              /* 232 */
+    case -PVFS_ETIME:          /* Timer expired */
+        return -ERROR_TIMEOUT;              /* 1460 */
+    case -PVFS_ENONET:         /* Machine is not on the network */
+        return -ERROR_NO_NETWORK;           /* 1222 */
+    case -PVFS_EREMOTE:        /* Object is remote */
+        return -1;          
+    case -PVFS_ECOMM:          /* Communication error on send */
+        return -1;
+    case -PVFS_EPROTO:         /* Protocol error */
+        return -1;
+    case -PVFS_EBADMSG:        /* Not a data message */
+        return -ERROR_INVALID_MESSAGE;      /* 1002 */      
+    case -PVFS_EOVERFLOW:      /* Value too large for defined data type */
+        return -ERROR_BUFFER_OVERFLOW;      /* 111 */
+    case -PVFS_ERESTART:       /* Interrupted system call should be restarted */
+        return -1;
+    case -PVFS_EMSGSIZE:       /* Message too long */
+        return -WSAEMSGSIZE;                /* 10040 */
+    case -PVFS_EPROTOTYPE:     /* Protocol wrong type for socket */
+        return -WSAEPROTOTYPE;              /* 10041 */
+    case -PVFS_ENOPROTOOPT:    /* Protocol not available */
+        return -WSAENOPROTOOPT;             /* 10042 */
+    case -PVFS_EPROTONOSUPPORT:/* Protocol not supported */
+        return -WSAEPROTONOSUPPORT;         /* 10043 */
+    case -PVFS_EOPNOTSUPP:     /* Operation not supported on transport endpoint */
+        return -WSAEOPNOTSUPP;              /* 10045 */
+    case -PVFS_EADDRINUSE:     /* Address already in use */
+        return -WSAEADDRINUSE;              /* 10048 */
+    case -PVFS_EADDRNOTAVAIL:  /* Cannot assign requested address */
+        return -WSAEADDRNOTAVAIL;           /* 10049 */
+    case -PVFS_ENETDOWN:       /* Network is down */
+        return -WSAENETDOWN;                /* 10050 */
+    case -PVFS_ENETUNREACH:    /* Network is unreachable */
+        return -WSAENETUNREACH;             /* 10051 */
+    case -PVFS_ENETRESET:      /* Network dropped connection because of reset */
+        return -WSAENETRESET;               /* 10052 */
+    case -PVFS_ENOBUFS:        /* No buffer space available */
+        return -WSAENOBUFS;                 /* 10055 */
+    case -PVFS_ETIMEDOUT:      /* Connection timed out */
+        return -WSAETIMEDOUT;               /* 10060 */
+    case -PVFS_ECONNREFUSED:   /* Connection refused */
+        return -WSAECONNREFUSED;            /* 10061 */
+    case -PVFS_EHOSTDOWN:      /* Host is down */
+        return -WSAEHOSTDOWN;               /* 10064 */
+    case -PVFS_EHOSTUNREACH:   /* No route to host */
+        return -WSAEHOSTUNREACH;            /* 10065 */
+    case -PVFS_EALREADY:       /* Operation already in progress */
+        return -WSAEALREADY;                /* 10037 */
+    case -PVFS_EACCES:         /* Access not allowed */
+        return -WSAEACCES;                  /* 10013 */
+    case -PVFS_ECONNRESET:    /* Connection reset by peer */
+        return -WSAECONNRESET;              /* 10054 */
+    }
+
+    return -1;
 }
 
 /* convert string from wide char (Unicode) to multi-byte string */
@@ -192,6 +312,39 @@ static void convert_filetime(CONST LPFILETIME pft, PVFS_time *t)
     *t = ll / 10000000LL;
 }
 
+/* Return resolved file system path.
+   Caller must free returned string. */
+static char *get_fs_path(const wchar_t *local_path)
+{
+    char *mb_path, *fs_path = NULL;
+    int ret;
+
+    /* convert from Unicode */
+    mb_path = convert_wstring(local_path);
+    if (mb_path == NULL)
+    {
+        return NULL;
+    }
+
+    /* resolve the path */
+    fs_path = (char *) malloc(MAX_PATH);
+    MALLOC_CHECK_N(fs_path);
+    ret = fs_resolve_path(mb_path, fs_path, MAX_PATH);
+    if (ret != 0)
+    {
+        DbgPrint("   fs_resolve_path returned %d\n");
+        cleanup_string(mb_path);
+        free(fs_path);
+        return NULL;
+    }
+
+    DEBUG_PATH(fs_path);
+
+    cleanup_string(mb_path);
+
+    return fs_path;
+}
+
 
 static int __stdcall
 PVFS_Dokan_create_file(
@@ -202,7 +355,7 @@ PVFS_Dokan_create_file(
     DWORD            FlagsAndAttributes,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, found, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
@@ -280,24 +433,9 @@ PVFS_Dokan_create_file(
 
     DokanFileInfo->Context = 0;
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(fs_path);
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* look up the file */
     found = 0;
@@ -367,10 +505,10 @@ PVFS_Dokan_create_file(
 
     DbgPrint("   fs_create/fs_truncate returns: %d\n", ret);
 
-    switch (ret)
+    
+    err = error_map(ret);
+    if (err == ERROR_SUCCESS)
     {
-    case 0:
-        err = 0;
         /* save the file handle in context */
         DokanFileInfo->Context = handle;
 
@@ -384,16 +522,6 @@ PVFS_Dokan_create_file(
         }
         else
             /* TODO */ ;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    case -PVFS_EEXIST:
-        err = -ERROR_ALREADY_EXISTS;
-        break;
-    default: 
-        /* TODO: default error */
-        err = -1;
     }
 
     /* assign nonzero context on error so cleanup works */
@@ -404,10 +532,9 @@ PVFS_Dokan_create_file(
     }
     */
 
-    free(local_path);
     free(fs_path);
 
-    DbgPrint("CreateFile exit: %d\n", err);
+    DbgPrint("CreateFile exit: %d (%d)\n", err, ret);
         
     return err;
 }
@@ -418,56 +545,31 @@ PVFS_Dokan_create_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, err;
     PVFS_handle handle;
 
     DbgPrint("CreateDirectory: %S\n", FileName);
 
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     ret = fs_mkdir(fs_path, &handle);
 
     DbgPrint("   fs_mkdir returns: %d\n", ret);
 
-    switch (ret)
+    err = error_map(ret);
+    if (err == ERROR_SUCCESS)
     {
-    case 0: 
-        err = 0;
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = handle;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    case -PVFS_EEXIST:
-        err = -ERROR_ALREADY_EXISTS;    
-        break;
-    default:
-        err = -1;
     }
 
-    free(local_path);
     free(fs_path);
 
-    DbgPrint("CreateDirectory exit: %d\n", err);
+    DbgPrint("CreateDirectory exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -478,32 +580,17 @@ PVFS_Dokan_open_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
 
     DbgPrint("OpenDirectory: %S\n", FileName);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* lookup the file */
     ret = fs_lookup(fs_path, &handle);    
@@ -523,27 +610,16 @@ PVFS_Dokan_open_directory(
         }
     }
 
-    switch (ret)
+    err = error_map(ret);
+    if (err == ERROR_SUCCESS)
     {
-    case 0: 
-        err = 0;
         DokanFileInfo->Context = handle;    
         DokanFileInfo->IsDirectory = TRUE;
-        break;
-    case -PVFS_ENOTDIR:
-        err = -ERROR_DIRECTORY;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    default: 
-        err = -1;  /* TODO */
     }
 
-    free(local_path);
     free(fs_path);
 
-    DbgPrint("OpenDirectory exit: %d\n", err);
+    DbgPrint("OpenDirectory exit: %d (%d)\n", err, ret);
     
     return err;
 }
@@ -554,7 +630,7 @@ PVFS_Dokan_close_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path = NULL, *fs_path = NULL;
+    char *fs_path = NULL;
     int ret = 0, err;
 
     DbgPrint("CloseFile: %S\n", FileName);
@@ -563,21 +639,10 @@ PVFS_Dokan_close_file(
     /* delete the file/dir if DeleteOnClose specified */
     if (DokanFileInfo->DeleteOnClose)
     {
-        /* convert from Unicode */
-        local_path = convert_wstring(FileName);
-        if (local_path == NULL)
-        {
-            return -ERROR_INVALID_DATA;
-        }
-
-        /* resolve the path */
-        fs_path = (char *) malloc(MAX_PATH);
-        MALLOC_CHECK(fs_path);
-        ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-        if (ret != 0)
-            goto close_exit;
-
-        DEBUG_PATH(fs_path);
+        /* get file system path */
+        fs_path = get_fs_path(FileName);
+        if (fs_path == NULL)
+            return -1;
 
         /* remove the file/dir */
         ret = fs_remove(fs_path);
@@ -587,27 +652,10 @@ PVFS_Dokan_close_file(
        Simply clear the handle. */
     DokanFileInfo->Context = 0;
 
-close_exit:
-
-    if (local_path != NULL)
-        cleanup_string(local_path);
     if (fs_path != NULL)
         free(fs_path);
 
-    switch (ret)
-    {
-    case 0:
-        err = 0;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    case -PVFS_ENOTEMPTY:
-        err = -ERROR_DIR_NOT_EMPTY;
-        break;
-    default:
-        err = -1;
-    }
+    err = error_map(ret);
 
     DbgPrint("CloseFile exit: %d (%d)\n", err, ret);
 
@@ -647,7 +695,7 @@ PVFS_Dokan_read_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     PVFS_size len64;
     int ret, err;
     
@@ -661,57 +709,20 @@ PVFS_Dokan_read_file(
         ReadLength == 0)
         return -1;
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
     
     /* perform the read operation */
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64);
     *ReadLength = (DWORD) len64;
-    /* for testing */
-    /*
-    memset(Buffer, 0, BufferLength);
-    *ReadLength = BufferLength;
-    ret = 0;
-    */
 
-    DbgPrint("   fs_read returns: %d\n", ret);
+    free(fs_path);    
 
-    switch (ret)
-    {
-    case 0: 
-        /*
-        strcpy(sbuf, "   Buffer bytes: ");
-        for (i = 0, buf = (char *) Buffer; i < (*ReadLength > 8 ? 8 : *ReadLength); i++)
-        {
-            sprintf(byte, "%02X ", buf[i]);
-            strcat(sbuf, byte);
-        }
-        DbgPrint("%s\n", sbuf);
-        */
-        err = 0;
-        break;
-    default:
-        err = -1;
-    }
-
-    DbgPrint("ReadFile exit: %d\n", err);
+    err = error_map(ret);
+    
+    DbgPrint("ReadFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -726,30 +737,17 @@ PVFS_Dokan_write_file(
     LONGLONG         Offset,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     PVFS_size len64;
     int ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
 
     DEBUG_PATH(fs_path);
     
@@ -758,18 +756,11 @@ PVFS_Dokan_write_file(
                    &len64);
     *NumberOfBytesWritten = (DWORD) len64;
 
-    DbgPrint("   fs_write returns: %d\n", ret);
+    free(fs_path);
 
-    switch (ret)
-    {
-    case 0: 
-        err = 0;
-        break;
-    default:
-        err = -1;
-    }
+    err = error_map(ret);
 
-    DbgPrint("WriteFile exit: %d\n", err);
+    DbgPrint("WriteFile exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -780,50 +771,25 @@ PVFS_Dokan_flush_file_buffers(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, err;
 
     DbgPrint("FlushFileBuffers: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* flush the file */
     ret = fs_flush(fs_path);
 
-    DbgPrint("   fs_flush returns: %d\n", ret);
-
-    switch (ret)
-    {
-    case 0: 
-        err = 0;
-        break;
-    default:
-        err = -1;
-    }
+    err = error_map(ret);
 
     free(fs_path);
-    free(local_path);
 
-    DbgPrint("FlushFileBuffers exit: %d\n", err);
+    DbgPrint("FlushFileBuffers exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -835,37 +801,20 @@ PVFS_Dokan_get_file_information(
     LPBY_HANDLE_FILE_INFORMATION HandleFileInformation,
     PDOKAN_FILE_INFO             DokanFileInfo)
 {
-    char *local_path, *fs_path, *filename;
+    char *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
 
     DbgPrint("GetFileInfo: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* get file attributes */
     ret = fs_getattr(fs_path, &attr);
-
-    DbgPrint("   fs_getattr returns: %d\n", ret);
 
     if (ret == 0)
     {
@@ -905,19 +854,11 @@ PVFS_Dokan_get_file_information(
 
     }    
     
-    switch (ret)
-    {
-    case 0: 
-        err = 0;
-        break;
-    default:
-        err = -1;
-    }
+    err = error_map(ret);
 
-    cleanup_string(local_path);
     free(fs_path);
 
-    DbgPrint("GetFileInfo exit: %d\n", err);
+    DbgPrint("GetFileInfo exit: %d (%d)\n", err, ret);
 
     return err;
 }
@@ -929,37 +870,20 @@ PVFS_Dokan_set_file_attributes(
     DWORD            FileAttributes,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, err;
     PVFS_sys_attr attr;
 
     DbgPrint("SetFileAttributes: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* convert attributes to PVFS */
     ret = fs_getattr(fs_path, &attr);
-
-    DbgPrint("   fs_getattr returns: %d\n", ret);
 
     if (ret == 0)
     {
@@ -971,23 +895,14 @@ PVFS_Dokan_set_file_attributes(
             /* TODO: permissions */ ;
 
         ret = fs_setattr(fs_path, &attr);
-
-        DbgPrint("   fs_setattr returns: %d\n", ret);
-    }
-
-    switch (ret)
-    {
-    case 0: 
-        err = 0;
-        break;
-    default:
-        err = -1;
     }
 
     free(fs_path);
-    cleanup_string(local_path);
 
-    DbgPrint("SetFileAttributes exit: %d\n", err);
+    err = error_map(ret);
+
+    DbgPrint("SetFileAttributes exit: %d (%d)\n", err, ret);
+
     return err;
 }
 
@@ -998,7 +913,7 @@ PVFS_Dokan_find_files(
     PFillFindData    FillFindData, // function pointer
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path,
+    char *fs_path,
          filename[PVFS_NAME_MAX], *full_path;
     int ret, err, count = 0;
     PVFS_ds_position token;
@@ -1009,21 +924,10 @@ PVFS_Dokan_find_files(
     DbgPrint("FindFiles: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-        goto find_files_exit;
-
-    DEBUG_PATH(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+        return -1;
 
     /* find the first file */
     ret = fs_find_first_file(fs_path, &token, filename, PVFS_NAME_MAX);
@@ -1086,22 +990,11 @@ find_files_exit:
 
     DbgPrint("   fs_find_xxx_file returns: %d\n", ret);
 
-    cleanup_string(local_path);
     free(fs_path);
 
-    switch (ret)
-    {
-    case 0: 
-        err = 0;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    default: 
-        err = -1;
-    }
+    err = error_map(ret);
 
-    DbgPrint("FindFiles exit: %d (%d files)\n", err, count);
+    DbgPrint("FindFiles exit: %d (%d) (%d files)\n", err, ret, count);
 
     return err;
 }
@@ -1112,48 +1005,26 @@ PVFS_Dokan_delete_file(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;         
+    char *fs_path;         
+    PVFS_handle handle;
     int ret, err;
 
     DbgPrint("DeleteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
     
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-
-    DEBUG_PATH(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+        return -1;
 
     /* Do not actually remove the file here, just return
-       success if file is found. Note that directories
-       will be removed even if they contain files.
+       success if file is found. 
        The file/dir will be deleted in close_file(). */
+    ret = fs_lookup(fs_path, &handle);
 
-    switch (ret)
-    {
-    case 0:
-        err = 0;
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    case -PVFS_ENOTEMPTY:
-        err = -ERROR_DIR_NOT_EMPTY;
-        break;
-    default:
-        err = -1;
-    }
-
-    cleanup_string(local_path);
     free(fs_path);
+
+    err = error_map(ret);
 
     DbgPrint("DeleteFile exit: %d (%d)\n", err, ret);
 
@@ -1166,16 +1037,16 @@ PVFS_Dokan_delete_directory(
     LPCWSTR          FileName,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    int ret;
+    int err;
 
     DbgPrint("DeleteDirectory: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    ret = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
+    err = PVFS_Dokan_delete_file(FileName, DokanFileInfo);
 
-    DbgPrint("DeleteDirectory exit: %d\n", ret);
+    DbgPrint("DeleteDirectory exit: %d\n", err);
 
-    return ret;
+    return err;
 }
 
 
@@ -1186,68 +1057,31 @@ PVFS_Dokan_move_file(
     BOOL             ReplaceIfExisting,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *old_local_path, *old_fs_path,
-         *new_local_path, *new_fs_path;
+    char *old_fs_path, *new_fs_path;
     int ret, err;
 
     DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    old_local_path = convert_wstring(FileName);
-    if (old_local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-    new_local_path = convert_wstring(NewFileName);
-    if (new_local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
+    /* get file system path */
+    old_fs_path = get_fs_path(FileName);
+    if (old_fs_path == NULL)
+        return -1;
 
-    /* resolve the paths */
-    old_fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(old_fs_path);
-    ret = fs_resolve_path(old_local_path, old_fs_path, MAX_PATH);
-    if (ret != 0)
-        goto move_exit;
-    DEBUG_PATH(old_fs_path);
-    
-    new_fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(new_fs_path);
-    ret = fs_resolve_path(new_local_path, new_fs_path, MAX_PATH);
-    if (ret != 0)
-        goto move_exit;
-    DEBUG_PATH(new_fs_path);
+    new_fs_path = get_fs_path(NewFileName);
+    if (new_fs_path == NULL)
+    {
+        free(old_fs_path);
+        return -1;
+    }
 
     /* rename/move the file */
     ret = fs_rename(old_fs_path, new_fs_path);
 
-    switch (ret)
-    {
-    case 0:
-        err = 0;
-        /*
-        if (DokanFileInfo->Context) {
-           // should close? or rename at closing?
-           CloseHandle((HANDLE)DokanFileInfo->Context);
-           DokanFileInfo->Context = 0;
-        }
-        */
-        break;
-    case -PVFS_ENOENT:
-        err = -ERROR_FILE_NOT_FOUND;
-        break;
-    default:
-        err = -1;
-    }
-
-move_exit:
-
-    cleanup_string(old_local_path);
-    cleanup_string(new_local_path);
     free(old_fs_path);
     free(new_fs_path);
+
+    err = error_map(ret);
 
     DbgPrint("MoveFile exit: %d (%d)\n", err, ret);
 
@@ -1314,32 +1148,17 @@ PVFS_Dokan_set_file_time(
     CONST FILETIME*  LastWriteTime,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
-    char *local_path, *fs_path;
+    char *fs_path;
     int ret, err;
     PVFS_sys_attr attr;
 
     DbgPrint("SetFileTime: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* convert from Unicode */
-    local_path = convert_wstring(FileName);
-    if (local_path == NULL)
-    {
-        return -ERROR_INVALID_DATA;
-    }
-
-    /* resolve the path */
-    fs_path = (char *) malloc(MAX_PATH);
-    MALLOC_CHECK(fs_path);
-    ret = fs_resolve_path(local_path, fs_path, MAX_PATH);
-    if (ret != 0)
-    {
-        free(local_path);
-        free(fs_path);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
         return -1;
-    }
-
-    DEBUG_PATH(fs_path);
 
     /* convert times to PVFS */
     ret = fs_getattr(fs_path, &attr);
@@ -1357,14 +1176,9 @@ PVFS_Dokan_set_file_time(
         DbgPrint("   fs_setattr returns: %d\n", ret);
     }
 
-    switch (ret)
-    {
-    case 0:
-        err = 0;
-        break;
-    default:
-        err = -1;
-    }
+    free(fs_path);
+
+    err = error_map(ret);
 
     DbgPrint("SetFileTime exit: %d (%d)\n", err, ret);
 
@@ -1609,14 +1423,10 @@ PVFS_Dokan_get_disk_free_space(
     ret = fs_get_diskfreespace((PVFS_size *) FreeBytesAvailable, 
                                (PVFS_size *) TotalNumberOfBytes);
 
-    switch (ret)
+    err = error_map(ret);
+    if (err == ERROR_SUCCESS)
     {
-    case 0: 
         *TotalNumberOfFreeBytes = *FreeBytesAvailable;
-        err = 0;
-        break;
-    default: 
-        err = -1;
     }
 
     DbgPrint("GetDiskFreeSpace exit: %d (%d)\n", err, ret);
@@ -1653,9 +1463,11 @@ PVFS_Dokan_get_volume_information(
     *VolumeSerialNumber = fs_get_id(0);
     *MaximumComponentLength = PVFS_NAME_MAX;
     *FileSystemFlags = FILE_CASE_SENSITIVE_SEARCH | 
-                       FILE_CASE_PRESERVED_NAMES | 
+                       FILE_CASE_PRESERVED_NAMES;
+                       /*
                        FILE_SUPPORTS_REMOTE_STORAGE |
                        FILE_PERSISTENT_ACLS;
+                       */
 
     /* File System Name */
     /* bug in volume.c -- see above */
