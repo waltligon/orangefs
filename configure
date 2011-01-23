@@ -5753,10 +5753,6 @@ if test "${with_kernel+set}" = set; then :
        as_fn_error "The kernel source tree must have been configured." "$LINENO" 5
     fi
 
-    if ! test -r $withval/include/linux/utsrelease.h && ! test -r $withval/include/generated/utsrelease.h; then
-        as_fn_error "The kernel source tree does not contain a known utsrelease.h file." "$LINENO" 5
-    fi
-
     if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
     elif test -r $withval/include/linux/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h; then
