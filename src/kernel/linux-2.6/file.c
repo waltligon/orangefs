@@ -2684,6 +2684,11 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     if (!rw->async)
     {
         error = do_readv_writev(rw);
+        /* not sure this is the correct place or way to update ki_pos but it
+         * definitely needs to occur somehow. otherwise, a write following 
+         * a synchronous writev will not write at the correct file position.
+         * store the offset from the read/write into the kiocb struct */
+        iocb->ki_pos = *offset;
         goto out_error;
     }
     /* Asynchronous I/O */
