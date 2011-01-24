@@ -10,6 +10,7 @@
 
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "client-service.h"
 #include "fs.h"
 
 FILE *g_DebugFile = NULL;
@@ -1479,7 +1480,7 @@ PVFS_Dokan_get_volume_information(
 }
 
 
-int __cdecl dokan_loop()
+int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 {
 
     int status;
@@ -1508,7 +1509,7 @@ int __cdecl dokan_loop()
 
     dokanOptions->Version = 600;
     /* Hard coded for now */
-    dokanOptions->MountPoint = L"Z:";
+    dokanOptions->MountPoint = convert_mbstring(options->mount_point);
 
     /* assign file operations */
     ZeroMemory(dokanOperations, sizeof(DOKAN_OPERATIONS));

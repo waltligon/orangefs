@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "client-service.h"
 #include "fs.h"
 
 #define WIN32ServiceName           "orangefs-client"
@@ -18,10 +19,82 @@ SERVICE_STATUS service_status;
 
 int is_running = 0;
 
-/* externs */
-extern int __cdecl dokan_loop();
+HANDLE hthread;
 
-void main_loop();
+DWORD thread_start(PORANGEFS_OPTIONS options);
+
+DWORD WINAPI main_loop(LPVOID poptions);
+
+FILE *log;
+
+/* externs */
+extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
+
+void init_service_log()
+{
+    char exe_path[MAX_PATH], *p;
+    int ret;
+
+    /* create log file in exe directory */
+    ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
+    if (ret != 0)
+    {
+        /* get directory */
+        p = strrchr(exe_path, '\\');
+        if (p)
+            *p = '\0';
+
+        strcat(exe_path, "\\service.log");
+
+        log = fopen(exe_path, "w");
+    }
+}
+
+void service_debug(char *format, ...)
+{
+    char buffer[512];
+    va_list argp;
+
+    va_start(argp, format);
+    vsprintf_s(buffer, sizeof(buffer), format, argp);
+    va_end(argp);
+
+    fprintf(log, buffer);
+    fflush(log);
+
+}
+
+void close_service_log()
+{
+    fclose(log);
+}
+
+BOOL check_mount_point(const char *mount_point)
+{
+    const char *slash;
+    char drive;
+    DWORD mask;
+
+    /* first check if a directory rather than drive is mapped */
+    slash = strchr(mount_point, '\\');
+    if (slash && slash[1] != '\0')
+        /* Dokan will exit if directory is invalid */
+        return TRUE;
+
+    drive = toupper(mount_point[0]);
+    drive -= 'A';
+    if (drive < 0 || drive > 25)
+        return FALSE;
+
+    mask = GetLogicalDrives();
+    if (mask == 0)
+    {
+        fprintf(stderr, "GetLogicalDrives failed: %u\n", GetLastError());
+        return FALSE;
+    }
+
+    return !(mask & (1 << drive));
+}
 
 DWORD service_install()
 {
@@ -180,15 +253,46 @@ void WINAPI service_ctrl(DWORD ctrl_code)
         Sleep(1000);
         SetServiceStatus(hstatus, &service_status);
         is_running = 0;
+        close_service_log();
     }
 }
 
 void WINAPI service_main(DWORD argc, char *argv[])
 {
+    DWORD i;
+    PORANGEFS_OPTIONS options;
+
+    init_service_log();
+
+    service_debug("Entered service_main\n");
+
+    /* allocate options */
+    options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+
+    /* default mount point */
+    strcpy(options->mount_point, "Z:");
+
+    for (i = 1; i < argc; i++)
+    {
+      if (!strcmp(argv[i], "-mount") || !strcmp(argv[i], "-m") ||
+          !strcmp(argv[i], "/m"))
+      {
+          if (i < (argc - 1))
+              strncpy(options->mount_point, argv[++i], MAX_PATH);
+          else
+              service_debug("Invalid argument %s. Using mount point Z:\n", argv[i]);
+      }
+    }
+
+    if (!check_mount_point(options->mount_point))
+        return;
+
     /* register our control handler routine */
     if ((hstatus = RegisterServiceCtrlHandler(WIN32ServiceName, service_ctrl))
-           != 0)
+           != NULL)
     {
+        service_debug("Service registered\n");
+
         /* run the service */
         service_status.dwCurrentState = SERVICE_RUNNING;
         service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
@@ -200,18 +304,65 @@ void WINAPI service_main(DWORD argc, char *argv[])
         if (SetServiceStatus(hstatus, &service_status))
         {
             is_running = 1;
-            main_loop();
+            service_debug("Starting thread\n");
+            thread_start(options);
         }
         
         /* shut down service */
+        /*
         service_status.dwCurrentState = SERVICE_STOPPED;
         SetServiceStatus(hstatus, &service_status);
+        */
+    }
+    else
+    {
+        service_debug("RegisterServiceCtrlHandler failed: %u\n", GetLastError());
     }
     /* TODO: error reporting */
 }
 
-void main_loop()
+DWORD thread_start(PORANGEFS_OPTIONS options)
 {
+    DWORD err = 0;
+
+    /* create and run the new thread */
+    hthread = CreateThread(NULL, 
+                           0, 
+                           main_loop,
+                           options,
+                           0,
+                           NULL);
+    if (hthread)
+    {  
+        while (is_running)
+            Sleep(1000);
+    }
+    else
+    {
+        err = GetLastError();
+        service_debug("CreateThread failed: %u\n", err);
+    }
+
+    return err;                           
+}
+
+DWORD thread_stop()
+{
+    DWORD err = 0;
+    
+    /* stop the thread */
+    if (!TerminateThread(hthread, 0))
+    {
+        err = GetLastError();
+        service_debug("TerminateThread failed: %u\n", err);
+    }
+
+    return err;
+}
+
+DWORD WINAPI main_loop(LPVOID poptions)
+{
+    PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
     int ret;
 
     /* init file systems */
@@ -220,24 +371,32 @@ void main_loop()
     /* run dokan operations */
     if (ret == 0)
     {
-        dokan_loop();
+        dokan_loop(options);
     }
 
     /* close file systems */
     fs_finalize();
 
+    return (DWORD) ret;
 }
 
 int main(int argc, char **argv, char **envp)
 {
   int i = 0;
   int run_service = 0;  
+  PORANGEFS_OPTIONS options;
+  DWORD err = 0;
 
   SERVICE_TABLE_ENTRY dispatch_table[2] = 
   {
       {WIN32ServiceName, (LPSERVICE_MAIN_FUNCTION) service_main},
       {NULL, NULL}
   };
+
+  options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+
+  /* default mount point */
+  strcpy(options->mount_point, "Z:");
 
   for (i = 0; i < argc; i++) 
   {
@@ -246,17 +405,28 @@ int main(int argc, char **argv, char **envp)
       {
           return service_install();
       }
-      else if (!stricmp(argv[i], "-removeService") ||
+      
+      if (!stricmp(argv[i], "-removeService") ||
                !stricmp(argv[i], "-u") || !stricmp(argv[i], "/u"))
       {
           return service_remove();
       }
-      else if (!strcmp(argv[i], "-service"))
+      
+      if (!strcmp(argv[i], "-service"))
       {
           run_service = 1;
-          break;
+      }
+
+      if (!strcmp(argv[i], "-mount") || !strcmp(argv[i], "-m") ||
+          !strcmp(argv[i], "/m"))
+      {
+          if (i < (argc - 1))
+              strncpy(options->mount_point, argv[++i], MAX_PATH);
+          else
+              fprintf(stderr, "Invalid argument -mount. Using mount point Z:\n");
       }
   }
+
 
   if (run_service) 
   {
@@ -266,8 +436,17 @@ int main(int argc, char **argv, char **envp)
   else 
   {    
       is_running = 1;
-      main_loop();
+
+      if (!check_mount_point(options->mount_point))
+      {
+          fprintf(stderr, "Drive already in use\n");
+          return -1;
+      }
+
+      err = main_loop(options);
   }
 
-  return 0;
+  free(options);
+
+  return err;
 }
