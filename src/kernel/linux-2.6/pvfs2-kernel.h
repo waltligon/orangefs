@@ -1297,6 +1297,15 @@ static inline void *kzalloc(size_t size, int flags)
 }
 #endif
 
+/* add in true/false enum for 2.6 kernels that don't have it (<2.6.9),
+ * taken include/linux/stddef.h */
+#ifndef HAVE_TRUE_FALSE_ENUM
+enum {
+    false   = 0,
+    true    = 1
+};
+#endif
+
 #endif /* __PVFS2KERNEL_H */
 
 /* @} */
