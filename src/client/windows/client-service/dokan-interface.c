@@ -32,20 +32,22 @@ static void DbgInit()
     char exe_path[MAX_PATH], *p;
     int ret;
 
-    /* create log file in exe directory */
-    ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
-    if (ret != 0)
+    if (g_DebugMode)
     {
-        /* get directory */
-        p = strrchr(exe_path, '\\');
-        if (p)
-            *p = '\0';
+        /* create log file in exe directory */
+        ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
+        if (ret != 0)
+        {
+            /* get directory */
+            p = strrchr(exe_path, '\\');
+            if (p)
+                *p = '\0';
 
-        strcat(exe_path, "\\pvfs.log");
+            strcat(exe_path, "\\pvfs.log");
 
-        g_DebugFile = fopen(exe_path, "w");
+            g_DebugFile = fopen(exe_path, "a");
+        }
     }
-
 }
 
 static void DbgPrint(LPCSTR format, ...)
@@ -84,8 +86,10 @@ static void DbgPrint(LPCSTR format, ...)
 
 static void DbgClose()
 {
-    if (g_DebugFile != NULL)
+    if (g_DebugFile != NULL) {
+        fprintf(g_DebugFile, "\n");
         fclose(g_DebugFile);
+    }
 }
 
 /* map a file system error code to a Dokan/Windows code 
@@ -1197,10 +1201,11 @@ PVFS_Dokan_get_file_security(
     PDOKAN_FILE_INFO      DokanFileInfo)
 {
     SID_IDENTIFIER_AUTHORITY sid_auth_world = SECURITY_WORLD_SID_AUTHORITY;
-    PSID everyone_sid = NULL, guest_sid = NULL;
+    PSID everyone_sid = NULL, self_sid = NULL /*guest_sid = NULL*/;
+    DWORD self_sid_size = SECURITY_MAX_SID_SIZE;
     EXPLICIT_ACCESS ea;
     PACL acl = NULL;
-    PSECURITY_DESCRIPTOR desc;
+    PSECURITY_DESCRIPTOR desc = NULL;
     int err = 1;
 
     DbgPrint("GetFileSecurity: %S\n", FileName);
@@ -1239,10 +1244,26 @@ PVFS_Dokan_get_file_security(
     }
 
     /* get SID for Guest account */
+    /*
     if (!AllocateAndInitializeSid(&sid_auth_world, 1, DOMAIN_USER_RID_GUEST,
                0, 0, 0, 0, 0, 0, 0, &guest_sid))
     {
         DbgPrint("   Could not allocate SID for Guest\n");
+        goto get_file_security_exit;
+    }
+    */
+
+    self_sid = LocalAlloc(LMEM_FIXED, self_sid_size);
+    if (self_sid == NULL)
+    {
+        DbgPrint("   Could not allocate SID for self\n");
+        goto get_file_security_exit;
+    }
+
+    /* get SID for current account */
+    if (!CreateWellKnownSid(WinSelfSid, NULL, self_sid, &self_sid_size))
+    {
+        DbgPrint("   Could not create SID for self\n");
         goto get_file_security_exit;
     }
 
@@ -1275,7 +1296,7 @@ PVFS_Dokan_get_file_security(
     /* set primary owner to Guest */
     if (*SecurityInformation & OWNER_SECURITY_INFORMATION)
     {
-        if (!SetSecurityDescriptorOwner(desc, guest_sid, FALSE))
+        if (!SetSecurityDescriptorOwner(desc, self_sid, FALSE))
         {
             DbgPrint("   Could not set descriptor owner\n");
             goto get_file_security_exit;
@@ -1321,8 +1342,12 @@ get_file_security_exit:
         LocalFree(desc);
     if (acl)
         LocalFree(acl);
+    /*
     if (guest_sid)
         FreeSid(guest_sid);
+    */
+    if (self_sid)
+        FreeSid(self_sid);
     if (everyone_sid)
         FreeSid(everyone_sid);
 
@@ -1489,11 +1514,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     PDOKAN_OPTIONS dokanOptions =
             (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
 
-#ifdef _DEBUG
-    g_DebugMode = g_UseStdErr = TRUE;
-#else
-    g_DebugMode = g_UseStdErr = FALSE;
-#endif
+    g_DebugMode = g_UseStdErr = options->debug;
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
     dokanOptions->ThreadCount = 0; /* use default */

@@ -17,15 +17,22 @@
 SERVICE_STATUS_HANDLE hstatus;
 SERVICE_STATUS service_status;
 
+#ifdef _DEBUG
+BOOL debug = TRUE;
+#else
+BOOL debug = FALSE;
+#endif
+
 int is_running = 0;
 
 HANDLE hthread;
 
 DWORD thread_start(PORANGEFS_OPTIONS options);
+DWORD thread_stop();
 
 DWORD WINAPI main_loop(LPVOID poptions);
 
-FILE *log;
+FILE *debug_log = NULL;
 
 /* externs */
 extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
@@ -34,6 +41,9 @@ void init_service_log()
 {
     char exe_path[MAX_PATH], *p;
     int ret;
+
+    if (!debug)
+        return;
 
     /* create log file in exe directory */
     ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
@@ -46,7 +56,7 @@ void init_service_log()
 
         strcat(exe_path, "\\service.log");
 
-        log = fopen(exe_path, "w");
+        debug_log = fopen(exe_path, "a");
     }
 }
 
@@ -55,18 +65,28 @@ void service_debug(char *format, ...)
     char buffer[512];
     va_list argp;
 
+    if (!debug)
+        return;
+
     va_start(argp, format);
     vsprintf_s(buffer, sizeof(buffer), format, argp);
     va_end(argp);
 
-    fprintf(log, buffer);
-    fflush(log);
+    fprintf(debug_log, buffer);
+    fflush(debug_log);
 
 }
 
 void close_service_log()
 {
-    fclose(log);
+    if (!debug)
+        return;
+
+    if (debug_log)
+    {
+        fprintf(debug_log, "\n");
+        fclose(debug_log);
+    }
 }
 
 BOOL check_mount_point(const char *mount_point)
@@ -215,14 +235,15 @@ DWORD service_remove()
                         break;
                 }
 
-                if (DeleteService(sch_service))                
-                    printf("%s removed\n", WIN32ServiceDisplayName);
-                else
-                    fprintf(stderr, "Error: DeleteService (%u)\n", 
-                      GetLastError());
-
-                CloseServiceHandle(sch_service);
             }
+            
+            if (DeleteService(sch_service))                
+                printf("%s removed\n", WIN32ServiceDisplayName);
+            else
+                fprintf(stderr, "Error: DeleteService (%u)\n", GetLastError());
+
+            CloseServiceHandle(sch_service);
+
         }
         else
         {
@@ -249,17 +270,19 @@ void WINAPI service_ctrl(DWORD ctrl_code)
     {
     case SERVICE_CONTROL_STOP:
     case SERVICE_CONTROL_SHUTDOWN:
+        service_debug("service_ctrl: shutdown received\n");
+        
         service_status.dwCurrentState = SERVICE_STOP_PENDING;
         Sleep(1000);
         SetServiceStatus(hstatus, &service_status);
+        
         is_running = 0;
-        close_service_log();
+        thread_stop();
     }
 }
 
 void WINAPI service_main(DWORD argc, char *argv[])
 {
-    DWORD i;
     PORANGEFS_OPTIONS options;
 
     init_service_log();
@@ -272,17 +295,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     /* default mount point */
     strcpy(options->mount_point, "Z:");
 
-    for (i = 1; i < argc; i++)
-    {
-      if (!strcmp(argv[i], "-mount") || !strcmp(argv[i], "-m") ||
-          !strcmp(argv[i], "/m"))
-      {
-          if (i < (argc - 1))
-              strncpy(options->mount_point, argv[++i], MAX_PATH);
-          else
-              service_debug("Invalid argument %s. Using mount point Z:\n", argv[i]);
-      }
-    }
+    /* TODO: read from config file */
 
     if (!check_mount_point(options->mount_point))
         return;
@@ -308,22 +321,25 @@ void WINAPI service_main(DWORD argc, char *argv[])
             thread_start(options);
         }
         
-        /* shut down service */
-        /*
+        /* shut down service */        
         service_status.dwCurrentState = SERVICE_STOPPED;
-        SetServiceStatus(hstatus, &service_status);
-        */
+        SetServiceStatus(hstatus, &service_status);        
     }
     else
     {
         service_debug("RegisterServiceCtrlHandler failed: %u\n", GetLastError());
+        /* TODO: error reporting */
     }
-    /* TODO: error reporting */
+    
+    close_service_log();
+
 }
 
 DWORD thread_start(PORANGEFS_OPTIONS options)
 {
     DWORD err = 0;
+
+    service_debug("thread_start enter\n");
 
     /* create and run the new thread */
     hthread = CreateThread(NULL, 
@@ -334,8 +350,7 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
                            NULL);
     if (hthread)
     {  
-        while (is_running)
-            Sleep(1000);
+        WaitForSingleObject(hthread, INFINITE);
     }
     else
     {
@@ -343,12 +358,16 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
         service_debug("CreateThread failed: %u\n", err);
     }
 
+    service_debug("thread_start exit\n");
+
     return err;                           
 }
 
 DWORD thread_stop()
 {
     DWORD err = 0;
+
+    service_debug("thread_stop enter\n");
     
     /* stop the thread */
     if (!TerminateThread(hthread, 0))
@@ -356,6 +375,8 @@ DWORD thread_stop()
         err = GetLastError();
         service_debug("TerminateThread failed: %u\n", err);
     }
+
+    service_debug("thread_stop exit\n");
 
     return err;
 }
@@ -425,8 +446,16 @@ int main(int argc, char **argv, char **envp)
           else
               fprintf(stderr, "Invalid argument -mount. Using mount point Z:\n");
       }
+
+      /* debug is always enabled for debug version */
+#ifndef _DEBUG
+      if (!strcmp(argv[i], "-debug") || !strcmp(argv[i], "-d") ||
+          !strcmp(argv[i], "/d"))
+          debug = TRUE;
+#endif
   }
 
+  options->debug = debug;
 
   if (run_service) 
   {

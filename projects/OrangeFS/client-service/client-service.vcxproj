@@ -115,14 +115,14 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\DokanLibrary;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\dokansrc-0.6.0\dokan;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc\dokan\dokan\objchk_wlh_x86\i386</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc-0.6.0\dokan\objchk_wlh_x86\i386</AdditionalLibraryDirectories>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;ws2_32.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -132,14 +132,14 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\DokanLibrary;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\dokansrc-0.6.0\dokan;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc\dokan\dokan\objchk_wlh_x86\i386</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc-0.6.0\dokan\objchk_wlh_x86\i386</AdditionalLibraryDirectories>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;ws2_32.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
