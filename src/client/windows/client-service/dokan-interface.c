@@ -1190,7 +1190,7 @@ PVFS_Dokan_set_file_time(
     return err;
 }
 
-
+/* TODO: Not currently in use. Causes Windows Explorer to crash. */
 static int __stdcall
 PVFS_Dokan_get_file_security(
     LPCWSTR               FileName,
@@ -1517,7 +1517,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     g_DebugMode = g_UseStdErr = options->debug;
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
-    dokanOptions->ThreadCount = 0; /* use default */
+    dokanOptions->ThreadCount = options->threads;
 
     DbgInit();
 
@@ -1556,13 +1556,13 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOperations->UnlockFile = PVFS_Dokan_unlock_file;
     dokanOperations->GetDiskFreeSpace = PVFS_Dokan_get_disk_free_space;
     dokanOperations->GetVolumeInformation = PVFS_Dokan_get_volume_information;
-    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security;
+/*    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security; */
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
 
     DbgPrint("Entering DokanMain\n");
 
-    /* TODO: dokan loops until termination */
+    /* dokan loops until termination */
     status = DokanMain(dokanOptions, dokanOperations);
 
     DbgPrint("Exited DokanMain\n");
@@ -1585,6 +1585,9 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             break;
         case DOKAN_MOUNT_ERROR:
             DbgPrint("Can't assign a drive letter\n");
+            break;
+        case DOKAN_MOUNT_POINT_ERROR:
+            DbgPrint("Can't assign mount point\n");
             break;
         default:
             DbgPrint("Unknown error: %d\n", status);

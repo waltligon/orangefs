@@ -34,12 +34,12 @@ int split_path(char *fs_path,
 }
 
 /* initialize file systems */
-int fs_initialize()
+int fs_initialize(const char *tabfile)
 {
     int ret, i, found_one = 0;
 
     /* read tab file */
-    tab = PVFS_util_parse_pvfstab(NULL);
+    tab = PVFS_util_parse_pvfstab(tabfile);
     if (!tab)
     {
         fprintf(stderr, "Error: failed to parse pvfstab\n");

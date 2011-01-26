@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "client-service.h"
+#include "config.h"
 #include "fs.h"
 
 #define WIN32ServiceName           "orangefs-client"
@@ -295,7 +296,8 @@ void WINAPI service_main(DWORD argc, char *argv[])
     /* default mount point */
     strcpy(options->mount_point, "Z:");
 
-    /* TODO: read from config file */
+    /* read from config file */
+    get_config(options);
 
     if (!check_mount_point(options->mount_point))
         return;
@@ -384,19 +386,49 @@ DWORD thread_stop()
 DWORD WINAPI main_loop(LPVOID poptions)
 {
     PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
-    int ret;
+    char *tabfile, exe_path[MAX_PATH], *p;
+    int ret, malloc_flag = 0;
+
+    /* locate tabfile -- env. variable overrides */
+    if (!(tabfile = getenv("PVFS2TAB_FILE")))
+    {
+        ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
+        if (ret)
+        {
+            /* get directory */
+            p = strrchr(exe_path, '\\');
+            if (p)
+                *p = '\0';
+
+            tabfile = (char *) malloc(MAX_PATH);
+            malloc_flag = TRUE;
+
+            strcpy(tabfile, exe_path);
+            strcat(tabfile, "\\pvfs2tab");
+        }
+        else
+        {
+           fprintf(stderr, "GetModuleFileName failed: %u\n", GetLastError());
+        }
+    }
 
     /* init file systems */
-    ret = fs_initialize();
+    if (tabfile)
+        ret = fs_initialize(tabfile);
+    else
+        ret = ERROR_FILE_NOT_FOUND;
 
     /* run dokan operations */
     if (ret == 0)
     {
         dokan_loop(options);
+
+        /* close file systems */
+        fs_finalize();
     }
 
-    /* close file systems */
-    fs_finalize();
+    if (malloc_flag)
+        free(tabfile);
 
     return (DWORD) ret;
 }
@@ -419,7 +451,11 @@ int main(int argc, char **argv, char **envp)
   /* default mount point */
   strcpy(options->mount_point, "Z:");
 
-  for (i = 0; i < argc; i++) 
+  /* get options from config file */
+  get_config(options);
+
+  /* command line arguments override config file options */
+  for (i = 1; i < argc; i++) 
   {
       if (!stricmp(argv[i], "-installService") ||
           !stricmp(argv[i], "-w") || !stricmp(argv[i], "/w")) 
