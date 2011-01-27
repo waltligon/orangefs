@@ -25,6 +25,7 @@ BOOL debug = FALSE;
 #endif
 
 int is_running = 0;
+int run_service = 0;  
 
 HANDLE hthread;
 
@@ -43,7 +44,7 @@ void init_service_log()
     char exe_path[MAX_PATH], *p;
     int ret;
 
-    if (!debug)
+    if (!debug || !run_service)
         return;
 
     /* create log file in exe directory */
@@ -66,7 +67,7 @@ void service_debug(char *format, ...)
     char buffer[512];
     va_list argp;
 
-    if (!debug)
+    if (!debug || !run_service)
         return;
 
     va_start(argp, format);
@@ -80,7 +81,7 @@ void service_debug(char *format, ...)
 
 void close_service_log()
 {
-    if (!debug)
+    if (!debug || !run_service)
         return;
 
     if (debug_log)
@@ -286,10 +287,6 @@ void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
 
-    init_service_log();
-
-    service_debug("Entered service_main\n");
-
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
 
@@ -298,6 +295,14 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     /* read from config file */
     get_config(options);
+
+#ifndef _DEBUG
+    debug = options->debug;
+#endif
+
+    init_service_log();
+
+    service_debug("Entered service_main\n");
 
     if (!check_mount_point(options->mount_point))
         return;
@@ -387,6 +392,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
 {
     PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
     char *tabfile, exe_path[MAX_PATH], *p;
+    FILE *f;
     int ret, malloc_flag = 0;
 
     /* locate tabfile -- env. variable overrides */
@@ -404,7 +410,18 @@ DWORD WINAPI main_loop(LPVOID poptions)
             malloc_flag = TRUE;
 
             strcpy(tabfile, exe_path);
-            strcat(tabfile, "\\pvfs2tab");
+            strcat(tabfile, "\\orangefstab");
+
+            /* attempt to open file */
+            f = fopen(tabfile, "r");
+            if (f)
+                fclose(f);
+            else 
+            {
+                /* switch to pvfs2tab -- fs_initialize will fail if not valid */
+                strcpy(tabfile, exe_path);
+                strcat(tabfile, "\\pvfs2tab");
+            }
         }
         else
         {
@@ -414,7 +431,10 @@ DWORD WINAPI main_loop(LPVOID poptions)
 
     /* init file systems */
     if (tabfile)
+    {
+        service_debug("Using tabfile: %s\n", tabfile);
         ret = fs_initialize(tabfile);
+    }
     else
         ret = ERROR_FILE_NOT_FOUND;
 
@@ -426,6 +446,11 @@ DWORD WINAPI main_loop(LPVOID poptions)
         /* close file systems */
         fs_finalize();
     }
+    else 
+    {
+        service_debug("fs_initialize returned %d\n", ret);
+        fprintf(stderr, "fs_initialize returned %d\n", ret);
+    }
 
     if (malloc_flag)
         free(tabfile);
@@ -436,7 +461,6 @@ DWORD WINAPI main_loop(LPVOID poptions)
 int main(int argc, char **argv, char **envp)
 {
   int i = 0;
-  int run_service = 0;  
   PORANGEFS_OPTIONS options;
   DWORD err = 0;
 
@@ -509,6 +533,7 @@ int main(int argc, char **argv, char **envp)
       }
 
       err = main_loop(options);
+      printf("main_loop exited: %d\n", err);
   }
 
   free(options);

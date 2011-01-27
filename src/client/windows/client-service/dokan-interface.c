@@ -43,7 +43,7 @@ static void DbgInit()
             if (p)
                 *p = '\0';
 
-            strcat(exe_path, "\\pvfs.log");
+            strcat(exe_path, "\\orangefs.log");
 
             g_DebugFile = fopen(exe_path, "a");
         }
