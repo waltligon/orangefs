@@ -136,6 +136,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sss-test", "..\OrangeFS\sss
 		{9138ABF9-041F-4A55-9E87-0F433719F4FC} = {9138ABF9-041F-4A55-9E87-0F433719F4FC}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-test", "client-test\client-test.vcxproj", "{28761587-FE68-4AEB-8BF0-AB73484A0AD4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -294,9 +296,17 @@ Global
 		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Release|Win32.ActiveCfg = Release|Win32
 		{09F8C9E4-1E99-4EBB-88E6-2A2CA290D718}.Release|x64.ActiveCfg = Release|Win32
 		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Debug|Win32.ActiveCfg = Debug|Win32
+		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Debug|Win32.Build.0 = Debug|Win32
 		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Debug|x64.ActiveCfg = Debug|Win32
 		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Release|Win32.ActiveCfg = Release|Win32
+		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Release|Win32.Build.0 = Release|Win32
 		{3BE3BF7A-2824-49D2-8734-1D610416F086}.Release|x64.ActiveCfg = Release|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Debug|Win32.ActiveCfg = Debug|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Debug|Win32.Build.0 = Debug|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Debug|x64.ActiveCfg = Debug|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|Win32.ActiveCfg = Release|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|Win32.Build.0 = Release|Win32
+		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
