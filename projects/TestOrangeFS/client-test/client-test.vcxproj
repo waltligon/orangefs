@@ -63,6 +63,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\client\windows\client-test\client-test.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-test\create.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-support.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-test.c" />
   </ItemGroup>

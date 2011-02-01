@@ -7,10 +7,10 @@
 
 #include "test-support.h"
 
-int test_test(op_options *options)
+int test_test(op_options *options, int fatal)
 {
     
-    report_result("test-test", RESULT_SUCCESS, 0, OPER_EQUAL, 0);
+    report_result(options, "test-test", RESULT_SUCCESS, 0, OPER_EQUAL, 0);
 
     return 0;
 }

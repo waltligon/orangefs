@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "test-support.h"
 
@@ -15,7 +16,7 @@ char *root_dir;
                                  return NULL;
 
 /* test prototypes */
-extern int test_test(op_options *options);
+extern int test_test(op_options *options, int fatal);
 
 typedef struct _list_node
 {
@@ -26,13 +27,14 @@ typedef struct _list_node
 typedef struct 
 {
     const char *name;
-    int (*function) (op_options *);
+    int (*function) (op_options *, int);
+    int fatal;
 } test_operation;
 
 test_operation op_table[] =
 {
-    {"test-test", test_test},
-    {NULL, NULL}
+    {"test-test", test_test, FALSE},
+    {NULL, NULL, 0}
 };
 
 list_node *add_list_node(list_node *head, void *pdata, size_t len)
@@ -102,6 +104,8 @@ BOOL init()
 {
     DWORD attrs;
 
+    srand(time(NULL));
+
     /* Check the specified root directory */
     attrs = GetFileAttributes(root_dir);
 
@@ -134,6 +138,7 @@ int run_tests(int argc, char **argv)
 
     /* set options */
     test_options.root_dir = root_dir;
+    test_options.report_flags = REPORT_CONSOLE;
 
     /* call the test options */
     if (all_tests)
@@ -141,10 +146,15 @@ int run_tests(int argc, char **argv)
         for (i = 0; op_table[i].name; i++)
         {
             /* run the test function */
-            ret = op_table[i].function(&test_options);
+            ret = op_table[i].function(&test_options, op_table[i].fatal);
             /* this means the test had a technical failure, rather than
                an expected failure (for some tests) */
-            if (ret != 0) {
+            if (ret == CODE_FATAL)
+            {
+                fprintf(stderr, "Test %s: fatal exit\n", op_table[i].name);
+                break;
+            }
+            else if (ret != 0) {
                 fprintf(stderr, "Test %s exited with technical error %d\n",
                     op_table[i].name, ret);
                 break;
@@ -161,8 +171,13 @@ int run_tests(int argc, char **argv)
             if (op)
             {
                 /* run the test function */
-                ret = op->function(&test_options);
-                if (ret != 0)
+                ret = op->function(&test_options, op->fatal);
+                if (ret == CODE_FATAL)
+                {
+                    fprintf(stderr, "Test %s: fatal exit\n", op->name);
+                    break;
+                }
+                else if (ret != 0)
                 {
                     fprintf(stderr, "Test %s exited with technical error %d\n",
                         op->name, ret);

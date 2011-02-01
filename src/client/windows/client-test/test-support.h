@@ -7,9 +7,13 @@
 typedef struct
 {
     const char *root_dir;
+    int report_flags;
+    FILE *freport;
 } op_options;
 
 /* constants */
+#define CODE_FATAL    0x11111111L
+
 #define RESULT_SUCCESS   0
 #define RESULT_FAILURE   1
 
@@ -20,8 +24,21 @@ typedef struct
 #define OPER_LESSOREQUAL    4
 #define OPER_GREATEROREQUAL 5
 
+#define REPORT_CONSOLE    1
+#define REPORT_FILE       2
+
 /* functions */
-void report_result(const char *test_name,
+char *quickcat(const char *str1, const char *str2);
+
+char *randdir(const char *root);
+
+char *randfile(const char *root);
+
+void report_error(op_options *options,
+                  const char *msg);
+
+void report_result(op_options *options,
+                   const char *test_name,
                    int expected_result,
                    int expected_code,
                    int code_operation,
