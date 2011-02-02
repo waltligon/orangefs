@@ -131,7 +131,7 @@ void report_result(op_options *options,
     line = (char *) malloc(line_size);
 
     /* print to buffer */
-    ret = _snprintf(line, line_size, "%s %s %d %2s %d %s",
+    ret = _snprintf(line, line_size, "%s %s %d %s %d %s",
                     test_name, 
                     (expected_result == RESULT_SUCCESS) ? "EXPECT_SUCCESS" : "EXPECT_FAILURE",
                     actual_code, ops[code_operation], expected_code,

@@ -16,7 +16,9 @@ char *root_dir;
                                  return NULL;
 
 /* test prototypes */
-extern int test_test(op_options *options, int fatal);
+/* extern int test_test(op_options *options, int fatal); */
+extern int create_dir(op_options *options, int fatal);
+extern int create_subdir(op_options *options, int fatal);
 
 typedef struct _list_node
 {
@@ -33,7 +35,9 @@ typedef struct
 
 test_operation op_table[] =
 {
-    {"test-test", test_test, FALSE},
+    /*{"test-test", test_test, FALSE}, */
+    {"create-dir", create_dir, TRUE},
+    {"create-subdir", create_subdir, TRUE},
     {NULL, NULL, 0}
 };
 
