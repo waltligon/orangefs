@@ -7,9 +7,11 @@
 typedef struct
 {
     const char *root_dir;
+	char *tab_file;
+	int fs;
     int report_flags;
     FILE *freport;
-} op_options;
+} global_options;
 
 /* constants */
 #define CODE_FATAL    0x11111111L
@@ -34,10 +36,10 @@ char *randdir(const char *root);
 
 char *randfile(const char *root);
 
-void report_error(op_options *options,
+void report_error(global_options *options,
                   const char *msg);
 
-void report_result(op_options *options,
+void report_result(global_options *options,
                    const char *test_name,
                    int expected_result,
                    int expected_code,

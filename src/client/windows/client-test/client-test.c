@@ -10,15 +10,15 @@
 #include "test-support.h"
 
 /* globals */
-char *root_dir;
 
 #define MALLOC_CHECK(ptr)    if (ptr == NULL) \
                                  return NULL;
 
 /* test prototypes */
-/* extern int test_test(op_options *options, int fatal); */
-extern int create_dir(op_options *options, int fatal);
-extern int create_subdir(op_options *options, int fatal);
+/* extern int test_test(global_options *options, int fatal); */
+extern int create_dir(global_options *options, int fatal);
+extern int create_subdir(global_options *options, int fatal);
+extern int create_dir_toolong(global_options *options, int fatal);
 
 typedef struct _list_node
 {
@@ -29,7 +29,7 @@ typedef struct _list_node
 typedef struct 
 {
     const char *name;
-    int (*function) (op_options *, int);
+    int (*function) (global_options *, int);
     int fatal;
 } test_operation;
 
@@ -38,6 +38,7 @@ test_operation op_table[] =
     /*{"test-test", test_test, FALSE}, */
     {"create-dir", create_dir, TRUE},
     {"create-subdir", create_subdir, TRUE},
+    {"create-dir-toolong", create_dir_toolong, TRUE},
     {NULL, NULL, 0}
 };
 
@@ -104,45 +105,71 @@ test_operation *find_operation(char *name)
     return NULL;
 }
 
-BOOL init()
+int setoption(int argc, char **argv, global_options *options, int *index)
 {
-    DWORD attrs;
+    int ret = 0;
 
-    srand(time(NULL));
+    /* set option */
+    if (!_stricmp(argv[*index], "-tabfile"))
+    {
+        (*index)++;
+        if (*index >= argc || argv[*index][0] == '-')
+        {
+            fprintf(stderr, "illegal option -tabfile: missing filename\n");
+            ret = -1;
+        }
+        else
+            options->tab_file = argv[*index];
+    }
 
-    /* Check the specified root directory */
-    attrs = GetFileAttributes(root_dir);
-
-    return (attrs != INVALID_FILE_ATTRIBUTES) && 
-           (attrs & FILE_ATTRIBUTE_DIRECTORY);
+    return ret;
 }
 
-int run_tests(int argc, char **argv)
+BOOL init(int argc, char **argv, 
+          global_options *options, list_node *test_list)
+{
+    DWORD attrs;
+    int i, ret = 0;
+
+    srand((unsigned int) time(NULL));
+
+    /* Check the specified root directory */
+    attrs = GetFileAttributes(options->root_dir);
+
+    /* root directory must be found */
+    if ((attrs == INVALID_FILE_ATTRIBUTES) || 
+        !(attrs & FILE_ATTRIBUTE_DIRECTORY))
+        return FALSE;
+
+    /* option default */
+    options->report_flags = REPORT_CONSOLE;
+
+    /* get options */
+    i = 2;
+    while (i < argc)
+    {
+        if (argv[i][0] == '-')
+            ret = setoption(argc, argv, options, &i);            
+        else 
+            add_list_node(test_list, argv[i], strlen(argv[i])+1);
+
+        if (ret != 0)
+            return FALSE;
+
+        i++;
+    }
+
+    return TRUE;
+}
+
+int run_tests(global_options *options, list_node *test_list)
 {
     int i, ret = 0;
     BOOL all_tests = TRUE;
-    op_options test_options;
-    list_node *test_list, *node;
+    list_node *node;
     test_operation *op;
 
-    test_list = (list_node *) calloc(1, sizeof(list_node));
-
-    /* read arguments for tests (all by default) */
-    for (i = 2; i < argc; i++)
-    {
-        if (argv[i][0] == '-')
-            /* TODO: OPTION */
-            ;
-        else 
-        {
-            add_list_node(test_list, argv[i], strlen(argv[i])+1);
-            all_tests = FALSE;
-        }
-    }
-
-    /* set options */
-    test_options.root_dir = root_dir;
-    test_options.report_flags = REPORT_CONSOLE;
+    all_tests = test_list->next == NULL;
 
     /* call the test options */
     if (all_tests)
@@ -150,7 +177,7 @@ int run_tests(int argc, char **argv)
         for (i = 0; op_table[i].name; i++)
         {
             /* run the test function */
-            ret = op_table[i].function(&test_options, op_table[i].fatal);
+            ret = op_table[i].function(options, op_table[i].fatal);
             /* this means the test had a technical failure, rather than
                an expected failure (for some tests) */
             if (ret == CODE_FATAL)
@@ -175,7 +202,7 @@ int run_tests(int argc, char **argv)
             if (op)
             {
                 /* run the test function */
-                ret = op->function(&test_options, op->fatal);
+                ret = op->function(options, op->fatal);
                 if (ret == CODE_FATAL)
                 {
                     fprintf(stderr, "Test %s: fatal exit\n", op->name);
@@ -209,6 +236,8 @@ void finalize()
 int main(int argc, char **argv)
 {
     int ret = 0;
+    global_options *options;
+    list_node *test_list;
 
     if (argc < 2)
     {
@@ -219,20 +248,29 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    root_dir = argv[1];
+    /* init options */
+    options = (global_options *) calloc(1, sizeof(global_options));
+    options->root_dir = argv[1];
 
-    if (init())
+    test_list = (list_node *) calloc(1, sizeof(list_node));
+
+    /* initialize and run tests */
+    if (init(argc, argv, options, test_list))
     {
-        ret = run_tests(argc, argv);
+        ret = run_tests(options, test_list);
         finalize();
     }
     else
     {
-        fprintf(stderr, "init failed with error code %u\n", GetLastError());
-        return -1;
+        ret = GetLastError();
+        if (ret == ERROR_FILE_NOT_FOUND)
+            fprintf(stderr, "init failed: %s not found\n", argv[1]);
+        else
+            fprintf(stderr, "init failed with error code %u\n", ret);
+        return ret;
     }
 
-    if (ret != 0)
+    if (ret != 0 && ret != CODE_FATAL)
         fprintf(stderr, "Testing failed with error code %d\n", ret);
 
     return ret;

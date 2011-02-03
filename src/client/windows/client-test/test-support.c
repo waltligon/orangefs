@@ -69,7 +69,7 @@ char *randfile(const char *root)
     return file;
 }
 
-void report_error(op_options *options,
+void report_error(global_options *options,
                   const char *msg)
 {
     /* report to console and/or file */
@@ -84,7 +84,7 @@ void report_error(op_options *options,
 
 }
 
-void report_result(op_options *options,
+void report_result(global_options *options,
                    const char *test_name,
                    int expected_result,
                    int expected_code,
