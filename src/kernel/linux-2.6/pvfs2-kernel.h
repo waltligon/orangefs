@@ -275,7 +275,12 @@ enum PVFS_async_io_type
 extern int pvfs2_acl_chmod(struct inode *inode);
 extern int pvfs2_init_acl(struct inode *inode, struct inode *dir);
 
+#ifdef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+extern const struct xattr_handler *pvfs2_xattr_handlers[];
+#else
 extern struct xattr_handler *pvfs2_xattr_handlers[];
+#endif /* HAVE_CONST_S_XATTR_IN_SUPERBLOCK */
+
 extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_access_handler;
 extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
@@ -299,14 +304,63 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
     return internal_flag;
 }
 
-int pvfs2_xattr_set_trusted(struct inode *inode, 
-    const char *name, const void *buffer, size_t size, int flags);
-int pvfs2_xattr_get_trusted(struct inode *inode,
-    const char *name, void *buffer, size_t size);
-int pvfs2_xattr_set_default(struct inode *inode, 
-    const char *name, const void *buffer, size_t size, int flags);
-int pvfs2_xattr_get_default(struct inode *inode,
-    const char *name, void *buffer, size_t size);
+int pvfs2_xattr_set_trusted(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    struct dentry *dentry, 
+#else
+    struct inode *inode, 
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    const char *name, 
+    const void *buffer, 
+    size_t size, 
+    int flags
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    );
+
+int pvfs2_xattr_get_trusted(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    struct dentry *dentry,
+#else
+    struct inode *inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    const char *name, 
+    void *buffer, 
+    size_t size
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    );
+
+int pvfs2_xattr_set_default(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    struct dentry *dentry, 
+#else
+    struct inode *inode, 
+#endif /*HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    const char *name, 
+    const void *buffer, 
+    size_t size, 
+    int flags
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    );
+
+int pvfs2_xattr_get_default(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    struct dentry *dentry,
+#else
+    struct inode *inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    const char *name, 
+    void *buffer, 
+    size_t size
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    );
 
 
 #endif

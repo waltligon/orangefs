@@ -49,6 +49,9 @@
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
 
+/* Define if s_xattr member of super_block struct is const */
+#undef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
@@ -112,6 +115,10 @@
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
+
+/* Define if fsync function in file_operations struct wants a dentry pointer
+   as the second parameter */
+#undef HAVE_FSYNC_DENTRY_PARAM
 
 /* Define if kernel has generic_file_readv */
 #undef HAVE_GENERIC_FILE_READV
@@ -447,11 +454,11 @@
 
 /* Define if kernel xattr_handle get function has dentry as first parameter
    and a fifth parameter */
-#undef HAVE_XATTR_HANLDER_GET_FIVE_PARAM
+#undef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
 
 /* Define if kernel xattr_handle set function has dentry as first parameter
    and a sixth parameter */
-#undef HAVE_XATTR_HANLDER_SET_SIX_PARAM
+#undef HAVE_XATTR_HANDLER_SET_SIX_PARAM
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
