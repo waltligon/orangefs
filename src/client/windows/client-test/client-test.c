@@ -8,17 +8,12 @@
 #include <time.h>
 
 #include "test-support.h"
+#include "test-list.h"
 
 /* globals */
 
 #define MALLOC_CHECK(ptr)    if (ptr == NULL) \
                                  return NULL;
-
-/* test prototypes */
-/* extern int test_test(global_options *options, int fatal); */
-extern int create_dir(global_options *options, int fatal);
-extern int create_subdir(global_options *options, int fatal);
-extern int create_dir_toolong(global_options *options, int fatal);
 
 typedef struct _list_node
 {
@@ -26,33 +21,12 @@ typedef struct _list_node
     struct _list_node *next;
 } list_node;
 
-typedef struct 
-{
-    const char *name;
-    int (*function) (global_options *, int);
-    int fatal;
-} test_operation;
-
-test_operation op_table[] =
-{
-    /*{"test-test", test_test, FALSE}, */
-    {"create-dir", create_dir, TRUE},
-    {"create-subdir", create_subdir, TRUE},
-    {"create-dir-toolong", create_dir_toolong, TRUE},
-    {NULL, NULL, 0}
-};
-
 list_node *add_list_node(list_node *head, void *pdata, size_t len)
 {
     list_node *last_node, *new_node;
 
-    /* find the end of the list */
-    last_node = head;
-    while (last_node->next)
-        last_node = last_node->next;
-
     /* create new head */
-    if (last_node == head)
+    if (head->data == NULL)
     {
         head->data = malloc(len);
         MALLOC_CHECK(head->data);
@@ -62,6 +36,10 @@ list_node *add_list_node(list_node *head, void *pdata, size_t len)
     }
     else
     {
+        last_node = head;
+        while (last_node->next)
+            last_node = last_node->next;
+
         new_node = (list_node *) calloc(1, sizeof(list_node));
         MALLOC_CHECK(new_node);
         new_node->data = malloc(len);
@@ -169,7 +147,7 @@ int run_tests(global_options *options, list_node *test_list)
     list_node *node;
     test_operation *op;
 
-    all_tests = test_list->next == NULL;
+    all_tests = test_list->data == NULL;
 
     /* call the test options */
     if (all_tests)
@@ -250,7 +228,12 @@ int main(int argc, char **argv)
 
     /* init options */
     options = (global_options *) calloc(1, sizeof(global_options));
-    options->root_dir = argv[1];
+
+    /* append trailing slash to root_dir if necessary */
+    options->root_dir = (char *) malloc(strlen(argv[1]) + 2);
+    strcpy(options->root_dir, argv[1]);
+    if (argv[1][strlen(argv[1])-1] != '\\')
+        strcat(options->root_dir, "\\");
 
     test_list = (list_node *) calloc(1, sizeof(list_node));
 
@@ -267,11 +250,21 @@ int main(int argc, char **argv)
             fprintf(stderr, "init failed: %s not found\n", argv[1]);
         else
             fprintf(stderr, "init failed with error code %u\n", ret);
+
+        free(options->root_dir);
+
         return ret;
     }
 
     if (ret != 0 && ret != CODE_FATAL)
         fprintf(stderr, "Testing failed with error code %d\n", ret);
+
+    free(options->root_dir);
+
+    {
+        char dummy[16];
+        gets(dummy);
+    }
 
     return ret;
 }

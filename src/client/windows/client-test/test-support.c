@@ -86,6 +86,7 @@ void report_error(global_options *options,
 
 void report_result(global_options *options,
                    const char *test_name,
+                   const char *sub_test,
                    int expected_result,
                    int expected_code,
                    int code_operation,
@@ -131,8 +132,9 @@ void report_result(global_options *options,
     line = (char *) malloc(line_size);
 
     /* print to buffer */
-    ret = _snprintf(line, line_size, "%s %s %d %s %d %s",
+    ret = _snprintf(line, line_size, "%s %s %s %d %s %d %s",
                     test_name, 
+                    sub_test,
                     (expected_result == RESULT_SUCCESS) ? "EXPECT_SUCCESS" : "EXPECT_FAILURE",
                     actual_code, ops[code_operation], expected_code,
                     ok_str);

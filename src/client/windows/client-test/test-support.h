@@ -6,9 +6,9 @@
 
 typedef struct
 {
-    const char *root_dir;
-	char *tab_file;
-	int fs;
+    char *root_dir;
+    char *tab_file;
+    int fs;
     int report_flags;
     FILE *freport;
 } global_options;
@@ -41,6 +41,7 @@ void report_error(global_options *options,
 
 void report_result(global_options *options,
                    const char *test_name,
+                   const char *sub_test,
                    int expected_result,
                    int expected_code,
                    int code_operation,

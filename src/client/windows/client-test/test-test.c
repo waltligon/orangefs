@@ -10,7 +10,7 @@
 int test_test(global_options *options, int fatal)
 {
     
-    report_result(options, "test-test", RESULT_SUCCESS, 0, OPER_EQUAL, 0);
+    report_result(options, "test-test", "main", RESULT_SUCCESS, 0, OPER_EQUAL, 0);
 
     return 0;
 }

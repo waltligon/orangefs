@@ -68,6 +68,8 @@
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-test.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\src\client\windows\client-test\create.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-test\test-list.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-support.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
