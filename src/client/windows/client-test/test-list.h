@@ -7,6 +7,7 @@
 #include "test-support.h"
 
 #include "create.h"
+#include "open.h"
 
 typedef struct 
 {
@@ -25,6 +26,7 @@ test_operation op_table[] =
     {"create-file-long", create_file_long, FALSE},
     {"create-file-toolong", create_file_toolong, FALSE},
     {"create-files-many", create_files_many, FALSE},
+    {"open-file", open_file, TRUE},
     {NULL, NULL, 0}
 };
 

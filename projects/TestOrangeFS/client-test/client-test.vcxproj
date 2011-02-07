@@ -64,11 +64,15 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\client\windows\client-test\client-test.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\create.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-test\open.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-test\test-io.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-support.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-test.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\client\windows\client-test\create.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-test\open.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-test\test-io.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-list.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-support.h" />
   </ItemGroup>
