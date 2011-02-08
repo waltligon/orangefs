@@ -68,6 +68,7 @@
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-io.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-support.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-test.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-test\timer.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\client\windows\client-test\create.h" />
@@ -75,6 +76,7 @@
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-io.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-list.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-support.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-test\timer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

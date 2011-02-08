@@ -47,4 +47,10 @@ void report_result(global_options *options,
                    int code_operation,
                    int actual_code);
 
+void report_perf(global_options *options,
+                 const char *test_name,
+                 const char *sub_test,
+                 double value,
+                 char *format);
+
 #endif

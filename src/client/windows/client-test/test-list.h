@@ -8,6 +8,7 @@
 
 #include "create.h"
 #include "open.h"
+#include "test-io.h"
 
 typedef struct 
 {
@@ -27,6 +28,7 @@ test_operation op_table[] =
     {"create-file-toolong", create_file_toolong, FALSE},
     {"create-files-many", create_files_many, FALSE},
     {"open-file", open_file, TRUE},
+    {"io-file", io_file, FALSE},
     {NULL, NULL, 0}
 };
 

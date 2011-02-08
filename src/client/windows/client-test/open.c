@@ -7,6 +7,11 @@
 
 #include "open.h"
 
+void open_file_cleanup(char *file_name)
+{
+    _unlink(file_name);
+}
+
 /* open file w/specified mode */
 int open_file_int(char *file_name, char *mode)
 {
@@ -43,6 +48,7 @@ int open_file(global_options *options, int fatal)
 
     if (code != 0 && fatal)
     {
+        open_file_cleanup(file_name);
         free(file_name);
         return CODE_FATAL;
     }
@@ -60,6 +66,7 @@ int open_file(global_options *options, int fatal)
 
     if (code != 0 && fatal)
     {
+        open_file_cleanup(file_name);
         free(file_name);
         return CODE_FATAL;
     }
@@ -77,6 +84,7 @@ int open_file(global_options *options, int fatal)
 
     if (code != 0 && fatal)
     {
+        open_file_cleanup(file_name);
         free(file_name);
         return CODE_FATAL;
     }
@@ -94,9 +102,12 @@ int open_file(global_options *options, int fatal)
 
     if (code != 0 && fatal)
     {
+        open_file_cleanup(file_name);
         free(file_name);
         return CODE_FATAL;
     }
+
+    open_file_cleanup(file_name);
 
     free(file_name);
 

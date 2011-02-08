@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "test-support.h"
+#include "timer.h"
 
 const char *ops[] = {"=", "<>", "<", ">", "=<", ">="};
 
@@ -154,3 +155,26 @@ void report_result(global_options *options,
     free(line);
 }
 
+void report_perf(global_options *options,
+                 const char *test_name,
+                 const char *sub_test,
+                 double value,
+                 char *format)
+{
+    char valstr[32];
+
+    /* get the string for the value in the specified format */
+    sprintf(valstr, format, value);
+
+    /* report to console and/or file */
+    if (options->report_flags & REPORT_CONSOLE)
+        printf("%s %s PERF %s\n", test_name, sub_test, valstr);
+
+    if (options->report_flags & REPORT_FILE)
+    {
+        fprintf(options->freport, "%s %s PERF %s\n", test_name, sub_test, valstr);
+        fflush(options->freport);
+    }
+
+}
+                   
