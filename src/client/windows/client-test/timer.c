@@ -6,21 +6,20 @@
 #include "timer.h"
 
 /* get the start time for the timer */
-unsigned long long timer_start()
+unsigned __int64 timer_start()
 {
     LARGE_INTEGER counter;
 
     if (!QueryPerformanceCounter(&counter))
         return 0;
 
-    return (unsigned) counter.QuadPart;
+    return counter.QuadPart;
 }
 
 /* get the elapsed time for the timer (seconds) */
-double timer_elapsed(unsigned long long start)
+double timer_elapsed(unsigned __int64 start)
 {
     LARGE_INTEGER counter, freq;
-    unsigned long long elapsed;
 
     if (!QueryPerformanceCounter(&counter))
         return 0;

@@ -29,6 +29,7 @@ test_operation op_table[] =
     {"create-files-many", create_files_many, FALSE},
     {"open-file", open_file, TRUE},
     {"io-file", io_file, FALSE},
+    {"flush-file", flush_file, FALSE},
     {NULL, NULL, 0}
 };
 

@@ -9,22 +9,33 @@
 #include "test-io.h"
 #include "timer.h"
 
+void io_file_cleanup(char *file_name)
+{
+    _unlink(file_name);
+}
+
 int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
 {
     FILE *f;
     int real_size, code = 0;
+    size_t total = 0;
 
     f = fopen(file_name, mode);
     if (!f)
         return errno;
 
-    if (!strcmp(mode, "r"))
-        real_size = fread(buffer, 1, size, f);
-    else /* "w" or "a" */
-        real_size = fwrite(buffer, 1, size, f);
+    while ((total < size) && !feof(f))
+    {
+        if (!strcmp(mode, "rb"))
+            real_size = fread(&(buffer[total]), 1, size - total, f);
+        else /* "wb" or "ab" */
+            real_size = fwrite(&(buffer[total]), 1, size - total, f);
+        if (real_size == 0 && errno != 0)
+            break;
+        total += real_size;
+    }
 
-    if (size != real_size)
-        code = errno;
+    code = errno;
 
     fclose(f);
 
@@ -39,7 +50,7 @@ int io_file(global_options *options, int fatal)
     char *perftests[] = {"io_file_write_4kb", "io_file_read_4kb", "io_file_write_100kb", 
                         "io_file_read_100kb", "io_file_write_1mb", "io_file_read_1mb"};
     char *subtests[] = {"4kb", "100kb", "1mb"};
-    unsigned long long start;
+    unsigned __int64 start;
     double elapsed;
     
     for (i = 0; i < 3; i++)
@@ -50,13 +61,13 @@ int io_file(global_options *options, int fatal)
         buffer = (char *) malloc(sizes[i]);
 
         /* fill buffer */
-        for (j = 0; j < sizes[i]; j++)
+        for (j = 0; (unsigned) j < sizes[i]; j++)
             buffer[j] = (char) j % 256;
 
         file_name = randfile(options->root_dir);
 
         start = timer_start();
-        code = io_file_int(file_name, "w", buffer, sizes[i]);
+        code = io_file_int(file_name, "wb", buffer, sizes[i]);
         elapsed = timer_elapsed(start);
 
         if (code != 0)
@@ -73,7 +84,7 @@ int io_file(global_options *options, int fatal)
         memcpy(copy, buffer, sizes[i]);
 
         start = timer_start();
-        code = io_file_int(file_name, "r", buffer, sizes[i]);
+        code = io_file_int(file_name, "rb", buffer, sizes[i]);
         elapsed = timer_elapsed(start);
 
         if (code != 0)
@@ -97,6 +108,8 @@ int io_file(global_options *options, int fatal)
                       OPER_EQUAL,
                       code);
 
+        io_file_cleanup(file_name);
+
         free(file_name); file_name = NULL;
         free(buffer); buffer = NULL;
         free(copy); copy = NULL;
@@ -106,7 +119,10 @@ int io_file(global_options *options, int fatal)
 io_file_exit:
 
     if (file_name)
+    {
+        io_file_cleanup(file_name);
         free(file_name);
+    }
     if (buffer)
         free(buffer);
     if (copy)
@@ -114,9 +130,88 @@ io_file_exit:
 
     if (!code_flag)
     {
-        /* todo: report_error */
+        report_error(options,
+            "io_file: I/O error\n");
         return code;
     }
+
+    return 0;
+}
+
+int flush_file(global_options *options, int fatal)
+{
+    char *file_name;
+    FILE *f, *f2;
+    int i, size = 4 * 1024, total = 0,
+        code;
+    char *buffer, *copy;
+
+    file_name = randfile(options->root_dir);
+
+    f = fopen(file_name, "wb");
+    if (!f)
+    {
+        free(file_name);
+        return -1;
+    }
+
+    /* write bytes to file */
+    buffer = (char *) malloc(size);
+    for (i = 0; i < size; i++)
+    {
+        buffer[i] = i % 256;
+    }
+    while (total < size)
+    {
+        total += fwrite(buffer, 1, size, f);
+    }
+
+    /* flush the file */
+    code = fflush(f);
+
+    report_result(options,
+                  "flush-file",
+                  "flush-call",
+                  RESULT_SUCCESS,
+                  0,
+                  OPER_EQUAL,
+                  code);
+
+    /* open another pointer to the file */
+    f2 = fopen(file_name, "rb");
+    if (!f2)
+    {
+        free(file_name);
+        return -1;
+    }
+
+    /* compare data */
+    copy = (char *) malloc(size);
+    memcpy(copy, buffer, size);
+    total = 0;
+    while (total < size)
+    {
+        total += fread(buffer, 1, size, f2);
+    }
+
+    code = memcmp(copy, buffer, size);
+
+    report_result(options,
+                  "flush-file",
+                  "flush-compare",
+                  RESULT_SUCCESS,
+                  0,
+                  OPER_EQUAL,
+                  code);
+
+    fclose(f2);
+    fclose(f);
+
+    _unlink(file_name);
+
+    free(copy);
+    free(buffer);
+    free(file_name);
 
     return 0;
 }
