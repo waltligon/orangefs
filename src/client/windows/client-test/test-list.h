@@ -9,6 +9,8 @@
 #include "create.h"
 #include "open.h"
 #include "test-io.h"
+#include "file-ops.h"
+#include "info.h"
 
 typedef struct 
 {
@@ -30,6 +32,16 @@ test_operation op_table[] =
     {"open-file", open_file, TRUE},
     {"io-file", io_file, FALSE},
     {"flush-file", flush_file, FALSE},
+    {"delete-file", delete_file, FALSE},
+    {"delete-file-notexist", delete_file_notexist, FALSE},
+    {"delete-dir-empty", delete_dir_empty, FALSE},
+    {"delete-dir-notempty", delete_dir_notempty, FALSE},
+    {"rename-file", rename_file, FALSE},
+    {"rename-file-exist", rename_file_exist, FALSE},
+    {"move-file", move_file, FALSE},
+    {"move-file-baddir", move_file_baddir, FALSE},
+    {"move-file-exist", move_file_exist, FALSE},
+    {"file-time", file_time, FALSE},
     {NULL, NULL, 0}
 };
 

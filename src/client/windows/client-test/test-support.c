@@ -70,6 +70,21 @@ char *randfile(const char *root)
     return file;
 }
 
+/* create a 0-byte file */
+int quick_create(char *file_name)
+{
+    FILE *f;
+
+    f = fopen(file_name, "w");
+    if (f)
+    {
+        fclose(f);
+        return 0;
+    }
+
+    return errno;
+}
+
 void report_error(global_options *options,
                   const char *msg)
 {
@@ -137,7 +152,7 @@ void report_result(global_options *options,
                     test_name, 
                     sub_test,
                     (expected_result == RESULT_SUCCESS) ? "EXPECT_SUCCESS" : "EXPECT_FAILURE",
-                    actual_code, ops[code_operation], expected_code,
+                    expected_code, ops[code_operation], actual_code,
                     ok_str);
     if (ret < 0)
         sprintf(line, "LINE BUFFER OVERFLOW");

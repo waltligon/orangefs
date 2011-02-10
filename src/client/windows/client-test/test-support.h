@@ -32,6 +32,8 @@ typedef struct
 /* functions */
 char *quickcat(const char *str1, const char *str2);
 
+int quick_create(char *file_name);
+
 char *randdir(const char *root);
 
 char *randfile(const char *root);
