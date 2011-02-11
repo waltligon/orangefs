@@ -75,7 +75,7 @@ then
     exit 1
 fi
 
-${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-perror 0 
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-perror 0 2>&1
 if [ "${?}" != 0 ]
 then
     echo "pvfs2-perror failure." 1>&2
