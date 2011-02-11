@@ -32,11 +32,11 @@ int main(int argc, char **argv)
 {
     int    ret=0,
            mode=0;
-    char   filename[PATH_MAX]= "",
-           testDir[PATH_MAX]= "", /* Directory where all the test files will reside */
-           pvfsPath[PVFS_NAME_MAX]= "", /* fs relative path */
-           cmd[PATH_MAX]       = "",
-           pvfs2_tab_file[PATH_MAX]= ""; /* used to store pvfs2 tab file */
+    char   filename[PATH_MAX]= { 0 },
+           testDir[PATH_MAX]= { 0 }, /* Directory where all test files reside */
+           pvfsPath[PVFS_NAME_MAX]= { 0 }, /* fs relative path */
+           cmd[PATH_MAX]       = { 0 },
+           pvfs2_tab_file[PATH_MAX]= { 0 }; /* used to store pvfs2 tab file */
     struct file_ref stFileRef;
     struct common_options commonOpts;
     struct stat stStats;
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 
     if(commonOpts.printResults)
     {
-        printf("-------------------- Starting mkdir tests --------------------\n");
+        printf("------------------ Starting mkdir tests ------------------\n");
     }
 
     /* Setup the PVFS2TAB file first thing */
@@ -129,13 +129,23 @@ int main(int argc, char **argv)
       exit(1);
     }
 
-    /* Verify that the permissions are at 777 */
-    ret = stat_file(testDir, 
-                    &stStats,
-                    0, /* Don't follow link */ 
-                    commonOpts.use_pvfs2_lib, 
-                    commonOpts.verbose);
-   
+    if(commonOpts.use_pvfs2_lib)
+    {
+        ret = stat_file(testDir,
+                         NULL,
+                         0, /* Don't follow link */
+                         commonOpts.use_pvfs2_lib,
+                         commonOpts.verbose);
+    }
+    else
+    {
+        /* Verify that the permissions are at 777 */
+        ret = stat_file(testDir, 
+                        &stStats,
+                        0, /* Don't follow link */ 
+                        commonOpts.use_pvfs2_lib, 
+                        commonOpts.verbose);
+    } 
     if(ret != TEST_COMMON_SUCCESS)
     {
       fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", testDir);
@@ -143,22 +153,29 @@ int main(int argc, char **argv)
     }
     else
     {
-        print_stats(stStats, commonOpts.verbose);
-        /* Check to make sure the permissions are correct */
-        if(!is_file_mode_correct(stStats.st_mode, mode, &commonOpts))
+        if(! commonOpts.use_pvfs2_lib)
         {
-            if(commonOpts.verbose)
+            print_stats(stStats, commonOpts.verbose);
+            /* Check to make sure the permissions are correct */
+            if(!is_file_mode_correct(stStats.st_mode, mode, &commonOpts))
             {
-                fprintf(stdout, "\t [%s] has mode [%o]\n", testDir, stStats.st_mode);
+                if(commonOpts.verbose)
+                {
+                    fprintf(stdout, "\t [%s] has mode [%o]\n", 
+                            testDir, stStats.st_mode);
+                }
+                fprintf(stderr, "\t FAILED. [%s] NOT created using mode [%o]\n",
+                        testDir, mode); 
+                /* Let's not quit here, we may find more errors by running 
+                 * more tests */
             }
-            fprintf(stderr, "\t FAILED. [%s] NOT created using mode [%o]\n", testDir, mode); 
-            /* Let's not quit here, we may find more errors by running more tests */
         }
         else
         {
             if(commonOpts.printResults)
             {
-                fprintf(stdout, "\t PASSED. [%s] created using mode [%o]\n", testDir, mode); 
+                fprintf(stdout, "\t PASSED. [%s] created using mode [%o]\n", 
+                        testDir, mode); 
             }
         }
     }
@@ -167,6 +184,7 @@ int main(int argc, char **argv)
      * The main directory must already be created. Both child and main directory
      * will need to be removed later
      */
+    memset(filename, 0, PATH_MAX);
     sprintf(filename, "%s/%s", testDir, "child_dir");
     mode = S_IRWXO | S_IRWXG | S_IRWXU;  /* 0777 */
     ret = create_directory(filename, 
@@ -181,13 +199,24 @@ int main(int argc, char **argv)
       exit(1);
     }
 
-    /* Verify that the directory exists */
-    ret = stat_file(filename, 
-                    &stStats,
-                    0, /* Don't follow link */ 
-                    commonOpts.use_pvfs2_lib, 
-                    commonOpts.verbose);
-   
+    if(commonOpts.use_pvfs2_lib)
+    {
+        ret = stat_file(filename, 
+                        NULL,
+                        0, /* Don't follow link */ 
+                        commonOpts.use_pvfs2_lib, 
+                        commonOpts.verbose);
+    }
+    else
+    {
+        /* Verify that the directory exists */
+        memset(&stStats, 0, sizeof(stStats));
+        ret = stat_file(filename, 
+                        &stStats,
+                        0, /* Don't follow link */ 
+                        commonOpts.use_pvfs2_lib, 
+                        commonOpts.verbose);
+    }
     if(ret != TEST_COMMON_SUCCESS)
     {
       fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", filename);
@@ -195,15 +224,21 @@ int main(int argc, char **argv)
     }
     else
     {
-        print_stats(stStats, commonOpts.verbose);
+        if(! commonOpts.use_pvfs2_lib)
+        {
+            print_stats(stStats, commonOpts.verbose);
+        }
+
         if(commonOpts.printResults)
         {
-            fprintf(stdout, "\t PASSED. [%s] created using mode [%o]\n", filename, mode); 
+            fprintf(stdout, "\t PASSED. [%s] created using mode [%o]\n", 
+                    filename, mode); 
         }
     }
 
     /* Remove the child_dir */
-    ret = remove_directory(filename, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+    ret = remove_directory(filename, commonOpts.use_pvfs2_lib, 
+                           commonOpts.verbose);
     
     if(ret != 0)
     {
@@ -211,7 +246,8 @@ int main(int argc, char **argv)
     }
 
     /* Remove the main directory */
-    ret = remove_directory(testDir, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+    ret = remove_directory(testDir, commonOpts.use_pvfs2_lib, 
+                           commonOpts.verbose);
     
     if(ret != 0)
     {
@@ -224,6 +260,7 @@ int main(int argc, char **argv)
      */
     if(commonOpts.use_pvfs2_lib)
     {
+        memset(filename, 0, PATH_MAX);
         sprintf(filename, "%s/%s", testDir, "child_dir");
         mode = S_IRWXO | S_IRWXG | S_IRWXU;  /* 0777 */
 
@@ -233,34 +270,36 @@ int main(int argc, char **argv)
         if(ret != TEST_COMMON_SUCCESS)
         {
           fprintf(stderr, "\t FAILED. Couldn't create [%s]\n", filename);
-          /* Let's not quit here, we may find more errors by running more tests */
+          /* Let's not quit here, we may find more errors by running more 
+           * tests */
         }
     
         /* Verify that the directory exists */
         ret = stat_file(filename, 
-                        &stStats,
+                        NULL,
                         0, /* Don't follow link */ 
                         commonOpts.use_pvfs2_lib, 
                         commonOpts.verbose);
        
         if(ret != TEST_COMMON_SUCCESS)
         {
-          fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", filename);
-          /* Let's not quit here, we may find more errors by running more tests */
+          fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", 
+                  filename);
+          /* Let's not quit here, we may find more errors by running more 
+           * tests */
         }
         else
         {
-            print_stats(stStats, commonOpts.verbose);
             if(commonOpts.printResults)
             {
-                fprintf(stdout, "\t PASSED. [%s] created with parent mode set and mode [%o]\n", 
-                        filename, 
-                        mode); 
+                fprintf(stdout, "\t PASSED. [%s] created with parent mode "
+                        "set and mode [%o]\n", filename, mode); 
             }
         }
     
         /* Remove the child directory */
-        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, 
+                               commonOpts.verbose);
         
         if(ret != 0)
         {
@@ -270,13 +309,16 @@ int main(int argc, char **argv)
         }
 
         /* Remove the main directory */
+        memset(filename, 0, PATH_MAX);
         sprintf(filename, "%s", testDir);
-        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, 
+                               commonOpts.verbose);
         
         if(ret != 0)
         {
             fprintf(stderr, "\t FAILED. Unable to remove [%s]\n", filename);
-            /* Let's not quit here, we may find more errors by running more tests */
+            /* Let's not quit here, we may find more errors by running more 
+             * tests */
         }
     }
 
@@ -286,9 +328,11 @@ int main(int argc, char **argv)
      */
     if(commonOpts.use_pvfs2_lib)
     {
+        memset(filename, 0, PATH_MAX);
         sprintf(filename, "%s/%s", testDir, "child_dir");
         mode = S_IRWXO | S_IRWXG | S_IRWXU;  /* 0777 */
 
+        memset(cmd, 0, PATH_MAX);
         sprintf(cmd, "pvfs2-mkdir -p -m %o %s %s", mode, testDir, filename);
         ret = system(cmd);
     
@@ -301,26 +345,28 @@ int main(int argc, char **argv)
     
         /* Verify that the directory exists */
         ret = stat_file(filename, 
-                        &stStats,
+                        NULL,
                         0, /* Don't follow link */ 
                         commonOpts.use_pvfs2_lib, 
                         commonOpts.verbose);
        
         if(ret != TEST_COMMON_SUCCESS)
         {
-          fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", filename);
+          fprintf(stderr, "\t FAILED. Couldn't execute stat on [%s]\n", 
+                  filename);
         }
         else
         {
-            print_stats(stStats, commonOpts.verbose);
             if(commonOpts.printResults)
             {
-                fprintf(stdout, "\t PASSED. created two directories via command line\n"); 
+                fprintf(stdout, "\t PASSED. created two directories via "
+                        "command line\n"); 
             }
         }
     
         /* Remove the child directory */
-        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, 
+                               commonOpts.verbose);
         
         if(ret != 0)
         {
@@ -329,8 +375,10 @@ int main(int argc, char **argv)
         }
 
         /* Remove the main directory */
+        memset(filename, 0, PATH_MAX);
         sprintf(filename, "%s", testDir);
-        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, commonOpts.verbose);
+        ret = remove_directory(filename, commonOpts.use_pvfs2_lib, 
+                               commonOpts.verbose);
         
         if(ret != 0)
         {
@@ -349,7 +397,7 @@ int main(int argc, char **argv)
     
     if(commonOpts.verbose)
     {
-        printf("-------------------- Ending   mkdir tests --------------------\n");
+        printf("------------------ Ending   mkdir tests ------------------\n");
     }
 
     return 0;  

@@ -308,67 +308,74 @@ int stat_file(
     const int     use_pvfs2_lib, /**< determines use of pvfs2 library */
     const int     verbose)       /**< Turns on verbose prints if set to non-zero value */
 {
-   int  ret=0;
-   char szPvfsPath[PVFS_NAME_MAX] = "";
-   PVFS_sysresp_lookup  lk_response;
-   PVFS_object_ref      ref;
-   PVFS_sysresp_getattr getattr_response;
-   PVFS_credentials     credentials;
-   PVFS_fs_id           fs_id;
-  
+    int  ret=0;
+    char cmd[PATH_MAX] = { 0 };
+    char szPvfsPath[PVFS_NAME_MAX] = { 0 };
+    PVFS_sysresp_lookup  lk_response;
+    PVFS_object_ref      ref;
+    PVFS_sysresp_getattr getattr_response;
+    PVFS_credentials      credentials;
+    PVFS_fs_id           fs_id;
+
     if(verbose) { printf("\tPerforming stat on [%s]\n", fileName); }
    
-    if(use_pvfs2_lib)
+    if(use_pvfs2_lib && (fileStats == NULL) )
     {
-        ret = PVFS_util_resolve(fileName, 
-                                &fs_id, 
-                                szPvfsPath, 
+        snprintf(cmd, sizeof(cmd), "%spvfs2-stat %s %s %s",
+                 pvfsEXELocation,
+                 (followLink ? "-L" : ""),
+                 fileName, 
+                 (verbose ? " >/dev/null 2>&1" : ""));
+        if( verbose ) { printf("\tExecuting [%s]\n", cmd); }
+        ret = system(cmd);
+        if(ret < 0)
+        {
+            return(TEST_COMMON_FAIL);
+        }
+    }
+    else if( use_pvfs2_lib && (fileStats != NULL) )
+    {
+        /* calling this with a stat structure we assume that the caller
+         * knows this will use the library's ncache. If they use this
+         * and call other functions in this file that use system() calls 
+         * they may get failures due to bad ncache entries */
+        ret = PVFS_util_resolve(fileName,
+                                &fs_id,
+                                szPvfsPath,
                                 sizeof(szPvfsPath));
 
         if (ret < 0)
         {
-            print_error("Error: could not find file system for [%s] in pvfstab\n", fileName);
+            print_error("Error: could not find file system for [%s] "
+                        "in pvfstab\n", fileName);
             return(TEST_COMMON_FAIL);
         }
 
         PVFS_util_gen_credentials(&credentials);
- 
-        if(followLink)
-        {
-            ret = PVFS_sys_lookup(fs_id, 
-                                  szPvfsPath, 
-                                  &credentials, 
-                                  &lk_response, 
-                                  PVFS2_LOOKUP_LINK_FOLLOW,
-                                  NULL);
-        }
-        else
-        {
-            ret = PVFS_sys_lookup(fs_id, 
-                                  szPvfsPath, 
-                                  &credentials, 
-                                  &lk_response, 
-                                  PVFS2_LOOKUP_LINK_NO_FOLLOW,
-                                  NULL);
-        }
-   
+
+        ret = PVFS_sys_lookup(fs_id,
+                              szPvfsPath,
+                              &credentials,
+                              &lk_response,
+                              (followLink ? PVFS2_LOOKUP_LINK_FOLLOW :
+                                            PVFS2_LOOKUP_LINK_NO_FOLLOW),
+                              NULL);
         if(ret < 0)
         {
             PVFS_perror("PVFS_sys_lookup", ret);
             return(TEST_COMMON_FAIL);
         }
-     
+
         ref.handle = lk_response.ref.handle;
         ref.fs_id  = fs_id;
-      
-        ret = PVFS_sys_getattr(ref, 
+
+        ret = PVFS_sys_getattr(ref,
                                PVFS_ATTR_SYS_ALL,
-                               &credentials, 
+                               &credentials,
                                &getattr_response,
                                NULL);
-
         if(ret < 0)
-        {                          
+        {
             PVFS_perror("PVFS_sys_getattr", ret);
             return(TEST_COMMON_FAIL);
         }
@@ -399,6 +406,7 @@ int stat_file(
             return(TEST_COMMON_FAIL);
         }
     }
+
     return(TEST_COMMON_SUCCESS);  
 }
 
@@ -982,7 +990,6 @@ int pvfs2_open(
 
     /* Initialize memory */
     memset(&fs_id,        0, sizeof(fs_id));
-    memset(&credentials,  0, sizeof(credentials));
     memset(&resp_lookup,  0, sizeof(resp_lookup));
 
     ret = PVFS_util_resolve(fileName, 
@@ -1052,7 +1059,7 @@ int pvfs2_open(
  */
 int pvfs2_create_file(const char             * fileName,    /**< File Name */
                       const PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                      const PVFS_credentials * credentials, /**< Struct with user/group permissions for operation */
+                      const PVFS_credentials  * credentials, /**< Struct with user/group permissions for operation */
                       const int                mode,        /**< open mode flags */
                       const int                verbose,     /**< Turns on verbose prints if set to non-zero value */
                       struct file_ref        * pstFileRef)  /**< File descriptor (or handle) for an open file*/
@@ -1139,15 +1146,15 @@ int pvfs2_create_file(const char             * fileName,    /**< File Name */
 void copy_pvfs2_to_stat(const PVFS_sys_attr * attr,
                         struct stat         * fileStats)
 {
-    /* We blindly say we have all the data in the attr struct without checking 
-    * for validity against the masks 
+    /* We blindly say we have all the data in the attr struct without checking
+    * for validity against the masks
     */
     memcpy(&fileStats->st_atime, &attr->atime, sizeof(fileStats->st_atime));
     memcpy(&fileStats->st_mtime, &attr->mtime, sizeof(fileStats->st_mtime));
     memcpy(&fileStats->st_ctime, &attr->ctime, sizeof(fileStats->st_ctime));
     memcpy(&fileStats->st_uid,   &attr->owner, sizeof(fileStats->st_uid));
     memcpy(&fileStats->st_gid,   &attr->group, sizeof(fileStats->st_gid));
-    memcpy(&fileStats->st_mode,  &attr->perms, sizeof(fileStats->st_mode));   
+    memcpy(&fileStats->st_mode,  &attr->perms, sizeof(fileStats->st_mode));
 }
 
 /**
@@ -1157,7 +1164,7 @@ void copy_pvfs2_to_stat(const PVFS_sys_attr * attr,
  */
 int lookup_parent(char             * filename,    /**< File Name */
                   PVFS_fs_id         fs_id,       /**< PVFS2 files sytem ID for the fileName parm */
-                  PVFS_credentials * credentials, /**< Struct with user/group permissions for operation */
+                  PVFS_credentials  * credentials, /**< Struct with user/group permissions for operation */
                   PVFS_handle      * handle,      /**< PVFS2 handle  */
                   int                verbose)     /**< Turns on verbose prints if set to non-zero value */
 {
