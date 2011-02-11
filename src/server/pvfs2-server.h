@@ -642,6 +642,10 @@ typedef struct PINT_server_op
 
     int free_val;
 
+    /* generic int for use by state machines that are accessing
+     * PINT_server_op structs before pjumping to them. */
+    int local_index;
+
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
      * permission checking); may be used/modified by later states as well
