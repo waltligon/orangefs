@@ -140,19 +140,21 @@ void report_result(global_options *options,
     line_size += strlen(test_name);
     line_size += 14;  /* EXPECT_SUCCESS */
     line_size += 11;  /* max decimal size -- actual_code */
-    line_size += 2;  /* operator */
+    line_size += 8;   /* expected */
+    line_size += 2;   /* operator */
     line_size += 11;  /* expected_code */
+    line_size += 3;   /* got */
     line_size += 6;   /* NOT_OK */
-    line_size += 6;  /* spaces & null */
+    line_size += 9;   /* spaces & null */
 
     line = (char *) malloc(line_size);
 
     /* print to buffer */
-    ret = _snprintf(line, line_size, "%s %s %s %d %s %d %s",
+    ret = _snprintf(line, line_size, "%s %s %s expected %s %d got %d %s",
                     test_name, 
                     sub_test,
                     (expected_result == RESULT_SUCCESS) ? "EXPECT_SUCCESS" : "EXPECT_FAILURE",
-                    expected_code, ops[code_operation], actual_code,
+                    ops[code_operation], expected_code, actual_code,
                     ok_str);
     if (ret < 0)
         sprintf(line, "LINE BUFFER OVERFLOW");

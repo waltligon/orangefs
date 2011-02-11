@@ -7,5 +7,6 @@
 #include "test-support.h"
 
 int file_time(global_options *options, int fatal);
+int volume_space(global_options *options, int fatal);
 
 #endif

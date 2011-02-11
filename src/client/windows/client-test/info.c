@@ -7,6 +7,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <direct.h>
+#include <ctype.h>
 
 #include "test-support.h"
 #include "info.h"
@@ -52,7 +54,60 @@ int file_time(global_options *options, int fatal)
                   OPER_EQUAL,
                   0);
 
+    _unlink(file_name);
+
     free(file_name);
+
+    if (code != 0 && fatal)
+        return CODE_FATAL;
+
+    return 0;
+}
+
+int volume_space(global_options *options, int fatal)
+{
+    struct _diskfree_t driveinfo;
+    int code;
+    __int64 total_clusters, avail_clusters, 
+            sectors_per_cluster, bytes_per_sector,
+            bytes_free, bytes_total;
+    double gb_free, gb_total;
+
+    code = _getdiskfree(toupper(options->root_dir[0]) - 'A' + 1, &driveinfo); 
+
+    report_result(options, 
+                  "volume-space",
+                  "main",
+                  RESULT_SUCCESS,
+                  0,
+                  OPER_EQUAL,
+                  code);
+
+    if (code == 0)
+    {
+        total_clusters = driveinfo.total_clusters;
+        avail_clusters = driveinfo.avail_clusters;
+        sectors_per_cluster = driveinfo.sectors_per_cluster;
+        bytes_per_sector = driveinfo.bytes_per_sector;
+
+        bytes_free = avail_clusters * sectors_per_cluster * bytes_per_sector;
+        gb_free = (double) bytes_free / (double) (1024*1024*1024);
+
+        report_perf(options,
+                    "volume-space",
+                    "free-space",
+                    gb_free,
+                    "%4.3f GB");
+
+        bytes_total = total_clusters * sectors_per_cluster * bytes_per_sector;
+        gb_total = (double) bytes_total / (double) (1024*1024*1024);
+
+        report_perf(options,
+                    "volume-space",
+                    "avail-space",
+                    gb_total,
+                    "%4.3f GB");
+    }
 
     if (code != 0 && fatal)
         return CODE_FATAL;

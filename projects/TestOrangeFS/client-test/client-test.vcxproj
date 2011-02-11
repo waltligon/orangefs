@@ -65,6 +65,7 @@
     <ClCompile Include="..\..\..\src\client\windows\client-test\client-test.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\create.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\file-ops.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-test\find.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\info.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\open.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-test\test-io.c" />
@@ -75,6 +76,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\src\client\windows\client-test\create.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\file-ops.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-test\find.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\info.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\open.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-test\test-io.h" />

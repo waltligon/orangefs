@@ -11,6 +11,7 @@
 #include "test-io.h"
 #include "file-ops.h"
 #include "info.h"
+#include "find.h"
 
 typedef struct 
 {
@@ -42,6 +43,9 @@ test_operation op_table[] =
     {"move-file-baddir", move_file_baddir, FALSE},
     {"move-file-exist", move_file_exist, FALSE},
     {"file-time", file_time, FALSE},
+    {"volume-space", volume_space, FALSE},
+    {"find-files", find_files, FALSE},
+    {"find-files-pattern", find_files_pattern, FALSE},
     {NULL, NULL, 0}
 };
 
