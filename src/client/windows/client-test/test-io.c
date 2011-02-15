@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <process.h>
+#include <direct.h>
 
 #include "test-support.h"
 #include "test-io.h"
@@ -214,4 +216,45 @@ int flush_file(global_options *options, int fatal)
     free(file_name);
 
     return 0;
+}
+
+typedef struct
+{
+    int threadi;
+    global_options *options;
+} thread_args;
+
+void __cdecl io_file_mt_thread(void *pargs)
+{
+    thread_args *args = (thread_args *) pargs;
+    char *dir_name, *file_name;
+    int i;
+
+    /* create directory */
+    dir_name = (char *) malloc(strlen(args->options->root_dir) + 16);
+    sprintf(dir_name, "%smt%02d", args->options->root_dir, args->threadi);
+    _mkdir(dir_name);
+
+    /* create 1000 files and write 4KB to them */
+    for (i = 0; i < 1000; i++)
+    {
+        file_name = (char *) malloc(strlen(dir_name) + 16);
+        sprintf(file_name, "%s\\mt%04d.tst", dir_name, i);
+
+    }
+}
+
+int io_file_mt(global_options *options, int fatal)
+{
+    thread_args args;
+    int code;
+
+    /* spawn 10 threads */
+    args.options = options;
+    for (args.threadi = 0; args.threadi < 10; args.threadi++)
+    {
+        _beginthread(io_file_mt_thread, 0, &args);
+    }
+
+
 }
