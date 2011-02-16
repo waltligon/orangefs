@@ -10,6 +10,7 @@
 #include "test-support.h"
 #include "test-io.h"
 #include "timer.h"
+#include "thread.h"
 
 void io_file_cleanup(char *file_name)
 {
@@ -224,37 +225,162 @@ typedef struct
     global_options *options;
 } thread_args;
 
-void __cdecl io_file_mt_thread(void *pargs)
+#define THREAD_COUNT   10
+#define FILE_COUNT     100
+
+void io_file_mt_cleanup(global_options *options)
+{
+    char *dir_name, *file_name;
+    int i, j;
+
+    for (i = 0; i < THREAD_COUNT; i++)
+    {
+        dir_name = (char *) malloc(strlen(options->root_dir) + 16);
+        sprintf(dir_name, "%smt%02d", options->root_dir, i);
+
+        for (j = 0; j < FILE_COUNT; j++)
+        {
+            file_name = (char *) malloc(strlen(dir_name) + 16);
+            sprintf(file_name, "%s\\mt%04d.tst", dir_name, j);
+
+            _unlink(file_name);
+
+            free(file_name);
+        }
+
+        _rmdir(dir_name);
+
+        free(dir_name);
+    }
+}
+
+unsigned __stdcall io_file_mt_thread(void *pargs)
 {
     thread_args *args = (thread_args *) pargs;
-    char *dir_name, *file_name;
+    char *dir_name, *file_name, buf[4096];
     int i;
+    unsigned __int64 start;
+    double elapsed;
+    unsigned int total = 0;
+    FILE *f;
 
     /* create directory */
     dir_name = (char *) malloc(strlen(args->options->root_dir) + 16);
     sprintf(dir_name, "%smt%02d", args->options->root_dir, args->threadi);
     _mkdir(dir_name);
 
+    for (i = 0; i < 4096; i++)
+        buf[i] = i % 256;
+
     /* create 1000 files and write 4KB to them */
-    for (i = 0; i < 1000; i++)
+    for (i = 0; i < FILE_COUNT; i++)
     {
         file_name = (char *) malloc(strlen(dir_name) + 16);
         sprintf(file_name, "%s\\mt%04d.tst", dir_name, i);
+        start = timer_start();
+        f = fopen(file_name, "wb");
+        if (f)
+        {
+            fwrite(buf, 1, 4096, f);
+            fclose(f);
+        }
+        elapsed = timer_elapsed(start);
+        total += (unsigned int) (elapsed * 1000000.0);
 
+        free(file_name);
     }
+
+    free(dir_name);
+
+    return total;
 }
 
 int io_file_mt(global_options *options, int fatal)
 {
-    thread_args args;
-    int code;
+    thread_args *args;
+    uintptr_t *hthreads;
+    int threadi, ret, i, code = 0;
+    unsigned int counter, total;
+    unsigned __int64 start;
+    double elapsed;
 
-    /* spawn 10 threads */
-    args.options = options;
-    for (args.threadi = 0; args.threadi < 10; args.threadi++)
+    /* allocate args */
+    args = (thread_args *) malloc(sizeof(thread_args) * THREAD_COUNT);
+
+    /* allocate thread array */
+    hthreads = (uintptr_t *) malloc(sizeof(uintptr_t) * THREAD_COUNT);
+
+    /* spawn threads */    
+    start = timer_start();
+    for (threadi = 0; threadi < THREAD_COUNT; threadi++)
     {
-        _beginthread(io_file_mt_thread, 0, &args);
+        args[threadi].options = options;
+        args[threadi].threadi = threadi;
+
+        hthreads[threadi] = _beginthreadex(NULL, 0, io_file_mt_thread, &(args[threadi]), 0, NULL);
+        if (hthreads[threadi] == 0)
+        {
+            /* TODO */
+            code = -1;
+            break;
+        }
     }
 
+    /* wait for threads to complete */
+    if (code == 0)
+    {
+        ret = thread_wait_multiple(THREAD_COUNT, hthreads, 1, THREAD_WAIT_INFINITE);
+        elapsed = timer_elapsed(start);
 
+        if (ret >= THREAD_WAIT_SIGNALED && ret < THREAD_COUNT)
+        {
+            /* sum the exit codes */
+            for (i = 0, total = 0; i < THREAD_COUNT; i++)
+            {
+                /* exit code is time in microseconds */
+                if (get_thread_exit_code(hthreads[i], &counter))
+                {
+                    total += counter;
+                }
+                else 
+                {
+                    /* TODO */
+                    code = -1;
+                    break;
+                }
+            }
+        }
+        else 
+        {
+            code = ret * -1;
+        }
+    }
+
+    if (code == 0)
+    {
+        report_perf(options,
+                    "io-file-mt",
+                    "file-io",
+                    (double) total / 1000000,
+                    "%3.3f sec");
+
+        report_perf(options,
+                    "io-file-mt",
+                    "total",
+                    elapsed,
+                    "%3.3f sec");
+    }
+    else
+    {
+        /* TODO */
+        report_error(options,
+                     "io_file_mt: failed");
+    }
+
+    io_file_mt_cleanup(options);
+
+    free(hthreads);
+    free(args);
+
+    return code;
 }

@@ -99,7 +99,30 @@ int setoption(int argc, char **argv, global_options *options, int *index)
         else
             options->tab_file = argv[*index];
     }
-
+    else if (!_stricmp(argv[*index], "-console"))
+    {
+        options->report_flags |= REPORT_CONSOLE;
+    }
+    else if (!_stricmp(argv[*index], "-file"))
+    {
+        (*index)++;
+        if (*index >= argc || argv[*index][0] == '-')
+        {
+            fprintf(stderr, "illegal option -file: missing filename\n");
+            ret = -1;
+        }
+        else
+        {
+            options->report_flags |= REPORT_FILE;
+            options->freport = fopen(argv[*index], "w");
+            if (options->freport == NULL)
+            {
+                fprintf(stderr, "error: could not open report file\n");
+                ret = -1;
+            }
+        }
+    }
+    
     return ret;
 }
 

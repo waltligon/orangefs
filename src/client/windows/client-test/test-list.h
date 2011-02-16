@@ -46,6 +46,7 @@ test_operation op_table[] =
     {"volume-space", volume_space, FALSE},
     {"find-files", find_files, FALSE},
     {"find-files-pattern", find_files_pattern, FALSE},
+    {"io-file-mt", io_file_mt, FALSE},
     {NULL, NULL, 0}
 };
 

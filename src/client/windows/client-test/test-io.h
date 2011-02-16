@@ -8,5 +8,6 @@
 
 int io_file(global_options *options, int fatal);
 int flush_file(global_options *options, int fatal);
+int io_file_mt(global_options *options, int fatal);
 
 #endif
