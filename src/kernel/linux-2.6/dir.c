@@ -291,10 +291,34 @@ static int pvfs2_readdir(
                 else 
                 {
                     /* this means a filldir call failed */
-                    file->f_pos = rhandle.readdir_response.token - 
-                        (rhandle.readdir_response.pvfs_dirent_outcount - i + 1);
-                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
+                    if(rhandle.readdir_response.token == PVFS_READDIR_END)
+                    {
+                        /* If PVFS hit end of directory, then there is no
+                         * way to do math on the token that it returned.
+                         * Instead we go by the f_pos but back up to account for
+                         * the artificial . and .. entries.  The fact that
+                         * "token_set" is non zero indicates that we are on
+                         * the first iteration of getdents(). 
+                         */
+                        file->f_pos -= 3;
+                    }
+                    else
+                    {
+                        file->f_pos = rhandle.readdir_response.token - 
+                            (rhandle.readdir_response.pvfs_dirent_outcount - i + 1);
+                    }
+                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  "
+                                                   "Setting f_pos to: %ld\n"
+                                                  , (unsigned long) file->f_pos);
                 }
+            }
+            
+            /* did we hit the end of the directory? */
+            if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
+            {
+                gossip_debug(GOSSIP_DIR_DEBUG,
+                    "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
+                file->f_pos = PVFS_READDIR_END;
             }
 
             /* did we hit the end of the directory? */

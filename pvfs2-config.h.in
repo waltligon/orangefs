@@ -1,5 +1,8 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
+/* Define if building universal (internal helper macro) */
+#undef AC_APPLE_UNIVERSAL_BUILD
+
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -48,6 +51,9 @@
 
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
+
+/* Define if s_xattr member of super_block struct is const */
+#undef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
 
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
@@ -112,6 +118,10 @@
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
+
+/* Define if fsync function in file_operations struct wants a dentry pointer
+   as the second parameter */
+#undef HAVE_FSYNC_DENTRY_PARAM
 
 /* Define if kernel has generic_file_readv */
 #undef HAVE_GENERIC_FILE_READV
@@ -247,6 +257,9 @@
 
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
+
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
 
 /* Define if mount.h contains MNT_NOATIME flags */
 #undef HAVE_MNT_NOATIME
@@ -402,6 +415,9 @@
 /* Define if TAU library is used */
 #undef HAVE_TAU
 
+/* Define if kernel stddef has true/false enum */
+#undef HAVE_TRUE_FALSE_ENUM
+
 /* Define if register_sysctl_table takes two arguments */
 #undef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
 
@@ -438,11 +454,11 @@
 
 /* Define if kernel xattr_handle get function has dentry as first parameter
    and a fifth parameter */
-#undef HAVE_XATTR_HANLDER_GET_FIVE_PARAM
+#undef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
 
 /* Define if kernel xattr_handle set function has dentry as first parameter
    and a sixth parameter */
-#undef HAVE_XATTR_HANLDER_SET_SIX_PARAM
+#undef HAVE_XATTR_HANDLER_SET_SIX_PARAM
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -468,10 +484,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -489,6 +505,14 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
-/* Define to 1 if your processor stores words with the most significant byte
-   first (like Motorola and SPARC, unlike Intel and VAX). */
-#undef WORDS_BIGENDIAN
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+#  undef WORDS_BIGENDIAN
+# endif
+#endif

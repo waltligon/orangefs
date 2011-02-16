@@ -2684,6 +2684,11 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     if (!rw->async)
     {
         error = do_readv_writev(rw);
+        /* not sure this is the correct place or way to update ki_pos but it
+         * definitely needs to occur somehow. otherwise, a write following 
+         * a synchronous writev will not write at the correct file position.
+         * store the offset from the read/write into the kiocb struct */
+        iocb->ki_pos = *offset;
         goto out_error;
     }
     /* Asynchronous I/O */
@@ -2985,9 +2990,19 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(inode,
-                                      "user.pvfs2.meta_hint",
-                                      &val, sizeof(val));
+        ret = pvfs2_xattr_get_default(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+                file->f_dentry,
+#else
+                inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+                "user.pvfs2.meta_hint",
+                &val, 
+                sizeof(val)
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+                , 0
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+                );
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -3024,9 +3039,20 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(inode,
-                                      "user.pvfs2.meta_hint",
-                                      &val, sizeof(val), 0);
+        ret = pvfs2_xattr_set_default(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
+                file->f_dentry,
+#else
+                inode,
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+                "user.pvfs2.meta_hint",
+                &val, 
+                sizeof(val), 
+                0
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
+                , 0                                      
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+                );
     }
 
     return ret;
@@ -3112,7 +3138,9 @@ int pvfs2_file_release(
  */
 int pvfs2_fsync(
     struct file *file,
+#ifdef HAVE_FSYNC_DENTRY_PARAM
     struct dentry *dentry,
+#endif
     int datasync)
 {
     int ret = -EINVAL;

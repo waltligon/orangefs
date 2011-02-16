@@ -1339,7 +1339,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    x.get = get_xattr_h;
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_XATTR_HANLDER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
+	AC_DEFINE(HAVE_XATTR_HANDLER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
 	AC_MSG_RESULT(no)
 	)
 
@@ -1363,10 +1363,66 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    x.set = set_xattr_h;
 	],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_XATTR_HANLDER_SET_SIX_PARAM, 1, [Define if kernel xattr_handle set function has dentry as first parameter and a sixth parameter]),
+	AC_DEFINE(HAVE_XATTR_HANDLER_SET_SIX_PARAM, 1, [Define if kernel xattr_handle set function has dentry as first parameter and a sixth parameter]),
 	AC_MSG_RESULT(no)
 	)
+        CFLAGS=$tmp_cflags
 
+	dnl xattr_handler is also a const
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for const s_xattr member in super_block struct)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/xattr.h>
+		struct super_block sb;
+                const struct xattr_handler *x[] = { NULL };
+	], 
+	[ 
+            sb.s_xattr = x;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_CONST_S_XATTR_IN_SUPERBLOCK, 1, [Define if s_xattr member of super_block struct is const]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl early 2.6 kernels do not contain true/false enum in stddef.h
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(stddef.h true/false enum)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/stddef.h>
+                int f = true;
+	], 
+	[ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TRUE_FALSE_ENUM, 1, [Define if kernel stddef has true/false enum]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+	dnl fsync no longer has a dentry second parameter
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for dentry argument in fsync)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations f;
+		static int local_fsync(struct file *f, struct dentry *d, int i)
+		{ return 0; }
+	], 
+	[ 
+	    f.fsync = local_fsync;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSYNC_DENTRY_PARAM, 1, [Define if fsync function in file_operations struct wants a dentry pointer as the second parameter]),
+	AC_MSG_RESULT(no)
+	)
         CFLAGS=$tmp_cflags
 
 	CFLAGS=$oldcflags
