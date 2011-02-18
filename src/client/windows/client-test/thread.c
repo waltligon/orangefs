@@ -1,12 +1,42 @@
 /* Copyright (C) 2011 Omnibond, LLC
    Windows client tests -- thread functions */
 
+#ifdef WIN32
 #include <Windows.h>
+#include <process.h>
+#else
+#include <pthread.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "thread.h"
+
+/*
+#ifdef WIN32
+int thread_create(void *handle, void *(*start_routine)(void *), void *arg)
+{
+    uintptr_t uhandle;
+    uhandle = _beginthreadex(NULL, 0, start_routine, arg, 0, NULL);
+
+    if (uhandle == 0)
+        return -1;
+
+    memcpy(handle, &uhandle, sizeof(uintptr_t));
+
+    return 0;
+}
+#else
+int thread_create(void *handle, void *(*start_routine)(void *), void *arg)
+{
+    return pthread_create((pthread_t *) handle,                          
+                          NULL,
+                          start_routine,
+                          arg);
+}
+#endif
+*/
 
 int thread_wait(uintptr_t handle, unsigned int timeout)
 {

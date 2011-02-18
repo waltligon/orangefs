@@ -8,6 +8,7 @@
 #define THREAD_WAIT_TIMEOUT       0x102L
 #define THREAD_WAIT_INFINITE 0xFFFFFFFFL
 
+/*int thread_create(void *handle, void *(*start_routine)(void *), void *arg);*/
 
 int thread_wait(uintptr_t handle, unsigned int timeout);
 

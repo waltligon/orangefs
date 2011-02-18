@@ -1,7 +1,9 @@
 /* Copyright (C) 2011 Omnibond, LLC
    Windows client - test program */
 
+#ifdef WIN32
 #include <Windows.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
