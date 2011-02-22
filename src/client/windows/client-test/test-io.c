@@ -32,13 +32,14 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
         if (!strcmp(mode, "rb"))
             real_size = fread(&(buffer[total]), 1, size - total, f);
         else /* "wb" or "ab" */
-            real_size = fwrite(&(buffer[total]), 1, size - total, f);
-        if (real_size == 0 && errno != 0)
+            real_size = fwrite(&(buffer[total]), 1, size - total, f);        
+        if (real_size == 0)
+        {
+            code = errno;
             break;
+        }
         total += real_size;
     }
-
-    code = errno;
 
     fclose(f);
 

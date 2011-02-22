@@ -24,7 +24,7 @@ test_operation op_table[] =
 {
     /*{"test-test", test_test, FALSE}, */
     {"create-dir", create_dir, TRUE},
-    {"create-subdir", create_subdir, TRUE},
+    {"create-subdir", create_subdir, FALSE},
     {"create-dir-toolong", create_dir_toolong, FALSE},
     {"create-files", create_files, TRUE},
     {"create-file-long", create_file_long, FALSE},
