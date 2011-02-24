@@ -3,11 +3,16 @@
 
 #ifdef WIN32
 #include <Windows.h>
+#else
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
 
 #include "test-support.h"
 #include "test-list.h"
@@ -128,21 +133,31 @@ int setoption(int argc, char **argv, global_options *options, int *index)
     return ret;
 }
 
-BOOL init(int argc, char **argv, 
+int init(int argc, char **argv, 
           global_options *options, list_node *test_list)
-{
-    DWORD attrs;
+{    
     int i, ret = 0;
+#ifdef WIN32
+    DWORD attrs;    
+#else
+    struct stat buf;
+#endif
 
     srand((unsigned int) time(NULL));
 
     /* Check the specified root directory */
+#ifdef WIN32
     attrs = GetFileAttributes(options->root_dir);
 
     /* root directory must be found */
     if ((attrs == INVALID_FILE_ATTRIBUTES) || 
         !(attrs & FILE_ATTRIBUTE_DIRECTORY))
         return FALSE;
+#else
+    ret = stat(options->root_dir, &buf);
+    if (ret != 0 || !(S_ISDIR(buf.st_mode)))
+        return FALSE;
+#endif
 
     /* option default */
     options->report_flags = REPORT_CONSOLE;
@@ -168,7 +183,7 @@ BOOL init(int argc, char **argv,
 int run_tests(global_options *options, list_node *test_list)
 {
     int i, ret = 0;
-    BOOL all_tests = TRUE;
+    int all_tests = TRUE;
     list_node *node;
     test_operation *op;
 
@@ -245,7 +260,7 @@ int main(int argc, char **argv)
     if (argc < 2)
     {
         printf("USAGE: client-test root-dir [options]\n");
-        printf("    root-dir: path for test files, e.g. Z:\\client-test\n");
+        printf("    root-dir: path for test files, e.g. Z:\\client-test or /pvfs2\n");
         /* TODO: list available tests */
 
         return -1;
@@ -257,8 +272,8 @@ int main(int argc, char **argv)
     /* append trailing slash to root_dir if necessary */
     options->root_dir = (char *) malloc(strlen(argv[1]) + 2);
     strcpy(options->root_dir, argv[1]);
-    if (argv[1][strlen(argv[1])-1] != '\\')
-        strcat(options->root_dir, "\\");
+    if (argv[1][strlen(argv[1])-1] != SLASH_CHAR)
+        strcat(options->root_dir, SLASH_STR);
 
     test_list = (list_node *) calloc(1, sizeof(list_node));
 
@@ -270,8 +285,13 @@ int main(int argc, char **argv)
     }
     else
     {
+#ifdef WIN32
         ret = GetLastError();
         if (ret == ERROR_FILE_NOT_FOUND)
+#else
+        ret = errno;
+        if (ret == ENOENT)
+#endif
             fprintf(stderr, "init failed: %s not found\n", argv[1]);
         else
             fprintf(stderr, "init failed with error code %u\n", ret);

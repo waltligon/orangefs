@@ -7,7 +7,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#ifdef WIN32
 #include <direct.h>
+#endif
 #include <ctype.h>
 
 #include "test-support.h"

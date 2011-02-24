@@ -4,8 +4,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef WIN32
 #include <process.h>
 #include <direct.h>
+#else
+#include <pthread.h>
+#endif
 
 #include "test-support.h"
 #include "test-io.h"
@@ -242,7 +246,7 @@ void io_file_mt_cleanup(global_options *options)
         for (j = 0; j < FILE_COUNT; j++)
         {
             file_name = (char *) malloc(strlen(dir_name) + 16);
-            sprintf(file_name, "%s\\mt%04d.tst", dir_name, j);
+            sprintf(file_name, "%s%cmt%04d.tst", dir_name, SLASH_CHAR, j);
 
             _unlink(file_name);
 
@@ -278,7 +282,7 @@ unsigned __stdcall io_file_mt_thread(void *pargs)
     for (i = 0; i < FILE_COUNT; i++)
     {
         file_name = (char *) malloc(strlen(dir_name) + 16);
-        sprintf(file_name, "%s\\mt%04d.tst", dir_name, i);
+        sprintf(file_name, "%s%cmt%04d.tst", dir_name, SLASH_CHAR, i);
         start = timer_start();
         f = fopen(file_name, "wb");
         if (f)
@@ -388,7 +392,7 @@ int io_file_mt(global_options *options, int fatal)
 }
 #else
 /* Linux version */
-unsigned __stdcall io_file_mt_thread(void *pargs)
+void *io_file_mt_thread(void *pargs)
 {
     thread_args *args = (thread_args *) pargs;
     char *dir_name, *file_name, buf[4096];
@@ -410,7 +414,7 @@ unsigned __stdcall io_file_mt_thread(void *pargs)
     for (i = 0; i < FILE_COUNT; i++)
     {
         file_name = (char *) malloc(strlen(dir_name) + 16);
-        sprintf(file_name, "%s\\mt%04d.tst", dir_name, i);
+        sprintf(file_name, "%s%cmt%04d.tst", dir_name, SLASH_CHAR, i);
         start = timer_start();
         f = fopen(file_name, "wb");
         if (f)
@@ -426,7 +430,7 @@ unsigned __stdcall io_file_mt_thread(void *pargs)
 
     free(dir_name);
 
-    return total;
+    return &total;
 }
 
 int io_file_mt(global_options *options, int fatal)
@@ -434,7 +438,7 @@ int io_file_mt(global_options *options, int fatal)
     thread_args *args;
     pthread_t *hthreads;
     int threadi, ret, i, code = 0;
-    unsigned int counter, total;
+    unsigned int *counter, total;
     time_t start;
     double elapsed;
 
@@ -443,6 +447,8 @@ int io_file_mt(global_options *options, int fatal)
 
     /* allocate thread array */
     hthreads = (pthread_t *) malloc(sizeof(uintptr_t) * THREAD_COUNT);
+
+    counter = (unsigned int *) malloc(sizeof(unsigned int));
 
     /* spawn threads */    
     timer_start(&start);
@@ -459,31 +465,14 @@ int io_file_mt(global_options *options, int fatal)
     /* wait for threads to complete */
     if (code == 0)
     {
-        ret = thread_wait_multiple(THREAD_COUNT, hthreads, 1, THREAD_WAIT_INFINITE);
-        elapsed = timer_elapsed(start);
+        for (i = 0; i < THREAD_COUNT && code == 0; i++)
+        {
+            /* return value is time in microseconds */
+            code = pthread_join(hthreads[threadi], &counter);
+            total += *counter;
+        }
 
-        if (ret >= THREAD_WAIT_SIGNALED && ret < THREAD_COUNT)
-        {
-            /* sum the exit codes */
-            for (i = 0, total = 0; i < THREAD_COUNT; i++)
-            {
-                /* exit code is time in microseconds */
-                if (get_thread_exit_code(hthreads[i], &counter))
-                {
-                    total += counter;
-                }
-                else 
-                {
-                    /* TODO */
-                    code = -1;
-                    break;
-                }
-            }
-        }
-        else 
-        {
-            code = ret * -1;
-        }
+        elapsed = timer_elapsed(start);
     }
 
     if (code == 0)
@@ -504,11 +493,12 @@ int io_file_mt(global_options *options, int fatal)
     {
         /* TODO */
         report_error(options,
-                     "io_file_mt: failed");
+                     "io_file_mt: thread join failed");
     }
 
     io_file_mt_cleanup(options);
 
+    free(counter);
     free(hthreads);
     free(args);
 

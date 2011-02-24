@@ -31,8 +31,8 @@ char *randdir(const char *root)
         return NULL;
 
     /* append trailing slash */
-    if (strlen(root) > 0 && root[strlen(root)-1] != '\\')
-        slashdir = quickcat(root, "\\");
+    if (strlen(root) > 0 && root[strlen(root)-1] != SLASH_CHAR)
+        slashdir = quickcat(root, SLASH_STR);
     else
         slashdir = _strdup(root);
 
@@ -55,8 +55,8 @@ char *randfile(const char *root)
         return NULL;
 
     /* append trailing slash */
-    if (strlen(root) > 0 && root[strlen(root)-1] != '\\')
-        slashdir = quickcat(root, "\\");
+    if (strlen(root) > 0 && root[strlen(root)-1] != SLASH_CHAR)
+        slashdir = quickcat(root, SLASH_STR);
     else
         slashdir = _strdup(root);
 

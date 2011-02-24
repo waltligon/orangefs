@@ -4,6 +4,25 @@
 #ifndef __TESTS_H
 #define __TESTS_H
 
+#ifdef WIN32
+#define SLASH_CHAR '\\'
+#define SLASH_STR  "\\"
+#else
+#define SLASH_CHAR '/'
+#define SLASH_STR  "/"
+
+#define TRUE   1
+#define FALSE  0
+
+#define _rmdir rmdir
+#define _mkdir(dir) mkdir(dir, 0777)
+#define _strdup strdup
+#define _unlink unlink
+#define _stricmp strcasecmp
+#define _stat stat
+
+#endif
+
 typedef struct
 {
     char *root_dir;

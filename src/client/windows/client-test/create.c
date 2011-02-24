@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#ifdef WIN32
 #include <direct.h>
-
+#endif
+#include <errno.h>
 #include "test-support.h"
 
 void create_dir_cleanup(char *dir)
@@ -46,13 +48,13 @@ void create_subdir_cleanup(char *root_dir, char *path)
 
     /* copy root_dir without trailing backslash */
     root_dir_int = _strdup(root_dir);
-    if (root_dir_int[strlen(root_dir_int)-1] == '\\')
+    if (root_dir_int[strlen(root_dir_int)-1] == SLASH_CHAR)
         root_dir_int[strlen(root_dir_int)-1] = '\0';
 
     /* remove directories back to front */
     while (_stricmp(root_dir_int, path))
     {
-        slash = strrchr(path, '\\');
+        slash = strrchr(path, SLASH_CHAR);
         if (slash)
             *slash = '\0';
 
@@ -117,7 +119,7 @@ int create_subdir_int(global_options *options, int fatal, int max_size)
         dir_size = rem_size > 8 ? 8 : rem_size;
         for (i = 0; i < dir_size-1; i++)
             dir[i] = randchar();
-        dir[dir_size-1] = '\\';
+        dir[dir_size-1] = SLASH_CHAR;
         dir[dir_size] = '\0';
 
         /* append the path */

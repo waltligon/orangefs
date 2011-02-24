@@ -7,7 +7,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#ifdef WIN32
 #include <direct.h>
+#endif
 
 #include "test-support.h"
 #include "file-ops.h"
@@ -285,7 +287,7 @@ int move_file(global_options *options, int fatal)
 
     /* move file */    
     new_name = (char *) malloc(strlen(dir_name) + strlen(file_name) + 4);
-    sprintf(new_name, "%s\\%s", dir_name, strrchr(file_name, '\\')+1);
+    sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, SLASH_CHAR)+1);
     code = rename(file_name, new_name) == 0 ? 0 : errno;
 
     report_result(options,
@@ -324,7 +326,7 @@ int move_file_baddir(global_options *options, int fatal)
 
     /* move file */    
     new_name = (char *) malloc(strlen(dir_name) + strlen(file_name) + 4);
-    sprintf(new_name, "%s\\%s", dir_name, strrchr(file_name, '\\')+1);
+    sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, SLASH_CHAR)+1);
     code = rename(file_name, new_name) == 0 ? 0 : errno;
 
     report_result(options,
@@ -372,7 +374,7 @@ int move_file_exist(global_options *options, int fatal)
 
     /* create new file */    
     new_name = (char *) malloc(strlen(dir_name) + strlen(file_name) + 4);
-    sprintf(new_name, "%s\\%s", dir_name, strrchr(file_name, '\\')+1);
+    sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, '\\')+1);
     if ((code = quick_create(new_name)) != 0)
     {
         free(new_name);
