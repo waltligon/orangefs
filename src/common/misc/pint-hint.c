@@ -327,10 +327,13 @@ void encode_PINT_hint(char **pptr, const PINT_hint *hint)
             if(tmp_hint->type == PINT_HINT_UNKNOWN)
             {
                 encode_string(pptr, &tmp_hint->type_string);
+                tmp_hint->encode(pptr, (void *)&tmp_hint->value);
             }
-
-            /* encode the hint using the encode function provided */
-            tmp_hint->encode(pptr, & tmp_hint->value);
+            else
+            {
+               /* encode the hint using the encode function provided */
+               tmp_hint->encode(pptr, tmp_hint->value);
+            }
         }
 
         tmp_hint = tmp_hint->next;
