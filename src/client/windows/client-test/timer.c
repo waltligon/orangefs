@@ -6,6 +6,7 @@
 #else
 #include <sys/time.h>
 #endif
+#include <stdlib.h>
 
 #include "timer.h"
 

@@ -43,7 +43,9 @@ test_operation op_table[] =
     {"move-file-baddir", move_file_baddir, FALSE},
     {"move-file-exist", move_file_exist, FALSE},
     {"file-time", file_time, FALSE},
+#ifdef WIN32
     {"volume-space", volume_space, FALSE},
+#endif
     {"find-files", find_files, FALSE},
     {"find-files-pattern", find_files_pattern, FALSE},
     {"io-file-mt", io_file_mt, FALSE},

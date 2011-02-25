@@ -2,16 +2,15 @@
    Windows client tests -- thread functions */
 
 #ifdef WIN32
+
 #include <Windows.h>
 #include <process.h>
-#else
-#include <pthread.h>
-#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "thread.h"
+
 
 /*
 #ifdef WIN32
@@ -67,3 +66,5 @@ int get_thread_exit_code(uintptr_t handle, unsigned int *code)
 {
     return GetExitCodeThread((HANDLE) handle, (LPDWORD) code);
 }
+
+#endif

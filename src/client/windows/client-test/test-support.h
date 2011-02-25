@@ -20,6 +20,7 @@
 #define _unlink unlink
 #define _stricmp strcasecmp
 #define _stat stat
+#define _snprintf snprintf
 
 #endif
 

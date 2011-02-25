@@ -374,7 +374,7 @@ int move_file_exist(global_options *options, int fatal)
 
     /* create new file */    
     new_name = (char *) malloc(strlen(dir_name) + strlen(file_name) + 4);
-    sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, '\\')+1);
+    sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, SLASH_CHAR)+1);
     if ((code = quick_create(new_name)) != 0)
     {
         free(new_name);

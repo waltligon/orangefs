@@ -10,6 +10,7 @@
 #else
 #include <pthread.h>
 #endif
+#include <errno.h>
 
 #include "test-support.h"
 #include "test-io.h"
@@ -58,7 +59,11 @@ int io_file(global_options *options, int fatal)
     char *perftests[] = {"io_file_write_4kb", "io_file_read_4kb", "io_file_write_100kb", 
                         "io_file_read_100kb", "io_file_write_1mb", "io_file_read_1mb"};
     char *subtests[] = {"4kb", "100kb", "1mb"};
+#ifdef WIN32
     unsigned __int64 start;
+#else
+    struct timeval start;
+#endif
     double elapsed;
     
     for (i = 0; i < 3; i++)
@@ -74,9 +79,17 @@ int io_file(global_options *options, int fatal)
 
         file_name = randfile(options->root_dir);
 
+#ifdef WIN32
         start = timer_start();
+#else
+        timer_start(&start);
+#endif
         code = io_file_int(file_name, "wb", buffer, sizes[i]);
+#ifdef WIN32
         elapsed = timer_elapsed(start);
+#else
+        elapsed = timer_elapsed(&start);
+#endif
 
         if (code != 0)
             goto io_file_exit;
@@ -91,9 +104,18 @@ int io_file(global_options *options, int fatal)
         copy = (char *) malloc(sizes[i]);
         memcpy(copy, buffer, sizes[i]);
 
+#ifdef WIN32
         start = timer_start();
+#else
+        timer_start(&start);
+#endif
         code = io_file_int(file_name, "rb", buffer, sizes[i]);
+
+#ifdef WIN32
         elapsed = timer_elapsed(start);
+#else
+        elapsed = timer_elapsed(&start);
+#endif
 
         if (code != 0)
             goto io_file_exit;
@@ -307,7 +329,7 @@ int io_file_mt(global_options *options, int fatal)
     uintptr_t *hthreads;
     int threadi, ret, i, code = 0;
     unsigned int counter, total;
-    unsigned __int64 start;
+    unsigned long long start;
     double elapsed;
 
     /* allocate args */
@@ -397,10 +419,13 @@ void *io_file_mt_thread(void *pargs)
     thread_args *args = (thread_args *) pargs;
     char *dir_name, *file_name, buf[4096];
     int i;
-    unsigned __int64 start;
+    struct timeval start;
     double elapsed;
-    unsigned int total = 0;
+    unsigned int *total = 0;
     FILE *f;
+
+    total = (unsigned int *) malloc(sizeof(unsigned int));
+    *total = 0;
 
     /* create directory */
     dir_name = (char *) malloc(strlen(args->options->root_dir) + 16);
@@ -415,14 +440,14 @@ void *io_file_mt_thread(void *pargs)
     {
         file_name = (char *) malloc(strlen(dir_name) + 16);
         sprintf(file_name, "%s%cmt%04d.tst", dir_name, SLASH_CHAR, i);
-        start = timer_start();
+        timer_start(&start);
         f = fopen(file_name, "wb");
         if (f)
         {
             fwrite(buf, 1, 4096, f);
             fclose(f);
         }
-        elapsed = timer_elapsed(start);
+        elapsed = timer_elapsed(&start);
         total += (unsigned int) (elapsed * 1000000.0);
 
         free(file_name);
@@ -430,7 +455,7 @@ void *io_file_mt_thread(void *pargs)
 
     free(dir_name);
 
-    return &total;
+    return total;
 }
 
 int io_file_mt(global_options *options, int fatal)
@@ -439,16 +464,14 @@ int io_file_mt(global_options *options, int fatal)
     pthread_t *hthreads;
     int threadi, ret, i, code = 0;
     unsigned int *counter, total;
-    time_t start;
+    struct timeval start;
     double elapsed;
 
     /* allocate args */
     args = (thread_args *) malloc(sizeof(thread_args) * THREAD_COUNT);
 
     /* allocate thread array */
-    hthreads = (pthread_t *) malloc(sizeof(uintptr_t) * THREAD_COUNT);
-
-    counter = (unsigned int *) malloc(sizeof(unsigned int));
+    hthreads = (pthread_t *) malloc(sizeof(pthread_t) * THREAD_COUNT);
 
     /* spawn threads */    
     timer_start(&start);
@@ -467,12 +490,16 @@ int io_file_mt(global_options *options, int fatal)
     {
         for (i = 0; i < THREAD_COUNT && code == 0; i++)
         {
+            counter = (unsigned int *) malloc(sizeof(unsigned int));
+
             /* return value is time in microseconds */
             code = pthread_join(hthreads[threadi], &counter);
             total += *counter;
+
+            free(counter);
         }
 
-        elapsed = timer_elapsed(start);
+        elapsed = timer_elapsed(&start);
     }
 
     if (code == 0)

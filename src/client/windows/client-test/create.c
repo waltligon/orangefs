@@ -51,15 +51,19 @@ void create_subdir_cleanup(char *root_dir, char *path)
     if (root_dir_int[strlen(root_dir_int)-1] == SLASH_CHAR)
         root_dir_int[strlen(root_dir_int)-1] = '\0';
 
+    if (!_stricmp(root_dir_int, path))
+        return;
+
     /* remove directories back to front */
-    while (_stricmp(root_dir_int, path))
+    do 
     {
+        _rmdir(path);
+
         slash = strrchr(path, SLASH_CHAR);
         if (slash)
             *slash = '\0';
 
-        _rmdir(path);
-    }
+    } while  (_stricmp(root_dir_int, path));
 
     free(root_dir_int);
 
