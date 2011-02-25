@@ -153,6 +153,13 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 60
+/* max number of bytes in an extended attribute key including null term */
+#define PVFS_REQ_LIMIT_EATTR_KEY_LEN    PVFS_MAX_XATTR_NAMELEN
+/* max number of bytes in an extended attribute value including null term */
+#define PVFS_REQ_LIMIT_EATTR_VAL_LEN    PVFS_MAX_XATTR_VALUELEN
+/* max number of keys or key/value pairs to set or get in an operation */
+#define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
+
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -1726,7 +1733,8 @@ endecode_fields_2aa_struct(
     PVFS_ds_keyval, key,
     PVFS_size, valsz);
 #define extra_size_PVFS_servreq_geteattr \
-    (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    ((PVFS_REQ_LIMIT_EATTR_KEY_LEN + sizeof(PVFS_size) \
+     * PVFS_REQ_LIMIT_EATTR_LIST))
 
 #define PINT_SERVREQ_GETEATTR_FILL(__req,   \
                                   __creds, \
@@ -1761,8 +1769,8 @@ endecode_fields_1aa_struct(
     PVFS_ds_keyval, val,
     PVFS_error, err);
 #define extra_size_PVFS_servresp_geteattr \
-    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST + \
-    PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_error))
+    ((PVFS_REQ_LIMIT_EATTR_VAL_LEN + sizeof(PVFS_error)) \
+     * PVFS_REQ_LIMIT_EATTR_LIST)
 
 /* seteattr ****************************************************/
 /* - sets list of extended attributes */
@@ -1786,8 +1794,8 @@ endecode_fields_4aa_struct(
     PVFS_ds_keyval, key,
     PVFS_ds_keyval, val);
 #define extra_size_PVFS_servreq_seteattr \
-    ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN) \
-        * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    ((PVFS_REQ_LIMIT_EATTR_KEY_LEN  + PVFS_REQ_LIMIT_EATTR_VAL_LEN) \
+        * PVFS_REQ_LIMIT_EATTR_LIST)
 
 #define PINT_SERVREQ_SETEATTR_FILL(__req,   \
                                   __creds,       \
@@ -1826,7 +1834,7 @@ endecode_fields_3_struct(
     PVFS_fs_id, fs_id,
     PVFS_ds_keyval, key);
 #define extra_size_PVFS_servreq_deleattr \
-    PVFS_REQ_LIMIT_KEY_LEN
+    PVFS_REQ_LIMIT_EATTR_KEY_LEN 
 
 #define PINT_SERVREQ_DELEATTR_FILL(__req,   \
                                   __creds, \
@@ -1865,7 +1873,7 @@ endecode_fields_4a_struct(
     uint32_t, nkey,
     PVFS_size, keysz);
 #define extra_size_PVFS_servreq_listeattr \
-    (PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_size))
+    (PVFS_REQ_LIMIT_EATTR_LIST * sizeof(PVFS_size))
 
 #define PINT_SERVREQ_LISTEATTR_FILL(__req,            \
                                   __creds,            \
@@ -1900,7 +1908,7 @@ endecode_fields_2a_struct(
     uint32_t, nkey,
     PVFS_ds_keyval, key);
 #define extra_size_PVFS_servresp_listeattr \
-    (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    (PVFS_REQ_LIMIT_EATTR_KEY_LEN * PVFS_REQ_LIMIT_EATTR_LIST)
 
 
 /* server request *********************************************/

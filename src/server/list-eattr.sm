@@ -84,6 +84,30 @@ static PINT_sm_action listeattr_setup_resp(
 
     js_p->error_code = 0;
 
+    /* ensure not too many keys were requested */
+    if( s_op->req->u.listeattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* enforce that no key size be larger than PVFS_MAX_XATTR_NAMELEN.
+     * Otherwise, when a blind memcpy happens inside dbpf based on the key 
+     * size we won't over run our fixed length buffer. fixed buffer size is: 
+     * PVFS_NAME_MAX ==  DBPF_MAX_KEY_LENGTH == PVFS_MAX_XATTR_NAMELEN */
+    for( i = 0; i < s_op->req->u.listeattr.nkey; i++)
+    {
+        if( s_op->req->u.listeattr.keysz[i] > PVFS_MAX_XATTR_NAMELEN )
+        {
+             gossip_debug(GOSSIP_LISTEATTR_DEBUG, "%s: requested key %d "
+                          "size of %ld is greater than maximum of %d\n",
+                          __func__, i, (int64_t)s_op->req->u.listeattr.keysz[i],
+                          PVFS_MAX_XATTR_NAMELEN );
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
     s_op->resp.u.listeattr.key =
         malloc(s_op->req->u.listeattr.nkey * sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.listeattr.key)
@@ -93,8 +117,11 @@ static PINT_sm_action listeattr_setup_resp(
     }
 
     s_op->resp.u.listeattr.nkey = s_op->req->u.listeattr.nkey;
+
     for (i = 0, tsz = 0; i < s_op->req->u.listeattr.nkey; i++)
+    {
         tsz += s_op->req->u.listeattr.keysz[i];
+    }
     s_op->u.eattr.buffer = malloc(tsz);
     if (!s_op->u.eattr.buffer)
     {

@@ -77,6 +77,13 @@ static PINT_sm_action deleattr_verify_eattribs(
                  PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
+
+    if( s_op->req->u.deleattr.key.buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
     switch (a_p->objtype)
     {
     case PVFS_TYPE_METAFILE :

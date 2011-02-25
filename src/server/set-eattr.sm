@@ -127,6 +127,27 @@ static int seteattr_verify_eattribs(
                  PINT_util_get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
+    if( s_op->req->u.seteattr.nkey > PVFS_MAX_XATTR_LISTLEN  )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    for( i = 0; i < s_op->req->u.seteattr.nkey; i++ )
+    {
+        if( s_op->req->u.seteattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+
+        if( s_op->req->u.seteattr.val[i].buffer_sz > PVFS_MAX_XATTR_VALUELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
     /* iterate through the keys that are being written */
     int j = 0;
     char *valBuf = NULL;
