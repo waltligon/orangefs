@@ -320,11 +320,20 @@ do {                                                                           \
  */
 struct PINT_server_lookup_op
 {
-    /* segment pointer and state */
+    /* current segment (0..N), number of segments in the path */
+    int seg_ct, seg_nr; 
+
+    /* number of attrs read succesfully */
+    int attr_ct;
+
+    /* number of handles read successfully */
+    int handle_ct;
+
     char *segp;
     void *segstate;
 
     PVFS_handle dirent_handle;
+    PVFS_ds_attributes *ds_attr_array;
 };
 
 struct PINT_server_readdir_op
