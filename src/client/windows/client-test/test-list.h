@@ -45,9 +45,9 @@ test_operation op_table[] =
     {"file-time", file_time, FALSE},
 #ifdef WIN32
     {"volume-space", volume_space, FALSE},
-#endif
     {"find-files", find_files, FALSE},
     {"find-files-pattern", find_files_pattern, FALSE},
+#endif
     {"io-file-mt", io_file_mt, FALSE},
     {NULL, NULL, 0}
 };
