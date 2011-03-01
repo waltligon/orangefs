@@ -42,6 +42,7 @@ struct open_cache_entry
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     int fd;
+    int remove_flag;
     enum open_cache_open_type type;
 
     struct qlist_head queue_link;
@@ -187,10 +188,25 @@ int dbpf_open_cache_get(
 
     tmp_entry = dbpf_open_cache_find_entry(
         &used_list, "used list", coll_id, handle);
+    if (tmp_entry && tmp_entry->remove_flag)
+    {
+       gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the used-list with the "
+                  "remove flag set.\n");
+       gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
+       gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
+    }
+
     if(!tmp_entry)
     {
         tmp_entry = dbpf_open_cache_find_entry(
             &unused_list, "unused list", coll_id, handle);
+        if (tmp_entry && tmp_entry->remove_flag)
+        {
+           gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the UNused-list with the "
+                      "remove flag set.\n");
+           gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
+           gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
+        }
     }
 
     out_ref->fd = -1;
@@ -240,6 +256,10 @@ int dbpf_open_cache_get(
 	found = 1;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from free list.\n");
+        gossip_err("DBPF_OPEN_CACHE_GET:  pulled FIRST entry from the free-list with the "
+                      "remove flag set to %d. handle:%llu\n",tmp_entry->remove_flag,llu(handle));
+        gossip_err("\t\t\tSetting remove-flag to zero.\n");
+        tmp_entry->remove_flag=0;
     }
 
     /* anything in unused list (still open, but ref_ct == 0)? */
@@ -253,6 +273,10 @@ int dbpf_open_cache_get(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from unused list.\n");
 
+        gossip_err("DBPF_OPEN_CACHE_GET:  pulled FIRST entry from the UNused-list with the "
+                      "remove flag set to %d. handle:%llu\n",tmp_entry->remove_flag,llu(handle));
+        gossip_err("\t\t\tSetting remove-flag to zero.\n");
+        tmp_entry->remove_flag=0;
 	if (tmp_entry->fd > -1)
 	{
             close_fd(tmp_entry->fd, tmp_entry->type);
@@ -285,6 +309,8 @@ int dbpf_open_cache_get(
 	out_ref->internal = tmp_entry;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: moving to used list.\n");
+        gossip_err("DBPF_OPEN_CACHE_GET: putting entry on the USED list.\n");
+        gossip_err("/t/thandle:%llu  /tremove-flag:%d\n",llu(tmp_entry->handle),tmp_entry->remove_flag);
 	qlist_add(&tmp_entry->queue_link, &used_list);
 	gen_mutex_unlock(&cache_mutex);
 	return 0;
@@ -334,6 +360,9 @@ void dbpf_open_cache_put(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_put: cached entry.\n");
 
+        gossip_err("DBPF_OPEN_CACHE_PUT: decremented ref_ct to %d for handle:%llu\n",tmp_entry->ref_ct
+                                                                                    ,llu(tmp_entry->handle));
+
 	if(tmp_entry->ref_ct == 0)
 	{
 	    /* put this in unused list since ref ct hit zero */
@@ -345,6 +374,7 @@ void dbpf_open_cache_put(
 	{
 	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 		"dbpf_open_cache_put: move to unused list.\n");
+            gossip_err("DBPF_OPEN_CACHE_PUT: moving handle:%llu to the UNused list.\n",llu(tmp_entry->handle));
 	    qlist_add_tail(&tmp_entry->queue_link, &unused_list);
 	}
     }
@@ -397,7 +427,9 @@ int dbpf_open_cache_remove(
             gossip_err("DBPF_OPEN_CACHE_REMOVE:  Entry found in the used_list when trying to "
                         "remove from the unused_list.\n");
             gossip_err("\t\tused_list entry:\n");
-            gossip_err("\t\t\thandle:%llu\n",llu(tmp_entry->handle));
+            gossip_err("\t\t\t     handle:%llu\n",llu(tmp_entry->handle));
+            gossip_err("\t\t\t     ref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
+            gossip_err("\t\t\tremove-flag:%d\n",tmp_entry->remove_flag);
             switch(tmp_entry->type)
             {
                case DBPF_FD_BUFFERED_READ:
@@ -428,7 +460,9 @@ int dbpf_open_cache_remove(
             }/*end switch*/
             gossip_err("\t\t\t  type:%s\n",open_type);
 
-            return (-1);
+            tmp_entry->remove_flag=1;
+
+            return (0);
 	    //assert(0);
 	}
     }
@@ -451,6 +485,10 @@ int dbpf_open_cache_remove(
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_remove: unused entry.\n");
+        gossip_err("DBPF_OPEN_CACHE_REMOVE: handle:%llu found in the UNused list with"
+                   " remove-flag:%d.\n",llu(tmp_entry->handle),tmp_entry->remove_flag);
+        gossip_err("\t\tSetting remove-flag to zero.\n");
+        tmp_entry->remove_flag = 0;
 	if (tmp_entry->fd > -1)
 	{
             close_fd(tmp_entry->fd, tmp_entry->type);
