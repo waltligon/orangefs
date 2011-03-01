@@ -111,6 +111,9 @@ void dbpf_open_cache_initialize(void)
 	gossip_err("Warning: dbpf_open_cache disabled.\n");
     }
 
+    /* initialize prealloc array */
+    memset(&prealloc[0],0,sizeof(struct open_cache_entry)*OPEN_CACHE_SIZE);
+
     for (i = 0; i < OPEN_CACHE_SIZE; i++)
     {
         prealloc[i].fd = -1;
@@ -371,6 +374,7 @@ int dbpf_open_cache_remove(
     int ret = -1;
     int tmp_error = 0;
     struct qlist_head* scratch;
+    char open_type[32] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache_remove: called\n");
@@ -390,7 +394,42 @@ int dbpf_open_cache_remove(
 	if ((tmp_entry->handle == handle) &&
             (tmp_entry->coll_id == coll_id))
 	{
-	    assert(0);
+            gossip_err("DBPF_OPEN_CACHE_REMOVE:  Entry found in the used_list when trying to "
+                        "remove from the unused_list.\n");
+            gossip_err("\t\tused_list entry:\n");
+            gossip_err("\t\t\thandle:%llu\n",llu(tmp_entry->handle));
+            switch(tmp_entry->type)
+            {
+               case DBPF_FD_BUFFERED_READ:
+               {
+                  strcpy(&open_type[0],"DBPF_FD_BUFFERED_READ");
+                  break;
+               }
+               case DBPF_FD_BUFFERED_WRITE:
+               {
+                  strcpy(&open_type[0],"DBPF_FD_BUFFERED_WRITE");
+                  break;
+               }
+               case DBPF_FD_DIRECT_READ:
+               {
+                  strcpy(&open_type[0],"DBPF_FD_DIRECT_READ");
+                  break;
+               }
+               case DBPF_FD_DIRECT_WRITE:
+               {
+                  strcpy(&open_type[0],"DBPF_FD_DIRECT_WRITE");
+                  break;
+               }
+               default:
+               {
+                  strcpy(&open_type[0],"UNKNOWN FD TYPE");
+                  break;
+               }
+            }/*end switch*/
+            gossip_err("\t\t\t  type:%s\n",open_type);
+
+            return (-1);
+	    //assert(0);
 	}
     }
 
