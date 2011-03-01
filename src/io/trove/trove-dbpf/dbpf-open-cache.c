@@ -424,7 +424,7 @@ int dbpf_open_cache_remove(
 	if ((tmp_entry->handle == handle) &&
             (tmp_entry->coll_id == coll_id))
 	{
-            gossip_err("DBPF_OPEN_CACHE_REMOVE:  Entry found in the used_list when trying to "
+            gossip_err("DBPF_OPEN_CACHE_REMOVE:  BINGO! Entry found in the used_list when trying to "
                         "remove from the unused_list.\n");
             gossip_err("\t\tused_list entry:\n");
             gossip_err("\t\t\t     handle:%llu\n",llu(tmp_entry->handle));
