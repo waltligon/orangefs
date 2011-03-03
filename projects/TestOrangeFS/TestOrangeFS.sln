@@ -138,6 +138,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "sss-test", "..\OrangeFS\sss
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "client-test", "client-test\client-test.vcxproj", "{28761587-FE68-4AEB-8BF0-AB73484A0AD4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "posix-test", "posix-test\posix-test.vcxproj", "{D3738B06-0CF0-438F-856D-AA92B07F584E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -292,6 +294,12 @@ Global
 		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|Win32.ActiveCfg = Release|Win32
 		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|Win32.Build.0 = Release|Win32
 		{28761587-FE68-4AEB-8BF0-AB73484A0AD4}.Release|x64.ActiveCfg = Release|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Debug|Win32.Build.0 = Debug|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Debug|x64.ActiveCfg = Debug|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Release|Win32.ActiveCfg = Release|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Release|Win32.Build.0 = Release|Win32
+		{D3738B06-0CF0-438F-856D-AA92B07F584E}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

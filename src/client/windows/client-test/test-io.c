@@ -421,7 +421,7 @@ void *io_file_mt_thread(void *pargs)
     int i;
     struct timeval start;
     double elapsed;
-    unsigned int *total = 0;
+    unsigned int *total;
     FILE *f;
 
     total = (unsigned int *) malloc(sizeof(unsigned int));
@@ -448,12 +448,14 @@ void *io_file_mt_thread(void *pargs)
             fclose(f);
         }
         elapsed = timer_elapsed(&start);
-        total += (unsigned int) (elapsed * 1000000.0);
+        *total += (unsigned int) (elapsed * 1000000.0);
 
         free(file_name);
     }
 
     free(dir_name);
+
+    pthread_exit(total);
 
     return total;
 }
@@ -463,7 +465,8 @@ int io_file_mt(global_options *options, int fatal)
     thread_args *args;
     pthread_t *hthreads;
     int threadi, ret, i, code = 0;
-    unsigned int *counter, total;
+    unsigned int total;
+    void *counter;
     struct timeval start;
     double elapsed;
 
@@ -490,11 +493,9 @@ int io_file_mt(global_options *options, int fatal)
     {
         for (i = 0; i < THREAD_COUNT && code == 0; i++)
         {
-            counter = (unsigned int *) malloc(sizeof(unsigned int));
-
             /* return value is time in microseconds */
-            code = pthread_join(hthreads[threadi], &counter);
-            total += *counter;
+            code = pthread_join(hthreads[i], &counter);            
+            total += *((unsigned int *) counter);
 
             free(counter);
         }
@@ -525,7 +526,6 @@ int io_file_mt(global_options *options, int fatal)
 
     io_file_mt_cleanup(options);
 
-    free(counter);
     free(hthreads);
     free(args);
 
