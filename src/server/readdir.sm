@@ -166,7 +166,7 @@ static PINT_sm_action readdir_iterate_on_entries(
         s_op->req->u.readdir.fs_id, s_op->req->u.readdir.dirent_handle,
         s_op->req->u.readdir.token, s_op->key_a, s_op->val_a,
         s_op->req->u.readdir.dirent_count, 
-        0, 
+        TROVE_KEYVAL_DIRECTORY_ENTRY, 
         NULL, smcb, 0, js_p,
         &j_id, server_job_context, s_op->req->hints);
 

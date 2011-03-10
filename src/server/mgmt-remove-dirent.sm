@@ -67,7 +67,7 @@ static PINT_sm_action mgmt_remove_dirent(
         s_op->req->u.mgmt_remove_dirent.dirent_handle,
         &s_op->key,
         NULL,
-        TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT,
+        TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY,
         NULL,
         smcb,
         0,

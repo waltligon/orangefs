@@ -212,7 +212,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     /* We also want to keep track of the keyval entries added on this
      * handle, which allows us to get the size of the directory later
      */
-    keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+    keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
 
     ret = job_trove_keyval_write(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,

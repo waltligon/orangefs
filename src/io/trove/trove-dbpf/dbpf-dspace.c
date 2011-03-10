@@ -554,6 +554,7 @@ static int remove_one_handle(
     ret = PINT_dbpf_keyval_iterate(
         coll_p->keyval_db,
         ref.handle,
+        DBPF_ATTRIBUTE_TYPE,
         coll_p->pcache,
         NULL,
         NULL,

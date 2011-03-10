@@ -896,7 +896,7 @@ int pvfs2_mkspace(
 
         ret = trove_keyval_write(
             coll_id, root_dirdata_handle, &key, &val, 
-            TROVE_SYNC | TROVE_NOOVERWRITE | TROVE_KEYVAL_HANDLE_COUNT, 
+            TROVE_SYNC | TROVE_NOOVERWRITE | TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY, 
 	    0,
             NULL, trove_context, &op_id, NULL);
 

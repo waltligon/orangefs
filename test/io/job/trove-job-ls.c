@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     while ( num_processed == chunk ) 
 	{
 		ret = job_trove_keyval_iterate(coll_id, handle, pos, key, val, chunk,
-			0, NULL, NULL, 0, &job_stat, &foo_id, context, NULL);
+			TROVE_KEYVAL_DIRECTORY_ENTRY, NULL, NULL, 0, &job_stat, &foo_id, context, NULL);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval iterate failed.\n");

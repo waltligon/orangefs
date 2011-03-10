@@ -186,6 +186,7 @@ typedef int (* PINT_dbpf_keyval_iterate_callback)(
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
     TROVE_handle handle,
+    char type,
     PINT_dbpf_keyval_pcache *pcache,    
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
@@ -449,6 +450,13 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                 int opcode,
                                 struct dbpf_aio_ops * aio_ops,
                                 PVFS_hint  hints);
+
+enum dbpf_key_type
+{
+    DBPF_DIRECTORY_ENTRY_TYPE = 'd',
+    DBPF_ATTRIBUTE_TYPE = 'a',
+    DBPF_COUNT_TYPE = 'c'
+};
 
 struct dbpf_keyval_get_handle_info_op
 {
