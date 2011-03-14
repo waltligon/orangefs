@@ -80,7 +80,7 @@ static int mgmt_get_dirent(
         s_op->req->u.mgmt_get_dirent.fs_id,
         s_op->req->u.mgmt_get_dirent.handle,
         &s_op->key, &s_op->val, 
-        0, 
+        TROVE_KEYVAL_DIRECTORY_ENTRY, 
         NULL, smcb, 0, js_p, &j_id,
         server_job_context, s_op->req->hints);
 

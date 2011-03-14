@@ -113,7 +113,7 @@ static PINT_sm_action chdirent_read_directory_entry(
         s_op->req->u.chdirent.dirent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        TROVE_KEYVAL_DIRECTORY_ENTRY,
         NULL,
         smcb,
         0,
