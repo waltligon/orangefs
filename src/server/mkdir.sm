@@ -62,13 +62,12 @@ nested machine pvfs2_mkdir_work_sm
     state fill_handles_to_dist_dir_struct
     {
         run mkdir_fill_handles_to_dist_dir_struct;
-        default => write_keyval_to_meta_handle;
 /*
-        default => remote_dirdata_attr_and_keyval_setup_msgpair;
+        default => write_keyval_to_meta_handle;
 */
+        default => remote_dirdata_attr_and_keyval_setup_msgpair;
     }
 
-/*
     state remote_dirdata_attr_and_keyval_setup_msgpair
     {
         run mkdir_remote_dirdata_attr_and_keyval_setup_msgpair;
@@ -82,7 +81,6 @@ nested machine pvfs2_mkdir_work_sm
         success => write_keyval_to_meta_handle;
         default => err_msg;
     }
-*/
     
     state write_keyval_to_meta_handle
     {
@@ -446,7 +444,6 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
-#if 0
 static int mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -464,10 +461,7 @@ static int mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *
     attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
     attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
     attr.mask = PVFS_ATTR_COMMON_ALL;
-    /* not writing DISTDIR_ATTR */ 
-    /*
-       attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
-     */
+    attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
 
     gossip_debug(
         GOSSIP_MKDIR_DEBUG,
@@ -510,7 +504,6 @@ static int mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
-#endif
 
 static PINT_sm_action mkdir_write_keyval_to_meta_handle(
         struct PINT_smcb *smcb, job_status_s *js_p)
