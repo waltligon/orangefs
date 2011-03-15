@@ -33,6 +33,7 @@
 struct dbpf_keyval_db_entry
 {
     TROVE_handle handle;
+    char type;
     char key[DBPF_MAX_KEY_LENGTH];
 };
 
@@ -284,11 +285,12 @@ void print_keyval( DBT key, DBT val )
 
     k = key.data;
     printf("(%llu)", llu(k->handle));
-    if( key.size == 8 )
+    printf("(%c)", k->type);
+    if( key.size == 9 )
     {
         printf("()(%d) -> ", key.size);
     }
-    else if( key.size == 16 )
+    else if( key.size == 17 )
     {
         kh = *(uint64_t *)k->key;
         printf("(%llu)(%d) -> ", llu(kh), key.size);
@@ -321,7 +323,7 @@ void print_keyval( DBT key, DBT val )
         printf("(%llu)(%d)\n", llu(vh), val.size );
     }
  
-    else if( (key.size == 8 || key.size == 16 ) && val.size == 4 )
+    else if( (key.size == 9 || key.size == 17 ) && val.size == 4 )
     {
         vi = *(uint32_t *)val.data;
         printf("(%u)(%d)\n", vi, val.size );
