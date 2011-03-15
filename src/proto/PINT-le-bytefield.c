@@ -110,12 +110,10 @@ static void lebf_initialize(void)
 		resp.u.getconfig.fs_config_buf = tmp_name;
 		respsize = extra_size_PVFS_servresp_getconfig;
 		break;
-	    case PVFS_SERV_LOOKUP_PATH:
-		req.u.lookup_path.path = "";
-		resp.u.lookup_path.handle_count = 0;
-		resp.u.lookup_path.attr_count = 0;
-		reqsize = extra_size_PVFS_servreq_lookup_path;
-		respsize = extra_size_PVFS_servresp_lookup_path;
+	    case PVFS_SERV_LOOKUP:
+		req.u.lookup.name = "";
+		reqsize = extra_size_PVFS_servreq_lookup;
+		respsize = extra_size_PVFS_servresp_lookup;
 		break;
 	    case PVFS_SERV_BATCH_CREATE:
 		/* can request a range of handles */
@@ -433,7 +431,7 @@ static int lebf_encode_req(
     switch (req->op) {
 
 	/* call standard function defined in headers */
-	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_LOOKUP, lookup);
 	CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -542,7 +540,7 @@ static int lebf_encode_resp(
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
-        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+        CASE(PVFS_SERV_LOOKUP, lookup);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -645,7 +643,7 @@ static int lebf_decode_req(
     switch (req->op) {
 
 	/* call standard function defined in headers */
-	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_LOOKUP, lookup);
 	CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -744,7 +742,7 @@ static int lebf_decode_resp(
 
 	/* call standard function defined in headers */
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
-	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_LOOKUP, lookup);
 	CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -939,7 +937,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 break;
 
 	    case PVFS_SERV_GETCONFIG:
-	    case PVFS_SERV_LOOKUP_PATH:
+	    case PVFS_SERV_LOOKUP:
 	    case PVFS_SERV_REMOVE:
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -981,15 +979,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         {
             switch (resp->op)
             {
-                case PVFS_SERV_LOOKUP_PATH:
-                    {
-                        struct PVFS_servresp_lookup_path *lookup =
-                            &resp->u.lookup_path;
-                        decode_free(lookup->handle_array);
-                        decode_free(lookup->attr_array);
-                        break;
-                    }
-
                 case PVFS_SERV_READDIR:
                     decode_free(resp->u.readdir.dirent_array);
                     break;
@@ -1127,6 +1116,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_REMOVE:
+                case PVFS_SERV_LOOKUP:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:

@@ -416,7 +416,7 @@ static int rename_lookups_comp_fn(
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
+    assert(resp_p->op == PVFS_SERV_LOOKUP);
     assert((index > -1) && (index < 2));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
@@ -447,9 +447,7 @@ static int rename_lookups_comp_fn(
       generally we won't be here on index == 1, since 'new'
       may not exist
     */
-    assert(resp_p->u.lookup_path.handle_count == 1);
-    sm_p->u.rename.refns[index].handle =
-        resp_p->u.lookup_path.handle_array[0];
+    sm_p->u.rename.refns[index].handle = resp_p->u.lookup.handle;
     sm_p->u.rename.refns[index].fs_id =
         sm_p->u.rename.parent_refns[index].fs_id;
 
@@ -575,6 +573,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
         return SM_ACTION_COMPLETE;
     }
 
+    /* nlmills: TODO: get a real capability */
     PINT_null_capability(&capability);
 
     /* prepare to post the lookup send/recv pairs */
@@ -586,7 +585,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                      i, llu(sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
-        PINT_SERVREQ_LOOKUP_PATH_FILL(
+        PINT_SERVREQ_LOOKUP_FILL(
             msg_p->req,
             capability,
             sm_p->u.rename.entries[i],

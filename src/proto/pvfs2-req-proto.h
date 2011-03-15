@@ -47,7 +47,7 @@ enum PVFS_server_op
     PVFS_SERV_IO = 3,
     PVFS_SERV_GETATTR = 4,
     PVFS_SERV_SETATTR = 5,
-    PVFS_SERV_LOOKUP_PATH = 6,
+    PVFS_SERV_LOOKUP = 6,
     PVFS_SERV_CRDIRENT = 7,
     PVFS_SERV_RMDIRENT = 8,
     PVFS_SERV_CHDIRENT = 9,
@@ -117,10 +117,6 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_IOREQ_BYTES        8192
 /* maximum size of distribution name used for the hints */
 #define PVFS_REQ_LIMIT_DIST_NAME          128
-/* max count of segments allowed per path lookup (note that this governs 
- * the number of handles and attributes returned in lookup_path responses)
- */
-#define PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT   40
 /* max count of datafiles associated with a logical file */
 #define PVFS_REQ_LIMIT_DFILE_COUNT        1024
 #define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \
@@ -142,10 +138,6 @@ enum PVFS_server_op
 /* max number of info list items returned by mgmt dspace info list op */
 /* max number of dspace info structs returned by mgmt dpsace info op */
 #define PVFS_REQ_LIMIT_MGMT_DSPACE_INFO_LIST_COUNT 1024
-/* max number of path elements in a lookup_attr response */
-#define PVFS_REQ_LIMIT_MAX_PATH_ELEMENTS  40
-/* max number of symlinks to resolve before erroring out */
-#define PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT 8
 /* max number of bytes in the key of a key/value pair including null term */
 #define PVFS_REQ_LIMIT_KEY_LEN 128
 /* max number of bytes in a value of a key/value/pair */
@@ -701,66 +693,58 @@ do {                                             \
     PINT_CONVERT_ATTR(&(__req).u.setattr.attr, &(__attr), __extra_amask);\
 } while (0)
 
-/* lookup path ************************************************/
-/* - looks up as many elements of the specified path as possible */
+/* lookup *****************************************************/
+/* - looks up an entry in a directory */
 
-struct PVFS_servreq_lookup_path
+struct PVFS_servreq_lookup
 {
-    char *path;                  /* path name */
+    char *name;                  /* entry name */
     PVFS_fs_id fs_id;            /* file system */
-    PVFS_handle handle; /* handle of path parent */
+    PVFS_handle handle; /* handle of parent directory */
     /* mask of attribs to return with lookup results */
     uint32_t attrmask;
 };
 endecode_fields_5_struct(
-    PVFS_servreq_lookup_path,
-    string, path,
+    PVFS_servreq_lookup,
+    string, name,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_handle, handle,
     uint32_t, attrmask);
-#define extra_size_PVFS_servreq_lookup_path \
+#define extra_size_PVFS_servreq_lookup \
   roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1)
 
-#define PINT_SERVREQ_LOOKUP_PATH_FILL(__req,           \
-                                      __cap,           \
-                                      __path,          \
-                                      __fsid,          \
-                                      __handle,        \
-                                      __amask,         \
-                                      __hints)         \
-do {                                                   \
-    memset(&(__req), 0, sizeof(__req));                \
-    (__req).op = PVFS_SERV_LOOKUP_PATH;                \
-    (__req).capability = (__cap);                      \
-    (__req).hints = (__hints);                         \
-    (__req).u.lookup_path.path = (__path);             \
-    (__req).u.lookup_path.fs_id = (__fsid);            \
-    (__req).u.lookup_path.handle = (__handle);\
-    (__req).u.lookup_path.attrmask = (__amask);        \
+#define PINT_SERVREQ_LOOKUP_FILL(__req,           \
+                                 __cap,           \
+                                 __name,          \
+                                 __fsid,          \
+                                 __handle,        \
+                                 __amask,         \
+                                 __hints)         \
+do {                                              \
+    memset(&(__req), 0, sizeof(__req));           \
+    (__req).op = PVFS_SERV_LOOKUP;                \
+    (__req).capability = (__cap);                 \
+    (__req).hints = (__hints);                    \
+    (__req).u.lookup.name = (__name);             \
+    (__req).u.lookup.fs_id = (__fsid);            \
+    (__req).u.lookup.handle = (__handle);         \
+    (__req).u.lookup.attrmask = (__amask);        \
 } while (0)
 
-struct PVFS_servresp_lookup_path
+struct PVFS_servresp_lookup
 {
-    /* array of handles for each successfully resolved path segment */
-    PVFS_handle *handle_array;            
-    /* array of attributes for each path segment (when available) */
-    PVFS_object_attr *attr_array;
-    uint32_t handle_count; /* # of handles returned */
-    uint32_t attr_count;   /* # of attributes returned */
+    /* handle of the directory entry */
+    PVFS_handle handle;            
+    /* attributes of the directory entry (when available) */
+    PVFS_object_attr attr;
 };
-endecode_fields_1a_1a_struct(
-    PVFS_servresp_lookup_path,
-    skip4,,
-    uint32_t, handle_count,
-    PVFS_handle, handle_array,
-    skip4,,
-    uint32_t, attr_count,
-    PVFS_object_attr, attr_array);
-/* this is a big thing that could be either a full path,
-* or lots of handles, just use the max io req limit */
-#define extra_size_PVFS_servresp_lookup_path \
-  (PVFS_REQ_LIMIT_IOREQ_BYTES)
+endecode_fields_2_struct(
+    PVFS_servresp_lookup,
+    PVFS_handle, handle,
+    PVFS_object_attr, attr);
+#define extra_size_PVFS_servresp_lookup \
+  (extra_size_PVFS_object_attr)
 
 /* mkdir *******************************************************/
 /* - makes a new directory object */
@@ -1968,7 +1952,7 @@ struct PVFS_server_req
         struct PVFS_servreq_setattr setattr;
         struct PVFS_servreq_mkdir mkdir;
         struct PVFS_servreq_readdir readdir;
-        struct PVFS_servreq_lookup_path lookup_path;
+        struct PVFS_servreq_lookup lookup;
         struct PVFS_servreq_crdirent crdirent;
         struct PVFS_servreq_rmdirent rmdirent;
         struct PVFS_servreq_chdirent chdirent;
@@ -2030,7 +2014,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_getattr getattr;
         struct PVFS_servresp_mkdir mkdir;
         struct PVFS_servresp_readdir readdir;
-        struct PVFS_servresp_lookup_path lookup_path;
+        struct PVFS_servresp_lookup lookup;
         struct PVFS_servresp_rmdirent rmdirent;
         struct PVFS_servresp_chdirent chdirent;
         struct PVFS_servresp_getconfig getconfig;

@@ -33,8 +33,7 @@
 #include "pint-util.h"
 #include "security-util.h"
 
-#define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
-#define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
+#define MAX_LOOKUP_SEGMENTS 40
 
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
