@@ -1064,6 +1064,7 @@ int PINT_cached_config_map_to_server(
     }
 
     *server_addr = tmp_entry->server_addr;
+
     return(0);
 }
 

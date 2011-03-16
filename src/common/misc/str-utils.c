@@ -228,7 +228,7 @@ int PINT_parse_handle_ranges(
        valid.  */ 
     out_extent->first = out_extent->last =
 #if defined(WIN32)
-        (PVFS_handle)_strtoui64(p, &endchar, 16);
+        (PVFS_handle)_strtoui64(p, &endchar, 0);
 #elif defined(HAVE_STRTOULL)
         (PVFS_handle)strtoull(p, &endchar, 0);
 #else
@@ -245,7 +245,7 @@ int PINT_parse_handle_ranges(
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
 #if defined(WIN32)
-        out_extent->last = (PVFS_handle)_strtoui64(p, &endchar, 16);
+        out_extent->last = (PVFS_handle)_strtoui64(p, &endchar, 0);
 #elif defined(HAVE_STRTOULL)
 	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
 #else

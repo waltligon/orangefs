@@ -5,11 +5,17 @@
  */
 
 #include <assert.h>
+#ifdef WIN32
+#include <time.h>
+#else
 #include <sys/time.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 #include "client.h"
