@@ -133,7 +133,6 @@ int fs_resolve_path(const char *local_path,
     
     /* prepend mount directory to path */
     strcpy(full_path, mntent->mnt_dir);
-    printf("   full_path: %s\n", full_path);
     /* append path */
     if (full_path[strlen(full_path)-1] != '/')
         strcat(full_path, "/");
