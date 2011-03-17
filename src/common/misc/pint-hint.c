@@ -136,6 +136,7 @@ int PVFS_hint_add_internal(
     }
 
     new_hint->length = length;
+    new_hint->type_string = NULL;
     new_hint->value = malloc(new_hint->length);
     if(!new_hint->value)
     {
@@ -247,6 +248,7 @@ int PVFS_hint_add(
 
     if(info)
     {
+        new_hint->type_string = NULL;
         new_hint->type = info->type;
         new_hint->flags = info->flags;
         new_hint->encode = info->encode;
@@ -329,7 +331,7 @@ void encode_PINT_hint(char **pptr, const PINT_hint *hint)
             }
 
             /* encode the hint using the encode function provided */
-            tmp_hint->encode(pptr, tmp_hint->value);
+            tmp_hint->encode(pptr, &tmp_hint->value);
         }
 
         tmp_hint = tmp_hint->next;
@@ -564,7 +566,7 @@ void *PINT_hint_get_value_by_name(
 
     while(h)
     {
-        if(!strcmp(h->type_string, name))
+        if(h->type_string != NULL && !strcmp(h->type_string, name))
         {
             if(length)
             {

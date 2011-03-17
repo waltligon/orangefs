@@ -545,6 +545,8 @@ int PINT_cached_config_map_servers(
     else if(layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
         num_io_servers -= 1;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "layout algorithm = %d\n", layout->algorithm);
+
     switch(layout->algorithm)
     {
         case PVFS_SYS_LAYOUT_LIST:
@@ -632,7 +634,13 @@ int PINT_cached_config_map_servers(
                 layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
             {
                 for(i=0; i < cur_config_cache->io_server_count; i++)
-                    if(strcmp(node_name, cur_config_cache->io_server_array[i].addr_string) == 0)
+                {
+                    cur_mapping = PINT_llist_head(server_list);
+                    assert(cur_mapping);
+                    server_list = PINT_llist_next(server_list);
+
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "host_alias = %s, node_name = %s, cur_config_cache->io_server_array[%d],addr_string=%s\n", cur_mapping->alias_mapping->host_alias, node_name, i, cur_config_cache->io_server_array[i].addr_string);
+                    if(strcmp(cur_mapping->alias_mapping->host_alias, node_name) == 0)
                     {
                         if(layout->algorithm == PVFS_SYS_LAYOUT_LOCAL_RR0 || layout->algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
                             start_index = (i+1)%cur_config_cache->io_server_count;
@@ -642,6 +650,7 @@ int PINT_cached_config_map_servers(
                             start_index = i;
                         break;
                     }
+                }
             }
             else if (layout->algorithm == PVFS_SYS_LAYOUT_NONE)
                 start_index = 0;
@@ -651,6 +660,9 @@ int PINT_cached_config_map_servers(
             /* fall through */
 
         case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+
+            /* TODO: had to get server_list again because it went through already? */
+            server_list = cur_config_cache->fs->data_handle_ranges;
 
             if(num_io_servers < *inout_num_datafiles)
             {

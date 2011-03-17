@@ -204,6 +204,8 @@ static int check_stuffed(
        s_op->req->u.create.layout.algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
         tmp = PINT_hint_get_value_by_type(s_op->req->hints, PINT_HINT_UNKNOWN, &length);
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "layout->algorithm=%d, node name from client = %s, len=%d\n", s_op->req->u.create.layout.algorithm, tmp, length); 
+
     layout = &s_op->req->u.create.layout;
 
     if(layout->algorithm == PVFS_SYS_LAYOUT_LIST)

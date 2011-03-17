@@ -2163,7 +2163,7 @@ DOTCONF_CB(get_flow_buffers_per_flow)
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     fs_conf->fp_buffers_per_flow = cmd->data.value;
-    if(fs_conf->fp_buffers_per_flow < 2)
+    if(fs_conf->fp_buffers_per_flow < 1)
     {
         return("Error: FlowBuffersPerFlow must be at least 2.\n");
     }

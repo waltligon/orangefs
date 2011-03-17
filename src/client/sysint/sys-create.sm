@@ -434,7 +434,7 @@ static PINT_sm_action create_create_setup_msgpair(
         /* first check that local client node is in metadata server list */
         myhn = PVFS_sys_get_local_hostname();
 
-        PVFS_hint_add(&sm_p->hints, "first_node", sizeof(myhn), &myhn);
+        PVFS_hint_add(&sm_p->hints, "first_node", sizeof(myhn), myhn);
     }
 
     ret = PINT_cached_config_get_next_meta(
