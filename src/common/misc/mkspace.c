@@ -426,7 +426,6 @@ int pvfs2_mkspace(
                       "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
-#if 0
         /* set root dirdata dspace attributes */
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
         attr.uid = getuid();
@@ -453,7 +452,6 @@ int pvfs2_mkspace(
                        "attributes failed; aborting!\n");
             return -1;
         }
-#endif
 
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
@@ -597,7 +595,6 @@ int pvfs2_mkspace(
             return -1;
         }
 
-#if 0
         /* adjust dist_dir_attr val_a */
         val_a[0].buffer = &dirdata_dist_dir_attr;
         
@@ -630,7 +627,7 @@ int pvfs2_mkspace(
 
         mkspace_print(
             verbose, "info: wrote attributes for root directory.\n");
-#endif
+
 
         /****************************************************
           at this point we need to create and initialize the
@@ -756,7 +753,6 @@ int pvfs2_mkspace(
             "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
-#if 0
         /* set lost+found dirdata dspace attributes */
         memset(&attr, 0, sizeof(TROVE_ds_attributes_s));
         attr.uid = getuid();
@@ -783,7 +779,6 @@ int pvfs2_mkspace(
                        "attributes failed; aborting!\n");
             return -1;
         }
-#endif
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
         key.buffer_sz = DIRECTORY_ENTRY_KEYLEN;
@@ -849,7 +844,7 @@ int pvfs2_mkspace(
             return -1;
         }
 
-#if 0
+
         /* adjust dist_dir_attr val */
         val_a[0].buffer = &dirdata_dist_dir_attr;
 
@@ -882,7 +877,7 @@ int pvfs2_mkspace(
 
         mkspace_print(verbose, "info: wrote attributes for "
                       "lost+found directory.\n");
-#endif
+
 
         /*
           finally, crdirent the lost+found directory into the root

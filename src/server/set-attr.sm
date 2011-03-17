@@ -295,6 +295,7 @@ static PINT_sm_action setattr_verify_attribs(
             }
             memcpy(a_p->u.dir.dirdata_handles, req_a_p->u.dir.dirdata_handles,
                 a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
+            js_p->error_code = STATE_DIRDATA;
         }
         else
         {
@@ -510,7 +511,7 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     job_id_t j_id;
     int i;
 
-    /* reset from jump to here with STATE_METAFILE */
+    /* reset from jump to here with STATE_DIRDATA */
     js_p->error_code = 0;
 
     /* if we don't need to write the distr_dir struct, skip it */
