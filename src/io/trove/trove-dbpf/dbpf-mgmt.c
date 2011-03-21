@@ -68,7 +68,7 @@ extern int TROVE_db_cache_size_bytes;
 extern int TROVE_shm_key_hint;
 
 struct dbpf_storage *my_storage_p = NULL;
-static int db_open_count, db_close_count;
+static int db_open_count = 0, db_close_count = 0;
 static void unlink_db_cache_files(const char* path);
 static int start_directio_threads(void);
 static int stop_directio_threads(void);
@@ -84,6 +84,8 @@ static int PINT_dbpf_io_completion_callback(PINT_context_id ctx_id,
                                      PVFS_error *errors);
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
+
+int PINT_dbpf_defer_sync = 0;
 
 static void dbpf_db_error_callback(
 #ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
@@ -458,6 +460,15 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
             coll->immediate_completion = *(int *)parameter;
             ret = 0;
             break;
+        case TROVE_COLLECTION_DEFER_SYNC_TO_SHUTDOWN:
+            gossip_debug(GOSSIP_TROVE_DEBUG, 
+                         "dbpf collection %d - %s defer sync to shutdown\n",
+                         (int) coll_id,
+                         (*(int *)parameter) ? "Enabling" : "Disabling");
+            assert(coll);
+            PINT_dbpf_defer_sync = *(int *)parameter;
+            ret = 0;
+            break;
         case TROVE_DIRECTIO_THREADS_NUM:
             trove_directio_threads_num = *(int *)parameter;
             ret = 0;
@@ -806,6 +817,9 @@ int dbpf_finalize(void)
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
+    /* re-enable syncing to flush dbs on shutdown if trove was 
+     * configured to defer syncs */
+
     if (my_storage_p)
     {
         ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
@@ -840,6 +854,10 @@ int dbpf_finalize(void)
         free(my_storage_p);
         my_storage_p = NULL;
     }
+
+    /* flush to disk here for safety if data syncs were deferred */
+    if(PINT_dbpf_defer_sync)
+        sync();
 
     return 1;
 }

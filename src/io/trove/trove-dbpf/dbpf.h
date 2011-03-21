@@ -162,6 +162,7 @@ extern PINT_event_type trove_dbpf_dspace_getattr_event_id;
 extern PINT_event_type trove_dbpf_dspace_setattr_event_id;
 
 extern int dbpf_pid;
+extern int PINT_dbpf_defer_sync;
 
 struct dbpf_aio_ops
 {
@@ -594,7 +595,7 @@ PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
     int tmp_ret, tmp_errno;                               \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                  \
+    if (dbpf_op_ptr->flags & TROVE_SYNC && !PINT_dbpf_defer_sync)  \
     {                                                     \
         if ((tmp_ret = DBPF_SYNC(fd)) != 0)               \
         {                                                 \
@@ -613,7 +614,7 @@ do {                                                      \
 #define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)    \
 do {                                                     \
     int tmp_ret, tmp_errno;                              \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
+    if (dbpf_op_ptr->flags & TROVE_SYNC && !PINT_dbpf_defer_sync)  \
     {                                                    \
         if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
         {                                                \
@@ -634,7 +635,7 @@ do {                                                     \
 do {                                                          \
     int tmp_ret;                                              \
     ret = 0;                                                  \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                      \
+    if (dbpf_op_ptr->flags & TROVE_SYNC && !PINT_dbpf_defer_sync)  \
     {                                                         \
         if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)         \
         {                                                     \

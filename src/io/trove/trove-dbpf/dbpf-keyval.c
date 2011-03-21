@@ -1468,11 +1468,14 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
 
-    if ((ret = op_p->coll_p->keyval_db->sync(
-                op_p->coll_p->keyval_db, 0)) != 0)
+    if(!PINT_dbpf_defer_sync)
     {
-        ret = -dbpf_db_error_to_trove_error(ret);
-        goto return_error;
+        if ((ret = op_p->coll_p->keyval_db->sync(
+                    op_p->coll_p->keyval_db, 0)) != 0)
+        {
+            ret = -dbpf_db_error_to_trove_error(ret);
+            goto return_error;
+        }
     }
 
     return 1;

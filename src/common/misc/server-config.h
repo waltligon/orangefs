@@ -84,6 +84,7 @@ typedef struct filesystem_configuration_s
     int trove_sync_meta;
     int trove_sync_data;
     int immediate_completion;
+    int defer_sync;
     int coalescing_high_watermark;
     int coalescing_low_watermark;
     int file_stuffing;

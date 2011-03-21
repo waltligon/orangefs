@@ -90,7 +90,8 @@ enum
     TROVE_SHM_KEY_HINT,
     TROVE_DIRECTIO_THREADS_NUM,
     TROVE_DIRECTIO_OPS_PER_QUEUE,
-    TROVE_DIRECTIO_TIMEOUT
+    TROVE_DIRECTIO_TIMEOUT,
+    TROVE_COLLECTION_DEFER_SYNC_TO_SHUTDOWN
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove

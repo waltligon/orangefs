@@ -35,13 +35,16 @@ static int dbpf_sync_db(
                  "in coalesce_queue:%d pending:%d\n",
                  sync_context_type, sync_context->coalesce_counter, 
                  sync_context->sync_counter);
-    ret = dbp->sync(dbp, 0);
-    if(ret != 0)
+    if(!PINT_dbpf_defer_sync)
     {
-        gossip_err("db SYNC failed: %s\n",
-                   db_strerror(ret));
-        ret = -dbpf_db_error_to_trove_error(ret);
-        return ret;
+        ret = dbp->sync(dbp, 0);
+        if(ret != 0)
+        {
+            gossip_err("db SYNC failed: %s\n",
+                       db_strerror(ret));
+            ret = -dbpf_db_error_to_trove_error(ret);
+            return ret;
+        }
     }
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]:\tcoalesce %d sync stop\n",

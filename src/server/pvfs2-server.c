@@ -1029,7 +1029,17 @@ static int server_initialize_subsystems(
                 gossip_err("Error setting coalescing low watermark\n");
                 return ret;
             } 
-            
+             
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_DEFER_SYNC_TO_SHUTDOWN,
+                (void *)&cur_fs->defer_sync);
+            if(ret < 0)
+            {
+                gossip_err("Error setting trove deferred sync mode\n");
+                return ret;
+            } 
+           
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context,
                 TROVE_COLLECTION_IMMEDIATE_COMPLETION,

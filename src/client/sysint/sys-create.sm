@@ -431,10 +431,13 @@ static PINT_sm_action create_create_setup_msgpair(
        sm_p->u.create.layout.algorithm == PVFS_SYS_LAYOUT_REMOTE_RR)
     {
         /* user requested file be placed locally */
-        /* first check that local client node is in metadata server list */
+        /* get client node name and pass it to the server */
+        /* so that server can create a file starting from the node name */
         myhn = PVFS_sys_get_local_hostname();
 
         PVFS_hint_add(&sm_p->hints, "first_node", sizeof(myhn), myhn);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,"client node name = %s\n", myhn);
     }
 
     ret = PINT_cached_config_get_next_meta(

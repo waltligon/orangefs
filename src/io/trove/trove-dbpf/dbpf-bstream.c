@@ -593,11 +593,14 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     }
     got_fd = 1;
 
-    ret = DBPF_SYNC(tmp_ref.fd);
-    if (ret != 0)
+    if(!PINT_dbpf_defer_sync)
     {
-        ret = -trove_errno_to_trove_error(errno);
-        goto return_error;
+        ret = DBPF_SYNC(tmp_ref.fd);
+        if (ret != 0)
+        {
+            ret = -trove_errno_to_trove_error(errno);
+            goto return_error;
+        }
     }
     dbpf_open_cache_put(&tmp_ref);
     return 1;

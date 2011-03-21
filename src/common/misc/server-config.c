@@ -102,6 +102,7 @@ static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
 static DOTCONF_CB(get_immediate_completion);
+static DOTCONF_CB(get_defer_sync);
 static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
@@ -893,6 +894,9 @@ static const configoption_t options[] =
         CTX_FILESYSTEM,"0"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
+        CTX_STORAGEHINTS, "no"},
+
+    {"DeferSyncToShutdown", ARG_STR, get_defer_sync, NULL,
         CTX_STORAGEHINTS, "no"},
 
     {"CoalescingHighWatermark", ARG_STR, get_coalescing_high_watermark, NULL,
@@ -2666,6 +2670,28 @@ DOTCONF_CB(get_secret_key)
     fs_conf->secret_key = strdup(cmd->data.str);
     return NULL;
 }
+
+DOTCONF_CB(get_defer_sync)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if(!strcmp((char *)cmd->data.str, "yes"))
+    {
+        fs_conf->defer_sync = 1;
+    }
+    else
+    {
+        fs_conf->defer_sync = 0;
+    }
+
+    return NULL;
+}
+
 
 DOTCONF_CB(get_immediate_completion)
 {
