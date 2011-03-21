@@ -457,6 +457,7 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    int saved_error_code; /* holds error_code from previous state. */
 };
 
 struct PINT_server_mgmt_remove_dirent_op
