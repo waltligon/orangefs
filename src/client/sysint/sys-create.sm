@@ -422,9 +422,10 @@ static PINT_sm_action create_create_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
     /* reset the attributes to what got passed in to the sysint call. the retry
-     * path comes through here so we'll want to reset it after each try. */
-    PINT_CONVERT_ATTR(&sm_p->u.create.attr, &sm_p->u.create.store_attr, 
-                      PVFS_ATTR_META_ALL);
+     * path comes through here so we'll want to reset it after each try. 
+     * force the mask to all meta attributes. */
+    PINT_copy_object_attr(&(sm_p->u.create.attr), &(sm_p->u.create.store_attr));
+    sm_p->u.create.attr.mask |= PVFS_ATTR_META_ALL;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
