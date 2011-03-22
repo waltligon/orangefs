@@ -91,19 +91,25 @@ machine pvfs2_pjmp_remove_work_sm
 {
     state pjmp_remove_work_initialize
     {
-        run pjmp_initialize;
-        default => pjmp_call_remove_work_sm;
+        run pjmp_remove_work_schedule_job;
+        success => pjmp_call_remove_work_sm;
+        default => pjmp_remove_work_execute_terminate;
     }
 
     state pjmp_call_remove_work_sm
     {
         jump pvfs2_remove_work_sm;
-        default => pjmp_remove_work_execute_terminate;
+        default => pjmp_remove_work_release_job;
     }
 
+    state pjmp_remove_work_release_job
+    {
+        run pjmp_remove_work_release_job;
+        default => pjmp_remove_work_execute_terminate;
+    }
     state pjmp_remove_work_execute_terminate
     {
-        run pjmp_execute_terminate;
+        run pjmp_remove_work_execute_terminate;
         default => terminate;
     }
 }
@@ -231,6 +237,64 @@ static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
 
    return SM_ACTION_TERMINATE;
 }/*end action cleanup_msgpairarray*/
+
+static PINT_sm_action pjmp_remove_work_schedule_job(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+   int ret;
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   ret = PINT_server_req_get_object_ref(s_op->req
+                                       ,&s_op->target_fs_id
+                                       ,&s_op->target_handle);
+   s_op->access_type = PINT_server_req_get_access_type(s_op->req);
+   s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
+
+   gossip_err("pjmp_remove_work_schedule_job: s_op->target_fs_id:%llu   s_op->target_handle:%llu\n"
+              ,llu(s_op->target_fs_id)
+              ,llu(s_op->target_handle));
+
+   js_p->error_code = 0;
+   ret = job_req_sched_post( s_op->op
+                            ,s_op->target_fs_id
+                            ,s_op->target_handle
+                            ,s_op->access_type
+                            ,s_op->sched_policy
+                            ,smcb
+                            ,0
+                            ,js_p
+                            ,&(s_op->scheduled_id)
+                            ,server_job_context);
+   return ret;
+}/*end pjmp_remove_work_schedule_job*/
+
+
+static PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+   int ret = -1;
+   job_id_t tmp_id;
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   /* save the error-code returned from the previous step */
+   s_op->u.remove.saved_error_code = js_p->error_code;
+
+   ret = job_req_sched_release( s_op->scheduled_id
+                               ,smcb
+                               ,0
+                               ,js_p
+                               ,&tmp_id
+                               ,server_job_context);
+ 
+   return ret;  
+}/*end pjmp_remove_work_release_job*/
+
+static PINT_sm_action pjmp_remove_work_execute_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+   js_p->error_code = s_op->u.remove.saved_error_code;
+
+   return SM_ACTION_TERMINATE;
+}/*end pjmp_remove_execute_terminate */
 
 
 /*
