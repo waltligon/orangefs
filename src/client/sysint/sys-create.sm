@@ -424,8 +424,12 @@ static PINT_sm_action create_create_setup_msgpair(
     /* reset the attributes to what got passed in to the sysint call. the retry
      * path comes through here so we'll want to reset it after each try. 
      * force the mask to all meta attributes. */
-    PINT_copy_object_attr(&(sm_p->u.create.attr), &(sm_p->u.create.store_attr));
-    sm_p->u.create.attr.mask |= PVFS_ATTR_META_ALL;
+    if( sm_p->u.create.retry_count > 0 )
+    {
+        PINT_copy_object_attr(&(sm_p->u.create.attr), 
+                              &(sm_p->u.create.store_attr));
+        sm_p->u.create.attr.mask |= PVFS_ATTR_META_ALL;
+    }
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
