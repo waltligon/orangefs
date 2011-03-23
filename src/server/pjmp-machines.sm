@@ -249,10 +249,6 @@ static PINT_sm_action pjmp_remove_work_schedule_job(struct PINT_smcb *smcb, job_
    s_op->access_type = PINT_server_req_get_access_type(s_op->req);
    s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
-   gossip_err("pjmp_remove_work_schedule_job: s_op->target_fs_id:%llu   s_op->target_handle:%llu\n"
-              ,llu(s_op->target_fs_id)
-              ,llu(s_op->target_handle));
-
    js_p->error_code = 0;
    ret = job_req_sched_post( s_op->op
                             ,s_op->target_fs_id
