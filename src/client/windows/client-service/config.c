@@ -5,9 +5,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "client-service.h"
 #include "config.h"
+
+extern struct qlist_head user_list;
 
 FILE *open_config_file()
 {
@@ -50,10 +53,98 @@ FILE *open_config_file()
     return f;
 }
 
+void close_config_file(FILE *f)
+{
+    fclose(f);
+}
+
+/* parse line in format: <[domain\]user name> <uid>:<gid> */
+int parse_user()
+{
+    char *token, *p;
+    char user_name[256];
+    char uid[16], gid[16];
+    int i, ret = 0;
+    PORANGEFS_USER puser;
+
+    /* assume current string being parsed */
+    token = strtok(NULL, " \t");
+
+    if (token)
+    {
+        /* copy user name */
+        strncpy(user_name, token, 256);
+
+        token = strtok(NULL, " \t");
+        if (token)
+        {
+            uid[0] = gid[0] = '\0';
+            i = 0;
+            p = token;
+            while (*p && *p != ':' && i < 15)
+            {
+                if (isdigit(*p))
+                {
+                    uid[i++] = *p++;
+                }
+                else 
+                {
+                    ret = 1;
+                    break;
+                }
+            }
+            uid[i] = '\0';
+            if (ret == 0)
+            {
+                if (*p == ':')
+                    p++;
+                i = 0;
+                while(*p && i < 15)
+                {
+                    if (isdigit(*p))
+                    {
+                        gid[i++] = *p++;
+                    }
+                    else 
+                    {
+                        ret = 1;
+                        break;
+                    }
+                }
+                gid[i] = '\0';
+            }
+        }
+        else
+        {
+            ret = 1;
+        }
+    }
+    else
+    {
+        ret = 1;
+    }
+
+    if (ret == 0)
+        ret = !(strlen(uid) > 0 && strlen(gid) > 0);
+
+    if (ret == 0)
+    {
+        /* add user to linked list */
+        puser = (PORANGEFS_USER) malloc(sizeof(ORANGEFS_USER));
+        strncpy(puser->user_name, user_name, 256);
+        puser->uid = atoi(uid);
+        puser->gid = atoi(gid);
+
+        qlist_add(&puser->list_link, &user_list);
+    }
+
+    return ret;
+}
+
 int get_config(PORANGEFS_OPTIONS options)
 {
     FILE *config_file;
-    char line[256], copy[256], *token, *p;
+    char line[256], copy[256], *token;
 
     config_file = open_config_file();
     if (config_file == NULL)
@@ -63,6 +154,7 @@ int get_config(PORANGEFS_OPTIONS options)
     /* parse options from the file */
     while (!feof(config_file))
     {
+        line[0] = '\0';
         fgets(line, 256, config_file);
 
         /* remove \n */        
@@ -84,20 +176,36 @@ int get_config(PORANGEFS_OPTIONS options)
             {
                 /* copy the remaining portion of the line 
                    as the mount point */
+                /*
                 p = line + strlen(token);
                 while (*p && (*p == ' ' || *p == '\t'))
                     p++;
                 if (*p)
-                    strncpy(options->mount_point, p, MAX_PATH);
+                */
+                token = strtok(NULL, " \t");
+                strncpy(options->mount_point, token, MAX_PATH);
             }
             else if (!stricmp(token, "-threads") ||
                      !stricmp(token, "threads"))
             {
+                /*
                 p = line + strlen(token);
                 while (*p && (*p == ' ' || *p == '\t'))
                     p++;
                 if (*p)
-                    options->threads = atoi(p);
+                */
+                token = strtok(NULL, " \t");
+                options->threads = atoi(token);
+            }
+            else if (!stricmp(token, "-user") ||
+                     !stricmp(token, "user")) 
+            {
+                if (parse_user() != 0)
+                {
+                    fprintf(stderr, "-user option: parse error\n");
+                    close_config_file(config_file);
+                    return 1;
+                }
             }
 #ifndef _DEBUG
             /* debug already enabled for debug builds */
@@ -112,10 +220,7 @@ int get_config(PORANGEFS_OPTIONS options)
         }
     }
 
-    return 0;
-}
+    close_config_file(config_file);
 
-void close_config_file(FILE *f)
-{
-    fclose(f);
+    return 0;
 }

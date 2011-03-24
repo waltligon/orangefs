@@ -36,6 +36,8 @@ DWORD WINAPI main_loop(LPVOID poptions);
 
 FILE *debug_log = NULL;
 
+struct qlist_head user_list;
+
 /* externs */
 extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
 
@@ -286,16 +288,20 @@ void WINAPI service_ctrl(DWORD ctrl_code)
 void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
+    int ret;
 
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+    
+    /* init user list */
+    INIT_QLIST_HEAD(&user_list);
 
     /* default mount point */
     strcpy(options->mount_point, "Z:");
 
     /* read from config file */
-    get_config(options);
-
+    ret = get_config(options);
+        
 #ifndef _DEBUG
     debug = options->debug;
 #endif
@@ -303,6 +309,13 @@ void WINAPI service_main(DWORD argc, char *argv[])
     init_service_log();
 
     service_debug("Entered service_main\n");
+
+    if (ret != 0)
+    {
+        service_debug("Could not parse config file: check user options\n");
+        close_service_log();
+        return;
+    }
 
     if (!check_mount_point(options->mount_point))
         return;
@@ -463,6 +476,7 @@ int main(int argc, char **argv, char **envp)
   int i = 0;
   PORANGEFS_OPTIONS options;
   DWORD err = 0;
+  char mount_point[256];
 
   SERVICE_TABLE_ENTRY dispatch_table[2] = 
   {
@@ -470,15 +484,9 @@ int main(int argc, char **argv, char **envp)
       {NULL, NULL}
   };
 
-  options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+  mount_point[0] = '\0';
 
-  /* default mount point */
-  strcpy(options->mount_point, "Z:");
-
-  /* get options from config file */
-  get_config(options);
-
-  /* command line arguments override config file options */
+  /* command line arguments */
   for (i = 1; i < argc; i++) 
   {
       if (!stricmp(argv[i], "-installService") ||
@@ -502,7 +510,7 @@ int main(int argc, char **argv, char **envp)
           !strcmp(argv[i], "/m"))
       {
           if (i < (argc - 1))
-              strncpy(options->mount_point, argv[++i], MAX_PATH);
+              strncpy(mount_point, argv[++i], MAX_PATH);
           else
               fprintf(stderr, "Invalid argument -mount. Using mount point Z:\n");
       }
@@ -515,8 +523,6 @@ int main(int argc, char **argv, char **envp)
 #endif
   }
 
-  options->debug = debug;
-
   if (run_service) 
   {
       /* dispatch the main service thread */
@@ -524,6 +530,27 @@ int main(int argc, char **argv, char **envp)
   } 
   else 
   {    
+      options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+
+      /* init user list */
+      INIT_QLIST_HEAD(&user_list);
+
+      /* get options from config file */
+      if (get_config(options) != 0)
+          return 1;
+
+      /* override with mount point from command line */
+      if (strlen(mount_point) > 0)
+          strcpy(options->mount_point, mount_point);
+
+      /* use default mount point */
+      if (strlen(options->mount_point) == 0)
+          strcpy(options->mount_point, "Z:");
+
+      /* turn debug on if specified on command line */
+      if (debug)
+          options->debug = TRUE;
+
       is_running = 1;
 
       if (!check_mount_point(options->mount_point))
@@ -532,11 +559,13 @@ int main(int argc, char **argv, char **envp)
           return -1;
       }
 
+      /* process requests */
       err = main_loop(options);
+      
       printf("main_loop exited: %d\n", err);
-  }
 
-  free(options);
+      free(options);
+  }
 
   return err;
 }

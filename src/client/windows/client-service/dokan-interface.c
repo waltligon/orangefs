@@ -350,6 +350,10 @@ static char *get_fs_path(const wchar_t *local_path)
     return fs_path;
 }
 
+static PVFS_credentials *get_credentials(ULONG64 context)
+{
+    
+}
 
 static int __stdcall
 PVFS_Dokan_create_file(
@@ -364,6 +368,7 @@ PVFS_Dokan_create_file(
     int ret, found, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
+    PVFS_credentials *credentials;
 
     DbgPrint("CreateFile: %S\n", FileName);
     
@@ -467,9 +472,9 @@ PVFS_Dokan_create_file(
     case CREATE_ALWAYS:
         if (found)
         {
-            fs_remove(fs_path);
+            fs_remove(fs_path, credentials);
         }
-        ret = fs_create(fs_path, &handle);
+        ret = fs_create(fs_path, credentials, &handle);
         break;
     case CREATE_NEW:
         if (found) 
@@ -480,14 +485,14 @@ PVFS_Dokan_create_file(
         else
         {
             /* create file */
-            ret = fs_create(fs_path, &handle);
+            ret = fs_create(fs_path, credentials, &handle);
         }
         break;
     case OPEN_ALWAYS:
         if (!found)
         {    
             /* create file */
-            ret = fs_create(fs_path, &handle);
+            ret = fs_create(fs_path, credentials, &handle);
         }
         break;
     case OPEN_EXISTING:
@@ -504,7 +509,7 @@ PVFS_Dokan_create_file(
         }
         else
         {   
-            ret = fs_truncate(fs_path, 0);
+            ret = fs_truncate(fs_path, 0, credentials);
         }
     }
 
@@ -520,7 +525,7 @@ PVFS_Dokan_create_file(
         DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
         /* determine whether this is a directory */
-        ret = fs_getattr(fs_path, &attr);
+        ret = fs_getattr(fs_path, credentials, &attr);
         if (ret == 0)
         {
             DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
@@ -553,6 +558,7 @@ PVFS_Dokan_create_directory(
     char *fs_path;
     int ret, err;
     PVFS_handle handle;
+    PVFS_credentials *credentials;
 
     DbgPrint("CreateDirectory: %S\n", FileName);
 
@@ -561,7 +567,7 @@ PVFS_Dokan_create_directory(
     if (fs_path == NULL)
         return -1;
 
-    ret = fs_mkdir(fs_path, &handle);
+    ret = fs_mkdir(fs_path, credentials, &handle);
 
     DbgPrint("   fs_mkdir returns: %d\n", ret);
 
@@ -589,6 +595,7 @@ PVFS_Dokan_open_directory(
     int ret, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
+    PVFS_credentials *credentials;
 
     DbgPrint("OpenDirectory: %S\n", FileName);
 
@@ -598,13 +605,13 @@ PVFS_Dokan_open_directory(
         return -1;
 
     /* lookup the file */
-    ret = fs_lookup(fs_path, &handle);    
+    ret = fs_lookup(fs_path, credentials, &handle);    
 
     DbgPrint("   fs_lookup returns: %d\n", ret);
 
     if (ret == 0)
     {
-        ret = fs_getattr(fs_path, &attr);
+        ret = fs_getattr(fs_path, credentials, &attr);
         DbgPrint("   fs_getattr returns: %d\n", ret);
         if (ret == 0)
         {
@@ -637,6 +644,7 @@ PVFS_Dokan_close_file(
 {
     char *fs_path = NULL;
     int ret = 0, err;
+    PVFS_credentials *credentials;
 
     DbgPrint("CloseFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -650,7 +658,7 @@ PVFS_Dokan_close_file(
             return -1;
 
         /* remove the file/dir */
-        ret = fs_remove(fs_path);
+        ret = fs_remove(fs_path, credentials);
     }
 
     /* PVFS doesn't have a close-file semantic.
@@ -702,6 +710,7 @@ PVFS_Dokan_read_file(
 {
     char *fs_path;
     PVFS_size len64;
+    PVFS_credentials *credentials;
     int ret, err;
     
     DbgPrint("ReadFile: %S\n", FileName);
@@ -720,7 +729,7 @@ PVFS_Dokan_read_file(
         return -1;
     
     /* perform the read operation */
-    ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64);
+    ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, credentials);
     *ReadLength = (DWORD) len64;
 
     free(fs_path);    
@@ -744,6 +753,7 @@ PVFS_Dokan_write_file(
 {
     char *fs_path;
     PVFS_size len64;
+    PVFS_credentials *credentials;
     int ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
@@ -758,7 +768,7 @@ PVFS_Dokan_write_file(
     
     /* perform the read operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
-                   &len64);
+                   &len64, credentials);
     *NumberOfBytesWritten = (DWORD) len64;
 
     free(fs_path);
@@ -778,6 +788,7 @@ PVFS_Dokan_flush_file_buffers(
 {
     char *fs_path;
     int ret, err;
+    PVFS_credentials *credentials;
 
     DbgPrint("FlushFileBuffers: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -788,7 +799,7 @@ PVFS_Dokan_flush_file_buffers(
         return -1;
 
     /* flush the file */
-    ret = fs_flush(fs_path);
+    ret = fs_flush(fs_path, credentials);
 
     err = error_map(ret);
 
@@ -809,6 +820,7 @@ PVFS_Dokan_get_file_information(
     char *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
+    PVFS_credentials *credentials;
 
     DbgPrint("GetFileInfo: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -819,7 +831,7 @@ PVFS_Dokan_get_file_information(
         return -1;
 
     /* get file attributes */
-    ret = fs_getattr(fs_path, &attr);
+    ret = fs_getattr(fs_path, credentials, &attr);
 
     if (ret == 0)
     {
@@ -878,6 +890,7 @@ PVFS_Dokan_set_file_attributes(
     char *fs_path;
     int ret, err;
     PVFS_sys_attr attr;
+    PVFS_credentials *credentials;
 
     DbgPrint("SetFileAttributes: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -888,7 +901,7 @@ PVFS_Dokan_set_file_attributes(
         return -1;
 
     /* convert attributes to PVFS */
-    ret = fs_getattr(fs_path, &attr);
+    ret = fs_getattr(fs_path, credentials, &attr);
 
     if (ret == 0)
     {
@@ -899,7 +912,7 @@ PVFS_Dokan_set_file_attributes(
         if (FileAttributes & FILE_ATTRIBUTE_READONLY)
             /* TODO: permissions */ ;
 
-        ret = fs_setattr(fs_path, &attr);
+        ret = fs_setattr(fs_path, &attr, credentials);
     }
 
     free(fs_path);
@@ -922,6 +935,7 @@ PVFS_Dokan_find_files(
          filename[PVFS_NAME_MAX], *full_path;
     int ret, err, count = 0;
     PVFS_ds_position token;
+    PVFS_credentials *credentials;
     WIN32_FIND_DATAW find_data;
     wchar_t *wpath, *wfilename;
     BY_HANDLE_FILE_INFORMATION hfile_info;
@@ -935,7 +949,7 @@ PVFS_Dokan_find_files(
         return -1;
 
     /* find the first file */
-    ret = fs_find_first_file(fs_path, &token, filename, PVFS_NAME_MAX);
+    ret = fs_find_first_file(fs_path, &token, credentials, filename, PVFS_NAME_MAX);
     if (ret != 0)
         goto find_files_exit;
 
@@ -985,7 +999,7 @@ PVFS_Dokan_find_files(
         cleanup_string(wfilename);
 
         /* find next file */
-        ret = fs_find_next_file(fs_path, &token, filename, PVFS_NAME_MAX);
+        ret = fs_find_next_file(fs_path, &token, credentials, filename, PVFS_NAME_MAX);
 
         if (ret != 0)
             goto find_files_exit;
@@ -1012,6 +1026,7 @@ PVFS_Dokan_delete_file(
 {
     char *fs_path;         
     PVFS_handle handle;
+    PVFS_credentials *credentials;
     int ret, err;
 
     DbgPrint("DeleteFile: %S\n", FileName);
@@ -1025,7 +1040,7 @@ PVFS_Dokan_delete_file(
     /* Do not actually remove the file here, just return
        success if file is found. 
        The file/dir will be deleted in close_file(). */
-    ret = fs_lookup(fs_path, &handle);
+    ret = fs_lookup(fs_path, credentials, &handle);
 
     free(fs_path);
 
@@ -1064,6 +1079,7 @@ PVFS_Dokan_move_file(
 {
     char *old_fs_path, *new_fs_path;
     int ret, err;
+    PVFS_credentials *credentials;
 
     DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1081,7 +1097,7 @@ PVFS_Dokan_move_file(
     }
 
     /* rename/move the file */
-    ret = fs_rename(old_fs_path, new_fs_path);
+    ret = fs_rename(old_fs_path, new_fs_path, credentials);
 
     free(old_fs_path);
     free(new_fs_path);
@@ -1113,7 +1129,7 @@ PVFS_Dokan_lock_file(
 
 static int __stdcall
 PVFS_Dokan_set_end_of_file(
-    LPCWSTR                FileName,
+    LPCWSTR             FileName,
     LONGLONG            ByteOffset,
     PDOKAN_FILE_INFO    DokanFileInfo)
 {
@@ -1155,6 +1171,7 @@ PVFS_Dokan_set_file_time(
 {
     char *fs_path;
     int ret, err;
+    PVFS_credentials *credentials;
     PVFS_sys_attr attr;
 
     DbgPrint("SetFileTime: %S\n", FileName);
@@ -1166,7 +1183,7 @@ PVFS_Dokan_set_file_time(
         return -1;
 
     /* convert times to PVFS */
-    ret = fs_getattr(fs_path, &attr);
+    ret = fs_getattr(fs_path, credentials, &attr);
 
     DbgPrint("   fs_getattr returns: %d\n", ret);
 
@@ -1176,7 +1193,7 @@ PVFS_Dokan_set_file_time(
         convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
         convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
 
-        ret = fs_setattr(fs_path, &attr);        
+        ret = fs_setattr(fs_path, &attr, credentials);        
 
         DbgPrint("   fs_setattr returns: %d\n", ret);
     }
@@ -1442,11 +1459,13 @@ PVFS_Dokan_get_disk_free_space(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int ret, err;
+    PVFS_credentials *credentials;
 
     DbgPrint("GetDiskFreeSpace\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    ret = fs_get_diskfreespace((PVFS_size *) FreeBytesAvailable, 
+    ret = fs_get_diskfreespace(credentials,
+                               (PVFS_size *) FreeBytesAvailable, 
                                (PVFS_size *) TotalNumberOfBytes);
 
     err = error_map(ret);
@@ -1529,7 +1548,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
 
     dokanOptions->Version = 600;
-    /* Hard coded for now */
+
     dokanOptions->MountPoint = convert_mbstring(options->mount_point);
 
     /* assign file operations */

@@ -9,9 +9,6 @@
 
 const PVFS_util_tab *tab;
 
-/* TODO: global credentials for now */
-PVFS_credentials credentials;
-
 /* split path into base dir and entry name components */
 int split_path(char *fs_path, 
                char *base_dir,
@@ -71,9 +68,6 @@ int fs_initialize(const char *tabfile)
         PVFS_sys_finalize();
         return -1;
     }
-
-    /* generate credentials */
-    PVFS_util_gen_credentials(&credentials);
 
     return 0;
 }
@@ -154,13 +148,14 @@ int fs_resolve_path(const char *local_path,
 /* lookup PVFS file path 
       returns 0 and handle if exists */
 int fs_lookup(char *fs_path,
+              PVFS_credentials *credentials,
               PVFS_handle *handle)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     PVFS_sysresp_lookup resp;
     int ret;
 
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp,
                           TRUE, NULL);
     if (ret == 0)
         *handle = resp.ref.handle;
@@ -171,6 +166,7 @@ int fs_lookup(char *fs_path,
 /* create file with specified path
       returns 0 and handle on success */
 int fs_create(char *fs_path,
+              PVFS_credentials *credentials,
               PVFS_handle *handle)
 {    
     char *base_dir, *entry_name;
@@ -198,7 +194,7 @@ int fs_create(char *fs_path,
         goto fs_create_exit;
 
     /* lookup parent path */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_create_exit;
@@ -209,13 +205,13 @@ int fs_create(char *fs_path,
     /* create file */
     memset(&attr, 0, sizeof(PVFS_sys_attr));
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials->uid;
+    attr.group = credentials->gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
-              &credentials, NULL, &resp_create, NULL, NULL);
+              credentials, NULL, &resp_create, NULL, NULL);
     if (ret)
         goto fs_create_exit;
 
@@ -229,7 +225,8 @@ fs_create_exit:
 }
 
 /* remove specified directory or file */
-int fs_remove(char *fs_path)
+int fs_remove(char *fs_path,
+              PVFS_credentials *credentials)
 {
     char *base_dir, *entry_name;
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
@@ -249,7 +246,7 @@ int fs_remove(char *fs_path)
         goto fs_remove_exit;
 
     /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_remove_exit;
@@ -257,7 +254,7 @@ int fs_remove(char *fs_path)
     parent_ref.fs_id = resp_lookup.ref.fs_id;
     parent_ref.handle = resp_lookup.ref.handle;
 
-    ret = PVFS_sys_remove(entry_name, parent_ref, &credentials, NULL);
+    ret = PVFS_sys_remove(entry_name, parent_ref, credentials, NULL);
 
 fs_remove_exit:
     free(entry_name);
@@ -267,7 +264,8 @@ fs_remove_exit:
 }
 
 int fs_rename(char *old_path, 
-              char *new_path)
+              char *new_path,
+              PVFS_credentials *credentials)
 {
     char *old_base_dir, *old_entry_name,
          *new_base_dir, *new_entry_name;
@@ -289,7 +287,7 @@ int fs_rename(char *old_path,
         goto fs_rename_exit;
 
     /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, old_base_dir, &credentials, &old_resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, old_base_dir, credentials, &old_resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_rename_exit;
@@ -305,7 +303,7 @@ int fs_rename(char *old_path,
         goto fs_rename_exit;
 
     /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, new_base_dir, &credentials, &new_resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, new_base_dir, credentials, &new_resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_rename_exit;
@@ -315,7 +313,7 @@ int fs_rename(char *old_path,
 
     /* rename/move the file */
     ret = PVFS_sys_rename(old_entry_name, old_parent_ref, new_entry_name,
-                          new_parent_ref, &credentials, NULL);
+                          new_parent_ref, credentials, NULL);
 
 fs_rename_exit:
     
@@ -328,19 +326,20 @@ fs_rename_exit:
 }
 
 int fs_truncate(char *fs_path,
-                PVFS_size size)
+                PVFS_size size,
+                PVFS_credentials *credentials)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     int ret;
     PVFS_sysresp_lookup resp_lookup;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_truncate_exit;
 
-    ret = PVFS_sys_truncate(resp_lookup.ref, size, &credentials, NULL);
+    ret = PVFS_sys_truncate(resp_lookup.ref, size, credentials, NULL);
 
 fs_truncate_exit:
 
@@ -348,6 +347,7 @@ fs_truncate_exit:
 }
 
 int fs_getattr(char *fs_path,
+               PVFS_credentials *credentials,
                PVFS_sys_attr *attr)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
@@ -360,14 +360,14 @@ int fs_getattr(char *fs_path,
         return -PVFS_EINVAL;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_getattr_exit;
 
     /* read all attributes */
     ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
-                           &credentials, &resp_getattr, NULL);
+                           credentials, &resp_getattr, NULL);
     if (ret != 0)
         goto fs_getattr_exit;
 
@@ -379,7 +379,8 @@ fs_getattr_exit:
 }
 
 int fs_setattr(char *fs_path,
-               PVFS_sys_attr *attr)
+               PVFS_sys_attr *attr,
+               PVFS_credentials *credentials)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     int ret;
@@ -389,13 +390,13 @@ int fs_setattr(char *fs_path,
         attr == NULL)
         return -PVFS_EINVAL;
 
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_setattr_exit;
 
     /* set attributes */
-    ret = PVFS_sys_setattr(resp_lookup.ref, *attr, &credentials, NULL);
+    ret = PVFS_sys_setattr(resp_lookup.ref, *attr, credentials, NULL);
 
 fs_setattr_exit:
 
@@ -403,6 +404,7 @@ fs_setattr_exit:
 }
 
 int fs_mkdir(char *fs_path,
+             PVFS_credentials *credentials,
              PVFS_handle *handle)
 {
     char *base_dir, *entry_name;
@@ -426,7 +428,7 @@ int fs_mkdir(char *fs_path,
         goto fs_mkdir_exit;
 
     /* lookup parent path */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
                           TRUE, NULL);
 
     if (ret != 0)
@@ -438,12 +440,12 @@ int fs_mkdir(char *fs_path,
     /* create file */
     memset(&attr, 0, sizeof(PVFS_sys_attr));
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials->uid;
+    attr.group = credentials->gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
-    ret = PVFS_sys_mkdir(entry_name, parent_ref, attr, &credentials,
+    ret = PVFS_sys_mkdir(entry_name, parent_ref, attr, credentials,
                          &resp_mkdir, NULL);
 
     if (ret == 0)
@@ -461,7 +463,8 @@ int fs_io(enum PVFS_io_type io_type,
           void *buffer,
           size_t buffer_len,
           uint64_t offset,
-          PVFS_size *op_len)
+          PVFS_size *op_len,
+          PVFS_credentials *credentials)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     PVFS_sysresp_lookup resp_lookup;
@@ -475,7 +478,7 @@ int fs_io(enum PVFS_io_type io_type,
         return -PVFS_EINVAL;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_io_exit;
@@ -493,7 +496,7 @@ int fs_io(enum PVFS_io_type io_type,
 
     /* perform io operation */
     ret = PVFS_sys_io(object_ref, file_req, offset, buffer, mem_req,
-                      &credentials, &resp_io, io_type, NULL);
+                      credentials, &resp_io, io_type, NULL);
     if (ret == 0 && op_len != NULL)
     {
         *op_len = resp_io.total_completed;
@@ -506,7 +509,8 @@ fs_io_exit:
     return ret;
 }
 
-int fs_flush(char *fs_path)
+int fs_flush(char *fs_path,
+             PVFS_credentials *credentials)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     int ret;
@@ -516,13 +520,13 @@ int fs_flush(char *fs_path)
         return -PVFS_EINVAL;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_flush_exit;
 
     /* flush file */
-    ret = PVFS_sys_flush(resp_lookup.ref, &credentials, NULL);
+    ret = PVFS_sys_flush(resp_lookup.ref, credentials, NULL);
 
 fs_flush_exit:
 
@@ -531,6 +535,7 @@ fs_flush_exit:
 
 int fs_find_next_file(char *fs_path, 
                       PVFS_ds_position *token,
+                      PVFS_credentials *credentials,
                       char *filename,
                       size_t max_name_len)
 {
@@ -544,13 +549,13 @@ int fs_find_next_file(char *fs_path,
         return -PVFS_EINVAL;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, &credentials, &resp_lookup,
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
                           TRUE, NULL);
     if (ret != 0)
         goto fs_readdir_exit;
 
     /* read one entry, starting with token */
-    ret = PVFS_sys_readdir(resp_lookup.ref, *token, 1, &credentials, 
+    ret = PVFS_sys_readdir(resp_lookup.ref, *token, 1, credentials, 
                            &resp_readdir, NULL);
     if (ret != 0)
         goto fs_readdir_exit;
@@ -575,6 +580,7 @@ fs_readdir_exit:
 
 int fs_find_first_file(char *fs_path,
                        PVFS_ds_position *token,
+                       PVFS_credentials *credentials,
                        char *filename,
                        size_t max_name_len)
 {
@@ -584,10 +590,11 @@ int fs_find_first_file(char *fs_path,
     }
 
    *token = PVFS_READDIR_START;
-   return fs_find_next_file(fs_path, token, filename, max_name_len);
+   return fs_find_next_file(fs_path, token, credentials, filename, max_name_len);
 }
 
-int fs_get_diskfreespace(PVFS_size *free_bytes, 
+int fs_get_diskfreespace(PVFS_credentials *credentials,
+                         PVFS_size *free_bytes, 
                          PVFS_size *total_bytes)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
@@ -599,7 +606,7 @@ int fs_get_diskfreespace(PVFS_size *free_bytes,
         return -PVFS_EINVAL;
     }
 
-    ret = PVFS_sys_statfs(mntent->fs_id, &credentials, &resp_statfs, NULL);
+    ret = PVFS_sys_statfs(mntent->fs_id, credentials, &resp_statfs, NULL);
 
     if (ret == 0)
     {
