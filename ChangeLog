@@ -53,7 +53,7 @@ orangefs-2.8.3-20110323
 * Bug fix: null handle/fs_id sent to getattr in client create state machine
         CVS: Orange-Branch:bligon:20101201170021
 
-* Added support for new (> 2.6.18) kernels up through 2.6.37.
+* Added support for newer (> 2.6.18) kernels up through 2.6.34.
         CVS: Orange-Branch:mtmoore:20101216185529 
         CVS: Orange-Branch:mtmoore:20101221153412 
         CVS: Orange-Branch:mtmoore:20101221153514
