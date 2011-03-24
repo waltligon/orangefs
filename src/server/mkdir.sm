@@ -444,7 +444,7 @@ static PINT_sm_action mkdir_fill_handles_to_dist_dir_struct(
     return SM_ACTION_COMPLETE;
 }
 
-static int mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;

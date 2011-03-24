@@ -14,10 +14,12 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "dist-dir-utils.h"
 
 enum
 {
     INVALID_OBJECT = 131,
+    INVALID_DIRDATA,
     UPDATE_DIR_ATTR_REQUIRED
 };
 
@@ -35,7 +37,24 @@ machine pvfs2_crdirent_sm
     state setup_op
     {
         run crdirent_setup_op;
+/*
         default => validate;
+*/
+        default => get_dist_dir_attr;
+    }
+
+    state get_dist_dir_attr
+    {
+        run crdirent_get_dist_dir_attr;
+        success => get_bitmap;
+        default => final_response;
+    }
+
+    state get_bitmap
+    {
+        run crdirent_get_bitmap;
+        success => validate;
+        default => final_response;
     }
 
     state validate
@@ -43,12 +62,19 @@ machine pvfs2_crdirent_sm
         run crdirent_validate;
         success => write_directory_entry;
         INVALID_OBJECT => validation_object_type_failure;
+        INVALID_DIRDATA => validation_dirdata_mismatch;
         default => final_response;
     }
 
     state validation_object_type_failure
     {
         run validation_object_type_failure;
+        default => final_response;
+    }
+
+    state validation_dirdata_mismatch
+    {
+        run validation_dirdata_mismatch;
         default => final_response;
     }
 
@@ -87,16 +113,179 @@ machine pvfs2_crdirent_sm
 
 %%
 
+/* crdirent_setup_op()
+ *
+ * prepare some state machine fields for later processing; mainly just
+ * storing request structure fields in state machine so that nested
+ * machines are not dependent on request type
+ */
+static PINT_sm_action crdirent_setup_op(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
+        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
+
+    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
+    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
+    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
+    s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
+    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
+    s_op->u.crdirent.dir_attr_update_required = 0;
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+
+
+static PINT_sm_action crdirent_get_dist_dir_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t j_id;
+
+    /* set up key and value structures for reading the dist_dir_attr */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+    s_op->free_val = 0;
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  trying to read dist_dir_attr (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->u.crdirent.fs_id, llu(s_op->u.crdirent.dirent_handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+
+static PINT_sm_action crdirent_get_bitmap(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    PVFS_object_attr *attr_p;
+    job_id_t j_id;
+
+    attr_p = &s_op->attr;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
+        attr_p->u.dir.dist_dir_bitmap = NULL;
+        attr_p->u.dir.dirdata_handles = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "crdirent: get dist-dir-attr for dirdata handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(s_op->u.crdirent.dirent_handle),
+            attr_p->u.dir.dist_dir_attr.tree_height,
+            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.bitmap_size,
+            attr_p->u.dir.dist_dir_attr.split_size,
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for dirdata bitmap */
+    attr_p->u.dir.dirdata_handles = NULL; 
+    attr_p->u.dir.dist_dir_bitmap =
+        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
+                sizeof(PVFS_dist_dir_bitmap_basetype));
+    if(!attr_p->u.dir.dist_dir_bitmap)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up attr->mask */
+    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+    /* set up key and value structures for reading dirdata bitmap */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = attr_p->u.dir.dist_dir_bitmap;
+    s_op->val.buffer_sz = 
+        attr_p->u.dir.dist_dir_attr.bitmap_size *
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  trying to read dirdata bitmap (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->u.crdirent.fs_id, llu(s_op->u.crdirent.dirent_handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+
 /*
  * Function: crdirent_validate
  *
- * Synopsis: verifies that entry name and object type is valid
+ * Synopsis: verifies that entry name and object type is valid, entry name belongs to the right dirdata object.
  */
 static PINT_sm_action crdirent_validate(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
+    int i;
+    unsigned char *c;
+    PVFS_object_attr *attr_p;
+
+    attr_p = &s_op->attr;
+
+    /* gossip bitmap, since jump from get_bitmap*/
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "crdirent: dist_dir_bitmap as:\n");
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
+
+
 
     if ((s_op->u.crdirent.name == NULL) ||
         (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
@@ -131,15 +320,47 @@ static PINT_sm_action crdirent_validate(
         return SM_ACTION_COMPLETE;
     }
 
-    /* make sure we're dealing with a directory */
+    /* make sure we're dealing with a dirdata object */
     if (!(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE) ||
         !(s_op->attr.objtype == PVFS_TYPE_DIRDATA))
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, " Cannot read dirent on "
-                     "a non-directory!  Returning error.\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: error: Cannot read dirent on "
+                     "a non-dirdata object!  Returning error.\n");
 
         js_p->error_code = INVALID_OBJECT;
         return SM_ACTION_COMPLETE;
+    }
+
+    /* make sure the entry belongs to the dirdata handle*/
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(s_op->u.crdirent.name);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: encrypt dirent %s into hash value %llu.\n",
+            s_op->u.crdirent.name,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &attr_p->u.dir.dist_dir_attr,
+            attr_p->u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    if(dirdata_server_index != 
+            attr_p->u.dir.dist_dir_attr.server_no)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "crdirent: error: WRONG dirdata object for the dirent! Returning error.\n");
+
+        js_p->error_code = INVALID_DIRDATA;
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "crdirent: Correct dirdata object!\n");
     }
 
     js_p->error_code = 0;
@@ -153,6 +374,18 @@ static PINT_sm_action validation_object_type_failure(
                  "type_failure called\n");
 
     js_p->error_code = -PVFS_ENOTDIR;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action validation_dirdata_mismatch(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: validation_dirdata_"
+                 "mismatch called, let client try again!!\n");
+
+    /* using a new error code?? use the try again error code*/
+    js_p->error_code = -PVFS_EAGAIN;
     return SM_ACTION_COMPLETE;
 }
 
@@ -284,29 +517,6 @@ static PINT_sm_action crdirent_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-/* crdirent_setup_op()
- *
- * prepare some state machine fields for later processing; mainly just
- * storing request structure fields in state machine so that nested
- * machines are not dependent on request type
- */
-static PINT_sm_action crdirent_setup_op(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
-        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
-
-    s_op->u.crdirent.name = s_op->req->u.crdirent.name;
-    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
-    s_op->u.crdirent.dirent_handle = s_op->req->u.crdirent.dirent_handle;
-    s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
-    s_op->u.crdirent.dir_attr_update_required = 0;
-
-    js_p->error_code = 0;
-    return SM_ACTION_COMPLETE;
-}
 
 static inline int PINT_get_object_ref_crdirent(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)

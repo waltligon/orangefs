@@ -1066,6 +1066,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
     int count, ret;
     PINT_dbpf_keyval_iterate_callback tmp_callback = NULL;
     int i;
+    char type;
 
     count = *op_p->u.k_iterate_keys.count_p;
 
@@ -1084,9 +1085,19 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
         tmp_callback = PINT_dbpf_dspace_remove_keyval;
     }
 
+    /* set type */
+    if(op_p->flags & TROVE_KEYVAL_DIRECTORY_ENTRY)
+    {
+        type = DBPF_DIRECTORY_ENTRY_TYPE;
+    }
+    else
+    {
+        type = DBPF_ATTRIBUTE_TYPE;
+    }
+
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
                                    op_p->handle,
-                                   DBPF_ATTRIBUTE_TYPE,
+                                   type,
                                    op_p->coll_p->pcache,
                                    (count != 0) ?
                                    op_p->u.k_iterate_keys.key_array : NULL,

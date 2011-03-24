@@ -34,7 +34,8 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     MKDIR_RETRY = 180,
-    MKDIR_SKIP_EATTR = 181
+    MKDIR_SKIP_EATTR = 181,
+    CRDIRENT_RETRY
 };
 
 static int mkdir_msg_comp_fn(
@@ -126,7 +127,15 @@ machine pvfs2_client_mkdir_sm
     state mkdir_crdirent_failure
     {
         run mkdir_crdirent_failure;
+        success => mkdir_crdirent_retry_getattr;
         default => delete_handle_setup_msgpair;
+    }
+
+    state mkdir_crdirent_retry_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => mkdir_crdirent_setup_msgpair;
+        default => mkdir_crdirent_failure;
     }
 
     state delete_handle_setup_msgpair
@@ -477,6 +486,28 @@ static PINT_sm_action mkdir_crdirent_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");

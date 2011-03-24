@@ -1872,7 +1872,7 @@ static PINT_sm_action getattr_get_dir_hint(
 
         for(i=0; i < attr_p->u.dir.dist_dir_attr.num_servers; i++)
         {
-            gossip_debug(GOSSIP_MKDIR_DEBUG, 
+            gossip_debug(GOSSIP_GETATTR_DEBUG, 
                     "\t\tdirdata server %d: %llu.\n",
                     i, llu(attr_p->u.dir.dirdata_handles[i]));
         }
