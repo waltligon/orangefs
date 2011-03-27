@@ -201,6 +201,7 @@ int PINT_init_capability(PVFS_capability *cap)
     return ret;
 }
 
+#if 0
 /* nlmills: temporary function to help gather statistics */
 static void hash_capability(const PVFS_capability *cap, char *mdstr)
 {
@@ -234,6 +235,7 @@ static void hash_capability(const PVFS_capability *cap, char *mdstr)
         sprintf(mdstr+2*i, "%02x", (unsigned int)md[i]);
     }
 }
+#endif
 
 /*  PINT_sign_capability
  *
@@ -329,8 +331,10 @@ int PINT_sign_capability(PVFS_capability *cap)
 
     EVP_MD_CTX_cleanup(&mdctx);
 
+#if 0
     hash_capability(cap, mdstr);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CAPSIGN: %s\n", mdstr);
+#endif
 
     return 0;
 }
@@ -368,8 +372,10 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 0;
     }
 
+#if 0
     hash_capability(cap, mdstr);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CAPVRFY: %s\n", mdstr);
+#endif
     
     pubkey = SECURITY_lookup_pubkey(cap->issuer);
     if (pubkey == NULL)
@@ -462,6 +468,7 @@ int PINT_init_credential(PVFS_credential *cred)
     return ret;
 }
 
+#if 0
 /* nlmills: temporary function to help gather statistics */
 static void hash_credential(const PVFS_credential *cred, char *mdstr)
 {
@@ -494,6 +501,7 @@ static void hash_credential(const PVFS_credential *cred, char *mdstr)
         sprintf(mdstr+2*i, "%02x", (unsigned int)md[i]);
     }
 }
+#endif
 
 /* PINT_sign_credential
  *
@@ -577,8 +585,10 @@ int PINT_sign_credential(PVFS_credential *cred)
         return -1;
     }
 
+#if 0
     hash_credential(cred, mdstr);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CREDSIGN: %s\n", mdstr);
+#endif
     
     return 0;
 }
@@ -610,8 +620,10 @@ int PINT_verify_credential(const PVFS_credential *cred)
         return 0;
     }
 
+#if 0
     hash_credential(cred, mdstr);
     gossip_debug(GOSSIP_SECURITY_DEBUG, "CREDVRFY: %s\n", mdstr);
+#endif
 
     pubkey = SECURITY_lookup_pubkey(cred->issuer);
     if (pubkey == NULL)
