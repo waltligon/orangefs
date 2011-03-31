@@ -1974,7 +1974,7 @@ static int dbpf_keyval_iterate_cursor_get(
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    if(key_entry.handle != handle)
+    if(key_entry.handle != handle || key_entry.type != type)
     {
             return -TROVE_ENOENT;
     }
