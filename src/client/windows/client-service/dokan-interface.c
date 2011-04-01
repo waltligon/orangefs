@@ -1,4 +1,4 @@
-/* TODO: Copyright (C) Omnibond, LLC 2010 */
+/* TODO: Copyright (C) Omnibond, LLC 2011 */
 
 #include <Windows.h>
 #include <AccCtrl.h>
@@ -6,16 +6,27 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "dokan.h"
-/* TODO: needed? #include <fileinfo.h> */
 
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "client-service.h"
 #include "fs.h"
+#include "quickhash.h"
 
 FILE *g_DebugFile = NULL;
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
+
+extern struct qlist_head user_list;
+
+struct cred_entry
+{
+    struct qhash_head hash_link;
+    ULONG64 context;
+    PVFS_credentials credentials;
+};
+
+struct qhash_table *cred_cache;
 
 #define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
 
@@ -337,7 +348,7 @@ static char *get_fs_path(const wchar_t *local_path)
     ret = fs_resolve_path(mb_path, fs_path, MAX_PATH);
     if (ret != 0)
     {
-        DbgPrint("   fs_resolve_path returned %d\n");
+        DbgPrint("   fs_resolve_path returned %d\n", ret);
         cleanup_string(mb_path);
         free(fs_path);
         return NULL;
@@ -350,9 +361,149 @@ static char *get_fs_path(const wchar_t *local_path)
     return fs_path;
 }
 
-static PVFS_credentials *get_credentials(ULONG64 context)
+int cred_compare(void *key, 
+                 struct qhash_head *link)
 {
+    struct cred_entry *entry = qhash_entry(link, struct cred_entry, hash_link);
+
+    return (entry->context == *((ULONG64 *) key));
+}
+
+static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
+                                     PVFS_credentials *credentials)
+{
+    HANDLE htoken;
+    PTOKEN_USER token_user;
+    char buffer[1024], user_name[256], domain_name[256];
+    DWORD user_len = 256, domain_len = 256, return_len, err;
+    SID_NAME_USE snu;
+    struct qlist_head *user_link;
+    PORANGEFS_USER puser, req_user;
+
+    /* get requesting user information */
+    htoken = DokanOpenRequestorToken(file_info);
+    if (htoken == INVALID_HANDLE_VALUE)
+    {
+        DbgPrint("   DokanOpenRequestorToken failed\n");
+        return -ERROR_INVALID_HANDLE;
+    }
+
+    if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
+    {
+        err = GetLastError();
+        DbgPrint("   GetTokenInformation failed: %d\n", err);
+        CloseHandle(htoken);
+        return err * -1;
+    }
+
+    CloseHandle(htoken);
+
+    token_user = (PTOKEN_USER) buffer;
+
+    if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
+                          domain_name, &domain_len, &snu))
+    {
+        err = GetLastError();
+        DbgPrint("   LookupAccountSid failed: %u\n", err);
+    }
+
+    /* search user list for credentials */
+    req_user = NULL;
+    qlist_for_each(user_link, &user_list)
+    {
+        puser = qlist_entry(user_link, ORANGEFS_USER, list_link);
+        if (!stricmp(puser->user_name, user_name)) 
+        {
+            req_user = puser;
+            break;
+        }
+    }
     
+    if (req_user != NULL)
+    {
+        credentials->uid = req_user->uid;
+        credentials->gid = req_user->gid;
+
+        return 0;
+    }    
+
+    /* can't locate credentials for requesting user */
+    DbgPrint("   get_requestor_credentials:  user not found\n");
+    return -ERROR_USER_PROFILE_LOAD;
+}
+
+static int get_credentials(PDOKAN_FILE_INFO file_info, 
+                           PVFS_credentials *credentials)
+{
+    struct qhash_head *item;
+    struct cred_entry *entry;
+    int ret;
+
+    if (file_info == NULL || credentials == NULL)
+        return -ERROR_INVALID_PARAMETER;
+
+    DbgPrint("   get_credentials:  context: %llu\n", file_info->Context);
+
+    if (file_info->Context != 0)
+    {
+        /* check cache for existing credentials 
+           associated with the context */        
+        item = qhash_search(cred_cache, &file_info->Context);
+        if (item != NULL)
+        {
+            /* if cache hit -- return credentials */
+            entry = qhash_entry(item, struct cred_entry, hash_link);
+            credentials->uid = entry->credentials.uid;
+            credentials->gid = entry->credentials.gid;
+
+            DbgPrint("   get_credentials:  cache hit (%d:%d)\n", 
+                      credentials->uid, credentials->gid);
+            return 0;
+        }
+        else
+        {
+            /* else get requestor credentials and add to cache */
+            ret = get_requestor_credentials(file_info, credentials);
+            if (ret != 0)
+                return ret;
+            entry = (struct cred_entry *) calloc(1, sizeof(struct cred_entry));
+            if (entry == NULL)
+            {
+                DbgPrint("   get_credentials: out of memory\n");
+                return -ERROR_NOT_ENOUGH_MEMORY;
+            }
+            
+            entry->context = file_info->Context;
+            entry->credentials.uid = credentials->uid;
+            entry->credentials.gid = credentials->gid;
+            qhash_add(cred_cache, &file_info->Context, &entry->hash_link);
+        }
+    }
+    else
+    {
+        /* retrieve credentials for the requestor */
+        ret = get_requestor_credentials(file_info, credentials);
+        if (ret != 0)
+            return ret;
+    }
+
+    DbgPrint("   get_credentials:  requestor credentials (%d:%d)\n", 
+             credentials->uid, credentials->gid);
+    DbgPrint("   get_credentials:  exit\n");
+
+    return 0;
+}
+
+static void remove_credentials(ULONG64 context)
+{
+    struct qhash_head *link; 
+    
+    link = qhash_search_and_remove(cred_cache, &context);
+    if (link != NULL)
+    {
+        free(qhash_entry(link, struct cred_entry, hash_link));
+    }
+
 }
 
 static int __stdcall
@@ -368,7 +519,7 @@ PVFS_Dokan_create_file(
     int ret, found, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("CreateFile: %S\n", FileName);
     
@@ -443,13 +594,18 @@ PVFS_Dokan_create_file(
 
     DokanFileInfo->Context = 0;
 
+    /* load credentials (of requestor) */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
+
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
 
     /* look up the file */
     found = 0;
-    ret = fs_lookup(fs_path, &handle);    
+    ret = fs_lookup(fs_path, &credentials, &handle);    
 
     DbgPrint("   fs_lookup returns: %d\n", ret);
 
@@ -472,9 +628,9 @@ PVFS_Dokan_create_file(
     case CREATE_ALWAYS:
         if (found)
         {
-            fs_remove(fs_path, credentials);
+            fs_remove(fs_path, &credentials);
         }
-        ret = fs_create(fs_path, credentials, &handle);
+        ret = fs_create(fs_path, &credentials, &handle);
         break;
     case CREATE_NEW:
         if (found) 
@@ -485,14 +641,14 @@ PVFS_Dokan_create_file(
         else
         {
             /* create file */
-            ret = fs_create(fs_path, credentials, &handle);
+            ret = fs_create(fs_path, &credentials, &handle);
         }
         break;
     case OPEN_ALWAYS:
         if (!found)
         {    
             /* create file */
-            ret = fs_create(fs_path, credentials, &handle);
+            ret = fs_create(fs_path, &credentials, &handle);
         }
         break;
     case OPEN_EXISTING:
@@ -509,7 +665,7 @@ PVFS_Dokan_create_file(
         }
         else
         {   
-            ret = fs_truncate(fs_path, 0, credentials);
+            ret = fs_truncate(fs_path, 0, &credentials);
         }
     }
 
@@ -525,7 +681,7 @@ PVFS_Dokan_create_file(
         DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
         /* determine whether this is a directory */
-        ret = fs_getattr(fs_path, credentials, &attr);
+        ret = fs_getattr(fs_path, &credentials, &attr);
         if (ret == 0)
         {
             DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
@@ -533,14 +689,6 @@ PVFS_Dokan_create_file(
         else
             /* TODO */ ;
     }
-
-    /* assign nonzero context on error so cleanup works */
-    /* TODO: use linked list to make sure context is not in use */
-    /* TODO: needed?
-    if (err != 0) {        
-        DokanFileInfo->Context = rand();
-    }
-    */
 
     free(fs_path);
 
@@ -558,16 +706,23 @@ PVFS_Dokan_create_directory(
     char *fs_path;
     int ret, err;
     PVFS_handle handle;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("CreateDirectory: %S\n", FileName);
+
+    DokanFileInfo->Context = 0;
+
+    /* load credentials (of requestor) */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
 
-    ret = fs_mkdir(fs_path, credentials, &handle);
+    ret = fs_mkdir(fs_path, &credentials, &handle);
 
     DbgPrint("   fs_mkdir returns: %d\n", ret);
 
@@ -595,9 +750,16 @@ PVFS_Dokan_open_directory(
     int ret, err;
     PVFS_handle handle;
     PVFS_sys_attr attr;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("OpenDirectory: %S\n", FileName);
+
+    DokanFileInfo->Context = 0;
+
+    /* load credentials (of requestor) */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -605,13 +767,13 @@ PVFS_Dokan_open_directory(
         return -1;
 
     /* lookup the file */
-    ret = fs_lookup(fs_path, credentials, &handle);    
+    ret = fs_lookup(fs_path, &credentials, &handle);    
 
     DbgPrint("   fs_lookup returns: %d\n", ret);
 
     if (ret == 0)
     {
-        ret = fs_getattr(fs_path, credentials, &attr);
+        ret = fs_getattr(fs_path, &credentials, &attr);
         DbgPrint("   fs_getattr returns: %d\n", ret);
         if (ret == 0)
         {
@@ -644,7 +806,7 @@ PVFS_Dokan_close_file(
 {
     char *fs_path = NULL;
     int ret = 0, err;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("CloseFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -652,18 +814,21 @@ PVFS_Dokan_close_file(
     /* delete the file/dir if DeleteOnClose specified */
     if (DokanFileInfo->DeleteOnClose)
     {
+        /* load credentials */
+        err = get_credentials(DokanFileInfo, &credentials);
+        if (err != 0)
+            return err;
+
         /* get file system path */
         fs_path = get_fs_path(FileName);
         if (fs_path == NULL)
             return -1;
 
         /* remove the file/dir */
-        ret = fs_remove(fs_path, credentials);
+        ret = fs_remove(fs_path, &credentials);
     }
 
-    /* PVFS doesn't have a close-file semantic.
-       Simply clear the handle. */
-    DokanFileInfo->Context = 0;
+    /* PVFS doesn't have a close-file semantic */ 
 
     if (fs_path != NULL)
         free(fs_path);
@@ -684,14 +849,9 @@ PVFS_Dokan_cleanup(
     DbgPrint("Cleanup: %S\n", FileName);
     DbgPrint("  Context: %llx\n", DokanFileInfo->Context);
 
-    /* needed?
-    if (DokanFileInfo->Context == 0) {
-    }
-    else {
-        DbgPrint("  Cleanup: invalid handle\n");
-        return -1;
-    }
-    */
+    /* remove context's entry from cache */
+    if (DokanFileInfo->Context != 0)
+        remove_credentials(DokanFileInfo->Context);
 
     DbgPrint("Cleanup exit: %d\n", 0);
 
@@ -710,7 +870,7 @@ PVFS_Dokan_read_file(
 {
     char *fs_path;
     PVFS_size len64;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
     int ret, err;
     
     DbgPrint("ReadFile: %S\n", FileName);
@@ -723,13 +883,18 @@ PVFS_Dokan_read_file(
         ReadLength == 0)
         return -1;
 
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
     
     /* perform the read operation */
-    ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, credentials);
+    ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credentials);
     *ReadLength = (DWORD) len64;
 
     free(fs_path);    
@@ -753,22 +918,25 @@ PVFS_Dokan_write_file(
 {
     char *fs_path;
     PVFS_size len64;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
     int ret, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
-
-    DEBUG_PATH(fs_path);
     
     /* perform the read operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
-                   &len64, credentials);
+                   &len64, &credentials);
     *NumberOfBytesWritten = (DWORD) len64;
 
     free(fs_path);
@@ -788,10 +956,15 @@ PVFS_Dokan_flush_file_buffers(
 {
     char *fs_path;
     int ret, err;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("FlushFileBuffers: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -799,7 +972,7 @@ PVFS_Dokan_flush_file_buffers(
         return -1;
 
     /* flush the file */
-    ret = fs_flush(fs_path, credentials);
+    ret = fs_flush(fs_path, &credentials);
 
     err = error_map(ret);
 
@@ -820,10 +993,15 @@ PVFS_Dokan_get_file_information(
     char *fs_path, *filename;
     int ret, err;
     PVFS_sys_attr attr;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("GetFileInfo: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -831,7 +1009,7 @@ PVFS_Dokan_get_file_information(
         return -1;
 
     /* get file attributes */
-    ret = fs_getattr(fs_path, credentials, &attr);
+    ret = fs_getattr(fs_path, &credentials, &attr);
 
     if (ret == 0)
     {
@@ -890,10 +1068,13 @@ PVFS_Dokan_set_file_attributes(
     char *fs_path;
     int ret, err;
     PVFS_sys_attr attr;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("SetFileAttributes: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -901,7 +1082,7 @@ PVFS_Dokan_set_file_attributes(
         return -1;
 
     /* convert attributes to PVFS */
-    ret = fs_getattr(fs_path, credentials, &attr);
+    ret = fs_getattr(fs_path, &credentials, &attr);
 
     if (ret == 0)
     {
@@ -912,7 +1093,7 @@ PVFS_Dokan_set_file_attributes(
         if (FileAttributes & FILE_ATTRIBUTE_READONLY)
             /* TODO: permissions */ ;
 
-        ret = fs_setattr(fs_path, &attr, credentials);
+        ret = fs_setattr(fs_path, &attr, &credentials);
     }
 
     free(fs_path);
@@ -935,7 +1116,7 @@ PVFS_Dokan_find_files(
          filename[PVFS_NAME_MAX], *full_path;
     int ret, err, count = 0;
     PVFS_ds_position token;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
     WIN32_FIND_DATAW find_data;
     wchar_t *wpath, *wfilename;
     BY_HANDLE_FILE_INFORMATION hfile_info;
@@ -943,13 +1124,18 @@ PVFS_Dokan_find_files(
     DbgPrint("FindFiles: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
+    /* load credentials (of requestor) */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
         return -1;
 
     /* find the first file */
-    ret = fs_find_first_file(fs_path, &token, credentials, filename, PVFS_NAME_MAX);
+    ret = fs_find_first_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
     if (ret != 0)
         goto find_files_exit;
 
@@ -999,7 +1185,7 @@ PVFS_Dokan_find_files(
         cleanup_string(wfilename);
 
         /* find next file */
-        ret = fs_find_next_file(fs_path, &token, credentials, filename, PVFS_NAME_MAX);
+        ret = fs_find_next_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
 
         if (ret != 0)
             goto find_files_exit;
@@ -1007,7 +1193,7 @@ PVFS_Dokan_find_files(
 
 find_files_exit:    
 
-    DbgPrint("   fs_find_xxx_file returns: %d\n", ret);
+    DbgPrint("   fs_find_xxxx_file returns: %d\n", ret);
 
     free(fs_path);
 
@@ -1026,12 +1212,15 @@ PVFS_Dokan_delete_file(
 {
     char *fs_path;         
     PVFS_handle handle;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
     int ret, err;
 
     DbgPrint("DeleteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
-    
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
@@ -1040,7 +1229,7 @@ PVFS_Dokan_delete_file(
     /* Do not actually remove the file here, just return
        success if file is found. 
        The file/dir will be deleted in close_file(). */
-    ret = fs_lookup(fs_path, credentials, &handle);
+    ret = fs_lookup(fs_path, &credentials, &handle);
 
     free(fs_path);
 
@@ -1079,10 +1268,15 @@ PVFS_Dokan_move_file(
 {
     char *old_fs_path, *new_fs_path;
     int ret, err;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("MoveFile: %S -> %S\n", FileName, NewFileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     old_fs_path = get_fs_path(FileName);
@@ -1097,7 +1291,7 @@ PVFS_Dokan_move_file(
     }
 
     /* rename/move the file */
-    ret = fs_rename(old_fs_path, new_fs_path, credentials);
+    ret = fs_rename(old_fs_path, new_fs_path, &credentials);
 
     free(old_fs_path);
     free(new_fs_path);
@@ -1171,11 +1365,16 @@ PVFS_Dokan_set_file_time(
 {
     char *fs_path;
     int ret, err;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
     PVFS_sys_attr attr;
 
     DbgPrint("SetFileTime: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    if (err != 0)
+        return err;
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -1183,7 +1382,7 @@ PVFS_Dokan_set_file_time(
         return -1;
 
     /* convert times to PVFS */
-    ret = fs_getattr(fs_path, credentials, &attr);
+    ret = fs_getattr(fs_path, &credentials, &attr);
 
     DbgPrint("   fs_getattr returns: %d\n", ret);
 
@@ -1193,7 +1392,7 @@ PVFS_Dokan_set_file_time(
         convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
         convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
 
-        ret = fs_setattr(fs_path, &attr, credentials);        
+        ret = fs_setattr(fs_path, &attr, &credentials);        
 
         DbgPrint("   fs_setattr returns: %d\n", ret);
     }
@@ -1445,6 +1644,7 @@ PVFS_Dokan_unmount(
 {
     DbgPrint("Unmount\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+
     DbgPrint("Unmount exit: %d\n", 0);
 
     return 0;
@@ -1459,12 +1659,15 @@ PVFS_Dokan_get_disk_free_space(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     int ret, err;
-    PVFS_credentials *credentials;
+    PVFS_credentials credentials;
 
     DbgPrint("GetDiskFreeSpace\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    ret = fs_get_diskfreespace(credentials,
+    /* load credentials (of requestor) */
+    err = get_credentials(DokanFileInfo, &credentials);
+
+    ret = fs_get_diskfreespace(&credentials,
                                (PVFS_size *) FreeBytesAvailable, 
                                (PVFS_size *) TotalNumberOfBytes);
 
@@ -1533,6 +1736,9 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     PDOKAN_OPTIONS dokanOptions =
             (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
 
+    /* init credential cache */
+    cred_cache = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
+
     g_DebugMode = g_UseStdErr = options->debug;
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
@@ -1579,6 +1785,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
 
+
     DbgPrint("Entering DokanMain\n");
 
     /* dokan loops until termination */
@@ -1612,6 +1819,8 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             DbgPrint("Unknown error: %d\n", status);
             break;
     }
+
+    qhash_destroy_and_finalize(cred_cache, struct cred_entry, hash_link, free);
 
     free(dokanOptions);
     free(dokanOperations);
