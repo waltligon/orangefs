@@ -4700,6 +4700,10 @@ $as_echo "no" >&6; }
 fi
 
 
+if test $HAVE_PERL = "no"; then
+    as_fn_error "\"perl required in PATH to complete build\"" "$LINENO" 5
+fi
+
 # Extract the first word of "find", so it can be a program name with args.
 set dummy find; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -4737,6 +4741,10 @@ else
 $as_echo "no" >&6; }
 fi
 
+
+if test $HAVE_FIND = "no"; then
+    as_fn_error "\"find required in PATH complete build\"" "$LINENO" 5
+fi
 
 # Extract the first word of "bison", so it can be a program name with args.
 set dummy bison; ac_word=$2
@@ -4776,6 +4784,10 @@ $as_echo "no" >&6; }
 fi
 
 
+if test $HAVE_BISON = "no"; then
+    as_fn_error "\"bison required in PATH to complete build\"" "$LINENO" 5
+fi
+
 # Extract the first word of "flex", so it can be a program name with args.
 set dummy flex; ac_word=$2
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
@@ -4814,7 +4826,9 @@ $as_echo "no" >&6; }
 fi
 
 
-
+if test $HAVE_FLEX = "no"; then
+    as_fn_error "\"flex required in PATH to complete build\"" "$LINENO" 5
+fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for required Math::BigInt perl module" >&5
 $as_echo_n "checking for required Math::BigInt perl module... " >&6; }

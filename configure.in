@@ -76,10 +76,24 @@ CFLAGS=$USR_CFLAGS
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
-AC_CHECK_PROG(HAVE_FIND, find, yes, no)
-AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
-AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_PERL = "no"; then
+    AC_MSG_ERROR("perl required in PATH to complete build")
+fi
 
+AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+if test $HAVE_FIND = "no"; then
+    AC_MSG_ERROR("find required in PATH complete build")
+fi
+
+AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
+if test $HAVE_BISON = "no"; then
+    AC_MSG_ERROR("bison required in PATH to complete build")
+fi
+
+AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_FLEX = "no"; then
+    AC_MSG_ERROR("flex required in PATH to complete build")
+fi
 
 AC_MSG_CHECKING([for required Math::BigInt perl module])
 perl -e "use Math::BigInt" 2>&1 > /dev/null
