@@ -26,7 +26,7 @@ struct cred_entry
     PVFS_credentials credentials;
 };
 
-struct qhash_table *cred_cache;
+struct qhash_table *cred_table;
 
 #define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
 
@@ -428,7 +428,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     }    
 
     /* can't locate credentials for requesting user */
-    DbgPrint("   get_requestor_credentials:  user not found\n");
+    DbgPrint("   get_requestor_credentials:  user %s not found\n", user_name);
     return -ERROR_USER_PROFILE_LOAD;
 }
 
@@ -437,18 +437,18 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
 {
     struct qhash_head *item;
     struct cred_entry *entry;
-    int ret;
+    int ret = 0;
 
     if (file_info == NULL || credentials == NULL)
         return -ERROR_INVALID_PARAMETER;
 
-    DbgPrint("   get_credentials:  context: %llu\n", file_info->Context);
+    DbgPrint("   get_credentials:  context: %llx\n", file_info->Context);
 
     if (file_info->Context != 0)
     {
         /* check cache for existing credentials 
            associated with the context */        
-        item = qhash_search(cred_cache, &file_info->Context);
+        item = qhash_search(cred_table, &file_info->Context);
         if (item != NULL)
         {
             /* if cache hit -- return credentials */
@@ -456,27 +456,13 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
             credentials->uid = entry->credentials.uid;
             credentials->gid = entry->credentials.gid;
 
-            DbgPrint("   get_credentials:  cache hit (%d:%d)\n", 
-                      credentials->uid, credentials->gid);
-            return 0;
+            DbgPrint("   get_credentials:  found (%d:%d)\n", 
+                      credentials->uid, credentials->gid);            
         }
         else
         {
-            /* else get requestor credentials and add to cache */
-            ret = get_requestor_credentials(file_info, credentials);
-            if (ret != 0)
-                return ret;
-            entry = (struct cred_entry *) calloc(1, sizeof(struct cred_entry));
-            if (entry == NULL)
-            {
-                DbgPrint("   get_credentials: out of memory\n");
-                return -ERROR_NOT_ENOUGH_MEMORY;
-            }
-            
-            entry->context = file_info->Context;
-            entry->credentials.uid = credentials->uid;
-            entry->credentials.gid = credentials->gid;
-            qhash_add(cred_cache, &file_info->Context, &entry->hash_link);
+            DbgPrint("   get_credentials:  not found\n");
+            ret = -1;
         }
     }
     else
@@ -485,25 +471,52 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
         ret = get_requestor_credentials(file_info, credentials);
         if (ret != 0)
             return ret;
+        DbgPrint("   get_credentials:  requestor credentials (%d:%d)\n", 
+            credentials->uid, credentials->gid);
     }
 
-    DbgPrint("   get_credentials:  requestor credentials (%d:%d)\n", 
-             credentials->uid, credentials->gid);
     DbgPrint("   get_credentials:  exit\n");
 
-    return 0;
+    return ret;
+}
+
+static void add_credentials(ULONG64 context, PVFS_credentials *credentials)
+{
+    struct cred_entry *entry;
+
+    entry = (struct cred_entry *) calloc(1, sizeof(struct cred_entry));
+    if (entry == NULL)
+    {
+        DbgPrint("   add_credentials: out of memory\n");
+        return;
+    }
+            
+    entry->context = context;
+    entry->credentials.uid = credentials->uid;
+    entry->credentials.gid = credentials->gid;
+    qhash_add(cred_table, &entry->context, &entry->hash_link);
+
 }
 
 static void remove_credentials(ULONG64 context)
 {
     struct qhash_head *link; 
     
-    link = qhash_search_and_remove(cred_cache, &context);
+    link = qhash_search_and_remove(cred_table, &context);
     if (link != NULL)
     {
         free(qhash_entry(link, struct cred_entry, hash_link));
     }
 
+}
+
+static ULONG64 gen_context()
+{
+    LARGE_INTEGER counter;
+
+    QueryPerformanceCounter(&counter);
+
+    return (ULONG64) counter.QuadPart;
 }
 
 static int __stdcall
@@ -675,10 +688,11 @@ PVFS_Dokan_create_file(
     err = error_map(ret);
     if (err == ERROR_SUCCESS)
     {
-        /* save the file handle in context */
-        DokanFileInfo->Context = handle;
+        /* generate unique context */
+        DokanFileInfo->Context = gen_context();
 
         DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+        add_credentials(DokanFileInfo->Context, &credentials);
 
         /* determine whether this is a directory */
         ret = fs_getattr(fs_path, &credentials, &attr);
@@ -730,7 +744,8 @@ PVFS_Dokan_create_directory(
     if (err == ERROR_SUCCESS)
     {
         DokanFileInfo->IsDirectory = TRUE;
-        DokanFileInfo->Context = handle;
+        DokanFileInfo->Context = gen_context();
+        add_credentials(DokanFileInfo->Context, &credentials);
     }
 
     free(fs_path);
@@ -787,8 +802,9 @@ PVFS_Dokan_open_directory(
     err = error_map(ret);
     if (err == ERROR_SUCCESS)
     {
-        DokanFileInfo->Context = handle;    
         DokanFileInfo->IsDirectory = TRUE;
+        DokanFileInfo->Context = gen_context();
+        add_credentials(DokanFileInfo->Context, &credentials);
     }
 
     free(fs_path);
@@ -1124,7 +1140,7 @@ PVFS_Dokan_find_files(
     DbgPrint("FindFiles: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* load credentials (of requestor) */
+    /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
     if (err != 0)
         return err;
@@ -1664,8 +1680,8 @@ PVFS_Dokan_get_disk_free_space(
     DbgPrint("GetDiskFreeSpace\n");
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* load credentials (of requestor) */
-    err = get_credentials(DokanFileInfo, &credentials);
+    /* use default credentials */
+    credentials.uid = credentials.gid = 0;
 
     ret = fs_get_diskfreespace(&credentials,
                                (PVFS_size *) FreeBytesAvailable, 
@@ -1737,7 +1753,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
 
     /* init credential cache */
-    cred_cache = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
+    cred_table = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
 
     g_DebugMode = g_UseStdErr = options->debug;
 
@@ -1820,7 +1836,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             break;
     }
 
-    qhash_destroy_and_finalize(cred_cache, struct cred_entry, hash_link, free);
+    qhash_destroy_and_finalize(cred_table, struct cred_entry, hash_link, free);
 
     free(dokanOptions);
     free(dokanOperations);
