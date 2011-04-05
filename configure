@@ -6734,14 +6734,16 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
 	fi
 
+	CFLAGS="$CFLAGS -Werror"
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dentry argument in kernel super_operations statfs" >&5
 $as_echo_n "checking for dentry argument in kernel super_operations statfs... " >&6; }
-															cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+														                                        	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
 		#define __KERNEL__
 		#include <linux/fs.h>
-		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+                struct super_operations sop;
+		int s(struct dentry *de, struct kstatfs *kfs)
 		{
 			return 0;
 		}
@@ -6749,6 +6751,8 @@ $as_echo_n "checking for dentry argument in kernel super_operations statfs... " 
 int
 main ()
 {
+
+                    sop.statfs = s;
 
   ;
   return 0;
@@ -6766,6 +6770,7 @@ $as_echo "no" >&6; }
 
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+	CFLAGS=$tmp_cflags
 
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for vfsmount argument in kernel file_system_type get_sb" >&5
 $as_echo_n "checking for vfsmount argument in kernel file_system_type get_sb... " >&6; }
@@ -8642,6 +8647,80 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
         CFLAGS=$tmp_cflags
+
+		tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for unlocked_ioctl in file_operations" >&5
+$as_echo_n "checking for unlocked_ioctl in file_operations... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations f;
+
+int
+main ()
+{
+
+	    f.unlocked_ioctl = NULL;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_UNLOCKED_IOCTL_HANDLER 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+		tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for inode_setattr" >&5
+$as_echo_n "checking for inode_setattr... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct iattr *iattr;
+                struct inode *inode;
+
+int
+main ()
+{
+
+	        inode_setattr(inode, iattr);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_INODE_SETATTR 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+
+
 
 	CFLAGS=$oldcflags
 

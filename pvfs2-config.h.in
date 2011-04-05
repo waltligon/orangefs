@@ -168,6 +168,9 @@
 /* Define if kernel has iget_locked */
 #undef HAVE_IGET_LOCKED
 
+/* Define if inode_setattr is defined */
+#undef HAVE_INODE_SETATTR
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -436,6 +439,9 @@
 
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
+/* Define if file_operations struct has unlocked_ioctl member */
+#undef HAVE_UNLOCKED_IOCTL_HANDLER
 
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
