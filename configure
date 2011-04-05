@@ -2476,7 +2476,7 @@ PVFS2_VERSION_SUB=4
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
-PVFS2_VERSION=orangefs-$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 
 
 cat >>confdefs.h <<_ACEOF
@@ -9437,6 +9437,39 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking Berkeley DB version" >&5
+$as_echo_n "checking Berkeley DB version... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+            #include <db.h>
+
+int
+main ()
+{
+
+             #if DB_VERSION_MAJOR < 4 || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 8) || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8 && \
+                 DB_VERSION_PATCH < 30)
+                 #error "Recommend version of Berkeley DB at least 4.8.30"
+             #endif
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+        HAVE_DB_OLD=0
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+        HAVE_DB_OLD=1
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     CFLAGS="$oldcflags"
 
 else
@@ -9827,6 +9860,39 @@ $as_echo "no" >&6; }
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+        { $as_echo "$as_me:${as_lineno-$LINENO}: checking Berkeley DB version" >&5
+$as_echo_n "checking Berkeley DB version... " >&6; }
+    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+            #include <db.h>
+
+int
+main ()
+{
+
+             #if DB_VERSION_MAJOR < 4 || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 8) || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8 && \
+                 DB_VERSION_PATCH < 30)
+                 #error "Recommend version of Berkeley DB at least 4.8.30"
+             #endif
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+        HAVE_DB_OLD=0
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+        HAVE_DB_OLD=1
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     CFLAGS="$oldcflags"
 
 fi
@@ -12575,6 +12641,17 @@ $as_echo "$as_me: WARNING: You have selected to build $PKGSTR to use a \"fast\" 
 		    times on the fast interface.  Suggest you configure with
 		    \"--without-bmi-tcp\" for the best performance." >&2;}
     fi
+fi
+
+if test x$HAVE_DB_OLD = x1; then
+    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior
+                    to 4.8.30. It is highly recommended that you update the
+                    version of Berkeley DB you are building against." >&5
+$as_echo "$as_me: WARNING: The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior
+                    to 4.8.30. It is highly recommended that you update the
+                    version of Berkeley DB you are building against." >&2;}
 fi
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: " >&5

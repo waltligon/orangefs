@@ -23,7 +23,7 @@ PVFS2_VERSION_SUB=4
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
-PVFS2_VERSION=orangefs-$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_VERSION_MAJOR, major version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_VERSION_MINOR, minor version number)
@@ -1305,6 +1305,13 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 		    times on the fast interface.  Suggest you configure with
 		    "--without-bmi-tcp" for the best performance.])
     fi
+fi
+
+if test x$HAVE_DB_OLD = x1; then
+    AC_MSG_WARN([The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior 
+                    to 4.8.30. It is highly recommended that you update the 
+                    version of Berkeley DB you are building against.])
 fi
 
 AC_MSG_RESULT()
