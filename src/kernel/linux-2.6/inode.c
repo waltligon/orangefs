@@ -200,6 +200,14 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
 #ifdef HAVE_INODE_SETATTR
         ret = inode_setattr(inode, iattr);
 #else
+        if ((attr->ia_valid & ATTR_SIZE) &&
+           attr->ia_size != i_size_read(inode)) 
+        {
+            error = vmtruncate(inode, attr->ia_size);
+            if (error)
+                return error;
+        }
+
         setattr_copy(inode, iattr);
         mark_inode_dirty(inode);
         ret = 0;
