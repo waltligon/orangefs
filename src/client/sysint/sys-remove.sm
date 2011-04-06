@@ -47,6 +47,7 @@ extern job_context_id pint_client_sm_context;
 enum
 {
     RMDIRENT_RETRY = 1,
+    RMDIRENT_RETRY_NEED_GETATTR,
     CRDIRENT_RETRY,
     RETURN_STORED_ERROR_CODE
 };
@@ -98,7 +99,14 @@ machine pvfs2_client_remove_sm
     {
         run remove_rmdirent_retry_or_fail;
 	RMDIRENT_RETRY => rmdirent_timer;
+	RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
         default => cleanup;
+    }
+
+    state rmdirent_getattr_setup
+    {
+        run remove_rmdirent_getattr_setup;
+        default => init_getattr;
     }
 
     state do_remove
@@ -352,6 +360,31 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+
+static PINT_sm_action remove_rmdirent_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "remove state: rmdirent_getattr_setup\n");
+
+    js_p->error_code = 0;
+
+    /* clear getattr */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->parent_ref,
+        PVFS_ATTR_DIR_DISTDIR_ATTR,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    return SM_ACTION_COMPLETE;
+}
+
+
 static PINT_sm_action remove_getattr_setup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -362,6 +395,9 @@ static PINT_sm_action remove_getattr_setup(
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
     js_p->error_code = 0;
+
+    /* clear getattr */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -570,6 +606,19 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_retry_or_fail\n");
 
+    /* try again if we get a dirdata mismatch. */
+    if (js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry crdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
+	js_p->error_code = CRDIRENT_RETRY;
+	return SM_ACTION_COMPLETE;
+    }
+
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
         (sm_p->u.remove.retry_count < sm_p->msgarray_op.params.retry_limit))
@@ -608,6 +657,19 @@ static PINT_sm_action remove_rmdirent_retry_or_fail(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_retry_or_fail\n");
+
+    /* try again if we get a dirdata mismatch. */
+    if (js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "  received -PVFS_EAGAIN, wrong dirdata server, will do getattr and retry rmdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
+	js_p->error_code = RMDIRENT_RETRY_NEED_GETATTR;
+	return SM_ACTION_COMPLETE;
+    }
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&

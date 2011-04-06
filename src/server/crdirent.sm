@@ -514,6 +514,9 @@ static PINT_sm_action crdirent_update_directory_attr(
 static PINT_sm_action crdirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));
 }
 
