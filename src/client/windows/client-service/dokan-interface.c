@@ -36,6 +36,13 @@ struct qhash_table *cred_table;
 #define MALLOC_CHECK_N(ptr) if (ptr == NULL) \
                                 return NULL
 
+#define CRED_CHECK(func, err)  do { \
+                                   if (err != 0) { \
+                                       DbgPrint("%s: bad credentials (%d)\n", func, err); \
+                                       return err; \
+                                   } \
+                               } while (0)
+
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
 static void DbgInit()
@@ -407,6 +414,14 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         DbgPrint("   LookupAccountSid failed: %u\n", err);
     }
 
+    /* system user functions as root */
+    if (!stricmp(user_name, "SYSTEM"))
+    {
+        credentials->uid = credentials->gid = 0;
+
+        return 0;
+    }
+
     /* search user list for credentials */
     req_user = NULL;
     qlist_for_each(user_link, &user_list)
@@ -609,8 +624,7 @@ PVFS_Dokan_create_file(
 
     /* load credentials (of requestor) */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("CreateFile", err);
 
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
@@ -728,8 +742,7 @@ PVFS_Dokan_create_directory(
 
     /* load credentials (of requestor) */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("CreateDirectory", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -773,8 +786,7 @@ PVFS_Dokan_open_directory(
 
     /* load credentials (of requestor) */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("OpenDirectory", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -832,8 +844,7 @@ PVFS_Dokan_close_file(
     {
         /* load credentials */
         err = get_credentials(DokanFileInfo, &credentials);
-        if (err != 0)
-            return err;
+        CRED_CHECK("CloseFile", err);
 
         /* get file system path */
         fs_path = get_fs_path(FileName);
@@ -845,6 +856,10 @@ PVFS_Dokan_close_file(
     }
 
     /* PVFS doesn't have a close-file semantic */ 
+
+    /* remove credentials from table */
+    if (DokanFileInfo->Context != 0)
+        remove_credentials(DokanFileInfo->Context);
 
     if (fs_path != NULL)
         free(fs_path);
@@ -863,11 +878,7 @@ PVFS_Dokan_cleanup(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     DbgPrint("Cleanup: %S\n", FileName);
-    DbgPrint("  Context: %llx\n", DokanFileInfo->Context);
-
-    /* remove context's entry from cache */
-    if (DokanFileInfo->Context != 0)
-        remove_credentials(DokanFileInfo->Context);
+    DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
     DbgPrint("Cleanup exit: %d\n", 0);
 
@@ -901,8 +912,7 @@ PVFS_Dokan_read_file(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("ReadFile", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -942,8 +952,7 @@ PVFS_Dokan_write_file(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("WriteFile", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -979,9 +988,8 @@ PVFS_Dokan_flush_file_buffers(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
-
+    CRED_CHECK("FlushFileBuffers", err);
+    
     /* get file system path */
     fs_path = get_fs_path(FileName);
     if (fs_path == NULL)
@@ -1016,8 +1024,7 @@ PVFS_Dokan_get_file_information(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("GetFileInfo", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -1091,6 +1098,7 @@ PVFS_Dokan_set_file_attributes(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
+    CRED_CHECK("SetFileAttributes", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -1142,8 +1150,7 @@ PVFS_Dokan_find_files(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("FindFiles", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -1236,6 +1243,7 @@ PVFS_Dokan_delete_file(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
+    CRED_CHECK("DeleteFile", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
@@ -1291,8 +1299,7 @@ PVFS_Dokan_move_file(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("MoveFile", err);
 
     /* get file system path */
     old_fs_path = get_fs_path(FileName);
@@ -1389,8 +1396,7 @@ PVFS_Dokan_set_file_time(
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
-    if (err != 0)
-        return err;
+    CRED_CHECK("SetFileTime", err);
 
     /* get file system path */
     fs_path = get_fs_path(FileName);
