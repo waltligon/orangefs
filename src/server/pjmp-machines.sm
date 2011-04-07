@@ -186,26 +186,23 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
    gossip_debug(GOSSIP_SERVER_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:"
                                     "call_msgpairarray for operation (%s)\n"
                                    ,PINT_map_server_op_to_string(smcb->op));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:"
-                                    "call_msgpairarray for operation (%s)\n"
-                                   ,PINT_map_server_op_to_string(smcb->op));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tframe count is %d.\n",smcb->frame_count);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t base frame is %d.\n",smcb->base_frame);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t op nbr is #%d.\n",smcb->op);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tframe count is %d.\n",smcb->frame_count);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\t base frame is %d.\n",smcb->base_frame);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\t op nbr is #%d.\n",smcb->op);
 
    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_sm_msgarray_op *msgarray = &(s_op->msgarray_op);
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\ts_op:%p\n",s_op);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",s_op);
 
    js_p->error_code = 0;
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmsgarray->msgpair.req.op:%d\n"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tmsgarray->msgpair.req.op:%d\n"
                                     ,msgarray->msgpair.req.op );
 
    PINT_sm_push_frame(smcb,0,msgarray);
    
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tAFTER PUSH:smcb->base_frame:%d"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tAFTER PUSH:smcb->base_frame:%d"
                                     "\tframe_count:%d\n"
                                    ,smcb->base_frame,smcb->frame_count);
 
@@ -215,24 +212,24 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
 static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
                                            ,job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:cleanup_msgpairarray"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:cleanup_msgpairarray"
                                     "....\n");
    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_sm_msgarray_op *msgarray = &(s_op->msgarray_op);
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\ts_op:%p\n",s_op);
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",s_op);
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d\n"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tjs_p->error_code:%d\n"
                                    ,js_p->error_code);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tBEFORE POP:smcb->frame_base:%d"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tBEFORE POP:smcb->frame_base:%d"
                                     "\tframe_count:%d\n"
                                    ,smcb->base_frame,smcb->frame_count);
 
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmsgarray->msgpair.req.op:%d\n"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\tmsgarray->msgpair.req.op:%d\n"
                                     ,msgarray->msgpair.req.op );
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\ts_op->resp.status:%d\n"
+   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op->resp.status:%d\n"
                                    ,s_op->resp.status);
 
    return SM_ACTION_TERMINATE;
