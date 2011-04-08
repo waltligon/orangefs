@@ -525,6 +525,42 @@ static void remove_credentials(ULONG64 context)
 
 }
 
+/* Permission constants */
+#define PERM_READ    4
+#define PERM_WRITE   2
+#define PERM_EXECUTE 1
+
+/* Return true if user with credentials has permission (given attributes) */
+static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int perm)
+{
+    int mask;
+
+    /* root user (uid 0 or gid 0) always has rights */
+    if (credentials->uid == 0 || credentials->gid == 0)
+        return 1;
+        
+    if (attr->owner == credentials->uid)
+        /* use owner mask */
+        mask = (attr->perms >> 6) & 7;
+    else if (attr->group == credentials->gid)
+        /* use group mask (must be primary group) */
+        mask = (attr->perms >> 3) & 7;
+    else
+        /* use other mask */
+        mask = attr->perms & 7;
+
+    if (mask & perm)
+        return 1;
+
+    return 0;
+}
+
+/* Check permissions for create file call */
+static int check_create_perm(DWORD access_mode, PVFS_credentials *credentials, int perm)
+{
+    
+}
+
 static ULONG64 gen_context()
 {
     LARGE_INTEGER counter;
@@ -1050,8 +1086,9 @@ PVFS_Dokan_get_file_information(
         free(filename);
         ret = 0;
         
-        /* TODO
-           Check perms for READONLY */
+        /* Check perms for READONLY */
+        if (!check_perm(&attr, &credentials, PERM_WRITE))
+            HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_READONLY;
         
         /* check for temporary file */
         if (DokanFileInfo->DeleteOnClose)
