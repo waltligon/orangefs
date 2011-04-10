@@ -36,7 +36,10 @@ enum
     RENAME_CHDIRENT = 130,
     RENAME_REMOVE_REQUIRED,
     RENAME_CRDIRENT_RETRY,
-    RENAME_RMDIRENT_RETRY
+    RENAME_CRDIRENT_RETRY_NEED_GETATTR,
+    RENAME_RMDIRENT_RETRY,
+    RENAME_RMDIRENT_RETRY_NEED_GETATTR,
+    RENAME_CHDIRENT_RETRY
 };
 
 static int rename_lookups_comp_fn(
@@ -139,7 +142,27 @@ machine pvfs2_client_rename_sm
     {
 	run rename_crdirent_retry_or_fail;
 	RENAME_CRDIRENT_RETRY => rename_crdirent_timer;
+	RENAME_CRDIRENT_RETRY_NEED_GETATTR => crdirent_getattr_setup;
 	default => cleanup;
+    }
+
+    state crdirent_getattr_setup
+    {
+        run rename_crdirent_getattr_setup;
+        default => crdirent_getattr;
+    }
+
+    state crdirent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_getattr_fill_dirent_handle;
+        default => cleanup;
+    }
+
+    state crdirent_getattr_fill_dirent_handle
+    {
+        run rename_crdirent_getattr_fill_dirent_handle;
+        default => rename_crdirent_setup_msgpair;
     }
 
     state rename_crdirent_timer
@@ -166,7 +189,27 @@ machine pvfs2_client_rename_sm
     {
 	run rename_rmdirent_retry_or_fail;
 	RENAME_RMDIRENT_RETRY => rename_rmdirent_timer;
+	RENAME_RMDIRENT_RETRY_NEED_GETATTR => rmdirent_getattr_setup;
 	default => rename_rmdirent_failure;
+    }
+
+    state rmdirent_getattr_setup
+    {
+        run rename_rmdirent_getattr_setup;
+        default => rmdirent_getattr;
+    }
+
+    state rmdirent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => rmdirent_getattr_fill_dirent_handle;
+        default => cleanup;
+    }
+
+    state rmdirent_getattr_fill_dirent_handle
+    {
+        run rename_rmdirent_getattr_fill_dirent_handle;
+        default => rename_rmdirent_setup_msgpair;
     }
 
     state rename_rmdirent_timer
@@ -213,6 +256,13 @@ machine pvfs2_client_rename_sm
     {
         jump pvfs2_msgpairarray_sm;
         success => rename_rmdirent_setup_msgpair;
+        default => rename_chdirent_retry_or_failure;
+    }
+
+    state rename_chdirent_retry_or_failure
+    {
+        run rename_chdirent_retry_or_failure;
+	RENAME_CHDIRENT_RETRY => rename_parent_getattr_setup_msgpair_array;
         default => rename_chdirent_failure;
     }
 
@@ -550,6 +600,10 @@ static int rename_lookups_comp_fn(
 
         if(sm_p->msgarray_op.msgarray[0].op_status == 0)
         {
+
+            /* in case it's chdirent retry */
+            PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
             PINT_SM_GETATTR_STATE_FILL(
                 sm_p->getattr,
                 sm_p->object_ref,
@@ -639,6 +693,14 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL, i = 0;
     PINT_sm_msgpair_state *msg_p;
+
+    if(js_p->error_code == RENAME_CHDIRENT_RETRY)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "rename_chdirent: RETRY!! back to rename_parent_getattr_setup_msgpair_array!\n");
+        /* destroy the previous used msgarray */
+        PINT_msgpairarray_destroy(&sm_p->msgarray_op);
+    }
 
     js_p->error_code = 0;
 
@@ -911,6 +973,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     assert(attr);
     sm_p->u.rename.types[1] = attr->objtype;
 
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest type: %d\n", attr->objtype);
     if(attr->objtype == PVFS_TYPE_DIRECTORY)
@@ -995,6 +1058,29 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     }
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_chdirent_retry_or_failure(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* try again if we get a -PVFS_EAGAIN failure. */
+    if (js_p->error_code == -PVFS_EAGAIN) 
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "rename_chdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "will do getattr and retry chdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
+	js_p->error_code = RENAME_CHDIRENT_RETRY;
+
+	return  SM_ACTION_COMPLETE;
+    }
+
+    /* let other errors fall through to next state */
     return SM_ACTION_COMPLETE;
 }
 
@@ -1085,6 +1171,20 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    /* try again if we get a -PVFS_EAGAIN failure. */
+    if (js_p->error_code == -PVFS_EAGAIN) 
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "rename_crdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "will do getattr and retry crdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->u.rename.parent_refns[1]);
+	js_p->error_code = RENAME_CRDIRENT_RETRY_NEED_GETATTR;
+
+	return  SM_ACTION_COMPLETE;
+    }
+
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
 	(sm_p->u.rename.retry_count < sm_p->msgarray_op.params.retry_limit))
@@ -1109,10 +1209,84 @@ static PINT_sm_action rename_crdirent_retry_or_fail(
     return SM_ACTION_COMPLETE;
 }
 
+
+static PINT_sm_action rename_crdirent_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename_crdirent state: getattr_setup\n");
+
+    js_p->error_code = 0;
+
+    /* clear getattr */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->u.rename.parent_refns[1],
+        PVFS_ATTR_DIR_DISTDIR_ATTR,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_crdirent_getattr_fill_dirent_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename_crdirent state: fill dirent handle\n");
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[1]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.rename.entries[1],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash, 
+            &attr->u.dir.dist_dir_attr, attr->u.dir.dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[1] =
+        attr->u.dir.dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: selecting dirdata_servers[%d]=%llu"
+            " as the dirent_handle for dirent %s.\n",
+            dirdata_index, llu(attr->u.dir.dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[1]);
+
+    return SM_ACTION_COMPLETE;
+}
+
+
 static PINT_sm_action rename_rmdirent_retry_or_fail(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+
+    /* try again if we get a -PVFS_EAGAIN failure. */
+    if (js_p->error_code == -PVFS_EAGAIN) 
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                "rename_rmdirent: received -PVFS_EAGAIN, wrong dirdata server, "
+                "will do getattr and retry rmdirent!\n");
+
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index]);
+	js_p->error_code = RENAME_RMDIRENT_RETRY_NEED_GETATTR;
+
+	return  SM_ACTION_COMPLETE;
+    }
+
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
@@ -1139,6 +1313,65 @@ static PINT_sm_action rename_rmdirent_retry_or_fail(
     /* let other errors fall through to next state */
     return SM_ACTION_COMPLETE;
 }
+
+
+static PINT_sm_action rename_rmdirent_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename_rmdirent state: getattr_setup\n");
+
+    js_p->error_code = 0;
+
+    /* clear getattr */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index],
+        PVFS_ATTR_DIR_DISTDIR_ATTR,
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action rename_rmdirent_getattr_fill_dirent_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    PVFS_dist_dir_hash_type hash;
+    int dirdata_index;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename_rmdirent state: fill dirent handle\n");
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+
+    hash = PINT_encrypt_dirdata(sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
+    /* gossip hash */
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: encrypt dirent %s into hash value %llu.\n",
+            sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
+            llu(hash));
+
+    dirdata_index = PINT_find_dist_dir_bucket(hash, 
+            &attr->u.dir.dist_dir_attr, attr->u.dir.dist_dir_bitmap);
+    /* stash dirent_handle */
+    sm_p->u.rename.dirent_handle[sm_p->u.rename.rmdirent_index] =
+        attr->u.dir.dirdata_handles[dirdata_index];
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: selecting dirdata_servers[%d]=%llu"
+            " as the dirent_handle for dirent %s.\n",
+            dirdata_index, llu(attr->u.dir.dirdata_handles[dirdata_index]),
+            sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
+
+    return SM_ACTION_COMPLETE;
+}
+
+
 
 static PINT_sm_action rename_getattr_src_interpret(
         struct PINT_smcb *smcb, job_status_s *js_p)

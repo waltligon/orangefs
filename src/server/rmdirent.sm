@@ -120,7 +120,7 @@ static PINT_sm_action rmdirent_get_dist_dir_attr(
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dist_dir_attr (coll_id = %d, "
                  "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->u.crdirent.fs_id, llu(s_op->u.crdirent.dirent_handle),
+		 s_op->req->u.rmdirent.fs_id, llu(s_op->req->u.rmdirent.dirent_handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
