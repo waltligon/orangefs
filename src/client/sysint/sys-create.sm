@@ -102,7 +102,15 @@ machine pvfs2_client_create_sm
     state crdirent_failure
     {
         run create_crdirent_failure;
+        success => crdirent_getattr;
         default => delete_handles_setup_msgpair_array;
+    }
+
+    state crdirent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => crdirent_failure;
     }
 
     state delete_handles_setup_msgpair_array
@@ -335,6 +343,8 @@ static PINT_sm_action create_init(
     {
         js_p->error_code = 0;
 
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
         return job_req_sched_post_timer(
             sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
@@ -535,6 +545,27 @@ static PINT_sm_action create_crdirent_failure(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
+
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "create: received -PVFS_EAGAIN, will retry getattr and crdirent.\n");
+
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->object_ref);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->object_ref,
+                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
 
     sm_p->u.create.stored_error_code = js_p->error_code;
 
