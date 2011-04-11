@@ -10,9 +10,11 @@
 #include "server-config.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-server.h"
+#include "pint-util.h"
 //#include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "dist-dir-utils.h"
 
 %%
 
@@ -21,8 +23,25 @@ machine pvfs2_mgmt_get_dirent_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
+/*
         success => get_dirent;
+*/
+        success => get_dist_dir_attr;
         default => final_response;
+    }
+
+    state get_dist_dir_attr
+    {
+        run mgmt_get_dirent_get_dist_dir_attr;
+        success => get_bitmap;
+        default => get_dirent_setup_resp;
+    }
+
+    state get_bitmap
+    {
+        run mgmt_get_dirent_get_bitmap;
+        success => get_dirent;
+        default => get_dirent_setup_resp;
     }
 
     state get_dirent
@@ -52,14 +71,183 @@ machine pvfs2_mgmt_get_dirent_sm
 
 %%
 
+static PINT_sm_action mgmt_get_dirent_get_dist_dir_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t j_id;
+
+    /* set up key and value structures for reading the dist_dir_attr */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+    s_op->free_val = 0;
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  trying to read dist_dir_attr (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.mgmt_get_dirent.fs_id, llu(s_op->req->u.mgmt_get_dirent.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.mgmt_get_dirent.fs_id, s_op->req->u.mgmt_get_dirent.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+
+static PINT_sm_action mgmt_get_dirent_get_bitmap(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    PVFS_object_attr *attr_p;
+    job_id_t j_id;
+
+    attr_p = &s_op->attr;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
+        attr_p->u.dir.dist_dir_bitmap = NULL;
+        attr_p->u.dir.dirdata_handles = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "mgmt_get_dirent: get dist-dir-attr for dirdata handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(s_op->req->u.mgmt_get_dirent.handle),
+            attr_p->u.dir.dist_dir_attr.tree_height,
+            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.bitmap_size,
+            attr_p->u.dir.dist_dir_attr.split_size,
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for dirdata bitmap */
+    attr_p->u.dir.dirdata_handles = NULL; 
+    attr_p->u.dir.dist_dir_bitmap =
+        malloc(attr_p->u.dir.dist_dir_attr.bitmap_size *
+                sizeof(PVFS_dist_dir_bitmap_basetype));
+    if(!attr_p->u.dir.dist_dir_bitmap)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up attr->mask */
+    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+    /* set up key and value structures for reading dirdata bitmap */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = attr_p->u.dir.dist_dir_bitmap;
+    s_op->val.buffer_sz = 
+        attr_p->u.dir.dist_dir_attr.bitmap_size *
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->free_val = 0; /* will be freed in PINT_free_object_attr*/
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+		 "  trying to read dirdata bitmap (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.mgmt_get_dirent.fs_id, llu(s_op->req->u.mgmt_get_dirent.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.mgmt_get_dirent.fs_id, s_op->req->u.mgmt_get_dirent.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
 static int mgmt_get_dirent(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
+    int i;
+    unsigned char *c;
+    PVFS_object_attr *attr_p;
 
     js_p->error_code = 0;
+
+    attr_p = &s_op->attr;
+
+    /* gossip bitmap, since jump from get_bitmap*/
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "mgmt_get_dirent: dist_dir_bitmap as:\n");
+    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {
+        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
+
+
+    /* make sure the entry belongs to the dirdata handle*/
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(s_op->req->u.mgmt_get_dirent.entry);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: encrypt dirent %s into hash value %llu.\n",
+            s_op->req->u.mgmt_get_dirent.entry,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &attr_p->u.dir.dist_dir_attr,
+            attr_p->u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_get_dirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    if(dirdata_server_index != 
+            attr_p->u.dir.dist_dir_attr.server_no)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "mgmt_get_dirent: error: WRONG dirdata object for the dirent! Returning error.\n");
+
+        /* return an error to tell the client to try again */
+        js_p->error_code = -PVFS_EAGAIN;
+        return SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "mgmt_get_dirent: Correct dirdata object!\n");
+    }
+
 
     s_op->key.buffer = s_op->req->u.mgmt_get_dirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.mgmt_get_dirent.entry) + 1;
@@ -116,6 +304,9 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(
 static PINT_sm_action mgmt_get_dirent_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_free_object_attr(&s_op->attr);
     return(server_state_machine_complete(smcb));
 }
 
