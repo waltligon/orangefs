@@ -8694,12 +8694,13 @@ $as_echo_n "checking for inode_setattr... " >&6; }
 		#include <linux/fs.h>
                 struct iattr *iattr;
                 struct inode *inode;
+                int ret;
 
 int
 main ()
 {
 
-	        inode_setattr(inode, iattr);
+	        ret = inode_setattr(inode, iattr);
 
   ;
   return 0;

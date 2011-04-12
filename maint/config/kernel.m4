@@ -1463,9 +1463,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		#include <linux/fs.h>
                 struct iattr *iattr;
                 struct inode *inode;
+                int ret;
 	], 
 	[ 
-	        inode_setattr(inode, iattr);
+	        ret = inode_setattr(inode, iattr);
 	],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_INODE_SETATTR, 1, [Define if inode_setattr is defined]),
