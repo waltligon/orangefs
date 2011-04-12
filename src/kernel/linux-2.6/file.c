@@ -3002,7 +3002,7 @@ int pvfs2_ioctl(
 #ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
                 file->f_dentry,
 #else
-                inode,
+                file->f_dentry->d_inode,
 #endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
                 "user.pvfs2.meta_hint",
                 &val, 
@@ -3051,7 +3051,7 @@ int pvfs2_ioctl(
 #ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
                 file->f_dentry,
 #else
-                inode,
+                file->f_dentry->d_inode,
 #endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
                 "user.pvfs2.meta_hint",
                 &val, 
