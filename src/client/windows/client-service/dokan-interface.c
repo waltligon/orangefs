@@ -555,10 +555,48 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int pe
     return 0;
 }
 
-/* Check permissions for create file call */
-static int check_create_perm(DWORD access_mode, PVFS_credentials *credentials, int perm)
+/* Check permissions for create_file call */
+static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, DWORD access_mode)
 {
-    
+    int ret;
+
+    /* read access */
+    if (access_mode & GENERIC_READ ||
+        access_mode & GENERIC_ALL ||
+        access_mode & FILE_READ_ATTRIBUTES ||
+        access_mode & FILE_READ_DATA ||
+        access_mode & FILE_READ_EA ||
+        access_mode & STANDARD_RIGHTS_READ)
+    {
+        ret = check_perm(attr, credentials, PERM_READ);
+    }
+
+    if (!ret)
+        return ret;
+
+    /* write access */
+    if (access_mode & GENERIC_WRITE ||
+        access_mode & GENERIC_ALL ||
+        access_mode & FILE_WRITE_ATTRIBUTES ||
+        access_mode & FILE_WRITE_DATA ||
+        access_mode & FILE_WRITE_EA ||
+        access_mode & STANDARD_RIGHTS_WRITE)
+    {
+        ret = check_perm(attr, credentials, PERM_WRITE);
+    }
+
+    if (!ret)
+        return ret;
+
+    /* execute access */
+    if (access_mode & GENERIC_EXECUTE ||
+        access_mode & GENERIC_ALL ||
+        access_mode & STANDARD_RIGHTS_EXECUTE)
+    {
+        ret = check_perm(attr, credentials, PERM_EXECUTE);
+    }
+
+    return ret;
 }
 
 static ULONG64 gen_context()
@@ -580,7 +618,7 @@ PVFS_Dokan_create_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, found, err;
+    int ret, found, err, attr_flag = 0;
     PVFS_handle handle;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
@@ -679,12 +717,36 @@ PVFS_Dokan_create_file(
     else if (ret != 0)
     {
         free(fs_path);
-        return -1;
+        return error_map(ret);
     }
     else
     {
         found = 1;
     }
+
+    /* check permissions for existing file */
+    if (found)
+    {
+        ret = fs_getattr(fs_path, &credentials, &attr);
+        if (ret == 0)
+        {
+            ret = check_create_perm(&attr, &credentials, AccessMode);
+            if (!ret)
+            {
+                free(fs_path);
+                return -ERROR_ACCESS_DENIED;
+            }
+            attr_flag = 1;
+        }
+        else
+        {
+            DbgPrint("   fs_getattr (1) failed with code: %d\n", ret);
+            free(fs_path);
+            return error_map(ret);
+        }
+    }
+
+    ret = 0;
 
     switch (CreationDisposition)
     {
@@ -745,13 +807,18 @@ PVFS_Dokan_create_file(
         add_credentials(DokanFileInfo->Context, &credentials);
 
         /* determine whether this is a directory */
-        ret = fs_getattr(fs_path, &credentials, &attr);
+        if (!attr_flag)
+        {
+            ret = fs_getattr(fs_path, &credentials, &attr);
+        }
         if (ret == 0)
         {
             DokanFileInfo->IsDirectory = attr.objtype & PVFS_TYPE_DIRECTORY;
         }
         else
-            /* TODO */ ;
+        {
+            DbgPrint("   fs_getattr (2) failed with code: %d\n", ret);
+        }
     }
 
     free(fs_path);
