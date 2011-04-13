@@ -5,6 +5,7 @@
 #include <AclAPI.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "dokan.h"
 
 #include "pvfs2.h"
@@ -119,6 +120,7 @@ static int error_map(int fs_err)
     case 0:
         return ERROR_SUCCESS;         /* 0 */
     case -PVFS_EPERM:          /* Operation not permitted */
+    case -PVFS_EACCES:         /* Access not allowed */
         return -ERROR_ACCESS_DENIED;  /* 5 */
     case -PVFS_ENOENT:         /* No such file or directory */
         return -ERROR_FILE_NOT_FOUND;  /* 2 */
@@ -231,8 +233,6 @@ static int error_map(int fs_err)
         return -WSAEHOSTUNREACH;            /* 10065 */
     case -PVFS_EALREADY:       /* Operation already in progress */
         return -WSAEALREADY;                /* 10037 */
-    case -PVFS_EACCES:         /* Access not allowed */
-        return -WSAEACCES;                  /* 10013 */
     case -PVFS_ECONNRESET:    /* Connection reset by peer */
         return -WSAECONNRESET;              /* 10054 */
     }
@@ -558,7 +558,7 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int pe
 /* Check permissions for create_file call */
 static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, DWORD access_mode)
 {
-    int ret;
+    int ret = 0;
 
     /* read access */
     if (access_mode & GENERIC_READ ||
@@ -566,7 +566,7 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
         access_mode & FILE_READ_ATTRIBUTES ||
         access_mode & FILE_READ_DATA ||
         access_mode & FILE_READ_EA ||
-        access_mode & STANDARD_RIGHTS_READ)
+        access_mode & READ_CONTROL)
     {
         ret = check_perm(attr, credentials, PERM_READ);
     }
@@ -580,7 +580,9 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
         access_mode & FILE_WRITE_ATTRIBUTES ||
         access_mode & FILE_WRITE_DATA ||
         access_mode & FILE_WRITE_EA ||
-        access_mode & STANDARD_RIGHTS_WRITE)
+        access_mode & DELETE ||
+        access_mode & WRITE_DAC ||
+        access_mode & WRITE_OWNER)
     {
         ret = check_perm(attr, credentials, PERM_WRITE);
     }
@@ -590,8 +592,7 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
 
     /* execute access */
     if (access_mode & GENERIC_EXECUTE ||
-        access_mode & GENERIC_ALL ||
-        access_mode & STANDARD_RIGHTS_EXECUTE)
+        access_mode & GENERIC_ALL)
     {
         ret = check_perm(attr, credentials, PERM_EXECUTE);
     }
@@ -618,7 +619,8 @@ PVFS_Dokan_create_file(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, found, err, attr_flag = 0;
+    int ret, found, err, attr_flag = 0,
+        new_flag = 0;
     PVFS_handle handle;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
@@ -733,6 +735,7 @@ PVFS_Dokan_create_file(
             ret = check_create_perm(&attr, &credentials, AccessMode);
             if (!ret)
             {
+                DbgPrint("CreateFile exit: access denied\n");
                 free(fs_path);
                 return -ERROR_ACCESS_DENIED;
             }
@@ -740,7 +743,7 @@ PVFS_Dokan_create_file(
         }
         else
         {
-            DbgPrint("   fs_getattr (1) failed with code: %d\n", ret);
+            DbgPrint("CreateFile exit: fs_getattr (1) failed with code: %d\n", ret);
             free(fs_path);
             return error_map(ret);
         }
@@ -838,6 +841,7 @@ PVFS_Dokan_create_directory(
     int ret, err;
     PVFS_handle handle;
     PVFS_credentials credentials;
+    PVFS_sys_attr attr;
 
     DbgPrint("CreateDirectory: %S\n", FileName);
 
@@ -862,6 +866,12 @@ PVFS_Dokan_create_directory(
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
         add_credentials(DokanFileInfo->Context, &credentials);
+
+        memset(&attr, 0, sizeof(attr));            
+        /* TODO: using default permissions: rwxr-xr-x */
+        attr.perms = 0755;
+        attr.mask = PVFS_ATTR_SYS_PERM;
+        fs_setattr(fs_path, &attr, &credentials);
     }
 
     free(fs_path);
@@ -1001,7 +1011,8 @@ PVFS_Dokan_read_file(
     char *fs_path;
     PVFS_size len64;
     PVFS_credentials credentials;
-    int ret, err;
+    PVFS_sys_attr attr;
+    int ret, ret2, err;
     
     DbgPrint("ReadFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1026,6 +1037,16 @@ PVFS_Dokan_read_file(
     ret = fs_read(fs_path, Buffer, BufferLength, Offset, &len64, &credentials);
     *ReadLength = (DWORD) len64;
 
+    /* set the access time */
+    if (ret == 0)
+    {
+        attr.mask = PVFS_ATTR_SYS_ATIME;
+        attr.atime = time(NULL);
+        ret2 = fs_setattr(fs_path, &attr, &credentials);
+        if (ret2 != 0)
+            DbgPrint("   fs_setattr returned %d\n", ret2);
+    }
+
     free(fs_path);    
 
     err = error_map(ret);
@@ -1048,7 +1069,8 @@ PVFS_Dokan_write_file(
     char *fs_path;
     PVFS_size len64;
     PVFS_credentials credentials;
-    int ret, err;
+    PVFS_sys_attr attr;
+    int ret, ret2, err;
 
     DbgPrint("WriteFile: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1062,10 +1084,20 @@ PVFS_Dokan_write_file(
     if (fs_path == NULL)
         return -1;
     
-    /* perform the read operation */
+    /* perform the write operation */
     ret = fs_write(fs_path, (void *) Buffer, NumberOfBytesToWrite, Offset, 
                    &len64, &credentials);
     *NumberOfBytesWritten = (DWORD) len64;
+
+    /* set the modify and access times */
+    if (ret == 0)
+    {
+        attr.mask = PVFS_ATTR_SYS_ATIME|PVFS_ATTR_SYS_MTIME;
+        attr.atime = attr.mtime = time(NULL);
+        ret2 = fs_setattr(fs_path, &attr, &credentials);
+        if (ret2 != 0)
+            DbgPrint("   fs_setattr returned %d\n", ret2);
+    }
 
     free(fs_path);
 

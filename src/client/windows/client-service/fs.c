@@ -207,7 +207,8 @@ int fs_create(char *fs_path,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
-    attr.perms = 1877;
+    /* default permissions: rwxr-xr-x */
+    attr.perms = 0755;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
@@ -442,7 +443,8 @@ int fs_mkdir(char *fs_path,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
-    attr.perms = 1877;
+    /* default permissions: rwxr-xr-x */
+    attr.perms = 0755;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_mkdir(entry_name, parent_ref, attr, credentials,
