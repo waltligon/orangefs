@@ -1246,12 +1246,20 @@ PVFS_Dokan_set_file_attributes(
 
     if (ret == 0)
     {
-        if (FileAttributes & FILE_ATTRIBUTE_DIRECTORY)
-            attr.objtype = PVFS_TYPE_DIRECTORY;
-        else if (FileAttributes & FILE_ATTRIBUTE_NORMAL)
-            attr.objtype = PVFS_TYPE_DATAFILE;
-        if (FileAttributes & FILE_ATTRIBUTE_READONLY)
-            /* TODO: permissions */ ;
+        /* owner write permission is on and request to make
+           file readonly */
+        if ((attr.perms & 0200) &&
+            (FileAttributes & FILE_ATTRIBUTE_READONLY))
+        {
+            attr.perms |= ~0200;
+        }
+        else if (!(attr.perms & 0200) && 
+                 !(FileAttributes & FILE_ATTRIBUTE_READONLY))
+        {
+            /* owner write permission is off and request to make
+               file writable */
+            attr.perms |= 0200;
+        }
 
         ret = fs_setattr(fs_path, &attr, &credentials);
     }
