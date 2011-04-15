@@ -538,7 +538,7 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int pe
     /* root user (uid 0 or gid 0) always has rights */
     if (credentials->uid == 0 || credentials->gid == 0)
         return 1;
-        
+    
     if (attr->owner == credentials->uid)
         /* use owner mask */
         mask = (attr->perms >> 6) & 7;
@@ -558,37 +558,65 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int pe
 /* Check permissions for create_file call */
 static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, DWORD access_mode)
 {
-    int ret = 0;
+    int ret = 0, read_flag = 0, write_flag = 0;
 
-    /* read access */
-    if (access_mode & GENERIC_READ ||
-        access_mode & GENERIC_ALL ||
-        access_mode & FILE_READ_ATTRIBUTES ||
-        access_mode & FILE_READ_DATA ||
+    /* read attributes access */
+    if (access_mode & FILE_READ_ATTRIBUTES ||
         access_mode & FILE_READ_EA ||
         access_mode & READ_CONTROL)
     {
-        ret = check_perm(attr, credentials, PERM_READ);
+        /* owner can always read attributes */
+        ret = attr->owner == credentials->uid;
+        if (!ret)
+        {
+            /* otherwise read permissions are needed */
+            ret = check_perm(attr, credentials, PERM_READ);
+            if (!ret)
+                return ret;
+            read_flag = 1;
+        }
     }
 
-    if (!ret)
-        return ret;
+    /* read data access */
+    if (access_mode & GENERIC_READ ||
+        access_mode & GENERIC_ALL ||
+        access_mode & FILE_READ_DATA)
+    {
+        ret = read_flag || check_perm(attr, credentials, PERM_READ);
+        
+        if (!ret)
+            return ret;
+    }
+
+    /* write attributes access */
+    if (access_mode & FILE_WRITE_ATTRIBUTES ||
+        access_mode & FILE_WRITE_EA)
+    {
+        /* owner can always write attributes */
+        ret = attr->owner == credentials->uid;
+        if (!ret)
+        {
+            /* otherwise write permissions are needed */
+            ret = check_perm(attr, credentials, PERM_WRITE);
+            if (!ret)
+                return ret;
+            write_flag = 1;
+        }
+    }
 
     /* write access */
     if (access_mode & GENERIC_WRITE ||
         access_mode & GENERIC_ALL ||
-        access_mode & FILE_WRITE_ATTRIBUTES ||
         access_mode & FILE_WRITE_DATA ||
-        access_mode & FILE_WRITE_EA ||
         access_mode & DELETE ||
         access_mode & WRITE_DAC ||
         access_mode & WRITE_OWNER)
     {
-        ret = check_perm(attr, credentials, PERM_WRITE);
-    }
+        ret = write_flag || check_perm(attr, credentials, PERM_WRITE);
 
-    if (!ret)
-        return ret;
+        if (!ret)
+            return ret;
+    }
 
     /* execute access */
     if (access_mode & GENERIC_EXECUTE ||
@@ -866,12 +894,6 @@ PVFS_Dokan_create_directory(
         DokanFileInfo->IsDirectory = TRUE;
         DokanFileInfo->Context = gen_context();
         add_credentials(DokanFileInfo->Context, &credentials);
-
-        memset(&attr, 0, sizeof(attr));            
-        /* TODO: using default permissions: rwxr-xr-x */
-        attr.perms = 0755;
-        attr.mask = PVFS_ATTR_SYS_PERM;
-        fs_setattr(fs_path, &attr, &credentials);
     }
 
     free(fs_path);
@@ -1153,6 +1175,7 @@ PVFS_Dokan_get_file_information(
     int ret, err;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
+    char info[32];
 
     DbgPrint("GetFileInfo: %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
@@ -1171,32 +1194,51 @@ PVFS_Dokan_get_file_information(
 
     if (ret == 0)
     {
+        strcpy(info, "   ");
         /* convert to Windows attributes */
         HandleFileInformation->dwFileAttributes = 0;
-        if (attr.objtype & PVFS_TYPE_DIRECTORY) 
+        if (attr.objtype & PVFS_TYPE_DIRECTORY) {
             HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_DIRECTORY;
+            strcat(info, "DIR ");
+        }
 
         /* check for hidden file */
         filename = (char *) malloc(strlen(fs_path) + 1);
         MALLOC_CHECK(filename);
         ret = PINT_remove_base_dir(fs_path, filename, strlen(fs_path) + 1);
         if (ret == 0 && filename[0] == '.')
+        {
             HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_HIDDEN;
+            strcat(info, "HIDDEN ");
+        }
         free(filename);
         ret = 0;
         
         /* Check perms for READONLY */
         if (!check_perm(&attr, &credentials, PERM_WRITE))
+        {
             HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_READONLY;
-        
+            strcat(info, "READONLY ");
+        }
+
         /* check for temporary file */
         if (DokanFileInfo->DeleteOnClose)
+        {
             HandleFileInformation->dwFileAttributes |= FILE_ATTRIBUTE_TEMPORARY;
+            strcat(info, "TEMP ");
+        }
 
         /* normal file */
         if (HandleFileInformation->dwFileAttributes == 0)
+        {
             HandleFileInformation->dwFileAttributes = FILE_ATTRIBUTE_NORMAL;
+            strcat(info, "NORMAL");
+        }
+        DbgPrint("%s\n", info);
         
+        /* links */
+        HandleFileInformation->nNumberOfLinks = 1;
+
         /* file times */
         convert_pvfstime(attr.ctime, &HandleFileInformation->ftCreationTime);
         convert_pvfstime(attr.atime, &HandleFileInformation->ftLastAccessTime);
@@ -1225,7 +1267,7 @@ PVFS_Dokan_set_file_attributes(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, err;
+    int ret, err, change_flag = 0;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
@@ -1246,22 +1288,32 @@ PVFS_Dokan_set_file_attributes(
 
     if (ret == 0)
     {
-        /* owner write permission is on and request to make
+        attr.mask = PVFS_ATTR_SYS_PERM;
+        /* write permission is on and request to make
            file readonly */
-        if ((attr.perms & 0200) &&
+        if (((attr.perms & 0200) ||
+            (attr.perms & 0020) ||
+            (attr.perms & 0002)) &&
             (FileAttributes & FILE_ATTRIBUTE_READONLY))
         {
-            attr.perms |= ~0200;
+            attr.perms &= ~0222;
+            change_flag = 1;
         }
-        else if (!(attr.perms & 0200) && 
+        else if ((!(attr.perms & 0200) ||
+                  !(attr.perms & 0020) ||
+                  !(attr.perms & 0002)) &&
                  !(FileAttributes & FILE_ATTRIBUTE_READONLY))
         {
-            /* owner write permission is off and request to make
+            /* write permission is off and request to make
                file writable */
-            attr.perms |= 0200;
+            attr.perms |= 0222;
+            change_flag = 1;
         }
 
-        ret = fs_setattr(fs_path, &attr, &credentials);
+        if (change_flag)
+        {
+            ret = fs_setattr(fs_path, &attr, &credentials);
+        }
     }
 
     free(fs_path);
@@ -1511,14 +1563,32 @@ PVFS_Dokan_set_allocation_size(
     LONGLONG         AllocSize,
     PDOKAN_FILE_INFO DokanFileInfo)
 {
+    int ret, err;
+    PVFS_credentials credentials;
+    char *fs_path;
+
     DbgPrint("SetAllocationSize %S\n", FileName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
 
-    /* function not needed (?) */
+    /* load credentials */
+    err = get_credentials(DokanFileInfo, &credentials);
+    CRED_CHECK("SetFileTime", err);
 
-    DbgPrint("SetAllocationSize exit: %d\n", 0);
+    /* get file system path */
+    fs_path = get_fs_path(FileName);
+    if (fs_path == NULL)
+        return -1;
+    
+    /* truncate file */
+    ret = fs_truncate(fs_path, AllocSize, &credentials);
 
-    return 0;
+    free(fs_path);
+
+    err = error_map(ret);
+
+    DbgPrint("SetAllocationSize exit: %d (%d)\n", err, ret);
+
+    return err;
 }
 
 
@@ -1531,7 +1601,7 @@ PVFS_Dokan_set_file_time(
     PDOKAN_FILE_INFO DokanFileInfo)
 {
     char *fs_path;
-    int ret, err;
+    int ret = 0, err;
     PVFS_credentials credentials;
     PVFS_sys_attr attr;
 
@@ -1547,21 +1617,29 @@ PVFS_Dokan_set_file_time(
     if (fs_path == NULL)
         return -1;
 
-    /* convert times to PVFS */
-    ret = fs_getattr(fs_path, &credentials, &attr);
-
-    DbgPrint("   fs_getattr returns: %d\n", ret);
-
-    if (ret == 0)
+    /* convert and set the file times */
+    memset(&attr, 0, sizeof(PVFS_sys_attr));
+    if (CreationTime != NULL && CreationTime->dwLowDateTime != 0 &&
+        CreationTime->dwHighDateTime != 0)
     {
         convert_filetime((LPFILETIME) CreationTime, &attr.ctime);
-        convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
-        convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
-
-        ret = fs_setattr(fs_path, &attr, &credentials);        
-
-        DbgPrint("   fs_setattr returns: %d\n", ret);
+        attr.mask |= PVFS_ATTR_SYS_CTIME;
     }
+    if (LastAccessTime != NULL && LastAccessTime->dwLowDateTime != 0 &&
+        LastAccessTime->dwHighDateTime != 0)
+    {
+        convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
+        attr.mask |= PVFS_ATTR_SYS_ATIME;
+    }
+    if (LastWriteTime != NULL && LastWriteTime->dwLowDateTime != 0 &&
+        LastWriteTime->dwHighDateTime != 0)
+    {
+        convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
+        attr.mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    
+    if (attr.mask != 0)
+        ret = fs_setattr(fs_path, &attr, &credentials);
 
     free(fs_path);
 
