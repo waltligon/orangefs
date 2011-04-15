@@ -58,6 +58,14 @@ machine pvfs2_client_mgmt_create_dirent_sm
     state create_dirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
+        success => cleanup;
+        default => create_dirent_retry_or_fail;
+    }
+
+    state create_dirent_retry_or_fail
+    {
+        run mgmt_create_dirent_retry_or_fail;
+        success => parent_getattr;
         default => cleanup;
     }
 
@@ -265,6 +273,38 @@ static int mgmt_create_dirent_comp_fn(
     }
     return resp_p->status;
 }
+
+
+static PINT_sm_action mgmt_create_dirent_retry_or_fail(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* if need to retry. clear the error_code and setup getattr. */
+    if(js_p->error_code == -PVFS_EAGAIN)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt-create-dirent: received -PVFS_EAGAIN, will retry getattr and mgmt-create-dirent.\n");
+
+        /* setup getattr */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+        /* clear acache content */
+        PINT_acache_invalidate(sm_p->parent_ref);
+
+        PINT_SM_GETATTR_STATE_FILL(
+                sm_p->getattr,
+                sm_p->parent_ref,
+                PVFS_ATTR_DIR_DISTDIR_ATTR,
+                PVFS_TYPE_DIRECTORY,
+                0);
+
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PVFS_perror_gossip("mgmt-create-dirent failed", js_p->error_code);
+    return SM_ACTION_COMPLETE;
+}
+
 
 static PINT_sm_action mgmt_create_dirent_cleanup(
     struct PINT_smcb *smcb, job_status_s *js_p)
