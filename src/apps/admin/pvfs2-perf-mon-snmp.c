@@ -57,47 +57,47 @@ int main(int argc, char **argv)
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
-    if(!user_opts)
+    if (!user_opts)
     {
-	    fprintf(stderr, "Error: failed to parse command line arguments.\n");
-	    usage(argc, argv);
-	    return(-1);
+        fprintf(stderr, "Error: failed to parse command line arguments.\n");
+        usage(argc, argv);
+        return(-1);
     }
 
     ret = PVFS_util_init_defaults();
-    if(ret < 0)
+    if (ret < 0)
     {
-	    PVFS_perror("PVFS_util_init_defaults", ret);
-	    return(-1);
+        PVFS_perror("PVFS_util_init_defaults", ret);
+        return(-1);
     }
 
     /* translate local path into pvfs2 relative path */
     ret = PVFS_util_resolve(user_opts->mnt_point,
-        &cur_fs, pvfs_path, PVFS_NAME_MAX);
-    if(ret < 0)
+                            &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    if (ret < 0)
     {
-	    PVFS_perror("PVFS_util_resolve", ret);
-	    return(-1);
+        PVFS_perror("PVFS_util_resolve", ret);
+        return(-1);
     }
 
     PVFS_util_gen_credentials(&creds);
 
     /* count how many I/O servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
-	&io_server_count);
-    if(ret < 0)
+                                  &io_server_count);
+    if (ret < 0)
     {
-	    PVFS_perror("PVFS_mgmt_count_servers", ret);
-	    return(-1);
+         PVFS_perror("PVFS_mgmt_count_servers", ret);
+	     return(-1);
     }
 
     /* allocate a 2 dimensional array for statistics */
     perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
-	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
-    if(!perf_matrix)
+                   io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
+    if (!perf_matrix)
     {
-	    perror("malloc");
-	    return(-1);
+        perror("malloc");
+        return(-1);
     }
     for(i=0; i<io_server_count; i++)
     {
@@ -116,8 +116,8 @@ int main(int argc, char **argv)
     next_id_array = (uint32_t *) malloc(io_server_count * sizeof(uint32_t));
     if (next_id_array == NULL)
     {
-	    perror("malloc");
-	    return -1;
+	     perror("malloc");
+	     return -1;
     }
     memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
 
@@ -151,26 +151,42 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats when requested */
     while (1)
     {
-        int cmd=0, srv=0, smp=0;
+        int srv=0, smp=0, snaptime=0;
         /* wait for a request from SNMP driver */
-        fscanf(stdin," %256[a-zA-Z0-9 ]\n", cmd_buffer);
+        ret = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
+
         /* if PING output PONG */
-        if (!strncmp(cmd_buffer, "PING", 4))
+        if (!strncasecmp(cmd_buffer, "PING", 4))
         {
             fprintf(stdout,"PONG\n");
 	        fflush(stdout);
             continue;
         }
+
         /* try to parse GET command */
-        if (!strncmp(cmd_buffer, "GET", 3))
+        if (!strncasecmp(cmd_buffer, "GET", 3))
         {
-            sscanf(cmd_buffer, "GET %d", &cmd);
+            /* found GET read OID */
+            ret = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
+            /*  */
+            for(c = cmd_buffer; *c != '\0'; c++)
+                if (*c == '\n')
+                    *c = '\0';
+
         }
         else
+        {
             /* bad command */
+            fprintf(stdout, "NONE\n");
+            fflush(stdout);
             continue;
+        }
+
         /* good command read counters */
-	    ret = PVFS_mgmt_perf_mon_list(cur_fs,
+        if (time(NULL) - snaptime > 60)
+        {
+            snaptime = time(NULL);
+	        ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				          &creds,
 				          perf_matrix, 
 				          end_time_ms_array,
@@ -179,60 +195,60 @@ int main(int argc, char **argv)
 				          io_server_count, 
 				          HISTORY,
 				          NULL, NULL);
-	    if (ret < 0)
-	    {
-	        PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
-	        return -1;
-	    }
+	        if (ret < 0)
+	        {
+	            PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
+	            return -1;
+	        }
+        }
 
         /* format requested OID */
         if (perf_matrix[srv][smp].valid_flag)
         {
             /* valid measurement */
-            switch (cmd)
+            if (!strcmp(cmd_buffer,OID_READ))
             {
-                case REQ :
-                    fprintf(stdout,"1:Requests Processed:COUNTER:%d\n",
-                        perf_matrix[srv][smp].requests);
-                    break;
-                case READ :
-                    fprintf(stdout,"2:Bytes Read:COUNTER:%d\n",
-                        perf_matrix[srv][smp].read);
-                    break;
-                case WRITE :
-                    fprintf(stdout,"3:Bytes Written:COUNTER:%d\n",
-                        perf_matrix[srv][smp].write);
-                    break;
-                case MREAD :
-                    fprintf(stdout,"4:Metadata Read Ops:COUNTER:%d\n",
-                        perf_matrix[srv][smp].metadata_read);
-                    break;
-                case MWRITE :
-                    fprintf(stdout,"5:Metadata Write Ops:COUNTER:%d\n",
-                        perf_matrix[srv][smp].metadata_write);
-                    break;
-                case DSPACEOPS :
-                    fprintf(stdout,"6:Metadata DSpace Ops:COUNTER:%d\n",
-                        perf_matrix[srv][smp].dspace_queue);
-                    break;
-                case KEYVALOPS :
-                    fprintf(stdout,"7:Metadata KeyVal Ops:COUNTER:%d\n",
-                        perf_matrix[srv][smp].keyval_queue);
-                    break;
-                case REQSCHED :
-                    fprintf(stdout,"8:Scheduled Requests:INTEGER:%d\n",
-                        perf_matrix[srv][smp].reqsched);
-                    break;
-                default :
-                    fprintf(stdout,"0:Invalid Command:COUNTER:0\n")
-                    break;
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].read;
+            }
+            else if (!strcmp(cmd_buffer,OID_WRITE))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].write;
+            }
+            else if (!strcmp(cmd_buffer,OID_MREAD))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].metadata_read;
+            }
+            else if (!strcmp(cmd_buffer,OID_MWRITE))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].metadata_write;
+            }
+            else if (!strcmp(cmd_buffer,OID_DSPACE))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].dspace_queue;
+            }
+            else if (!strcmp(cmd_buffer,OID_KEYVAL))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].keyval_queue;
+            }
+            else if (!strcmp(cmd_buffer,OID_REQSCHED))
+            {
+                returnType = "COUNTER";
+                returnValue = perf_matrix[srv][smp].reqsched;
             }
         }
         else
         {
             /* invalid measurement */
-            fprintf(stdout,"0:Invalid Measurement:COUNTER:0\n")
+            returnType = "NONE";
+            returnValue = 0;
         }
+        fprintf(stdout,"%s\n%s\n", returnType, returnValue);
         fflush(stdout);
         /* wait for next command */
     }
@@ -436,5 +452,5 @@ static void usage(int argc, char **argv)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ts=4 sts=4 sw=4 expandtab
  */
