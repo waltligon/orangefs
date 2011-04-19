@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <getopt.h>
 
+#include "bmi.h"
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
@@ -50,19 +51,17 @@ static void usage(int argc, char** argv);
 int main(int argc, char **argv)
 {
     int ret = -1;
+    char *retc = NULL;
     PVFS_fs_id cur_fs;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    int i,j;
+    int i;
     PVFS_credentials creds;
     int io_server_count;
     struct PVFS_mgmt_perf_stat** perf_matrix;
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
     PVFS_BMI_addr_t *addr_array, server_addr;
-    int tmp_type;
-    uint64_t next_time;
-    float bw;
     char *cmd_buffer = (char *)malloc(CMD_BUF_SIZE);
 
     /* look at command line arguments */
@@ -86,6 +85,7 @@ int main(int argc, char **argv)
                 (BMI_addr_lookup (&server_addr, user_opts->server_addr) == 0))
         {
             /* set up single server */
+            addr_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t));
             addr_array[0] = server_addr;
             io_server_count = 1;
         }
@@ -184,8 +184,15 @@ int main(int argc, char **argv)
     {
         int srv=0, smp=0;
         time_t snaptime=0;
+        char *returnType=NULL; 
+        int returnValue=0;
         /* wait for a request from SNMP driver */
-        ret = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
+        retc = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
+        if (!retc)
+        {
+            /* error on read */
+            return -1;
+        }
 
         /* if PING output PONG */
         if (!strncasecmp(cmd_buffer, "PING", 4))
@@ -198,13 +205,18 @@ int main(int argc, char **argv)
         /* try to parse GET command */
         if (!strncasecmp(cmd_buffer, "GET", 3))
         {
+            char *c;
             /* found GET read OID */
-            ret = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
-            /*  */
+            retc = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
+            if (!retc)
+            {
+                /* error on read */
+                return -1;
+            }
+            /* replace newlines with null char */
             for(c = cmd_buffer; *c != '\0'; c++)
                 if (*c == '\n')
                     *c = '\0';
-
         }
         else
         {
