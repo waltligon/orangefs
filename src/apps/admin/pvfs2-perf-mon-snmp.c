@@ -92,7 +92,7 @@ int main(int argc, char **argv)
         else
         {
             /* bad argument - address not found */
-            fprintf(stderr, "Error: failed to parser server address.\n");
+            fprintf(stderr, "Error: failed to parse server address.\n");
             usage(argc, argv);
             return(-1);
         }
@@ -318,7 +318,7 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    char flags[] = "vm:";
+    char flags[] = "vm:s:";
     int one_opt = 0;
     int len = 0;
 
@@ -342,6 +342,7 @@ static struct options* parse_args(int argc, char* argv[])
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
 	        case('m'):
+                /* we need to add a '/' to the end so cannot strdup */
 		        len = strlen(optarg)+1;
 		        tmp_opts->mnt_point = (char*)malloc(len+1);
 		        if(!tmp_opts->mnt_point)
@@ -356,31 +357,20 @@ static struct options* parse_args(int argc, char* argv[])
 		            free(tmp_opts);
 		            return(NULL);
 		        }
-		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
-		 * function expects some trailing segments or at least
-		 * a slash off of the mount point
-		 */
+		        /* TODO: dirty hack... fix later.  The remove_dir_prefix()
+		        * function expects some trailing segments or at least
+		        * a slash off of the mount point
+		        */
 		        strcat(tmp_opts->mnt_point, "/");
 		        tmp_opts->mnt_point_set = 1;
 		        break;
 	        case('s'):
-		        len = strlen(optarg)+1;
-		        tmp_opts->server_addr = (char*)malloc(len+1);
-		        if(!tmp_opts->mnt_point)
-		        {
-		            free(tmp_opts);
-		            return(NULL);
-		        }
-		        memset(tmp_opts->server_addr, 0, len+1);
-		        ret = sscanf(optarg, "%s", tmp_opts->server_addr);
-		        if(ret < 1)
-                {
-		            free(tmp_opts);
-		            return(NULL);
-		        }
-                /*
                 tmp_opts->server_addr = strdup(optarg);
-                */
+                if (!tmp_opts->server_addr)
+                {
+                    free(tmp_opts);
+                    return NULL;
+                }
 		        tmp_opts->server_addr_set = 1;
 		        break;
 	        case('?'):
@@ -389,7 +379,7 @@ static struct options* parse_args(int argc, char* argv[])
 	    }
     }
 
-    if (!tmp_opts->mnt_point_set)
+    if (!(tmp_opts->mnt_point_set || tmp_opts->server_addr_set))
     {
 	    free(tmp_opts);
 	    return(NULL);
