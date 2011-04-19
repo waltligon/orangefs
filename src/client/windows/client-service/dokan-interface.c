@@ -1619,20 +1619,20 @@ PVFS_Dokan_set_file_time(
 
     /* convert and set the file times */
     memset(&attr, 0, sizeof(PVFS_sys_attr));
-    if (CreationTime != NULL && CreationTime->dwLowDateTime != 0 &&
-        CreationTime->dwHighDateTime != 0)
+    if (CreationTime != NULL && !(CreationTime->dwLowDateTime == 0 &&
+        CreationTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) CreationTime, &attr.ctime);
         attr.mask |= PVFS_ATTR_SYS_CTIME;
     }
-    if (LastAccessTime != NULL && LastAccessTime->dwLowDateTime != 0 &&
-        LastAccessTime->dwHighDateTime != 0)
+    if (LastAccessTime != NULL && !(LastAccessTime->dwLowDateTime == 0 &&
+        LastAccessTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastAccessTime, &attr.atime);
         attr.mask |= PVFS_ATTR_SYS_ATIME;
     }
-    if (LastWriteTime != NULL && LastWriteTime->dwLowDateTime != 0 &&
-        LastWriteTime->dwHighDateTime != 0)
+    if (LastWriteTime != NULL && !(LastWriteTime->dwLowDateTime == 0 &&
+        LastWriteTime->dwHighDateTime == 0))
     {
         convert_filetime((LPFILETIME) LastWriteTime, &attr.mtime);
         attr.mask |= PVFS_ATTR_SYS_MTIME;
