@@ -79,8 +79,16 @@ int main(int argc, char **argv)
         PVFS_perror("PVFS_util_init_defaults", ret);
         return(-1);
     }
+    PVFS_util_gen_credentials(&creds);
     if (user_opts->server_addr_set)
     {
+        if (PVFS_util_get_default_fsid(&cur_fs) < 0)
+        {
+            /* Can't find a file system */
+            fprintf(stderr, "Error: failed to find a file system.\n");
+            usage(argc, argv);
+            return(-1);
+        }
         if (user_opts->server_addr &&
                 (BMI_addr_lookup (&server_addr, user_opts->server_addr) == 0))
         {
@@ -108,8 +116,6 @@ int main(int argc, char **argv)
             PVFS_perror("PVFS_util_resolve", ret);
             return(-1);
         }
-
-        PVFS_util_gen_credentials(&creds);
 
         /* count how many I/O servers we have */
         ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
