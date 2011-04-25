@@ -558,23 +558,16 @@ static int check_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, int pe
 /* Check permissions for create_file call */
 static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials, DWORD access_mode)
 {
-    int ret = 0, read_flag = 0, write_flag = 0;
+    int ret = 0, write_flag = 0;
 
     /* read attributes access */
     if (access_mode & FILE_READ_ATTRIBUTES ||
         access_mode & FILE_READ_EA ||
-        access_mode & READ_CONTROL)
+        access_mode & READ_CONTROL ||
+        access_mode & SYNCHRONIZE)
     {
-        /* owner can always read attributes */
-        ret = attr->owner == credentials->uid;
-        if (!ret)
-        {
-            /* otherwise read permissions are needed */
-            ret = check_perm(attr, credentials, PERM_READ);
-            if (!ret)
-                return ret;
-            read_flag = 1;
-        }
+        /* On PVFS2, all users have these rights */
+        ret = 1;
     }
 
     /* read data access */
@@ -582,7 +575,7 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
         access_mode & GENERIC_ALL ||
         access_mode & FILE_READ_DATA)
     {
-        ret = read_flag || check_perm(attr, credentials, PERM_READ);
+        ret = check_perm(attr, credentials, PERM_READ);
         
         if (!ret)
             return ret;
@@ -590,9 +583,12 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
 
     /* write attributes access */
     if (access_mode & FILE_WRITE_ATTRIBUTES ||
-        access_mode & FILE_WRITE_EA)
+        access_mode & FILE_WRITE_EA ||
+        access_mode & WRITE_DAC ||
+        access_mode & WRITE_OWNER ||
+        access_mode & DELETE)
     {
-        /* owner can always write attributes */
+        /* owner always has these permissions */
         ret = attr->owner == credentials->uid;
         if (!ret)
         {
@@ -607,11 +603,11 @@ static int check_create_perm(PVFS_sys_attr *attr, PVFS_credentials *credentials,
     /* write access */
     if (access_mode & GENERIC_WRITE ||
         access_mode & GENERIC_ALL ||
-        access_mode & FILE_WRITE_DATA ||
-        access_mode & DELETE ||
-        access_mode & WRITE_DAC ||
-        access_mode & WRITE_OWNER)
+        access_mode & FILE_WRITE_DATA)
     {
+        /* Either user is owner, or has write permissions checked already. 
+           Note that if owner doesn't have write data, the file will be  
+           marked read-only */
         ret = write_flag || check_perm(attr, credentials, PERM_WRITE);
 
         if (!ret)
@@ -869,7 +865,6 @@ PVFS_Dokan_create_directory(
     int ret, err;
     PVFS_handle handle;
     PVFS_credentials credentials;
-    PVFS_sys_attr attr;
 
     DbgPrint("CreateDirectory: %S\n", FileName);
 

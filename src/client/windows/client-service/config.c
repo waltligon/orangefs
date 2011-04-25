@@ -207,14 +207,11 @@ int get_config(PORANGEFS_OPTIONS options)
                     return 1;
                 }
             }
-#ifndef _DEBUG
-            /* debug already enabled for debug builds */
             else if (!stricmp(token, "-debug") ||
                      !stricmp(token, "debug"))
             {
                 options->debug = TRUE;
             }            
-#endif
             else
                 fprintf(stderr, "Unknown option %s\n", token);
         }

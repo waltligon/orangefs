@@ -494,33 +494,28 @@ int main(int argc, char **argv, char **envp)
       {
           return service_install();
       }
-      
-      if (!stricmp(argv[i], "-removeService") ||
+      else if (!stricmp(argv[i], "-removeService") ||
                !stricmp(argv[i], "-u") || !stricmp(argv[i], "/u"))
       {
           return service_remove();
       }
-      
-      if (!strcmp(argv[i], "-service"))
+      else if (!strcmp(argv[i], "-service"))
       {
           run_service = 1;
       }
-
-      if (!strcmp(argv[i], "-mount") || !strcmp(argv[i], "-m") ||
-          !strcmp(argv[i], "/m"))
+      else if (!strcmp(argv[i], "-mount") || !strcmp(argv[i], "-m") ||
+               !strcmp(argv[i], "/m"))
       {
           if (i < (argc - 1))
               strncpy(mount_point, argv[++i], MAX_PATH);
           else
               fprintf(stderr, "Invalid argument -mount. Using mount point Z:\n");
       }
-
-      /* debug is always enabled for debug version */
-#ifndef _DEBUG
-      if (!strcmp(argv[i], "-debug") || !strcmp(argv[i], "-d") ||
-          !strcmp(argv[i], "/d"))
+      else if (!strcmp(argv[i], "-debug") || !strcmp(argv[i], "-d") ||
+               !strcmp(argv[i], "/d"))
+      {
           debug = TRUE;
-#endif
+      }
   }
 
   if (run_service) 
