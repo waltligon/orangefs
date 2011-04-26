@@ -87,30 +87,30 @@
 #define encode_string(pptr,pbuf) do { \
     u_int32_t len = 0; \
     if (*pbuf) \
-	len = strlen(*pbuf); \
+	    len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
-	memcpy(*(pptr)+4, *pbuf, len+1); \
-	int pad = roundup8(4 + len + 1) - (4 + len + 1); \
-	*(pptr) += roundup8(4 + len + 1); \
-	memset(*(pptr)-pad, 0, pad); \
+	    memcpy(*(pptr)+4, *pbuf, len+1); \
+	    int pad = roundup8(4 + len + 1) - (4 + len + 1); \
+	    *(pptr) += roundup8(4 + len + 1); \
+	    memset(*(pptr)-pad, 0, pad); \
     } else { \
-	*(u_int32_t *) (*(pptr)+4) = 0; \
-	*(pptr) += 8; \
+	    *(u_int32_t *) (*(pptr)+4) = 0; \
+	    *(pptr) += 8; \
     } \
 } while (0)
 #else
 #define encode_string(pptr,pbuf) do { \
     u_int32_t len = 0; \
     if (*pbuf) \
-	len = strlen(*pbuf); \
+	    len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
-	memcpy(*(pptr)+4, *pbuf, len+1); \
-	*(pptr) += roundup8(4 + len + 1); \
+	    memcpy(*(pptr)+4, *pbuf, len+1); \
+	    *(pptr) += roundup8(4 + len + 1); \
     } else { \
-	*(u_int32_t *) *(pptr) = 0; \
-	*(pptr) += 8; \
+	    *(u_int32_t *) *(pptr) = 0; \
+	    *(pptr) += 8; \
     } \
 } while (0)
 #endif
