@@ -1,7 +1,7 @@
 all: simple1_unaligned test_grep test_kmeans test_vren
 
-MPICC=mpicc
-#MPICC = /home/sson/as-branch/mpich2.tcp/bin/mpicc
+#MPICC=mpicc
+MPICC = /home/sson/as-branch/mpich2.tcp/bin/mpicc
 CFLAGS=-Wall -O2 
 
 simple.o: simple.c
@@ -44,7 +44,15 @@ vector1.o: vector1.c
 	$(MPICC) -c vector1.c
 vector1: vector1.o
 	$(MPICC) $(CFLAGS) -o vector1 vector1.o
+testwrite: testwrite.o
+	$(MPICC) -O2 -o testwrite testwrite.o -L/home/sson/as-branch/subfiling_lib_PnetCDF_v0.1 -lsubfile -L/home/sson/as-branch/parallel-netcdf-1.2.0-as/install/lib -lpnetcdf 
+testwrite.o: testwrite.c
+	$(MPICC) -O2  -c testwrite.c -I/home/sson/as-branch/parallel-netcdf-1.2.0-as/install/include -I/home/sson/as-branch/subfiling_lib_PnetCDF_v0.1
+testread: testread.o 
+	$(MPICC) -O2 -o testread testread.o -L/home/sson/as-branch/subfiling_lib_PnetCDF_v0.1 -lsubfile -L/home/sson/as-branch/parallel-netcdf-1.2.0-as/install/lib -lpnetcdf
+testread.o: testread.c
+	$(MPICC) -O2  -c testread.c -I/home/sson/as-branch/parallel-netcdf-1.2.0-as/install/include -I/home/sson/as-branch/subfiling_lib_PnetCDF_v0.1
 
 clean:
-	rm -f *.o *~ simple simple1 simple2 simple3 vector vector1 simple1_unaligned test_kmeans
+	rm -f *.o *~ simple simple1 simple2 simple3 vector vector1 simple1_unaligned test_kmeans testwrite testread
 	rm -f test_grep
