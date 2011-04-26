@@ -51,13 +51,44 @@ static unsigned long verify_cert(X509 *cert, X509 *ca_cert)
 {
     X509_STORE *trust_store;
     X509_STORE_CTX *ctx;
+    int ret;
+    unsigned long err;
 
     /* add CA cert to trusted store */
     trust_store = X509_STORE_new();
     if (trust_store == NULL)
-        return ERR_get_error();
+        goto verify_cert_exit;
 
-    X509_STORE_add_cert(trust_store, ca_cert);
+    ret = X509_STORE_add_cert(trust_store, ca_cert);
+    if (!ret)
+        goto verify_cert_exit;
 
+    /* setup the context with the certs */
+    ctx = X509_STORE_CTX_new();
+    if (ctx == NULL)
+        goto verify_cert_exit;
 
+    ret = X509_STORE_CTX_init(ctx, trust_store, cert, NULL);
+    if (!ret)
+        goto verify_cert_exit;
+
+    /* TODO: verify proxy cert */
+    /* verify the cert */
+    X509_verify_cert(ctx);
+    
+verify_cert_exit:
+    err = ERR_get_error();
+
+    if (ctx != NULL)
+    {
+        X509_STORE_CTX_cleanup(ctx);
+        X509_STORE_CTX_free(ctx);
+    }
+
+    if (trust_store != NULL)
+    {
+        X509_STORE_free(trust_store);
+    }
+
+    return err;
 }
