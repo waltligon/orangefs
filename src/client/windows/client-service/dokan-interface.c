@@ -412,6 +412,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     {
         err = GetLastError();
         DbgPrint("   LookupAccountSid failed: %u\n", err);
+        return err * -1;
     }
 
     /* system user functions as root */

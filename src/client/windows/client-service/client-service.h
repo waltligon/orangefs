@@ -9,6 +9,8 @@
 typedef struct
 {
     char mount_point[MAX_PATH];
+    char cert_dir_prefix[MAX_PATH];
+    char ca_path[MAX_PATH];
     int threads;
     int debug;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;

@@ -31,7 +31,7 @@ FILE *open_config_file()
 
             file_name = (char *) malloc(MAX_PATH);
             malloc_flag = TRUE;
-            strcpy(file_name, exe_path);
+            strncpy(file_name, exe_path, MAX_PATH-14);
             strcat(file_name, "\\orangefs.cfg");
 
             ret = 0;
@@ -171,8 +171,7 @@ int get_config(PORANGEFS_OPTIONS options)
             if (token == NULL)
                 continue;
 
-            if (!stricmp(token, "-mount") ||
-                !stricmp(token, "mount"))
+            if (!stricmp(token, "mount"))
             {
                 /* copy the remaining portion of the line 
                    as the mount point */
@@ -185,8 +184,7 @@ int get_config(PORANGEFS_OPTIONS options)
                 token = strtok(NULL, " \t");
                 strncpy(options->mount_point, token, MAX_PATH);
             }
-            else if (!stricmp(token, "-threads") ||
-                     !stricmp(token, "threads"))
+            else if (!stricmp(token, "threads"))
             {
                 /*
                 p = line + strlen(token);
@@ -197,18 +195,44 @@ int get_config(PORANGEFS_OPTIONS options)
                 token = strtok(NULL, " \t");
                 options->threads = atoi(token);
             }
-            else if (!stricmp(token, "-user") ||
-                     !stricmp(token, "user")) 
+            else if (!stricmp(token, "user")) 
             {
                 if (parse_user() != 0)
                 {
-                    fprintf(stderr, "-user option: parse error\n");
+                    fprintf(stderr, "user option: parse error\n");
                     close_config_file(config_file);
                     return 1;
                 }
             }
-            else if (!stricmp(token, "-debug") ||
-                     !stricmp(token, "debug"))
+            else if (!stricmp(token, "cert-dir-prefix"))
+            {
+                if (strlen(line) > 16)
+                {
+                    strncpy(options->cert_dir_prefix, line + 16, MAX_PATH-2);
+                    options->cert_dir_prefix[MAX_PATH-2] = '\0';
+                    if (options->cert_dir_prefix[strlen(options->cert_dir_prefix)-1] != '\\')
+                        strcat(options->cert_dir_prefix, "\\");
+                }
+                else
+                {
+                    fprintf(stderr, "cert-dir-prefix option: parse error\n");
+                }
+            }
+            else if (!stricmp(token, "ca-path"))
+            {
+                if (strlen(line) > 8)
+                {
+                    strncpy(options->ca_path, line + 8, MAX_PATH-2);
+                    options->ca_path[MAX_PATH-2] = '\0';
+                    if (options->ca_path[strlen(options->ca_path)-1] != '\\')
+                        strcat(options->ca_path, "\\");
+                }
+                else
+                {
+                    fprintf(stderr, "ca-path option: parse error\n");
+                }
+            }
+            else if (!stricmp(token, "debug"))
             {
                 options->debug = TRUE;
             }            
