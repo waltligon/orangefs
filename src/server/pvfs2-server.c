@@ -1276,6 +1276,7 @@ static void hup_sighandler(int sig, siginfo_t *info, void *secret)
 static void reload_config(void)
 {
     struct server_configuration_s sighup_server_config;
+    struct server_configuration_s *orig_server_config;
     PINT_llist *orig_filesystems = NULL;
     PINT_llist *hup_filesystems  = NULL;
     struct filesystem_configuration_s *orig_fs;
@@ -1293,6 +1294,19 @@ static void reload_config(void)
     }
     else /* Successful load of config */
     {
+        /* Get the current server configuration and update global items */
+        orig_server_config = get_server_config_struct();
+        if (orig_server_config->event_logging)
+        {
+            free(orig_server_config->event_logging);
+        }
+        
+        /* Copy the new logging mask into the current server configuration */
+        orig_server_config->event_logging = strdup(sighup_server_config.event_logging);
+        
+        /* Reset the debug mask */
+        gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
+
         orig_filesystems = server_config.file_systems;
         /* Loop and update all stored file systems */
         while(orig_filesystems)
@@ -1769,6 +1783,13 @@ static int server_parse_cmd_line_args(int argc, char **argv)
     }
 
     fs_conf = argv[optind++];
+    if (fs_conf[0] != '/')
+    {
+        /* force the user to enter a full path for the conf file, so that SIGHUP functionality will */
+        /* always work.                                                                             */
+        gossip_err("Error: Please specify an absolute path for the conf file.\n");
+        goto parse_cmd_line_args_failure;
+    }
 
     if(argc - total_arguments > 2)
     {
