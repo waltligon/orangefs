@@ -10,12 +10,9 @@
  *  PVFS2 system interface routines for reading and writing files.
  */
 
-#define _ISOC99_SOURCE /* log2, ceil, max, etc */ 
-
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include <math.h> /* sson */
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -30,6 +27,10 @@
 #define IO_MAX_SEGMENT_NUM 50
 #define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE)
 #define PVFS2_SMALL_IO_OFF 1 /* AS: for now, ignore small_io */
+
+#define CEILING_POS(X) ((X-(int)(X)) > 0 ? (int)(X+1) : (int)(X))
+#define CEILING_NEG(X) ((X-(int)(X)) < 0 ? (int)(X-1) : (int)(X))
+#define CEILING(X) ( ((X) > 0) ? CEILING_POS(X) : CEILING_NEG(X) )
 
 extern job_context_id pint_client_sm_context;
 
@@ -2585,7 +2586,7 @@ static inline int io_check_context_status(
 				tmp_sum += new*count;
 				final = (tmp_sum)/(count+sm_p->u.io.count);
 			    }
-			    sm_p->u.io.count += ceil((resp->u.read_completion.total_completed/8)-0.5);
+			    sm_p->u.io.count += CEILING((resp->u.read_completion.total_completed/8)-0.5);
 			    gossip_debug(GOSSIP_IO_DEBUG, 
 					 "result(DOUBLE): old=%lf, new=%lf, final=%lf\n", old, new, final); /* AS */
 			    break;

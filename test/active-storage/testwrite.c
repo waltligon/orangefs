@@ -128,11 +128,16 @@ int main(int argc, char **argv)
     MPI_Type_size(newtype, &bufcount);
 //    printf("bufcount :%d, sizeof(double):%d\n", bufcount,sizeof(double));
     bufcount = bufcount/sizeof(double);
-    printf("bufcount/sizeof(double) :%d\n", bufcount);
+//    printf("bufcount/sizeof(double) :%d\n", bufcount);
     writebuf = (double *) malloc(bufcount * sizeof(double));
-    printf("bufcount:%d\n", bufcount);
-    for (i=0; i<bufcount; i++) writebuf[i] = 1.0*( mynod + 1 );
-/*
+//    printf("bufcount:%d\n", bufcount);
+    double sum = 0;
+    for (i=0; i<bufcount; i++) { 
+	writebuf[i] = 1.0*( mynod + 1 );
+	sum += writebuf[i];
+    }
+    printf("write rank:%d, sum:%f\n", mynod, sum);
+	    /*
     array_size = array_of_gsizes[0]*array_of_gsizes[1]*array_of_gsizes[2];
     tmpbuf = (double *) calloc(array_size, sizeof(double));
     MPI_Irecv(tmpbuf, 1, newtype, mynod, 10, MPI_COMM_WORLD, &request);
@@ -183,20 +188,24 @@ int main(int argc, char **argv)
 
       sprintf(sfilename, "%s.%03d.",filename,k);
       subfile_create(MPI_COMM_WORLD, sfilename, 0, MPI_INFO_NULL, sfp, &ncid);
-      printf("subfile open ncid:%d\n", ncid);
+//      printf("subfile open ncid:%d\n", ncid);
       ncmpi_def_dim(ncid, "x", sfsizes[0], &dimid1);
       ncmpi_def_dim(ncid, "y", sfsizes[1], &dimid2);
       ncmpi_def_dim(ncid, "z", sfsizes[2], &dimid3);
-  
+      
+
       cube_dim[0] = dimid1;
       cube_dim[1] = dimid2;
       cube_dim[2] = dimid3;
       ncmpi_def_var (ncid, "cube", NC_DOUBLE, 3, cube_dim, &cube_id);
+      ncmpi_put_att_int(ncid, cube_id, "global_size", NC_INT, 3, array_of_gsizes);
+
 
       ncmpi_enddef(ncid);
 
   
       subfile_write(sfp, cube_id, writebuf, bufcount, MPI_DOUBLE, mpi_status);
+
 
       subfile_close(sfp);
 	

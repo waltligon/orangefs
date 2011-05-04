@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
+
 int main(int argc, char **argv)
 {
     MPI_Datatype newtype;
@@ -237,6 +238,11 @@ int main(int argc, char **argv)
 
     
 
+    double sum = 0;
+    for (i=0; i<bufcount; i++) { 
+	sum += readbuf[i];
+    }
+    printf("read rank:%d, sum:%f\n", mynod, sum);
 
     free(readbuf);
     free(filename);
