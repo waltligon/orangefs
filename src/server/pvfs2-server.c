@@ -121,7 +121,8 @@ typedef struct
 } options_t;
 
 static options_t s_server_options = { 0, 0, 1, NULL, NULL};
-static char *fs_conf = NULL;
+static char fs_conf[PATH_MAX];
+static char startup_cwd[PATH_MAX];
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -227,7 +228,6 @@ int main(int argc, char **argv)
                     s_server_options.server_alias, PVFS2_VERSION);
 
     /* code to handle older two config file format */
-
     ret = PINT_parse_config(&server_config, fs_conf, s_server_options.server_alias);
     if (ret)
     {
@@ -1285,6 +1285,8 @@ static void reload_config(void)
     char **tmp_ptr = NULL;
     int *tmp_int_ptr = NULL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Reloading configuration %s\n",
+                 fs_conf);
     /* We received a SIGHUP. Update configuration in place */
     if (PINT_parse_config(&sighup_server_config, fs_conf, s_server_options.server_alias) < 0)
     {
@@ -1782,12 +1784,63 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         goto parse_cmd_line_args_failure;
     }
 
-    fs_conf = argv[optind++];
-    if (fs_conf[0] != '/')
+    if (argv[optind][0] != '/')
     {
-        /* force the user to enter a full path for the conf file, so that SIGHUP functionality will */
-        /* always work.                                                                             */
-        gossip_err("Error: Please specify an absolute path for the conf file.\n");
+        if( getcwd(startup_cwd, PATH_MAX) < 0 )
+        {
+            gossip_err("Failed to get current working directory to create "
+                       "absolute path for configuration file: %s\n",
+                       strerror(errno));
+        }
+
+        if( (strlen(argv[optind]) + strlen(startup_cwd) + 1) >= PATH_MAX )
+        {
+            gossip_err("Config file path greater than %d characters\n",
+                       PATH_MAX);
+            goto parse_cmd_line_args_failure;
+        }
+
+        if( strncat(startup_cwd, "/", PATH_MAX) == NULL )
+        {
+            gossip_err("Failure creating absolute path from relative "
+                       "configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+
+        /* copy the relative path into the string for the user */
+        if( strncat(startup_cwd, argv[optind++], PATH_MAX) == NULL )
+        {
+            gossip_err("Failure creating absolute path from relative "
+                       "configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+
+        if( strncpy(fs_conf, startup_cwd, PATH_MAX) == NULL )
+        {
+            gossip_err("Failure copying created full path into configuration "
+                       "file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+        gossip_err("Built path %s\n", fs_conf);
+    }
+    else
+    {
+        if( strlen(argv[optind]) >= PATH_MAX )
+        {
+            gossip_err("Config file path greater than %d characters\n",
+                       PATH_MAX);
+            goto parse_cmd_line_args_failure;
+        }
+        if( strncpy( fs_conf, argv[optind++], PATH_MAX) == NULL )
+        {
+            gossip_err("Failure copying configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+    }
+
+    if( fs_conf == NULL )
+    {
+        gossip_err("Failure copying configuration file path\n");
         goto parse_cmd_line_args_failure;
     }
 
