@@ -368,7 +368,6 @@ static PINT_sm_action prelude_perm_check(
     PVFS_ds_attributes *ds_attr = NULL;
     PVFS_uid translated_uid = s_op->req->credentials.uid;
     PVFS_gid translated_gid = s_op->req->credentials.gid;
-    PVFS_fs_id  fsid = PVFS_FS_ID_NULL;
     int squashed_flag = 0;
     int skip_acl_flag = 0;
 
@@ -409,7 +408,7 @@ static PINT_sm_action prelude_perm_check(
         else 
         {
             /* Translate the uid and gid's in case we need to do some squashing based on the export and the client address */
-            if (translate_ids(fsid, s_op->req->credentials.uid, s_op->req->credentials.gid,
+            if (translate_ids(s_op->target_fs_id, s_op->req->credentials.uid, s_op->req->credentials.gid,
                 &translated_uid, &translated_gid, s_op->addr) == 1)
             {
                 squashed_flag = 1;
@@ -425,6 +424,11 @@ static PINT_sm_action prelude_perm_check(
                 {
                     s_op->req->u.mkdir.attr.owner = translated_uid;
                     s_op->req->u.mkdir.attr.group = translated_gid;
+                }
+                else if (s_op->req->op == PVFS_SERV_CREATE)
+                {
+                    s_op->req->u.create.attr.owner = translated_uid;
+                    s_op->req->u.create.attr.group = translated_gid;
                 }
             }
        }
