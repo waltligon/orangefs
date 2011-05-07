@@ -1821,7 +1821,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                        "file path\n");
             goto parse_cmd_line_args_failure;
         }
-        gossip_err("Built path %s\n", fs_conf);
     }
     else
     {
