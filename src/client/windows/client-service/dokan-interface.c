@@ -69,7 +69,7 @@ static void DbgInit()
     }
 }
 
-static void DbgPrint(LPCSTR format, ...)
+static void DbgPrint(char *format, ...)
 {
     if (g_DebugMode) 
     {

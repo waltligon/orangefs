@@ -12,7 +12,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509_vfy.h>
 
-#include "pvfs2.h"
+#include "cert.h"
 
 extern char *convert_wstring(const wchar_t *);
 extern wchar_t *convert_mbstring(const char *);
@@ -128,7 +128,7 @@ static unsigned int get_profile_dir(char *userid,
             return -1;
         }
         
-        strcpy(profile_dir, mbstr);
+        strncpy(profile_dir, mbstr, MAX_PATH);
 
         free(mbstr);
     }

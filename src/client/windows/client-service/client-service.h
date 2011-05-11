@@ -23,4 +23,6 @@ typedef struct
     int gid;
 } ORANGEFS_USER, *PORANGEFS_USER;
 
+void DbgPrint(char *format, ...);
+
 #endif
