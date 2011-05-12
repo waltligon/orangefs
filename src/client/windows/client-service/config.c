@@ -224,8 +224,6 @@ int get_config(PORANGEFS_OPTIONS options)
                 {
                     strncpy(options->ca_path, line + 8, MAX_PATH-2);
                     options->ca_path[MAX_PATH-2] = '\0';
-                    if (options->ca_path[strlen(options->ca_path)-1] != '\\')
-                        strcat(options->ca_path, "\\");
                 }
                 else
                 {
