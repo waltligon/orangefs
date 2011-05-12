@@ -1557,6 +1557,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     ibmap->hostname = hostname;
     ibmap->port = port;
     ibmap->reconnect_flag = reconnect_flag;
+    ibmap->ref_count = 1;
 
     return map;
 }
@@ -1609,6 +1610,7 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	    ib_method_addr_t *ibmap = c->remote_map->method_data;
 	    if (ibmap->port == port && !strcmp(ibmap->hostname, hostname)) {
 	       map = c->remote_map;
+	       ibmap->ref_count++;
 	       break;
 	    }
 	}
@@ -1953,8 +1955,12 @@ static int BMI_ib_set_info(int option, void *param __unused)
     case BMI_DROP_ADDR: {
 	struct bmi_method_addr *map = param;
 	ib_method_addr_t *ibmap = map->method_data;
-	free(ibmap->hostname);
-	free(map);
+	ibmap->ref_count--;
+        if (ibmap->ref_count == 0)
+        {
+	   free(ibmap->hostname);
+	   free(map);
+        }
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
