@@ -10,6 +10,7 @@
 #include "client-service.h"
 #include "config.h"
 #include "fs.h"
+#include "user-cache.h"
 
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
@@ -36,7 +37,9 @@ DWORD WINAPI main_loop(LPVOID poptions);
 
 FILE *debug_log = NULL;
 
-struct qlist_head user_list;
+extern struct qhash_table *user_cache;
+
+PORANGEFS_OPTIONS goptions;
 
 /* externs */
 extern int __cdecl dokan_loop(PORANGEFS_OPTIONS options);
@@ -291,16 +294,20 @@ void WINAPI service_main(DWORD argc, char *argv[])
     int ret;
 
     /* allocate options */
-    options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
-    
-    /* init user list */
-    INIT_QLIST_HEAD(&user_list);
+    options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
+
+    /* init user cache */
+    user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
 
     /* default mount point */
     strcpy(options->mount_point, "Z:");
 
     /* read from config file */
     ret = get_config(options);
+
+    /* point global options */
+    goptions = options;
+    
         
 #ifndef _DEBUG
     debug = options->debug;
@@ -353,6 +360,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     
     close_service_log();
 
+    free(options);
 }
 
 DWORD thread_start(PORANGEFS_OPTIONS options)
@@ -525,14 +533,17 @@ int main(int argc, char **argv, char **envp)
   } 
   else 
   {    
-      options = (PORANGEFS_OPTIONS) calloc(sizeof(ORANGEFS_OPTIONS), 1);
+      options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */
-      INIT_QLIST_HEAD(&user_list);
+      user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
 
       /* get options from config file */
       if (get_config(options) != 0)
           return 1;
+
+      /* point goptions */
+      goptions = options;
 
       /* override with mount point from command line */
       if (strlen(mount_point) > 0)

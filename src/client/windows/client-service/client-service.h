@@ -6,6 +6,11 @@
 
 #include "quicklist.h"
 
+#define USER_MODE_NONE 0
+#define USER_MODE_LIST 1
+#define USER_MODE_CERT 2
+#define USER_MODE_LDAP 3
+
 typedef struct
 {
     char mount_point[MAX_PATH];
@@ -13,15 +18,8 @@ typedef struct
     char ca_path[MAX_PATH];
     int threads;
     int debug;
+    int user_mode;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
-
-typedef struct
-{
-    struct qlist_head list_link;
-    char user_name[256];
-    int uid;
-    int gid;
-} ORANGEFS_USER, *PORANGEFS_USER;
 
 void DbgPrint(char *format, ...);
 

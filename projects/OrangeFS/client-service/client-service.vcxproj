@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\src\client\windows\client-service\cert.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-service\config.c" />
+    <ClCompile Include="..\..\..\src\client\windows\client-service\user-cache.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-service\dokan-interface.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-service\fs.c" />
     <ClCompile Include="..\..\..\src\client\windows\client-service\service-main.c" />
@@ -29,6 +30,7 @@
     <ClInclude Include="..\..\..\src\client\windows\client-service\cert.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\client-service.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\config.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-service\user-cache.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\fs.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

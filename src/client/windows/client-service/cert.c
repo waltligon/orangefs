@@ -14,9 +14,12 @@
 #include <openssl/x509_vfy.h>
 
 #include "cert.h"
+#include "user-cache.h"
 
 extern char *convert_wstring(const wchar_t *);
 extern wchar_t *convert_mbstring(const char *);
+
+extern PORANGEFS_OPTIONS goptions;
 
 /* initialize OpenSSL */
 static void openssl_init()
@@ -262,48 +265,31 @@ static unsigned int get_profile_dir(char *userid,
 
 /* retrieve OrangeFS credentials from cert */
 static unsigned int get_cert_credentials(char *userid,
-                                         char *cert_dir_prefix,
-                                         char *ca_path,
-                                         PVFS_credentials *credentials)
+                                         PVFS_credentials *credentials,
+                                         time_t *expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
          cert_pattern[MAX_PATH];
     HANDLE h_find;
     WIN32_FIND_DATA find_data;
-    X509 *cert, *chain_cert, *ca_cert;
+    X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain;
     int ret, i;
 
-    if (userid == NULL || credentials == NULL ||
-        ca_path == NULL)
+    if (userid == NULL || credentials == NULL)
         return -1;
 
-    /* checked for cached credentials */
-    ret = get_cached_credentials(userid, credentials);
-    if (ret == 0)
-    {
-        /* cache hit */
-        return 0;
-    }
-    else if (ret != 1)
-    {
-        /* error */
-        return ret;
-    }
-
-    /* credentials not in cache... */
-
     /* locate the certificates and CA */
-    if (cert_dir_prefix != NULL)
+    if (goptions->cert_dir_prefix != NULL)
     {
-        if ((strlen(cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
+        if ((strlen(goptions->cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
         {
             DbgPrint("User %s: path to cert too long\n", userid);
             return -1;
         }
 
         /* cert dir is cert_dir_prefix\userid */
-        strcpy(cert_dir, cert_dir_prefix);
+        strcpy(cert_dir, goptions->cert_dir_prefix);
         strcat(cert_dir, userid);
     }
     else
@@ -363,7 +349,7 @@ static unsigned int get_cert_credentials(char *userid,
         goto get_cert_credentials_exit;
 
     /* load CA cert */
-    ret = load_cert_from_file(ca_path, &ca_cert);
+    ret = load_cert_from_file(goptions->ca_path, &ca_cert);
     if (ret != 0)
     {
         DbgPrint("Error loading CA cert %s: %d\n", cert_path, ret);
@@ -373,12 +359,17 @@ static unsigned int get_cert_credentials(char *userid,
     /* read and cache credentials from certificate */
     ret = verify_cert(cert, ca_cert, chain, credentials);
 
-
 get_cert_credentials_exit:
+
     /* free chain */
     while (sk_X509_num(chain) > 0)
         sk_X509_pop_free(chain, X509_free);
     sk_X509_free(chain);
+
+    if (cert != NULL)
+        X509_free(cert);
+    if (ca_cert != NULL)
+        X509_free(ca_cert);
 
     return ret;
 }

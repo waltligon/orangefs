@@ -9,8 +9,9 @@
 
 #include "client-service.h"
 #include "config.h"
+#include "user-cache.h"
 
-extern struct qlist_head user_list;
+extern struct qhash_table user_cache;
 
 FILE *open_config_file()
 {
@@ -65,7 +66,7 @@ int parse_user()
     char user_name[256];
     char uid[16], gid[16];
     int i, ret = 0;
-    PORANGEFS_USER puser;
+    PVFS_credentials credentials;
 
     /* assume current string being parsed */
     token = strtok(NULL, " \t");
@@ -129,13 +130,11 @@ int parse_user()
 
     if (ret == 0)
     {
-        /* add user to linked list */
-        puser = (PORANGEFS_USER) malloc(sizeof(ORANGEFS_USER));
-        strncpy(puser->user_name, user_name, 256);
-        puser->uid = atoi(uid);
-        puser->gid = atoi(gid);
-
-        qlist_add(&puser->list_link, &user_list);
+        /* add user to cache with no expiration */
+        credentials.uid = atoi(uid);
+        credentials.gid = atoi(gid);
+        
+        add_user(user_name, &credentials, 0);
     }
 
     return ret;
@@ -195,15 +194,56 @@ int get_config(PORANGEFS_OPTIONS options)
                 token = strtok(NULL, " \t");
                 options->threads = atoi(token);
             }
+            else if (!stricmp(token, "user-mode"))
+            {
+                token = strtok(NULL, " \t");
+                if (token == NULL)
+                {
+                    fprintf(stderr, "user-mode option must be list, certificate, or ldap\n");
+                    close_config_file(config_file);
+                    return 1;
+                }
+                if (!stricmp(token, "list"))
+                {
+                    options->user_mode = USER_MODE_LIST;
+                }
+                else if (!stricmp(token, "certificate"))
+                {
+                    options->user_mode = USER_MODE_CERT;
+                }
+                else if (!stricmp(token, "ldap"))
+                {
+                    options->user_mode = USER_MODE_LDAP;
+                }
+                else
+                {
+                    fprintf(stderr, "user-mode option must be list, certificate, or ldap\n");
+                    close_config_file(config_file);
+                    return 1;
+                }
+            }
             else if (!stricmp(token, "user")) 
             {
+                if (options->user_mode == USER_MODE_NONE)
+                {
+                    fprintf(stderr, "user option: specify 'user-mode list' above user option\n");
+                    close_config_file(config_file);
+                    return 1;
+                }
+                else if (options->user_mode != USER_MODE_LIST)
+                {
+                    fprintf(stderr, "user option: not legal with current user mode\n");
+                    close_config_file(config_file);
+                    return 1;
+                }
+
                 if (parse_user() != 0)
                 {
                     fprintf(stderr, "user option: parse error\n");
                     close_config_file(config_file);
                     return 1;
                 }
-            }
+            }            
             else if (!stricmp(token, "cert-dir-prefix"))
             {
                 if (strlen(line) > 16)

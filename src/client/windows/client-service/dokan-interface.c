@@ -12,7 +12,7 @@
 #include "str-utils.h"
 #include "client-service.h"
 #include "fs.h"
-#include "quickhash.h"
+#include "user-cache.h"
 
 FILE *g_DebugFile = NULL;
 BOOL g_UseStdErr;
@@ -20,14 +20,16 @@ BOOL g_DebugMode;
 
 extern struct qlist_head user_list;
 
-struct cred_entry
+struct context_entry
 {
     struct qhash_head hash_link;
     ULONG64 context;
     PVFS_credentials credentials;
 };
 
-struct qhash_table *cred_table;
+struct qhash_table *context_cache;
+extern struct qhash_table *user_cache;
+extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
 
@@ -371,7 +373,7 @@ static char *get_fs_path(const wchar_t *local_path)
 int cred_compare(void *key, 
                  struct qhash_head *link)
 {
-    struct cred_entry *entry = qhash_entry(link, struct cred_entry, hash_link);
+    struct context_entry *entry = qhash_entry(link, struct context_entry, hash_link);
 
     return (entry->context == *((ULONG64 *) key));
 }
@@ -384,8 +386,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     char buffer[1024], user_name[256], domain_name[256];
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
-    struct qlist_head *user_link;
-    PORANGEFS_USER puser, req_user;
+    int ret;
 
     /* get requesting user information */
     htoken = DokanOpenRequestorToken(file_info);
@@ -424,6 +425,35 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     }
 
     /* search user list for credentials */
+    ret = get_cached_user(user_name, credentials);
+    if (ret == 1)
+    {
+        /* cache miss */
+        if (goptions->user_mode == USER_MODE_LIST)
+        {
+            /* can't locate credentials for requesting user */
+            DbgPrint("   get_requestor_credentials:  user %s not found\n", user_name);
+            return -ERROR_USER_PROFILE_LOAD;
+        }
+        else if (goptions->user_mode == USER_MODE_CERT)
+        {
+            /* load credentials from certificate */
+            ret = get_cert_credentials(user_name, credentials);
+            if (ret == 0)
+            {
+                add_user(user_name, credentials);
+            }
+            else
+            {
+                /* TODO: print out OpenSSL/internal errors */
+            }
+        }
+        else /* user-mode == LDAP */ 
+        {
+            /* TODO */
+        }
+    }
+    /*
     req_user = NULL;
     qlist_for_each(user_link, &user_list)
     {
@@ -441,7 +471,8 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         credentials->gid = req_user->gid;
 
         return 0;
-    }    
+    }
+    */
 
     /* can't locate credentials for requesting user */
     DbgPrint("   get_requestor_credentials:  user %s not found\n", user_name);
@@ -452,7 +483,7 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
                            PVFS_credentials *credentials)
 {
     struct qhash_head *item;
-    struct cred_entry *entry;
+    struct context_entry *entry;
     int ret = 0;
 
     if (file_info == NULL || credentials == NULL)
@@ -464,11 +495,11 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
     {
         /* check cache for existing credentials 
            associated with the context */        
-        item = qhash_search(cred_table, &file_info->Context);
+        item = qhash_search(context_cache, &file_info->Context);
         if (item != NULL)
         {
             /* if cache hit -- return credentials */
-            entry = qhash_entry(item, struct cred_entry, hash_link);
+            entry = qhash_entry(item, struct context_entry, hash_link);
             credentials->uid = entry->credentials.uid;
             credentials->gid = entry->credentials.gid;
 
@@ -485,10 +516,9 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
     {
         /* retrieve credentials for the requestor */
         ret = get_requestor_credentials(file_info, credentials);
-        if (ret != 0)
-            return ret;
-        DbgPrint("   get_credentials:  requestor credentials (%d:%d)\n", 
-            credentials->uid, credentials->gid);
+        if (ret == 0)
+            DbgPrint("   get_credentials:  requestor credentials (%d:%d)\n", 
+              credentials->uid, credentials->gid);
     }
 
     DbgPrint("   get_credentials:  exit\n");
@@ -498,9 +528,9 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
 
 static void add_credentials(ULONG64 context, PVFS_credentials *credentials)
 {
-    struct cred_entry *entry;
+    struct context_entry *entry;
 
-    entry = (struct cred_entry *) calloc(1, sizeof(struct cred_entry));
+    entry = (struct context_entry *) calloc(1, sizeof(struct context_entry));
     if (entry == NULL)
     {
         DbgPrint("   add_credentials: out of memory\n");
@@ -510,7 +540,7 @@ static void add_credentials(ULONG64 context, PVFS_credentials *credentials)
     entry->context = context;
     entry->credentials.uid = credentials->uid;
     entry->credentials.gid = credentials->gid;
-    qhash_add(cred_table, &entry->context, &entry->hash_link);
+    qhash_add(context_cache, &entry->context, &entry->hash_link);
 
 }
 
@@ -518,10 +548,10 @@ static void remove_credentials(ULONG64 context)
 {
     struct qhash_head *link; 
     
-    link = qhash_search_and_remove(cred_table, &context);
+    link = qhash_search_and_remove(context_cache, &context);
     if (link != NULL)
     {
-        free(qhash_entry(link, struct cred_entry, hash_link));
+        free(qhash_entry(link, struct context_entry, hash_link));
     }
 
 }
@@ -1977,7 +2007,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
 
     /* init credential cache */
-    cred_table = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
+    context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
 
     g_DebugMode = g_UseStdErr = options->debug;
 
@@ -2060,7 +2090,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             break;
     }
 
-    qhash_destroy_and_finalize(cred_table, struct cred_entry, hash_link, free);
+    qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
 
     free(dokanOptions);
     free(dokanOperations);
