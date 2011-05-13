@@ -1,0 +1,1003 @@
+/*
+ * (C) 2010 Clemson University
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <assert.h>
+#include <unistd.h>
+
+#include "extent-utils.h"
+#include "pint-cached-config.h" 
+#include "pint-perf-counter.h"
+#include "pint-util.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-req-proto.h"
+#include "pvfs2-server.h"
+#include "pvfs2-types.h"
+#include "pvfs2-util.h"
+#include "server-config.h"
+#include "dist-dir-utils.h"
+
+
+/*****
+mgmt_create_root_dir.sm:
+1. enters admin mode.
+2. allocate dirdata servers for root directory.
+3. enters normal mode.
+4. create lost+found directory under the root directory.
+*****/
+
+enum
+{
+    NO_REQ = 100,
+};
+
+static char *lost_and_found_string = "lost+found";
+
+static int mkdir_lost_and_found_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+static int crdirent_lost_and_found_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+static int delete_lost_and_found_handle_comp_fn(
+        void *v_p,
+        struct PVFS_server_resp *resp_p,
+        int index);
+
+%%
+
+machine pvfs2_mgmt_create_root_dir_sm
+{
+    state check_for_request
+    {
+        run mgmt_create_root_dir_check_for_request;
+        NO_REQ => change_to_admin_mode; 
+        default => cleanup_noreq;    
+    }
+
+    state change_to_admin_mode
+    {
+        run mgmt_create_root_dir_change_to_admin_mode;
+        success => admin_response_release;
+        default => cleanup_noreq;
+    }
+
+    state admin_response_release
+    {
+        run mgmt_create_root_dir_response_release;
+        default => create_dist_dir_struct;
+    }
+   
+    state create_dist_dir_struct
+    {
+        run mgmt_create_root_dir_create_dist_dir_struct;
+        success => request_remote_dirdata_dspace;
+        default => cleanup_noreq;
+    }
+
+    state request_remote_dirdata_dspace
+    {
+        run mgmt_create_root_dir_request_remote_dirdata_dspace;
+        success => create_local_dirdata_dspace;
+        default => cleanup_noreq;
+    }
+
+    state create_local_dirdata_dspace
+    {
+        run mgmt_create_root_dir_create_local_dirdata_dspace;
+        success => fill_handles_to_dist_dir_struct;
+        default => cleanup_noreq;
+    }
+
+    state fill_handles_to_dist_dir_struct
+    {
+        run mgmt_create_root_dir_fill_handles_to_dist_dir_struct;
+        default => remote_dirdata_attr_and_keyval_setup_msgpair;
+    }
+
+    state remote_dirdata_attr_and_keyval_setup_msgpair
+    {
+        run mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair;
+        success => remote_dirdata_attr_and_keyval_xfer_msgpair;
+        default => cleanup_noreq;
+    }
+
+    state remote_dirdata_attr_and_keyval_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => write_keyval_to_meta_handle;
+        default => cleanup_noreq;
+    }
+    
+    state write_keyval_to_meta_handle
+    {
+        run mgmt_create_root_dir_write_keyval_to_meta_handle;
+        success => change_to_normal_mode;
+        default => cleanup_noreq;
+    }
+
+
+    state change_to_normal_mode
+    {
+        run mgmt_create_root_dir_change_to_normal_mode;
+        success => normal_response_release;
+        default => cleanup_noreq;
+    }
+
+    state normal_response_release
+    {
+        run mgmt_create_root_dir_response_release;
+        success => mkdir_lost_and_found_setup_msgpair;
+        default => cleanup_noreq;
+    }
+
+    state mkdir_lost_and_found_setup_msgpair
+    {
+        run mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair;
+        success => mkdir_lost_and_found_msg_xfer_msgpair;
+        default => cleanup_noreq;
+
+    }
+
+    state mkdir_lost_and_found_msg_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => crdirent_lost_and_found_setup_msgpair;
+        default => cleanup_noreq;
+    }
+
+    state crdirent_lost_and_found_setup_msgpair
+    {
+        run mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair;
+        success => crdirent_lost_and_found_xfer_msgpair;
+        default => cleanup_noreq;
+    }
+
+    state crdirent_lost_and_found_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => cleanup_noreq;
+        default => delete_lost_and_found_handle_setup_msgpair;
+    }
+
+    state delete_lost_and_found_handle_setup_msgpair
+    {
+        run mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair;
+        success => delete_lost_and_found_handle_xfer_msgpair;
+        default => cleanup_noreq;
+    }
+
+    state delete_lost_and_found_handle_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup_noreq;
+    }
+
+    state cleanup_noreq
+    {
+        run mgmt_create_root_dir_cleanup_noreq;
+        default => terminate;
+    }
+}
+
+%%
+
+/*
+ * Function: mgmt_create_root_dir_check_for_request
+ * Params:   server_op *b,
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Check if this state machine came about from a request or 
+ *           from a noreq() state machine (on server startup).
+ */
+static PINT_sm_action mgmt_create_root_dir_check_for_request( 
+    struct PINT_smcb *smcb, 
+    job_status_s *js_p)
+{
+
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+    assert(s_op);
+
+    if( s_op->req == NULL )
+    {
+        js_p->error_code = NO_REQ;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt_create_root_dir: can only be called noreq, not doing anything!!\n");
+        js_p->error_code = 0;
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
+    return SM_ACTION_COMPLETE;
+}
+
+/*
+ * Function: mgmt_create_root_dir_change_to_admin_mode
+ * Params:   server_op *b,
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Moves the server into admin mode
+ */
+static PINT_sm_action mgmt_create_root_dir_change_to_admin_mode(
+    struct PINT_smcb *smcb, 
+    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+
+    assert(s_op);
+
+    js_p->error_code = 0;
+    ret = job_req_sched_change_mode( PVFS_SERVER_ADMIN_MODE, NULL,
+                                     0, js_p, &s_op->scheduled_id, 
+                                     server_job_context);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
+    return ret;
+}
+
+
+
+
+/* init dist_dir_struct in s_op->attr.u.dir and s_op->u.mgmt_create_root_dir */
+static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    int num_total_dirdata_servers, num_initial_dirdata_servers;
+//    server_configuration_s *user_opts = get_server_config_struct();
+    int ret = -1;
+    unsigned char *c;
+    int i;
+
+    attr = (&s_op->attr);
+
+    /* use total # of meta servers as the num_total_dirdata_servers */
+    ret = PINT_cached_config_get_num_meta(s_op->target_fs_id,
+                                            &num_total_dirdata_servers);
+    if(ret < 0)
+    {
+        gossip_err("Error: failed to get number of metadata servers\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set num_dirdata_servers for pre-allocation of dirdata handles */
+    s_op->u.mgmt_create_root_dir.num_dirdata_servers =
+        num_total_dirdata_servers;
+
+    /* for root dir, use all dirdata servers */
+    num_initial_dirdata_servers = num_total_dirdata_servers;
+
+    /* init meta handle dist_dir_struct */
+    ret = PINT_init_dist_dir_state(&attr->u.dir.dist_dir_attr,
+            &attr->u.dir.dist_dir_bitmap,
+            num_total_dirdata_servers,
+            0,
+            num_initial_dirdata_servers);
+
+    assert(ret == 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "mgmt-create-root-dir: Init dist-dir-attr for dir meta handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(s_op->target_handle),
+            attr->u.dir.dist_dir_attr.tree_height,
+            attr->u.dir.dist_dir_attr.num_servers,
+            attr->u.dir.dist_dir_attr.bitmap_size,
+            attr->u.dir.dist_dir_attr.split_size,
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
+
+    /* gossip bitmap, may adjust later */
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+            "mgmt-create-root-dir: Init dist_dir_bitmap as:\n");
+    for(i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
+            i >= 0 ; i--)
+    {
+        c = (unsigned char *)(attr->u.dir.dist_dir_bitmap + i);
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                " i=%d : %02x %02x %02x %02x\n",
+                i, c[3], c[2], c[1], c[0]);
+    }
+    gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
+
+    /* allocate dirdata handle space, similar to create.sm */
+    attr->u.dir.dirdata_handles = malloc(
+            sizeof(*attr->u.dir.dirdata_handles) *
+            num_total_dirdata_servers);
+    s_op->u.mgmt_create_root_dir.handle_array_local = malloc(
+            sizeof(*s_op->u.mgmt_create_root_dir.handle_array_local) *
+            num_total_dirdata_servers);
+    s_op->u.mgmt_create_root_dir.handle_array_remote = malloc(
+            sizeof(*s_op->u.mgmt_create_root_dir.handle_array_remote) *
+            num_total_dirdata_servers);
+
+    if(!attr->u.dir.dirdata_handles ||
+            !s_op->u.mgmt_create_root_dir.handle_array_local ||
+            !s_op->u.mgmt_create_root_dir.handle_array_remote )
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* dirdata on every meta server */
+    s_op->u.mgmt_create_root_dir.handle_array_local_count = 1;
+    s_op->u.mgmt_create_root_dir.handle_array_remote_count = 
+        s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d local dirdata files\n", 
+        s_op->u.mgmt_create_root_dir.handle_array_local_count);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "creating %d remote dirdata files\n", 
+        s_op->u.mgmt_create_root_dir.handle_array_remote_count);
+
+    /* setup PVFS_credentials */
+    PINT_util_gen_credentials(
+            &s_op->u.mgmt_create_root_dir.creds);
+
+    return SM_ACTION_COMPLETE; 
+}
+
+
+static PINT_sm_action mgmt_create_root_dir_request_remote_dirdata_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t j_id;
+
+
+    if(s_op->u.mgmt_create_root_dir.handle_array_remote_count == 0)
+    {
+        js_p->error_code = 0;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    ret = job_precreate_pool_get_handles(
+        s_op->target_fs_id,
+        s_op->u.mgmt_create_root_dir.handle_array_remote_count,
+        PVFS_TYPE_DIRDATA,
+        NULL, /* server string set to NULL for now */
+        s_op->u.mgmt_create_root_dir.handle_array_remote,
+        0,
+        smcb,
+        0,
+        js_p,
+        &j_id,
+        server_job_context,
+        NULL);
+
+    return ret;
+
+}
+
+
+
+static PINT_sm_action mgmt_create_root_dir_create_local_dirdata_dspace(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    int ret = -PVFS_ENOMEM;
+    job_id_t tmp_id;
+    PVFS_handle_extent_array extent_array;
+    server_configuration_s *user_opts = get_server_config_struct();
+
+    attr = (&s_op->attr);
+
+    assert(s_op->u.mgmt_create_root_dir.num_dirdata_servers > 0);
+
+
+    if(s_op->u.mgmt_create_root_dir.handle_array_local_count == 0)
+    {
+        /* no local work to do */
+        js_p->error_code = 0;
+        return(SM_ACTION_COMPLETE);
+    }
+
+    ret = PINT_config_get_meta_handle_extent_array(
+        user_opts, s_op->target_fs_id, &extent_array);
+    assert(ret == 0);
+    assert(extent_array.extent_count > 0);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " local dirdata handle(s) will "
+                 "be in starting hrange[0] %llu-%llu\n",
+                 llu(extent_array.extent_array[0].first),
+                 llu(extent_array.extent_array[0].last));
+
+    ret = job_trove_dspace_create_list(
+        s_op->target_fs_id,
+        &extent_array,
+        s_op->u.mgmt_create_root_dir.handle_array_local,
+        s_op->u.mgmt_create_root_dir.handle_array_local_count,
+        PVFS_TYPE_DIRDATA, 
+        NULL,
+        TROVE_SYNC,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context, 
+        NULL);
+
+    return(ret);
+}
+
+
+
+static PINT_sm_action mgmt_create_root_dir_fill_handles_to_dist_dir_struct(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    int i;
+
+    attr = &s_op->attr;
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "  local dirdata handle (%llu)\n",
+        llu(s_op->u.mgmt_create_root_dir.handle_array_local[0]));
+
+    /* fill dirdata_handles array */
+    attr->u.dir.dirdata_handles[0] =
+        s_op->u.mgmt_create_root_dir.handle_array_local[0];
+
+    for(i = 0; i < s_op->u.mgmt_create_root_dir.num_dirdata_servers - 1; i++)
+    {
+        attr->u.dir.dirdata_handles[i+1] =
+            s_op->u.mgmt_create_root_dir.handle_array_remote[i];
+    }
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "\t mgmt-create-root-dir: dirdata handles array of root directory %llu.\n",
+            llu(s_op->target_handle));
+
+    for(i=0; i<s_op->u.mgmt_create_root_dir.num_dirdata_servers; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                "\t\tdirdata server %d: %llu.\n",
+                i, llu(attr->u.dir.dirdata_handles[i]));
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr attr;
+    int ret;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: send_remote_dir_data\n");
+
+    /* !!! set dirdata attr, set all the static component */
+    memset(&attr, 0, sizeof(PVFS_object_attr));
+    attr.owner = getuid();
+    attr.group = getgid();
+    attr.perms = 0777;
+    attr.objtype = PVFS_TYPE_DIRDATA;
+    PINT_dist_dir_attr_copyto(attr.u.dir.dist_dir_attr,
+                              s_op->attr.u.dir.dist_dir_attr);
+    attr.u.dir.dirdata_handles = s_op->attr.u.dir.dirdata_handles;
+    attr.u.dir.dist_dir_bitmap = s_op->attr.u.dir.dist_dir_bitmap;
+    attr.mask = PVFS_ATTR_COMMON_ALL;
+    attr.mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG,
+        "  SENDING attrs: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu ]\n",
+        attr.owner, attr.group, attr.perms,
+        attr.objtype, llu(attr.atime),
+        llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
+
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->target_fs_id);
+
+    PINT_SERVREQ_TREE_SETATTR_FILL(
+        msg_p->req,
+        s_op->u.mgmt_create_root_dir.creds,
+        s_op->target_fs_id,
+        PVFS_TYPE_DIRDATA,
+        attr,
+        s_op->attr.u.dir.dist_dir_attr.num_servers,
+        s_op->attr.u.dir.dirdata_handles,
+        NULL);
+
+    msg_p->fs_id = s_op->target_fs_id;
+    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr;
+    int ret = -1;
+    job_id_t j_id;
+
+    /* total 3 keyvals, PVFS_DIST_DIR_ATTR, PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES */
+    int keyval_count = 3;
+
+    /* !!!! this is to set meta handle keyval,
+     * use dist_dir_attr in s_op->attr 
+     */
+    attr = &s_op->attr;
+
+    s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->key_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    s_op->val_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
+    if(!s_op->val_a)
+    {
+        free(s_op->key_a);
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(s_op->val_a, 0, sizeof(PVFS_ds_keyval) * keyval_count);
+
+    s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+
+    s_op->val_a[0].buffer = &attr->u.dir.dist_dir_attr;
+    s_op->val_a[0].buffer_sz =
+         sizeof(attr->u.dir.dist_dir_attr);
+
+    s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
+    s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
+
+    s_op->val_a[1].buffer_sz =
+        attr->u.dir.dist_dir_attr.bitmap_size * 
+        sizeof(PVFS_dist_dir_bitmap_basetype);
+    s_op->val_a[1].buffer = attr->u.dir.dist_dir_bitmap;
+
+    s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+
+    s_op->val_a[2].buffer = attr->u.dir.dirdata_handles;
+    s_op->val_a[2].buffer_sz = attr->u.dir.dist_dir_attr.num_servers * 
+        sizeof(*attr->u.dir.dirdata_handles);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, 
+            "  writing dist-dir-struct keyvals for meta handle: %llu "
+            "\t with server_no=%d and branch_level=%d \n", 
+            llu(s_op->target_handle),
+            attr->u.dir.dist_dir_attr.server_no,
+            attr->u.dir.dist_dir_attr.branch_level);
+
+
+    ret = job_trove_keyval_write_list(
+            s_op->target_fs_id,
+            s_op->target_handle, /* meta handle */
+            s_op->key_a, s_op->val_a,
+            keyval_count, TROVE_SYNC, NULL, smcb,
+            0, js_p, &j_id, server_job_context,
+            NULL);
+
+    return ret;
+}
+
+
+
+
+
+
+
+
+/*
+ * Function: mgmt_create_root_dir_change_to_normal_mode
+ * Params:   server_op *b,
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: Moves the server into normal mode
+ */
+static PINT_sm_action mgmt_create_root_dir_change_to_normal_mode(
+    struct PINT_smcb *smcb, 
+    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+    assert(s_op);
+
+    js_p->error_code = 0;
+    ret = job_req_sched_change_mode( PVFS_SERVER_NORMAL_MODE, NULL,
+                                     0, js_p, &s_op->scheduled_id, 
+                                     server_job_context);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
+    return ret;
+}
+
+/*
+ * Function: mgmt_create_root_dir_response_release
+ *
+ * Params:   server_op *b,
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: release the operation from the request scheduler 
+ *           (from final-response.sm)
+ *
+ */
+static PINT_sm_action mgmt_create_root_dir_response_release( struct PINT_smcb *smcb, 
+                                                      job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = 0;
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+
+    /* catch cases in which the operation has not been scheduled */
+    if (!s_op->scheduled_id)
+    {
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
+
+    ret = job_req_sched_release( s_op->scheduled_id, smcb, 0, js_p, 
+                                 &tmp_id, server_job_context);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
+    return ret;
+}
+
+
+
+static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PVFS_handle_extent_array meta_handle_extent_array;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_sys_attr sys_attr;
+    PVFS_sys_layout layout;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+
+    js_p->error_code = 0;
+
+
+    memset(&sys_attr, 0, sizeof(sys_attr));
+    sys_attr.owner = getuid();
+    sys_attr.group = getgid();
+    sys_attr.perms = 0777;
+    sys_attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+    sys_attr.objtype = PVFS_TYPE_DIRECTORY;
+    // use all dirdata servers
+    sys_attr.dirdata_count = 
+        s_op->attr.u.dir.dist_dir_attr.num_servers;
+
+    memset(&layout, 0, sizeof(layout));
+    layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG," mgmt_create_root_dir: posting mkdir req for lost+found dir.\n ");
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+
+    ret = PINT_cached_config_get_next_meta(
+        s_op->target_fs_id,
+        &msg_p->svr_addr, &meta_handle_extent_array);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+
+    PINT_SERVREQ_MKDIR_FILL(
+        msg_p->req,
+        s_op->u.mgmt_create_root_dir.creds,
+        s_op->target_fs_id,
+        meta_handle_extent_array,
+        sys_attr,
+        s_op->attr.u.dir.dist_dir_attr.num_servers,
+        layout,
+        NULL);
+
+    msg_p->fs_id = s_op->target_fs_id;
+    msg_p->handle = meta_handle_extent_array.extent_array[0].first;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = mkdir_lost_and_found_comp_fn;
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static int mkdir_lost_and_found_comp_fn(void *v_p,
+                             struct PVFS_server_resp *resp_p,
+                             int index)
+{
+    PINT_smcb *smcb = v_p;
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mkdir_lost_and_found_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_MKDIR);
+
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    /* otherwise, just stash the newly created meta handle */
+    s_op->u.mgmt_create_root_dir.lost_and_found_handle = resp_p->u.mkdir.handle;
+
+    gossip_debug(
+        GOSSIP_SERVER_DEBUG, "*** Got newly created dir handle %llu for lost+found dir.\n",
+        llu(s_op->u.mgmt_create_root_dir.lost_and_found_handle));
+
+    return 0;
+}
+
+
+
+static PINT_sm_action mgmt_create_root_dir_crdirent_lost_and_found_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_dist_dir_hash_type dirdata_hash;
+    int dirdata_server_index;
+
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "mgmt-create-root-dir state: crdirent_lost_and_found_setup_msgpair\n");
+
+    js_p->error_code = 0;
+    
+    /* find the hash value and the dist dir bucket */
+    dirdata_hash = PINT_encrypt_dirdata(lost_and_found_string);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir: encrypt dirent %s into hash value %llu.\n",
+            lost_and_found_string,
+            llu(dirdata_hash));
+
+    dirdata_server_index = 
+        PINT_find_dist_dir_bucket(dirdata_hash,
+            &s_op->attr.u.dir.dist_dir_attr,
+            s_op->attr.u.dir.dist_dir_bitmap);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir: selecting bucket No.%d from dist_dir_bitmap.\n",
+            dirdata_server_index);
+
+    gossip_debug(GOSSIP_SERVER_DEBUG," mgmt-create-root-dir: posting crdirent req\n");
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "hooking dirent %s (%llu) under "
+                 "parent handle %llu, dirdata_handle %llu with server_no=%d\n",
+                 lost_and_found_string,
+                 llu(s_op->u.mgmt_create_root_dir.lost_and_found_handle),
+                 llu(s_op->target_handle),
+                 llu(s_op->attr.u.dir.dirdata_handles[dirdata_server_index]),
+                 dirdata_server_index);
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+
+    PINT_SERVREQ_CRDIRENT_FILL(
+        msg_p->req,
+        s_op->u.mgmt_create_root_dir.creds,
+        lost_and_found_string,
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle,
+        s_op->target_handle,
+        s_op->attr.u.dir.dirdata_handles[dirdata_server_index],
+        s_op->target_fs_id,
+        NULL);
+
+    msg_p->fs_id = s_op->target_fs_id;
+    /* send to dirdata server */
+    msg_p->handle = 
+        s_op->attr.u.dir.dirdata_handles[dirdata_server_index];
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = crdirent_lost_and_found_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle,
+        s_op->target_fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+static int crdirent_lost_and_found_comp_fn(void *v_p,
+                                  struct PVFS_server_resp *resp_p,
+                                  int index)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+    return resp_p->status;
+}
+
+
+
+static PINT_sm_action mgmt_create_root_dir_delete_lost_and_found_handle_setup_msgpair(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    PVFS_BMI_addr_t metafile_server_addr;
+    PINT_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: "
+                 "delete_lost_and_found_handle_setup_msgpair_array\n");
+
+    js_p->error_code = 0;
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+
+    ret = PINT_cached_config_map_to_server(
+        &metafile_server_addr, 
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle,
+        s_op->target_fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    PINT_SERVREQ_REMOVE_FILL(
+        msg_p->req,
+        s_op->u.mgmt_create_root_dir.creds,
+        s_op->target_fs_id,
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle,
+        NULL);
+
+    msg_p->fs_id = s_op->target_fs_id;
+    msg_p->handle = 
+        s_op->u.mgmt_create_root_dir.lost_and_found_handle;
+    msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    msg_p->comp_fn = delete_lost_and_found_handle_comp_fn;
+    msg_p->svr_addr = metafile_server_addr;
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, " Preparing to remove "
+                 "lost+found directory handle %llu\n", llu(msg_p->handle));
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    return SM_ACTION_COMPLETE;
+}
+
+
+static int delete_lost_and_found_handle_comp_fn(void *v_p,
+                                       struct PVFS_server_resp *resp_p,
+                                       int index)
+{
+    gossip_debug(GOSSIP_SERVER_DEBUG, "delete_lost_and_found_handle_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_REMOVE);
+    return resp_p->status;
+}
+
+
+
+/*
+ * Function: mgmt_create_root_dir_cleanup_noreq
+ *
+ * Params:   server_op *b,
+ *           job_status_s *js_p
+ *
+ * Returns:  int
+ *
+ * Synopsis: free memory and return
+ *
+ */
+static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb, 
+        job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
+
+    assert(s_op);
+
+    /* this ensures that we succeeded in getting this mirror made. if
+     * we failed we will be in admin mode (unless we didn't get in admin
+     * mode) but the sm will still error out. */
+    //assert( PINT_req_sched_get_mode() == PVFS_SERVER_NORMAL_MODE );
+
+    if(s_op->key_a)
+    {
+        free(s_op->key_a);
+    }
+
+    if(s_op->val_a)
+    {
+        free(s_op->val_a);
+    }
+
+    PINT_free_object_attr(&s_op->attr);
+
+    if(s_op->u.mgmt_create_root_dir.handle_array_local)
+    {
+        free(s_op->u.mgmt_create_root_dir.handle_array_local);
+    }
+
+    if(s_op->u.mgmt_create_root_dir.handle_array_remote)
+    {
+        free(s_op->u.mgmt_create_root_dir.handle_array_remote);
+    }
+
+
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
+    return(server_state_machine_complete_noreq(smcb));
+}
+
+
+PINT_GET_OBJECT_REF_DEFINE(mgmt_create_root_dir);
+
+struct PINT_server_req_params pvfs2_mgmt_create_root_dir_params =
+{
+    .string_name = "mgmt-create-root-dir",
+    .get_object_ref = PINT_get_object_ref_mgmt_create_root_dir,
+    .perm = PINT_SERVER_CHECK_NONE,
+    .access_type = PINT_server_req_modify,
+    .sched_policy = PINT_SERVER_REQ_SCHEDULE,
+    .state_machine = &pvfs2_mgmt_create_root_dir_sm
+};
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

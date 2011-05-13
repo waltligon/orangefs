@@ -48,7 +48,8 @@ ifdef BUILD_SERVER
 		$(DIR)/precreate-pool-refiller.c \
 		$(DIR)/unstuff.c \
                 $(DIR)/tree-communicate.c \
-                $(DIR)/mgmt-get-dirent.c
+                $(DIR)/mgmt-get-dirent.c \
+                $(DIR)/mgmt-create-root-dir.c 
 
 	# c files that should be added to server library
 	SERVERSRC += \

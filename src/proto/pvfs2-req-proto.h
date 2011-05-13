@@ -85,6 +85,7 @@ enum PVFS_server_op
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
     PVFS_SERV_TREE_SETATTR = 43,
     PVFS_SERV_MGMT_GET_DIRENT = 44,
+    PVFS_SERV_MGMT_CREATE_ROOT_DIR = 45,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -95,7 +96,10 @@ enum PVFS_server_op
 #define PVFS_SERV_IS_MGMT_OP(x) \
     ((x) == PVFS_SERV_MGMT_SETPARAM \
   || (x) == PVFS_SERV_MGMT_REMOVE_OBJECT \
-  || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
+  || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT \
+  || (x) == PVFS_SERV_MGMT_CREATE_ROOT_DIR \
+  || (x) == PVFS_SERV_TREE_SETATTR \
+)
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -2029,6 +2033,34 @@ endecode_fields_2_struct(
     PVFS_handle, handle,
     PVFS_error, error);
 
+
+/* mgmt_create_root_dir */
+/* - used to create root directory at very first startup time, only called noreq */
+struct PVFS_servreq_mgmt_create_root_dir
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+};
+endecode_fields_2_struct(
+    PVFS_servreq_mgmt_create_root_dir,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id);
+
+#define PINT_SERVREQ_MGMT_CREATE_ROOT_DIR_FILL(__req,   \
+                                                  __creds, \
+                                                  __fsid,  \
+                                                  __handle,\
+                                                  __hints) \
+do {                                                       \
+    memset(&(__req), 0, sizeof(__req));                    \
+    (__req).op = PVFS_SERV_MGMT_CREATE_ROOT_DIR;        \
+    (__req).credentials = (__creds);                       \
+    (__req).hints = (__hints);                             \
+    (__req).u.mgmt_create_root_dir.fs_id = (__fsid);    \
+    (__req).u.mgmt_create_root_dir.handle = (__handle); \
+} while (0)
+
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -2076,6 +2108,7 @@ struct PVFS_server_req
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
         struct PVFS_servreq_tree_setattr tree_setattr;
         struct PVFS_servreq_mgmt_get_dirent mgmt_get_dirent;
+        struct PVFS_servreq_mgmt_create_root_dir mgmt_create_root_dir;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

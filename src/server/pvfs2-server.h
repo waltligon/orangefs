@@ -616,6 +616,20 @@ struct PINT_server_mgmt_get_dirent_op
     PVFS_handle handle;
 };
 
+
+struct PINT_server_mgmt_create_root_dir_op
+{
+    PVFS_handle lost_and_found_handle;
+    PVFS_credentials creds;
+    int num_dirdata_servers;
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    PVFS_error saved_error_code;
+    int handle_index;
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -712,6 +726,7 @@ typedef struct PINT_server_op
         struct PINT_server_mirror_op mirror;
         struct PINT_server_tree_communicate_op tree_communicate;
         struct PINT_server_mgmt_get_dirent_op mgmt_get_dirent;
+        struct PINT_server_mgmt_create_root_dir_op mgmt_create_root_dir;
     } u;
 
 } PINT_server_op;
@@ -814,6 +829,7 @@ int server_state_machine_alloc_noreq(
     enum PVFS_server_op op, struct PINT_smcb ** new_op);
 int server_state_machine_start_noreq(
     struct PINT_smcb *new_op);
+int server_state_machine_complete_noreq(PINT_smcb *smcb);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0
