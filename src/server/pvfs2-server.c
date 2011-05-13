@@ -1293,52 +1293,6 @@ static int server_check_if_root_directory_created( void )
                     PINT_smcb_free(tmp_op);
                     return ret;
                 }
-
-#if 0
-                /* create the lost+found directory !!! */
-                PVFS_sys_attr       attr;
-                PVFS_object_ref     parent_ref;
-                PVFS_sysresp_mkdir  resp_mkdir;
-                PVFS_credentials creds;
-                char *lost_and_found_string = "lost+found";
-
-                /* Initialize any variables */
-                memset(&attr,        0, sizeof(attr));
-                memset(&parent_ref,  0, sizeof(parent_ref));
-                memset(&resp_mkdir,  0, sizeof(resp_mkdir));
-
-                parent_ref.fs_id = cur_fs->coll_id;
-                parent_ref.handle = root_handle;
-
-                PINT_util_gen_credentials(&creds);
-
-                attr.owner = getuid();
-                attr.group = getgid();
-                attr.perms = 0777;
-                attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
-                ret = PINT_cached_config_get_num_meta(
-                        cur_fs->coll_id,
-                        &attr.dirdata_count);
-                if(ret < 0)
-                {
-                    gossip_err("Error: failed to get number of metadata servers\n");
-                    return ret;
-                }
-
-
-                ret = PVFS_sys_mkdir(lost_and_found_string, 
-                        parent_ref, 
-                        attr,
-                        &creds, 
-                        &resp_mkdir, NULL);
-
-                if (ret < 0)
-                {
-                    PVFS_perror("PVFS_sys_mkdir", ret);
-                    return(ret);
-                }
-#endif
-
             }
             else // debug print
             {
