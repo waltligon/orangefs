@@ -9,9 +9,11 @@
 #include "dokan.h"
 
 #include "pvfs2.h"
+#include "gen-locks.h"
 #include "str-utils.h"
 #include "client-service.h"
 #include "fs.h"
+#include "cert.h"
 #include "user-cache.h"
 
 FILE *g_DebugFile = NULL;
@@ -28,6 +30,7 @@ struct context_entry
 };
 
 struct qhash_table *context_cache;
+gen_mutex_t context_cache_mutex;
 extern struct qhash_table *user_cache;
 extern PORANGEFS_OPTIONS goptions;
 
@@ -386,6 +389,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     char buffer[1024], user_name[256], domain_name[256];
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
+    time_t expires;
     int ret;
 
     /* get requesting user information */
@@ -438,10 +442,10 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         else if (goptions->user_mode == USER_MODE_CERT)
         {
             /* load credentials from certificate */
-            ret = get_cert_credentials(user_name, credentials);
+            ret = get_cert_credentials(user_name, credentials, &expires);
             if (ret == 0)
             {
-                add_user(user_name, credentials);
+                add_user(user_name, credentials, expires);
             }
             else
             {
@@ -494,7 +498,8 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
     if (file_info->Context != 0)
     {
         /* check cache for existing credentials 
-           associated with the context */        
+           associated with the context */    
+        gen_mutex_lock(&context_cache_mutex);
         item = qhash_search(context_cache, &file_info->Context);
         if (item != NULL)
         {
@@ -511,6 +516,7 @@ static int get_credentials(PDOKAN_FILE_INFO file_info,
             DbgPrint("   get_credentials:  not found\n");
             ret = -1;
         }
+        gen_mutex_unlock(&context_cache_mutex);
     }
     else
     {
@@ -540,20 +546,23 @@ static void add_credentials(ULONG64 context, PVFS_credentials *credentials)
     entry->context = context;
     entry->credentials.uid = credentials->uid;
     entry->credentials.gid = credentials->gid;
-    qhash_add(context_cache, &entry->context, &entry->hash_link);
 
+    gen_mutex_lock(&context_cache_mutex);
+    qhash_add(context_cache, &entry->context, &entry->hash_link);
+    gen_mutex_unlock(&context_cache_mutex);
 }
 
 static void remove_credentials(ULONG64 context)
 {
     struct qhash_head *link; 
     
+    gen_mutex_lock(&context_cache_mutex);
     link = qhash_search_and_remove(context_cache, &context);
     if (link != NULL)
     {
         free(qhash_entry(link, struct context_entry, hash_link));
     }
-
+    gen_mutex_unlock(&context_cache_mutex);
 }
 
 /* Permission constants */
@@ -2008,6 +2017,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 
     /* init credential cache */
     context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
+    gen_mutex_init(&context_cache_mutex);
 
     g_DebugMode = g_UseStdErr = options->debug;
 
@@ -2091,6 +2101,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     }
 
     qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
+    gen_mutex_destroy(&context_cache_mutex);
 
     free(dokanOptions);
     free(dokanOperations);

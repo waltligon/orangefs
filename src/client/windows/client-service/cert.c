@@ -263,10 +263,21 @@ static unsigned int get_profile_dir(char *userid,
     return ret;
 }
 
+static time_t get_cert_expires(X509 *cert)
+{
+    ASN1_INTEGER *asn1_int;
+
+    asn1_int = X509_get_notAfter(cert);
+    if (asn1_int != NULL)
+        return ASN1_INTEGER_get(asn1_int);
+
+    return 0;
+}
+
 /* retrieve OrangeFS credentials from cert */
-static unsigned int get_cert_credentials(char *userid,
-                                         PVFS_credentials *credentials,
-                                         time_t *expires)
+static int get_cert_credentials(char *userid,
+                                PVFS_credentials *credentials,
+                                time_t *expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
          cert_pattern[MAX_PATH];
@@ -322,9 +333,10 @@ static unsigned int get_cert_credentials(char *userid,
         return -1;
     }
 
-    do {
-       strcpy(cert_path, cert_dir);
-       strcat(cert_path, find_data.cFileName);
+    do
+    {
+        strcpy(cert_path, cert_dir);
+        strcat(cert_path, find_data.cFileName);
         /* load proxy cert */
         if (!stricmp(find_data.cFileName, "cert.0"))
         {
@@ -345,6 +357,9 @@ static unsigned int get_cert_credentials(char *userid,
 
     FindClose(h_find);
     
+    if (cert == NULL)
+        ret = -1;
+    
     if (ret != 0)
         goto get_cert_credentials_exit;
 
@@ -358,6 +373,11 @@ static unsigned int get_cert_credentials(char *userid,
 
     /* read and cache credentials from certificate */
     ret = verify_cert(cert, ca_cert, chain, credentials);
+
+    if (ret == 0)
+    {
+        *expires = get_cert_expires(cert);
+    }
 
 get_cert_credentials_exit:
 

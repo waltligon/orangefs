@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "gen-locks.h"
+
 #include "client-service.h"
 #include "config.h"
 #include "fs.h"
@@ -38,6 +40,8 @@ DWORD WINAPI main_loop(LPVOID poptions);
 FILE *debug_log = NULL;
 
 extern struct qhash_table *user_cache;
+
+extern gen_mutex_t user_cache_mutex;
 
 PORANGEFS_OPTIONS goptions;
 
@@ -298,6 +302,8 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     /* init user cache */
     user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
+    
+    gen_mutex_init(&user_cache_mutex);
 
     /* default mount point */
     strcpy(options->mount_point, "Z:");
@@ -537,6 +543,8 @@ int main(int argc, char **argv, char **envp)
 
       /* init user list */
       user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
+      
+      gen_mutex_init(&user_cache_mutex);
 
       /* get options from config file */
       if (get_config(options) != 0)
@@ -569,6 +577,8 @@ int main(int argc, char **argv, char **envp)
       err = main_loop(options);
       
       printf("main_loop exited: %d\n", err);
+
+      gen_mutex_destroy(&user_cache_mutex);
 
       free(options);
   }
