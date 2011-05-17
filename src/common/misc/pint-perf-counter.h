@@ -12,8 +12,8 @@
 #include "gen-locks.h"
 
 enum {
-PERF_DEFAULT_TIME_INTERVAL_SECS = 300,
-PERF_DEFAULT_HISTORY_SIZE       = 6,
+    PERF_DEFAULT_TIME_INTERVAL_SECS = 300,
+    PERF_DEFAULT_HISTORY_SIZE       = 6,
 };
 
 /** flag that indicates that values for a particular key should be preserved
@@ -75,19 +75,19 @@ struct PINT_perf_counter
 extern struct PINT_perf_counter *PINT_server_pc;
 
 struct PINT_perf_counter* PINT_perf_initialize(
-    struct PINT_perf_key* key_array);
+        struct PINT_perf_key* key_array);
 
 void PINT_perf_finalize(
-    struct PINT_perf_counter* pc);
+        struct PINT_perf_counter* pc);
 
 void PINT_perf_reset(
-    struct PINT_perf_counter* pc);
+        struct PINT_perf_counter* pc);
 
 void __PINT_perf_count(
-    struct PINT_perf_counter* pc,
-    int key, 
-    int64_t value,
-    enum PINT_perf_ops op);
+        struct PINT_perf_counter* pc,
+        int key, 
+        int64_t value,
+        enum PINT_perf_ops op);
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     #define PINT_perf_count(w,x,y,z) do{}while(0)
@@ -96,29 +96,29 @@ void __PINT_perf_count(
 #endif
 
 void PINT_perf_rollover(
-    struct PINT_perf_counter* pc);
+        struct PINT_perf_counter* pc);
 
 int PINT_perf_set_info(
-    struct PINT_perf_counter* pc,
-    enum PINT_perf_option option,
-    unsigned int arg);
+        struct PINT_perf_counter* pc,
+        enum PINT_perf_option option,
+        unsigned int arg);
 
 int PINT_perf_get_info(
-    struct PINT_perf_counter* pc,
-    enum PINT_perf_option option,
-    unsigned int* arg);
+        struct PINT_perf_counter* pc,
+        enum PINT_perf_option option,
+        unsigned int* arg);
 
 void PINT_perf_retrieve(
-    struct PINT_perf_counter* pc,        
-    int64_t** value_matrix,
-    uint64_t* start_time_array_ms,       
-    uint64_t* interval_array_ms,         
-    int max_key,                         
-    int max_history);     
+        struct PINT_perf_counter* pc,        
+        int64_t** value_matrix,
+        uint64_t* start_time_array_ms,       
+        uint64_t* interval_array_ms,         
+        int max_key,                         
+        int max_history);     
 
 char* PINT_perf_generate_text(
-    struct PINT_perf_counter* pc,
-    int max_size);
+        struct PINT_perf_counter* pc,
+        int max_size);
 
 #endif /* __PINT_PERF_COUNTER_H */
 

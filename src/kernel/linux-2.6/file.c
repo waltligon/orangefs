@@ -2962,8 +2962,12 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
  */
 
 #ifdef HAVE_NO_FS_IOC_FLAGS
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+long pvfs2_ioctl(
+#else
 int pvfs2_ioctl(
         struct inode *inode,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
         struct file *file,
         unsigned int cmd,
         unsigned long arg)
@@ -2972,8 +2976,12 @@ int pvfs2_ioctl(
 }
 #else
 
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+long pvfs2_ioctl(
+#else
 int pvfs2_ioctl(
     struct inode *inode,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     struct file *file,
     unsigned int cmd,
     unsigned long arg)
@@ -2994,7 +3002,7 @@ int pvfs2_ioctl(
 #ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
                 file->f_dentry,
 #else
-                inode,
+                file->f_dentry->d_inode,
 #endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
                 "user.pvfs2.meta_hint",
                 &val, 
@@ -3043,7 +3051,7 @@ int pvfs2_ioctl(
 #ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
                 file->f_dentry,
 #else
-                inode,
+                file->f_dentry->d_inode,
 #endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
                 "user.pvfs2.meta_hint",
                 &val, 
@@ -3397,7 +3405,11 @@ struct file_operations pvfs2_file_operations =
     .aio_write = pvfs2_file_aio_write,
 #  endif
 #endif
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+    .unlocked_ioctl = pvfs2_ioctl,
+#else
     .ioctl = pvfs2_ioctl,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,

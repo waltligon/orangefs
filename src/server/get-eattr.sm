@@ -86,11 +86,25 @@ static PINT_sm_action geteattr_setup_resp(
 
     js_p->error_code = 0;
 
+    /* ensure not too many keys were requested */
+    if( s_op->req->u.geteattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* iterate through the keys and see if they fall into valid name spaces */
     for(i=0; i<s_op->req->u.geteattr.nkey; i++)
     {
         gossip_debug(GOSSIP_GETEATTR_DEBUG, "geteattr key %d : %s\n", i, 
                 (char *) s_op->req->u.geteattr.key[i].buffer);
+
+        /* ensure no buffer_sz is too larger */
+        if( s_op->req->u.geteattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
 
         js_p->error_code = PINT_eattr_check_access(
             &s_op->req->u.geteattr.key[i],

@@ -690,6 +690,7 @@ kernapps: $(KERNAPPS) $(KERNAPPSTHR)
 
 # this is needed for the make dist
 statecompgen: $(STATECOMPGEN)
+
 # target for builging development tools
 develtools: $(DEVELTOOLS)
 

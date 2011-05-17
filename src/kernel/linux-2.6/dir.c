@@ -321,14 +321,6 @@ static int pvfs2_readdir(
                 file->f_pos = PVFS_READDIR_END;
             }
 
-            /* did we hit the end of the directory? */
-            if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
-            {
-                gossip_debug(GOSSIP_DIR_DEBUG,
-                    "End of dir detected; setting f_pos to PVFS_READDIR_END.\n");
-                file->f_pos = PVFS_READDIR_END;
-            }
-
             gossip_debug(GOSSIP_DIR_DEBUG, 
                          "pos = %llu, file->f_pos should have been %ld\n",
                          llu(pos),

@@ -82,6 +82,7 @@ typedef struct {
     int port;
     ib_connection_t *c;
     int reconnect_flag;
+    int ref_count;  
 } ib_method_addr_t;
 
 /*

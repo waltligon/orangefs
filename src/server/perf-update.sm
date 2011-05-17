@@ -94,11 +94,11 @@ static PINT_sm_action perf_update_do_work(
 	
     /* post another timer */
     return(job_req_sched_post_timer(user_opts->perf_update_interval,
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+	        smcb,
+	        0,
+	        js_p,
+	        &tmp_id,
+	        server_job_context));
 }
 
 static int perm_perf_update(PINT_server_op *s_op)

@@ -1,8 +1,5 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
-/* Define if building universal (internal helper macro) */
-#undef AC_APPLE_UNIVERSAL_BUILD
-
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -147,6 +144,9 @@
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
 
+/* Define if pwd.h exists */
+#undef HAVE_GETPWUID
+
 /* Define if struct super_operations in kernel has get_fs_key callback */
 #undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 
@@ -170,6 +170,9 @@
 
 /* Define if kernel has iget_locked */
 #undef HAVE_IGET_LOCKED
+
+/* Define if inode_setattr is defined */
+#undef HAVE_INODE_SETATTR
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -257,9 +260,6 @@
 
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
-
-/* Define to 1 if you have the <mntent.h,> header file. */
-#undef HAVE_MNTENT_H_
 
 /* Define if mount.h contains MNT_NOATIME flags */
 #undef HAVE_MNT_NOATIME
@@ -437,6 +437,9 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define if file_operations struct has unlocked_ioctl member */
+#undef HAVE_UNLOCKED_IOCTL_HANDLER
+
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 
@@ -484,10 +487,10 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of `long int', as computed by sizeof. */
+/* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of `void *', as computed by sizeof. */
+/* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -505,14 +508,6 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
-/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
-   significant byte first (like Motorola and SPARC, unlike Intel). */
-#if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
-#else
-# ifndef WORDS_BIGENDIAN
-#  undef WORDS_BIGENDIAN
-# endif
-#endif
+/* Define to 1 if your processor stores words with the most significant byte
+   first (like Motorola and SPARC, unlike Intel and VAX). */
+#undef WORDS_BIGENDIAN

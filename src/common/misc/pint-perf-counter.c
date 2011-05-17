@@ -79,7 +79,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
 
     /* allocate time arrays */
     pc->start_time_array_ms =
-        (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     if(!pc->start_time_array_ms)
     {
         gen_mutex_destroy(&pc->mutex);
@@ -87,7 +87,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
         return(NULL);
     }
     pc->interval_array_ms = 
-        (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     if(!pc->interval_array_ms)
     {
         free(pc->start_time_array_ms);
@@ -96,9 +96,9 @@ struct PINT_perf_counter* PINT_perf_initialize(
         return(NULL);
     }
     memset(pc->start_time_array_ms, 0,
-        PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     memset(pc->interval_array_ms, 0,
-        PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
         
     /* allocate value matrix */
     pc->value_matrix = (int64_t**)malloc(pc->key_count*sizeof(int64_t*));
@@ -114,7 +114,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
     for(i=0; i<pc->key_count; i++)
     {
         pc->value_matrix[i] =
-            (int64_t*)malloc(pc->history_size*sizeof(int64_t));
+                (int64_t*)malloc(pc->history_size*sizeof(int64_t));
         if(!pc->value_matrix[i])
         {
             for(i=i-1; i>= 0; i--)
@@ -153,9 +153,9 @@ void PINT_perf_reset(
 
     /* zero out all fields */
     memset(pc->start_time_array_ms, 0,
-        PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     memset(pc->interval_array_ms, 0,
-        PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
+            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
     for(i=0; i<pc->key_count; i++)
     {
         if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
@@ -178,7 +178,7 @@ void PINT_perf_reset(
  * destroys a perf counter instance
  */
 void PINT_perf_finalize(
-    struct PINT_perf_counter* pc)    /**< pointer to counter instance */
+        struct PINT_perf_counter* pc)    /**< pointer to counter instance */
 {
     int i;
 
@@ -200,11 +200,10 @@ void PINT_perf_finalize(
  * performs an operation on the given key within a performance counter
  * \see PINT_perf_count macro
  */
-void __PINT_perf_count(
-    struct PINT_perf_counter* pc,
-    int key, 
-    int64_t value,
-    enum PINT_perf_ops op)
+void __PINT_perf_count( struct PINT_perf_counter* pc,
+                        int key, 
+                        int64_t value,
+                        enum PINT_perf_ops op)
 {
     if(!pc)
     {
@@ -246,8 +245,7 @@ void __PINT_perf_count(
 /** 
  * rolls over the current history window
  */
-void PINT_perf_rollover(
-    struct PINT_perf_counter* pc)
+void PINT_perf_rollover( struct PINT_perf_counter* pc)
 {
     int i;
     struct timeval tv;
@@ -270,12 +268,12 @@ void PINT_perf_rollover(
         for(i=0; i<pc->key_count; i++)
         {
             memmove(&pc->value_matrix[i][1], &pc->value_matrix[i][0],
-                ((pc->history_size-1)*sizeof(int64_t)));
+                    ((pc->history_size-1)*sizeof(int64_t)));
         }
         memmove(&pc->interval_array_ms[1], &pc->interval_array_ms[0],
-            ((pc->history_size-1)*sizeof(uint64_t)));
+                ((pc->history_size-1)*sizeof(uint64_t)));
         memmove(&pc->start_time_array_ms[1], &pc->start_time_array_ms[0],
-            ((pc->history_size-1)*sizeof(uint64_t)));
+                ((pc->history_size-1)*sizeof(uint64_t)));
         if(int_time > pc->start_time_array_ms[1])
         {
             pc->interval_array_ms[1] = int_time - pc->start_time_array_ms[1];
@@ -304,10 +302,9 @@ void PINT_perf_rollover(
  * sets runtime tunable performance counter options 
  * \returns 0 on success, -PVFS_error on failure
  */
-int PINT_perf_set_info(
-    struct PINT_perf_counter* pc,
-    enum PINT_perf_option option,
-    unsigned int arg)
+int PINT_perf_set_info(  struct PINT_perf_counter* pc,
+                         enum PINT_perf_option option,
+                         unsigned int arg)
 {
     uint64_t* tmp_unsigned;
     int64_t* tmp_signed;
@@ -334,22 +331,22 @@ int PINT_perf_set_info(
                  * counter instance will still be operational
                  */
                 PINT_PERF_REALLOC_ARRAY(pc,
-                    tmp_unsigned,
-                    pc->start_time_array_ms,
-                    arg,
-                    uint64_t);
+                        tmp_unsigned,
+                        pc->start_time_array_ms,
+                        arg,
+                        uint64_t);
                 PINT_PERF_REALLOC_ARRAY(pc,
-                    tmp_unsigned,
-                    pc->interval_array_ms,
-                    arg,
-                    uint64_t);
+                        tmp_unsigned,
+                        pc->interval_array_ms,
+                        arg,
+                        uint64_t);
                 for(i=0; i<pc->key_count; i++)
                 {
                     PINT_PERF_REALLOC_ARRAY(pc,
-                        tmp_signed,
-                        pc->value_matrix[i],
-                        arg,
-                        int64_t);
+                            tmp_signed,
+                            pc->value_matrix[i],
+                            arg,
+                            int64_t);
                 }
                 pc->history_size = arg;
             }
@@ -367,10 +364,9 @@ int PINT_perf_set_info(
  * retrieves runtime tunable performance counter options 
  * \returns 0 on success, -PVFS_error on failure
  */
-int PINT_perf_get_info(
-    struct PINT_perf_counter* pc,
-    enum PINT_perf_option option,
-    unsigned int* arg)
+int PINT_perf_get_info( struct PINT_perf_counter* pc,
+                        enum PINT_perf_option option,
+                        unsigned int* arg)
 {
     if(!pc)
     {
@@ -400,12 +396,12 @@ int PINT_perf_get_info(
  * retrieves measurement history
  */
 void PINT_perf_retrieve(
-    struct PINT_perf_counter* pc,        /**< performance counter */
-    int64_t** value_matrix, /**< 2d matrix to fill in with measurements */
-    uint64_t* start_time_array_ms,       /**< array of start times */
-    uint64_t* interval_array_ms,         /**< array of interval lengths */
-    int max_key,                         /**< max key value (1st dimension) */
-    int max_history)                     /**< max history (2nd dimension) */
+        struct PINT_perf_counter* pc,    /**< performance counter */
+        int64_t** value_matrix, /**< 2d matrix to fill in with measurements */
+        uint64_t* start_time_array_ms,   /**< array of start times */
+        uint64_t* interval_array_ms,     /**< array of interval lengths */
+        int max_key,                     /**< max key value (1st dimension) */
+        int max_history)                 /**< max history (2nd dimension) */
 {
     int i;
     int tmp_max_key;
@@ -450,12 +446,12 @@ void PINT_perf_retrieve(
     for(i=0; i<tmp_max_key; i++)
     {
         memcpy(value_matrix[i], pc->value_matrix[i],
-            (tmp_max_history*sizeof(int64_t)));
+                (tmp_max_history*sizeof(int64_t)));
     }
     memcpy(start_time_array_ms, pc->start_time_array_ms,
-        (tmp_max_history*sizeof(uint64_t)));
+            (tmp_max_history*sizeof(uint64_t)));
     memcpy(interval_array_ms, pc->interval_array_ms,
-        (tmp_max_history*sizeof(uint64_t)));
+            (tmp_max_history*sizeof(uint64_t)));
     
     gen_mutex_unlock(&pc->mutex);
 
@@ -470,9 +466,8 @@ void PINT_perf_retrieve(
     return;
 }
 
-char* PINT_perf_generate_text(
-    struct PINT_perf_counter* pc,
-    int max_size)
+char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
+                               int max_size)
 {
     int total_size = 0;
     int line_size = 0;
@@ -521,7 +516,7 @@ char* PINT_perf_generate_text(
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", 
-                (unsigned)(pc->start_time_array_ms[i]%1000));
+                    (unsigned)(pc->start_time_array_ms[i]%1000));
             position += 4;
         }
         else
@@ -553,7 +548,7 @@ char* PINT_perf_generate_text(
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", 
-                (unsigned)(pc->interval_array_ms[i]%1000));
+                    (unsigned)(pc->interval_array_ms[i]%1000));
             position += 4;
         }
         else

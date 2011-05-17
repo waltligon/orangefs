@@ -182,6 +182,7 @@ struct PINT_client_create_sm
     int datafile_count;
     PVFS_handle *datafile_handles;
     int stuffed;
+    PVFS_object_attr store_attr;
 
     PVFS_handle handles[2];
 };

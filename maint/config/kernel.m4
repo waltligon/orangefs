@@ -453,6 +453,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
+	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
 	dnl Rely on the fact that there is an external vfs_statfs that is
 	dnl of the same type as the .statfs in struct super_operations to
@@ -468,18 +469,28 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl If this test passes, the kernel uses a struct dentry argument.
 	dnl If this test fails, the kernel uses something else (old struct
 	dnl super_block perhaps).
+        dnl
+        dnl Need to use the second approach because vfs_statfs changes without
+        dnl a cooresponding change in statfs in super_operations. I'm not that
+        dnl concerned with reliance on Werror since we use it heavily
+        dnl throughout these checks
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+                struct super_operations sop;
+		int s(struct dentry *de, struct kstatfs *kfs)
 		{
 			return 0;
 		}
-		], [],
+		], 
+                [
+                    sop.statfs = s;
+                ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if super_operations statfs has dentry argument),
 		AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for vfsmount argument in kernel file_system_type get_sb)
 	dnl Same trick as above.  A single commit changed mayn things at once:
@@ -1424,6 +1435,47 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
         CFLAGS=$tmp_cflags
+
+	dnl file_operations has unlocked_ioctl instead of ioctl as of 2.6.36
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for unlocked_ioctl in file_operations)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations f;
+	], 
+	[ 
+	    f.unlocked_ioctl = NULL;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_UNLOCKED_IOCTL_HANDLER, 1, [Define if file_operations struct has unlocked_ioctl member]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl 2.6.36 removed inode_setattr with the other BKL removal changes
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for inode_setattr)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct iattr *iattr;
+                struct inode *inode;
+                int ret;
+	], 
+	[ 
+	        ret = inode_setattr(inode, iattr);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_INODE_SETATTR, 1, [Define if inode_setattr is defined]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+
 
 	CFLAGS=$oldcflags
 

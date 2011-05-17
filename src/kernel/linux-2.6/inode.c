@@ -190,12 +190,29 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     int ret = -EINVAL;
     struct inode *inode = dentry->d_inode;
 
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", dentry->d_name.name);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: called on %s\n", 
+                 dentry->d_name.name);
 
     ret = inode_change_ok(inode, iattr);
     if (ret == 0)
     {
+
+#ifdef HAVE_INODE_SETATTR
         ret = inode_setattr(inode, iattr);
+#else
+        if ((iattr->ia_valid & ATTR_SIZE) &&
+           iattr->ia_size != i_size_read(inode)) 
+        {
+            ret = vmtruncate(inode, iattr->ia_size);
+            if (ret)
+                return ret;
+        }
+
+        setattr_copy(inode, iattr);
+        mark_inode_dirty(inode);
+        ret = 0;
+#endif /* HAVE_INODE_SETATTR */
+    
         gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2_setattr: inode_setattr returned %d\n", ret);
 
         if (ret == 0)

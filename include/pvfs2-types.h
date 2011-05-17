@@ -484,9 +484,13 @@ typedef struct
  * upcall request types.
  * NOTE: Please retain them as multiples of 8 even if you wish to change them
  * This is *NECESSARY* for supporting 32 bit user-space binaries on a 64-bit kernel.
+ * Due to implementation within DBPF, this really needs to be PVFS_NAME_MAX,
+ * which it was the same value as, but no reason to let it break if that
+ * changes in the future.
  */
-#define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
-                                        by <linux/xattr.h> */
+#define PVFS_MAX_XATTR_NAMELEN   PVFS_NAME_MAX /* Not the same as 
+                                                  XATTR_NAME_MAX defined
+                                                  by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
 #define PVFS_MAX_XATTR_LISTLEN   8  /* Not the same as XATTR_LIST_MAX
