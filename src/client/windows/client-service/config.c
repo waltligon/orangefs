@@ -48,6 +48,10 @@ FILE *open_config_file()
     if (ret == 0)
         f = fopen(file_name, "r");
 
+    if (f == NULL)
+        fprintf(stderr, "Fatal: could not open file %s\n", 
+            file_name == NULL ? "(null)" : file_name);
+
     if (malloc_flag)
         free(file_name);
 
@@ -147,8 +151,8 @@ int get_config(PORANGEFS_OPTIONS options)
 
     config_file = open_config_file();
     if (config_file == NULL)
-        /* do not return an error -- config file is not required */
-        return 0;
+        /* config file is required */
+        return 1;
 
     /* parse options from the file */
     while (!feof(config_file))
@@ -280,6 +284,12 @@ int get_config(PORANGEFS_OPTIONS options)
     }
 
     close_config_file(config_file);
+
+    if (options->user_mode == USER_MODE_NONE)
+    {
+        fprintf(stderr, "Must specify user-mode (list, certificate or ldap)\n");
+        return 1;
+    }
 
     return 0;
 }

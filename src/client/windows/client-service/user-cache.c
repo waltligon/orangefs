@@ -11,6 +11,9 @@
 #include "client-service.h"
 #include "user-cache.h"
 
+/* amount of time cache mgmt thread sleeps */
+#define USER_THREAD_SLEEP_TIME    60000
+
 struct qhash_table *user_cache;
 
 gen_mutex_t user_cache_mutex;
@@ -27,14 +30,26 @@ int add_user(char *user_name,
              PVFS_credentials *credentials,
              time_t expires)
 {
+    struct qhash_head *link;
     struct user_entry *entry;
+
+    /* search for existing entry -- delete if found */
+    gen_mutex_lock(&user_cache_mutex);
+    link = qhash_search(user_cache, user_name);
+    if (link != NULL)
+    {        
+        DbgPrint("   add_user: deleting user %s\n", user_name);
+        qhash_del(link);
+        free(qhash_entry(link, struct user_entry, hash_link));
+    }
+    gen_mutex_unlock(&user_cache_mutex);
 
     /* allocate entry */
     entry = (struct user_entry *) calloc(1, sizeof(struct user_entry));
     if (entry == NULL)
     {
-        DbgPrint("   add_credentials: out of memory\n");
-        return;
+        DbgPrint("   add_user: out of memory\n");
+        return -1;
     }
             
     /* add to hash table */
@@ -45,6 +60,8 @@ int add_user(char *user_name,
 
     gen_mutex_lock(&user_cache_mutex);
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
+    DbgPrint("   add_user: adding user %s (%u:%u) expires %u\n", user_name,
+        credentials->uid, credentials->gid, expires);
     gen_mutex_unlock(&user_cache_mutex);
 
     return 0;
@@ -53,18 +70,21 @@ int add_user(char *user_name,
 int get_cached_user(char *user_name, 
                     PVFS_credentials *credentials)
 {
-    qhash_head *item;
+    struct qhash_head *link;
     struct user_entry *entry;
 
     /* locate user by user_name */
     gen_mutex_lock(&user_cache_mutex);
-    item = qhash_search(user_cache, user_name);
-    if (item != NULL)
+    link = qhash_search(user_cache, user_name);
+    if (link != NULL)
     {
         /* if cache hit -- return credentials */
-        entry = qhash_entry(item, struct user_entry, hash_link);
+        entry = qhash_entry(link, struct user_entry, hash_link);
         credentials->uid = entry->credentials.uid;
         credentials->gid = entry->credentials.gid;
+
+        DbgPrint("   get_cached_user: hit for %s (%u:%u)\n", user_name,
+            credentials->uid, credentials->gid);
 
         gen_mutex_unlock(&user_cache_mutex);
 
@@ -77,24 +97,59 @@ int get_cached_user(char *user_name,
     return 1;
 }
 
-/* remove user entry */
+/* remove user entry -- note user_cache_mutex 
+   should be locked */
+/* *** not currently needed
 int remove_user(char *user_name)
 {
     struct qhash_head *link; 
     
-    gen_mutex_lock(&user_cache_mutex);
     link = qhash_search_and_remove(user_cache, user_name);
     if (link != NULL)
     {
         free(qhash_entry(link, struct user_entry, hash_link));
     }
-    gen_mutex_unlock(&user_cache_mutex);
 
     return 0;
 }
+*/
 
 unsigned int user_cache_thread(void *options)
 {
+    int i;
+    struct qhash_head *head, *link, *temp;
+    struct user_entry *entry;
+    time_t now;
+
+    /* remove expired user entries from user cache */
+    do
+    {        
+        Sleep(USER_THREAD_SLEEP_TIME);
+
+        DbgPrint("user_cache_thread: checking\n");
+
+        now = time(NULL);
+
+        gen_mutex_lock(&user_cache_mutex);
+        for (i = 0; i < user_cache->table_size; i++)
+        {
+            head = qhash_search_at_index(user_cache, i);
+            qhash_for_each_safe(link, temp, head)
+            {
+                entry = qhash_entry(link, struct user_entry, hash_link);
+                if (entry->expires != 0 && entry->expires < now)
+                {   
+                    DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
+                    qhash_del(link);
+                    free(entry);
+                }
+            }
+        }
+        gen_mutex_unlock(&user_cache_mutex);
+
+        DbgPrint("user_cache_thread: check complete\n");
+
+    } while (1);
 
     return 0;
 }

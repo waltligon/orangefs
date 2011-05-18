@@ -51,7 +51,7 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
-static void DbgInit()
+void DbgInit()
 {
     char exe_path[MAX_PATH], *p;
     int ret;
@@ -74,7 +74,7 @@ static void DbgInit()
     }
 }
 
-static void DbgPrint(char *format, ...)
+void DbgPrint(char *format, ...)
 {
     if (g_DebugMode) 
     {
@@ -108,7 +108,7 @@ static void DbgPrint(char *format, ...)
     }
 }
 
-static void DbgClose()
+void DbgClose()
 {
     if (g_DebugFile != NULL) {
         fprintf(g_DebugFile, "\n");
@@ -246,7 +246,7 @@ static int error_map(int fs_err)
 }
 
 /* convert string from wide char (Unicode) to multi-byte string */
-static char *convert_wstring(const wchar_t *wcstr)
+char *convert_wstring(const wchar_t *wcstr)
 {
     errno_t err;
     size_t ret, mb_size;
@@ -282,7 +282,7 @@ static char *convert_wstring(const wchar_t *wcstr)
 
 }
 
-static wchar_t *convert_mbstring(const char *mbstr)
+wchar_t *convert_mbstring(const char *mbstr)
 {
     errno_t err;
     size_t ret, w_size;
@@ -2016,7 +2016,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
             (PDOKAN_OPTIONS) malloc(sizeof(DOKAN_OPTIONS));
 
     /* init credential cache */
-    context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 1023);
+    context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 257);
     gen_mutex_init(&context_cache_mutex);
 
     g_DebugMode = g_UseStdErr = options->debug;

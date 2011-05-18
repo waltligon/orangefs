@@ -12,6 +12,7 @@
 #include "client-service.h"
 #include "config.h"
 #include "fs.h"
+#include "cert.h"
 #include "user-cache.h"
 
 #define WIN32ServiceName           "orangefs-client"
@@ -30,10 +31,13 @@ BOOL debug = FALSE;
 int is_running = 0;
 int run_service = 0;  
 
-HANDLE hthread;
+HANDLE hthread, hcache_thread;
 
 DWORD thread_start(PORANGEFS_OPTIONS options);
 DWORD thread_stop();
+
+DWORD cache_thread_start();
+DWORD cache_thread_stop();
 
 DWORD WINAPI main_loop(LPVOID poptions);
 
@@ -301,7 +305,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
     /* init user cache */
-    user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
+    user_cache = qhash_init(user_compare, quickhash_string_hash, 257);
     
     gen_mutex_init(&user_cache_mutex);
 
@@ -312,8 +316,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     ret = get_config(options);
 
     /* point global options */
-    goptions = options;
-    
+    goptions = options;    
         
 #ifndef _DEBUG
     debug = options->debug;
@@ -339,6 +342,17 @@ void WINAPI service_main(DWORD argc, char *argv[])
     {
         service_debug("Service registered\n");
 
+        /* run the user cache thread */
+        ret = cache_thread_start();
+        if (ret != 0)
+        {
+            service_debug("Could not start cache thread: %u\n", ret);
+            close_service_log();
+            free(options);
+            
+            return;
+        }
+
         /* run the service */
         service_status.dwCurrentState = SERVICE_RUNNING;
         service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP;
@@ -353,6 +367,12 @@ void WINAPI service_main(DWORD argc, char *argv[])
             service_debug("Starting thread\n");
             thread_start(options);
         }
+
+        /* stop cache thread */
+        cache_thread_stop();
+
+        /* cleanup OpenSSL */
+        openssl_cleanup();
         
         /* shut down service */        
         service_status.dwCurrentState = SERVICE_STOPPED;
@@ -363,6 +383,8 @@ void WINAPI service_main(DWORD argc, char *argv[])
         service_debug("RegisterServiceCtrlHandler failed: %u\n", GetLastError());
         /* TODO: error reporting */
     }
+
+    qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
     
     close_service_log();
 
@@ -411,6 +433,35 @@ DWORD thread_stop()
     }
 
     service_debug("thread_stop exit\n");
+
+    return err;
+}
+
+DWORD cache_thread_start()
+{
+    DWORD err = 0;
+
+    /* create and run the user cache thread */
+    hcache_thread = CreateThread(NULL,
+                                 0,
+                                 (LPTHREAD_START_ROUTINE) user_cache_thread,
+                                 NULL,
+                                 0,
+                                 NULL);
+    
+    if (hcache_thread == NULL)
+        err = GetLastError();
+
+    return err;
+}
+
+DWORD cache_thread_stop()
+{
+    DWORD err = 0;
+
+    if (hcache_thread != NULL)
+        if (!TerminateThread(hcache_thread, 0))
+            err = GetLastError();
 
     return err;
 }
@@ -532,6 +583,9 @@ int main(int argc, char **argv, char **envp)
       }
   }
 
+  /* initialize OpenSSL */
+  openssl_init();
+
   if (run_service) 
   {
       /* dispatch the main service thread */
@@ -542,7 +596,7 @@ int main(int argc, char **argv, char **envp)
       options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */
-      user_cache = qhash_init(user_compare, quickhash_64bit_hash, 1023);
+      user_cache = qhash_init(user_compare, quickhash_string_hash, 257);
       
       gen_mutex_init(&user_cache_mutex);
 
@@ -565,13 +619,22 @@ int main(int argc, char **argv, char **envp)
       if (debug)
           options->debug = TRUE;
 
-      is_running = 1;
-
       if (!check_mount_point(options->mount_point))
       {
           fprintf(stderr, "Drive already in use\n");
           return -1;
       }
+
+      /* start user cache thread  */
+      err = cache_thread_start();
+      if (err != 0)
+      {
+          fprintf(stderr, "User cache thread did not start: %u\n", err);
+          free(options);
+          return err;
+      }
+
+      is_running = 1;
 
       /* process requests */
       err = main_loop(options);
@@ -579,6 +642,12 @@ int main(int argc, char **argv, char **envp)
       printf("main_loop exited: %d\n", err);
 
       gen_mutex_destroy(&user_cache_mutex);
+
+      cache_thread_stop();
+
+      qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+
+      openssl_cleanup();
 
       free(options);
   }

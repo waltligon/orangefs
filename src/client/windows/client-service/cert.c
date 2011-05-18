@@ -22,7 +22,7 @@ extern wchar_t *convert_mbstring(const char *);
 extern PORANGEFS_OPTIONS goptions;
 
 /* initialize OpenSSL */
-static void openssl_init()
+void openssl_init()
 {
     SSL_library_init();
     SSL_load_error_strings();
@@ -31,7 +31,7 @@ static void openssl_init()
 }
 
 /* cleanup OpenSSL */
-static void openssl_cleanup()
+void openssl_cleanup()
 {
     CRYPTO_cleanup_all_ex_data();
     ERR_free_strings();
@@ -231,7 +231,7 @@ verify_cert_exit:
 static unsigned int get_profile_dir(char *userid, 
                                     char *profile_dir)
 {
-    USER_INFO_4 user_info;
+    LPUSER_INFO_4 user_info;
     LPWSTR wuserid;
     int ret;
     char *mbstr;
@@ -246,16 +246,18 @@ static unsigned int get_profile_dir(char *userid,
 
     if (ret == 0)
     {
-        mbstr = convert_wstring(user_info.usri4_profile);
+        mbstr = convert_wstring(user_info->usri4_profile);
         if (mbstr == NULL) 
         {
             free(wuserid);
-            return -1;
+            ret = -1;
         }
         
         strncpy(profile_dir, mbstr, MAX_PATH);
 
         free(mbstr);
+
+        NetApiBufferFree(user_info);
     }
 
     free(wuserid);
@@ -275,9 +277,9 @@ static time_t get_cert_expires(X509 *cert)
 }
 
 /* retrieve OrangeFS credentials from cert */
-static int get_cert_credentials(char *userid,
-                                PVFS_credentials *credentials,
-                                time_t *expires)
+int get_cert_credentials(char *userid,
+                         PVFS_credentials *credentials,
+                         time_t *expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
          cert_pattern[MAX_PATH];
@@ -285,7 +287,7 @@ static int get_cert_credentials(char *userid,
     WIN32_FIND_DATA find_data;
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain;
-    int ret, i;
+    int ret;
 
     if (userid == NULL || credentials == NULL)
         return -1;
