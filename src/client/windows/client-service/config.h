@@ -6,6 +6,8 @@
 
 #include "client-service.h"
 
-int get_config(PORANGEFS_OPTIONS options);
+int get_config(PORANGEFS_OPTIONS options,
+               char *error_msg,
+               unsigned int error_msg_len);
 
 #endif

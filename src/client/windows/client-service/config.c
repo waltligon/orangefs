@@ -13,10 +13,11 @@
 
 extern struct qhash_table user_cache;
 
-FILE *open_config_file()
+static FILE *open_config_file(char *error_msg, 
+                              unsigned int error_msg_len)
 {
     FILE *f = NULL;
-    char *file_name, exe_path[MAX_PATH], *p;
+    char *file_name = NULL, exe_path[MAX_PATH], *p;
     DWORD ret = 0, malloc_flag = FALSE;
 
     /* environment variable overrides */
@@ -40,7 +41,7 @@ FILE *open_config_file()
         else
         {
             ret = GetLastError();
-            fprintf(stderr, "GetModuleFileName failed: %u\n", ret);
+            _snprintf(error_msg, error_msg_len, "GetModuleFileName failed: %u\n", ret);
         }
     }
 
@@ -49,7 +50,7 @@ FILE *open_config_file()
         f = fopen(file_name, "r");
 
     if (f == NULL)
-        fprintf(stderr, "Fatal: could not open file %s\n", 
+        _snprintf(error_msg, error_msg_len, "Fatal: could not open configuration file %s\n", 
             file_name == NULL ? "(null)" : file_name);
 
     if (malloc_flag)
@@ -58,7 +59,7 @@ FILE *open_config_file()
     return f;
 }
 
-void close_config_file(FILE *f)
+static void close_config_file(FILE *f)
 {
     fclose(f);
 }
@@ -144,12 +145,15 @@ int parse_user()
     return ret;
 }
 
-int get_config(PORANGEFS_OPTIONS options)
+int get_config(PORANGEFS_OPTIONS options,
+               char *error_msg,
+               unsigned int error_msg_len)
 {
     FILE *config_file;
     char line[256], copy[256], *token;
+    int ret = 0;
 
-    config_file = open_config_file();
+    config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
         /* config file is required */
         return 1;
@@ -203,9 +207,9 @@ int get_config(PORANGEFS_OPTIONS options)
                 token = strtok(NULL, " \t");
                 if (token == NULL)
                 {
-                    fprintf(stderr, "user-mode option must be list, certificate, or ldap\n");
-                    close_config_file(config_file);
-                    return 1;
+                    _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");                    
+                    ret = 1;
+                    goto get_config_exit;
                 }
                 if (!stricmp(token, "list"))
                 {
@@ -221,31 +225,31 @@ int get_config(PORANGEFS_OPTIONS options)
                 }
                 else
                 {
-                    fprintf(stderr, "user-mode option must be list, certificate, or ldap\n");
-                    close_config_file(config_file);
-                    return 1;
+                    _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
             }
             else if (!stricmp(token, "user")) 
             {
                 if (options->user_mode == USER_MODE_NONE)
                 {
-                    fprintf(stderr, "user option: specify 'user-mode list' above user option\n");
-                    close_config_file(config_file);
-                    return 1;
+                    _snprintf(error_msg, error_msg_len, "user option: specify 'user-mode list' above user option\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
                 else if (options->user_mode != USER_MODE_LIST)
                 {
-                    fprintf(stderr, "user option: not legal with current user mode\n");
-                    close_config_file(config_file);
-                    return 1;
+                    _snprintf(error_msg, error_msg_len, "user option: not legal with current user mode\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
 
                 if (parse_user() != 0)
                 {
-                    fprintf(stderr, "user option: parse error\n");
-                    close_config_file(config_file);
-                    return 1;
+                    _snprintf(error_msg, error_msg_len, "user option: parse error\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
             }            
             else if (!stricmp(token, "cert-dir-prefix"))
@@ -259,7 +263,9 @@ int get_config(PORANGEFS_OPTIONS options)
                 }
                 else
                 {
-                    fprintf(stderr, "cert-dir-prefix option: parse error\n");
+                    _snprintf(error_msg, error_msg_len, "cert-dir-prefix option: parse error\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
             }
             else if (!stricmp(token, "ca-path"))
@@ -271,7 +277,9 @@ int get_config(PORANGEFS_OPTIONS options)
                 }
                 else
                 {
-                    fprintf(stderr, "ca-path option: parse error\n");
+                    _snprintf(error_msg, error_msg_len, "ca-path option: parse error\n");
+                    ret = 1;
+                    goto get_config_exit;
                 }
             }
             else if (!stricmp(token, "debug"))
@@ -279,17 +287,27 @@ int get_config(PORANGEFS_OPTIONS options)
                 options->debug = TRUE;
             }            
             else
-                fprintf(stderr, "Unknown option %s\n", token);
+                _snprintf(error_msg, error_msg_len, "Unknown option %s\n", token);
         }
     }
 
-    close_config_file(config_file);
-
     if (options->user_mode == USER_MODE_NONE)
     {
-        fprintf(stderr, "Must specify user-mode (list, certificate or ldap)\n");
-        return 1;
+        _snprintf(error_msg, error_msg_len, "Must specify user-mode (list, certificate or ldap)\n");
+        ret = 1;
+        goto get_config_exit;
     }
 
-    return 0;
+    if (options->user_mode == USER_MODE_CERT &&
+        strlen(options->ca_path) == 0)
+    {
+        _snprintf(error_msg, error_msg_len, "Must specify ca-path with certificate mode\n");
+        ret = 1;
+    }
+
+get_config_exit:
+
+    close_config_file(config_file);
+
+    return ret;
 }

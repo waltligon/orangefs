@@ -227,11 +227,11 @@ verify_cert_exit:
     return err;
 }
 
-/* get user profile directory */
-static unsigned int get_profile_dir(char *userid, 
-                                    char *profile_dir)
+/* get user home directory */
+static unsigned int get_home_dir(char *userid, 
+                                 char *home_dir)
 {
-    LPUSER_INFO_4 user_info;
+    LPUSER_INFO_11 user_info;
     LPWSTR wuserid;
     int ret;
     char *mbstr;
@@ -242,20 +242,21 @@ static unsigned int get_profile_dir(char *userid,
         return -1;
 
     /* get user information */
-    ret = NetUserGetInfo(NULL, wuserid, 4, (LPBYTE *) &user_info);
+    ret = NetUserGetInfo(NULL, wuserid, 11, (LPBYTE *) &user_info);
 
     if (ret == 0)
     {
-        mbstr = convert_wstring(user_info->usri4_profile);
+        mbstr = convert_wstring(user_info->usri11_home_dir);
         if (mbstr == NULL) 
         {
             free(wuserid);
             ret = -1;
         }
         
-        strncpy(profile_dir, mbstr, MAX_PATH);
+        strncpy(home_dir, mbstr, MAX_PATH);
 
-        free(mbstr);
+        if (mbstr != NULL)
+            free(mbstr);
 
         NetApiBufferFree(user_info);
     }
@@ -293,7 +294,7 @@ int get_cert_credentials(char *userid,
         return -1;
 
     /* locate the certificates and CA */
-    if (goptions->cert_dir_prefix != NULL)
+    if (strlen(goptions->cert_dir_prefix) > 0)
     {
         if ((strlen(goptions->cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
         {
@@ -308,7 +309,7 @@ int get_cert_credentials(char *userid,
     else
     {
         /* get profile directory */
-        ret = get_profile_dir(userid, cert_dir);
+        ret = get_home_dir(userid, cert_dir);
         if (ret != 0)
         {
             DbgPrint("User %s: could not locate profile dir: %d\n", userid,
@@ -327,7 +328,7 @@ int get_cert_credentials(char *userid,
     chain = sk_X509_new_null();
 
     strcpy(cert_pattern, cert_dir);
-    strcat(cert_pattern, "cert.*");
+    strcat(cert_pattern, "\\cert.*");
     h_find = FindFirstFile(cert_pattern, &find_data);
     if (h_find == INVALID_HANDLE_VALUE)
     {

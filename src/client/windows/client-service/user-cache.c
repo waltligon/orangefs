@@ -134,14 +134,17 @@ unsigned int user_cache_thread(void *options)
         for (i = 0; i < user_cache->table_size; i++)
         {
             head = qhash_search_at_index(user_cache, i);
-            qhash_for_each_safe(link, temp, head)
-            {
-                entry = qhash_entry(link, struct user_entry, hash_link);
-                if (entry->expires != 0 && entry->expires < now)
-                {   
-                    DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
-                    qhash_del(link);
-                    free(entry);
+            if (head != NULL)
+            {    
+                qhash_for_each_safe(link, temp, head)
+                {
+                    entry = qhash_entry(link, struct user_entry, hash_link);
+                    if (entry->expires != 0 && entry->expires < now)
+                    {   
+                        DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
+                        qhash_del(link);
+                        free(entry);
+                    }
                 }
             }
         }

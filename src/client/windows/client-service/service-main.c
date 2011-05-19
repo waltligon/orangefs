@@ -300,6 +300,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
 {
     PORANGEFS_OPTIONS options;
     int ret;
+    char error_msg[512];    
 
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
@@ -313,7 +314,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     strcpy(options->mount_point, "Z:");
 
     /* read from config file */
-    ret = get_config(options);
+    ret = get_config(options, error_msg, 512);
 
     /* point global options */
     goptions = options;    
@@ -328,7 +329,8 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     if (ret != 0)
     {
-        service_debug("Could not parse config file: check user options\n");
+        service_debug(error_msg);
+        service_debug("Could not parse config file: exiting\n");
         close_service_log();
         return;
     }
@@ -542,6 +544,7 @@ int main(int argc, char **argv, char **envp)
   PORANGEFS_OPTIONS options;
   DWORD err = 0;
   char mount_point[256];
+  char error_msg[512];
 
   SERVICE_TABLE_ENTRY dispatch_table[2] = 
   {
@@ -601,8 +604,12 @@ int main(int argc, char **argv, char **envp)
       gen_mutex_init(&user_cache_mutex);
 
       /* get options from config file */
-      if (get_config(options) != 0)
-          return 1;
+      if (get_config(options, error_msg, 512) != 0)
+      {
+          fprintf(stderr, error_msg);
+          err = 1;
+          goto main_exit;
+      }
 
       /* point goptions */
       goptions = options;
@@ -622,7 +629,8 @@ int main(int argc, char **argv, char **envp)
       if (!check_mount_point(options->mount_point))
       {
           fprintf(stderr, "Drive already in use\n");
-          return -1;
+          err = 1;
+          goto main_exit;
       }
 
       /* start user cache thread  */
@@ -630,8 +638,7 @@ int main(int argc, char **argv, char **envp)
       if (err != 0)
       {
           fprintf(stderr, "User cache thread did not start: %u\n", err);
-          free(options);
-          return err;
+          goto main_exit;
       }
 
       is_running = 1;
@@ -644,6 +651,8 @@ int main(int argc, char **argv, char **envp)
       gen_mutex_destroy(&user_cache_mutex);
 
       cache_thread_stop();
+
+main_exit:
 
       qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
 
