@@ -2,7 +2,7 @@
    Certificate functions */
 
 #include <Windows.h>
-#include <LM.h>
+#include <Userenv.h>
 #include <stdio.h>
 
 #include <openssl/ssl.h>
@@ -15,9 +15,6 @@
 
 #include "cert.h"
 #include "user-cache.h"
-
-extern char *convert_wstring(const wchar_t *);
-extern wchar_t *convert_mbstring(const char *);
 
 extern PORANGEFS_OPTIONS goptions;
 
@@ -227,43 +224,16 @@ verify_cert_exit:
     return err;
 }
 
-/* get user home directory */
-static unsigned int get_home_dir(char *userid, 
-                                 char *home_dir)
+/* get user profile directory -- profile_dir should be MAX_PATH bytes */
+static unsigned int get_profile_dir(HANDLE huser, 
+                                    char *profile_dir)
 {
-    LPUSER_INFO_11 user_info;
-    LPWSTR wuserid;
-    int ret;
-    char *mbstr;
+    DWORD profile_len = MAX_PATH;
 
-    /* convert to unicode */
-    wuserid = convert_mbstring(userid);
-    if (wuserid == NULL)
-        return -1;
+    if (!GetUserProfileDirectory(huser, profile_dir, &profile_len))
+        return GetLastError();
 
-    /* get user information */
-    ret = NetUserGetInfo(NULL, wuserid, 11, (LPBYTE *) &user_info);
-
-    if (ret == 0)
-    {
-        mbstr = convert_wstring(user_info->usri11_home_dir);
-        if (mbstr == NULL) 
-        {
-            free(wuserid);
-            ret = -1;
-        }
-        
-        strncpy(home_dir, mbstr, MAX_PATH);
-
-        if (mbstr != NULL)
-            free(mbstr);
-
-        NetApiBufferFree(user_info);
-    }
-
-    free(wuserid);
-
-    return ret;
+    return 0;
 }
 
 static time_t get_cert_expires(X509 *cert)
@@ -278,7 +248,8 @@ static time_t get_cert_expires(X509 *cert)
 }
 
 /* retrieve OrangeFS credentials from cert */
-int get_cert_credentials(char *userid,
+int get_cert_credentials(HANDLE huser,
+                         char *userid,
                          PVFS_credentials *credentials,
                          time_t *expires)
 {
@@ -309,7 +280,7 @@ int get_cert_credentials(char *userid,
     else
     {
         /* get profile directory */
-        ret = get_home_dir(userid, cert_dir);
+        ret = get_profile_dir(huser, cert_dir);
         if (ret != 0)
         {
             DbgPrint("User %s: could not locate profile dir: %d\n", userid,
@@ -333,7 +304,7 @@ int get_cert_credentials(char *userid,
     if (h_find == INVALID_HANDLE_VALUE)
     {
         DbgPrint("User %s: no certificates\n", userid);
-        return -1;
+        goto get_cert_credentials_exit;
     }
 
     do

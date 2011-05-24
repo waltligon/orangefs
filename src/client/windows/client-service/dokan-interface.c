@@ -408,8 +408,6 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         return err * -1;
     }
 
-    CloseHandle(htoken);
-
     token_user = (PTOKEN_USER) buffer;
 
     if (!LookupAccountSid(NULL, token_user->User.Sid, user_name, &user_len,
@@ -417,6 +415,8 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     {
         err = GetLastError();
         DbgPrint("   LookupAccountSid failed: %u\n", err);
+        CloseHandle(htoken);
+
         return err * -1;
     }
 
@@ -424,6 +424,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     if (!stricmp(user_name, "SYSTEM"))
     {
         credentials->uid = credentials->gid = 0;
+        CloseHandle(htoken);
 
         return 0;
     }
@@ -442,7 +443,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         else if (goptions->user_mode == USER_MODE_CERT)
         {
             /* load credentials from certificate */
-            ret = get_cert_credentials(user_name, credentials, &expires);
+            ret = get_cert_credentials(htoken, user_name, credentials, &expires);
             if (ret == 0)
             {
                 add_user(user_name, credentials, expires);
@@ -479,8 +480,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     */
 
     /* can't locate credentials for requesting user */
-    DbgPrint("   get_requestor_credentials:  user %s not found\n", user_name);
-    return -ERROR_USER_PROFILE_LOAD;
+    return ret;
 }
 
 static int get_credentials(PDOKAN_FILE_INFO file_info, 
