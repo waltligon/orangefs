@@ -711,7 +711,11 @@ out:
     return error;
 }
 
-static int pvfs2_check_acl(struct inode *inode, int mask)
+static int pvfs2_check_acl(struct inode *inode, int mask
+#ifdef HAVE_THREE_PARAM_ACL_CHECK
+                           , unsigned int flags
+#endif /* HAVE_THREE_PARAM_ACL_CHECK */
+                          )
 {
     struct posix_acl *acl = NULL;
 
@@ -742,8 +746,13 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
 #ifdef HAVE_TWO_PARAM_PERMISSION
 int pvfs2_permission(struct inode *inode, int mask)
 #else
-int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
-#endif
+int pvfs2_permission(struct inode *inode, int mask, 
+#ifdef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+unsigned int flags)
+#else
+struct nameidata *nd)
+#endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
+#endif /* HAVE_TWO_PARAM_PERMISSION */
 {
 #ifdef HAVE_CURRENT_FSUID
     int fsuid = current_fsuid();
@@ -754,7 +763,11 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
 #ifdef HAVE_GENERIC_PERMISSION
     int ret;
 
-    ret = generic_permission(inode, mask, pvfs2_check_acl);
+    ret = generic_permission(inode, mask, 
+#ifdef HAVE_FOUR_PARAM_GENERIC_PERMISSION
+                             0,
+#endif /* HAVE_FOUR_PARAM_GENERIC_PERMISSION */ 
+                             pvfs2_check_acl);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %llu mask = %o"

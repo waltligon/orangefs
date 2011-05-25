@@ -151,7 +151,12 @@ invalid_exit:
     return 0;
 }
 
-static int pvfs2_d_delete (struct dentry * dentry)
+static int pvfs2_d_delete (
+#ifdef HAVE_D_DELETE_CONST
+const
+#endif /* HAVE_D_DELETE_CONST */
+struct dentry * dentry
+)
 {
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: called on dentry %p.\n", __func__, dentry);
@@ -207,8 +212,15 @@ static int pvfs2_d_revalidate(
   link_path_walk to pass our error up
 */
 static int pvfs2_d_hash(
+#ifdef HAVE_THREE_PARAM_D_HASH
+    const struct dentry *parent,
+    const struct inode *inode,
+    struct qstr *hash
+#else
     struct dentry *parent,
-    struct qstr *hash)
+    struct qstr *hash
+#endif /* HAVE_THREE_PARAM_D_HASH */
+                        )
 {
 /*     gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2: pvfs2_d_hash called " */
 /*                 "(name: %s | len: %d | hash: %d)\n", */
@@ -216,6 +228,32 @@ static int pvfs2_d_hash(
     return 0;
 }
 
+#ifdef HAVE_SEVEN_PARAM_D_COMPARE
+static int pvfs2_d_compare(
+                            const struct dentry *parent, 
+                            const struct inode * pinode,
+                            const struct dentry *dentry, 
+                            const struct inode *inode,
+                            unsigned int len, 
+                            const char *str, 
+                            const struct qstr *name)
+{
+    int i = 0;
+    gossip_debug(GOSSIP_DCACHE_DEBUG, "pvfs2_d_compare: "
+                 "called on parent %p\n  (name1: %s| name2: %s)\n", 
+                 parent, str, name->name);
+
+    if( len != name->len ) 
+        return 1;
+  
+    for( i=0; i < len; i++ )
+    {
+        if( str[i] != name->name[i] )
+            return 1;
+    }
+    return 0;
+}
+#else
 static int pvfs2_d_compare(
     struct dentry *parent,
     struct qstr *d_name,
@@ -229,6 +267,8 @@ static int pvfs2_d_compare(
              (d_name->hash == name->hash) &&
              (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
+#endif /* HAVE_SEVEN_PARAM_D_COMPARE */
+
 
 /** PVFS2 implementation of VFS dentry operations */
 struct dentry_operations pvfs2_dentry_operations =
@@ -246,6 +286,7 @@ struct dentry_operations pvfs2_dentry_operations =
  */
 static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
 {
+  unsigned int local_count = 0;
   if(!entry)
   {
     printk("--- dentry %p: no entry, ret: %d\n", entry, ret);
@@ -264,9 +305,17 @@ static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret)
     return;
   }
 
+#ifdef HAVE_DENTRY_D_COUNT_ATOMIC
+  local_count = atomic_read(&entry->d_count);
+#else
+  spin_lock(&entry->d_lock);
+  local_count = entry->d_count;
+  spin_unlock(&entry->d_lock);
+#endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
+
   printk("--- dentry %p: d_count: %d, name: %s, parent: %p, parent name: %s, ret: %d\n",
         entry,
-        atomic_read(&entry->d_count),
+        local_count,
         entry->d_name.name,
         entry->d_parent,
         entry->d_parent->d_name.name,

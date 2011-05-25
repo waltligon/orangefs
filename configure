@@ -7176,6 +7176,40 @@ $as_echo "#define HAVE_GENERIC_PERMISSION 1" >>confdefs.h
 fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
+                	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for four-param generic_permission" >&5
+$as_echo_n "checking for four-param generic_permission... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *f;
+
+int
+main ()
+{
+
+	        generic_permission(f, 0, 0, NULL);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_FOUR_PARAM_GENERIC_PERMISSION 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for generic_getxattr api in kernel" >&5
 $as_echo_n "checking for generic_getxattr api in kernel... " >&6; }
 			cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -8720,7 +8754,240 @@ fi
 rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
         CFLAGS=$tmp_cflags
 
+                	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for three-param dentry_operations.d_hash" >&5
+$as_echo_n "checking for three-param dentry_operations.d_hash... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
 
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_hash_t(const struct dentry *d,
+                                    const struct inode *i,
+                                    struct qstr * q)
+                { return 0; }
+
+int
+main ()
+{
+
+                d.d_hash = d_hash_t;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_THREE_PARAM_D_HASH 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+
+                        	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for seven-param dentry_operations.d_compare" >&5
+$as_echo_n "checking for seven-param dentry_operations.d_compare... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_compare_t(const struct dentry *d1,
+                                       const struct inode *i1,
+                                       const struct dentry *d2,
+                                       const struct inode *i2,
+                                       unsigned int len,
+                                       const char *str,
+                                       const struct qstr *qstr)
+                { return 0; }
+
+int
+main ()
+{
+
+                d.d_compare = d_compare_t;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_SEVEN_PARAM_D_COMPARE 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+
+                	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for constified dentry_operations.d_delete" >&5
+$as_echo_n "checking for constified dentry_operations.d_delete... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_delete_t(const struct dentry *d)
+                { return 0; }
+
+int
+main ()
+{
+
+                d.d_delete = d_delete_t;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_D_DELETE_CONST 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+                	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dentry.d_count atomic_t type" >&5
+$as_echo_n "checking for dentry.d_count atomic_t type... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                atomic_t x;
+
+int
+main ()
+{
+
+                x = d.d_count;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_DENTRY_D_COUNT_ATOMIC 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+                        	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for three-param inode_operations permission" >&5
+$as_echo_n "checking for three-param inode_operations permission... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode_operations i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+
+int
+main ()
+{
+
+            i.permission = p;
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_THREE_PARAM_PERMISSION_WITH_FLAG 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
+
+                	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for three-param acl_check of generic_permission" >&5
+$as_echo_n "checking for three-param acl_check of generic_permission... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+
+int
+main ()
+{
+
+            generic_permission(i, 0, 0, p);
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+$as_echo "#define HAVE_THREE_PARAM_ACL_CHECK 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        CFLAGS=$tmp_cflags
 
 
 	CFLAGS=$oldcflags

@@ -709,6 +709,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_GENERIC_PERMISSION, 1, Define if kernel has generic_permission),
 	)
 
+        dnl generic_permission in 2.6.38 and newer has a four parameter 
+        dnl signature
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for four-param generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *f;
+	], 
+	[ 
+	        generic_permission(f, 0, 0, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FOUR_PARAM_GENERIC_PERMISSION, 1, [Define if generic_permission takes four parameters]),
+	AC_MSG_RESULT(no)
+	)
+
 	AC_MSG_CHECKING(for generic_getxattr api in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined
@@ -1474,7 +1492,146 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
         CFLAGS=$tmp_cflags
 
+        dnl dentry operations struct d_hash function has a different signature
+        dnl in 2.6.38 and newer, second param is an inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param dentry_operations.d_hash)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_hash_t(const struct dentry *d, 
+                                    const struct inode *i, 
+                                    struct qstr * q)
+                { return 0; }
+	], 
+	[ 
+                d.d_hash = d_hash_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_D_HASH, 1, [Define if d_hash member of dentry_operations has three params, the second inode paramsbeing the difference]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
+
+        dnl dentry operations struct d_compare function has a different 
+        dnl signature in 2.6.38 and newer, split out dentry/inodes, string and
+        dnl qstr params
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for seven-param dentry_operations.d_compare)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_compare_t(const struct dentry *d1, 
+                                       const struct inode *i1,
+                                       const struct dentry *d2, 
+                                       const struct inode *i2, 
+                                       unsigned int len, 
+                                       const char *str, 
+                                       const struct qstr *qstr)
+                { return 0; }
+	], 
+	[ 
+                d.d_compare = d_compare_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SEVEN_PARAM_D_COMPARE, 1, [Define if d_compare member of dentry_operations has seven params]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+        dnl dentry operations struct d_delete argumentis constified in  
+        dnl 2.6.38 and newer
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for constified dentry_operations.d_delete)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_delete_t(const struct dentry *d)
+                { return 0; }
+	], 
+	[ 
+                d.d_delete = d_delete_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_D_DELETE_CONST, 1, [Define if d_delete member of dentry_operations has a const dentry param]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl dentry member d_count is no longer atomic and has it's own spinlock
+        dnl in 2.6.38 and newer
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for dentry.d_count atomic_t type)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                atomic_t x;
+	], 
+	[ 
+                x = d.d_count;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DENTRY_D_COUNT_ATOMIC, 1, [Define if d_count member of dentry is of type atomic_t]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl permission function pointer in the inode_operations struct now
+        dnl takes three params with the third being an unsigned int (circa
+        dnl 2.6.38
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param inode_operations permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode_operations i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+	], 
+	[ 
+            i.permission = p;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_PERMISSION_WITH_FLAG, 1, [Define if permission function pointer of inode_operations struct has three parameters and the third parameter is for flags (unsigned int)]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl the acl_check parameter of the generic_permission function has a
+        dnl third parameter circa 2.6.38
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param acl_check of generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+	], 
+	[ 
+            generic_permission(i, 0, 0, p);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_ACL_CHECK, 1, [Define if acl_check param of generic_permission function has three parameters]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
 
 	CFLAGS=$oldcflags

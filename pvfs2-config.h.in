@@ -73,6 +73,9 @@
 /* Define if DB has get_pagesize function */
 #undef HAVE_DB_GET_PAGESIZE
 
+/* Define if d_count member of dentry is of type atomic_t */
+#undef HAVE_DENTRY_D_COUNT_ATOMIC
+
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
@@ -81,6 +84,9 @@
 
 /* Define if dcache.h contains d_alloc_annon */
 #undef HAVE_D_ALLOC_ANON
+
+/* Define if d_delete member of dentry_operations has a const dentry param */
+#undef HAVE_D_DELETE_CONST
 
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
@@ -106,6 +112,9 @@
 /* Define if struct super_operations in kernel has find_inode_handle callback
    */
 #undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
+/* Define if generic_permission takes four parameters */
+#undef HAVE_FOUR_PARAM_GENERIC_PERMISSION
 
 /* Define to 1 if you have the `fsetxattr' function. */
 #undef HAVE_FSETXATTR
@@ -344,6 +353,9 @@
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
 
+/* Define if d_compare member of dentry_operations has seven params */
+#undef HAVE_SEVEN_PARAM_D_COMPARE
+
 /* Define if SLAB_KERNEL is defined in kernel */
 #undef HAVE_SLAB_KERNEL
 
@@ -417,6 +429,18 @@
 
 /* Define if TAU library is used */
 #undef HAVE_TAU
+
+/* Define if acl_check param of generic_permission function has three
+   parameters */
+#undef HAVE_THREE_PARAM_ACL_CHECK
+
+/* Define if d_hash member of dentry_operations has three params, the second
+   inode paramsbeing the difference */
+#undef HAVE_THREE_PARAM_D_HASH
+
+/* Define if permission function pointer of inode_operations struct has three
+   parameters and the third parameter is for flags (unsigned int) */
+#undef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
 
 /* Define if kernel stddef has true/false enum */
 #undef HAVE_TRUE_FALSE_ENUM

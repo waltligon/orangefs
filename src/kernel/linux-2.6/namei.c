@@ -394,15 +394,24 @@ static int pvfs2_rename(
     struct dentry *new_dentry)
 {
     int ret = -EINVAL, are_directories = 0;
+    unsigned int local_count = 0;
     pvfs2_inode_t *pvfs2_old_parent_inode = PVFS2_I(old_dir);
     pvfs2_inode_t *pvfs2_new_parent_inode = PVFS2_I(new_dir);
     pvfs2_kernel_op_t *new_op = NULL;
     struct super_block *sb = NULL;
 
+
+#ifdef HAVE_DENTRY_D_COUNT_ATOMIC
+    local_count = atomic_read(&new_dentry->d_count);
+#else
+    spin_lock( &new_dentry->d_lock );
+    local_count = new_dentry->d_count;
+    spin_unlock( &new_dentry->d_lock );
+#endif /* HAVE_DENTRY_D_COUNT_ATOMIC */
     gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_rename: called (%s/%s => %s/%s) ct=%d\n",
                 old_dentry->d_parent->d_name.name, old_dentry->d_name.name,
                 new_dentry->d_parent->d_name.name, new_dentry->d_name.name,
-                atomic_read(&new_dentry->d_count));
+                local_count);
 
     are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
 #if 0

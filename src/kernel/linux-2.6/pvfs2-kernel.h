@@ -865,8 +865,12 @@ struct inode *pvfs2_iget_common(
 #if defined(PVFS2_LINUX_KERNEL_2_4) || defined(HAVE_TWO_PARAM_PERMISSION)
 int pvfs2_permission(struct inode *, int);
 #else
-int pvfs2_permission(struct inode *inode, 
-					 int mask, struct nameidata *nd);
+int pvfs2_permission(struct inode *, int mask, 
+#ifdef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+                     unsigned int flags);
+#else
+                     struct nameidata *nd);
+#endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
 #endif
 
 /*****************************
