@@ -49,7 +49,7 @@ static unsigned long load_cert_from_file(char *path,
         return errno;
 
     *cert = PEM_read_X509(f, NULL, NULL, NULL);
-    if (cert == NULL)
+    if (*cert == NULL)
         return ERR_get_error();
 
     return 0;
@@ -261,7 +261,7 @@ int get_cert_credentials(HANDLE huser,
     STACK_OF(X509) *chain;
     int ret;
 
-    if (userid == NULL || credentials == NULL)
+    if (userid == NULL || credentials == NULL || expires == NULL)
         return -1;
 
     /* locate the certificates and CA */
@@ -281,7 +281,12 @@ int get_cert_credentials(HANDLE huser,
     {
         /* get profile directory */
         ret = get_profile_dir(huser, cert_dir);
-        if (ret != 0)
+        if (ret == 0)
+        {
+            if (strlen(cert_dir) > 0 && cert_dir[strlen(cert_dir)-1] != '\\')
+                strcat(cert_dir, "\\");
+        }
+        else
         {
             DbgPrint("User %s: could not locate profile dir: %d\n", userid,
                 ret);
@@ -299,17 +304,18 @@ int get_cert_credentials(HANDLE huser,
     chain = sk_X509_new_null();
 
     strcpy(cert_pattern, cert_dir);
-    strcat(cert_pattern, "\\cert.*");
+    strcat(cert_pattern, "cert.*");
     h_find = FindFirstFile(cert_pattern, &find_data);
     if (h_find == INVALID_HANDLE_VALUE)
     {
         DbgPrint("User %s: no certificates\n", userid);
+        ret = -1;
         goto get_cert_credentials_exit;
     }
 
     do
     {
-        strcpy(cert_path, cert_dir);
+        strcpy(cert_path, cert_dir);        
         strcat(cert_path, find_data.cFileName);
         /* load proxy cert */
         if (!stricmp(find_data.cFileName, "cert.0"))
