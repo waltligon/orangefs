@@ -236,29 +236,18 @@ static unsigned int get_profile_dir(HANDLE huser,
     return 0;
 }
 
-static time_t get_cert_expires(X509 *cert)
-{
-    ASN1_INTEGER *asn1_int;
-
-    asn1_int = X509_get_notAfter(cert);
-    if (asn1_int != NULL)
-        return ASN1_INTEGER_get(asn1_int);
-
-    return 0;
-}
-
 /* retrieve OrangeFS credentials from cert */
 int get_cert_credentials(HANDLE huser,
                          char *userid,
                          PVFS_credentials *credentials,
-                         time_t *expires)
+                         ASN1_UTCTIME **expires)
 {
     char cert_dir[MAX_PATH], cert_path[MAX_PATH],
          cert_pattern[MAX_PATH];
     HANDLE h_find;
     WIN32_FIND_DATA find_data;
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
-    STACK_OF(X509) *chain;
+    STACK_OF(X509) *chain = NULL;
     int ret;
 
     if (userid == NULL || credentials == NULL || expires == NULL)
@@ -356,15 +345,14 @@ int get_cert_credentials(HANDLE huser,
 
     if (ret == 0)
     {
-        *expires = get_cert_expires(cert);
+        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
     }
 
 get_cert_credentials_exit:
 
     /* free chain */
-    while (sk_X509_num(chain) > 0)
+    if (chain != NULL)
         sk_X509_pop_free(chain, X509_free);
-    sk_X509_free(chain);
 
     if (cert != NULL)
         X509_free(cert);

@@ -139,7 +139,7 @@ int parse_user()
         credentials.uid = atoi(uid);
         credentials.gid = atoi(gid);
         
-        add_user(user_name, &credentials, 0);
+        add_user(user_name, &credentials, NULL);
     }
 
     return ret;

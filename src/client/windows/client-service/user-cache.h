@@ -1,6 +1,8 @@
 /* Copyright (C) 2011 Omnibond, LLC
    User cache declarations */
 
+#include <openssl/asn1.h>
+
 #include "pvfs2.h"
 #include "quickhash.h"
 
@@ -9,7 +11,7 @@ struct user_entry
     struct qhash_head hash_link;
     char user_name[256];
     PVFS_credentials credentials;
-    time_t expires;
+    ASN1_UTCTIME *expires;
 };
 
 int user_compare(void *key, 
@@ -17,7 +19,7 @@ int user_compare(void *key,
 
 int add_user(char *user_name, 
              PVFS_credentials *credentials,
-             time_t expires);
+             ASN1_UTCTIME *expires);
 
 int get_cached_user(char *user_name, 
                     PVFS_credentials *credentials);

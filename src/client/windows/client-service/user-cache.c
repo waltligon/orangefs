@@ -28,7 +28,7 @@ int user_compare(void *key,
 
 int add_user(char *user_name, 
              PVFS_credentials *credentials,
-             time_t expires)
+             ASN1_UTCTIME *expires)
 {
     struct qhash_head *link;
     struct user_entry *entry;
@@ -60,8 +60,8 @@ int add_user(char *user_name,
 
     gen_mutex_lock(&user_cache_mutex);
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
-    DbgPrint("   add_user: adding user %s (%u:%u) expires %u (entry %08x)\n", 
-             user_name, credentials->uid, credentials->gid, expires, entry);
+    DbgPrint("   add_user: adding user %s (%u:%u) expires %s (entry %08x)\n", 
+        user_name, credentials->uid, credentials->gid, expires->data, entry);
     gen_mutex_unlock(&user_cache_mutex);
 
     return 0;
@@ -139,7 +139,8 @@ unsigned int user_cache_thread(void *options)
                 qhash_for_each_safe(link, temp, head)
                 {
                     entry = qhash_entry(link, struct user_entry, hash_link);
-                    if (entry->expires != 0 && entry->expires < now)
+                    if (entry->expires != NULL && 
+                        ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
                     {   
                         DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
                         qhash_del(link);

@@ -389,7 +389,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     char buffer[1024], user_name[256], domain_name[256];
     DWORD user_len = 256, domain_len = 256, return_len, err;
     SID_NAME_USE snu;
-    time_t expires;
+    ASN1_UTCTIME *expires;
     int ret;
 
     /* get requesting user information */
@@ -458,28 +458,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
             /* TODO */
         }
     }
-    /*
-    req_user = NULL;
-    qlist_for_each(user_link, &user_list)
-    {
-        puser = qlist_entry(user_link, ORANGEFS_USER, list_link);
-        if (!stricmp(puser->user_name, user_name)) 
-        {
-            req_user = puser;
-            break;
-        }
-    }
-    
-    if (req_user != NULL)
-    {
-        credentials->uid = req_user->uid;
-        credentials->gid = req_user->gid;
 
-        return 0;
-    }
-    */
-
-    /* can't locate credentials for requesting user */
     return ret;
 }
 
