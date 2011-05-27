@@ -117,7 +117,7 @@ int remove_user(char *user_name)
 unsigned int user_cache_thread(void *options)
 {
     int i;
-    struct qhash_head *head, *link, *temp;
+    struct qhash_head *head;
     struct user_entry *entry;
     time_t now;
 
@@ -136,16 +136,13 @@ unsigned int user_cache_thread(void *options)
             head = qhash_search_at_index(user_cache, i);
             if (head != NULL)
             {    
-                qhash_for_each_safe(link, temp, head)
-                {
-                    entry = qhash_entry(link, struct user_entry, hash_link);
-                    if (entry->expires != NULL && 
-                        ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
-                    {   
-                        DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
-                        qhash_del(link);
-                        free(entry);
-                    }
+                entry = qhash_entry(head, struct user_entry, hash_link);
+                if (entry->expires != NULL && 
+                    ASN1_UTCTIME_cmp_time_t(entry->expires, now) == -1)
+                {   
+                    DbgPrint("user_cache_thread: removing %s\n", entry->user_name);
+                    qhash_del(head);
+                    free(entry);
                 }
             }
         }

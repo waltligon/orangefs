@@ -249,6 +249,7 @@ int get_cert_credentials(HANDLE huser,
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain = NULL;
     int ret;
+    time_t now;
 
     if (userid == NULL || credentials == NULL || expires == NULL)
         return -1;
@@ -344,8 +345,13 @@ int get_cert_credentials(HANDLE huser,
     ret = verify_cert(cert, ca_cert, chain, credentials);
 
     if (ret == 0)
-    {
+    {        
         *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
+        
+        /* cert will still be verified after expiring -- check it here */
+        now = time(NULL);
+        if (ASN1_UTCTIME_cmp_time_t(*expires, now) == -1)
+            ret = -ERROR_ACCESS_DENIED;
     }
 
 get_cert_credentials_exit:
