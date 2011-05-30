@@ -163,6 +163,23 @@ int gossip_enable_file(
     return 0;
 }
 
+int gossip_reopen_file(
+    const char *filename,
+    const char *mode)
+{
+    if( gossip_facility != GOSSIP_FILE )
+    {
+        return -EINVAL;
+    }
+
+    /* close the file */
+    gossip_disable_file();
+
+    /* open the file */
+    gossip_enable_file( filename, mode );
+    return 0;
+}
+
 /** Turns off any active logging facility and disables debugging.
  *
  *  \return 0 on success, -errno on failure.

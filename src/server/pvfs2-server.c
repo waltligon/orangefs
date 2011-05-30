@@ -365,6 +365,10 @@ int main(int argc, char **argv)
             if (signal_recvd_flag == SIGHUP)
             {
                 reload_config();
+
+                /* re-open log file to allow normal rotation */
+                gossip_reopen_file(server_config.logfile, "a");
+
                 signal_recvd_flag = 0; /* Reset the flag */
             }
             else

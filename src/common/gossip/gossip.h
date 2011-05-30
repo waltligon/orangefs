@@ -85,6 +85,9 @@ int gossip_enable_stderr(
 int gossip_enable_file(
     const char *filename,
     const char *mode);
+int gossip_reopen_file(
+    const char *filename,
+    const char *mode);
 int gossip_disable(
     void);
 int gossip_set_debug_mask(
