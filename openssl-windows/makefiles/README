@@ -1,0 +1,6 @@
+Use to build OpenSSL DLLs.
+
+Place makefile(s) in ms directory in OpenSSL source tree.
+
+Follow OpenSSL Windows steps (INSTALL.W32/INSTALL.W64), but on the nmake step, use the desired makefile instead of the generated one.
+

@@ -392,18 +392,20 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
     ASN1_UTCTIME *expires;
     int ret;
 
+    DbgPrint("   get_requestor_credentials: enter\n");
+
     /* get requesting user information */
     htoken = DokanOpenRequestorToken(file_info);
     if (htoken == INVALID_HANDLE_VALUE)
     {
-        DbgPrint("   DokanOpenRequestorToken failed\n");
+        DbgPrint("   get_requestor_credentials: DokanOpenRequestorToken failed\n");
         return -ERROR_INVALID_HANDLE;
     }
 
     if (!GetTokenInformation(htoken, TokenUser, buffer, sizeof(buffer), &return_len))
     {
         err = GetLastError();
-        DbgPrint("   GetTokenInformation failed: %d\n", err);
+        DbgPrint("   get_requestor_credentials: GetTokenInformation failed: %d\n", err);
         CloseHandle(htoken);
         return err * -1;
     }
@@ -414,7 +416,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
                           domain_name, &domain_len, &snu))
     {
         err = GetLastError();
-        DbgPrint("   LookupAccountSid failed: %u\n", err);
+        DbgPrint("   get_requestor_credentials: LookupAccountSid failed: %u\n", err);
         CloseHandle(htoken);
 
         return err * -1;
@@ -450,7 +452,9 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
             }
             else
             {
-                /* TODO: print out OpenSSL/internal errors */
+                /* error reporting has been done through DbgPrint...
+                   result is access denied */
+                ret = -ERROR_ACCESS_DENIED;
             }
         }
         else /* user-mode == LDAP */ 
@@ -458,6 +462,10 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
             /* TODO */
         }
     }
+
+    CloseHandle(htoken);
+
+    DbgPrint("   get_requestor_credentials: exit\n");
 
     return ret;
 }
@@ -1998,7 +2006,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 257);
     gen_mutex_init(&context_cache_mutex);
 
-    g_DebugMode = g_UseStdErr = options->debug;
+    g_DebugMode = /* g_UseStdErr = */ options->debug;
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
     dokanOptions->ThreadCount = options->threads;
@@ -2007,8 +2015,10 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 
     if (g_DebugMode)
         dokanOptions->Options |= DOKAN_OPTION_DEBUG;
+    /*
     if (g_UseStdErr)
         dokanOptions->Options |= DOKAN_OPTION_STDERR;
+    */
 
     dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
 

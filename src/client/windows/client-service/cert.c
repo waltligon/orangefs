@@ -16,6 +16,8 @@
 #include "cert.h"
 #include "user-cache.h"
 
+#define OPENSSL_CERT_ERROR    0xFFFF
+
 extern PORANGEFS_OPTIONS goptions;
 
 /* initialize OpenSSL */
@@ -50,7 +52,9 @@ static unsigned long load_cert_from_file(char *path,
 
     *cert = PEM_read_X509(f, NULL, NULL, NULL);
     if (*cert == NULL)
-        return ERR_get_error();
+        return OPENSSL_CERT_ERROR;
+
+    fclose(f);
 
     return 0;
 }
@@ -153,12 +157,14 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
                                         &credentials->gid);
                 if (ret != 0)
                 {
-                    DbgPrint("Could not parse credential string: %s\n", credstr);
+                    DbgPrint("   verify_cert: could not parse credential string: %s\n", credstr);
+                    ok = 0;
                 }
             }
             else
             {
-                DbgPrint("Could not load policy\n");
+                DbgPrint("    verify_cert: could not load policy\n");
+                ok = 0;
             }
 
             PROXY_CERT_INFO_EXTENSION_free(pci);
@@ -176,39 +182,58 @@ static unsigned long verify_cert(X509 *cert,
 {
     X509_STORE *trust_store;
     X509_STORE_CTX *ctx;
-    int ret;
-    unsigned long err;
+    int ret, verify_flag = 0;
     int (*save_verify_cb)(int ok, X509_STORE_CTX *ctx);
 
     /* add CA cert to trusted store */
     trust_store = X509_STORE_new();
     if (trust_store == NULL)
+    {
+        ret = OPENSSL_CERT_ERROR;
         goto verify_cert_exit;
+    }
 
     ret = X509_STORE_add_cert(trust_store, ca_cert);
     if (!ret)
+    {
+        ret = OPENSSL_CERT_ERROR;
         goto verify_cert_exit;
+    }
 
     /* setup the context with the certs */
     ctx = X509_STORE_CTX_new();
     if (ctx == NULL)
+    {
+        ret = OPENSSL_CERT_ERROR;
         goto verify_cert_exit;
+    }
 
     ret = X509_STORE_CTX_init(ctx, trust_store, cert, chain);
     if (!ret)
+    {
+        ret = OPENSSL_CERT_ERROR;
         goto verify_cert_exit;
+    }
 
-    /* verify the cert and get credentials */
+    /* set up verify callback */
     save_verify_cb = ctx->verify_cb;
     X509_STORE_CTX_set_verify_cb(ctx, verify_callback);
     X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_idx(), credentials);
     X509_STORE_CTX_set_flags(ctx, X509_V_FLAG_ALLOW_PROXY_CERTS);
-    ret = X509_verify_cert(ctx);
+
+    /* verify the cert */
+    verify_flag = 1;
+    ret = (X509_verify_cert(ctx) == 1) ? 0 : OPENSSL_CERT_ERROR;
 
     X509_STORE_CTX_set_verify_cb(ctx, save_verify_cb);
     
 verify_cert_exit:
-    err = ERR_get_error();
+
+    if (verify_flag && ret == OPENSSL_CERT_ERROR)
+    {
+        DbgPrint("   verify_cert: %s\n", 
+            X509_verify_cert_error_string(ctx->error));
+    }
 
     if (ctx != NULL)
     {
@@ -221,7 +246,7 @@ verify_cert_exit:
         X509_STORE_free(trust_store);
     }
 
-    return err;
+    return ret;
 }
 
 /* get user profile directory -- profile_dir should be MAX_PATH bytes */
@@ -250,16 +275,23 @@ int get_cert_credentials(HANDLE huser,
     STACK_OF(X509) *chain = NULL;
     int ret;
     time_t now;
+    unsigned long err;
+    char errstr[256];
 
+    DbgPrint("   get_cert_credentials: enter\n");
+    
     if (userid == NULL || credentials == NULL || expires == NULL)
+    {
+        DbgPrint("   get_cert_credentials: invalid parameter\n");
         return -1;
+    }
 
     /* locate the certificates and CA */
     if (strlen(goptions->cert_dir_prefix) > 0)
     {
         if ((strlen(goptions->cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
         {
-            DbgPrint("User %s: path to cert too long\n", userid);
+            DbgPrint("   get_cert_credentials: user %s: path to cert too long\n", userid);
             return -1;
         }
 
@@ -278,14 +310,14 @@ int get_cert_credentials(HANDLE huser,
         }
         else
         {
-            DbgPrint("User %s: could not locate profile dir: %d\n", userid,
+            DbgPrint("   get_cert_credentials: user %s: could not locate profile dir: %d\n", userid,
                 ret);
             return ret;
         }
         
         if (strlen(cert_dir) + 7 > MAX_PATH)
         {
-            DbgPrint("User %s: profile dir too long\n", userid);
+            DbgPrint("   get_cert_credentials: user %s: profile dir too long\n", userid);
             return -1;
         }
     }
@@ -298,7 +330,7 @@ int get_cert_credentials(HANDLE huser,
     h_find = FindFirstFile(cert_pattern, &find_data);
     if (h_find == INVALID_HANDLE_VALUE)
     {
-        DbgPrint("User %s: no certificates\n", userid);
+        DbgPrint("   get_cert_credentials: user %s: no certificates\n", userid);
         ret = -1;
         goto get_cert_credentials_exit;
     }
@@ -316,19 +348,24 @@ int get_cert_credentials(HANDLE huser,
         {
             /* load intermediate certs (including user cert) */
             ret = load_cert_from_file(cert_path, &chain_cert);
-            if (ret == 0)
+            if (ret == 0) 
                 sk_X509_push(chain, chain_cert);
         }
         if (ret != 0)
         {
-            DbgPrint("Error loading cert %s: %d\n", cert_path, ret);
+            DbgPrint("   get_cert_credentials: error loading cert %s: %d\n", 
+                cert_path, ret);
         }
     } while (ret == 0 && FindNextFile(h_find, &find_data));
 
     FindClose(h_find);
-    
+
+    /* no proxy cert */
     if (cert == NULL)
-        ret = -1;
+    {
+        DbgPrint("   get_cert_credentials: missing or invalid cert.0\n");
+        ret = OPENSSL_CERT_ERROR;
+    }
     
     if (ret != 0)
         goto get_cert_credentials_exit;
@@ -337,7 +374,8 @@ int get_cert_credentials(HANDLE huser,
     ret = load_cert_from_file(goptions->ca_path, &ca_cert);
     if (ret != 0)
     {
-        DbgPrint("Error loading CA cert %s: %d\n", cert_path, ret);
+        DbgPrint("   get_cert_credentials: error loading CA cert %s: %d\n", 
+            goptions->ca_path, ret);
         goto get_cert_credentials_exit;
     }
 
@@ -346,15 +384,20 @@ int get_cert_credentials(HANDLE huser,
 
     if (ret == 0)
     {        
-        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));
-        
-        /* cert will still be verified after expiring -- check it here */
-        now = time(NULL);
-        if (ASN1_UTCTIME_cmp_time_t(*expires, now) == -1)
-            ret = -ERROR_ACCESS_DENIED;
+        *expires = M_ASN1_UTCTIME_dup(X509_get_notAfter(cert));        
     }
 
 get_cert_credentials_exit:
+
+    /* error handling */
+    if (ret == OPENSSL_CERT_ERROR)
+    {
+        while ((err = ERR_get_error()) != 0)
+        {
+            ERR_error_string_n(err, errstr, 256);
+            DbgPrint("   get_cert_credentials: %s\n", errstr);
+        }
+    }
 
     /* free chain */
     if (chain != NULL)
@@ -364,6 +407,8 @@ get_cert_credentials_exit:
         X509_free(cert);
     if (ca_cert != NULL)
         X509_free(ca_cert);
+
+    DbgPrint("   get_cert_credentials: exit\n");
 
     return ret;
 }
