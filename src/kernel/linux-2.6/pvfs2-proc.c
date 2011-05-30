@@ -435,7 +435,7 @@ static int min_slot_timeout_secs[] = {0}, max_slot_timeout_secs[] = {INT_MAX};
  * Modern kernels (up to 2.6.33) prefer to number the controls themselves.
  */
 #ifdef CTL_UNNUMBERED
-#define UNNUMBERED_OR_VAL(x) CTL_UNNUMBERED
+#define UNNUMBERED_OR_VAL(x) ((x==CTL_NONE) ? CTL_NONE : CTL_UNNUMBERED)
 #else
 #define UNNUMBERED_OR_VAL(x) x
 #endif
@@ -492,7 +492,7 @@ static ctl_table pvfs2_acache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &acache_rec_extra,
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 static ctl_table pvfs2_static_acache_table[] = {
     /* controls static acache timeout */
@@ -531,7 +531,7 @@ static ctl_table pvfs2_static_acache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &static_acache_rec_extra,
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 
 static ctl_table pvfs2_ncache_table[] = {
@@ -571,7 +571,7 @@ static ctl_table pvfs2_ncache_table[] = {
         .proc_handler = &pvfs2_param_proc_handler,
         .extra1 = &ncache_rec_extra
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 static int acache_perf_count = PVFS2_PERF_COUNT_REQUEST_ACACHE;
 static int static_acache_perf_count = PVFS2_PERF_COUNT_REQUEST_STATIC_ACACHE;
@@ -601,7 +601,7 @@ static ctl_table pvfs2_pc_table[] = {
         .proc_handler = pvfs2_pc_proc_handler,
         .extra1 = &ncache_perf_count
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 
 pvfs2_stats g_pvfs2_stats;
@@ -639,7 +639,7 @@ static ctl_table pvfs2_stats_table[] = {
         .mode     = 0444,
         .proc_handler = &proc_dointvec,
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 
 
@@ -762,7 +762,7 @@ static ctl_table pvfs2_table[] = {
         .mode = 0555,
         .child = pvfs2_stats_table
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 static ctl_table fs_table[] = {
     {
@@ -771,7 +771,7 @@ static ctl_table fs_table[] = {
         .mode = 0555,
         .child = pvfs2_table
     },
-    { CTL_NAME(0) }
+    { CTL_NAME(CTL_NONE) }
 };
 #endif
 
