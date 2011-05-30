@@ -535,41 +535,36 @@ bmx_verify_num_str(char *num_str)
 static int
 bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint32_t *ep_id)
 {
-        int             ret             = 0;
-        int             colon1_found    = 0;
-        int             colon2_found    = 0;
-        char           *s               = NULL;
-        char           *colon1          = NULL;
-        char           *colon2          = NULL;
-        char           *fs              = NULL;
-        char           *host            = NULL;
-        uint32_t        bd              = -1;
-        uint32_t        ep              = 0;
+        int             ret          = 0;
+        int             colon1_found = 0;
+        int             colon2_found = 0;
+        char           *tmp_peername = NULL;
+        char           *colon1       = NULL;
+        char           *colon2       = NULL;
+        char           *fs           = NULL;
+        char           *host         = NULL;
+        uint32_t        bd           = -1;
+        uint32_t        ep           = 0;
 
-        if (peername == NULL || hostname == NULL || board == NULL || ep_id == NULL) {
-                debug(BMX_DB_INFO, "parse_peername() called with invalid parameter");
+        tmp_peername = string_key("mx",peername);
+        if (!tmp_peername) {
+                debug(BMX_DB_INFO, "parse_peername() called with invalid peername");
                 return -BMI_EINVAL;
         }
 
-        if (peername[0] != 'm' ||
-            peername[1] != 'x' ||
-            peername[2] != ':' ||
-            peername[3] != '/' ||
-            peername[4] != '/') {
-                debug(BMX_DB_INFO, "parse_peername() peername does not start with mx://");
-                return -1;
+        if (tmp_peername == NULL || hostname == NULL || board == NULL || ep_id == NULL) {
+                debug(BMX_DB_INFO, "parse_peername() called with invalid parameter");
+                return -BMI_EINVAL;
         }
-
-        s = strdup(&peername[5]);
-        fs = strchr(s, '/');
+        fs = strchr(tmp_peername, '/');
         if (fs) {
                 *fs = '\0';
         }
-        colon1 = strchr(s, ':');
+        colon1 = strchr(tmp_peername, ':');
         if (!colon1) {
                 debug(BMX_DB_INFO, "parse_peername() strchr() failed");
         } else {
-                colon2 = strrchr(s, ':');
+                colon2 = strrchr(tmp_peername, ':');
                 if (colon1 == colon2) {
                         /* colon2_found == 0 */
                         debug(BMX_DB_INFO, "parse_peername() MX hostname does not "
@@ -603,15 +598,15 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                     NULL != strchr(colon2, ':')) {
                         debug(BMX_DB_INFO, "parse_peername() too many ':' (%s %s)", 
                                            colon1, colon2);
-                        free(s);
+                        free(tmp_peername);
                         return -1;
                 }
         }
 
-        host = strdup(s);
+        host = strdup(tmp_peername);
         if (!host) {
                 debug(BMX_DB_MEM, "parse_peername() malloc() failed");
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -623,7 +618,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         } else {
                 debug(BMX_DB_WARN, "%s is not a valid hostname", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -631,21 +626,21 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid hostname", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
         ret = bmx_verify_num_str(colon1);
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid board ID", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
         ret = bmx_verify_num_str(colon2);
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid endpoint ID", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -653,7 +648,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         *board = bd;
         *ep_id = ep;
 
-        free(s);
+        free(tmp_peername);
 
         return 0;
 }
