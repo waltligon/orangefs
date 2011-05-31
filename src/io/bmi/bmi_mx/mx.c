@@ -39,6 +39,9 @@ bmx_peer_connect(struct bmx_peer *peer);
 static void
 bmx_create_peername(void);
 
+void *
+BMI_mx_memalloc(bmi_size_t size, enum bmi_op_type send_recv);
+
 static int
 bmx_peer_init_state(struct bmx_peer *peer) __attribute__ ((unused));
 
