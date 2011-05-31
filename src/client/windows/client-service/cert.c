@@ -148,24 +148,24 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
             pci = (PROXY_CERT_INFO_EXTENSION *) 
                     X509_get_ext_d2i(xs, NID_proxyCertInfo, NULL, NULL);
 
-            credstr = (char *) pci->proxyPolicy->policy->data;
-            if (pci->proxyPolicy->policy->length > 0)
+            if (pci->proxyPolicy->policy != NULL && pci->proxyPolicy->policy->length > 0)
             {
+                credstr = (char *) pci->proxyPolicy->policy->data;
                 credentials = (PVFS_credentials *) X509_STORE_CTX_get_ex_data(
-                                 ctx, get_proxy_auth_ex_data_idx());
+                    ctx, get_proxy_auth_ex_data_idx());
                 ret = parse_credentials(credstr, &credentials->uid, 
                                         &credentials->gid);
                 if (ret != 0)
                 {
-                    DbgPrint("   verify_cert: could not parse credential string: %s\n", credstr);
+                    DbgPrint("   verify_callback: could not parse credential string: %s\n", credstr);
                     ok = 0;
                 }
             }
             else
             {
-                DbgPrint("    verify_cert: could not load policy\n");
+                DbgPrint("   verify_callback: could not load policy\n");
                 ok = 0;
-            }
+            }            
 
             PROXY_CERT_INFO_EXTENSION_free(pci);
         }
@@ -229,7 +229,9 @@ static unsigned long verify_cert(X509 *cert,
     
 verify_cert_exit:
 
-    if (verify_flag && ret == OPENSSL_CERT_ERROR)
+    /* print error... for non-verify errors, get_cert_credentials
+       will print errors */
+    if (verify_flag && ret == OPENSSL_CERT_ERROR && ctx->error != 0)
     {
         DbgPrint("   verify_cert: %s\n", 
             X509_verify_cert_error_string(ctx->error));
@@ -274,7 +276,6 @@ int get_cert_credentials(HANDLE huser,
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain = NULL;
     int ret;
-    time_t now;
     unsigned long err;
     char errstr[256];
 
@@ -298,6 +299,7 @@ int get_cert_credentials(HANDLE huser,
         /* cert dir is cert_dir_prefix\userid */
         strcpy(cert_dir, goptions->cert_dir_prefix);
         strcat(cert_dir, userid);
+        strcat(cert_dir, "\\");
     }
     else
     {

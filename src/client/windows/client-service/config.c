@@ -13,42 +13,52 @@
 
 extern struct qhash_table user_cache;
 
+/* get the directory where exe resides
+   module_dir should be MAX_PATH */
+DWORD get_module_dir(char *module_dir)
+{
+    char *p;
+
+    /* get exe path */
+    if (!GetModuleFileName(NULL, module_dir, MAX_PATH))
+        return GetLastError();
+
+    /* remove exe file name */
+    p = strrchr(module_dir, '\\');  
+    if (p)
+        *p = '\0';
+  
+    return 0;
+}
+
 static FILE *open_config_file(char *error_msg, 
                               unsigned int error_msg_len)
 {
     FILE *f = NULL;
-    char *file_name = NULL, exe_path[MAX_PATH], *p;
+    char *file_name = NULL, module_dir[MAX_PATH];
     DWORD ret = 0, malloc_flag = FALSE;
 
     /* environment variable overrides */
     if (!(file_name = getenv("ORANGEFS_CONFIG_FILE")))
     {
         /* look for file in exe directory */
-        ret = GetModuleFileName(NULL, exe_path, MAX_PATH);
-        if (ret)
+        ret = get_module_dir(module_dir);
+        if (ret == 0)
         {
-            p = strrchr(exe_path, '\\');
-            if (p)
-                *p = '\0';
-
             file_name = (char *) malloc(MAX_PATH);
             malloc_flag = TRUE;
-            strncpy(file_name, exe_path, MAX_PATH-14);
-            strcat(file_name, "\\orangefs.cfg");
-
-            ret = 0;
+            strncpy(file_name, module_dir, MAX_PATH-14);
+            strcat(file_name, "\\orangefs.cfg");            
         }
         else
         {
-            ret = GetLastError();
             _snprintf(error_msg, error_msg_len, "GetModuleFileName failed: %u\n", ret);
+            return NULL;
         }
     }
 
     /* open config file */
-    if (ret == 0)
-        f = fopen(file_name, "r");
-
+    f = fopen(file_name, "r");
     if (f == NULL)
         _snprintf(error_msg, error_msg_len, "Fatal: could not open configuration file %s\n", 
             file_name == NULL ? "(null)" : file_name);
@@ -150,13 +160,20 @@ int get_config(PORANGEFS_OPTIONS options,
                unsigned int error_msg_len)
 {
     FILE *config_file;
-    char line[256], copy[256], *token;
+    char module_dir[MAX_PATH], line[256], copy[256], *token;
     int ret = 0;
 
     config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
         /* config file is required */
         return 1;
+
+    /* default CA path */
+    if (get_module_dir(module_dir) == 0)
+    {
+        strcpy(options->ca_path, module_dir);
+        strcat(options->ca_path, "\\CA\\cacert.pem");
+    }
 
     /* parse options from the file */
     while (!feof(config_file))
