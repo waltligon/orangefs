@@ -155,6 +155,51 @@ int parse_user()
     return ret;
 }
 
+static int parse_ldap_option(PORANGEFS_OPTIONS options,
+                      char *token,
+                      char *error_msg,
+                      unsigned int error_msg_len)
+{
+    if (!stricmp(token, "ldap-host"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-bind-dn"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-bind-password"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-search-root"))
+    {
+            
+    }
+    else if (!stricmp(token, "ldap-search-scope"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-search-class"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-naming-attr"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-uid-attr"))
+    {
+
+    }
+    else if (!stricmp(token, "ldap-gid-attr"))
+    {
+
+    }
+
+    return 0;
+}
+
 int get_config(PORANGEFS_OPTIONS options,
                char *error_msg,
                unsigned int error_msg_len)
@@ -303,8 +348,18 @@ int get_config(PORANGEFS_OPTIONS options,
             {
                 options->debug = TRUE;
             }            
+            else if (!strnicmp(token, "ldap", 4))
+            {
+                ret = parse_ldap_option(options, token, error_msg, error_msg_len);
+                if (ret != 0)
+                    goto get_config_exit;
+            }
             else
+            {
                 _snprintf(error_msg, error_msg_len, "Unknown option %s\n", token);
+                ret = 1;
+                goto get_config_exit;
+            }
         }
     }
 

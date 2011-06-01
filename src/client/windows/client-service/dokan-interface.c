@@ -1324,7 +1324,7 @@ PVFS_Dokan_set_file_attributes(
         else if ((!(attr.perms & 0200) ||
                   !(attr.perms & 0020) ||
                   !(attr.perms & 0002)) &&
-                 !(FileAttributes & FILE_ATTRIBUTE_READONLY))
+                  !(FileAttributes & FILE_ATTRIBUTE_READONLY))
         {
             /* write permission is off and request to make
                file writable */
