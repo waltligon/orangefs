@@ -13,9 +13,16 @@
 
 extern struct qhash_table user_cache;
 
+#define LDAP_SCOPE_ONELEVEL    0x01
+#define LDAP_SCOPE_SUBTREE     0x02
+
+#define EAT_WS(str)    while (*str && (*str == ' ' || \
+                              *str == '\t')) \
+                           str++
+
 /* get the directory where exe resides
    module_dir should be MAX_PATH */
-DWORD get_module_dir(char *module_dir)
+static DWORD get_module_dir(char *module_dir)
 {
     char *p;
 
@@ -75,7 +82,7 @@ static void close_config_file(FILE *f)
 }
 
 /* parse line in format: <[domain\]user name> <uid>:<gid> */
-int parse_user()
+static int parse_user()
 {
     char *token, *p;
     char user_name[256];
@@ -105,7 +112,7 @@ int parse_user()
                 }
                 else 
                 {
-                    ret = 1;
+                    ret = -1;
                     break;
                 }
             }
@@ -123,7 +130,7 @@ int parse_user()
                     }
                     else 
                     {
-                        ret = 1;
+                        ret = -1;
                         break;
                     }
                 }
@@ -132,12 +139,12 @@ int parse_user()
         }
         else
         {
-            ret = 1;
+            ret = -1;
         }
     }
     else
     {
-        ret = 1;
+        ret = -1;
     }
 
     if (ret == 0)
@@ -156,48 +163,158 @@ int parse_user()
 }
 
 static int parse_ldap_option(PORANGEFS_OPTIONS options,
-                      char *token,
+                      char *line,
+                      char *option,
                       char *error_msg,
                       unsigned int error_msg_len)
 {
-    if (!stricmp(token, "ldap-host"))
-    {
+    char *p, temp[256], *token;
+    int ret = -1;
 
-    }
-    else if (!stricmp(token, "ldap-bind-dn"))
-    {
+    error_msg[0] = '\0';
 
-    }
-    else if (!stricmp(token, "ldap-bind-password"))
+    if (options->user_mode != USER_MODE_LDAP)
     {
-
-    }
-    else if (!stricmp(token, "ldap-search-root"))
-    {
-            
-    }
-    else if (!stricmp(token, "ldap-search-scope"))
-    {
-
-    }
-    else if (!stricmp(token, "ldap-search-class"))
-    {
-
-    }
-    else if (!stricmp(token, "ldap-naming-attr"))
-    {
-
-    }
-    else if (!stricmp(token, "ldap-uid-attr"))
-    {
-
-    }
-    else if (!stricmp(token, "ldap-gid-attr"))
-    {
-
+        strncpy(error_msg, "Specify \"user-mode ldap\" before other ldap options\n", 
+            error_msg_len);
+        goto parse_ldap_option_exit;
     }
 
-    return 0;
+    if (!stricmp(option, "ldap-host"))
+    {
+        /* parse string of form ldap[s]://host[:port] */
+        p = line + strlen(option);
+        EAT_WS(p);
+       
+        strncpy(temp, p, 256);
+        token = strtok(temp, ":/");
+        if (token != NULL)        
+            if (!stricmp(token, "ldap"))
+                options->ldap.secure = 0;
+            else if (!stricmp(token, "ldaps"))
+                options->ldap.secure = 1;
+            else
+                goto parse_ldap_option_exit;        
+        else 
+            goto parse_ldap_option_exit;
+        
+        token = strtok(NULL, ":/");
+        if (token != NULL && strlen(token) > 0)
+            strcpy(options->ldap.host, token);
+        else
+            goto parse_ldap_option_exit;
+
+        token = strtok(NULL, ":");
+        if (token != NULL && strlen(token) > 0)
+            options->ldap.port = atoi(token);
+
+        ret = 0;
+    }
+    else if (!stricmp(option, "ldap-bind-dn"))
+    {
+        /* the dn of the user used to bind to the ldap host */
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.bind_dn, p, 256);
+        options->ldap.bind_dn[255] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-bind-password"))
+    {
+        /* the password of the binding user */
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.bind_password, p, 32);
+        options->ldap.bind_dn[31] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-search-root"))
+    {
+        /* dn of the object from which to start the search */
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.search_root, p, 256);
+        options->ldap.search_root[255] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-search-scope"))
+    {
+        /* scope of search: onelevel or subtree */
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(temp, p, 32);
+        temp[31] = '\0';
+
+        if (!stricmp(temp, "onelevel"))
+            options->ldap.search_scope = LDAP_SCOPE_ONELEVEL;
+        else if (!stricmp(temp, "subtree"))
+            options->ldap.search_scope = LDAP_SCOPE_SUBTREE;
+        else
+        {
+            strncpy(error_msg, "ldap-search-scope must be onelevel or subtree\n", error_msg_len);
+            goto parse_ldap_option_exit;
+        }
+
+        ret = 0;
+    }
+    else if (!stricmp(option, "ldap-search-class"))
+    {
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.search_class, p, 32);
+        options->ldap.search_class[31] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-naming-attr"))
+    {
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.naming_attr, p, 32);
+        options->ldap.naming_attr[31] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-uid-attr"))
+    {
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.uid_attr, p, 32);
+        options->ldap.uid_attr[31] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else if (!stricmp(option, "ldap-gid-attr"))
+    {
+        p = line + strlen(option);
+        EAT_WS(p);
+
+        strncpy(options->ldap.gid_attr, p, 32);
+        options->ldap.gid_attr[31] = '\0';
+
+        ret = strlen(p) > 0 ? 0 : -1;
+    }
+    else
+    {
+        _snprintf(error_msg, error_msg_len, "Invalid option %s\n", option);
+    }
+
+parse_ldap_option_exit:
+
+    if (ret != 0 && strlen(error_msg) == 0)
+        _snprintf(error_msg, error_msg_len, "Could not parse option %s\n", option);
+
+    return ret;
 }
 
 int get_config(PORANGEFS_OPTIONS options,
@@ -205,13 +322,13 @@ int get_config(PORANGEFS_OPTIONS options,
                unsigned int error_msg_len)
 {
     FILE *config_file;
-    char module_dir[MAX_PATH], line[256], copy[256], *token;
+    char module_dir[MAX_PATH], line[256], copy[256], *token, *p;
     int ret = 0;
 
     config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
         /* config file is required */
-        return 1;
+        return -1;
 
     /* default CA path */
     if (get_module_dir(module_dir) == 0)
@@ -219,6 +336,13 @@ int get_config(PORANGEFS_OPTIONS options,
         strcpy(options->ca_path, module_dir);
         strcat(options->ca_path, "\\CA\\cacert.pem");
     }
+
+    /* default LDAP options */
+    options->ldap.search_scope = LDAP_SCOPE_ONELEVEL;
+    strcpy(options->ldap.search_class, "user");
+    strcpy(options->ldap.naming_attr, "sAMAccountName");
+    strcpy(options->ldap.uid_attr, "uidNumber");
+    strcpy(options->ldap.gid_attr, "gidNumber");
 
     /* parse options from the file */
     while (!feof(config_file))
@@ -270,7 +394,7 @@ int get_config(PORANGEFS_OPTIONS options,
                 if (token == NULL)
                 {
                     _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");                    
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
                 if (!stricmp(token, "list"))
@@ -288,7 +412,7 @@ int get_config(PORANGEFS_OPTIONS options,
                 else
                 {
                     _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
             }
@@ -297,28 +421,30 @@ int get_config(PORANGEFS_OPTIONS options,
                 if (options->user_mode == USER_MODE_NONE)
                 {
                     _snprintf(error_msg, error_msg_len, "user option: specify 'user-mode list' above user option\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
                 else if (options->user_mode != USER_MODE_LIST)
                 {
                     _snprintf(error_msg, error_msg_len, "user option: not legal with current user mode\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
 
                 if (parse_user() != 0)
                 {
                     _snprintf(error_msg, error_msg_len, "user option: parse error\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
             }            
             else if (!stricmp(token, "cert-dir-prefix"))
             {
-                if (strlen(line) > 16)
+                p = line + strlen(token);
+                EAT_WS(p);
+                if (strlen(p) > 0)
                 {
-                    strncpy(options->cert_dir_prefix, line + 16, MAX_PATH-2);
+                    strncpy(options->cert_dir_prefix, p, MAX_PATH-2);
                     options->cert_dir_prefix[MAX_PATH-2] = '\0';
                     if (options->cert_dir_prefix[strlen(options->cert_dir_prefix)-1] != '\\')
                         strcat(options->cert_dir_prefix, "\\");
@@ -326,21 +452,23 @@ int get_config(PORANGEFS_OPTIONS options,
                 else
                 {
                     _snprintf(error_msg, error_msg_len, "cert-dir-prefix option: parse error\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
             }
             else if (!stricmp(token, "ca-path"))
             {
-                if (strlen(line) > 8)
+                p = line + strlen(token);
+                EAT_WS(p);
+                if (strlen(p) > 0)
                 {
-                    strncpy(options->ca_path, line + 8, MAX_PATH-2);
+                    strncpy(options->ca_path, p, MAX_PATH-2);
                     options->ca_path[MAX_PATH-2] = '\0';
                 }
                 else
                 {
                     _snprintf(error_msg, error_msg_len, "ca-path option: parse error\n");
-                    ret = 1;
+                    ret = -1;
                     goto get_config_exit;
                 }
             }
@@ -350,14 +478,14 @@ int get_config(PORANGEFS_OPTIONS options,
             }            
             else if (!strnicmp(token, "ldap", 4))
             {
-                ret = parse_ldap_option(options, token, error_msg, error_msg_len);
+                ret = parse_ldap_option(options, line, token, error_msg, error_msg_len);
                 if (ret != 0)
                     goto get_config_exit;
             }
             else
             {
                 _snprintf(error_msg, error_msg_len, "Unknown option %s\n", token);
-                ret = 1;
+                ret = -1;
                 goto get_config_exit;
             }
         }
@@ -365,16 +493,20 @@ int get_config(PORANGEFS_OPTIONS options,
 
     if (options->user_mode == USER_MODE_NONE)
     {
-        _snprintf(error_msg, error_msg_len, "Must specify user-mode (list, certificate or ldap)\n");
-        ret = 1;
+        _snprintf(error_msg, error_msg_len, "Must specify user-mode (list, "
+            "certificate or ldap)\n");
+        ret = -1;
         goto get_config_exit;
     }
 
-    if (options->user_mode == USER_MODE_CERT &&
-        strlen(options->ca_path) == 0)
+    if (options->user_mode == USER_MODE_LDAP &&
+        (strlen(options->ldap.bind_dn) == 0 ||
+         strlen(options->ldap.host) == 0 ||
+         strlen(options->ldap.search_root) == 0))
     {
-        _snprintf(error_msg, error_msg_len, "Must specify ca-path with certificate mode\n");
-        ret = 1;
+        _snprintf(error_msg, error_msg_len, "Missing ldap option: ldap-host, "
+            "ldap-bind-dn, or ldap-search-root\n");
+        ret = -1;
     }
 
 get_config_exit:

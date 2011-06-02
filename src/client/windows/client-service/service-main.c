@@ -14,6 +14,7 @@
 #include "fs.h"
 #include "cert.h"
 #include "user-cache.h"
+#include "ldap-support.h"
 
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
@@ -589,6 +590,13 @@ int main(int argc, char **argv, char **envp)
   /* initialize OpenSSL */
   openssl_init();
 
+  /* initialize LDAP */
+  if (PVFS_ldap_init() != 0)
+  {
+      fprintf(stderr, "LDAP could not be initialized\n");
+      return 1;
+  }
+
   if (run_service) 
   {
       /* dispatch the main service thread */
@@ -655,6 +663,8 @@ int main(int argc, char **argv, char **envp)
 main_exit:
 
       qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
+
+      PVFS_ldap_cleanup();
 
       openssl_cleanup();
 

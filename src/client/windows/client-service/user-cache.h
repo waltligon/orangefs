@@ -1,6 +1,9 @@
 /* Copyright (C) 2011 Omnibond, LLC
    User cache declarations */
 
+#ifndef __USER_CACHE_H
+#define __USER_CACHE_H
+
 #include <openssl/asn1.h>
 
 #include "pvfs2.h"
@@ -28,3 +31,4 @@ int remove_user(char *user_name);
 
 unsigned int user_cache_thread(void *options);
 
+#endif

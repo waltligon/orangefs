@@ -13,12 +13,28 @@
 
 typedef struct
 {
+    char host[256];
+    int port;
+    int secure;
+    char bind_dn[256];
+    char bind_password[32];
+    char search_root[256];
+    int search_scope;
+    char search_class[32];
+    char naming_attr[32];
+    char uid_attr[32];
+    char gid_attr[32];
+} LDAP_OPTIONS, *PLDAP_OPTIONS;
+
+typedef struct
+{
     char mount_point[MAX_PATH];
     char cert_dir_prefix[MAX_PATH];
     char ca_path[MAX_PATH];
     int threads;
     int debug;
     int user_mode;
+    LDAP_OPTIONS ldap;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
 
 void DbgPrint(char *format, ...);
