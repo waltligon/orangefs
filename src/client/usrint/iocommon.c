@@ -8,7 +8,8 @@ void iocommon_ensure_init()
 
     /* Initialize the file system with mount points */
     int ret;
-    if (!init){
+    if (!init)
+    {
         ret = PVFS_util_init_defaults();
         assert(ret==PVFS_FD_SUCCESS);
         init=1;
@@ -203,9 +204,13 @@ int iocommon_create_file( const char *filename,
                          &resp_create,
                          NULL,
                          NULL);
+
     *ref = resp_create.ref;
 
-    if (dist) PINT_dist_free(dist);
+    if (dist)
+    {
+        PINT_dist_free(dist);
+    }
 
     return rc;
 }
@@ -230,16 +235,9 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
 
     /* Split the path into a directory and file */
     rc = split_pathname(pathname, &directory, &filename);
-    if (0 != rc && (0 == directory || 0 == filename))
+    if (rc == -1)
     {
-        errno = ENOMEM;
-        return pd;
-    }
-    else if (rc != 0)
-    {
-        fprintf(stderr, "Error: %s is not a legal PVFS path.\n", pathname);
-        errno = EACCES;
-        return pd;
+        goto errorout;
     }
 
     /* Check the flag to determine if links are followed */
@@ -253,61 +251,86 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
     }
 
     /* Get reference for the parent directory */
-    rc = iocommon_lookup_absolute(directory, &parent_ref);
-    if (0 == rc)
+    if (pdir == NULL)
     {
-
-        /* An open procedure safe for multiprocessing */
-
-        //Attempt to find file
-        rc = iocommon_lookup_relative(filename, parent_ref, follow_link, &file_ref);
-
-        //File was found
-        if (rc==0){
-            //if EXCLUSIVE, fail
-            if ((flag & O_EXCL) && (flag & O_CREAT)){
-                return pd;
+        rc = iocommon_lookup_absolute(directory, &parent_ref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (directory)
+        {
+            rc = iocommon_lookup_relative(directory,
+                                          pdir,
+                                          follow_link,
+                                          &parent_ref);
+            if (rc == -1)
+            {
+                goto errorout:
             }
         }
-        //File wasn't found
-        else {
-            //create file?
-            if (flag & O_CREAT){
-                rc = iocommon_create_file(filename, file_permission, file_creation_param, parent_ref, &file_ref);
-                //create failed, the file must have been created by a different process
-                if (rc){
-                    //get existing handle
-                    rc = iocommon_lookup_relative(filename, parent_ref, follow_link, &file_ref);
+        else
+        {
+            parent_ref = pdir;
+        }
+    }
+
+    /* An open procedure safe for multiprocessing */
+
+    /* Attempt to find file */
+    rc = iocommon_lookup_relative(filename,
+                                  parent_ref,
+                                  follow_link,
+                                  &file_ref);
+    /* File was found */
+    if (rc == 0)
+    {
+        //if EXCLUSIVE, fail */
+        if ((flag & O_EXCL) && (flag & O_CREAT))
+        {
+            errno = EEXIST;
+            goto errorout;
+        }
+    }
+    else
+    {
+        /* File wasn't found */
+        if (flag & O_CREAT)
+        {
+            /* create file? */
+            rc = iocommon_create_file(filename,
+                                      file_permission,
+                                      file_creation_param,
+                                      parent_ref,
+                                      &file_ref);
+            /* create failed, the file must have been */
+            /* created by a different process, so just open it */
+            if (rc != -1)
+            {
+                /* get existing handle */
+                rc = iocommon_lookup_relative(filename,
+                                              parent_ref,
+                                              follow_link,
+                                              &file_ref);
+                if (rc == -1)
+                {
+                    /* not sure what is wrong */
+                    goto errorout;
                 }
             }
         }
     }
-    else
-    {
-        errno = ENOTDIR;
-        return pd;
-    }
-
-    /* Free directory and filename memory */
-    free(directory);
-    free(filename);
 
     /* Translate the pvfs reference into a file descriptor */
-    if (0 == rc)
-    {
-       /* Set the file information */
-       /* create fd object */
-       pd = pvfs_alloc_descriptor(&pvfs_ops);
-       pd->pvfs_ref = file_ref;
-       pd->flags = flag;
-       pd->is_in_use = 1;    //indicate fd is valid!
-    }
-    else
-    {
-        /* Inidicate that an error occurred */
-        errno = EACCES;
-        return pd;
-    }
+    /* Set the file information */
+    /* create fd object */
+    pd = pvfs_alloc_descriptor(&pvfs_ops);
+    pd->pvfs_ref = file_ref;
+    pd->flags = flag;
+    pd->is_in_use = 1;    //indicate fd is valid!
 
     /* Truncate the file if neccesary */
     if (flag & O_TRUNC)
@@ -319,11 +342,39 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
 
     /* Move to the end of file if necessary */
     if (flag & O_APPEND)
+    {
         iocommon_lseek(pd, 0, 0, SEEK_END);
+    }
 
+    /* Free directory and filename memory */
+    if (directory)
+    {
+        free(directory);
+    }
+    if (filename)
+    {
+        free(filename);
+    }
     return pd;
+
+errorout:
+
+    /* Free directory and filename memory */
+    if (directory)
+    {
+        free(directory);
+    }
+    if (filename)
+    {
+        free(filename);
+    }
+    return NULL;
 }
 
+/**
+ *
+ *
+ */
 off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             PVFS_size unit_size, int whence)
 {
@@ -472,56 +523,58 @@ int iocommon_rename(pvfs_descriptor *olddir, const char *oldname,
     return rc;
 }
 
-/* do a blocking read or write
- * extra_offset = extra padding to the pd's offset, independent of the pd's offset */
-int iocommon_readorwrite( enum PVFS_io_type which,
-        pvfs_descriptor *pd, PVFS_size offset, void *buf,
-        PVFS_Request etype_req, PVFS_Request file_req, size_t count)
+/** do a blocking read or write
+ * 
+ */
+int iocommon_readorwrite(enum PVFS_io_type which,
+                         pvfs_descriptor *pd,
+                         PVFS_size offset,
+                         void *buf,
+                         PVFS_Request mem_req,
+                         PVFS_Request file_req)
         //returned by nonblocking operations
 {
-        int rc;
-        PVFS_Request contig_memory_req;
-        PVFS_credentials *creds;
-        PVFS_sysresp_io read_resp;
-        PVFS_size req_size;
+    int rc;
+    PVFS_credentials *creds;
+    PVFS_sysresp_io read_resp;
 
-        memset(&contig_memory_req, 0, sizeof(PVFS_Request));
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
 
-        //Ensure descriptor is used for the correct type of access
-        if (which==PVFS_IO_READ && (O_WRONLY & pd->flags)){
-            errno = EBADF;
-            return PVFS_FD_FAILURE;
-        }
-        else if (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
-        {
-            errno = EBADF;
-            return PVFS_FD_FAILURE;
-        }
+    //Ensure descriptor is used for the correct type of access
+    if (which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE)) ||
+        which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
+    {
+        errno = EBADF;
+        return PVFS_FD_FAILURE;
+    }
 
-        /* Create the memory request of a contiguous region: 'mem_req' x count  */
-        rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
+    iocommon_cred(&creds);
 
-        iocommon_cred(&creds);
+    rc = PVFS_sys_io(pd->pvfs_ref,
+                     file_req,
+                     offset,
+                     buf,
+                     mem_req,
+                     creds,
+                     &read_resp,
+                     which,
+                     PVFS_HINT_NULL);
 
-           rc = PVFS_sys_io(pd->pvfs_ref, file_req, offset, buf,
-                            contig_memory_req, creds, &read_resp,
-                            which, PVFS_HINT_NULL);
+    if (0 != rc)
+    {
+        errno = EIO;
+        return PVFS_FD_FAILURE;
+    }
 
-        if (0 != rc)
-        {
-            errno = EIO;
-            return PVFS_FD_FAILURE;
-        }
-
-        PVFS_Request_size(contig_memory_req, &req_size);
-        pd->file_pointer += req_size;
-
-        PVFS_Request_free(&contig_memory_req);
-        return PVFS_FD_SUCCESS;
+    return read_resp.total_completed;
 }
 
-/*
- * [Do a nonblocking read or write]
+/** Do a nonblocking read or write
+ *
  * extra_offset = extra padding to the pd's offset,
  * independent of the pd's offset
  * Returns an op_id, response, and ret_mem_request
@@ -534,48 +587,50 @@ int iocommon_ireadorwrite( enum PVFS_io_type which,
         PVFS_sys_op_id *ret_op_id, PVFS_sysresp_io *ret_resp,
         PVFS_Request *ret_memory_req)
 {
-        int rc;
-        PVFS_Request contig_memory_req;
-        PVFS_credentials *credentials;
-        PVFS_size req_size;
+    int rc;
+    PVFS_Request contig_memory_req;
+    PVFS_credentials *credentials;
+    PVFS_size req_size;
 
-        //Ensure descriptor is used for the correct type of access
-        if (which==PVFS_IO_READ && (O_WRONLY & pd->flags)){
-            errno = EBADF;
-            return PVFS_FD_FAILURE;
-        }
-        else if (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
-        {
-            errno = EBADF;
-            return PVFS_FD_FAILURE;
-        }
+    //Ensure descriptor is used for the correct type of access
+    if (which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE)) ||
+        which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
+    {
+        errno = EBADF;
+        return PVFS_FD_FAILURE;
+    }
 
-        //Create the memory request of a contiguous region: 'mem_req' x count
-        rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
+    //Create the memory request of a contiguous region: 'mem_req' x count
+    rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
 
-        iocommon_cred(&credentials);
+    iocommon_cred(&credentials);
 
-        rc = PVFS_isys_io(pd->pvfs_ref, file_req,
-                          pd->file_pointer+extra_offset,
-                          buf, contig_memory_req,
-                          credentials,
-                          ret_resp,
-                          which,
-                          ret_op_id, PVFS_HINT_NULL, NULL);
+    rc = PVFS_isys_io(pd->pvfs_ref,
+                      file_req,
+                      pd->file_pointer+extra_offset,
+                      buf,
+                      contig_memory_req,
+                      credentials,
+                      ret_resp,
+                      which,
+                      ret_op_id,
+                      PVFS_HINT_NULL,
+                      NULL);
 
-        assert(*ret_op_id!=-1);//TODO: handle this
+    assert(*ret_op_id!=-1);//TODO: handle this
 
-        if (rc!=0){
-            errno = EIO;
-            return PVFS_FD_FAILURE;
-        }
+    if (rc!=0)
+    {
+        errno = EIO;
+        return PVFS_FD_FAILURE;
+    }
 
-        PVFS_Request_size(contig_memory_req, &req_size);
-        pd->file_pointer += req_size;
+    PVFS_Request_size(contig_memory_req, &req_size);
+    pd->file_pointer += req_size;
 
-        *ret_memory_req = contig_memory_req;
+    *ret_memory_req = contig_memory_req;
 
-        return PVFS_FD_SUCCESS;
+    return PVFS_FD_SUCCESS;
 }
 
 int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
@@ -637,11 +692,17 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf)
     buf->st_ino = pd->pvfs_ref.handle;
     buf->st_mode = attr.perms;
     if (attr.objtype & PVFS_TYPE_METAFILE)
+    {
         buf->st_mode |= S_IFREG;
+    }
     if (attr.objtype & PVFS_TYPE_DIRECTORY)
+    {
         buf->st_mode |= S_IFDIR;
+    }
     if (attr.objtype & PVFS_TYPE_SYMLINK)
+    {
         buf->st_mode |= S_IFLNK;
+    }
     buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
@@ -672,11 +733,17 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf)
     buf->st_ino = pd->pvfs_ref.handle;
     buf->st_mode = attr.perms;
     if (attr.objtype & PVFS_TYPE_METAFILE)
+    {
         buf->st_mode |= S_IFREG;
+    }
     if (attr.objtype & PVFS_TYPE_DIRECTORY)
+    {
         buf->st_mode |= S_IFDIR;
+    }
     if (attr.objtype & PVFS_TYPE_SYMLINK)
+    {
         buf->st_mode |= S_IFLNK;
+    }
     buf->st_nlink = 1; /* PVFS does not allow hard links */
     buf->st_uid = attr.owner;
     buf->st_gid = attr.group;
@@ -697,9 +764,13 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
     PVFS_sys_attr        attr;
 
     if (owner != -1)
+    {
         attr.owner = owner;
+    }
     if (owner != -1)
+    {
         attr.group = group;
+    }
     attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
 
     ret = iocommon_setattr(pd->pvfs_ref, &attr);

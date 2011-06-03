@@ -1,29 +1,41 @@
+#include <fcntl.h>
 #include <usrint.h>
 #include <dirent.h>
+#include <stdarg.h>
+
+#define ISFLAGSET(s,f) ((stream->_flags & (f)) == (f))
 
 /* STDIO implementation - this gives users something to link to
  * that will call back to the PVFS lib - also lets us optimize
  * in a few spots like buffer sizes and stuff
  */
 
+/** struct representing a directory stream for buffered dir io
+ *
+ * this struct type is undefined in /usr/include as it is opaque
+ * it is defined in this file only.  This design is based loosely
+ * on the buffered IO scheme used in Linux for files.
+ */
+struct __dirstream {
+    int flags;      /**< general flags field */
+    int fileno;     /**< file dscriptor of open dir */
+    char *buf_base; /**< pointer to beginning of buffer */
+    char *buf_end;  /**< pointer to end of buffer */
+    char *buf_act;  /**< pointer to end of active portion of buffer */
+    char *buf_ptr;  /**< pointer to current position in buffer */
+};
 
-/*
- *fopen wrapper 
- */ 
+#define DIRSTREAM_MAGIC 0xfd100000
 
-FILE *fopen(const char * path, const char * mode)
-{ 
-    int flags = 0, fd = 0;
-    mode_t perm = 0;
-    pvfs_descriptor *pd = NULL;
-    const char *p = NULL;
+/** This function coverts from stream style mode to ssycall style flags
+ *
+ */
+static int mode2flags(char *mode)
+{
+    char *p;
+    int flags;
     int append = false, read = false, write = false, update = false;
     int exclusive = false;
-
-    if(!pvfs_lib_init)
-    { 
-        load_glibc(); 
-    } 
 
     /* look for fopen modes */ 
     for(p = mode; *p; p++)
@@ -34,7 +46,7 @@ FILE *fopen(const char * path, const char * mode)
                 if (read || write)
                 {
                     errno = EINVAL;
-                    return NULL;
+                    return -1;
                 }
                 break; 
             case 'r':
@@ -42,7 +54,7 @@ FILE *fopen(const char * path, const char * mode)
                 if (append || write)
                 {
                     errno = EINVAL;
-                    return NULL;
+                    return -1;
                 }
                 break; 
             case 'w':
@@ -50,7 +62,7 @@ FILE *fopen(const char * path, const char * mode)
                 if (read || append)
                 {
                     errno = EINVAL;
-                    return NULL;
+                    return -1;
                 }
                 break; 
             case '+':
@@ -58,7 +70,7 @@ FILE *fopen(const char * path, const char * mode)
                 if (!(read || write || append))
                 {
                     errno = EINVAL;
-                    return NULL;
+                    return -1;
                 }
                 break;
             case 'b': /* this is ignored in POSIX */
@@ -70,12 +82,12 @@ FILE *fopen(const char * path, const char * mode)
                 if (!(read || write || append))
                 {
                     errno = EINVAL;
-                    return NULL;
+                    return -1;
                 }
                 break;
             default:
                 errno = EINVAL;
-                return NULL;
+                return -1;
                 break; 
         }
     }
@@ -83,7 +95,7 @@ FILE *fopen(const char * path, const char * mode)
     if (!(read || write || append))
     {
         errno = EINVAL;
-        return NULL;
+        return -1;
     }
     if (read)
     { 
@@ -113,380 +125,553 @@ FILE *fopen(const char * path, const char * mode)
     {
         flags |= O_EXCL;
     }
-     
-    /* this is our version of open */
-    fd = open(path, flags, 0666); 
+    return flags;
+}
+ 
+/**
+ * fopen opens a file, then adds a stream to it
+ */ 
+FILE *fopen(const char * path, const char * mode)
+{ 
+    int fd = 0;
+    int flags = 0;
+    FILE *newfile = NULL;
 
-    if(fd)
-    { 
-        pd = pvfs_find_descriptor(fd);
-        /* set up buffering here */
-        pd->bufsize = pd->fsops->buffsize();
-        pd->buf = malloc(pd->bufsize);
-        pd->buftotal = 0;
-        pd->buf_off = 0;
-        pd->bufptr = 0;
-        return PFILE2FILE(pd); 
+    flags = mode2flags(mode);
+    if (flags == -1)
+    {
+        return NULL;
     }
-    else
-    { 
-        pvfs_debug("pvfs call to open failed\n"); 
-        return NULL; 
+
+    fd = open(path, flags, 0666);
+    if (fd == -1)
+    {
+        return NULL;
     }
+
+    newfile = fdopen(fd, mode);
+
+    return newfile;
 }
 
+/** this function sets up a new stream's buffer area
+ *
+ */
+static void init_stream (FILE *stream, flags, bufsize)
+{
+    /* set up stream here */
+    stream->_flags = _IO_MAGIC;
+    if (!(flags & O_WRONLY))
+        stream->_flags |= _IO_NO_READS;
+    if (!(flags & O_RDONLY))
+        stream->_flags |= _IO_NO_WRITES;
+    /* set up default buffering here */
+    stream->_IO_buf_base   = (char *)malloc(bufsize);
+    stream->_IO_buf_end    = stream + bufsize;
+    stream->_IO_read_base  = stream->_IO_buf_base;
+    stream->_IO_read_ptr   = stream->_IO_buf_base;
+    stream->_IO_read_end   = stream->_IO_buf_base;
+    stream->_IO_write_base = stream->_IO_buf_base;
+    stream->_IO_write_ptr  = stream->_IO_buf_base;
+    stream->_IO_write_end  = stream->_IO_buf_end;
+}
+
+/**
+ * fdopen adds a stream to an existing open file
+ */
 FILE *fdopen(int fd, const char *mode)
 {
-    pvfs_descriptor *pd;
-    pd = pvfs_find_descriptor(fd);
-    /* check for valid mode here */
-    /* set up buffering here */
-    return PFILE2FILE(pd); 
+    FILE *newfile = NULL;
+    int flags;
+
+    /* need to check for valid mode here */
+    /* it must be compatible with the existing mode */
+    flags = mode2flags(mode);
+
+    newfile = (FILE *)malloc(sizeof(FILE));
+    if (!newfile)
+    {
+        errno = ENOMEM;
+        return NULL; 
+    }
+    memset(newfile, 0, sizeof(FILE));
+
+    newfile->_fileno = fd;
+    init_stream(newfile, flags, PVFS_BUFSIZE);
+
+    return newfile;
 }
 
+/**
+ * freopen closes the file and opens another one for the stream
+ */
 FILE *freopen(const char *path, const char *mode, FILE *stream)
 {
-    pvfs_descriptor *pd = FILE2PFILE(stream)
+    int fd = 0;
+    int flags = 0;
     /* see if stream is in use - if so close the file */
-    /* open the file and put its info in the given descriptor */
-    return PFILE2FILE(pd);
+    if (stream->_fileno > -1)
+    {
+        int rc;
+        rc = close(stream->_fileno);
+        if (rc == -1)
+        {
+            return NULL;
+        }
+    }
+
+    /* translate mode to flags */
+    flags = mode2flags(mode);
+
+    /* open the file */
+    fd = open(path, flags, 0666);
+    if (fd == -1)
+    {
+        return NULL;
+    }
+    stream->_fileno = fd;
+
+    /* reset buffering here */
+    if (stream->_IO_buf_base)
+        free (stream->_IO_buf_base);
+    init_stream(stream, flags, PVFS_BUFSIZE);
+
+    return stream;
 }
 
-/*
- * fwrite wrapper
+/** Implements buffered write using Linux pointer model
+ * 
+ *  Two sets of pointers, one for reading one for writing
+ *  flag determins which mode we are in.  start always 
+ *  points to beginning of buffer, end points to end
+ *  In read, end points to end of actual data read and
+ *  coincides with the file pointer.  In write the start
+ *  coincides with file pointer.  In either case ptr is
+ *  where user stream pointer is.
  */
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    off64_t rsz, rstart, rend;
-    off64_t firstblk, firstoff, firstsize;
-    off64_t lastblk, lastoff, lastsize;
-    off64_t curblk, numblk;
+    off64_t rsz, rsz_buf, rsz_extra;
+    int rc;
 
-    if (!stream || !stream->is_in_use || !ptr) {
-        errno = EBADF;
-        return 0;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC) ||
+            ISFLAGSET(stream, _IO_NO_WRITES) ||
+            !ptr || size <= 0 || nmemb <= 0)
+    {
+        errno = EINVAL;
+        return -1;
     }
-    /* rsz: request size in bytes */
-    rsz = size * nmemb;
-    /* rstart: first byte of request */
-    rstart = stream->file_pointer;
-    /* rend: last byte of request */
-    rend = rstart + rsz - 1;
 
-    /* file is divided into blocks from 0..N-1 */
-    /* curblk: block number of current buffer */
-    if (stream->buf_off == -1)
+    /* Check to see if switching from read to write */
+    if (!ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
-        curblk = -1;
-        stream->dirty = 0;
-    }
-    else
-    {
-        curblk = stream->buff_off/stream->bufsize;
-    }
-    /* firstblk: block number with first byte of request */
-    firstblk = rstart/stream->bufsize;
-    /* firstoff: offset from start of first block */
-    /* firstoff is in 0..blocksize */
-    firstoff = rstart%stream->bufsize;
-    /* lastblk: block number with last byte of request */
-    lastblk = rend/stream->bufsize;
-    /* lastoff: offset from start of last block */
-    /* lastoff is in 0..blocksize */
-    lastoff = rend%stream->bufsize;
-    /* numblk: number of blocks involved in request */
-    numblk = (lastblk - firstblk) + 1;
-    /* firstsize: number of bytes on first block of request */
-    /* firstsize is in 1..blocksize */
-    firstsize = (firstblk==lastblk) ? lastoff-firstoff+1 :
-    stream->bufsize-firstoff;
-    /* lastsize: number of bytes on last block of request */
-    /* lastsize is in 0..blocksize */
-    lastsize = (firstblk == lastblk) ? 0 : lastoff+1;
-    
-
-    /* if the current buffer is not involved, flush it */
-    if (curblk < firstblk || curblk > lastblk)
-    {
-        if (stream->dirty)
-            write(stream->fd, stream->buffer, stream->bufsize);
-        stream->dirty = 0;
-        stream->buf_off = -1;
-        curblk = -1;
-        /* write completes below - file pointer already in position */
-    }
-    /* if current buffer is completely overwritten, ignore it */
-    else if ((curblk > firstblk && curblk < lastblk) ||
-            (curblk == firstblk && firstsize == stream->bufsize) ||
-            (curblk == lastblk && lastsize = stream->bufsize))
-    {
-        stream->dirty = 0;
-        stream->buf_off = -1;
-        curblk = -1;
-        /* write completes below - file pointer already in position */
-    }
-    /* if current buffer is first, copy bytes */
-    else if (curblk == firstblk && firstsize < stream->bufsize)
-    {
-        memcopy(stream->buf+firstoff, ptr, firstsize);
-        if (numblk > 1)
+        /* write buffer back */
+        rc = write(stream->_fileno, stream->_IO_write_base,
+                stream->_IO_write_ptr - stream->_IO_write_base); 
+        if (rc == -1)
         {
-            lseek(stream->fd, stream->buf_off, SEEK_SET);
-            write(stream->fd, stream->buf, stream->bufsize);
-            stream->dirty = 0;
-            stream->buf_off = -1;
+            stream->_flags |= _IO_ERR_SEEN;
+            return -1;
         }
-        ptr += firstsize;
-        rsz -= firstsize;
-        /* write completes below - file pointer left in position */
+        /* reset read pointer */
+        stream->_IO_read = stream->_IO_read_end;
+        /* set flag */
+        stream->_flags |= _IO_CURRENTLY_PUTTING
+        /* indicate read buffer empty */
+        stream->_IO_read_end = stream->_IO_read_base;
+        stream->_IO_read_ptr = stream->_IO_read_end;
+        /* indicate write buffer empty */
+        stream->_IO_write_end = stream->_IO_buf_end;
+        stream->_IO_write_ptr = stream->_IO_write_base;
     }
-    /* now write the data */
-    if (lastsize > 0) /* write to the middle of a block */
+
+    rsz = size * nmemb;
+    rsz_buf = PVFS_util_min(rsz, stream->_IO_write_end - stream->_IO_write_ptr);
+    rsz_extra = rsz - rsz_buf;
+
+    if (rsz_buf) /* is only zero if buffer is full */
     {
-        /* should already be in position to write request data */
-        write(stream->fd, ptr, rsz-lastsize);
-        /* see if the last block is not the one already loaded */
-        if (curblk != lastblk)
+        memcpy(stream->_IO_write_ptr, ptr, rsz_buf);
+        stream->_IO_write_ptr += rsz_buf;
+    }
+
+    /* if there is more to write */
+    if (rsz_extra)
+    {
+        /* buffer is full - write the current buffer */
+        rc = write(stream->_fileno, stream->_IO_write_base,
+                        stream->_IO_write_ptr - stream->_IO_write_base);
+        if (rc == -1)
         {
-            /* cannot have a valid block in the buffer */
-            if (curblk != -1)
+            stream->_flags |= _IO_ERR_SEEN;
+            return -1;
+        }
+        /* reset buffer */
+        stream->_IO_write_ptr = stream->_IO_write_base;
+        /* if there more data left in request than fits in a buffer */
+        if(rsz_extra > stream->_IO_buf_end - stream->_IO_buf_base)
+        {
+            /* write data directly */
+            rc = write(stream->_fileno, ptr + rsz_buf, rsz_extra);
+            if (rc == -1)
             {
-                errno = 100;
+                stream->_flags |= _IO_ERR_SEEN;
                 return -1;
             }
-            /* locate new buffer block */
-            stream->buf_off = lastblock * stream->bufsize;
-            /* load a new buffer - file pointer should be in position */
-            stream->buftotal = read(stream->fd, stream->buf, stream->bufsize);
         }
-        /* move last of request data to buffer */
-        memcopy(stream->buf, ptr+(rsz-lastsize), lastsize);
-        /* move file pointer back to end of request */
-        stream->file_pointer = stream->buf_off+lastsize;
-        /* see of we extended the file */
-        if (lastsize > stream->buftotal)
-            stream->buftotal = lastsize;
+        else
+        {
+            memcpy(stream->_IO_write_ptr, ptr + rsz_buf, rsz_extra);
+            stream->_IO_write_ptr += rsz_extra;
+        }
     }
-    else /* writes to the end of a block */
-    {
-        /* should already be in position */
-        write(stream->fd, ptr, rsz);
-    }
-    /* file pointer should be in right place */
+    
     return rsz;
 }
 
 /*
- * fread wrapper
+ * fread implements the same buffer scheme as in fwrite
  */
 size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    off64_t rsz, rstart, rend;
-    off64_t firstblk, firstoff, firstsize;
-    off64_t lastblk, lastoff, lastsize;
-    off64_t curblk, numblk;
+    int fd;
+    pvfs_descriptor *pd;
+    int rsz, rsz_buf, rsz_extra;
+    int bytes_read;
+    int rc;
 
-    if (!stream || !stream->is_in_use || !ptr) {
-        errno = EBADF;
-        return 0;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC) ||
+            ISFLAGSET(stream, _IO_NO_READS) ||
+            !ptr || size < 0 || nmemb < 0)
+    {
+        errno = EINVAL;
+        return -1;
     }
-    /* rsz: request size in bytes */
-    rsz = size * nmemb;
-    /* rstart: first byte of request */
-    rstart = stream->file_pointer;
-    /* rend: last byte of request */
-    rend = rstart + rsz - 1;
 
-    /* file is divided into blocks from 0..N-1 */
-    /* curblk: block number of current buffer */
-    if (stream->buf_off == -1)
+    /* Check to see if switching from write to read */
+    if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
-        curblk = -1;
-        stream->dirty = 0;
+        /* write buffer back */
+        rc = write(stream->_fileno, stream->_IO_write_base,
+                stream->_IO_write_ptr - stream->_IO_write_base); 
+        if (rc == -1)
+        {
+            stream->_flags |= _IO_ERR_SEEN;
+            return -1;
+        }
+        /* reset write pointer */
+        stream->_IO_write_ptr = stream->_IO_write_base;
+        /* clear flag */
+        stream->_flags &= ~_IO_CURRENTLY_PUTTING
+        /* indicate read buffer empty */
+        stream->_IO_read_end = stream->_IO_read_base;
+        stream->_IO_read_ptr = stream->_IO_read_end;
     }
-    else
+
+    /* see if anything is in read buffer */
+    if (stream->_IO_read_end == stream->_IO_read_base ||
+        stream->_IO_read_ptr == stream->_IO_read_end)
     {
-        curblk = stream->buff_off/stream->bufsize;
+        /* buffer empty so read new buffer */
+        bytes_read = read(stream->_fileno, stream->_IO_read_base,
+                stream->_IO_buf_end - stream->_IO_buf_base);
+        if (bytes_read == -1)
+        {
+            stream->_flags |= _IO_ERR_SEEN;
+            return -1;
+        }
+        /* indicate end of read area */
+        stream->_IO_read_end = stream->_IO_read_base + bytes_read;
+        /* reset read pointer */
+        stream->_IO_read_ptr = stream->_IO_read_base;
     }
-    /* firstblk: block number with first byte of request */
-    firstblk = rstart/stream->bufsize;
-    /* firstoff: offset from start of first block */
-    /* firstoff is in 0..blocksize */
-    firstoff = rstart%stream->bufsize;
-    /* lastblk: block number with last byte of request */
-    lastblk = rend/stream->bufsize;
-    /* lastoff: offset from start of last block */
-    /* lastoff is in 0..blocksize */
-    lastoff = rend%stream->bufsize;
-    /* numblk: number of blocks involved in request */
-    numblk = (lastblk - firstblk) + 1;
-    /* firstsize: number of bytes on first block of request */
-    /* firstsize is in 1..blocksize */
-    firstsize = (firstblk==lastblk) ? lastoff-firstoff+1 :
-    stream->bufsize-firstoff;
-    /* lastsize: number of bytes on last block of request */
-    /* lastsize is in 0..blocksize */
-    lastsize = (firstblk == lastblk) ? 0 : lastoff+1;
+
+    /* 
+     * we assume there is a block in the buffer now
+     * and that the current file pointer corresponds
+     * to the end of the read buffer.  The user has
+     * only up to the read pointer.
+     */
+    rsz = size * nmemb;  /* total bytes requested */
+    rsz_buf = PVFS_util_min(rsz, stream->_IO_read_end - stream->_IO_read_ptr);
+    rsz_extra = rsz - rsz_buf;  /* bytes beyond the buffer */
     
+    /* copy rz_buf bytes from buffer */
+    if (rsz_buf) /* zero if at EOF */
+    {
+        memcpy(ptr, stream->_IO_read_ptr, rsz_buf);
+        stream->_IO_read_ptr += rsz_buf;
+    }
 
-    /* if the current buffer is not involved, flush it */
-    if (curblk < firstblk || curblk > lastblk)
+    /* if more bytes requested */
+    if (rsz_extra)
     {
-        if (stream->dirty)
-            write(stream->fd, stream->buffer, stream->bufsize);
-        stream->dirty = 0;
-        stream->buf_off = -1;
-        curblk = -1;
-        /* write completes below - file pointer already in position */
-    }
-    /* if current buffer is completely read, break into two reads */
-    else if ((curblk > firstblk && curblk < lastblk) ||
-            (curblk == firstblk && firstsize == stream->bufsize) ||
-            (curblk == lastblk && lastsize = stream->bufsize))
-    {
-        /* read from start up to buffer */
-        /* copy buffer */
-        /* if buffer dirty, flush */
-        if (stream->dirty)
+        /* if current buffer not at EOF */
+        if (stream->_IO_read_end == _IO_buf_end)
         {
-            lseek(stream->fd, stream->buf_off, SEEK_SET);
-            write(stream->fd, stream->buf, stream->bufsize);
-            stream->dirty = 0;
-            stream->buf_off = -1;
-            curblk = -1;
-        }
-        /* read completes below - file pointer already in position */
-    }
-    /* if current buffer is first, copy bytes */
-    else if (curblk == firstblk && firstsize < stream->bufsize)
-    {
-        memcopy(ptr, stream->buf+firstoff, firstsize);
-        /* if buffer dirty, flush */
-        if (stream->dirty)
-        {
-            lseek(stream->fd, stream->buf_off, SEEK_SET);
-            write(stream->fd, stream->buf, stream->bufsize);
-            stream->dirty = 0;
-            stream->buf_off = -1;
-        }
-        ptr += firstsize;
-        rsz -= firstsize;
-        /* read completes below - file pointer left in position */
-    }
-    /* now read the data */
-    if (lastsize > 0) /* read to the middle of a block */
-    {
-        /* should already be in position to read request data */
-        read(stream->fd, ptr, rsz-lastsize);
-        /* see if the last block is not the one already loaded */
-        if (curblk != lastblk)
-        {
-            /* cannot have a valid block in the buffer */
-            if (curblk != -1)
+            /* if more data requested than fits in buffer */
+            if (rsz_extra > (stream->_IO_buf_end - stream->_IO_buf_base))
             {
-                errno = 100;
+                /* read directly from file for remainder of request */
+                bytes_read = read(stream->_fileno, ptr+rsz_buf, rsz_extra);
+                if (bytes_read == -1)
+                {
+                    stream->_flags |= _IO_ERR_SEEN;
+                    return -1;
+                }
+                if (bytes_read == rsz_extra)
+                {
+                    /* then read next buffer */
+                    bytes_read = read(stream->_fileno, stream->_IO_buf_base,
+                            stream->_IO_buf_end - _IO_buf_base);
+                    if (bytes_read == -1)
+                    {
+                        stream->_flags |= _IO_ERR_SEEN;
+                        return -1;
+                    }
+                    stream->_IO_read_end = stream->_IO_read_base + bytes_read;
+                    stream->_IO_read_ptr = stream->_IO_read_base;
+                    return rsz;
+                }
+                /* have read to EOF */
+                stream->_flags |= _IO_EOF_SEEN;
+                return rsz_buf + bytes_read;
+            }
+            /* rest of request fits in a buffer - read next buffer */
+            bytes_read = read(stream->_fileno, stream->_IO_buf_base,
+                    stream->_IO_buf_end - _IO_buf_base);
+            if (bytes_read == -1)
+            {
+                stream->_flags |= _IO_ERR_SEEN;
                 return -1;
             }
-            /* locate new buffer block */
-            stream->buf_off = lastblock * stream->bufsize;
-            /* load a new buffer - file pointer should be in position */
-            stream->buftotal = read(stream->fd, stream->buf, stream->bufsize);
+            stream->_IO_read_end = stream->_IO_read_base + bytes_read;
+            stream->_IO_read_ptr = stream->_IO_read_base;
+            /* transfer remainder */
+            rsz_extra = PVFS_util_min(rsz_extra,
+                    stream->_IO_read_end - stream->_IO_read_ptr);
+            if (rsz_extra) /* zero if at EOF */
+            {
+                memcpy(ptr, stream->_IO_read_ptr, rsz_extra);
+                stream->_IO_read_ptr += rsz_extra;
+            }
+            if (rsz_buf + rsz_extra < rsz)
+            {
+                stream->_flags |= _IO_EOF_SEEN;
+            }
+            return rsz_buf + rsz_extra;
         }
-        /* move last of request data to buffer */
-        memcopy(ptr+(rsz-lastsize), stream->buf, lastsize);
-        /* move file pointer back to end of request */
-        stream->file_pointer = stream->buf_off+lastsize;
+        else
+        {
+            /* at EOF so return bytes read */
+            stream->_flags |= _IO_EOF_SEEN;
+            return rsz_buf;
+        }
     }
-    else /* writes to the end of a block */
-    {
-        /* should already be in position */
-        read(stream->fd, ptr, rsz);
-    }
-    /* file pointer should be in right place */
+    /* request totally within current buffer */
     return rsz;
 }
 
-/*
- * fclose wrapper
+/**
+ * fclose first writes any dirty data in the buffer
  */
 int fclose(FILE *stream)
 {
-    return close(stream->fd);
+    int rc;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    fd = stream->_fileno;
+    /* write any pending data */
+    if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
+    {
+        if (stream->_IO_write_ptr > stream->_IO_write_base)
+        {
+            rc = write(stream->_fileno, stream->_IO_write_ptr,
+                    stream->_IO_write_ptr - stream->_IO_write_base);
+            if (rc == -1)   
+            {
+                return -1;
+            }
+        }
+    }
+    if (!ISFLAGSET(stream, _IO_USER_BUF))
+    {
+        /* free the buffer */
+        free(stream->_IO_buf_base);
+    }
+    if (!ISFLAGSET(stream, _IO_DELETE_DONT_CLOSE))
+    {
+        return close(stream->_fileno);
+    }
+    free(stream);
+    return 0;
 }
 
-/*
+/**
  * fseek wrapper
  */
 off_t fseek(FILE *stream, off_t offset, int whence)
 {
-    return (off_t)lseek64(stream->fd, (off64_t)offset, whence);
+
+    return (off_t)fseek64(stream, (off64_t)offset, whence);
 }
 
-/*
- * fseek64 wrapper
+/** This is the main code for seeking on a stream
+ * 
+ *  If we seek a short distance within the current buffer
+ *  we can just move the stream pointer.  Otherwise we
+ *  have to clear the buffer, seek, and start fresh
  */
 off64_t fseek64(FILE *stream, off64_t offset, int whence)
 {
-    return lseek64(stream->fd, offset, whence);
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    /* if not just getting the position */
+    if ((offest != 0L) || (whence != SEEK_CUR))
+    {
+        int64_t filepos, fileend;
+        filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+        fileend = lseek64(stream->_fileno, 0, SEEK_END);
+        /* figure out if we are only seeking within the */
+        /* bounds of the current buffer to minimize */
+        /* unneccessary reads/writes */
+        if (whence == SEEK_CUR && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                (offset < stream->_IO_write_end - stream_IO_write_ptr) &&
+                (offset > stream->_IO_write_base - stream_IO_write_ptr))
+        {
+            stream->_IO_write_ptr += offset;
+            return filepos + stream->_IO_write_ptr;
+        }
+        if (whence == SEEK_CUR && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                (offset < stream->_IO_read - stream_IO_read) &&
+                (offset > stream->_IO_read - stream_IO_read))
+        {
+            stream->_IO_read += offset;
+            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+        }
+        if (whence == SEEK_SET && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                (offset > filepos) && (offset < filepos +
+                (stream->_IO_write_end - stream_IO_write_base)))
+        {
+            stream->_IO_write_ptr += offset - filepos;
+            return filepos + stream->_IO_write_ptr;
+        }
+        if (whence == SEEK_SET && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                (offset < filepos) && (offset > filepos -
+                (stream->_IO_read_end - stream_IO_read_base)))
+        {
+            stream->_IO_read_ptr += offset - filepos;
+            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+        }
+        if (whence == SEEK_END && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                ((fileend - offset) > filepos) &&
+                ((fileend - offset) < filepos +
+                (stream->_IO_write_end - stream_IO_write_base)))
+        {
+            stream->_IO_write_ptr += (fileend - offset) - filepos;
+            return filepos + stream->_IO_write_ptr;
+        }
+        if (whence == SEEK_END && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+                ((fileend - offset) < filepos) &&
+                ((fileend - offset) > filepos -
+                (stream->_IO_read_end - stream_IO_read_base)))
+        {
+            stream->_IO_read_ptr += (fileend - offset) - filepos;
+            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+        }
+        /* at this point the seek is beyond the current buffer */
+        /* if we are in write mode write back the buffer */
+        if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
+            stream->_IO_write_ptr > stream->_IO_write_base)
+        {
+            /* write buffer back */
+            ret = write(stream->_fileno, stream->_IO_write_base,
+                    stream->_IO_write_ptr - stream->_IO_write_base); 
+            if (ret < 0)
+                return ret;
+            /* reset write pointer */
+            stream->_IO_write_ptr = stream->_IO_write_base;
+        }
+        else
+        {
+            /* in read mode simply clear the buffer */
+            /* will force a read at next fread call */
+            stream->_IO_read_end = stream->_IO_read_base;
+            stream->_IO_read_ptr = stream->_IO_read_end;
+        }
+    }
+    return lseek64(stream->_fileno, offset, whence);
 }
 
-/*
+/**
  * fsetpos wrapper
  */
 int fsetpos(FILE *stream, fpos_t *pos)
 {
-    return lseek(stream->fd, *pos, SEEK_SET);
+    return (int)fseek64(stream, (off64_t)*pos, SEEK_SET);
 }
 
-/*
+/**
  * rewind wrapper
  */
 void rewind(FILE *stream)
 {
-    lseek(stream->fd, 0, SEEK_SET);
+    fseek64(stream, 0L, SEEK_SET);
 }
 
-/*
+/**
  * ftell wrapper
  */
 long ftell(FILE *stream)
 {
-    return (long)stream->file_pointer;
+    return (long)fseek64(stream, 0L, SEEK_CUR);
 }
 
-/*
+/**
  * fgetpos wrapper
  */
 int fgetpos(FILE *stream, fpos_t *pos)
 {
-    *pos = stream->file_pointer;
+    *pos = (fpos_t)fseek64(stream, 0L, SEEK_CUR);
     return 0;
 }
 
-/*
- * fflush wrapper
+/** forces a write back of potentially dirty buffer
+ * 
+ *  we don't have a dirty flag, so if user seeks
+ *  ahead within the buffer then does a flush
+ *  we will do an uncessary write
  */
 int fflush(FILE *stream)
 {
-    int rc = 0;
-    if (stream)
+    int rc;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        if (stream->buf && stream->dirty)
+        errno = EBADF;
+        return -1;
+    }
+    /* if we are in write mode write back the buffer */
+    if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
+        stream->_IO_write_ptr > stream->_IO_write_base)
+    {
+        /* write buffer back */
+        rc = write(stream->_fileno, stream->_IO_write_base,
+                stream->_IO_write_ptr - stream->_IO_write_base); 
+        if (rc < 0)
         {
-            lseek64(stream->fd, stream->buf_off, SEEK_SET);
-            /* buftotal should equal bufsize unless the buffer */
-            /* is at the end of the file and the buffer is too */
-            /* big - then buftotal is smaleer */
-            write(stream->fd, stream->buf, stream->buftotal);
-            stream->dirty = 0;
+            stream->_flags |= _IO_ERR_SEEN;
+            return rc;
         }
+        /* reset write pointer */
+        stream->_IO_write_ptr = stream->_IO_write_base;
     }
-    else
-    {
-        errno = EINVAL;
-        rc = -1;
-    }
-    return rc;
+    return 0;
 }
 
 /*
@@ -494,147 +679,112 @@ int fflush(FILE *stream)
  */
 int fputc(int c, FILE *stream)
 {
-    size_t len;
     int rc;
-    if (!stream || !stream->is_in_use || !s)
+    rc = fwrite(&c, 1, 1, stream);
+    if (ferror(stream))
     {
-        errno = EBADF;
-        return 0;
+        return EOF;
     }
-    rc = fwrite (&c, 1, 1, stream);
-    if (rc != 1)
-        rc = -1;
-    else
-        rc = c;
-    return rc;
+    return c;
 }
 
-/*
- * fputs wrapper
+/**
+ * fputs writes up to a null char
  */
 int fputs(const char *s, FILE *stream)
 {
     size_t len;
     int rc;
-    if (!stream || !stream->is_in_use || !s)
+    if (!s)
     {
-        errno = EBADF;
-        return 0;
+        errno = EINVAL;
+        return EOF;
     }
     len = strlen(s);
-    return fwrite (s, len, 1, stream);
+    rc = fwrite(s, len, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return rc;
 }
 
+/**
+ * putc wrapper
+ */
 int putc(int c, FILE *stream)
 {
     return fputc(c, stream);
 }
 
+/**
+ * putchar wrapper
+ */
 int putchar(int c)
 {
     return fputc(c, stdout);
 }
 
+/**
+ * puts wrapper
+ */
 int puts(const char *s, FILE *stream)
 {
-    fputs(s, stream);
+    int rc;
+    rc = fputs(s, stream);
+    if (rc == EOF)
+    {
+        return EOF;
+    }
     return fputs("\n", stream);
 }
 
 /**
- *
- * fgets wrapper
+ * fgets reads up to size or a newline
  */
 char *fgets(char *s, int size, FILE *stream)
 {
-    char *p;
-    long pos, current;
-    int rc;
+    char c, *p;
 
-    if (!pvfs_lib_init) {
-        load_glibc();
-    }
-    if (!stream || stream->_fileno < 0) {
-        errno = EBADF;
-        return 0;
-    }
-    if (pvfs_find_descriptor(stream->_fileno)) {
-        pos = ftell(stream);
-#ifdef DEBUG
-        pvfs_debug("fgets: pos=%ld\n", pos);
-#endif
-        rc = pvfs_read(stream->_fileno, s, size);
-        if (rc > 0) {
-            p = strchr(s, '\n');
-            if (p) {
-                ++p;
-                *p = '\0';
-                pos += strlen(s);
-                current = ftell(stream);
-#ifdef DEBUG
-                pvfs_debug("fgets: s=%s (len=%d)", s, strlen(s));
-#endif
-                if (pos != current) {
-#ifdef DEBUG
-                    pvfs_debug("fgets: new pos=%ld, current=%ld\n", pos, current);
-#endif
-                    pvfs_lseek(stream->_fileno, pos, SEEK_SET);
-#ifdef DEBUG
-                    pvfs_debug("fgets: set pos=%ld\n", ftell(stream));
-#endif
-                }
-                return s;
-            }
-        }
+    if (!s || size < 1)
+    {
+        errno = EINVAL;
         return NULL;
     }
-    else {
-#ifdef DEBUG
-        pvfs_debug("fgets: calling glibc_ops.fgets, s=%p, size=%ld, fd=%d\n",
-                    s, size, fileno(stream));
-#endif
-        return glibc_ops.fgets(s, size, stream);
+    if (size == 1)
+    {
+        *s = '\0';
+        return s;
     }
+    p = s;
+    size--;
+    do {
+        *p++ = c = fgetc(stream);
+    } while (--size && c != '\n' && !feof(stream) && !ferror(stream));
+    if (ferror(stream))
+    {
+        return NULL;
+    }
+    *p = '\0';
+    return s;
 }
 
 /**
- *
  * fgetc wrapper
  */
 int fgetc(FILE *stream)
 {
     int rc, ch;
 
-    if (!pvfs_lib_init) {
-        load_glibc();
+    rc = fread(&ch, 1, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
     }
-    if (!stream || stream->_fileno < 0) {
-        errno = EBADF;
-        return 0;
-    }
-    if (pvfs_find_descriptor(stream->_fileno)) {
-#ifdef DEBUG
-        pvfs_debug("fgetc: calling pvfs_read\n");
-#endif
-        rc = pvfs_read(stream->_fileno, &ch, 1);
-        if (rc > 0) {
-            return ch;
-        }
-        else {
-            errno = EBADF;
-            return EOF;
-        }
-    }
-    else {
-#ifdef DEBUG
-        pvfs_debug("fgetc: calling glibc_ops.fgetc\n");
-#endif
-        return glibc_ops.fgetc(stream);
-    }
+    return ch;
 }
 
 /**
- *
  * getc wrapper
  */
 int getc(FILE *stream)
@@ -642,98 +792,115 @@ int getc(FILE *stream)
     return fgetc(stream);
 }
 
+/**
+ * getchar wrapper
+ */
 int getchar(void)
 {
-    return fgetc(stream);
-}
-
-char *gets(char * s)
-{
+    return fgetc(stdin);
 }
 
 /**
- *
+ * gets
+ */
+char *gets(char * s)
+{
+    char c, *p;
+
+    if (!s)
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+    p = s;
+    do {
+        *p++ = c = fgetc(stream);
+    } while (c != '\n' && !feof(stream) && !ferror(stream));
+    if (ferror(stream))
+    {
+        return NULL;
+    }
+    return s;
+}
+
+/**
  * ungetc wrapper
+ *
+ * TODO: at the moment this will not unget beyond the current
+ *       buffer - needs a better implementation using the backup
+ *       buffer area _IO_save_base, _IO_save_end, _IO_backup_base
  */
 int ungetc(int c, FILE *stream)
 {
-    long pos;
+    int64_t rc;
 
-    if (!pvfs_lib_init) {
-        load_glibc();
+    rc = fseek64(stream, -1L, SEEK_CUR);
+    if (rc < 0)
+    {
+        return EOF;
     }
-    if (!stream || stream->_fileno < 0) {
-        errno = EBADF;
-        return 0;
-    }
-    if (pvfs_find_descriptor(stream->_fileno)) {
-#ifdef DEBUG
-        pvfs_debug("ungetc: current pos=%ld\n", ftell(stream));
-#endif
-        pos = ftell(stream) - 1;
-        pvfs_lseek(stream->_fileno, pos, SEEK_SET);
-#ifdef DEBUG
-        pvfs_debug("ungetc: set pos=%ld\n", ftell(stream));
-#endif
-        return c;
-    }
-    else {
-#ifdef DEBUG
-        pvfs_debug("ungetc: calling glibc_ops.ungetc\n");
-#endif
-        return glibc_ops.ungetc(c, stream);
-    }
+    return c;
 }
 
 /**
- *
+ * fprintf using a var arg list
+ */
+int vfprintf(FILE *stream, const char *format, va_list ap)
+{
+    char *buf;
+    int len, rc;
+
+    len = vasprintf(&buf, format, ap);
+    if (len < 0)
+    {
+        return len;
+    }
+    if (len > 0 && buf)
+    {
+        rc = fwrite(buf, len, 1, stream);
+    }
+    if (buf)
+    {
+        free(buf);
+    }
+    return rc;
+}
+
+int vprintf(const char *format, va_list ap)
+{
+    return vfprintf(stdout, format, ap);
+}
+
+/**
  * fprintf wrapper
  */
 int fprintf(FILE *stream, const char *format, ...)
 {
-    char *buf = NULL;
     size_t len;
     va_list ap;
-    int rc;
 
-    if (!pvfs_lib_init) {
-        load_glibc();
-    }
-    if (!stream || stream->_fileno < 0) {
-        errno = EBADF;
-        return 0;
-    }
-    if (pvfs_find_descriptor(stream->_fileno)) {
-        va_start(ap, format);
-        len = vasprintf(&buf, format, ap);
-        va_end(ap);
-        if (len > 0 && buf) {
-            rc = pvfs_write(stream->_fileno, buf, len);
-        }
-        else {
-#ifdef DEBUG
-            pvfs_debug("fprintf: vasprintf error\n", buf);
-#endif
-            errno = EIO;
-            rc = -1;
-        }
-        if (buf) {
-            free(buf);
-        }
-        return rc;
-    }
-    else {
-#ifdef DEBUG
-        pvfs_debug("fprintf: calling glibc_ops.fprintf for %d\n", stream->_fileno );
-#endif
-        return glibc_ops.fprintf(stream, format, ap);
-    }
+    va_start(ap, format);
+    len = vfprintf(stream, format, ap);
+    va_end(ap);
+    return len;
+}
+
+/**
+ * printf wrapper
+ */
+int printf(const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vfprintf(stdout, format, ap);
+    va_end(ap);
+    return len;
 }
 
 #if 0
-printf()
-{
-}
+/* TODO: These are not implemented yet */
 
 fscanf()
 {
@@ -744,48 +911,61 @@ scanf()
 }
 #endif
 
-/*
- * Stdio utilities for EOF, error, etc
+/**
+ * Stdio utilitie to clear error and eof for a stream
  */
-void clearerr (FILE *pf)
+void clearerr (FILE *stream)
 {
-    if (pf && pf->is_in_use)
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        pf->eof = 0;
-        pf->error = 0;
+        return;
     }
+    stream->_flags &= ~_IO_ERR_SEEN;
+    stream->_flags &= ~_IO_EOF_SEEN;
 }
 
-int feof (FILE *pf)
+/**
+ * Stdio utilitie to check if a stream is at EOF
+ */
+int feof (FILE *stream)
 {
-    if (pf && pf->is_in_use)
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        if (pf->eof)
-            return -1;
-        return 0;
+        error = EBADF;
+        return -1;
     }
-    return 0;
+    return stream->_flags & _IO_EOF_SEEN;
 }
 
-int ferror (FILE *pf)
+/**
+ * Stdio utilitie to check for error on a stream
+ */
+int ferror (FILE *stream)
 {
-    if (pf && pf->is_in_use)
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        if (pf->error)
-            return -1;
-        return 0;
+        error = EBADF;
+        return -1;
     }
-    return 0;
+    return stream->_flags & _IO_ERR_SEEN;
 }
 
-int fileno (FILE *pf)
+/**
+ * Stdio utilitie to get file descriptor from a stream
+ */
+int fileno (FILE *stream)
 {
-    if (pf && pf->is_in_use)
-        return pf->fd;
-    errno = EBADF;
-    return -1;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    {
+        error = EBADF;
+        return -1;
+    }
+    return stream->_fileno;
 }
 
+/** stdio function to delete a file
+ *
+ */
 int remove (const char *path)
 {
     int rc;
@@ -797,65 +977,440 @@ int remove (const char *path)
     return unlink (path);
 }
 
-void setbuf (FILE *pf, char *buf)
+/**
+ *  setbuf wrapper
+ */
+void setbuf (FILE *stream, char *buf)
 {
-    setvbuf(pd, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, BUFSIZ);
 }
 
-void setbuffer (FILE *pf, char *buf, size_t size)
+/**
+ *  setbuffer wrapper
+ */
+void setbuffer (FILE *stream, char *buf, size_t size)
 {
-    setvbuf(pd, buf, buf ? _IOFBF : _IONBF, size);
+    setvbuf(stream, buf, buf ? _IOFBF : _IONBF, size);
 }
 
-void setlinbuf (FILE *pf)
+/**
+ *  setlinbuf wrapper
+ */
+void setlinbuf (FILE *stream)
 {
-    setvbuf(pd, (chat *)NULL, buf ? _IOLBF : 0);
+    setvbuf(stream, (char *)NULL, buf ? _IOLBF : 0);
 }
 
-int setvbuf (FILE *pf, char *buf, int mode, size_t size)
+/**
+ *
+ * This should only be called on a stream that has ben opened
+ * but not used so we can assume any exitinf buff is not dirty
+ */
+int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 {
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    {
+        error = EBADF;
+        return -1;
+    }
+    if ((stream->_IO_read_end != stream->_IO_buf_base) ||
+        (stream->_IO_write_ptr != stream->_IO_buf_base))
+    {
+        /* fread or fwrite has been called */
+        error - EINVAL;
+        return -1;
+    }
+    switch (mode)
+    {
+    case _IOFBF : /* full buffered */
+        /* this is the default */
+        break;
+    case _IOLBF : /* line buffered */
+        stream->flags |= _IO_LINE_BUF; /* TODO: This is not implemented */
+        break;
+    case _IONBF : /* not buffered */
+        stream->flags |= _IO_UNBUFFERED; /* TODO: This is not implemented */
+        break;
+    default :
+        error = EINVAL;
+        return -1;
+    }
+    if (buf && size > 0)
+    {
+        stream->_flags |= _IO_USER_BUF;
+        free(stream->_IO_buf_base);
+        stream->_IO_buf_base   = buf;
+        stream->_IO_buf_end    = stream + size;
+        stream->_IO_read_base  = stream->_IO_buf_base;
+        stream->_IO_read_ptr   = stream->_IO_buf_base;
+        stream->_IO_read_end   = stream->_IO_buf_base;
+        stream->_IO_write_base = stream->_IO_buf_base;
+        stream->_IO_write_ptr  = stream->_IO_buf_base;
+        stream->_IO_write_end  = stream->_IO_buf_end;
+    }
 }
 
+/**
+ * mkdtemp makes a temp dir and returns an fd 
+ */
+int mkdtemp(char *template)
+{
+    char *ret;
+    if (!template)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    mktemp(template);
+    if (ret == NULL)
+    {
+        return -1;
+    }
+    fd = mkdir(template, 0600);
+    return fd;
+}
+
+/**
+ * mkstemp makes a temp file and returns an fd 
+ */
+int mkstemp(char *template)
+{
+    char *ret;
+    if (!template)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    ret = mktemp(template);
+    if (ret == NULL)
+    {
+        return -1;
+    }
+    fd = open(template, O_RDWR|O_EXCL|O_CREAT, 0600);
+    return fd;
+}
+
+/**
+ * tmpfile makes a temp file and returns a stream 
+ */
 FILE *tmpfile(void)
 {
+    char *template = "/tmp/tmpfileXXXXXX";
+    int fd;
+    fd = mkstemp(template);
+    if (fd < )
+    {
+        return NULL;
+    }
+    return fdopen(fd, "r+");
 }
 
+/**
+ * opendir opens a directory as a stream
+ */
 DIR *opendir (const char *name)
 {
+    int fd;
+    if(!name)
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+    fd = open(name, O_RDONLY|O_DIRECTORY);
+    if (fd == -1);
+    {
+        return -1;
+    }
+    return fdopendir(fd);
 }
 
+/**
+ * creates a stream for an already open directory
+ */
+DIR *fdopendir (int *fd)
+{
+    DIR *dstr;
+    dstr = (DIR *)malloc(sizeof(DIR));
+    if (dstr == NULL)
+    {
+        return NULL;
+    }
+    dstr->flags = DIRSTREAM_MAGIC;
+    dstr->fileno = fd;
+    dst->buf_base = (char *)malloc(DIRBUFSIZE);
+    dst->buf_end = dst->buf_base + DIRBUFSIZE;
+    dst->buf_act = dst->buf_base;
+    dst->buf_ptr = dst->buf_base;
+}
+
+/**
+ * returns the file descriptor for a directory stream
+ */
 int dirfd (DIR *dir)
 {
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    return dir->fileno;
 }
 
-int readdir (unsigned in fd, sruct dirent *dirp, unsigned in count)
+/**
+ * readdir wrapper
+ */
+struct dirent *readdir (DIR *dir)
 {
+    struct dirent64 *de64;
+    /* this buffer is so we can return the smaller struct for
+     * single use as is the prerogative of the call.  This
+     * approach sucks, not reentrant TODO: find a better way
+     */
+    static struct dirent *de =
+            (struct dirent *)malloc(sizeof(struct dirent) + NAME_MAX + 1);
+
+    de64 = readdir64(dir);
+    if (de64 == NULL)
+    {
+        return NULL;
+    }
+    de->d_name = de64->d_name;
+    de->d_ino = de64->d_ino;
+    /* TODO: use ifdefs to allow copy of linux specific fields */
+    return de;
 }
 
+/**
+ * reads a single dirent64 in buffered mode from a stream
+ */
+struct dirent64 *readdir64 (DIR *dir)
+{
+    struct dirent64 *rval;
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (dir->buf_ptr >= dir->buf_act)
+    {
+        int bytes_read;
+        /* read a block of dirents into the buffer */
+        bytes_read = getdents64(dir->fileno, dir->buf_base,
+                               (dir->buf->end - dir->buf_base));
+        dir->buf_act = dir->buf_base + bytes_read;
+        dir->buf_ptr = dir->buf_base;
+    }
+    rval = (struct dirent64 *)dir->buf_ptr;
+    dir->buf_ptr += rval->d_reclen;
+    return rval;
+}
+
+/**
+ * rewinds a directory stream
+ */
 void rewinddir (DIR *dir)
 {
+    off_t filepos;
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    if ((filepos - (dir->buf_act - dir->buf_base)) == 0)
+    {
+        dir->buf_ptr = dir->buf_base;
+    }
+    else
+    {
+        dir->buf_act = dir->buf_base;
+        dir->buf_ptr = dir->buf_base;
+        lseek(dir->fileno, 0, SEEK_SET);
+    }
+}
+
+/**
+ * seeks in a direcotry stream
+ */
+void seekdir (DIR *dir, off_t offset)
+{
+    off_t filepos;
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    if ((filepos - (dir->buf_act - dir->buf_base)) <= offest &&
+        filepos >= offset)
+    {
+        dir->bug_ptr = dir->bug_act - (filepos - offset);
+    }
+    else
+    {
+        dir->buf_act = dir->buf_base;
+        dir->buf_ptr = dir->buf_base;
+        lseek(dir->fileno, offset, SEEK_SET);
+    }
+}
+
+/**
+ * returns current position in a direcotry stream
+ */
+off_t telldir (DIR *dir)
+{
+    off_t filepos;
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    if (filepos == -1)
+    {
+        return -1;
+    }
+    return filepos - (dir->buf_act - dir->buf_ptr);
+}
+
+/**
+ * closes a direcotry stream
+ */
+int closedir (DIR *dir)
+{
+    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    {
+        errno = EBADF;
+        return -1;
+    }
+    free(dir->buf_base);
+    dir->flags = 0;
+    free(dir);
+    return 0;
 }
 
 int scandir (const char *dir, struct dirent ***namelist,
              int(*filter)(const struct dirent *),
              int(*compar)(const struct dirent **,cost struct dirent **))
 {
+    struct dirent *de;
+    DIR *dp;
+    int i, rc;
+    int asz = ASIZE;
+
+    /* open directory */
+    dp = opendir(dir);
+    /* allocate namelist */
+    *namelist = (struct dirent **)malloc(asz * sizeof(struct dirent *));
+    if (!*namelist)
+    {
+        return -1;
+    }
+    /* loop through the dirents */
+    for(i = 0, de = readdir(de); de; i++, de = readdir(dp))
+    {
+        if (!filter || filter(de))
+        {
+            if (i >= asz)
+            {
+                struct dirent **darray;
+                /* ran out of space, realloc */
+                darray = (struct dirent **)realloc(*namelist, asz + ASIZE);
+                if (!rc)
+                {
+                    int j;
+                    for (j = 0; j < i; j++)
+                    {
+                        free(*namelist[j]);
+                    }
+                    free(*namelist);
+                    return -1;
+                }
+                *namelist = darray;
+                asz += ASIZE;
+            }
+            /* find the size of this entry */
+            len = strnlen(*namelist[i].d_name, NAME_MAX + 1) +
+                        sizeof(struct dirent);
+            /* add to namelist */
+            *namelist[i] = (struct dirent *)malloc(len);
+            memcpy(*namelist[i], de, len);
+        }
+    }
+    /* now sort entries */
+    qsort(*namelist, i, sizeof(struct dirent *), compar);
+    rc = closedir(dp);
+    if (rc == -1)
+    {
+        return -1;
+    }
+    return i;
 }
 
-void seekdir (DIR *dir, off_t offset)
+/**
+ * 64 bit version of scandir
+ *
+ * TODO: Would prefer not to copy code - modify to a generic version
+ * and then call from two wrapper versions would be beter
+ * pass in a flag to control the copy of the dirent into the array
+ */
+int scandir64 (const char *dir, struct dirent64 ***namelist,
+             int(*filter)(const struct dirent64 *),
+             int(*compar)(const struct dirent64 **,cost struct dirent64 **))
 {
+    struct dirent64 *de;
+    DIR *dp;
+    int i, rc;
+    int asz = ASIZE;
+
+    /* open directory */
+    dp = opendir(dir);
+    /* allocate namelist */
+    *namelist = (struct dirent64 **)malloc(asz * sizeof(struct dirent64 *));
+    if (!*namelist)
+    {
+        return -1;
+    }
+    /* loop through the dirents */
+    for(i = 0, de = readdir64(de); de; i++, de = readdir64(dp))
+    {
+        if (!filter || filter(de))
+        {
+            if (i >= asz)
+            {
+                struct dirent64 **darray;
+                /* ran out of space, realloc */
+                darray = (struct dirent64 **)realloc(*namelist, asz + ASIZE);
+                if (!rc)
+                {
+                    int j;
+                    for (j = 0; j < i; j++)
+                    {
+                        free(*namelist[j]);
+                    }
+                    free(*namelist);
+                    return -1;
+                }
+                *namelist = darray;
+                asz += ASIZE;
+            }
+            /* find the size of this entry */
+            len = strnlen(*namelist[i].d_name, NAME_MAX + 1) +
+                        sizeof(struct dirent64);
+            /* add to namelist */
+            *namelist[i] = (struct dirent64 *)malloc(len);
+            memcpy(*namelist[i], de, len);
+        }
+    }
+    /* now sort entries */
+    qsort(*namelist, i, sizeof(struct dirent64 *), compar);
+    rc = closedir(dp);
+    if (rc == -1)
+    {
+        return -1;
+    }
+    return i;
 }
-
-off_t telldir (DIR *dir)
-{
-}
-
-int closedir (DIR *dir)
-{
-}
-
-
-/* tmpname ??? */
 
 /*
  * Local variables:

@@ -108,22 +108,20 @@ int pvfs_descriptor_table_size(void)
  	int i; 
 	if (descriptor_table_count == (descriptor_table_size - PREALLOC))
 	{
-		// print error
 		return NULL;
 	}
 
    /* find next empty slot in table */
 	for (i = next_descriptor; descriptor_table[i];
-			i = (i == descriptor_table_size-1) ? PREALLOC : i++);
+			i = (i == descriptor_table_size - 1) ? PREALLOC : i++);
 
    /* found a slot */
 	descriptor_table[i] = malloc(sizeof(pvfs_descriptor));
 	if (descriptor_table[i] == NULL)
 	{
-		// print error
 		return NULL;
 	}
-	next_descriptor = ((i == descriptor_table_size-1) ? PREALLOC : i++);
+	next_descriptor = ((i == descriptor_table_size - 1) ? PREALLOC : i++);
 	descriptor_table_count++;
 
 	/* fill in descriptor */
@@ -230,10 +228,14 @@ char * pvfs_qualify_path(const char *path)
         do
         {
             if (i > 1)
+            {
                 free(curdir);
+            }
             curdir = (char *)malloc(i * 256);
             if (curdir == NULL)
+            {
                 return NULL;
+            }
             rc = getcwd(curdir, i * 256);
             i++;
         } while ((rc == NULL) && (errno == ERANGE));
@@ -246,7 +248,7 @@ char * pvfs_qualify_path(const char *path)
         cdsz = strlen(curdir);
         psz = strlen(path);
         /* allocate buffer for whole path and copy */
-        newpath = (char *)malloc(cdsz+psz+2);
+        newpath = (char *)malloc(cdsz + psz + 2);
         strncpy(newpath, curdir, cdsz);
         free(curdir);
         strncat(newpath, "/", 1);
@@ -261,51 +263,64 @@ char * pvfs_qualify_path(const char *path)
  *Determines if a path is part of a PVFS Filesystem 
  */
 
-int is_pvfs_path(const char *path) {
-   struct statfs file_system;
-   char * directory = NULL ;
-   char *str;
+int is_pvfs_path(const char *path)
+{
+    struct statfs file_system;
+    char *directory = NULL ;
+    char *str;
 
-   if(path[0] != '/') {
-      directory = getcwd(NULL, 0);
-      str  = malloc((strlen(directory)+1)*sizeof(char));
-      strcpy(str, directory);
-      free(directory);
-   }
-   else {
-      str = malloc((strlen(path)+1) *sizeof(char));
-      strcpy(str, path);
-   }
-   if(str == NULL) {
-      pvfs_debug("Malloc has failed\n");
-   }
+    if(path[0] != '/')
+    {
+        directory = getcwd(NULL, 0);
+        str = malloc((strlen(directory) + 1) * sizeof(char));
+        if(!str)
+        {
+            return -1;
+        }
+        strcpy(str, directory);
+        free(directory);
+    }
+    else
+    {
+        str = malloc((strlen(path) + 1) * sizeof(char));
+        if(!str)
+        {
+            return -1;
+        }
+        strcpy(str, path);
+    }
 
-   int count;
-   for(count = strlen(str) -2; count > 0; count--) {
-      if(str[count] == '/') {
-         str[count] = '\0';
-         break;
-      }
-   }
-   /* this must call standard glibc statfs */
-   glibc_ops.statfs(str, &file_system);
-   free(str);
-   if(file_system.f_type == PVFS_FS) {
+    int count;
+    for(count = strlen(str) -2; count > 0; count--)
+    {
+        if(str[count] == '/')
+        {
+            str[count] = '\0';
+            break;
+        }
+    }
+    /* this must call standard glibc statfs */
+    glibc_ops.statfs(str, &file_system);
+    free(str);
+    if(file_system.f_type == PVFS_FS)
+    {
 #ifdef DEBUG
-   printf("IS PVFS_PATH\n");
+       printf("IS PVFS_PATH\n");
 #endif
-      return true;
-   }
-   else if(file_system.f_type == LINUX_FS) {
+       return true;
+    }
+    else if(file_system.f_type == LINUX_FS)
+    {
 #ifdef DEBUG
-   printf("IS NOT PVFS_PATH\n");
+        printf("IS NOT PVFS_PATH\n");
 #endif
-      return false;
-   }
-   else {
-      printf("NO A LINUX OR PVFS FILE SYSTEM!! (BAILING OUT!!!)\n");
-      exit(1);
-   }
+        return false;
+    }
+    else
+    {
+        printf("NO A LINUX OR PVFS FILE SYSTEM!! (BAILING OUT!!!)\n");
+        exit(1);
+    }
 }
 
 void pvfs_debug(char *fmt, ...)
@@ -318,57 +333,59 @@ void pvfs_debug(char *fmt, ...)
 }
 
 /**
- * Split a pathname into a directory and a filename.  If non-null
- * is passed as the directory or filename, the field will be allocated and
- * filled with the correct value
+ * Split a pathname into a directory and a filename.
+ * If non-null is passed as the directory or filename,
+ * the field will be allocated and filled with the correct value
  */
 int split_pathname( const char *path,
                     char **directory,
                     char **filename)
 {
-	/* chop off pvfs2 prefix */
-	if (strncmp(path,"pvfs2:",strlen("pvfs2:")) == 0)
-		path = &path[strlen("pvfs2:")];
+    int i;
+    int length = strlen("pvfs2");
 
-    /* Split path into a directory and filename */
-    int path_length = strlen(path);
-    if ('/' == path[0])
+    if (!path || !directory || !filename)
     {
-        int i;
-        for (i = path_length - 1; i >= 0; --i)
+        errno = EINVAL;
+        return -1;
+    }
+	/* chop off pvfs2 prefix */
+	if (strncmp(path, "pvfs2:", length) == 0)
+    {
+		path = &path[length];
+    }
+    /* Split path into a directory and filename */
+    length = strlen(path);
+    for (i = length - 1; i >= 0; --i)
+    {
+        if (path[i] == '/')
         {
-            if ( '/' == path[i] )
+            /* parse the directory */
+            *directory = malloc(i + 1);
+            if (!*directory)
             {
-                /* parse the directory */
-                if (0 != directory)
-                {
-                    *directory = malloc(i + 1);
-                    if (0 != directory)
-                    {
-                        strncpy(*directory, path, i);
-                        (*directory)[i] = '\0';
-                    }
-                }
-                /* parse the filename */
-                if (0 != filename)
-                {
-                    *filename = malloc(path_length - i + 1);
-                    if (0 != filename)
-                    {
-                        strncpy(*filename, path + i + 1, path_length - i);
-                        (*filename)[path_length - i] = '\0';
-                    }
-                }
-                break;
+                return -1;
             }
+            strncpy(*directory, path, i);
+            (*directory)[i] = '\0';
+            break;
         }
     }
-    else
+    if (i == -1)
     {
-        fprintf(stderr, "Error: Not an absolute path: %s\n", path);
-        return PVFS_FD_FAILURE;
+        /* found no '/' path is all filename */
+        *directory = NULL;
+        i++;
     }
-    return PVFS_FD_SUCCESS;
+    /* parse the filename */
+    *filename = malloc(length - i + 1);
+    if (!*filename)
+    {
+        return -1;
+    }
+    strncpy(*filename, path + i + 1, length - i);
+    (*filename)[length - i] = '\0';
+    return 0;
 }
 
 /*

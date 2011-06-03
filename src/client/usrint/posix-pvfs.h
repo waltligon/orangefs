@@ -48,7 +48,7 @@ ssize_t pvfs_pwrite( int fd, void *buf, size_t count, off_t offset );
 ssize_t pvfs_writev( int fd, const struct iovec *vector, int count );
 
 /* pvfs_pwrite64 */
-ssize_t pvfs_write64( int fd, void *buf, size_t count, off64_t offset );
+ssize_t pvfs_pwrite64( int fd, void *buf, size_t count, off64_t offset );
 
 /* pvfs_lseek */
 off_t pvfs_lseek(int fd, off_t offset, int whence);

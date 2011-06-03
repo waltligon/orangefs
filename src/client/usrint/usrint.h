@@ -52,6 +52,7 @@
 
 /* POSIX functions */ 
 
+/** struct of pointers to methods for posix system calls */
 typedef struct posix_ops_s
 {   
     int (*statfs)(const char *path, struct statfs *buf);
@@ -127,25 +128,17 @@ typedef struct posix_ops_s
 extern posix_ops glibc_ops;
 extern posix_ops pvfs_ops;
 
-/* PVFS Descriptor table entry */
-typedef struct pvfs_descriptor_s {
-    int fd;                   /* file number in PVFS descriptor_table */
-    int dup_cnt;              /* number of table slots with this des */
-    posix_ops *fsops;         /* syscalls to use for this file */
-    int posix_fd;             /* non-PVFS files, the true file number */
-    PVFS_object_ref pvfs_ref; /* PVFS fs_id and handle for PVFS file */
-    int flags;                /* the open flags used for this file */
-    off64_t file_pointer;     /* offset from the beginning of the file */
-    char is_in_use;           /* true if this descriptor is valid */
-    /* stdio fields */
-    char dirty;               /* buffer has changed data in it */
-    char eof;                 /* true if tried to read past EOF */
-    char error;               /* true if an error occured */
-    char *buf;                /* beginning of buffer */
-    size_t buftotal;          /* number of valid bytes in buffer */
-    size_t bufsize;           /* the size of the buffer */
-    off64_t buf_off;          /* offset in file that buffer holds */
-    char *bufptr;             /* convenient pointer into the buffer */
+/** PVFS Descriptor table entry */
+typedef struct pvfs_descriptor_s
+{
+    int fd;                   /**< file number in PVFS descriptor_table */
+    int dup_cnt;              /**< number of table slots with this des */
+    posix_ops *fsops;         /**< syscalls to use for this file */
+    int posix_fd;             /**< non-PVFS files, the true file number */
+    PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
+    int flags;                /**< the open flags used for this file */
+    off64_t file_pointer;     /**< offset from the beginning of the file */
+    char is_in_use;           /**< true if this descriptor is valid */
 } pvfs_descriptor;
 
 typedef struct pvfs_descriptor_s PFILE; /* these are for posix interface */
