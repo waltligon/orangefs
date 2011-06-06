@@ -228,7 +228,7 @@ static int parse_ldap_option(PORANGEFS_OPTIONS options,
         EAT_WS(p);
 
         strncpy(options->ldap.bind_password, p, 32);
-        options->ldap.bind_dn[31] = '\0';
+        options->ldap.bind_password[31] = '\0';
 
         ret = strlen(p) > 0 ? 0 : -1;
     }
@@ -317,18 +317,9 @@ parse_ldap_option_exit:
     return ret;
 }
 
-int get_config(PORANGEFS_OPTIONS options,
-               char *error_msg,
-               unsigned int error_msg_len)
+void set_defaults(PORANGEFS_OPTIONS options)
 {
-    FILE *config_file;
-    char module_dir[MAX_PATH], line[256], copy[256], *token, *p;
-    int ret = 0;
-
-    config_file = open_config_file(error_msg, error_msg_len);
-    if (config_file == NULL)
-        /* config file is required */
-        return -1;
+    char module_dir[MAX_PATH];
 
     /* default CA path */
     if (get_module_dir(module_dir) == 0)
@@ -343,6 +334,26 @@ int get_config(PORANGEFS_OPTIONS options,
     strcpy(options->ldap.naming_attr, "sAMAccountName");
     strcpy(options->ldap.uid_attr, "uidNumber");
     strcpy(options->ldap.gid_attr, "gidNumber");
+
+    /* default mount point */
+    strcpy(options->mount_point, "Z:");
+
+}
+
+int get_config(PORANGEFS_OPTIONS options,
+               char *error_msg,
+               unsigned int error_msg_len)
+{
+    FILE *config_file;
+    char line[256], copy[256], *token, *p;
+    int ret = 0;
+
+    config_file = open_config_file(error_msg, error_msg_len);
+    if (config_file == NULL)
+        /* config file is required */
+        return -1;
+
+    set_defaults(options);
 
     /* parse options from the file */
     while (!feof(config_file))
@@ -368,23 +379,11 @@ int get_config(PORANGEFS_OPTIONS options,
             {
                 /* copy the remaining portion of the line 
                    as the mount point */
-                /*
-                p = line + strlen(token);
-                while (*p && (*p == ' ' || *p == '\t'))
-                    p++;
-                if (*p)
-                */
                 token = strtok(NULL, " \t");
                 strncpy(options->mount_point, token, MAX_PATH);
             }
             else if (!stricmp(token, "threads"))
             {
-                /*
-                p = line + strlen(token);
-                while (*p && (*p == ' ' || *p == '\t'))
-                    p++;
-                if (*p)
-                */
                 token = strtok(NULL, " \t");
                 options->threads = atoi(token);
             }
@@ -500,14 +499,17 @@ int get_config(PORANGEFS_OPTIONS options,
     }
 
     if (options->user_mode == USER_MODE_LDAP &&
-        (strlen(options->ldap.bind_dn) == 0 ||
-         strlen(options->ldap.host) == 0 ||
+        (strlen(options->ldap.host) == 0 ||
          strlen(options->ldap.search_root) == 0))
     {
         _snprintf(error_msg, error_msg_len, "Missing ldap option: ldap-host, "
             "ldap-bind-dn, or ldap-search-root\n");
         ret = -1;
     }
+
+    if (options->user_mode == USER_MODE_LDAP &&
+        options->ldap.port == 0)
+        options->ldap.port = options->ldap.secure ? 636 : 389;
 
 get_config_exit:
 

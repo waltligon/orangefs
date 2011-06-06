@@ -15,6 +15,7 @@
 #include "fs.h"
 #include "cert.h"
 #include "user-cache.h"
+#include "ldap-support.h"
 
 FILE *g_DebugFile = NULL;
 BOOL g_UseStdErr;
@@ -459,7 +460,17 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         }
         else /* user-mode == LDAP */ 
         {
-            /* TODO */
+            ret = get_ldap_credentials(user_name, credentials);
+            if  (ret == 0)
+            {
+                add_user(user_name, credentials, NULL);
+            }
+            else
+            {
+                /* error reporting has been done through DbgPrint...
+                   result is access denied */
+                ret = -ERROR_ACCESS_DENIED;
+            }
         }
     }
 

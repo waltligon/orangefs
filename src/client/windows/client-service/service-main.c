@@ -47,7 +47,6 @@ FILE *debug_log = NULL;
 extern struct qhash_table *user_cache;
 
 extern gen_mutex_t user_cache_mutex;
-
 PORANGEFS_OPTIONS goptions;
 
 /* externs */
@@ -137,7 +136,7 @@ DWORD service_install()
     SC_HANDLE sch_service;
     SC_HANDLE sch_manager;
     char *exe_path, *command;
-    size_t size;
+    DWORD size;
     int err;
 
     /* Get location of executable */
@@ -373,6 +372,9 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
         /* stop cache thread */
         cache_thread_stop();
+
+        /* LDAP cleanup */
+        PVFS_ldap_cleanup();
 
         /* cleanup OpenSSL */
         openssl_cleanup();
@@ -626,10 +628,6 @@ int main(int argc, char **argv, char **envp)
       if (strlen(mount_point) > 0)
           strcpy(options->mount_point, mount_point);
 
-      /* use default mount point */
-      if (strlen(options->mount_point) == 0)
-          strcpy(options->mount_point, "Z:");
-
       /* turn debug on if specified on command line */
       if (debug)
           options->debug = TRUE;
@@ -656,9 +654,9 @@ int main(int argc, char **argv, char **envp)
       
       printf("main_loop exited: %d\n", err);
 
-      gen_mutex_destroy(&user_cache_mutex);
-
       cache_thread_stop();
+
+      gen_mutex_destroy(&user_cache_mutex);
 
 main_exit:
 

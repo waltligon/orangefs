@@ -60,8 +60,9 @@ int add_user(char *user_name,
 
     gen_mutex_lock(&user_cache_mutex);
     qhash_add(user_cache, &entry->user_name, &entry->hash_link);
-    DbgPrint("   add_user: adding user %s (%u:%u) expires %s (entry %08x)\n", 
-        user_name, credentials->uid, credentials->gid, expires->data, entry);
+    DbgPrint("   add_user: adding user %s (%u:%u) expires %s\n", 
+        user_name, credentials->uid, credentials->gid, 
+        expires != NULL ? expires->data : "never");
     gen_mutex_unlock(&user_cache_mutex);
 
     return 0;
