@@ -211,6 +211,8 @@ SO_FULLVER = $(SO_VER).$(SO_MINOR).$(SO_RELEASE)
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
+  # define __GNU_SOURCE in includes to replace incorrect usage of __USE_GNU
+CFLAGS += -D_GNU_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
   # include toplevel source dir

@@ -19,19 +19,6 @@
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
-#define __USE_GNU
-#include <ucontext.h>
-#endif
-
-#ifdef __PVFS2_SEGV_BACKTRACE__
-#include <execinfo.h>
-#define __USE_GNU
-#include <ucontext.h>
-#endif
-
-#ifdef __PVFS2_SEGV_BACKTRACE__
-#include <execinfo.h>
-#define __USE_GNU
 #include <ucontext.h>
 #endif
 
