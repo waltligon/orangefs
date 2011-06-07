@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "gen-locks.h"
+#include "gossip.h"
 
 #include "client-service.h"
 #include "config.h"
@@ -301,6 +302,9 @@ void WINAPI service_main(DWORD argc, char *argv[])
     PORANGEFS_OPTIONS options;
     int ret;
     char error_msg[512];    
+    char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
+
+    service_debug("Entered service_main\n");
 
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
@@ -325,8 +329,6 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     init_service_log();
 
-    service_debug("Entered service_main\n");
-
     if (ret != 0)
     {
         service_debug(error_msg);
@@ -337,6 +339,23 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     if (!check_mount_point(options->mount_point))
         return;
+
+    /* turn debug on if specified on command line */
+    if (debug)
+    {
+          /* enable win_client debugging by default */
+          if (strlen(options->debug_mask) == 0)
+          {
+              strcpy(options->debug_mask, "win_client");
+          }
+          _snprintf(env_debug_mask, sizeof(env_debug_mask), "PVFS2_DEBUGMASK=%s",
+              options->debug_mask);
+          _putenv(env_debug_mask);
+          /* debug file */
+          _snprintf(env_debug_file, sizeof(env_debug_file), "PVFS2_DEBUGFILE=%s",
+              options->debug_file);
+          _putenv(env_debug_file);
+    }
 
     /* register our control handler routine */
     if ((hstatus = RegisterServiceCtrlHandler(WIN32ServiceName, service_ctrl))
@@ -545,9 +564,10 @@ int main(int argc, char **argv, char **envp)
 {
   int i = 0;
   PORANGEFS_OPTIONS options;
-  DWORD err = 0;
+  DWORD err = 0, cmd_debug = FALSE;
   char mount_point[256];
   char error_msg[512];
+  char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
 
   SERVICE_TABLE_ENTRY dispatch_table[2] = 
   {
@@ -585,7 +605,7 @@ int main(int argc, char **argv, char **envp)
       else if (!strcmp(argv[i], "-debug") || !strcmp(argv[i], "-d") ||
                !strcmp(argv[i], "/d"))
       {
-          debug = TRUE;
+          cmd_debug = TRUE;
       }
   }
 
@@ -628,9 +648,32 @@ int main(int argc, char **argv, char **envp)
       if (strlen(mount_point) > 0)
           strcpy(options->mount_point, mount_point);
 
-      /* turn debug on if specified on command line */
+      /* turn debug on if specified on command line (or debug build) */
+      if (cmd_debug)
+          debug = TRUE;
       if (debug)
           options->debug = TRUE;
+
+      if (options->debug)
+      {          
+          /* enable win_client debugging by default */
+          if (strlen(options->debug_mask) == 0)
+          {
+              strcpy(options->debug_mask, "win_client");
+          }
+          _snprintf(env_debug_mask, sizeof(env_debug_mask), "PVFS2_DEBUGMASK=%s",
+              options->debug_mask);
+          _putenv(env_debug_mask);
+          /* debug file */
+          if (!options->debug_stderr)
+          {
+              _snprintf(env_debug_file, sizeof(env_debug_file), "PVFS2_DEBUGFILE=%s",
+                  options->debug_file);
+              _putenv(env_debug_file);
+          }
+          /* log thread id */
+          gossip_set_logstamp(GOSSIP_LOGSTAMP_THREAD);
+      }
 
       if (!check_mount_point(options->mount_point))
       {

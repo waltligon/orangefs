@@ -33,6 +33,9 @@ typedef struct
     char ca_path[MAX_PATH];
     int threads;
     int debug;
+    int debug_stderr;
+    char debug_mask[256];
+    char debug_file[MAX_PATH];
     int user_mode;
     LDAP_OPTIONS ldap;
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;

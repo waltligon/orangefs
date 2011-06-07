@@ -46,7 +46,10 @@ static FILE *open_config_file(char *error_msg,
     DWORD ret = 0, malloc_flag = FALSE;
 
     /* environment variable overrides */
-    if (!(file_name = getenv("ORANGEFS_CONFIG_FILE")))
+    file_name = getenv("ORANGEFS_CONFIG_FILE");
+    if (file_name == NULL)
+        file_name = getenv("PVFS2_CONFIG_FILE");
+    if (file_name == NULL)
     {
         /* look for file in exe directory */
         ret = get_module_dir(module_dir);
@@ -321,11 +324,14 @@ void set_defaults(PORANGEFS_OPTIONS options)
 {
     char module_dir[MAX_PATH];
 
-    /* default CA path */
+    /* default CA and debug file paths */
     if (get_module_dir(module_dir) == 0)
     {
         strcpy(options->ca_path, module_dir);
         strcat(options->ca_path, "\\CA\\cacert.pem");
+
+        strcpy(options->debug_file, module_dir);
+        strcat(options->debug_file, "\\orangefs.log");
     }
 
     /* default LDAP options */
@@ -346,7 +352,7 @@ int get_config(PORANGEFS_OPTIONS options,
 {
     FILE *config_file;
     char line[256], copy[256], *token, *p;
-    int ret = 0;
+    int ret = 0, debug_file_flag = FALSE;
 
     config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
@@ -474,7 +480,36 @@ int get_config(PORANGEFS_OPTIONS options,
             else if (!stricmp(token, "debug"))
             {
                 options->debug = TRUE;
-            }            
+                /* rest of line gives optional debug mask */
+                p = line + strlen(token);
+                EAT_WS(p);
+                if (strlen(p) > 0)
+                {
+                    strncpy(options->debug_mask, p, 256);
+                    options->debug_mask[255] = '\0';
+                }
+                else
+                {
+                    /* just debug Windows client */
+                    strcpy(options->debug_mask, "win_client");
+                }
+            }
+            else if (!stricmp(token, "debug-stderr"))
+            {
+                options->debug_stderr = options->debug = TRUE;
+            }
+            else if (!stricmp(token, "debug-file"))
+            {
+                debug_file_flag = TRUE;
+                /* path to debug file */
+                p = line + strlen(token);
+                EAT_WS(p);
+                if (strlen(p) > 0)
+                {
+                    strncpy(options->debug_file, p, MAX_PATH-2);
+                    options->debug_file[MAX_PATH-2] = '\0';
+                }
+            }
             else if (!strnicmp(token, "ldap", 4))
             {
                 ret = parse_ldap_option(options, line, token, error_msg, error_msg_len);
@@ -503,7 +538,15 @@ int get_config(PORANGEFS_OPTIONS options,
          strlen(options->ldap.search_root) == 0))
     {
         _snprintf(error_msg, error_msg_len, "Missing ldap option: ldap-host, "
-            "ldap-bind-dn, or ldap-search-root\n");
+            "or ldap-search-root\n");
+        ret = -1;
+    }
+
+    /* gossip can only print to either a file or stderr */
+    if (options->debug_stderr && debug_file_flag)
+    {
+        _snprintf(error_msg, error_msg_len, "Cannot specify both debug-stderr "
+            "and debug-file\n");
         ret = -1;
     }
 

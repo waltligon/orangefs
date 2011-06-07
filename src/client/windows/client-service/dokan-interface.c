@@ -9,6 +9,7 @@
 #include "dokan.h"
 
 #include "pvfs2.h"
+#include "gossip.h"
 #include "gen-locks.h"
 #include "str-utils.h"
 #include "client-service.h"
@@ -17,7 +18,6 @@
 #include "user-cache.h"
 #include "ldap-support.h"
 
-FILE *g_DebugFile = NULL;
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
@@ -52,6 +52,8 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_PATH(path)   DbgPrint("   resolved path: %s\n", path)
 
+#if 0
+/* we now debug through gossip */
 void DbgInit()
 {
     char exe_path[MAX_PATH], *p;
@@ -74,41 +76,40 @@ void DbgInit()
         }
     }
 }
+#endif
 
 void DbgPrint(char *format, ...)
 {
     if (g_DebugMode) 
     {
-        char buffer[512];
-        SYSTEMTIME sys_time;
-    
+        char buffer[GOSSIP_BUF_SIZE];
+        /* SYSTEMTIME sys_time; */
+            
         va_list argp;
         va_start(argp, format);
         vsprintf_s(buffer, sizeof(buffer), format, argp);
         va_end(argp);
-        if (g_UseStdErr)
-        {
-            fprintf(stderr, buffer);
-        } 
-        else
-        {
-            OutputDebugString(buffer);
-        }
 
-        /* log to file */
-        if (g_DebugFile != NULL)
-        {
-            GetLocalTime(&sys_time);
-            fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%4u) %s", 
-                    sys_time.wYear, sys_time.wMonth, sys_time.wDay, 
-                    sys_time.wHour, sys_time.wMinute, sys_time.wSecond, sys_time.wMilliseconds,
-                    GetThreadId(GetCurrentThread()),
-                    buffer);
-            fflush(g_DebugFile);
-        }
+#ifdef _DEBUG
+        /* debug to debugger window */
+        OutputDebugString(buffer);
+#endif
+        /*
+        GetLocalTime(&sys_time);
+        fprintf(g_DebugFile, "[%d-%02d-%02d %02d:%02d:%02d.%03d] (%4u) %s", 
+                sys_time.wYear, sys_time.wMonth, sys_time.wDay, 
+                sys_time.wHour, sys_time.wMinute, sys_time.wSecond, sys_time.wMilliseconds,
+                GetThreadId(GetCurrentThread()),
+                buffer);
+        fflush(g_DebugFile);
+        */
+        
+        /* use gossip to debug to file or stderr (set in config file) */
+        gossip_debug(GOSSIP_WIN_CLIENT_DEBUG, buffer);
     }
 }
 
+#if 0
 void DbgClose()
 {
     if (g_DebugFile != NULL) {
@@ -116,6 +117,7 @@ void DbgClose()
         fclose(g_DebugFile);
     }
 }
+#endif
 
 /* map a file system error code to a Dokan/Windows code 
    -1 is used as a default error */
@@ -2017,20 +2019,18 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     context_cache = qhash_init(cred_compare, quickhash_64bit_hash, 257);
     gen_mutex_init(&context_cache_mutex);
 
-    g_DebugMode = /* g_UseStdErr = */ options->debug;
+    g_DebugMode = options->debug;
+    g_UseStdErr = options->debug_stderr;
 
     ZeroMemory(dokanOptions, sizeof(DOKAN_OPTIONS));
     dokanOptions->ThreadCount = options->threads;
 
-    DbgInit();
-
     if (g_DebugMode)
         dokanOptions->Options |= DOKAN_OPTION_DEBUG;
-    /*
+    
     if (g_UseStdErr)
         dokanOptions->Options |= DOKAN_OPTION_STDERR;
-    */
-
+    
     dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
 
     dokanOptions->Version = 600;
@@ -2064,7 +2064,6 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 /*    dokanOperations->GetFileSecurityA = PVFS_Dokan_get_file_security; */
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
-
 
     DbgPrint("Entering DokanMain\n");
 
@@ -2105,8 +2104,6 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
 
     free(dokanOptions);
     free(dokanOperations);
-
-    DbgClose();
 
     return status;
 

@@ -94,6 +94,13 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -135,6 +142,13 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <CustomBuild>
+      <Command>..\..\pvfscommon\Release\statecomp %(FullPath)</Command>
+    </CustomBuild>
+    <CustomBuild>
+      <Message>..\..\pvfscommon\Release\statecomp %(FullPath)</Message>
+      <Outputs>%(RootDir)%(Directory)%(FileName).c</Outputs>
+    </CustomBuild>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\..\src\common\dotconf\dotconf.c" />

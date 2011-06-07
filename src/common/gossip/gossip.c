@@ -489,7 +489,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
     const char *format, va_list ap, enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
-    int bsize = sizeof(buffer);
+    int bsize = sizeof(buffer), temp_size;
     int ret = -EINVAL;
     struct timeval tv;
     time_t tp;
@@ -519,10 +519,16 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld (%ld)] ", (long)tv.tv_usec, 
-                    gen_thread_self());
-            bptr += 30;
-            bsize -= 30;
+            bptr += 8;
+#ifdef WIN32
+            temp_size = sprintf(bptr, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
+                           GetThreadId(GetCurrentThread()));
+#else
+            temp_size = sprintf(bptr, ".%06ld (%ld)] ", (long)tv.tv_usec, 
+                           gen_thread_self());
+#endif
+            bptr += temp_size;
+            bsize -= temp_size;
             break;
 
         case GOSSIP_LOGSTAMP_NONE:

@@ -32,8 +32,17 @@
     <ClInclude Include="..\..\..\src\client\windows\client-service\client-service.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\config.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\ldap-support.h" />
+    <ClInclude Include="..\..\..\src\client\windows\client-service\messages.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\user-cache.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\fs.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\src\client\windows\client-service\messages.mc">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\..\src\client\windows\client-service\messages.rc" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{61019A9A-D6E0-4E04-B163-EADB88766C9E}</ProjectGuid>
