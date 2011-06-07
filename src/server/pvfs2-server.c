@@ -368,7 +368,11 @@ int main(int argc, char **argv)
 
                 /* re-open log file to allow normal rotation */
                 gossip_reopen_file(server_config.logfile, "a");
-
+                gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                             "Re-opened log %s, continuing\n", 
+                             server_config.logfile);
+                gossip_set_debug_mask(1, debug_mask);
                 signal_recvd_flag = 0; /* Reset the flag */
             }
             else
