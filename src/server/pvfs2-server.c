@@ -1187,8 +1187,10 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGQUIT, &new_action, NULL);
 #ifdef __PVFS2_SEGV_BACKTRACE__
     sigaction (SIGSEGV, &segv_action, NULL);
+    sigaction (SIGABRT, &segv_action, NULL);
 #else
     sigaction (SIGSEGV, &new_action, NULL);
+    sigaction (SIGABRT, &new_action, NULL);
 #endif
 
     /* ignore these */
