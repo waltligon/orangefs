@@ -556,8 +556,7 @@ static int server_initialize(
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
     {
-        gossip_err("Error: Could not initialize server interfaces; "
-                   "aborting.\n");
+        gossip_err("Error: Could not initialize server subsystems\n");
         return ret;
     }
 
@@ -882,7 +881,7 @@ static int server_initialize_subsystems(
 
         if (ret < 0)
         {
-            gossip_err("Error initializing filesystem %s\n",
+            gossip_err("Error initializing trove for filesystem %s\n",
                         cur_fs->file_system_name);
             return ret;
         }

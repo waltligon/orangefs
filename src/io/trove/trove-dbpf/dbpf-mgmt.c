@@ -139,7 +139,7 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 
 retry:
     ret = db_env_create(&dbenv, 0);
-    if (ret != 0)
+    if (ret != 0 || dbenv == NULL)
     {
         gossip_err("dbpf_getdb_env: %s\n", db_strerror(ret));
         *error = ret;
@@ -864,34 +864,49 @@ int dbpf_finalize(void)
 
     if (my_storage_p)
     {
-        ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
-        if (ret)
+        if( my_storage_p->sto_attr_db )
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
+            ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize attr sync: %s\n", db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+
+            ret = db_close(my_storage_p->sto_attr_db);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize attr close: %s\n", db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+        }
+        else
+        {
+            gossip_err("dbpf_finalize: attribute database not defined\n");
         }
 
-        ret = db_close(my_storage_p->sto_attr_db);
-        if (ret)
+        if( my_storage_p->coll_db )
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
+            ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize collection sync: %s\n", 
+                           db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+    
+            ret = db_close(my_storage_p->coll_db);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize collection close: %s\n", 
+                           db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
         }
-
-        ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0);
-        if (ret)
+        else
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
-        }
-
-        ret = db_close(my_storage_p->coll_db);
-        if (ret)
-        {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
-        }
-
+            gossip_err("dbpf_finalize: collections database not defined\n");
+        } 
         free(my_storage_p->data_path);
 	free(my_storage_p->meta_path);
         free(my_storage_p);
@@ -1312,7 +1327,7 @@ int dbpf_collection_remove(char *collname,
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get collection");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1659,37 +1674,52 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
 
     dbpf_collection_deregister(coll_p);
 
-    if ((ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
+    if( coll_p == NULL )
+    {
+       gossip_err("Trove collection not defined.\n");
+       return 0;
+    }
+
+    if ( (coll_p->coll_attr_db != NULL ) &&
+         (ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->coll_attr_db)) != 0) 
+    if ( (coll_p->coll_attr_db != NULL ) &&
+         (ret = db_close(coll_p->coll_attr_db)) != 0) 
     {
         gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
+    if ( (coll_p->ds_db != NULL ) &&
+         (ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->ds_db)) != 0) 
+    if ( (coll_p->ds_db != NULL ) &&
+         (ret = db_close(coll_p->ds_db)) != 0) 
     {
         gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
+    if ( (coll_p->keyval_db != NULL ) &&
+         (ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->keyval_db)) != 0) 
+    if ( (coll_p->keyval_db != NULL ) &&
+         (ret = db_close(coll_p->keyval_db)) != 0) 
     {
         gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
     }
 
-    dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+    if( coll_p->coll_env != NULL )
+    {
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+    }
     free(coll_p->name);
     free(coll_p->data_path);
     free(coll_p->meta_path);
@@ -1762,7 +1792,7 @@ int dbpf_collection_lookup(char *collname,
     }
     else if (ret != 0)
     {
-        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get collection");
         gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         return -dbpf_db_error_to_trove_error(ret);
     }
@@ -2096,6 +2126,8 @@ struct dbpf_storage *dbpf_storage_lookup(
         free(sto_p->meta_path);
 		free(sto_p->data_path);
         free(sto_p);
+        gossip_err("Failure opening attribute database\n");
+                   
         my_storage_p = NULL;
         return NULL;
     }
@@ -2108,8 +2140,10 @@ struct dbpf_storage *dbpf_storage_lookup(
     {
         db_close(sto_p->sto_attr_db);
         free(sto_p->meta_path);
-		free(sto_p->data_path);
+        free(sto_p->data_path);
         free(sto_p);
+        gossip_err("Failure opening collection database\n");
+
         my_storage_p = NULL;
         return NULL;
     }
