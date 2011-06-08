@@ -61,6 +61,7 @@
 #endif
 
 #define PVFS2_VERSION_REQUEST 0xFF
+#define PVFS2_HELP            0xFE
 
 /* this controls how many jobs we will test for per job_testcontext()
  * call. NOTE: this is currently independent of the config file
@@ -210,6 +211,10 @@ int main(int argc, char **argv)
      */
     ret = server_parse_cmd_line_args(argc, argv);
     if (ret == PVFS2_VERSION_REQUEST)
+    {
+        return 0;
+    }
+    else if (ret == PVFS2_HELP)
     {
         return 0;
     }
@@ -1771,6 +1776,12 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case '?':
             case 'h':
           do_help:
+                usage(argc, argv);
+                if(s_server_options.server_alias)
+                {
+                    free(s_server_options.server_alias);
+                }
+                return PVFS2_HELP; 
             default:
           parse_cmd_line_args_failure:
                 usage(argc, argv);
