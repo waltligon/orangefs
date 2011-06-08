@@ -31,15 +31,19 @@ int split_path(char *fs_path,
 }
 
 /* initialize file systems */
-int fs_initialize(const char *tabfile)
+int fs_initialize(const char *tabfile, 
+                  char *error_msg,
+                  size_t error_msg_len)
 {
     int ret, i, found_one = 0;
+    char errbuf[256];
 
     /* read tab file */
     tab = PVFS_util_parse_pvfstab(tabfile);
     if (!tab)
     {
-        fprintf(stderr, "Error: failed to parse pvfstab\n");
+        _snprintf(error_msg, error_msg_len, "fs_initialize: failed to parse %s", 
+            tabfile);
         return -1;
     }
 
@@ -48,8 +52,9 @@ int fs_initialize(const char *tabfile)
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_sys_initialize", ret);
-        return -1;
+        PVFS_strerror_r(ret, errbuf, 256);
+        _snprintf(error_msg, error_msg_len, "PVFS_sys_initialize: %s", errbuf);
+        return ret;
     }
     
     /* initialize file systems */
@@ -62,8 +67,8 @@ int fs_initialize(const char *tabfile)
 
     if (!found_one)
     {
-        fprintf(stderr, "Error: could not initialize any file systems "
-            "from %s\n", tab->tabfile_name);
+        _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
+            "file systems from %s", tab->tabfile_name);
      
         PVFS_sys_finalize();
         return -1;

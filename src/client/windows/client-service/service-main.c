@@ -16,6 +16,7 @@
 #include "cert.h"
 #include "user-cache.h"
 #include "ldap-support.h"
+#include "messages.h"
 
 #define WIN32ServiceName           "orangefs-client"
 #define WIN32ServiceDisplayName    "OrangeFS Client"
@@ -34,6 +35,7 @@ int is_running = 0;
 int run_service = 0;  
 
 HANDLE hthread, hcache_thread;
+HANDLE hevent_log = NULL;
 
 DWORD thread_start(PORANGEFS_OPTIONS options);
 DWORD thread_stop();
@@ -105,6 +107,98 @@ void close_service_log()
     }
 }
 
+/* Open our Event Log entry (from registry) */
+DWORD init_event_log()
+{
+    hevent_log = RegisterEventSource(NULL, "OrangeFS Client");
+    return GetLastError();
+}
+
+/* Report an error to the Event Log, service log (file), and stderr. The 
+   entire text of the message is displayed without modification. */
+BOOL report_error_event(char *message, BOOL startup)
+{
+    char *strings[1];
+
+    /* startup errors also go to service log or stderr */
+    if (startup)
+    {
+        if (run_service)
+        {
+            service_debug("%s\n", message);
+        }
+        else
+        {
+            fprintf(stderr, "%s\n", message);
+        }
+    }
+
+    if (hevent_log != NULL)
+    {
+        strings[0] = message;
+
+        return ReportEvent(hevent_log, EVENTLOG_ERROR_TYPE, 0, 
+            MSG_GENERIC_ERROR, NULL, 1, 0, strings, NULL);
+    }
+
+    return FALSE;
+}
+
+/* Return the Windows error message for the specified code.
+   The returned string must be freed with LocalFree. */
+LPTSTR get_windows_message(DWORD err)
+{
+    LPVOID msg_buf;
+
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+                  FORMAT_MESSAGE_FROM_SYSTEM |
+                  FORMAT_MESSAGE_IGNORE_INSERTS,
+                  NULL,
+                  err,
+                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPTSTR) &msg_buf,
+                  0, NULL);
+
+    return (LPTSTR) msg_buf;
+}
+
+/* Report a Windows error to the Event Log 
+   Format is {prefix}{windows msg} ({err}) */
+BOOL report_windows_error(char *prefix, DWORD err)
+{
+    LPTSTR win_msg, message;
+    size_t msg_len;
+    BOOL ret;
+
+    win_msg = get_windows_message(err);
+    if (win_msg == NULL)
+        return FALSE;
+
+    /* remove trailing \r\n from win_msg */
+    if (win_msg[strlen(win_msg)-1] == '\n')
+        win_msg[strlen(win_msg)-1] = '\0';
+    if (win_msg[strlen(win_msg)-1] == '\r')
+        win_msg[strlen(win_msg)-1] = '\0';
+
+    msg_len = strlen(prefix)+strlen(win_msg)+16;
+    message = (LPTSTR) LocalAlloc(0, msg_len);
+    _snprintf(message, msg_len, "%s%s (%u)", prefix, win_msg, err);
+
+    ret = report_error_event(message, TRUE);
+
+    LocalFree(message);
+    LocalFree(win_msg);
+
+    return ret;
+}
+
+/* Close our Event Log source */
+void close_event_log()
+{
+    if (hevent_log != NULL)
+        DeregisterEventSource(hevent_log);
+}
+
 BOOL check_mount_point(const char *mount_point)
 {
     const char *slash;
@@ -125,7 +219,7 @@ BOOL check_mount_point(const char *mount_point)
     mask = GetLogicalDrives();
     if (mask == 0)
     {
-        fprintf(stderr, "GetLogicalDrives failed: %u\n", GetLastError());
+        report_windows_error("GetLogicalDrives failed: ", GetLastError());
         return FALSE;
     }
 
@@ -331,9 +425,9 @@ void WINAPI service_main(DWORD argc, char *argv[])
 
     if (ret != 0)
     {
-        service_debug(error_msg);
-        service_debug("Could not parse config file: exiting\n");
+        report_error_event(error_msg, TRUE);
         close_service_log();
+        close_event_log();
         return;
     }
 
@@ -367,8 +461,11 @@ void WINAPI service_main(DWORD argc, char *argv[])
         ret = cache_thread_start();
         if (ret != 0)
         {
-            service_debug("Could not start cache thread: %u\n", ret);
+            _snprintf(error_msg, sizeof(error_msg), "Fatal init error: could "
+                "not start cache thread: %u", ret);
+            report_error_event(error_msg, TRUE);
             close_service_log();
+            close_event_log();
             free(options);
             
             return;
@@ -404,13 +501,14 @@ void WINAPI service_main(DWORD argc, char *argv[])
     }
     else
     {
-        service_debug("RegisterServiceCtrlHandler failed: %u\n", GetLastError());
-        /* TODO: error reporting */
+        report_windows_error("RegisterServiceCtrlHandler failed: ", GetLastError());
     }
 
     qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
     
     close_service_log();
+
+    close_event_log();
 
     free(options);
 }
@@ -435,7 +533,7 @@ DWORD thread_start(PORANGEFS_OPTIONS options)
     else
     {
         err = GetLastError();
-        service_debug("CreateThread failed: %u\n", err);
+        report_windows_error("CreateThread (main) failed: ", err);
     }
 
     service_debug("thread_start exit\n");
@@ -453,7 +551,7 @@ DWORD thread_stop()
     if (!TerminateThread(hthread, 0))
     {
         err = GetLastError();
-        service_debug("TerminateThread failed: %u\n", err);
+        report_windows_error("TerminateThread (main) failed: ", err);
     }
 
     service_debug("thread_stop exit\n");
@@ -474,7 +572,10 @@ DWORD cache_thread_start()
                                  NULL);
     
     if (hcache_thread == NULL)
+    {
         err = GetLastError();
+        report_windows_error("CreateThread (user cache) failed: ", err);
+    }
 
     return err;
 }
@@ -485,7 +586,10 @@ DWORD cache_thread_stop()
 
     if (hcache_thread != NULL)
         if (!TerminateThread(hcache_thread, 0))
+        {
             err = GetLastError();
+            report_windows_error("TerminateThread (user cache) failed: ", err);
+        }
 
     return err;
 }
@@ -493,7 +597,8 @@ DWORD cache_thread_stop()
 DWORD WINAPI main_loop(LPVOID poptions)
 {
     PORANGEFS_OPTIONS options = (PORANGEFS_OPTIONS) poptions;
-    char *tabfile, exe_path[MAX_PATH], *p;
+    char *tabfile, exe_path[MAX_PATH], *p, error_msg[256],
+         event_msg[512];
     FILE *f;
     int ret, malloc_flag = 0;
 
@@ -525,22 +630,20 @@ DWORD WINAPI main_loop(LPVOID poptions)
                 strcat(tabfile, "\\pvfs2tab");
             }
         }
-        else
-        {
-           fprintf(stderr, "GetModuleFileName failed: %u\n", GetLastError());
-        }
     }
 
     /* init file systems */
     if (tabfile)
     {
         service_debug("Using tabfile: %s\n", tabfile);
-        ret = fs_initialize(tabfile);
+        ret = fs_initialize(tabfile, error_msg, 256);
     }
     else
-        ret = ERROR_FILE_NOT_FOUND;
+    {
+        report_windows_error("GetModuleFileName failed: ", GetLastError());
+    }
 
-    /* run dokan operations */
+    /*** main loop - run dokan client ***/
     if (ret == 0)
     {
         dokan_loop(options);
@@ -550,8 +653,9 @@ DWORD WINAPI main_loop(LPVOID poptions)
     }
     else 
     {
-        service_debug("fs_initialize returned %d\n", ret);
-        fprintf(stderr, "fs_initialize returned %d\n", ret);
+        _snprintf(event_msg, sizeof(event_msg), "Fatal init error: %s",
+            error_msg);        
+        report_error_event(event_msg, TRUE);
     }
 
     if (malloc_flag)
@@ -609,13 +713,18 @@ int main(int argc, char **argv, char **envp)
       }
   }
 
+  /* init event log */
+  if ((err = init_event_log()) != 0)
+      /* since we can't log to event log, log to stderr */
+      fprintf(stderr, "Could not open event log: %u\n", err);
+
   /* initialize OpenSSL */
   openssl_init();
 
   /* initialize LDAP */
   if (PVFS_ldap_init() != 0)
   {
-      fprintf(stderr, "LDAP could not be initialized\n");
+      report_error_event("Fatal error: LDAP could not be initialized", TRUE);
       return 1;
   }
 
@@ -635,8 +744,7 @@ int main(int argc, char **argv, char **envp)
 
       /* get options from config file */
       if (get_config(options, error_msg, 512) != 0)
-      {
-          fprintf(stderr, error_msg);
+      {          
           err = 1;
           goto main_exit;
       }
@@ -677,7 +785,8 @@ int main(int argc, char **argv, char **envp)
 
       if (!check_mount_point(options->mount_point))
       {
-          fprintf(stderr, "Drive already in use\n");
+          _snprintf(error_msg, sizeof(error_msg), "Fatal error: %s already "
+              "in use", options->mount_point);
           err = 1;
           goto main_exit;
       }
@@ -686,7 +795,7 @@ int main(int argc, char **argv, char **envp)
       err = cache_thread_start();
       if (err != 0)
       {
-          fprintf(stderr, "User cache thread did not start: %u\n", err);
+          sprintf(error_msg, "Fatal error: user cache thread did not start");
           goto main_exit;
       }
 
@@ -694,7 +803,11 @@ int main(int argc, char **argv, char **envp)
 
       /* process requests */
       err = main_loop(options);
-      
+      if (err != 0)
+      {
+          sprintf(error_msg, "Main loop exited with error code: %d", err);
+      }
+
       printf("main_loop exited: %d\n", err);
 
       cache_thread_stop();
@@ -703,11 +816,18 @@ int main(int argc, char **argv, char **envp)
 
 main_exit:
 
+      if (err != 0)
+      {          
+          report_error_event(error_msg, TRUE);
+      }
+
       qhash_destroy_and_finalize(user_cache, struct user_entry, hash_link, free);
 
       PVFS_ldap_cleanup();
 
       openssl_cleanup();
+
+      close_event_log();
 
       free(options);
   }

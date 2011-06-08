@@ -178,7 +178,8 @@ static int parse_ldap_option(PORANGEFS_OPTIONS options,
 
     if (options->user_mode != USER_MODE_LDAP)
     {
-        strncpy(error_msg, "Specify \"user-mode ldap\" before other ldap options\n", 
+        strncpy(error_msg, "Configuration file (fatal): "
+            "Specify \"user-mode ldap\" before other ldap options", 
             error_msg_len);
         goto parse_ldap_option_exit;
     }
@@ -261,7 +262,8 @@ static int parse_ldap_option(PORANGEFS_OPTIONS options,
             options->ldap.search_scope = LDAP_SCOPE_SUBTREE;
         else
         {
-            strncpy(error_msg, "ldap-search-scope must be onelevel or subtree\n", error_msg_len);
+            strncpy(error_msg, "Configuration file (fatal): "
+                "ldap-search-scope must be onelevel or subtree", error_msg_len);
             goto parse_ldap_option_exit;
         }
 
@@ -309,13 +311,15 @@ static int parse_ldap_option(PORANGEFS_OPTIONS options,
     }
     else
     {
-        _snprintf(error_msg, error_msg_len, "Invalid option %s\n", option);
+        _snprintf(error_msg, error_msg_len, "Configuration file (fatal): "
+            "Unknown option %s", option);
     }
 
 parse_ldap_option_exit:
 
     if (ret != 0 && strlen(error_msg) == 0)
-        _snprintf(error_msg, error_msg_len, "Could not parse option %s\n", option);
+        _snprintf(error_msg, error_msg_len, "Configuration file (fatal): "
+            "Could not parse option %s", option);
 
     return ret;
 }
@@ -398,7 +402,10 @@ int get_config(PORANGEFS_OPTIONS options,
                 token = strtok(NULL, " \t");
                 if (token == NULL)
                 {
-                    _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");                    
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "user-mode option must be list, certificate, "
+                        "or ldap");
                     ret = -1;
                     goto get_config_exit;
                 }
@@ -416,7 +423,10 @@ int get_config(PORANGEFS_OPTIONS options,
                 }
                 else
                 {
-                    _snprintf(error_msg, error_msg_len, "user-mode option must be list, certificate, or ldap\n");
+                    _snprintf(error_msg, error_msg_len,
+                        "Configuration file (fatal): "
+                        "user-mode option must be list, certificate, "
+                        "or ldap");
                     ret = -1;
                     goto get_config_exit;
                 }
@@ -425,20 +435,27 @@ int get_config(PORANGEFS_OPTIONS options,
             {
                 if (options->user_mode == USER_MODE_NONE)
                 {
-                    _snprintf(error_msg, error_msg_len, "user option: specify 'user-mode list' above user option\n");
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "user option: specify 'user-mode list' above user "
+                        "option");
                     ret = -1;
                     goto get_config_exit;
                 }
                 else if (options->user_mode != USER_MODE_LIST)
                 {
-                    _snprintf(error_msg, error_msg_len, "user option: not legal with current user mode\n");
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "user option: not legal with current user mode");
                     ret = -1;
                     goto get_config_exit;
                 }
 
                 if (parse_user() != 0)
                 {
-                    _snprintf(error_msg, error_msg_len, "user option: parse error\n");
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "user option: parse error");
                     ret = -1;
                     goto get_config_exit;
                 }
@@ -456,7 +473,9 @@ int get_config(PORANGEFS_OPTIONS options,
                 }
                 else
                 {
-                    _snprintf(error_msg, error_msg_len, "cert-dir-prefix option: parse error\n");
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "cert-dir-prefix option: parse error");
                     ret = -1;
                     goto get_config_exit;
                 }
@@ -472,7 +491,9 @@ int get_config(PORANGEFS_OPTIONS options,
                 }
                 else
                 {
-                    _snprintf(error_msg, error_msg_len, "ca-path option: parse error\n");
+                    _snprintf(error_msg, error_msg_len, 
+                        "Configuration file (fatal): "
+                        "ca-path option: parse error\n");
                     ret = -1;
                     goto get_config_exit;
                 }
@@ -512,13 +533,16 @@ int get_config(PORANGEFS_OPTIONS options,
             }
             else if (!strnicmp(token, "ldap", 4))
             {
-                ret = parse_ldap_option(options, line, token, error_msg, error_msg_len);
+                ret = parse_ldap_option(options, line, token, error_msg, 
+                    error_msg_len);
                 if (ret != 0)
                     goto get_config_exit;
             }
             else
             {
-                _snprintf(error_msg, error_msg_len, "Unknown option %s\n", token);
+                _snprintf(error_msg, error_msg_len, 
+                    "Configuration file (fatal): "
+                    "Unknown option %s", token);
                 ret = -1;
                 goto get_config_exit;
             }
@@ -527,8 +551,9 @@ int get_config(PORANGEFS_OPTIONS options,
 
     if (options->user_mode == USER_MODE_NONE)
     {
-        _snprintf(error_msg, error_msg_len, "Must specify user-mode (list, "
-            "certificate or ldap)\n");
+        _snprintf(error_msg, error_msg_len, 
+            "Configuration file (fatal): "
+            "Must specify user-mode (list, certificate or ldap)");
         ret = -1;
         goto get_config_exit;
     }
@@ -536,17 +561,19 @@ int get_config(PORANGEFS_OPTIONS options,
     if (options->user_mode == USER_MODE_LDAP &&
         (strlen(options->ldap.host) == 0 ||
          strlen(options->ldap.search_root) == 0))
-    {
-        _snprintf(error_msg, error_msg_len, "Missing ldap option: ldap-host, "
-            "or ldap-search-root\n");
+    {        
+        _snprintf(error_msg, error_msg_len, 
+            "Configuration file (fatal): "
+            "Missing ldap option: ldap-host, or ldap-search-root");
         ret = -1;
     }
 
     /* gossip can only print to either a file or stderr */
     if (options->debug_stderr && debug_file_flag)
     {
-        _snprintf(error_msg, error_msg_len, "Cannot specify both debug-stderr "
-            "and debug-file\n");
+        _snprintf(error_msg, error_msg_len, 
+            "Configuration file (fatal): "
+            "Cannot specify both debug-stderr and debug-file");
         ret = -1;
     }
 

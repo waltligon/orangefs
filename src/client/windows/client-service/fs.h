@@ -6,7 +6,9 @@
 
 #include "pvfs2.h"
 
-int fs_initialize(const char *tabfile);
+int fs_initialize(const char *tabfile,
+                  char *error_msg,
+                  size_t error_msg_len);
 
 struct PVFS_sys_mntent *fs_get_mntent(PVFS_fs_id fs_id);
 

@@ -37,6 +37,17 @@ void openssl_cleanup()
     ERR_remove_state(0);
 }
 
+/* certificate error reporting */
+static void report_cert_error(char *message)
+{
+    /* debug the message */
+    DbgPrint("   %s\n", message);
+
+    /* write to Event Log */
+    report_error_event(message, FALSE);
+
+}
+
 /* load certificate from file (PEM format) */
 static unsigned long load_cert_from_file(char *path, 
                                          X509 **cert)

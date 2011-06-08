@@ -42,4 +42,7 @@ typedef struct
 
 void DbgPrint(char *format, ...);
 
+BOOL report_error_event(char *message, 
+                        BOOL startup);
+
 #endif
