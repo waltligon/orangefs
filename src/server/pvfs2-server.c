@@ -1801,7 +1801,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if (argv[optind][0] != '/')
     {
-        if( getcwd(startup_cwd, PATH_MAX) < 0 )
+        if( (startup_cwd = getcwd(startup_cwd, PATH_MAX)) == NULL )
         {
             gossip_err("Failed to get current working directory to create "
                        "absolute path for configuration file: %s\n",
@@ -2455,7 +2455,8 @@ static int precreate_pool_initialize(int server_index)
 
                     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
                                  "%s, type: %u, fs_id: %llu, handle: %llu\n",
-                                 __func__, host, t, llu(cur_fs->coll_id), 
+                                 __func__, host, t, 
+                                 llu(cur_fs->coll_id), 
                                  llu(pool_handle));
                     ret = precreate_pool_setup_server(host, t, 
                         cur_fs->coll_id, &pool_handle);

@@ -101,7 +101,8 @@ static PINT_sm_action listeattr_setup_resp(
         {
              gossip_debug(GOSSIP_LISTEATTR_DEBUG, "%s: requested key %d "
                           "size of %ld is greater than maximum of %d\n",
-                          __func__, i, (int64_t)s_op->req->u.listeattr.keysz[i],
+                          __func__, i, 
+                          ((long int)s_op->req->u.listeattr.keysz[i]),
                           PVFS_MAX_XATTR_NAMELEN );
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
