@@ -533,7 +533,6 @@ char *PINT_util_guess_alias(void)
 {
     char tmp_alias[1024];
     char *tmpstr;
-    char *alias;
     int ret;
 
     /* hmm...failed to find alias as part of the server config filename,
@@ -547,7 +546,6 @@ char *PINT_util_guess_alias(void)
                    "process directly\n");
         return NULL;
     }
-    alias = tmp_alias;
 
     tmpstr = strstr(tmp_alias, ".");
     if(tmpstr)

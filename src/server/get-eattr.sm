@@ -78,7 +78,7 @@ static PINT_sm_action geteattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, tsz;
+    int i;
 
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
@@ -132,7 +132,7 @@ static PINT_sm_action geteattr_setup_resp(
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
-    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    for (i = 0; i < s_op->req->u.geteattr.nkey; i++)
     {
         s_op->resp.u.geteattr.val[i].buffer = malloc(
             s_op->req->u.geteattr.valsz[i]);

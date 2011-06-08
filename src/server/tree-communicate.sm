@@ -577,7 +577,6 @@ static int tree_get_file_size_work_cleanup(
     int i, j, k, task_id, error_code;
     uint32_t size_array_index=0, error_array_index=0;
     PINT_server_op *old_frame;
-    struct PVFS_servresp_tree_get_file_size *tree_resp = NULL;
     struct PVFS_servreq_tree_get_file_size *tree_req = NULL;
     PINT_sm_msgpair_state *tree_msgarray = NULL;
     PINT_sm_msgarray_op *tree_msgop = NULL;
@@ -595,9 +594,7 @@ static int tree_get_file_size_work_cleanup(
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
         if (old_frame)
-        {  /* response from sub-tree request */
-           tree_resp = &(old_frame->resp.u.tree_get_file_size);
-
+        {  
            /* sub-tree msgpair array*/
            tree_msgarray  = old_frame->msgarray_op.msgarray;
 

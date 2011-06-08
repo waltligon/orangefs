@@ -85,12 +85,11 @@ static int threaded_queues_destroy(struct PINT_manager_s *manager,
 {
     struct PINT_worker_threaded_queues_s *w;
     struct PINT_worker_thread_entry * tentry;
-    int i, count;
+    int i;
 
     w = &inst->threaded;
 
     gen_mutex_lock(&w->mutex);
-    count = w->attr.thread_count;
     gen_mutex_unlock(&w->mutex);
 
     /* stop all threads */

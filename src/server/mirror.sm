@@ -702,6 +702,11 @@ static PINT_sm_action check_comm ( struct PINT_smcb *smcb
 
    server_config = get_server_config_struct();
    cur_fs = PINT_config_find_fs_id(server_config,reqmir_p->fs_id);
+  
+   if( cur_fs == NULL )
+   {
+      return -PVFS_EINVAL;
+   }
 
    /*status_user_tag's will only exist for those destination handles that had */
    /*successful posts of a write-ack and flow.                                */

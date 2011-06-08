@@ -42,7 +42,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         }
         ret = (tmpbuf ? 0 : -1);
 #else
-	ret = strerror_r(tmp, buf, (size_t)limit);
+	ret = (long int)strerror_r(tmp, buf, (size_t)limit);
 #endif
     }
     return ret;

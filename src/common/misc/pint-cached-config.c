@@ -459,7 +459,7 @@ static int PINT_cached_config_get_extents(
     PVFS_BMI_addr_t tmp_addr;
     struct config_fs_cache_s *cur_config_cache = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
-    int num_io_servers, ret;
+    int ret;
 
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if(!hash_link)
@@ -475,7 +475,6 @@ static int PINT_cached_config_get_extents(
     assert(cur_config_cache->fs);
 
     server_list = cur_config_cache->fs->data_handle_ranges;
-    num_io_servers = PINT_llist_count(server_list);
 
     while(!PINT_llist_empty(server_list))
     {

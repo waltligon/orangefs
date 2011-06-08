@@ -380,7 +380,7 @@ static int small_io_completion_fn(void * user_args,
                              "\taggregate_size=%ld\n",
                             llu(msg_p->req.u.small_io.handle),
                             msg_p->req.u.small_io.io_type,
-                            msg_p->req.u.small_io.file_req_offset,
+                            ((long int)msg_p->req.u.small_io.file_req_offset),
                             ((long int)msg_p->req.u.small_io.aggregate_size));
 
 /*

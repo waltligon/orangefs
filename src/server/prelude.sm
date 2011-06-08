@@ -92,6 +92,10 @@ static PINT_sm_action prelude_setup(
 
     ret = PINT_server_req_get_object_ref(
         s_op->req, &s_op->target_fs_id, &s_op->target_handle);
+    if( ret != 0 )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+    }
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
