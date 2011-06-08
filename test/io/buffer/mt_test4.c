@@ -26,7 +26,7 @@ int main(int argc, char * argv[])
 
     NCAC_info_t info;
 
-    int ret1, ret2, ret3;
+    int ret1, ret2;
     int extcnt;
     int threadcnt;
 

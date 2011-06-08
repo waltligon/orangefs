@@ -92,7 +92,7 @@ static inline int path_lookup(
 	if (ret < 0) return -1;
 	if (state != 0) return -1;
 	
-	if (s_attr.type != TROVE_TEST_DIR) {
+	if ((int)s_attr.type != TROVE_TEST_DIR) {
 	    fprintf(stderr, "%s is not a directory.\n", dir);
 	    return -1;
 	}

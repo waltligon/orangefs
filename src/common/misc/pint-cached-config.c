@@ -318,7 +318,7 @@ int PINT_cached_config_get_server(
         return(-PVFS_EINVAL);
     }
 
-    if(type != PINT_SERVER_TYPE_META && type != PINT_SERVER_TYPE_IO)
+    if((int)type != PINT_SERVER_TYPE_META && (int)type != PINT_SERVER_TYPE_IO)
     {
         return(-PVFS_EINVAL);
     }
@@ -335,7 +335,7 @@ int PINT_cached_config_get_server(
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
-    if(type == PINT_SERVER_TYPE_META)
+    if((int)type == PINT_SERVER_TYPE_META)
     {
         server_cursor = 
             cur_config_cache->fs->meta_handle_ranges;

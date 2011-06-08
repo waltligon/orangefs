@@ -93,6 +93,8 @@ static int pvfs2_readpages(
         list_del(&page->lru);
         if (!add_to_page_cache(page, mapping, page->index, GFP_KERNEL)) {
             ret = read_one_page(page);
+            gossip_debug(GOSSIP_INODE_DEBUG, "failure adding page to cache, "
+                         "read_one_page returned: %d\n", ret);
         }
         else {
             page_cache_release(page);

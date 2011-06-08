@@ -92,7 +92,7 @@ int main(int argc, char **argv)
         TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) return -1;
 
-    if (s_attr.type != TROVE_TEST_DIR) {
+    if ((int)s_attr.type != TROVE_TEST_DIR) {
 	fprintf(stderr, "%s is not a directory.\n", path_name);
 	return -1;
     }
