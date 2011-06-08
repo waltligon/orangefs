@@ -1771,7 +1771,6 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'a':
           do_alias:
                 total_arguments++;
-                printf("optarg: %s\n", optarg);
                 s_server_options.server_alias = strdup(optarg);
                 break;
             case '?':
