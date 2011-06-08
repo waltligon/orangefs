@@ -2456,7 +2456,7 @@ static int precreate_pool_initialize(int server_index)
                     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
                                  "%s, type: %u, fs_id: %llu, handle: %llu\n",
                                  __func__, host, t, 
-                                 llu(cur_fs->coll_id), 
+                                 (long long unsigned int)cur_fs->coll_id, 
                                  llu(pool_handle));
                     ret = precreate_pool_setup_server(host, t, 
                         cur_fs->coll_id, &pool_handle);
