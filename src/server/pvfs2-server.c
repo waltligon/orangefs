@@ -1699,7 +1699,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"rmfs",0,0,0},
         {"version",0,0,0},
         {"pidfile",1,0,0},
-        {"alias",0,0,0},
+        {"alias",1,0,0},
         {0,0,0,0}
     };
 
@@ -1771,6 +1771,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'a':
           do_alias:
                 total_arguments++;
+                printf("optarg: %s\n", optarg);
                 s_server_options.server_alias = strdup(optarg);
                 break;
             case '?':
