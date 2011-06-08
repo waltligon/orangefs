@@ -29,6 +29,7 @@
 #include <src/common/misc/pvfs2-internal.h>  /* lld(), llu() */
 
 #include "pvfs2-test-config.h"
+#include <test/shared/test-common.h> /* now lld(), llu() here */
 
 #ifdef HAVE_ZLIB_H
 #include <zlib.h>
@@ -601,7 +602,8 @@ static int do_client(struct options *opts, bmi_context_id *context)
                             rcrc = adler32(rcrc, recv_buffer, bytes);
                             if(rcrc != crc)
                             {
-                                fprintf(stderr, "CRC Mismatch!  Sent %llu but received %llu\n",
+                                fprintf(stderr, "CRC Mismatch! "
+                                        "Sent %llu but received %llu\n",
                                         llu(crc), llu(rcrc));
                             }
                         }

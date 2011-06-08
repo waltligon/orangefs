@@ -42,7 +42,6 @@ int main(
     PVFS_Request mem_req;
     PVFS_Request mem_req2;
     void *buffer;
-    int buffer_size;
     void *off_buffer;
 
     if (argc != 2)
@@ -162,7 +161,6 @@ int main(
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     buffer = io_buffer;
-    buffer_size = io_size * sizeof(int);
 
     file_req = PVFS_BYTE;
 

@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     char *filename = NULL;
     int ret = -1, io_size = DEFAULT_IO_SIZE;
     int *io_buffer = NULL;
-    int i, errors, buffer_size;
+    int i, errors;
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
@@ -138,7 +138,6 @@ int main(int argc, char **argv)
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     buffer = io_buffer;
-    buffer_size = io_size * sizeof(int);
 
     /*
       file datatype is tiled, so we can get away with a trivial type

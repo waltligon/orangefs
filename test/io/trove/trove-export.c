@@ -156,8 +156,12 @@ int main(int argc, char **argv)
     }
 
     /* write data to file */
-    write(fd, buf, f_size);
-
+    ret = write(fd, buf, f_size);
+    if( ret == -1 )
+    {
+	fprintf(stderr, "write failed.\n");
+        return -1;
+    }
     close(fd);
 
     trove_close_context(coll_id, trove_context);

@@ -50,7 +50,6 @@ int main(int argc, char * argv[])
 
     ret1 = 0;
     ret2 = 1*req_cnt;
-    ret3 = 2*req_cnt;
 
     if (pthread_create(&thread1,
                  NULL,
