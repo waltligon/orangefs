@@ -1690,7 +1690,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
     int total_arguments = 0;
-    const char *cur_option = NULL;
+    const char *cur_option = NULL, *tmp_path = NULL;
     static struct option long_opts[] =
     {
         {"foreground",0,0,0},
@@ -1801,7 +1801,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 
     if (argv[optind][0] != '/')
     {
-        if( (startup_cwd = getcwd(startup_cwd, PATH_MAX)) == NULL )
+        if( (tmp_path = getcwd(startup_cwd, PATH_MAX)) == NULL )
         {
             gossip_err("Failed to get current working directory to create "
                        "absolute path for configuration file: %s\n",
