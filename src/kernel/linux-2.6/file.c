@@ -2183,9 +2183,6 @@ static ssize_t pvfs2_file_readx(
 {
     struct rw_options rw;
 
-    gossip_err("Executing pvfs2_file_readx.  offset:NONE \ttotal length:%zd\n"
-              ,iov_length(iov,nr_segs));
-
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READX;
