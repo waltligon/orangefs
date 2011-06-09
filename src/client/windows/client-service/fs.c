@@ -157,11 +157,45 @@ int fs_lookup(char *fs_path,
               PVFS_handle *handle)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    char *real_path;
     PVFS_sysresp_lookup resp;
-    int ret;
+    PVFS_sysresp_getattr resp_getattr;
+    PVFS_fs_id fs_id;
+    int ret, link_flag;
 
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp,
-                          TRUE, NULL);
+    real_path = strdup(fs_path);
+    do 
+    {
+        link_flag = FALSE;
+
+        /* lookup the given path on the FS */
+        ret = PVFS_sys_lookup(mntent->fs_id, real_path, credentials, &resp,
+            FALSE, NULL);
+        if (ret != 0)
+            break;
+
+        /* check if it's a link */
+        memset(&resp_getattr, 0, sizeof(resp_getattr));
+        ret = PVFS_sys_getattr(resp.ref, PVFS_ATTR_SYS_LNK_TARGET, credentials,
+            &resp_getattr, NULL);
+        if (ret != 0)
+            break;
+
+        if (resp_getattr.attr.link_target != NULL)
+        {
+            link_flag = TRUE;
+            /* get file name */
+            free(real_path);
+            real_path = (char *) malloc(PVFS_NAME_MAX);
+            ret = PVFS_util_resolve(resp_getattr.attr.link_target, &fs_id, 
+                real_path, PVFS_NAME_MAX);
+            /* free attr buffer */
+            free(resp_getattr.attr.link_target);
+        }
+    } while (link_flag);
+
+    free(real_path);
+
     if (ret == 0)
         *handle = resp.ref.handle;
 
@@ -357,7 +391,9 @@ int fs_getattr(char *fs_path,
                PVFS_sys_attr *attr)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
-    int ret;
+    char *real_path;
+    int ret, link_flag;
+    PVFS_fs_id fs_id;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
 
@@ -366,14 +402,42 @@ int fs_getattr(char *fs_path,
         return -PVFS_EINVAL;
 
     /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
-    if (ret != 0)
-        goto fs_getattr_exit;
+    real_path = strdup(fs_path);
+    do {
+        link_flag = FALSE;
 
-    /* read all attributes */
-    ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
+        ret = PVFS_sys_lookup(mntent->fs_id, real_path, credentials, &resp_lookup,
+            FALSE, NULL);
+        if (ret != 0)
+            break;
+        
+        /* read all attributes */
+        memset(&resp_getattr, 0, sizeof(resp_getattr));
+        ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
                            credentials, &resp_getattr, NULL);
+        if (ret != 0)
+            break;
+
+        /* get attributes for link target */
+        if (resp_getattr.attr.link_target != NULL)
+        {
+            link_flag = TRUE;
+            /* get file name */
+            free(real_path);
+            real_path = (char *) malloc(PVFS_NAME_MAX);
+            ret = PVFS_util_resolve(resp_getattr.attr.link_target, &fs_id, 
+                real_path, PVFS_NAME_MAX);
+            /* free attr buffers */
+            free(resp_getattr.attr.link_target);
+            if (resp_getattr.attr.dist_name != NULL)
+                free(resp_getattr.attr.dist_name);
+            if (resp_getattr.attr.dist_params != NULL)
+                free(resp_getattr.attr.dist_params);            
+        }
+    } while (link_flag);
+
+    free(real_path);
+
     if (ret != 0)
         goto fs_getattr_exit;
 

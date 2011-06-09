@@ -1199,6 +1199,16 @@ PVFS_Dokan_flush_file_buffers(
     return err;
 }
 
+/* free attribute buffers that are allocated with fs_getattr */
+#define FREE_ATTR_BUFS(attr)    do { \
+                                    if (attr.dist_name != NULL) \
+                                        free(attr.dist_name); \
+                                    if (attr.dist_params != NULL) \
+                                        free(attr.dist_params); \
+                                    if (attr.link_target != NULL) \
+                                        free(attr.link_target); \
+                                } while (0)
+
 
 static int __stdcall
 PVFS_Dokan_get_file_information(
@@ -1228,7 +1238,7 @@ PVFS_Dokan_get_file_information(
     ret = fs_getattr(fs_path, &credentials, &attr);
 
     if (ret == 0)
-    {
+    {        
         strcpy(info, "   ");
         /* convert to Windows attributes */
         HandleFileInformation->dwFileAttributes = 0;
@@ -1283,6 +1293,7 @@ PVFS_Dokan_get_file_information(
         HandleFileInformation->nFileSizeHigh = (attr.size & 0x7FFFFFFF00000000LL) >> 32;
         HandleFileInformation->nFileSizeLow = (attr.size & 0xFFFFFFFFLL);
 
+        FREE_ATTR_BUFS(attr);
     }    
     
     err = error_map(ret);

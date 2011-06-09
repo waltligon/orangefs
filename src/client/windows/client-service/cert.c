@@ -37,11 +37,13 @@ void openssl_cleanup()
     ERR_remove_state(0);
 }
 
+#define report_cert_error(msg)    _report_cert_error(msg, __func__)
+
 /* certificate error reporting */
-static void report_cert_error(char *message)
+static void _report_cert_error(char *message, char *fn_name)
 {
     /* debug the message */
-    DbgPrint("   %s\n", message);
+    DbgPrint("   %s: %s\n", fn_name, message);
 
     /* write to Event Log */
     report_error_event(message, FALSE);
@@ -71,7 +73,7 @@ static unsigned long load_cert_from_file(char *path,
 }
 
 
-static int get_proxy_auth_ex_data_idx(void)
+static int get_proxy_auth_ex_data_cred()
 {
     static volatile int idx = -1;
     if (idx < 0)
@@ -79,9 +81,25 @@ static int get_proxy_auth_ex_data_idx(void)
         CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
         if (idx < 0)
         {
-            idx = X509_STORE_CTX_get_ex_new_index(0,
-                                                  "for verify callback",
-                                                  NULL,NULL,NULL);
+            idx = X509_STORE_CTX_get_ex_new_index(0, "credentials", NULL, NULL,
+                NULL);
+        }
+        CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
+    }
+
+    return idx;
+}
+
+static int get_proxy_auth_ex_data_userid()
+{
+    static volatile int idx = -1;
+    if (idx < 0)
+    {
+        CRYPTO_w_lock(CRYPTO_LOCK_X509_STORE);
+        if (idx < 0)
+        {
+            idx = X509_STORE_CTX_get_ex_new_index(0, "userid",
+                NULL, NULL, NULL);
         }
         CRYPTO_w_unlock(CRYPTO_LOCK_X509_STORE);
     }
@@ -143,10 +161,12 @@ static int parse_credentials(char *credstr, PVFS_uid *uid, PVFS_gid *gid)
 
 static int verify_callback(int ok, X509_STORE_CTX *ctx)
 {
+    char *userid;
     X509 *xs;
     PROXY_CERT_INFO_EXTENSION *pci;
     char *credstr;
     PVFS_credentials *credentials;
+    char error_msg[256];
     int ret;
 
     /* prior verifies have succeeded */
@@ -156,6 +176,11 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
         xs = ctx->current_cert;
         if (xs->ex_flags & EXFLAG_PROXY)
         {
+            /* get userid for error logging */
+            userid = (char *) X509_STORE_CTX_get_ex_data(ctx, 
+                get_proxy_auth_ex_data_userid());
+            
+            /* get credentials in {UID}/{GID} form from cert policy */
             pci = (PROXY_CERT_INFO_EXTENSION *) 
                     X509_get_ext_d2i(xs, NID_proxyCertInfo, NULL, NULL);
 
@@ -163,18 +188,24 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
             {
                 credstr = (char *) pci->proxyPolicy->policy->data;
                 credentials = (PVFS_credentials *) X509_STORE_CTX_get_ex_data(
-                    ctx, get_proxy_auth_ex_data_idx());
+                    ctx, get_proxy_auth_ex_data_cred());
                 ret = parse_credentials(credstr, &credentials->uid, 
                                         &credentials->gid);
                 if (ret != 0)
                 {
-                    DbgPrint("   verify_callback: could not parse credential string: %s\n", credstr);
+                    _snprintf(error_msg, sizeof(error_msg), "User %s: proxy "
+                        "certificate contains invalid credential policy", 
+                        userid);
+                    report_cert_error(error_msg);
                     ok = 0;
                 }
             }
             else
             {
-                DbgPrint("   verify_callback: could not load policy\n");
+                _snprintf(error_msg, sizeof(error_msg), "User %s: proxy "
+                          "certificate contains no credential policy", 
+                          userid);
+                report_cert_error(error_msg);
                 ok = 0;
             }            
 
@@ -186,7 +217,8 @@ static int verify_callback(int ok, X509_STORE_CTX *ctx)
 }
 
 /* verify certificate */
-static unsigned long verify_cert(X509 *cert, 
+static unsigned long verify_cert(char *userid,
+                                 X509 *cert, 
                                  X509 *ca_cert,
                                  STACK_OF(X509) *chain,
                                  PVFS_credentials *credentials)
@@ -195,6 +227,7 @@ static unsigned long verify_cert(X509 *cert,
     X509_STORE_CTX *ctx;
     int ret, verify_flag = 0;
     int (*save_verify_cb)(int ok, X509_STORE_CTX *ctx);
+    char error_msg[256];
 
     /* add CA cert to trusted store */
     trust_store = X509_STORE_new();
@@ -229,7 +262,8 @@ static unsigned long verify_cert(X509 *cert,
     /* set up verify callback */
     save_verify_cb = ctx->verify_cb;
     X509_STORE_CTX_set_verify_cb(ctx, verify_callback);
-    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_idx(), credentials);
+    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_cred(), credentials);
+    X509_STORE_CTX_set_ex_data(ctx, get_proxy_auth_ex_data_userid(), userid);
     X509_STORE_CTX_set_flags(ctx, X509_V_FLAG_ALLOW_PROXY_CERTS);
 
     /* verify the cert */
@@ -244,8 +278,10 @@ verify_cert_exit:
        will print errors */
     if (verify_flag && ret == OPENSSL_CERT_ERROR && ctx->error != 0)
     {
-        DbgPrint("   verify_cert: %s\n", 
+        _snprintf(error_msg, sizeof(error_msg), "User %s: proxy certificate "
+            "verification error: %s", userid, 
             X509_verify_cert_error_string(ctx->error));
+        report_cert_error(error_msg);
     }
 
     if (ctx != NULL)
@@ -287,8 +323,9 @@ int get_cert_credentials(HANDLE huser,
     X509 *cert = NULL, *chain_cert = NULL, *ca_cert = NULL;
     STACK_OF(X509) *chain = NULL;
     int ret;
-    unsigned long err;
-    char errstr[256];
+    unsigned long err, err_flag = FALSE;
+    size_t err_size;
+    char error_msg[256], errstr[256];
 
     DbgPrint("   get_cert_credentials: enter\n");
     
@@ -303,7 +340,9 @@ int get_cert_credentials(HANDLE huser,
     {
         if ((strlen(goptions->cert_dir_prefix) + strlen(userid) + 8) > MAX_PATH)
         {
-            DbgPrint("   get_cert_credentials: user %s: path to cert too long\n", userid);
+            _snprintf(error_msg, sizeof(error_msg), "User %s: path to certificate "
+                "too long", userid);
+            report_cert_error(error_msg);
             return -1;
         }
 
@@ -323,14 +362,17 @@ int get_cert_credentials(HANDLE huser,
         }
         else
         {
-            DbgPrint("   get_cert_credentials: user %s: could not locate profile dir: %d\n", userid,
-                ret);
+            _snprintf(error_msg, sizeof(error_msg), "User %s: could not locate "
+                "profile directory: %d", userid, ret);
+            report_cert_error(error_msg);
             return ret;
         }
         
         if (strlen(cert_dir) + 7 > MAX_PATH)
         {
-            DbgPrint("   get_cert_credentials: user %s: profile dir too long\n", userid);
+            _snprintf(error_msg, sizeof(error_msg), "User %s: profile directory too "
+                "long", userid);
+            report_cert_error(error_msg);
             return -1;
         }
     }
@@ -343,7 +385,9 @@ int get_cert_credentials(HANDLE huser,
     h_find = FindFirstFile(cert_pattern, &find_data);
     if (h_find == INVALID_HANDLE_VALUE)
     {
-        DbgPrint("   get_cert_credentials: user %s: no certificates\n", userid);
+        _snprintf(error_msg, sizeof(error_msg), "User %s: no certificates in %s", 
+            userid, cert_dir);
+        report_cert_error(error_msg);
         ret = -1;
         goto get_cert_credentials_exit;
     }
@@ -366,8 +410,9 @@ int get_cert_credentials(HANDLE huser,
         }
         if (ret != 0)
         {
-            DbgPrint("   get_cert_credentials: error loading cert %s: %d\n", 
-                cert_path, ret);
+            _snprintf(error_msg, sizeof(error_msg), "Error loading cert %s. See "
+                "subsequent log messages for details", cert_path);
+            report_cert_error(error_msg);
         }
     } while (ret == 0 && FindNextFile(h_find, &find_data));
 
@@ -376,7 +421,9 @@ int get_cert_credentials(HANDLE huser,
     /* no proxy cert */
     if (cert == NULL)
     {
-        DbgPrint("   get_cert_credentials: missing or invalid cert.0\n");
+        _snprintf(error_msg, sizeof(error_msg), "Missing or invalid %scert.0. See "
+            "subsequent log messages for details", cert_dir);
+        report_cert_error(error_msg);
         ret = OPENSSL_CERT_ERROR;
     }
     
@@ -387,13 +434,15 @@ int get_cert_credentials(HANDLE huser,
     ret = load_cert_from_file(goptions->ca_path, &ca_cert);
     if (ret != 0)
     {
-        DbgPrint("   get_cert_credentials: error loading CA cert %s: %d\n", 
-            goptions->ca_path, ret);
+        _snprintf(error_msg, sizeof(error_msg), "User %s: error loading CA "
+            "certificate %s. See subsequent log messages for details", 
+            userid, goptions->ca_path);
+        report_cert_error(error_msg);
         goto get_cert_credentials_exit;
     }
 
     /* read and cache credentials from certificate */
-    ret = verify_cert(cert, ca_cert, chain, credentials);
+    ret = verify_cert(userid, cert, ca_cert, chain, credentials);
 
     if (ret == 0)
     {        
@@ -405,11 +454,21 @@ get_cert_credentials_exit:
     /* error handling */
     if (ret == OPENSSL_CERT_ERROR)
     {
-        while ((err = ERR_get_error()) != 0)
+        _snprintf(error_msg, sizeof(error_msg), "User %s: certificate "
+            "errors:\n", userid);
+        err_size = 255 - strlen(error_msg);
+        /* use err_size for remaining buffer size */
+        while ((err = ERR_get_error()) != 0 && err_size > 0)
         {
-            ERR_error_string_n(err, errstr, 256);
-            DbgPrint("   get_cert_credentials: %s\n", errstr);
+            err_flag = TRUE;
+            ERR_error_string_n(err, errstr, 256);            
+            strncat(error_msg, errstr, err_size);
+            err_size = 255 - strlen(error_msg);
+            strncat(error_msg, "\n", err_size);
+            err_size = 255 - strlen(error_msg);
         }
+        if (err_flag)
+            report_cert_error(error_msg);
     }
 
     /* free chain */
