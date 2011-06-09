@@ -119,8 +119,8 @@ static int fillup_buffer(cm_frame_t *frame)
 int main(int argc, char **argv)
 {
     int ret = -1;
-    char str_buf[PVFS_NAME_MAX] = {0}, *fname = NULL;
-    char pvfs_path[PVFS_NAME_MAX] = {0};
+    char str_buf[PVFS_NAME_MAX+1] = {0}, *fname = NULL;
+    char pvfs_path[PVFS_NAME_MAX+1] = {0};
     PVFS_fs_id cur_fs;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_create resp_create;
