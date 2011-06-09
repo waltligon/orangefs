@@ -118,7 +118,7 @@ typedef struct
 
 static options_t s_server_options = { 0, 0, 1, NULL, NULL};
 static char fs_conf[PATH_MAX];
-static char startup_cwd[PATH_MAX];
+static char startup_cwd[PATH_MAX+1];
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -1764,7 +1764,8 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 s_server_options.pidfile = optarg;
                 if(optarg[0] != '/')
                 {
-                    gossip_err("Error: pidfile must be specified with an absolute path.\n");
+                    gossip_err("Error: pidfile must be specified with an "
+                               "absolute path.\n");
                     goto parse_cmd_line_args_failure;
                 }
                 break;

@@ -604,8 +604,8 @@ static int do_client(struct options *opts, bmi_context_id *context)
                             {
                                 fprintf(stderr, "CRC Mismatch! "
                                         "Sent %llu but received %llu\n",
-                                        (long long unsigned int)crc, 
-                                        (long long unsigned int)rcrc);
+                                        llu(crc), 
+                                        llu(rcrc));
                             }
                         }
 #endif
