@@ -150,33 +150,35 @@ int fs_resolve_path(const char *local_path,
     return ret;
 }
 
-/* lookup PVFS file path 
-      returns 0 and handle if exists */
-int fs_lookup(char *fs_path,
-              PVFS_credentials *credentials,
-              PVFS_handle *handle)
+/* Workaround to follow PVFS2 file links */
+int sys_lookup_follow_links(PVFS_fs_id fs_id,
+                            char *fs_path,
+                            PVFS_credentials *credentials,
+                            PVFS_sysresp_lookup *resp)
 {
-    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
     char *real_path;
-    PVFS_sysresp_lookup resp;
     PVFS_sysresp_getattr resp_getattr;
-    PVFS_fs_id fs_id;
     int ret, link_flag;
 
+    if (fs_path == NULL || strlen(fs_path) == 0 || credentials == NULL ||
+        resp == NULL)
+        return -1;
+
+    /* copy to be used for link paths */
     real_path = strdup(fs_path);
     do 
     {
         link_flag = FALSE;
 
         /* lookup the given path on the FS */
-        ret = PVFS_sys_lookup(mntent->fs_id, real_path, credentials, &resp,
-            FALSE, NULL);
+        ret = PVFS_sys_lookup(fs_id, real_path, credentials, resp,
+            PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (ret != 0)
             break;
 
         /* check if it's a link */
         memset(&resp_getattr, 0, sizeof(resp_getattr));
-        ret = PVFS_sys_getattr(resp.ref, PVFS_ATTR_SYS_LNK_TARGET, credentials,
+        ret = PVFS_sys_getattr(resp->ref, PVFS_ATTR_SYS_LNK_TARGET, credentials,
             &resp_getattr, NULL);
         if (ret != 0)
             break;
@@ -192,9 +194,29 @@ int fs_lookup(char *fs_path,
             /* free attr buffer */
             free(resp_getattr.attr.link_target);
         }
-    } while (link_flag);
+    } while (ret == 0 && link_flag);
 
     free(real_path);
+
+    return ret;
+}
+
+/* lookup PVFS file path 
+   returns 0 and handle if exists */
+int fs_lookup(char *fs_path,
+              PVFS_credentials *credentials,
+              PVFS_handle *handle)
+{
+    struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
+    PVFS_sysresp_lookup resp;
+    int ret;
+
+    if (fs_path == NULL || credentials == NULL || handle == NULL)
+        return -1;
+
+    /* lookup the given path on the FS - do not follow links */
+    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp,
+        PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
 
     if (ret == 0)
         *handle = resp.ref.handle;
@@ -232,9 +254,9 @@ int fs_create(char *fs_path,
     if (ret != 0)
         goto fs_create_exit;
 
-    /* lookup parent path */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup parent path - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, base_dir, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_create_exit;
 
@@ -285,9 +307,9 @@ int fs_remove(char *fs_path,
     if (ret != 0)
         goto fs_remove_exit;
 
-    /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup parent entry - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, base_dir, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_remove_exit;
 
@@ -326,9 +348,9 @@ int fs_rename(char *old_path,
     if (ret != 0)
         goto fs_rename_exit;
 
-    /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, old_base_dir, credentials, &old_resp_lookup,
-                          TRUE, NULL);
+    /* lookup parent entry - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, old_base_dir, credentials, 
+        &old_resp_lookup);
     if (ret != 0)
         goto fs_rename_exit;
 
@@ -342,9 +364,9 @@ int fs_rename(char *old_path,
     if (ret != 0)
         goto fs_rename_exit;
 
-    /* lookup parent entry */
-    ret = PVFS_sys_lookup(mntent->fs_id, new_base_dir, credentials, &new_resp_lookup,
-                          TRUE, NULL);
+    /* lookup parent entry - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, new_base_dir, credentials, 
+        &new_resp_lookup);
     if (ret != 0)
         goto fs_rename_exit;
 
@@ -373,9 +395,9 @@ int fs_truncate(char *fs_path,
     int ret;
     PVFS_sysresp_lookup resp_lookup;
 
-    /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_truncate_exit;
 
@@ -391,9 +413,7 @@ int fs_getattr(char *fs_path,
                PVFS_sys_attr *attr)
 {
     struct PVFS_sys_mntent *mntent = fs_get_mntent(0);
-    char *real_path;
-    int ret, link_flag;
-    PVFS_fs_id fs_id;
+    int ret;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
 
@@ -401,42 +421,33 @@ int fs_getattr(char *fs_path,
         attr == NULL)
         return -PVFS_EINVAL;
 
-    /* lookup file */
-    real_path = strdup(fs_path);
-    do {
-        link_flag = FALSE;
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
+    if (ret != 0)
+        goto fs_getattr_exit;
 
-        ret = PVFS_sys_lookup(mntent->fs_id, real_path, credentials, &resp_lookup,
-            FALSE, NULL);
-        if (ret != 0)
-            break;
-        
-        /* read all attributes */
-        memset(&resp_getattr, 0, sizeof(resp_getattr));
-        ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
-                           credentials, &resp_getattr, NULL);
-        if (ret != 0)
-            break;
+    /* read all attributes */
+    memset(&resp_getattr, 0, sizeof(resp_getattr));
+    ret = PVFS_sys_getattr(resp_lookup.ref, PVFS_ATTR_SYS_ALL_NOHINT, 
+                        credentials, &resp_getattr, NULL);
 
-        /* get attributes for link target */
-        if (resp_getattr.attr.link_target != NULL)
-        {
-            link_flag = TRUE;
-            /* get file name */
-            free(real_path);
-            real_path = (char *) malloc(PVFS_NAME_MAX);
-            ret = PVFS_util_resolve(resp_getattr.attr.link_target, &fs_id, 
-                real_path, PVFS_NAME_MAX);
-            /* free attr buffers */
-            free(resp_getattr.attr.link_target);
-            if (resp_getattr.attr.dist_name != NULL)
-                free(resp_getattr.attr.dist_name);
-            if (resp_getattr.attr.dist_params != NULL)
-                free(resp_getattr.attr.dist_params);            
-        }
-    } while (link_flag);
-
-    free(real_path);
+    /* free attr bufs */
+    if (resp_getattr.attr.link_target != NULL)
+    {
+        free(resp_getattr.attr.link_target);
+        resp_getattr.attr.link_target = NULL;
+    }
+    if (resp_getattr.attr.dist_name != NULL)
+    {
+        free(resp_getattr.attr.dist_name);
+        resp_getattr.attr.dist_name = NULL;
+    }
+    if (resp_getattr.attr.dist_params != NULL)
+    {
+        free(resp_getattr.attr.dist_params);            
+        resp_getattr.attr.dist_params = NULL;
+    }
 
     if (ret != 0)
         goto fs_getattr_exit;
@@ -460,8 +471,9 @@ int fs_setattr(char *fs_path,
         attr == NULL)
         return -PVFS_EINVAL;
 
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_setattr_exit;
 
@@ -497,9 +509,9 @@ int fs_mkdir(char *fs_path,
     if (ret != 0)
         goto fs_mkdir_exit;
 
-    /* lookup parent path */
-    ret = PVFS_sys_lookup(mntent->fs_id, base_dir, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup parent path - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, base_dir, credentials, 
+        &resp_lookup);
 
     if (ret != 0)
         goto fs_mkdir_exit;
@@ -548,9 +560,9 @@ int fs_io(enum PVFS_io_type io_type,
         buffer == NULL)
         return -PVFS_EINVAL;
 
-    /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_io_exit;
 
@@ -590,9 +602,9 @@ int fs_flush(char *fs_path,
     if (fs_path == NULL || strlen(fs_path) == 0)
         return -PVFS_EINVAL;
 
-    /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_flush_exit;
 
@@ -619,9 +631,9 @@ int fs_find_next_file(char *fs_path,
         token == NULL || filename == NULL || max_name_len == 0)
         return -PVFS_EINVAL;
 
-    /* lookup file */
-    ret = PVFS_sys_lookup(mntent->fs_id, fs_path, credentials, &resp_lookup,
-                          TRUE, NULL);
+    /* lookup file - follow links */
+    ret = sys_lookup_follow_links(mntent->fs_id, fs_path, credentials, 
+        &resp_lookup);
     if (ret != 0)
         goto fs_readdir_exit;
 

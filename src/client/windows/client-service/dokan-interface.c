@@ -946,7 +946,6 @@ PVFS_Dokan_open_directory(
 {
     char *fs_path;
     int ret, err;
-    PVFS_handle handle;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
@@ -963,21 +962,14 @@ PVFS_Dokan_open_directory(
     if (fs_path == NULL)
         return -1;
 
-    /* lookup the file */
-    ret = fs_lookup(fs_path, &credentials, &handle);    
-
-    DbgPrint("   fs_lookup returns: %d\n", ret);
-
+    /* verify file is a directory */
+    ret = fs_getattr(fs_path, &credentials, &attr);
+    DbgPrint("   fs_getattr returns: %d\n", ret);
     if (ret == 0)
     {
-        ret = fs_getattr(fs_path, &credentials, &attr);
-        DbgPrint("   fs_getattr returns: %d\n", ret);
-        if (ret == 0)
+        if (!(attr.objtype & PVFS_TYPE_DIRECTORY))
         {
-            if (!(attr.objtype & PVFS_TYPE_DIRECTORY))
-            {
-                ret = -PVFS_ENOTDIR;
-            }
+            ret = -PVFS_ENOTDIR;
         }
     }
 
@@ -1422,7 +1414,11 @@ PVFS_Dokan_find_files(
         wpath = convert_mbstring(full_path);
         wfilename = convert_mbstring(filename);
         ret = PVFS_Dokan_get_file_information(wpath, &hfile_info, DokanFileInfo);
-        if (ret != 0) 
+        /* a file may have been deleted, or there is a link with an 
+           invalid target -- just continue listing files */        
+        if (ret == -PVFS_ENOENT)        
+            goto find_files_continue;
+        else if (ret != 0) 
         {
             free(full_path);
             cleanup_string(wpath);
@@ -1445,13 +1441,15 @@ PVFS_Dokan_find_files(
         /* Dokan callback function */
         FillFindData(&find_data, DokanFileInfo);
 
+find_files_continue:
+
         free(full_path);
         cleanup_string(wpath);
         cleanup_string(wfilename);
 
         /* find next file */
         ret = fs_find_next_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
-
+        
         if (ret != 0)
             goto find_files_exit;
     }
