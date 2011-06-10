@@ -892,6 +892,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
+            /* check for duplicates */
+            if(i > 0 && *(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[i-1])
+            {
+                gossip_err("Warning: got duplicate handle %llu.\n", llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: skipping entry.\n");
+                i--;
+                continue;
+            }
+
             op_p->u.d_iterate_handles.handle_array[i] =
                 *(TROVE_handle *)tmp_handle;
         }
@@ -923,8 +932,16 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             {
                 goto get_next;
             }
+
+            if(*(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+            {
+                gossip_err("Warning: found duplicate handle: %llu\n", llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: skipping entry.\n");
+            }
+
         } while (sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr));
+           sizeof_attr != sizeof(attr) ||
+           *(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]);
 
         *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
         goto return_ok;
@@ -955,6 +972,13 @@ get_next:
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
                      "failure @ recno\n");
         ret = -dbpf_db_error_to_trove_error(ret);
+    }
+    if(*op_p->u.d_iterate_handles.count_p > 0 && 
+        dummy_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+    {
+        gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
+        gossip_err("Warning: skipping entry.\n");
+        (*op_p->u.d_iterate_handles.count_p)--;
     }
     *op_p->u.d_iterate_handles.position_p = dummy_handle;
 
