@@ -126,10 +126,9 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
 		    ret = trove_handle_remove(ledger, handles[i]);
 		    if (ret != 0)
                     {
-			gossip_debug(
-                            GOSSIP_TROVE_DEBUG, "could not remove "
-                            "handle %llu\n", llu(handles[i]));
-			break;
+			gossip_err(
+                            "WARNING: could not remove "
+                            "handle %llu from ledger; continuing.\n", llu(handles[i]));
 		    }
                 }
                 ret = ((i == count) ? 0 : -1);
