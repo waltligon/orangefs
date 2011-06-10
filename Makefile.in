@@ -1207,11 +1207,14 @@ just_kmod24_install: just_kmod24
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.4/pvfs2.o $(KMOD_DIR)
 
-.PHONY: kmod24_install
-kmod24_install: kmod24 kernapps just_kmod24_install
+.PHONY: just_kmod24_apps_install
+just_kmod24_apps_install: kmod24 kernapps 
 	install -d $(sbindir)
 	install -m 755 $(KERNAPPS) $(KERNAPPSTHR) $(sbindir)
 	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(sbindir)
+
+.PHONY: kmod24_install
+kmod24_install: kmod24 kernapps just_kmod24_install just_kmod24_apps_install
 	@echo ""
 	@echo "For improved linux-2.4 support,"
 	@echo "install $(sbindir)/mount.pvfs2 to /sbin/mount.pvfs2"
