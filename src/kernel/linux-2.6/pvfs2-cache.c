@@ -202,28 +202,11 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
     }
 }
 
-
-static void dev_req_cache_ctor(
-#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
-    void *req
-#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
-    struct kmem_cache *cachep,
-    void *req
-#else
-    void *req,
-    pvfs2_kmem_cache_t * cachep,
-    unsigned long flags
-#endif
-)
-{
-    memset(req, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
-}
-
 int dev_req_cache_initialize(void)
 {
     dev_req_cache = kmem_cache_create(
         "pvfs2_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
-        PVFS2_CACHE_CREATE_FLAGS, dev_req_cache_ctor
+        PVFS2_CACHE_CREATE_FLAGS, NULL
 #ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
@@ -256,6 +239,10 @@ void *dev_req_alloc(void)
     {
         gossip_err("Failed to allocate from dev_req_cache\n"); 
     }
+    else
+    {
+        memset(buffer, 0, sizeof(MAX_ALIGNED_DEV_REQ_DOWNSIZE));
+    }
     return buffer;
 }
 
@@ -287,9 +274,7 @@ static void pvfs2_inode_cache_ctor(
 {
     pvfs2_inode_t *pvfs2_inode = req;
 
-    memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
     ClearInitFlag(pvfs2_inode);
-
     pvfs2_inode_initialize(pvfs2_inode);
 
 #ifndef PVFS2_LINUX_KERNEL_2_4
@@ -377,7 +362,10 @@ pvfs2_inode_t* pvfs2_inode_alloc(void)
     {
         gossip_err("Failed to allocate pvfs2_inode\n");
     }
-    else {
+    else 
+    {
+        ClearInitFlag(pvfs2_inode);
+        pvfs2_inode_initialize(pvfs2_inode);
         add_to_pinode_list(pvfs2_inode);
     }
     return pvfs2_inode;
@@ -398,28 +386,11 @@ void pvfs2_inode_release(pvfs2_inode_t *pinode)
 
 #ifdef HAVE_AIO_VFS_SUPPORT
 
-static void kiocb_ctor(
-#if defined(HAVE_KMEM_CACHE_CREATE_CTOR_ONE_PARAM)
-    void *req
-#elif defined(HAVE_KMEM_CACHE_CREATE_CTOR_TWO_PARAM)
-    struct kmem_cache *cachep,
-    void *req
-#else
-    void *req,
-    pvfs2_kmem_cache_t * cachep,
-    unsigned long flags
-#endif
-)
-{
-    memset(req, 0, sizeof(pvfs2_kiocb));
-}
-
-
 int kiocb_cache_initialize(void)
 {
     pvfs2_kiocb_cache = kmem_cache_create(
         "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
-        PVFS2_CACHE_CREATE_FLAGS, kiocb_ctor
+        PVFS2_CACHE_CREATE_FLAGS, NULL
 #ifdef HAVE_KMEM_CACHE_CREATE_DESTRUCTOR_PARAM
         , NULL
 #endif
@@ -451,6 +422,10 @@ pvfs2_kiocb* kiocb_alloc(void)
     if (x == NULL)
     {
         gossip_err("kiocb_alloc: kmem_cache_alloc failed!\n");
+    }
+    else
+    {
+        memset(x, 0, sizeof(pvfs2_kiocb));
     }
     return x;
 }
