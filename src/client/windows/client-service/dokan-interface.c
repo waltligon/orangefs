@@ -1,14 +1,15 @@
 /* TODO: Copyright (C) Omnibond, LLC 2011 */
 
 #include <Windows.h>
+#include "pvfs2.h"
 #include <AccCtrl.h>
 #include <AclAPI.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
 #include "dokan.h"
 
-#include "pvfs2.h"
 #include "gossip.h"
 #include "gen-locks.h"
 #include "str-utils.h"
@@ -37,7 +38,6 @@ extern PORANGEFS_OPTIONS goptions;
 
 #define DEBUG_FLAG(val, flag) if (val&flag) { DbgPrint("   "#flag"\n"); }
 
-/* TODO */
 #define MALLOC_CHECK(ptr)   if (ptr == NULL) \
                                 return -ERROR_NOT_ENOUGH_MEMORY
 #define MALLOC_CHECK_N(ptr) if (ptr == NULL) \

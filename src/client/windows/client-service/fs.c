@@ -1,10 +1,11 @@
 /* Client Service - file system routines */
 
+#include "pvfs2.h"
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 
-#include "pvfs2.h"
 #include "str-utils.h"
 
 const PVFS_util_tab *tab;
@@ -48,7 +49,6 @@ int fs_initialize(const char *tabfile,
     }
 
     /* initialize PVFS */
-    /* TODO: debug settings */
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {

@@ -256,12 +256,21 @@ int main(int argc, char **argv)
     int ret = 0;
     global_options *options;
     list_node *test_list;
+    test_operation *cur_test;
 
     if (argc < 2)
     {
         printf("USAGE: client-test root-dir [options]\n");
         printf("    root-dir: path for test files, e.g. Z:\\client-test or /pvfs2\n");
         /* TODO: list available tests */
+        printf("Tests:\n");
+        
+        cur_test = &op_table[0];
+        while (cur_test->name)
+        {
+            printf("    %s\n", cur_test->name);
+            cur_test++;
+        }
 
         return -1;
     }

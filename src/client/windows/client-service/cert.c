@@ -2,6 +2,7 @@
    Certificate functions */
 
 #include <Windows.h>
+#include "pvfs2.h"
 #include <Userenv.h>
 #include <stdio.h>
 

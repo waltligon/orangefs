@@ -3,6 +3,7 @@
 /* Client Service - service control functions */
 
 #include <Windows.h>
+#include "pvfs2.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -735,6 +736,9 @@ int main(int argc, char **argv, char **envp)
   } 
   else 
   {    
+      /* Windows memory debugging */
+      _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+
       options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */

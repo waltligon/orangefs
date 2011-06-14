@@ -2,6 +2,7 @@
    User cache functions */
 
 #include <Windows.h>
+#include "pvfs2.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
