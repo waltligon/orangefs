@@ -9,6 +9,14 @@
       <Configuration>Debug</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|Win32">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MemLeaks|x64">
+      <Configuration>MemLeaks</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Release|Win32">
       <Configuration>Release</Configuration>
       <Platform>Win32</Platform>
@@ -28,6 +36,7 @@
     <ClCompile Include="..\..\..\src\client\windows\client-service\service-main.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\..\include\windows\memleaks.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\cert.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\client-service.h" />
     <ClInclude Include="..\..\..\src\client\windows\client-service\config.h" />
@@ -55,7 +64,17 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>MultiByte</CharacterSet>
@@ -78,7 +97,13 @@
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -91,7 +116,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <TargetName>orangefs-client</TargetName>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">
+    <TargetName>orangefs-client</TargetName>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetName>orangefs-client</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
     <TargetName>orangefs-client</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -113,12 +144,40 @@
       <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\dokansrc-0.6.0\dokan;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..;..\..\..\openssl-1.0.0d\include;..\..\..\ldap-windows\Win32\inc</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc-0.6.0\dokan\objchk_wlh_x86\i386;..\..\..\ldap-windows\Win32\lib\mscvc;..\..\..\openssl-windows\lib\debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\dokansrc-0.6.0\dokan;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..\;..\..\..\openssl-1.0.0d\include;..\..\..\ldap-windows\Win64\inc</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokansrc-0.6.0\dokan\objchk_wlh_amd64\amd64;..\..\..\ldap-windows\Win64\lib;..\..\..\openssl-windows\lib64\debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MemLeaks|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\dokansrc-0.6.0\dokan;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..\;..\..\..\openssl-1.0.0d\include;..\..\..\ldap-windows\Win64\inc</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

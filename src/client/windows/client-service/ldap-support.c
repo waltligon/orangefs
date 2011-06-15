@@ -1,8 +1,11 @@
 /* Copyright (C) 2011 Omnibond LLC
-   LDAP functions */
+   
+   LDAP functions - OrangeFS credentials (UID/GID) can be stored
+   in an LDAP directory. The system will search for the username
+   and locate attributes containing information. The details of the
+   search can be configured in the configuration file. */
 
 #include <Windows.h>
-#include "pvfs2.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

@@ -2,7 +2,6 @@
    Configuration file functions */
 
 #include <Windows.h>
-#include "pvfs2.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

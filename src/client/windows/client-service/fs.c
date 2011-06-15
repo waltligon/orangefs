@@ -1,11 +1,14 @@
-/* Client Service - file system routines */
+/* Copyright (C) TODO
 
-#include "pvfs2.h"
+   Client Service - file system routines 
+   These routines provide a layer of abstraction between the Dokan
+   callbacks (dokan-interface.c) and OrangeFS. */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
 
+#include "pvfs2.h"
 #include "str-utils.h"
 
 const PVFS_util_tab *tab;
@@ -649,6 +652,10 @@ int fs_find_next_file(char *fs_path,
         *token = resp_readdir.token;
         
         strncpy(filename, resp_readdir.dirent_array[0].d_name, max_name_len);
+        filename[max_name_len-1] = '\0';
+
+        /* free memory */
+        free(resp_readdir.dirent_array);
     }
     else
     {

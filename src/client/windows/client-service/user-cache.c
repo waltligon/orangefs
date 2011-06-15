@@ -1,8 +1,11 @@
 /* Copyright (C) 2011 Omnibond, LLC
-   User cache functions */
+   
+   User cache functions - to speed credential lookup, the 
+   OrangeFS credentials (UID/GID) are cached with the username.
+   Cache entries from certificates expire when the certificate 
+   expires. */
 
 #include <Windows.h>
-#include "pvfs2.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -12,7 +15,7 @@
 #include "client-service.h"
 #include "user-cache.h"
 
-/* amount of time cache mgmt thread sleeps */
+/* amount of time cache mgmt thread sleeps (ms) */
 #define USER_THREAD_SLEEP_TIME    60000
 
 struct qhash_table *user_cache;

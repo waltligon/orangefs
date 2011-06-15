@@ -1,7 +1,11 @@
 /* TODO: Copyright (C) Omnibond, LLC 2011 */
 
+/* Dokan is a user-mode file system API like FUSE: http://dokan-dev.net/en/.
+   Most of the following functions are callbacks. dokan_loop starts the
+   Dokan thread. Functions are called as needed by Dokan (responding to
+   file system requests). */
+
 #include <Windows.h>
-#include "pvfs2.h"
 #include <AccCtrl.h>
 #include <AclAPI.h>
 #include <stdio.h>
@@ -10,9 +14,11 @@
 
 #include "dokan.h"
 
+#include "pvfs2.h"
 #include "gossip.h"
 #include "gen-locks.h"
 #include "str-utils.h"
+
 #include "client-service.h"
 #include "fs.h"
 #include "cert.h"
@@ -2040,7 +2046,8 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     if (g_UseStdErr)
         dokanOptions->Options |= DOKAN_OPTION_STDERR;
     
-    dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE;
+    dokanOptions->Options |= DOKAN_OPTION_KEEP_ALIVE |
+                             DOKAN_OPTION_REMOVABLE;
 
     dokanOptions->Version = 600;
 

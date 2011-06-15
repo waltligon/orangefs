@@ -1,8 +1,12 @@
 /* Copyright (C) 2011 Omnibond LLC
-   Certificate functions */
+   
+   Certificate functions - credentials are loaded from a 
+   certificate in the user's profile directory or a configured
+   directory. The (proxy) certificate contains the OrangeFS UID/GID
+   in its policy data field. A CA certificate is used to verify
+   the proxy certificate. */
 
 #include <Windows.h>
-#include "pvfs2.h"
 #include <Userenv.h>
 #include <stdio.h>
 

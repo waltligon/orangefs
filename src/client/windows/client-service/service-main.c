@@ -1,9 +1,10 @@
 /* Copyright (C) 2010 Omnibond, Inc. */
 
-/* Client Service - service control functions */
+/* Client Service - service control functions 
+   * Install or remove OrangeFS Client service
+   * Run client as a service or console app */
 
 #include <Windows.h>
-#include "pvfs2.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -735,10 +736,22 @@ int main(int argc, char **argv, char **envp)
       StartServiceCtrlDispatcher(dispatch_table);
   } 
   else 
-  {    
-      /* Windows memory debugging */
+  {          
+#if defined(_DEBUG) && defined(_MEMLEAKS)
+      /* Windows memory debugging 
+         NOTE: run from command prompt to generate file */
       _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
-
+      /* Output to memleaks.log */
+      _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
+      {
+          HANDLE hfile = CreateFile("memleaks.log", GENERIC_WRITE,
+              FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
+              NULL);
+          if (hfile != INVALID_HANDLE_VALUE)
+              _CrtSetReportFile(_CRT_WARN, hfile);
+      } 
+#endif
+      
       options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
       /* init user list */

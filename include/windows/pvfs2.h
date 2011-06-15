@@ -12,13 +12,6 @@
 #ifndef __PVFS2_H
 #define __PVFS2_H
 
-/* Windows -- memory debugging */
-#if defined(WIN32) && defined(_DEBUG)
-#define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
-#endif
-
 #ifndef PVFS2_VERSION_MAJOR
 #define PVFS2_VERSION_MAJOR 2
 #define PVFS2_VERSION_MINOR 8

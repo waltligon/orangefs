@@ -483,7 +483,6 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PVFS_object_ref object_ref;
     PINT_sm_msgpair_state *msg_p;
-    PINT_sm_msgarray_op *copy;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) %s\n", sm_p, __func__);
 
@@ -520,14 +519,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
         js_p->error_code = ret;
     }
 
-    /* Attempting to free this frame under certain error conditions 
-       causes heap fault. Make a copy */
-    /***
-    copy = malloc(sizeof(PINT_sm_msgarray_op));
-    memcpy(copy, &sm_p->msgarray_op, sizeof(PINT_sm_msgarray_op));
-    ***/
-    PINT_sm_push_frame(smcb, 0, /* copy */ &sm_p->msgarray_op);
-
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }
 
