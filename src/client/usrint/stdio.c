@@ -1,7 +1,16 @@
-#include <fcntl.h>
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines - implementation of stdio for pvfs
+ */
 #include <usrint.h>
 #include <dirent.h>
-#include <stdarg.h>
 
 #define ISFLAGSET(s,f) ((stream->_flags & (f)) == (f))
 
@@ -26,21 +35,23 @@ struct __dirstream {
 };
 
 #define DIRSTREAM_MAGIC 0xfd100000
+#define DIRBUFSIZE (512*1024)
+#define ASIZE 256
 
 /** This function coverts from stream style mode to ssycall style flags
  *
  */
-static int mode2flags(char *mode)
+static int mode2flags(const char *mode)
 {
-    char *p;
+    int i;
     int flags;
     int append = false, read = false, write = false, update = false;
     int exclusive = false;
 
     /* look for fopen modes */ 
-    for(p = mode; *p; p++)
+    for(i = 0; mode[i]; i++)
     { 
-        switch(*p) { 
+        switch(mode[i]) { 
             case 'a':
                 append = true; 
                 if (read || write)
@@ -157,7 +168,7 @@ FILE *fopen(const char * path, const char * mode)
 /** this function sets up a new stream's buffer area
  *
  */
-static void init_stream (FILE *stream, flags, bufsize)
+static int init_stream (FILE *stream, int flags, int bufsize)
 {
     /* set up stream here */
     stream->_flags = _IO_MAGIC;
@@ -167,13 +178,18 @@ static void init_stream (FILE *stream, flags, bufsize)
         stream->_flags |= _IO_NO_WRITES;
     /* set up default buffering here */
     stream->_IO_buf_base   = (char *)malloc(bufsize);
-    stream->_IO_buf_end    = stream + bufsize;
+    if (!stream->_IO_buf_base)
+    {
+        return -1;
+    }
+    stream->_IO_buf_end    = stream->_IO_buf_base + bufsize;
     stream->_IO_read_base  = stream->_IO_buf_base;
     stream->_IO_read_ptr   = stream->_IO_buf_base;
     stream->_IO_read_end   = stream->_IO_buf_base;
     stream->_IO_write_base = stream->_IO_buf_base;
     stream->_IO_write_ptr  = stream->_IO_buf_base;
     stream->_IO_write_end  = stream->_IO_buf_end;
+    return 0;
 }
 
 /**
@@ -181,6 +197,7 @@ static void init_stream (FILE *stream, flags, bufsize)
  */
 FILE *fdopen(int fd, const char *mode)
 {
+    int rc = 0;
     FILE *newfile = NULL;
     int flags;
 
@@ -197,8 +214,12 @@ FILE *fdopen(int fd, const char *mode)
     memset(newfile, 0, sizeof(FILE));
 
     newfile->_fileno = fd;
-    init_stream(newfile, flags, PVFS_BUFSIZE);
-
+    rc = init_stream(newfile, flags, PVFS_BUFSIZE);
+    if(rc)
+    {
+        free(newfile);
+        return NULL;
+    }
     return newfile;
 }
 
@@ -248,6 +269,8 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
  *  coincides with the file pointer.  In write the start
  *  coincides with file pointer.  In either case ptr is
  *  where user stream pointer is.
+ *
+ *  The FILE struct is struct _IO_FILE defined in /usr/include/libio.h
  */
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
@@ -274,9 +297,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             return -1;
         }
         /* reset read pointer */
-        stream->_IO_read = stream->_IO_read_end;
+        stream->_IO_read_ptr = stream->_IO_read_end;
         /* set flag */
-        stream->_flags |= _IO_CURRENTLY_PUTTING
+        stream->_flags |= _IO_CURRENTLY_PUTTING;
         /* indicate read buffer empty */
         stream->_IO_read_end = stream->_IO_read_base;
         stream->_IO_read_ptr = stream->_IO_read_end;
@@ -332,10 +355,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 /*
  * fread implements the same buffer scheme as in fwrite
  */
-size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     int fd;
-    pvfs_descriptor *pd;
     int rsz, rsz_buf, rsz_extra;
     int bytes_read;
     int rc;
@@ -362,7 +384,7 @@ size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         /* reset write pointer */
         stream->_IO_write_ptr = stream->_IO_write_base;
         /* clear flag */
-        stream->_flags &= ~_IO_CURRENTLY_PUTTING
+        stream->_flags &= ~_IO_CURRENTLY_PUTTING;
         /* indicate read buffer empty */
         stream->_IO_read_end = stream->_IO_read_base;
         stream->_IO_read_ptr = stream->_IO_read_end;
@@ -407,7 +429,7 @@ size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (rsz_extra)
     {
         /* if current buffer not at EOF */
-        if (stream->_IO_read_end == _IO_buf_end)
+        if (stream->_IO_read_end == stream->_IO_buf_end)
         {
             /* if more data requested than fits in buffer */
             if (rsz_extra > (stream->_IO_buf_end - stream->_IO_buf_base))
@@ -423,7 +445,7 @@ size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
                 {
                     /* then read next buffer */
                     bytes_read = read(stream->_fileno, stream->_IO_buf_base,
-                            stream->_IO_buf_end - _IO_buf_base);
+                            stream->_IO_buf_end - stream->_IO_buf_base);
                     if (bytes_read == -1)
                     {
                         stream->_flags |= _IO_ERR_SEEN;
@@ -439,7 +461,7 @@ size_t fread(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             }
             /* rest of request fits in a buffer - read next buffer */
             bytes_read = read(stream->_fileno, stream->_IO_buf_base,
-                    stream->_IO_buf_end - _IO_buf_base);
+                    stream->_IO_buf_end - stream->_IO_buf_base);
             if (bytes_read == -1)
             {
                 stream->_flags |= _IO_ERR_SEEN;
@@ -483,7 +505,6 @@ int fclose(FILE *stream)
         errno = EINVAL;
         return -1;
     }
-    fd = stream->_fileno;
     /* write any pending data */
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
@@ -513,10 +534,10 @@ int fclose(FILE *stream)
 /**
  * fseek wrapper
  */
-off_t fseek(FILE *stream, off_t offset, int whence)
+int fseek(FILE *stream, long offset, int whence)
 {
 
-    return (off_t)fseek64(stream, (off64_t)offset, whence);
+    return fseek64(stream, (off64_t)offset, whence);
 }
 
 /** This is the main code for seeking on a stream
@@ -525,15 +546,16 @@ off_t fseek(FILE *stream, off_t offset, int whence)
  *  we can just move the stream pointer.  Otherwise we
  *  have to clear the buffer, seek, and start fresh
  */
-off64_t fseek64(FILE *stream, off64_t offset, int whence)
+int fseek64(FILE *stream, const off64_t offset, int whence)
 {
+    int rc = 0;
     if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
         errno = EINVAL;
         return -1;
     }
     /* if not just getting the position */
-    if ((offest != 0L) || (whence != SEEK_CUR))
+    if ((offset != 0L) || (whence != SEEK_CUR))
     {
         int64_t filepos, fileend;
         filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
@@ -541,49 +563,49 @@ off64_t fseek64(FILE *stream, off64_t offset, int whence)
         /* figure out if we are only seeking within the */
         /* bounds of the current buffer to minimize */
         /* unneccessary reads/writes */
-        if (whence == SEEK_CUR && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
-                (offset < stream->_IO_write_end - stream_IO_write_ptr) &&
-                (offset > stream->_IO_write_base - stream_IO_write_ptr))
+        if (whence == SEEK_CUR && ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
+                (offset < stream->_IO_write_end - stream->_IO_write_ptr) &&
+                (offset > stream->_IO_write_base - stream->_IO_write_ptr))
         {
             stream->_IO_write_ptr += offset;
-            return filepos + stream->_IO_write_ptr;
+            return 0;
         }
-        if (whence == SEEK_CUR && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
-                (offset < stream->_IO_read - stream_IO_read) &&
-                (offset > stream->_IO_read - stream_IO_read))
+        if (whence == SEEK_CUR && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
+                (offset < stream->_IO_read_end - stream->_IO_read_ptr) &&
+                (offset > stream->_IO_read_base - stream->_IO_read_ptr))
         {
-            stream->_IO_read += offset;
-            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+            stream->_IO_read_ptr += offset;
+            return 0;
         }
-        if (whence == SEEK_SET && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+        if (whence == SEEK_SET && ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 (offset > filepos) && (offset < filepos +
-                (stream->_IO_write_end - stream_IO_write_base)))
+                (stream->_IO_write_end - stream->_IO_write_base)))
         {
             stream->_IO_write_ptr += offset - filepos;
-            return filepos + stream->_IO_write_ptr;
+            return 0;
         }
-        if (whence == SEEK_SET && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+        if (whence == SEEK_SET && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 (offset < filepos) && (offset > filepos -
-                (stream->_IO_read_end - stream_IO_read_base)))
+                (stream->_IO_read_end - stream->_IO_read_base)))
         {
             stream->_IO_read_ptr += offset - filepos;
-            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+            return 0;
         }
-        if (whence == SEEK_END && ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+        if (whence == SEEK_END && ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 ((fileend - offset) > filepos) &&
                 ((fileend - offset) < filepos +
-                (stream->_IO_write_end - stream_IO_write_base)))
+                (stream->_IO_write_end - stream->_IO_write_base)))
         {
             stream->_IO_write_ptr += (fileend - offset) - filepos;
-            return filepos + stream->_IO_write_ptr;
+            return 0;
         }
-        if (whence == SEEK_END && !ISFLAGSET(stream, _IO_CURRENLY_PUTTING) &&
+        if (whence == SEEK_END && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 ((fileend - offset) < filepos) &&
                 ((fileend - offset) > filepos -
-                (stream->_IO_read_end - stream_IO_read_base)))
+                (stream->_IO_read_end - stream->_IO_read_base)))
         {
             stream->_IO_read_ptr += (fileend - offset) - filepos;
-            return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+            return 0;
         }
         /* at this point the seek is beyond the current buffer */
         /* if we are in write mode write back the buffer */
@@ -591,10 +613,12 @@ off64_t fseek64(FILE *stream, off64_t offset, int whence)
             stream->_IO_write_ptr > stream->_IO_write_base)
         {
             /* write buffer back */
-            ret = write(stream->_fileno, stream->_IO_write_base,
-                    stream->_IO_write_ptr - stream->_IO_write_base); 
-            if (ret < 0)
-                return ret;
+            rc = write(stream->_fileno, stream->_IO_write_base,
+                       stream->_IO_write_ptr - stream->_IO_write_base); 
+            if (rc < 0)
+            {
+                return rc;
+            }
             /* reset write pointer */
             stream->_IO_write_ptr = stream->_IO_write_base;
         }
@@ -605,16 +629,19 @@ off64_t fseek64(FILE *stream, off64_t offset, int whence)
             stream->_IO_read_end = stream->_IO_read_base;
             stream->_IO_read_ptr = stream->_IO_read_end;
         }
+        lseek64(stream->_fileno, offset, whence);
     }
-    return lseek64(stream->_fileno, offset, whence);
+    /* seek to current position, no change */
+    return 0;
 }
 
 /**
  * fsetpos wrapper
  */
-int fsetpos(FILE *stream, fpos_t *pos)
+int fsetpos(FILE *stream, const fpos_t *pos)
 {
-    return (int)fseek64(stream, (off64_t)*pos, SEEK_SET);
+    fseek64(stream, (off64_t)(pos->__pos), SEEK_SET);
+    return 0;
 }
 
 /**
@@ -628,9 +655,28 @@ void rewind(FILE *stream)
 /**
  * ftell wrapper
  */
-long ftell(FILE *stream)
+long int ftell(FILE *stream)
 {
-    return (long)fseek64(stream, 0L, SEEK_CUR);
+    return (long int)ftell64(stream);
+}
+
+off64_t ftell64(FILE* stream)
+{
+    int64_t filepos;
+    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
+    if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
+    {
+        return filepos + (stream->_IO_write_ptr - stream->_IO_write_base);
+    }
+    else
+    {
+        return filepos - (stream->_IO_read_end - stream->_IO_read_ptr);
+    }
 }
 
 /**
@@ -638,7 +684,7 @@ long ftell(FILE *stream)
  */
 int fgetpos(FILE *stream, fpos_t *pos)
 {
-    *pos = (fpos_t)fseek64(stream, 0L, SEEK_CUR);
+    pos->__pos = ftell64(stream);
     return 0;
 }
 
@@ -728,15 +774,15 @@ int putchar(int c)
 /**
  * puts wrapper
  */
-int puts(const char *s, FILE *stream)
+int puts(const char *s)
 {
     int rc;
-    rc = fputs(s, stream);
+    rc = fputs(s, stdout);
     if (rc == EOF)
     {
         return EOF;
     }
-    return fputs("\n", stream);
+    return fputs("\n", stdout);
 }
 
 /**
@@ -814,9 +860,9 @@ char *gets(char * s)
     }
     p = s;
     do {
-        *p++ = c = fgetc(stream);
-    } while (c != '\n' && !feof(stream) && !ferror(stream));
-    if (ferror(stream))
+        *p++ = c = fgetc(stdin);
+    } while (c != '\n' && !feof(stdin) && !ferror(stdin));
+    if (ferror(stdin))
     {
         return NULL;
     }
@@ -931,7 +977,7 @@ int feof (FILE *stream)
 {
     if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        error = EBADF;
+        errno = EBADF;
         return -1;
     }
     return stream->_flags & _IO_EOF_SEEN;
@@ -944,7 +990,7 @@ int ferror (FILE *stream)
 {
     if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        error = EBADF;
+        errno = EBADF;
         return -1;
     }
     return stream->_flags & _IO_ERR_SEEN;
@@ -957,7 +1003,7 @@ int fileno (FILE *stream)
 {
     if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        error = EBADF;
+        errno = EBADF;
         return -1;
     }
     return stream->_fileno;
@@ -996,9 +1042,9 @@ void setbuffer (FILE *stream, char *buf, size_t size)
 /**
  *  setlinbuf wrapper
  */
-void setlinbuf (FILE *stream)
+void setlinebuf (FILE *stream)
 {
-    setvbuf(stream, (char *)NULL, buf ? _IOLBF : 0);
+    setvbuf(stream, (char *)NULL, _IOLBF, 0);
 }
 
 /**
@@ -1010,14 +1056,14 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 {
     if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
     {
-        error = EBADF;
+        errno = EBADF;
         return -1;
     }
     if ((stream->_IO_read_end != stream->_IO_buf_base) ||
         (stream->_IO_write_ptr != stream->_IO_buf_base))
     {
         /* fread or fwrite has been called */
-        error - EINVAL;
+        errno - EINVAL;
         return -1;
     }
     switch (mode)
@@ -1026,13 +1072,13 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
         /* this is the default */
         break;
     case _IOLBF : /* line buffered */
-        stream->flags |= _IO_LINE_BUF; /* TODO: This is not implemented */
+        stream->_flags |= _IO_LINE_BUF; /* TODO: This is not implemented */
         break;
     case _IONBF : /* not buffered */
-        stream->flags |= _IO_UNBUFFERED; /* TODO: This is not implemented */
+        stream->_flags |= _IO_UNBUFFERED; /* TODO: This is not implemented */
         break;
     default :
-        error = EINVAL;
+        errno = EINVAL;
         return -1;
     }
     if (buf && size > 0)
@@ -1040,7 +1086,7 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
         stream->_flags |= _IO_USER_BUF;
         free(stream->_IO_buf_base);
         stream->_IO_buf_base   = buf;
-        stream->_IO_buf_end    = stream + size;
+        stream->_IO_buf_end    = stream->_IO_buf_base + size;
         stream->_IO_read_base  = stream->_IO_buf_base;
         stream->_IO_read_ptr   = stream->_IO_buf_base;
         stream->_IO_read_end   = stream->_IO_buf_base;
@@ -1053,21 +1099,26 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 /**
  * mkdtemp makes a temp dir and returns an fd 
  */
-int mkdtemp(char *template)
+char * mkdtemp(char *template)
 {
-    char *ret;
+    char *rc = NULL;
+    int fd;
     if (!template)
     {
         errno = EINVAL;
-        return -1;
+        return NULL;
     }
-    mktemp(template);
-    if (ret == NULL)
+    rc = mktemp(template);
+    if (rc == NULL)
     {
-        return -1;
+        return NULL;
     }
     fd = mkdir(template, 0600);
-    return fd;
+    if (fd < 0)
+    {
+        return NULL;
+    }
+    return template;
 }
 
 /**
@@ -1076,6 +1127,7 @@ int mkdtemp(char *template)
 int mkstemp(char *template)
 {
     char *ret;
+    int fd;
     if (!template)
     {
         errno = EINVAL;
@@ -1098,7 +1150,7 @@ FILE *tmpfile(void)
     char *template = "/tmp/tmpfileXXXXXX";
     int fd;
     fd = mkstemp(template);
-    if (fd < )
+    if (fd < 0)
     {
         return NULL;
     }
@@ -1119,7 +1171,7 @@ DIR *opendir (const char *name)
     fd = open(name, O_RDONLY|O_DIRECTORY);
     if (fd == -1);
     {
-        return -1;
+        return NULL;
     }
     return fdopendir(fd);
 }
@@ -1127,7 +1179,7 @@ DIR *opendir (const char *name)
 /**
  * creates a stream for an already open directory
  */
-DIR *fdopendir (int *fd)
+DIR *fdopendir (int fd)
 {
     DIR *dstr;
     dstr = (DIR *)malloc(sizeof(DIR));
@@ -1137,10 +1189,10 @@ DIR *fdopendir (int *fd)
     }
     dstr->flags = DIRSTREAM_MAGIC;
     dstr->fileno = fd;
-    dst->buf_base = (char *)malloc(DIRBUFSIZE);
-    dst->buf_end = dst->buf_base + DIRBUFSIZE;
-    dst->buf_act = dst->buf_base;
-    dst->buf_ptr = dst->buf_base;
+    dstr->buf_base = (char *)malloc(DIRBUFSIZE);
+    dstr->buf_end = dstr->buf_base + DIRBUFSIZE;
+    dstr->buf_act = dstr->buf_base;
+    dstr->buf_ptr = dstr->buf_base;
 }
 
 /**
@@ -1166,17 +1218,30 @@ struct dirent *readdir (DIR *dir)
      * single use as is the prerogative of the call.  This
      * approach sucks, not reentrant TODO: find a better way
      */
-    static struct dirent *de =
-            (struct dirent *)malloc(sizeof(struct dirent) + NAME_MAX + 1);
+    static struct dirent *de = NULL;
+
+    if (!de)
+    {
+        de = (struct dirent *)malloc(sizeof(struct dirent));
+        if (!de)
+        {
+            return NULL;
+        }
+    }
 
     de64 = readdir64(dir);
     if (de64 == NULL)
     {
         return NULL;
     }
-    de->d_name = de64->d_name;
+    memcpy(de->d_name, de64->d_name, 256);
     de->d_ino = de64->d_ino;
-    /* TODO: use ifdefs to allow copy of linux specific fields */
+    /* these are Linux specific fields from the dirent */
+#if 1
+    de->d_off = de64->d_off;
+    de->d_reclen = de64->d_reclen;
+    de->d_type = de64->d_type;
+#endif
     return de;
 }
 
@@ -1189,14 +1254,14 @@ struct dirent64 *readdir64 (DIR *dir)
     if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
     {
         errno = EBADF;
-        return -1;
+        return NULL;
     }
     if (dir->buf_ptr >= dir->buf_act)
     {
         int bytes_read;
         /* read a block of dirents into the buffer */
         bytes_read = getdents64(dir->fileno, dir->buf_base,
-                               (dir->buf->end - dir->buf_base));
+                               (dir->buf_end - dir->buf_base));
         dir->buf_act = dir->buf_base + bytes_read;
         dir->buf_ptr = dir->buf_base;
     }
@@ -1214,7 +1279,7 @@ void rewinddir (DIR *dir)
     if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
     {
         errno = EBADF;
-        return -1;
+        return;
     }
     filepos = lseek(dir->fileno, 0, SEEK_CUR);
     if ((filepos - (dir->buf_act - dir->buf_base)) == 0)
@@ -1238,13 +1303,13 @@ void seekdir (DIR *dir, off_t offset)
     if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
     {
         errno = EBADF;
-        return -1;
+        return;
     }
     filepos = lseek(dir->fileno, 0, SEEK_CUR);
-    if ((filepos - (dir->buf_act - dir->buf_base)) <= offest &&
+    if ((filepos - (dir->buf_act - dir->buf_base)) <= offset &&
         filepos >= offset)
     {
-        dir->bug_ptr = dir->bug_act - (filepos - offset);
+        dir->buf_ptr = dir->buf_act - (filepos - offset);
     }
     else
     {
@@ -1289,13 +1354,14 @@ int closedir (DIR *dir)
     return 0;
 }
 
-int scandir (const char *dir, struct dirent ***namelist,
+int scandir (const char *dir,
+             struct dirent ***namelist,
              int(*filter)(const struct dirent *),
-             int(*compar)(const struct dirent **,cost struct dirent **))
+             int(*compar)(const void *, const void *))
 {
     struct dirent *de;
     DIR *dp;
-    int i, rc;
+    int len, i, rc;
     int asz = ASIZE;
 
     /* open directory */
@@ -1307,7 +1373,7 @@ int scandir (const char *dir, struct dirent ***namelist,
         return -1;
     }
     /* loop through the dirents */
-    for(i = 0, de = readdir(de); de; i++, de = readdir(dp))
+    for(i = 0, de = readdir(dp); de; i++, de = readdir(dp))
     {
         if (!filter || filter(de))
         {
@@ -1330,11 +1396,11 @@ int scandir (const char *dir, struct dirent ***namelist,
                 asz += ASIZE;
             }
             /* find the size of this entry */
-            len = strnlen(*namelist[i].d_name, NAME_MAX + 1) +
-                        sizeof(struct dirent);
+            len = strnlen((*namelist)[i]->d_name, NAME_MAX + 1) +
+                           sizeof(struct dirent);
             /* add to namelist */
             *namelist[i] = (struct dirent *)malloc(len);
-            memcpy(*namelist[i], de, len);
+            memcpy((*namelist)[i], de, len);
         }
     }
     /* now sort entries */
@@ -1356,11 +1422,11 @@ int scandir (const char *dir, struct dirent ***namelist,
  */
 int scandir64 (const char *dir, struct dirent64 ***namelist,
              int(*filter)(const struct dirent64 *),
-             int(*compar)(const struct dirent64 **,cost struct dirent64 **))
+             int(*compar)(const void *, const void *))
 {
     struct dirent64 *de;
     DIR *dp;
-    int i, rc;
+    int len, i, rc;
     int asz = ASIZE;
 
     /* open directory */
@@ -1372,7 +1438,7 @@ int scandir64 (const char *dir, struct dirent64 ***namelist,
         return -1;
     }
     /* loop through the dirents */
-    for(i = 0, de = readdir64(de); de; i++, de = readdir64(dp))
+    for(i = 0, de = readdir64(dp); de; i++, de = readdir64(dp))
     {
         if (!filter || filter(de))
         {
@@ -1395,11 +1461,11 @@ int scandir64 (const char *dir, struct dirent64 ***namelist,
                 asz += ASIZE;
             }
             /* find the size of this entry */
-            len = strnlen(*namelist[i].d_name, NAME_MAX + 1) +
-                        sizeof(struct dirent64);
+            len = strnlen((*namelist)[i]->d_name, NAME_MAX + 1) +
+                           sizeof(struct dirent64);
             /* add to namelist */
-            *namelist[i] = (struct dirent64 *)malloc(len);
-            memcpy(*namelist[i], de, len);
+            (*namelist)[i] = (struct dirent64 *)malloc(len);
+            memcpy((*namelist)[i], de, len);
         }
     }
     /* now sort entries */

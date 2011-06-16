@@ -1,4 +1,19 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines - wrappers for posix system calls
+ */
 #include <usrint.h>
+#include <linux/dirent.h>
+#include <posix-ops.h>
+#include <posix-pvfs.h>
+#include <openfile-util.h>
 
 static int pvfs_lib_init = 0; 
 
@@ -148,7 +163,7 @@ int unlink(const char *path)
     }
 }
 
-int unlinkat(int dirfd, const char *path)
+int unlinkat(int dirfd, const char *path, int flag)
 {
 }
 
@@ -307,7 +322,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 off_t lseek(int fd, off_t offset, int whence)
 {
     off64_t rc = lseek64(fd, (off64_t)offset, whence);
-    if (rc & 0xffffffff00000000)
+    if (rc & 0xffffffff00000000LLU)
     {
         errno = EINVAL;
         rc = -1;
@@ -351,6 +366,14 @@ int ftruncate(int fd, off_t length)
 }
 
 int ftruncate64(int fd, off64_t length)
+{
+}
+
+int posix_fallocate(int fd, off_t offset, off_t length)
+{
+}
+
+int posix_fadvize(int fd, off_t offset, off_t length, int advice)
 {
 }
 

@@ -5,9 +5,9 @@ LIBDIR=
 
 CFLAGS=$(INCDIR) $(LIBDIR)
 
-OBJS=iocommon.o openfile-util.o posix-pvfs.o posix.o stdio.o
+OBJS=iocommon.o openfile-util.o posix-pvfs.o posix.o stdio.o request.o
 
-INCS=usrint.h iocommon.h stdio-pvfs.h posix-pvfs.h openfile-util.h
+INCS=usrint.h iocommon.h posix-pvfs.h openfile-util.h posix-ops.h
 
 all: $(OBJS)
 
@@ -19,3 +19,4 @@ openfile-util.o:$(INCS)
 posix-pvfs.o:$(INCS)
 posix.o:$(INCS)
 stdio.o:$(INCS)
+request.o:$(INCS)

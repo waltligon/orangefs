@@ -1,3 +1,14 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines
+ */
 #ifndef OPENFILE_UTIL_H
 #define OPENFILE_UTIL_H 1
 
@@ -31,9 +42,9 @@ int pvfs_lookup_file(const char *filename,
                             int follow_links,
                             PVFS_object_ref *ref);
 
-pvfs_descriptor* pvfs_alloc_descriptor(posix_ops *fsops);
+pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops);
 
-pvfs_descriptor* pvfs_find_descriptor(int fd);
+pvfs_descriptor *pvfs_find_descriptor(int fd);
 
 
 int pvfs_create_file(const char *filename,

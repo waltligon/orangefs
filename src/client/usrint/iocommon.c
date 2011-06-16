@@ -1,4 +1,19 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines - low level calls to system interface
+ */
 #include <usrint.h>
+#include <linux/dirent.h>
+#include <posix-ops.h>
+#include <openfile-util.h>
+#include <iocommon.h>
 
 int init=0;
 
@@ -44,30 +59,29 @@ int iocommon_fsync(pvfs_descriptor *pd)
  * Find the PVFS handle to an object (file, dir sym) 
  * assumes an absoluate path
  */
-int iocommon_lookup_absolute( const char *abs_path, PVFS_object_ref *ref)
+int iocommon_lookup_absolute(const char *abs_path, PVFS_object_ref *ref)
 {
-    int rc;
+    int rc = 0;
     char pvfs_path[256];
     PVFS_fs_id lookup_fs_id;
+    PVFS_credentials *credentials;
+    PVFS_sysresp_lookup resp_lookup;
+
+    /* Initialize any variables */
+    memset(&resp_lookup, 0, sizeof(resp_lookup));
 
     /* Determine the fs_id and pvfs_path */
     rc = PVFS_util_resolve(abs_path, &lookup_fs_id, pvfs_path, 256);
-
-    if (0 == rc)
+    if (rc == -1)
     {
-        PVFS_credentials *credentials;
-        PVFS_sysresp_lookup resp_lookup;
+        return -1;
+    }
 
-        iocommon_cred(&credentials);
-        rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
-                             credentials, &resp_lookup,
-                             PVFS2_LOOKUP_LINK_FOLLOW, NULL);
-        *ref = resp_lookup.ref;
-    }
-    else
-    {
-        fprintf(stderr, "Error: No matching fstab entry for %s\n", abs_path);
-    }
+    iocommon_cred(&credentials);
+    rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
+                         credentials, &resp_lookup,
+                         PVFS2_LOOKUP_LINK_FOLLOW, NULL);
+    *ref = resp_lookup.ref;
 
     return rc;
 }
@@ -80,9 +94,12 @@ int iocommon_lookup_relative(const char *rel_path,
                              int follow_links,
                              PVFS_object_ref *ref )
 {
-    int rc;
+    int rc = 0;
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
+
+    /* Initialize any variables */
+    memset(&resp_lookup, 0, sizeof(resp_lookup));
 
     /* Set credentials */
     iocommon_cred(&credentials);
@@ -103,18 +120,22 @@ int iocommon_lookup_relative(const char *rel_path,
 /*
  * Create a file via the PVFS system interface
  */
-int iocommon_create_file( const char *filename,
-                             mode_t file_permission,
-                             PVFS_hint file_creation_param,
-                             PVFS_object_ref parent_ref,
-                             PVFS_object_ref *ref )
+int iocommon_create_file(const char *filename,
+                         mode_t file_permission,
+                         PVFS_hint file_creation_param,
+                         PVFS_object_ref parent_ref,
+                         PVFS_object_ref *ref )
 {
-    int rc;
+    int rc = 0;
     mode_t mode_mask;
     mode_t user_mode;
-    PVFS_sys_attr attributes;
+    PVFS_sys_attr attr;
     PVFS_credentials *credentials;
     PVFS_sysresp_create resp_create;
+
+    /* Initialize */
+    memset(&attr, 0, sizeof(attr));
+    memset(&resp_create, 0, sizeof(resp_create));
 
     /* Create distribution var */
     PVFS_sys_dist *dist=NULL;
@@ -133,14 +154,12 @@ int iocommon_create_file( const char *filename,
     }
 #endif
 
-    /* Set attributes */
-    memset(&attributes, 0, sizeof(attributes));
-    attributes.owner = getuid();
-    attributes.group = getgid();
-    attributes.atime = time(NULL);
-    attributes.mtime = attributes.atime;
-    attributes.ctime = attributes.atime;
-    attributes.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = getuid();
+    attr.group = getgid();
+    attr.atime = time(NULL);
+    attr.mtime = attr.atime;
+    attr.ctime = attr.atime;
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
 #if 0
     if (file_creation_param.striping_factor > 0){
@@ -157,39 +176,39 @@ int iocommon_create_file( const char *filename,
     /* Set file permissions */
     if (user_mode & S_IXOTH)
     {
-        attributes.perms |= PVFS_O_EXECUTE;
+        attr.perms |= PVFS_O_EXECUTE;
     }
     if (user_mode & S_IWOTH)
     {
-        attributes.perms |= PVFS_O_WRITE;
+        attr.perms |= PVFS_O_WRITE;
     }
     if (user_mode & S_IROTH)
     {
-        attributes.perms |= PVFS_O_READ;
+        attr.perms |= PVFS_O_READ;
     }
     if (user_mode & S_IXGRP)
     {
-        attributes.perms |= PVFS_G_EXECUTE;
+        attr.perms |= PVFS_G_EXECUTE;
     }
     if (user_mode & S_IWGRP)
     {
-        attributes.perms |= PVFS_G_WRITE;
+        attr.perms |= PVFS_G_WRITE;
     }
     if (user_mode & S_IRGRP)
     {
-        attributes.perms |= PVFS_G_READ;
+        attr.perms |= PVFS_G_READ;
     }
     if (user_mode & S_IXUSR)
     {
-        attributes.perms |= PVFS_U_EXECUTE;
+        attr.perms |= PVFS_U_EXECUTE;
     }
     if (user_mode & S_IWUSR)
     {
-        attributes.perms |= PVFS_U_WRITE;
+        attr.perms |= PVFS_U_WRITE;
     }
     if (user_mode & S_IRUSR)
     {
-        attributes.perms |= PVFS_U_READ;
+        attr.perms |= PVFS_U_READ;
     }
 
     /* Set credentials */
@@ -198,7 +217,7 @@ int iocommon_create_file( const char *filename,
     /* Contact server */
     rc = PVFS_sys_create((char*)filename,
                          parent_ref,
-                         attributes,
+                         attr,
                          credentials,
                          dist,
                          &resp_create,
@@ -224,14 +243,21 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
                                mode_t file_permission,
                                PVFS_object_ref *pdir)
 {
-    int rc;
+    int rc = 0;
     int follow_link;
-    char *directory;
-    char *filename;
+    char *directory = NULL;
+    char *filename = NULL;
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
     int fs_id = 0;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
+    PVFS_sysresp_getattr attributes_resp;
+    PVFS_credentials *credentials;
+
+    /* Initialize */
+    memset(&file_ref, 0, sizeof(file_ref));
+    memset(&parent_ref, 0, sizeof(parent_ref));
+    memset(&attributes_resp, 0, sizeof(attributes_resp));
 
     /* Split the path into a directory and file */
     rc = split_pathname(pathname, &directory, &filename);
@@ -264,17 +290,17 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
         if (directory)
         {
             rc = iocommon_lookup_relative(directory,
-                                          pdir,
+                                          *pdir,
                                           follow_link,
                                           &parent_ref);
             if (rc == -1)
             {
-                goto errorout:
+                goto errorout;
             }
         }
         else
         {
-            parent_ref = pdir;
+            parent_ref = *pdir;
         }
     }
 
@@ -330,7 +356,24 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
     pd = pvfs_alloc_descriptor(&pvfs_ops);
     pd->pvfs_ref = file_ref;
     pd->flags = flag;
-    pd->is_in_use = 1;    //indicate fd is valid!
+    pd->is_in_use = PVFS_FS;    //indicate fd is valid!
+
+    /* Get the file's type information from its attributes */
+    PVFS_sys_getattr(pd->pvfs_ref, PVFS_ATTR_SYS_ALL_NOHINT,
+                     credentials, &attributes_resp, NULL);
+    pd->mode = attributes_resp.attr.perms; /* this may change */
+    if (attributes_resp.attr.objtype & PVFS_TYPE_METAFILE)
+    {
+        pd->mode |= S_IFREG;
+    }
+    if (attributes_resp.attr.objtype & PVFS_TYPE_DIRECTORY)
+    {
+        pd->mode |= S_IFDIR;
+    }
+    if (attributes_resp.attr.objtype & PVFS_TYPE_SYMLINK)
+    {
+        pd->mode |= S_IFLNK;
+    }
 
     /* Truncate the file if neccesary */
     if (flag & O_TRUNC)
@@ -346,17 +389,6 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
         iocommon_lseek(pd, 0, 0, SEEK_END);
     }
 
-    /* Free directory and filename memory */
-    if (directory)
-    {
-        free(directory);
-    }
-    if (filename)
-    {
-        free(filename);
-    }
-    return pd;
-
 errorout:
 
     /* Free directory and filename memory */
@@ -368,22 +400,40 @@ errorout:
     {
         free(filename);
     }
-    return NULL;
+    if (rc == -1)
+    {
+        return NULL;
+    }
+    else
+    {
+        return pd;
+    }
 }
 
 /**
- *
+ * Implementation of lseek for file and directory via PVFS
  *
  */
 off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             PVFS_size unit_size, int whence)
 {
+    int rc = 0;
+    PVFS_credentials *credentials;
+    PVFS_sysresp_getattr attributes_resp;
+    PVFS_sysresp_readdir readdir_resp;
 
     if (0 == pd)
     {
         errno = EBADF;
         return PVFS_FD_FAILURE;
     }
+
+    /* Initialize */
+    memset(&readdir_resp, 0, sizeof(readdir_resp));
+    memset(&attributes_resp, 0, sizeof(attributes_resp));
+
+    /* Construct credentials*/
+    iocommon_cred(&credentials);
 
     switch(whence)
     {
@@ -399,16 +449,13 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
         }
         case SEEK_END:
         {
-            PVFS_credentials *credentials;
-            PVFS_sysresp_getattr attributes_resp;
-
-            /* Construct credentials*/
-            iocommon_cred(&credentials);
-
             /* Get the file's size in bytes as the ending offset */
-            PVFS_sys_getattr(pd->pvfs_ref, PVFS_ATTR_SYS_SIZE,
-                             credentials, &attributes_resp, NULL);
-
+            rc = PVFS_sys_getattr(pd->pvfs_ref, PVFS_ATTR_SYS_SIZE,
+                                  credentials, &attributes_resp, NULL);
+            if(rc)
+            {
+                return -1;
+            }
             pd->file_pointer = attributes_resp.attr.size + offset*unit_size;
             break;
         }
@@ -416,6 +463,29 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
         {
             errno = EINVAL;
             return PVFS_FD_FAILURE;
+        }
+    }
+    /* if this is a directory adjust token, the hard way */
+    if (S_ISDIR(pd->mode))
+    {
+        int dirent_no;
+        dirent_no = pd->file_pointer / sizeof(PVFS_dirent);
+        pd->file_pointer = dirent_no * sizeof(PVFS_dirent);
+        pd->token = PVFS_READDIR_START;
+        if(dirent_no)
+        {
+            rc = PVFS_sys_readdir(pd->pvfs_ref,
+                                  pd->token,
+                                  dirent_no,
+                                  credentials,
+                                  &readdir_resp,
+                                  NULL);
+            if(rc == -1)
+            {
+                return -1;
+            }
+            pd->token = readdir_resp.token;
+            free(readdir_resp.dirent_array);
         }
     }
     return pd->file_pointer;
@@ -426,100 +496,206 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
  * need to verify this is a file or symlink
  * use rmdir for directory
  */
-int iocommon_remove (const char *pathname, int dirflag) 
+int iocommon_remove (const char *pathname,
+                     PVFS_object_ref *pdir, 
+                     int dirflag)
 {
     int rc = 0;
-    char *parentdir = 0;
-    char *file = 0;
-    PVFS_object_ref parent_ref;
+    char *parentdir = NULL;
+    char *file = NULL;
+    PVFS_object_ref parent_ref, file_ref;
     PVFS_credentials *credentials;
     PVFS_sys_attr attr;
+
+    /* Initialize */
+    memset(&parent_ref, 0, sizeof(parent_ref));
+    memset(&file_ref, 0, sizeof(file_ref));
+    memset(&attr, 0, sizeof(attr));
 
     /* Initialize the system interface for this process */
     iocommon_ensure_init();
     iocommon_cred(&credentials);
 
-    if (0 == rc)
+    rc = split_pathname(pathname, &parentdir, &file);
+    if (rc == -1)
     {
-        rc = split_pathname(pathname, &parentdir, &file);
+        return -1;
     }
 
-    if (0 == rc)
+    if (!pdir)
     {
         rc = iocommon_lookup_absolute(parentdir, &parent_ref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
     }
+    else
+    {
+        if (!parentdir)
+        {
+            rc = iocommon_lookup_relative(parentdir, *pdir,
+                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        { 
+            parent_ref = *pdir;
+        }
+    }
+
     /* need to verify this is a file or symlink */
     /* WBL - What is going on here ??? */
-    iocommon_lookup_relative(parentdir, parent_ref,
-                PVFS2_LOOKUP_LINK_NO_FOLLOW, &parent_ref);
-    iocommon_getattr(parent_ref, &attr);
+    rc = iocommon_lookup_relative(file, parent_ref,
+                PVFS2_LOOKUP_LINK_NO_FOLLOW, &file_ref);
+    if (rc == -1)
+    {
+        goto errorout;
+    }
+    rc = iocommon_getattr(file_ref, &attr);
+    if (rc == -1)
+    {
+        goto errorout;
+    }
     if ((attr.objtype & PVFS_TYPE_DIRECTORY) && dirflag)
     {
         errno = EISDIR;
-        return -1;
+        goto errorout;
     }
     else if (!(attr.objtype & PVFS_TYPE_DIRECTORY) && !dirflag)
     {
         errno = ENOTDIR;
+        goto errorout;
+    }
+
+    rc = PVFS_sys_remove(file, parent_ref, credentials, PVFS_HINT_NULL);
+
+errorout:
+    if (parentdir)
+    {
+        free(parentdir);
+    }
+    if (file)
+    {
+        free(file);
+    }
+    if (rc == -1)
+    {
         return -1;
     }
-
-    if (0 == rc)
+    else
     {
-        rc = PVFS_sys_remove(file, parent_ref, credentials, PVFS_HINT_NULL);
+        return 0;
     }
-
-    free(parentdir);
-    free(file);
-    if (0 != rc)
-    {
-        return -1;
-    }
-    return 0;
 }
 
-int iocommon_unlink(const char *pathname)
+int iocommon_unlink(const char *pathname,
+                    PVFS_object_ref *pdir)
 {
-    return iocommon_remove(pathname, 1);
+    return iocommon_remove(pathname, pdir, 1);
 }
 
-int iocommon_rmdir(const char *pathname)
+int iocommon_rmdir(const char *pathname,
+                   PVFS_object_ref *pdir)
 {
-    return iocommon_remove(pathname, 0);
+    return iocommon_remove(pathname, pdir, 0);
 }
 
 /* if dir(s) are NULL, assume name is absolute */
-int iocommon_rename(pvfs_descriptor *olddir, const char *oldname,
-                    pvfs_descriptor *newdir, const char *newname)
+int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
+                    PVFS_object_ref *newpdir, const char *newpath)
 {
-    int rc;
-    char *oldent, *newent, *oldpath, *newpath;
+    int rc = 0;
+    char *olddir = NULL, *newdir = NULL, *oldname = NULL, *newname = NULL;
     PVFS_object_ref oldref, newref;
     PVFS_credentials *creds;
     PVFS_hint hints = PVFS_HINT_NULL;
 
+    /* Initialize */
+    memset(&oldref, 0, sizeof(oldref));
+    memset(&newref, 0, sizeof(newref));
+
     iocommon_cred(&creds);
-    if (olddir)
+    rc = split_pathname(oldpath, &olddir, &oldname);
+    if (rc == -1)
     {
-        /* do relative lookup */
+        return -1;
+    }
+    if (!olddir)
+    {
+        rc = iocommon_lookup_absolute(olddir, &oldref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
     }
     else
     {
-        /* do absolute lookup */
-        rc = split_pathname(oldname, &oldpath, &oldent);
-        rc = iocommon_lookup_absolute(oldpath, &oldref);
+        if (!olddir)
+        {
+            rc = iocommon_lookup_relative(olddir, *oldpdir, 
+                                PVFS2_LOOKUP_LINK_FOLLOW, &oldref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        {
+            oldref = *oldpdir;
+        }
+    }
+    rc = split_pathname(newpath, &olddir, &oldname);
+    if (rc == -1)
+    {
+        goto errorout;
+    }
+    if (!newpdir)
+    {
+        rc = iocommon_lookup_absolute(newdir, &newref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (!olddir)
+        {
+            rc = iocommon_lookup_relative(newdir, *newpdir,
+                            PVFS2_LOOKUP_LINK_FOLLOW, &newref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        {
+            newref = *newpdir;
+        }
+    }
+    rc = PVFS_sys_rename(oldname, oldref, newname, newref, creds, hints);
+
+errorout:
+    if (olddir)
+    {
+        free(olddir);
+    }
+    if (oldname)
+    {
+        free(oldname);
     }
     if (newdir)
     {
-        /* do relative lookup */
+        free(newdir);
     }
-    else
+    if (newname)
     {
-        /* do absolute lookup */
-        rc = split_pathname(newname, &newpath, &newent);
-        rc = iocommon_lookup_absolute(newpath, &newref);
+        free(newname);
     }
-    rc = PVFS_sys_rename(oldent, oldref, newent, newref, creds, hints);
     return rc;
 }
 
@@ -534,9 +710,12 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          PVFS_Request file_req)
         //returned by nonblocking operations
 {
-    int rc;
+    int rc = 0;
     PVFS_credentials *creds;
     PVFS_sysresp_io read_resp;
+
+    /* Initialize */
+    memset(&read_resp, 0, sizeof(read_resp));
 
     if (!pd)
     {
@@ -564,10 +743,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                      which,
                      PVFS_HINT_NULL);
 
-    if (0 != rc)
+    if (rc = -1)
     {
         errno = EIO;
-        return PVFS_FD_FAILURE;
+        return -1;
     }
 
     return read_resp.total_completed;
@@ -581,13 +760,18 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  * (which represents an etype_req*count region)
  * Note that the none of the PVFS_Requests are freed
  */
-int iocommon_ireadorwrite( enum PVFS_io_type which,
-        pvfs_descriptor *pd, PVFS_size extra_offset, void *buf,
-        PVFS_Request etype_req, PVFS_Request file_req, size_t count,
-        PVFS_sys_op_id *ret_op_id, PVFS_sysresp_io *ret_resp,
-        PVFS_Request *ret_memory_req)
+int iocommon_ireadorwrite(enum PVFS_io_type which,
+                          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+                          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req)
 {
-    int rc;
+    int rc = 0;
     PVFS_Request contig_memory_req;
     PVFS_credentials *credentials;
     PVFS_size req_size;
@@ -619,10 +803,10 @@ int iocommon_ireadorwrite( enum PVFS_io_type which,
 
     assert(*ret_op_id!=-1);//TODO: handle this
 
-    if (rc!=0)
+    if (rc != 0)
     {
         errno = EIO;
-        return PVFS_FD_FAILURE;
+        return -1;
     }
 
     PVFS_Request_size(contig_memory_req, &req_size);
@@ -630,27 +814,30 @@ int iocommon_ireadorwrite( enum PVFS_io_type which,
 
     *ret_memory_req = contig_memory_req;
 
-    return PVFS_FD_SUCCESS;
+    return -1;
 }
 
 int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_credentials     *credentials;
     PVFS_sysresp_getattr getattr_response;
+
+    /* Initialize */
+    memset(&getattr_response, 0, sizeof(getattr_response));
 
     /* check credentials */
     iocommon_cred(&credentials);
 
     /* now get attributes */
-    ret = PVFS_sys_getattr(obj,
-                           PVFS_ATTR_SYS_ALL_NOHINT,
-                           credentials,
-                           &getattr_response, NULL);
+    rc = PVFS_sys_getattr(obj,
+                          PVFS_ATTR_SYS_ALL_NOHINT,
+                          credentials,
+                          &getattr_response, NULL);
 
     *attr = getattr_response.attr;
 
-    if(ret < 0)
+    if(rc < 0)
     {
         errno = EACCES; /* need to get proper return code */
         return -1;
@@ -662,16 +849,16 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
 /* WBL - question - should attr not be a pointer */
 int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_credentials     *credentials;
 
     /* check credentials */
     iocommon_cred(&credentials);
 
     /* now get attributes */
-    ret = PVFS_sys_setattr(obj, *attr, credentials, NULL);
+    rc = PVFS_sys_setattr(obj, *attr, credentials, NULL);
 
-    if(ret < 0)
+    if(rc < 0)
     {
         errno = EACCES; /* need to get proper return code */
         return -1;
@@ -682,10 +869,13 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
 
 int iocommon_stat(pvfs_descriptor *pd, struct stat *buf)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_sys_attr        attr;
 
-    iocommon_getattr(pd->pvfs_ref, &attr);
+    /* Initialize */
+    memset(&attr, 0, sizeof(attr));
+
+    rc = iocommon_getattr(pd->pvfs_ref, &attr);
 
     /* copy attributes into standard stat struct */
     buf->st_dev = pd->pvfs_ref.fs_id;
@@ -723,10 +913,13 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf)
  */
 int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_sys_attr        attr;
 
-    iocommon_getattr(pd->pvfs_ref, &attr);
+    /* Initialize */
+    memset(&attr, 0, sizeof(attr));
+
+    rc = iocommon_getattr(pd->pvfs_ref, &attr);
 
     /* copy attributes into standard stat struct */
     buf->st_dev = pd->pvfs_ref.fs_id;
@@ -760,8 +953,11 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf)
 
 int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_sys_attr        attr;
+
+    /* Initialize */
+    memset(&attr, 0, sizeof(attr));
 
     if (owner != -1)
     {
@@ -773,32 +969,31 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
     }
     attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
 
-    ret = iocommon_setattr(pd->pvfs_ref, &attr);
+    rc = iocommon_setattr(pd->pvfs_ref, &attr);
 
-    return ret;
+    return rc;
 }
 
 int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_sys_attr        attr;
 
     attr.perms = mode & 07777; /* mask off any stray bits */
     attr.mask = PVFS_ATTR_SYS_PERM;
 
-    ret = iocommon_setattr(pd->pvfs_ref, &attr);
+    rc = iocommon_setattr(pd->pvfs_ref, &attr);
 
-    return ret;
+    return rc;
 }
 
-iocommon_make_directory(const char *pvfs_path, const int mode)
+iocommon_make_directory(const char *pvfs_path,
+                        const int mode,
+                        PVFS_object_ref *pdir)
 {
-    int ret = 0;
-    char parent_dir[PVFS_NAME_MAX] = "";
-    char base[PVFS_NAME_MAX]  = "";
-    char realpath[PVFS_NAME_MAX]  = "";
-    char * parentdir_ptr = NULL;
-    char * basename_ptr = NULL;
+    int rc = 0;
+    char *parentdir = NULL;
+    char *filename = NULL;
     PVFS_sys_attr       attr;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_object_ref     parent_ref;
@@ -813,56 +1008,73 @@ iocommon_make_directory(const char *pvfs_path, const int mode)
 
     iocommon_cred(&credentials);
 
-    /*
-     * Copy the file name into structures to be passed to dirname and basename
-     * These calls change the parameter, so we don't want to mess with original
-     */
-    strcpy(parent_dir, pvfs_path);
-    strcpy(base, pvfs_path);
-
-    parentdir_ptr = dirname(parent_dir);
-    basename_ptr  = basename(base);
-
-    /* Make sure we don't try and create the root directory */
-    if( strcmp(basename_ptr, "/") == 0 )
+    rc = split_pathname(pvfs_path, &parentdir, &filename);
+    if (rc == -1)
     {
-        errno = EEXIST;
-        return(-1);
+        return -1;
     }
 
+    /* Make sure we don't try and create the root or current directory */
+
     /* lookup parent */
-    ret = iocommon_lookup_absolute(parentdir_ptr, &parent_ref);
+    if (!pdir)
+    {
+        rc = iocommon_lookup_absolute(parentdir, &parent_ref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (!parentdir)
+        {
+            rc = iocommon_lookup_relative(parentdir, *pdir,
+                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        {
+            parent_ref = *pdir;
+        }
+    }
    
     /* Set the attributes for the new directory */
-    attr.owner = credentials->uid;
-    attr.group = credentials->gid;
+    attr.owner = (int)getuid;
+    attr.group = (int)getgid;
     attr.perms = mode;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
-    /* Clear out any info from previous calls */
-    memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
+    rc = PVFS_sys_mkdir(filename,
+                        parent_ref,
+                        attr,
+                        credentials,
+                        &resp_mkdir, NULL);
 
-    ret = PVFS_sys_mkdir(basename_ptr,
-                         parent_ref,
-                         attr,
-                         credentials,
-                         &resp_mkdir, NULL);
-
-    if (ret != 0)
+errorout:
+    if (parentdir)
     {
-        errno = ret;
-        return(-1);
+        free(parentdir);
     }
-   
-    return(0);
+    if (filename)
+    {
+        free(filename);
+    }   
+    return(rc);
 }
 
 int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
 {
-    int                  ret = 0;
+    int                  rc = 0;
     PVFS_sys_attr        attr;
 
-    iocommon_getattr(pd->pvfs_ref, &attr);
+    /* Initialize any variables */
+    memset(&attr, 0, sizeof(attr));
+
+    rc = iocommon_getattr(pd->pvfs_ref, &attr);
 
     /* copy attributes into standard stat struct */
     if (attr.objtype & PVFS_TYPE_SYMLINK)
@@ -878,15 +1090,13 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
     return 0;
 }
 
-int iocommon_symlink(const char  *pvfs_path,
-                     const char  *link_target)
+int iocommon_symlink(const char *pvfs_path,
+                     const char *link_target,
+                     PVFS_object_ref *pdir)
 {
-    int ret = 0;
-    char parent_dir[PVFS_NAME_MAX] = "";
-    char base[PVFS_NAME_MAX]  = "";
-    char realpath[PVFS_NAME_MAX]  = "";
-    char * parentdir_ptr = NULL;
-    char * basename_ptr = NULL;
+    int rc = 0;
+    char *parentdir = NULL;
+    char *filename = NULL;
     PVFS_sys_attr       attr;
     PVFS_object_ref     parent_ref;
     PVFS_sysresp_symlink  resp_symlink;
@@ -899,59 +1109,284 @@ int iocommon_symlink(const char  *pvfs_path,
 
     iocommon_cred(&credentials);
 
-    /*
-     * Copy the file name into structures to be passed to dirname and basename
-     * These calls change the parameter, so we don't want to mess with original
-     */
-    strcpy(parent_dir, pvfs_path);
-    strcpy(base,  pvfs_path);
 
-    parentdir_ptr = dirname(parent_dir);
-    basename_ptr  = basename(base);
-
-    /* Make sure we don't try and create the root directory */
-    if( strcmp(basename_ptr, "/") == 0 )
+    rc = split_pathname(pvfs_path, &parentdir, &filename);
+    if (rc == -1)
     {
-        errno = EEXIST;
-        return(-1);
+        return -1;
     }
 
+    /* Make sure we don't try and create the root or current directory */
+
     /* lookup parent */
-    ret = iocommon_lookup_absolute(parentdir_ptr, &parent_ref);
+    if (!pdir)
+    {
+        rc = iocommon_lookup_absolute(parentdir, &parent_ref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (!parentdir)
+        {
+            rc = iocommon_lookup_relative(parentdir, *pdir,
+                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        {
+            parent_ref = *pdir;
+        }
+    }
    
     /* Set the attributes for the new directory */
-    attr.owner = credentials->uid;
-    attr.group = credentials->gid;
+    attr.owner = getuid();
+    attr.group = getgid();
     attr.perms = 0777;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
-    /* Clear out any info from previous calls */
-    memset(&resp_symlink, 0, sizeof(PVFS_sysresp_symlink));
+    rc = PVFS_sys_symlink(filename,
+                          parent_ref,
+                          (char *)link_target,
+                          attr,
+                          credentials,
+                          &resp_symlink,
+                          NULL);
 
-    ret = PVFS_sys_symlink(basename_ptr,
-                           parent_ref,
-                           (char *)link_target,
-                           attr,
-                           credentials,
-                           &resp_symlink,
-                           NULL);
-
-    if (ret != 0)
+errorout:
+    if (parentdir)
     {
-        errno = ret;
-        return(-1);
+        free(parentdir);
     }
-   
-    return(0);
+    if (filename)
+    {
+        free(filename);
+    }   
+    return(rc);
 }
 
-int iocommon_getdents()
+int iocommon_getdents(pvfs_descriptor *pd,
+                      struct dirent *dirp,
+                      unsigned int count)
 {
+    int rc = 0;
+    int name_max;
+    PVFS_credentials *credentials;
+    PVFS_sysresp_readdir readdir_resp;
+    PVFS_ds_position token;
+    int bytes = 0, i = 0;
+
+    if (pd->token == PVFS_READDIR_END)
+    {
+        return -1;  /* EOF */
+    }
+
+    if (!S_ISDIR(pd->mode))
+    {
+        errno = ENOENT;
+        return -1;
+    }
+
+    /* Initialize */
+    memset(&readdir_resp, 0, sizeof(readdir_resp));
+
+    iocommon_cred(&credentials);
+
+    token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
+
+    rc = PVFS_sys_readdir(pd->pvfs_ref,
+                          token,
+                          count,
+                          credentials,
+                          &readdir_resp,
+                          NULL);
+    if(rc == -1)
+    {
+        return -1;
+    }
+    pd->token = readdir_resp.token;
+    name_max = MIN(NAME_MAX, PVFS_NAME_MAX);
+    while(readdir_resp.pvfs_dirent_outcount--)
+    {
+        /* copy a PVFS_dirent to a struct dirent */
+        dirp->d_ino = (long)readdir_resp.dirent_array[i].handle;
+        dirp->d_off = pd->file_pointer;
+        dirp->d_reclen = sizeof(PVFS_dirent);
+        memncpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+        dirp->d_name[name_max] = 0;
+        pd->file_pointer += sizeof(PVFS_dirent);
+        bytes += sizeof(PVFS_dirent);
+    }
+    free(readdir_resp.dirent_array);
+    return bytes;
 }
 
-int iocommon_access()
+/** Read entries from a directory.
+ *                  
+ *  \param token opaque value used to track position in directory
+ *         when more than one read is required.
+ *  \param pvfs_dirent_incount maximum number of entries to read, if
+ *         available, starting from token.
+PVFS_error PVFS_sys_readdir(
+    PVFS_object_ref ref,
+    PVFS_ds_position token, 
+    int32_t pvfs_dirent_incount,
+    const PVFS_credentials *credentials,
+    PVFS_sysresp_readdir *resp,
+    PVFS_hint hints)
+ */          
+/** Read entries from a directory and their associated attributes
+ *  in an efficient manner.
+ *  
+ *  \param token opaque value used to track position in directory
+ *         when more than one read is required.
+ *  \param pvfs_dirent_incount maximum number of entries to read, if
+ *         available, starting from token.
+PVFS_error PVFS_sys_readdirplus(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int32_t pvfs_dirent_incount,
+    const PVFS_credentials *credentials,
+    uint32_t attrmask,
+    PVFS_sysresp_readdirplus *resp,
+    PVFS_hint hints)
+ */
+
+int iocommon_access(const char *pvfs_path,
+                    const int mode,
+                    const int flags,
+                    PVFS_object_ref *pdir)
 {
+    int rc = 0;
+    char *parentdir = NULL;
+    char *file = NULL;
+    int followflag = PVFS2_LOOKUP_LINK_FOLLOW;
+    int uid = -1, gid = -1;
+    PVFS_object_ref parent_ref, file_ref;
+    PVFS_credentials *credentials;
+    PVFS_sys_attr attr;
+
+    /* Initialize */
+    memset(&parent_ref, 0, sizeof(parent_ref));
+    memset(&file_ref, 0, sizeof(file_ref));
+    memset(&attr, 0, sizeof(attr));
+
+    /* Initialize the system interface for this process */
+    iocommon_ensure_init();
+    iocommon_cred(&credentials);
+
+    rc = split_pathname(pvfs_path, &parentdir, &file);
+    if (rc == -1)
+    {
+        return -1;
+    }
+
+    if (!pdir)
+    {
+        rc = iocommon_lookup_absolute(parentdir, &parent_ref);
+        if (rc == -1)
+        {
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (!parentdir)
+        {
+            rc = iocommon_lookup_relative(parentdir, *pdir,
+                            PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref);
+            if (rc == -1)
+            {
+                goto errorout;
+            }
+        }
+        else
+        { 
+            parent_ref = *pdir;
+        }
+    }
+    /* Attempt to find file */
+    if (flags & AT_SYMLINK_NOFOLLOW)
+    {
+        followflag = PVFS2_LOOKUP_LINK_NO_FOLLOW;
+    }
+    rc = iocommon_lookup_relative(file,
+                                  parent_ref,
+                                  followflag,
+                                  &file_ref);
+    if (rc)
+    {
+        /* File was not found */
+        goto errorout;
+    }
+    /* Get file atributes */
+    rc = iocommon_getattr(file_ref, &attr);
+    if (rc)
+    {
+        goto errorout;
+    }
+    if (flags & AT_EACCESS)
+    {
+        uid = getuid();
+        gid = getgid();
+    }
+    else
+    {
+        uid = geteuid();
+        gid = getegid();
+    }
+    if (uid == attr.owner)
+    {
+        if (((R_OK & mode) && !(S_IRUSR & attr.perms)) ||
+           ((W_OK & mode) && !(S_IWUSR & attr.perms)) ||
+           ((X_OK & mode) && !(S_IXUSR & attr.perms)))
+        {
+            errno = EACCES;
+            rc = -1;
+            goto errorout;
+        }
+    }
+    else if (gid == attr.group)
+    {
+        if (((R_OK & mode) && !(S_IRGRP & attr.perms)) ||
+           ((W_OK & mode) && !(S_IWGRP & attr.perms)) ||
+           ((X_OK & mode) && !(S_IXGRP & attr.perms)))
+        {
+            errno = EACCES;
+            rc = -1;
+            goto errorout;
+        }
+    }
+    else
+    {
+        if (((R_OK & mode) && !(S_IROTH & attr.perms)) ||
+           ((W_OK & mode) && !(S_IWOTH & attr.perms)) ||
+           ((X_OK & mode) && !(S_IXOTH & attr.perms)))
+        {
+            errno = EACCES;
+            rc = -1;
+            goto errorout;
+        }
+    }
+    /* Access is allowed, rc should be 0 */  
+
+errorout:
+    if (parentdir)
+    {
+        free(parentdir);
+    }
+    if (file)
+    {
+        free(file);
+    }
+    return rc;
 }
+
 
 /*
  * Local variables:

@@ -1,3 +1,14 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines
+ */
 #ifndef IOCOMMON_H
 #define IOCOMMON_H 1
 
@@ -29,12 +40,12 @@ int iocommon_fsync(pvfs_descriptor *pvfs_info);
  * Find the PVFS handle to an object (file, dir sym) 
  * assumes an absoluate path
  */
-int iocommon_lookup_absolute( const char *abs_path, PVFS_object_ref *ref);
+int iocommon_lookup_absolute(const char *abs_path, PVFS_object_ref *ref);
 
 /*
  * Lookup a file via the PVFS system interface
  */
-int iocommon_lookup_relative( const char *rel_path,
+int iocommon_lookup_relative(const char *rel_path,
                              PVFS_object_ref parent_ref,
                              int follow_links,
                              PVFS_object_ref *ref );
@@ -42,7 +53,7 @@ int iocommon_lookup_relative( const char *rel_path,
 /*
  * Create a file via the PVFS system interface
  */
-int iocommon_create_file( const char *filename,
+int iocommon_create_file(const char *filename,
 			 mode_t file_permission,
 			 PVFS_hint file_creation_param,
                          PVFS_object_ref parent_ref,
@@ -64,21 +75,24 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset, PVFS_size unit_size,
  * need to verify this is a file or symlink
  * use rmdir for directory
  */
-int iocommon_remove (const char *pathname, int dirflag) ;
+int iocommon_remove (const char *pathname, PVFS_object_ref *pdir, int dirflag);
 
-int iocommon_unlink(const char *pathname);
+int iocommon_unlink(const char *pathname, PVFS_object_ref *pdir);
 
-int iocommon_rmdir(const char *pathname);
+int iocommon_rmdir(const char *pathname, PVFS_object_ref *pdir);
 
 /* if dir(s) are NULL, assume name is absolute */
-int iocommon_rename(pvfs_descriptor *olddir, const char *oldname,
-                    pvfs_descriptor *newdir, const char *newname);
+int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldname,
+                    PVFS_object_ref *newpdir, const char *newname);
 
 /* do a blocking read or write
  * extra_offset = extra padding to the pd's offset, independent of the pd's offset */
-int iocommon_readorwrite( enum PVFS_io_type which,
-		pvfs_descriptor *pd, PVFS_size offset, void *buf,
-        PVFS_Request etype_req, PVFS_Request file_req, size_t count);
+int iocommon_readorwrite(enum PVFS_io_type which,
+		         pvfs_descriptor *pd,
+                         PVFS_size offset,
+                         void *buf,
+                         PVFS_Request mem_req,
+                         PVFS_Request file_req);
         //returned by nonblocking operations
 
 /*
@@ -89,11 +103,16 @@ int iocommon_readorwrite( enum PVFS_io_type which,
  * (which represents an etype_req*count region)
  * Note that the none of the PVFS_Requests are freed
  */
-int iocommon_ireadorwrite( enum PVFS_io_type which,
-		pvfs_descriptor *pd, PVFS_size extra_offset, void *buf,
-        PVFS_Request etype_req, PVFS_Request file_req, size_t count,
-		PVFS_sys_op_id *ret_op_id, PVFS_sysresp_io *ret_resp,
-        PVFS_Request *ret_memory_req);
+int iocommon_ireadorwrite(enum PVFS_io_type which,
+		          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+		          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req);
 
 int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
 
@@ -111,15 +130,24 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group);
 
 int iocommon_chmod(pvfs_descriptor *pd, mode_t mode);
 
-int iocommon_make_directory(const char *pvfs_path, const int mode);
+int iocommon_make_directory(const char *pvfs_path,
+                            int mode,
+                            PVFS_object_ref *pdir);
 
 int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size);
 
-int iocommon_symlink(const char *pvfs_path, const char *link_target);
+int iocommon_symlink(const char *pvfs_path,
+                     const char *link_target,
+                     PVFS_object_ref *pdir);
 
-int iocommon_getdents();
+int iocommon_getdents(pvfs_descriptor *pd,
+                      struct dirent *dirp,
+                      unsigned int count);
 
-int iocommon_access();
+int iocommon_access(const char *pvfs_path,
+                    int mode,
+                    int flags,
+                    PVFS_object_ref *pdir);
 
 /*
  * Local variables:

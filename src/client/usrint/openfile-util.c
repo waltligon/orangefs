@@ -1,4 +1,18 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines - routines to manage open files
+ */
 #include <usrint.h>
+#include <linux/dirent.h>
+#include <posix-ops.h>
+#include <openfile-util.h>
 
 static int pvfs_is_sys_initialized = 0; 
 
@@ -16,14 +30,10 @@ pvfs_descriptor pvfs_stdin =
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_RDONLY,
+    .mode = 0,
     .file_pointer = 0,
-    .is_in_use = 1,
-    .dirty = 0,
-    .buf = NULL,
-    .buftotal = 0,
-    .bufsize = 0,
-    .buf_off = 0,
-    .bufptr = NULL
+    .token = 0,
+    .is_in_use = PVFS_FS
 };
 
 pvfs_descriptor pvfs_stdout =
@@ -34,14 +44,10 @@ pvfs_descriptor pvfs_stdout =
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_WRONLY | O_APPEND,
+    .mode = 0,
     .file_pointer = 0,
-    .is_in_use = 1,
-    .dirty = 0,
-    .buf = NULL,
-    .buftotal = 0,
-    .bufsize = 0,
-    .buf_off = 0,
-    .bufptr = NULL
+    .token = 0,
+    .is_in_use = PVFS_FS
 };
 
 pvfs_descriptor pvfs_stderr =
@@ -52,14 +58,10 @@ pvfs_descriptor pvfs_stderr =
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_WRONLY | O_APPEND,
+    .mode = 0,
     .file_pointer = 0,
-    .is_in_use = 1,
-    .dirty = 0,
-    .buf = NULL,
-    .buftotal = 0,
-    .bufsize = 0,
-    .buf_off = 0,
-    .bufptr = NULL
+    .token = 0,
+    .is_in_use = PVFS_FS
 };
 
 
@@ -132,16 +134,10 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[i]->pvfs_ref.fs_id = 0;
 	descriptor_table[i]->pvfs_ref.handle = 0;
 	descriptor_table[i]->flags = 0;
+	descriptor_table[i]->mode = 0;
 	descriptor_table[i]->file_pointer = 0;
-	descriptor_table[i]->is_in_use = 0;
-	descriptor_table[i]->dirty = 0;
-	descriptor_table[i]->eof = 0;
-	descriptor_table[i]->error = 0;
-	descriptor_table[i]->buf = NULL;
-	descriptor_table[i]->buftotal = 0;
-	descriptor_table[i]->bufsize = 0;
-	descriptor_table[i]->buf_off = 0;
-	descriptor_table[i]->bufptr = NULL;
+	descriptor_table[i]->token = 0;
+	descriptor_table[i]->is_in_use = PVFS_FS;
 
    return descriptor_table[i];
 }
@@ -195,11 +191,6 @@ int pvfs_free_descriptor(int fd)
     /* check if last copy */
     if (--(pd->dup_cnt) <= 0)
     {
-	    /* free buffer space */
-	    if (pd->buf)
-        {
-		    free(pd->buf);
-        }
 	    /* free descriptor - wipe memory first */
 	    memset(pd, 0, sizeof(pvfs_descriptor));
 	    free(pd);
@@ -377,10 +368,16 @@ int split_pathname( const char *path,
         *directory = NULL;
         i++;
     }
-    /* parse the filename */
+    /* copy the filename */
     *filename = malloc(length - i + 1);
     if (!*filename)
     {
+        if (*directory)
+        {
+            free(*directory);
+        }
+        *directory = NULL;
+        *filename = NULL;
         return -1;
     }
     strncpy(*filename, path + i + 1, length - i);

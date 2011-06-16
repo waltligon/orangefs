@@ -1,3 +1,14 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines
+ */
 
 #ifndef POSIX_PVFS_H
 #define POSIX_PVFS_H 1
@@ -40,15 +51,15 @@ ssize_t pvfs_readv(int fd, const struct iovec *vector, int count);
 ssize_t pvfs_pread64( int fd, void *buf, size_t count, off64_t offset );
 
 /* pvfs_write */
-ssize_t pvfs_write( int fd, void *buf, size_t count );
+ssize_t pvfs_write( int fd, const void *buf, size_t count );
 
 /* pvfs_pwrite */
-ssize_t pvfs_pwrite( int fd, void *buf, size_t count, off_t offset );
+ssize_t pvfs_pwrite( int fd, const void *buf, size_t count, off_t offset );
 
 ssize_t pvfs_writev( int fd, const struct iovec *vector, int count );
 
 /* pvfs_pwrite64 */
-ssize_t pvfs_pwrite64( int fd, void *buf, size_t count, off64_t offset );
+ssize_t pvfs_pwrite64( int fd, const void *buf, size_t count, off64_t offset );
 
 /* pvfs_lseek */
 off_t pvfs_lseek(int fd, off_t offset, int whence);

@@ -1,6 +1,35 @@
+/* 
+ * (C) 2011 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup usrint
+ *
+ *  PVFS2 user interface routines - pvfs version of posix system calls
+ */
 #include <usrint.h>
+#include <linux/dirent.h>
+#include <posix-ops.h>
+#include <posix-pvfs.h>
+#include <openfile-util.h>
+#include <iocommon.h>
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
+
+/* actual implementation of read and write are in these static funcs */
+
+static ssize_t pvfs_prdwr64(int fd,
+                            void *buf,
+                            size_t count,
+                            off64_t offset,
+                            int which);
+
+static ssize_t pvfs_rdwrv(int fd,
+                          const struct iovec *vector,
+                          size_t count,
+                          int which);
 
 /**
  *  pvfs_open
@@ -166,7 +195,7 @@ int pvfs_creat64(const char *path, mode_t mode, ...)
  */
 int pvfs_unlink (const char *path)
 {
-    return iocommon_unlink(path);
+    return iocommon_unlink(path, NULL);
 }
 
 /**
@@ -175,18 +204,17 @@ int pvfs_unlink (const char *path)
 int pvfs_unlinkat (int dirfd, const char *path)
 {
     int rc;
-    pvfs_descriptor *pd, *pd2;
+    pvfs_descriptor *pd;
 
     if (path[0] == '/' || dirfd == AT_FDCWD)
     {
-        rc = pvfs_unlink(path);
+        rc = iocommon_unlink(path, NULL);
     }
     else
     {
         int flags = O_RDONLY;
         pd = pvfs_find_descriptor(dirfd);
-        /* TODO: not sure what to do with this ... */
-        return -1;
+        rc = iocommon_unlink(path, &pd->pvfs_ref);
     }
     return rc;
 }
@@ -243,7 +271,8 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
         newdes = NULL;
         absnewpath = pvfs_qualify_path(newpath);
     }
-    rc = iocommon_rename(olddes, absoldpath, newdes, absnewpath);
+    rc = iocommon_rename(&olddes->pvfs_ref, absoldpath,
+                         &newdes->pvfs_ref, absnewpath);
     if (oldpath != absoldpath)
     {
         free(absoldpath);
@@ -258,7 +287,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
 /**
  * pvfs_read wrapper
  */
-ssize_t pvfs_read( int fd, void *buf, size_t count )
+ssize_t pvfs_read(int fd, void *buf, size_t count)
 {
     int rc;
 
@@ -267,7 +296,7 @@ ssize_t pvfs_read( int fd, void *buf, size_t count )
     {
         return -1;
     }
-    rc = pvfs_pread64(fd, buf, count, pd->file_pointer);
+    rc = pvfs_prdwr64(fd, buf, count, pd->file_pointer, PVFS_IO_READ);
     if (rc == -1)
     {
         return -1;
@@ -279,9 +308,9 @@ ssize_t pvfs_read( int fd, void *buf, size_t count )
 /**
  * pvfs_pread wrapper
  */
-ssize_t pvfs_pread( int fd, void *buf, size_t count, off_t offset )
+ssize_t pvfs_pread(int fd, void *buf, size_t count, off_t offset)
 {
-    return pvfs_pread64(fd, buf, count, (off64_t) offset);
+    return pvfs_prdwr64(fd, buf, count, (off64_t) offset, PVFS_IO_READ);
 }
 
 /**
@@ -303,7 +332,7 @@ ssize_t pvfs_pread64( int fd, void *buf, size_t count, off64_t offset )
 /**
  * pvfs_write wrapper
  */
-ssize_t pvfs_write( int fd, void *buf, size_t count )
+ssize_t pvfs_write(int fd, const void *buf, size_t count)
 {
     int rc;
     pvfs_descriptor *pd = pvfs_find_descriptor(fd);
@@ -311,7 +340,7 @@ ssize_t pvfs_write( int fd, void *buf, size_t count )
     {
         return -1;
     }
-    rc = pvfs_pwrite64(fd, buf, count, pd->file_pointer);
+    rc = pvfs_prdwr64(fd, (void *)buf, count, pd->file_pointer, PVFS_IO_WRITE);
     if (rc == -1)
     {
         return -1;
@@ -323,15 +352,15 @@ ssize_t pvfs_write( int fd, void *buf, size_t count )
 /**
  * pvfs_pwrite wrapper
  */
-ssize_t pvfs_pwrite( int fd, void *buf, size_t count, off_t offset )
+ssize_t pvfs_pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
-    return pvfs_pwrite64(fd, buf, count, (off64_t) offset);
+    return pvfs_prdwr64(fd, (void *)buf, count, (off64_t)offset, PVFS_IO_WRITE);
 }
 
 /**
  * pvfs_writev wrapper
  */
-ssize_t pvfs_writev( int fd, const struct iovec *vector, int count )
+ssize_t pvfs_writev(int fd, const struct iovec *vector, int count)
 {
     return pvfs_rdwrv(fd, vector, count, PVFS_IO_WRITE);
 }
@@ -339,16 +368,19 @@ ssize_t pvfs_writev( int fd, const struct iovec *vector, int count )
 /**
  * pvfs_pwrite64 wrapper
  */
-ssize_t pvfs_pwrite64( int fd, void *buf, size_t count, off64_t offset )
+ssize_t pvfs_pwrite64(int fd, const void *buf, size_t count, off64_t offset)
 {
-    return pvfs_prdwr64(fd, buf, count, offset, PVFS_IO_WRITE);
+    return pvfs_prdwr64(fd, (void *)buf, count, offset, PVFS_IO_WRITE);
 }
 
 /**
  * implements pread and pwrite with 64-bit file pointers
  */
-static ssize_t pvfs_prdwr64(int fd, void *buf,
-                            size_t count, off64_t offset, int which)
+static ssize_t pvfs_prdwr64(int fd,
+                            void *buf,
+                            size_t count,
+                            off64_t offset,
+                            int which)
 {
     int rc;
     pvfs_descriptor* pd;
@@ -374,13 +406,16 @@ static ssize_t pvfs_prdwr64(int fd, void *buf,
 /**
  * implements readv and writev
  */
-static ssize_t pvfs_rdwrv(int fd, const struct iovec *vector,
-                            size_t count, int which)
+static ssize_t pvfs_rdwrv(int fd,
+                          const struct iovec *vector,
+                          size_t count,
+                          int which)
 {
     int rc;
     pvfs_descriptor* pd;
     PVFS_Request freq, mreq;
     off64_t offset;
+    void *buf;
 
     memset(&freq, 0, sizeof(freq));
     memset(&mreq, 0, sizeof(mreq));
@@ -394,7 +429,7 @@ static ssize_t pvfs_rdwrv(int fd, const struct iovec *vector,
     offset = pd->file_pointer;
 
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
-    rc = pvfs_convert_iovec(vector, count, &mreq);
+    rc = pvfs_convert_iovec(vector, count, &mreq, &buf);
 
     rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq);
 
@@ -916,7 +951,7 @@ int pvfs_mkdir (const char *path, mode_t mode)
     char *newpath;
 
     newpath = pvfs_qualify_path(path);
-    rc = iocommon_make_directory(newpath, (mode & ~mask_val & 0777));
+    rc = iocommon_make_directory(newpath, (mode & ~mask_val & 0777), NULL);
     if (newpath != path)
     {
         free(newpath);
@@ -938,10 +973,10 @@ int pvfs_mkdirat (int dirfd, const char *path, mode_t mode)
     }
     else
     {
-        int flags = O_RDONLY;
         pd = pvfs_find_descriptor(dirfd);
-        /* TODO: not sure what to do with this ... */
-        return -1;
+        rc = iocommon_make_directory(path,
+                                     (mode & ~mask_val & 0777),
+                                     &pd->pvfs_ref);
     }
     return rc;
 }
@@ -955,7 +990,7 @@ int pvfs_rmdir (const char *path)
     char *newpath;
 
     newpath = pvfs_qualify_path(path);
-    rc = iocommon_rmdir(newpath);
+    rc = iocommon_rmdir(newpath, NULL);
     if (newpath != path)
     {
         free(newpath);
@@ -970,6 +1005,7 @@ int pvfs_rmdir (const char *path)
 ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz)
 {
     int rc;
+    char *newpath;
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
@@ -991,7 +1027,7 @@ int pvfs_readlinkat (int fd, const char *path, char *buf, size_t bufsiz)
 
     if (path[0] == '/' || fd == AT_FDCWD)
     {
-        rc = pvfs_readlink(path, buf, bufsize);
+        rc = pvfs_readlink(path, buf, bufsiz);
     }
     else
     {
@@ -1014,11 +1050,14 @@ int pvfs_readlinkat (int fd, const char *path, char *buf, size_t bufsiz)
 
 int pvfs_symlink (const char *oldpath, const char *newpath)
 {
-    return iocommon_symlink(newpath, oldpath);
+    return iocommon_symlink(newpath, oldpath, NULL);
 }
 
 int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath)
 {
+    pvfs_descriptor *pd;
+    pd = pvfs_find_descriptor(newdirfd);
+    return iocommon_symlink(newpath, oldpath, &pd->pvfs_ref);
 }
 
 /**
@@ -1041,10 +1080,7 @@ int pvfs_linkat (const char *oldpath, int newdirfd,
  */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-
-    return 1; /* success */
-    return 0; /* end of file */
-    return -1; /* error */
+    return pvfs_getdents(fd, dirp, 1);
 }
 
 /**
@@ -1052,18 +1088,21 @@ int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
  */
 int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    int bytes;
-    return bytes; /* success */
-    return 0; /* end of file */
-    return -1; /* error */
+    pvfs_descriptor *pd;
+    pd = pvfs_find_descriptor(fd);
+    return iocommon_getdents(pd, dirp, count);
 }
 
 int pvfs_access (const char * path, int mode)
 {
+    return iocommon_access(path, mode, 0, NULL);
 }
 
-int pvfs_faccessat (int dirfd, const char * path, int mode, int flags)
+int pvfs_faccessat (int fd, const char * path, int mode, int flags)
 {
+    pvfs_descriptor *pd;
+    pd = pvfs_find_descriptor(fd);
+    return iocommon_access(path, mode, flags, &pd->pvfs_ref);
 }
 
 int pvfs_flock(int fd, int op)
@@ -1134,7 +1173,7 @@ posix_ops pvfs_ops =
     .write = pvfs_write,
     .pwrite = pvfs_pwrite,
     .writev = pvfs_writev,
-    .write64 = pvfs_write64,
+/*  .write64 = pvfs_write64, */
     .lseek = pvfs_lseek,
     .lseek64 = pvfs_lseek64,
     .truncate = pvfs_truncate,
