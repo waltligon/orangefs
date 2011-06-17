@@ -340,6 +340,7 @@ static int parse_args(int argc, char** argv, struct options * opts)
     static struct option long_opts[] =
     {
         {"help",0,0,0},
+        {"parents",0,0,0},
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"mode",1,0,0},
