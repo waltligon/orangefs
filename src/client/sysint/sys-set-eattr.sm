@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file PVFS system calls for setting extended attributes
+ *  \ingroup sysint
+ */
+
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
@@ -115,6 +119,20 @@ PVFS_error PVFS_isys_seteattr_list(
 
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
+}
+
+PVFS_error PVFS_isys_seteattr(
+        PVFS_object_ref ref,
+        const PVFS_credentials *credentials,
+        PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p,
+        int32_t flags,
+        PVFS_sys_op_id *op_id,
+        PVFS_hint hints,
+        void *user_ptr)
+{
+    return PVFS_isys_seteattr_list(ref, credentials, 1, key_p, val_p, flags,
+                                op_id, hints, user_ptr);
 }
 
 PVFS_error PVFS_sys_seteattr_list(

@@ -134,7 +134,9 @@ static PINT_sm_action prelude_req_sched(
                              smcb, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
 
+    /* these are two different counters - one instantaneous, one cumulative */
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
     return ret;
 }
 

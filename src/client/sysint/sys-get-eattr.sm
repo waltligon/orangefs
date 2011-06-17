@@ -4,6 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+/** \file PVFS system calls for reading extended attributes
+ *  \ingroup sysint
+ */
+
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>

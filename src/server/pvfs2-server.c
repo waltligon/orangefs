@@ -70,19 +70,6 @@
  */
 #define PVFS_SERVER_TEST_COUNT 64
 
-/* track performance counters for the server */
-static struct PINT_perf_key server_keys[] =
-{
-    {"bytes read", PINT_PERF_READ, 0},
-    {"bytes written", PINT_PERF_WRITE, 0},
-    {"metadata reads", PINT_PERF_METADATA_READ, PINT_PERF_PRESERVE},
-    {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
-    {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
-    {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
-    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
-    {NULL, 0, 0},
-};
-
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
 
@@ -321,10 +308,10 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+#if 0
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* kick off performance update state machine */
-    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
-        &(tmp_op));
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -335,6 +322,7 @@ int main(int argc, char **argv)
                     "state machine.\n", ret);
         goto server_shutdown;
     }
+#endif
 #endif
 
     /* kick off timer for expired jobs */
@@ -1138,12 +1126,32 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    PINT_server_pc = PINT_perf_initialize(server_keys);
+                            /* hist size should be in server config too */
+    PINT_server_pc = PINT_perf_initialize(PINT_PERF_HISTORY_SIZE,
+                                        server_config.perf_update_interval);
     if(!PINT_server_pc)
     {
         gossip_err("Error initializing performance counters.\n");
         return(ret);
     }
+    /* if history_size is greater than 1, start the rollover SM */
+    if (PINT_server_pc->running)
+    {
+        struct PINT_smcb *tmp_op = NULL;
+        ret = server_state_machine_alloc_noreq(
+                PVFS_SERV_PERF_UPDATE, &(tmp_op));
+        if (ret == 0)
+        {
+            ret = server_state_machine_start_noreq(tmp_op);
+        }
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: failed to start perf update "
+                        "state machine.\n", ret);
+            return(ret);
+        }
+    }
+
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 

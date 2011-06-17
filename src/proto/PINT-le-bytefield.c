@@ -10,7 +10,7 @@
 #include <string.h>
 #include <assert.h>
 
-#define __PINT_REQPROTO_ENCODE_FUNCS_C  /* trigger actual definitions */
+#define __PINT_REQPROTO_ENCODE_FUNCS_C  /** trigger actual definitions */
 #include "endecode-funcs.h"
 #include "bmi.h"
 #include "bmi-byteswap.h"
@@ -21,18 +21,18 @@
 #include "pvfs2-req-proto.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
-#include "src/io/description/pint-request.h"  /* for PINT_Request */
-#include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
+#include "src/io/description/pint-request.h"  /** for PINT_Request */
+#include "src/io/description/pint-distribution.h"  /** for PINT_dist_lookup */
 #include "pvfs2-internal.h"
 #include "pint-hint.h"
 
-/* defined later */
+/** defined later */
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
 
 static int initializing_sizes = 0;
 
-/* an array of structs for storing precalculated maximum encoding sizes
+/** an array of structs for storing precalculated maximum encoding sizes
  * for each type of server operation 
  */
 static struct {
@@ -40,7 +40,7 @@ static struct {
     int resp;
 } *max_size_array = NULL;
 
-/* lebf_initialize()
+/** lebf_initialize()
  *
  * initializes the encoder module, calculates max sizes of each request type 
  * in advance
@@ -82,7 +82,7 @@ static void lebf_initialize(void)
 
     initializing_sizes = 1;
 
-    /* set number of hints in request to the max */
+    /** set number of hints in request to the max */
     for(i = 0; i < PVFS_HINT_MAX; ++i)
     {
         char name[PVFS_HINT_MAX_NAME_LENGTH] = {0};
@@ -101,7 +101,7 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
-		/* never used, skip initialization */
+		/** never used, skip initialization */
 		continue;
 	    case PVFS_SERV_GETCONFIG:
 		resp.u.getconfig.fs_config_buf = tmp_name;
@@ -115,7 +115,7 @@ static void lebf_initialize(void)
 		respsize = extra_size_PVFS_servresp_lookup_path;
 		break;
 	    case PVFS_SERV_BATCH_CREATE:
-		/* can request a range of handles */
+		/** can request a range of handles */
 		req.u.batch_create.handle_extent_array.extent_count = 0;
 		req.u.batch_create.object_count = 0;
 		resp.u.batch_create.handle_count = 0;
@@ -123,7 +123,7 @@ static void lebf_initialize(void)
 		respsize = extra_size_PVFS_servresp_batch_create;
 		break;
 	    case PVFS_SERV_CREATE:
-		/* can request a range of handles */
+		/** can request a range of handles */
 		reqsize = extra_size_PVFS_servreq_create;
                 respsize = extra_size_PVFS_servresp_create;
                 break;
@@ -136,7 +136,7 @@ static void lebf_initialize(void)
             case PVFS_SERV_IMM_COPIES:
                  break;
 	    case PVFS_SERV_REMOVE:
-		/* nothing special, let normal encoding work */
+		/** nothing special, let normal encoding work */
 		break;
 	    case PVFS_SERV_BATCH_REMOVE:
 		req.u.batch_remove.handles = NULL;
@@ -144,7 +144,7 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_batch_remove;
 		break;
 	    case PVFS_SERV_MGMT_REMOVE_OBJECT:
-		/* nothing special, let normal encoding work */
+		/** nothing special, let normal encoding work */
 		break;
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 		req.u.mgmt_remove_dirent.entry = tmp_name;
@@ -191,7 +191,7 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_chdirent;
 		break;
 	    case PVFS_SERV_TRUNCATE:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_MKDIR:
 		req.u.mkdir.handle_extent_array.extent_count = 0;
@@ -204,22 +204,22 @@ static void lebf_initialize(void)
 		respsize = extra_size_PVFS_servresp_readdir;
 		break;
 	    case PVFS_SERV_FLUSH:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_MGMT_SETPARAM:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_MGMT_NOOP:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_STATFS:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_WRITE_COMPLETION:
-		/* only a response, but nothing special there */
+		/** only a response, but nothing special there */
 		noreq = 1;
 		break;
 	    case PVFS_SERV_MGMT_PERF_MON:
@@ -241,7 +241,7 @@ static void lebf_initialize(void)
 		respsize = extra_size_PVFS_servresp_mgmt_event_mon;
 		break;
 	    case PVFS_SERV_PROTO_ERROR:
-		/* nothing special */
+		/** nothing special */
 		break;
 	    case PVFS_SERV_GETEATTR:
                 req.u.geteattr.nkey = 0;
@@ -278,11 +278,11 @@ static void lebf_initialize(void)
                 resp.u.tree_get_file_size.caller_handle_index = 0;
 		respsize = extra_size_PVFS_servresp_tree_get_file_size;
 		break;
-            case PVFS_SERV_NUM_OPS:  /* sentinel, should not hit */
+            case PVFS_SERV_NUM_OPS:  /** sentinel, should not hit */
                 assert(0);
                 break;
 	}
-	/* since these take the max size when mallocing in the encode,
+	/** since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
 	max_size_array[op_type].req = 
                                  max_size_array[op_type].resp = init_big_size;
@@ -304,7 +304,7 @@ static void lebf_initialize(void)
 	max_size_array[op_type].resp = respsize;
     }
 
-    /* clean up stuff just used for initialization */
+    /** clean up stuff just used for initialization */
     PVFS_hint_free(req.hints);
     free(tmp_dist.dist_name);
     free(tmp_name);
@@ -316,7 +316,7 @@ static void lebf_finalize(void)
     free(max_size_array);
 }
 
-/* lebf_encode_calc_max_size()
+/** lebf_encode_calc_max_size()
  *
  * reports the maximum allowed encoded size for the given request type
  *
@@ -351,13 +351,13 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     void *buf = NULL;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
-    /* this encoder always uses just one buffer */
+    /** this encoder always uses just one buffer */
     BF_ENCODE_TARGET_MSG_INIT(target_msg);
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"\tmaxsize:%d\tinitializing_sizes:%d\n"
                                       ,maxsize,initializing_sizes);
 
-    /* allocate the max size buffer to avoid the work of calculating it */
+    /** allocate the max size buffer to avoid the work of calculating it */
     buf = (initializing_sizes ? malloc(maxsize) :
            BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
     if (!buf)
@@ -372,7 +372,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     target_msg->alloc_size_list[0] = maxsize;
     target_msg->ptr_current = buf;
 
-    /* generic header */
+    /** generic header */
     memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
            PINT_ENC_GENERIC_HEADER_SIZE);
     target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
@@ -381,7 +381,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     return ret;
 }
 
-/* lebf_encode_req()
+/** lebf_encode_req()
  *
  * encodes a request structure
  *
@@ -403,7 +403,7 @@ static int lebf_encode_req(
 	goto out;
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_req\n");
 
-    /* every request has these fields */
+    /** every request has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_req(p, req);
 
@@ -412,7 +412,7 @@ static int lebf_encode_req(
 
     switch (req->op) {
 
-	/* call standard function defined in headers */
+	/** call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
@@ -452,7 +452,7 @@ static int lebf_encode_req(
         case PVFS_SERV_MGMT_NOOP:
 	case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
-	    /* nothing else */
+	    /** nothing else */
 	    break;
 
 	case PVFS_SERV_INVALID:
@@ -460,7 +460,7 @@ static int lebf_encode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
-        case PVFS_SERV_NUM_OPS:  /* sentinel */
+        case PVFS_SERV_NUM_OPS:  /** sentinel */
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
 	    ret = -PVFS_ENOSYS;
 	    break;
@@ -468,7 +468,7 @@ static int lebf_encode_req(
 
 #undef CASE
 
-    /* although much more may have been allocated */
+    /** although much more may have been allocated */
     target_msg->total_size = target_msg->ptr_current
       - (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
@@ -486,7 +486,7 @@ static int lebf_encode_req(
 }
 
 
-/* lebf_encode_resp()
+/** lebf_encode_resp()
  *
  * encodes a response structure
  *
@@ -504,7 +504,7 @@ static int lebf_encode_resp(
 	goto out;
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp\n");
 
-    /* every response has these fields */
+    /** every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
 
@@ -512,15 +512,15 @@ static int lebf_encode_resp(
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
 
 
-    /* we stand a good chance of segfaulting if we try to encode the response
+    /** we stand a good chance of segfaulting if we try to encode the response
      * after something bad happened reading data from disk. */
     if (resp->status == 0) 
     {
 
-        /* extra encoding rules for particular responses */
+        /** extra encoding rules for particular responses */
         switch (resp->op) {
 
-        /* call standard function defined in headers */
+        /** call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
@@ -561,14 +561,14 @@ static int lebf_encode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
-            /* nothing else */
+            /** nothing else */
             break;
 
         case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
-        case PVFS_SERV_NUM_OPS:  /* sentinel */
+        case PVFS_SERV_NUM_OPS:  /** sentinel */
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
             break;
@@ -577,7 +577,7 @@ static int lebf_encode_resp(
 
 #undef CASE
 
-    /* although much more may have been allocated */
+    /** although much more may have been allocated */
     target_msg->total_size = target_msg->ptr_current
       - (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
@@ -593,7 +593,7 @@ static int lebf_encode_resp(
     return ret;
 }
 
-/* lebf_decode_req()
+/** lebf_decode_req()
  *
  * decodes a request message
  *
@@ -615,7 +615,7 @@ static int lebf_decode_req(
 
     target_msg->buffer = req;
 
-    /* decode generic part of request (enough to get op number) */
+    /** decode generic part of request (enough to get op number) */
     decode_PVFS_server_req(p, req);
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_req\n");
 
@@ -624,7 +624,7 @@ static int lebf_decode_req(
 
     switch (req->op) {
 
-	/* call standard function defined in headers */
+	/** call standard function defined in headers */
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
@@ -663,7 +663,7 @@ static int lebf_decode_req(
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_IMM_COPIES:
-	    /* nothing else */
+	    /** nothing else */
 	    break;
 
 	case PVFS_SERV_INVALID:
@@ -672,7 +672,7 @@ static int lebf_decode_req(
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
-        case PVFS_SERV_NUM_OPS:  /* sentinel */
+        case PVFS_SERV_NUM_OPS:  /** sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -691,7 +691,7 @@ static int lebf_decode_req(
     return(ret);
 }
 
-/* lebf_decode_resp()
+/** lebf_decode_resp()
  *
  * decodes a response structure
  *
@@ -710,7 +710,7 @@ static int lebf_decode_resp(
 
     target_msg->buffer = resp;
 
-    /* decode generic part of response (including op number) */
+    /** decode generic part of response (including op number) */
     decode_PVFS_server_resp(p, resp);
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
@@ -722,7 +722,7 @@ static int lebf_decode_resp(
 
     switch (resp->op) {
 
-	/* call standard function defined in headers */
+	/** call standard function defined in headers */
 	CASE(PVFS_SERV_GETCONFIG, getconfig);
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
@@ -763,14 +763,14 @@ static int lebf_decode_resp(
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_IMM_COPIES:
         case PVFS_SERV_MGMT_SETPARAM:
-	    /* nothing else */
+	    /** nothing else */
 	    break;
 
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_PRECREATE_POOL_REFILLER:
         case PVFS_SERV_JOB_TIMER:
-        case PVFS_SERV_NUM_OPS:  /* sentinel */
+        case PVFS_SERV_NUM_OPS:  /** sentinel */
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -789,7 +789,7 @@ static int lebf_decode_resp(
     return(ret);
 }
 
-/* lebf_encode_rel()
+/** lebf_encode_rel()
  *
  * releases resources consumed while encoding
  *
@@ -800,7 +800,7 @@ static void lebf_encode_rel(
     enum PINT_encode_msg_type input_type)
 {
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_rel\n");
-    /* just a single buffer to free */
+    /** just a single buffer to free */
     if (initializing_sizes)
     {
 	free(msg->buffer_list[0]);
@@ -812,7 +812,7 @@ static void lebf_encode_rel(
     }
 }
 
-/* lebf_decode_rel()
+/** lebf_decode_rel()
  *
  * releases resources consumed while decoding
  *
@@ -927,7 +927,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_PRECREATE_POOL_REFILLER:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
-            case PVFS_SERV_NUM_OPS:  /* sentinel */
+            case PVFS_SERV_NUM_OPS:  /** sentinel */
 		gossip_lerr("%s: invalid request operation %d.\n",
 		  __func__, req->op);
                 break;
@@ -1001,7 +1001,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     break;
 
                 case PVFS_SERV_GETEATTR:
-                    /* need a loop here?  WBL */
+                    /** need a loop here?  WBL */
                     if (resp->u.geteattr.val)
                         decode_free(resp->u.geteattr.val);
                     break;
@@ -1081,7 +1081,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_PERF_UPDATE:
                 case PVFS_SERV_PRECREATE_POOL_REFILLER:
                 case PVFS_SERV_JOB_TIMER:
-                case PVFS_SERV_NUM_OPS:  /* sentinel */
+                case PVFS_SERV_NUM_OPS:  /** sentinel */
                     gossip_lerr("%s: invalid response operation %d.\n",
                                 __func__, resp->op);
                     break;

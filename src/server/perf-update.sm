@@ -35,7 +35,7 @@ machine pvfs2_perf_update_sm
 
 %%
 
-/* perf_update_error()
+/** perf_update_error()
  *
  * cleans up any resources consumed by this state machine and ends
  * execution of the machine
@@ -50,7 +50,7 @@ static PINT_sm_action perf_update_error(
     return(server_state_machine_complete(smcb));
 }
 
-/* perf_update_do_work()
+/** perf_update_do_work()
  *
  * resets counters, updates metrices, etc- this is intended to be called
  * repeatedly on a regular interval
@@ -65,7 +65,6 @@ static PINT_sm_action perf_update_do_work(
     char* ptr;
     char* token;
     char delim[] = "\n";
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
 #if 0
     PINT_STATE_DEBUG("do_work");
@@ -92,7 +91,7 @@ static PINT_sm_action perf_update_do_work(
     PINT_perf_rollover(PINT_server_pc);
 	
     /* post another timer */
-    return(job_req_sched_post_timer(user_opts->perf_update_interval,
+    return(job_req_sched_post_timer(PINT_server_pc->interval,
 	        smcb,
 	        0,
 	        js_p,

@@ -24,18 +24,44 @@
 #define HISTORY 1
 #define CMD_BUF_SIZE 256
 
-#define OID_REQ ".1.3.6.1.4.1.7778.1"
-#define OID_READ ".1.3.6.1.4.1.7778.2"
-#define OID_WRITE ".1.3.6.1.4.1.7778.3"
-#define OID_MREAD ".1.3.6.1.4.1.7778.4"
-#define OID_MWRITE ".1.3.6.1.4.1.7778.5"
-#define OID_DSPACE ".1.3.6.1.4.1.7778.6"
-#define OID_KEYVAL ".1.3.6.1.4.1.7778.7"
-#define OID_REQSCHED ".1.3.6.1.4.1.7778.8"
+/* these defines should match the defines in include/pvfs2-mgmt.h */
+#define OID_READ ".1.3.6.1.4.1.7778.0"
+#define OID_WRITE ".1.3.6.1.4.1.7778.1"
+#define OID_MREAD ".1.3.6.1.4.1.7778.2"
+#define OID_MWRITE ".1.3.6.1.4.1.7778.3"
+#define OID_DSPACE ".1.3.6.1.4.1.7778.4"
+#define OID_KEYVAL ".1.3.6.1.4.1.7778.5"
+#define OID_REQSCHED ".1.3.6.1.4.1.7778.6"
+#define OID_REQUESTS ".1.3.6.1.4.1.7778.7"
+
+#define INT_TYPE "INTEGER"
+#define CNT_TYPE "COUNTER"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
+
+struct MGMT_perf_iod
+{
+    const char *key_oid;
+    const char *key_type;
+    int key_number;
+    const char *key_name;
+};
+
+/* this table needs to match the list of keys in pvfs2-mgmt.h */
+static struct MGMT_perf_iod key_table[] = 
+{
+   {OID_READ, CNT_TYPE, PINT_PERF_READ, "Bytes Read"},
+   {OID_WRITE, CNT_TYPE, PINT_PERF_WRITE, "Bytes Written"},
+   {OID_MREAD, CNT_TYPE, PINT_PERF_METADATA_READ, "Metadata Read Ops"},
+   {OID_MWRITE, CNT_TYPE, PINT_PERF_METADATA_WRITE, "Metadata Write Ops"},
+   {OID_DSPACE, CNT_TYPE, PINT_PERF_METADATA_DSPACE_OPS, "Metadata DSPACE Ops"},
+   {OID_KEYVAL, CNT_TYPE, PINT_PERF_METADATA_KEYVAL_OPS, "Metadata KEYVAL Ops"},
+   {OID_REQSCHED, INT_TYPE, PINT_PERF_REQSCHED, "Requests Active"},
+   {OID_REQUESTS, CNT_TYPE, PINT_PERF_REQUESTS, "Requests Received"},
+   {NULL, NULL, -1, NULL}   /* this halts the key count */
+};
 
 struct options
 {
@@ -58,11 +84,12 @@ int main(int argc, char **argv)
     int i;
     PVFS_credentials creds;
     int io_server_count;
-    struct PVFS_mgmt_perf_stat** perf_matrix;
+    int64_t **perf_matrix;
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
     PVFS_BMI_addr_t *addr_array, server_addr;
     char *cmd_buffer = (char *)malloc(CMD_BUF_SIZE);
+    int max_keys, key_count;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -79,6 +106,7 @@ int main(int argc, char **argv)
         PVFS_perror("PVFS_util_init_defaults", ret);
         return(-1);
     }
+
     PVFS_util_gen_credentials(&creds);
     if (user_opts->server_addr_set)
     {
@@ -146,9 +174,11 @@ int main(int argc, char **argv)
         }
     }
 
+    /* count keys */
+    for (max_keys = 0; key_table[max_keys].key_number >= 0; max_keys++);
+
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
-                   io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
+    perf_matrix = (int64_t **)malloc(io_server_count * sizeof(int64_t *));
     if (!perf_matrix)
     {
         perror("malloc");
@@ -156,8 +186,8 @@ int main(int argc, char **argv)
     }
     for(i=0; i<io_server_count; i++)
     {
-	    perf_matrix[i] = (struct PVFS_mgmt_perf_stat *)
-	            malloc(HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
+	    perf_matrix[i] = (int64_t *)malloc(HISTORY * (max_keys + 2)
+                                        * sizeof(int64_t));
 	    if (perf_matrix[i] == NULL)
 	    {
 	        perror("malloc");
@@ -188,10 +218,10 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats when requested */
     while (1)
     {
-        int srv=0, smp=0;
-        time_t snaptime=0;
-        char *returnType=NULL; 
-        int returnValue=0;
+        int srv = 0;
+        time_t snaptime = 0;
+        const char *returnType = NULL; 
+        int64_t returnValue = 0;
         /* wait for a request from SNMP driver */
         retc = fgets(cmd_buffer, CMD_BUF_SIZE, stdin);
         if (!retc)
@@ -232,10 +262,11 @@ int main(int argc, char **argv)
             continue;
         }
 
-        /* good command read counters */
+        /* good command - read counters */
         if (time(NULL) - snaptime > 60)
         {
             snaptime = time(NULL);
+            key_count = max_keys;
 	        ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				          &creds,
 				          perf_matrix, 
@@ -243,6 +274,7 @@ int main(int argc, char **argv)
 				          addr_array,
 				          next_id_array,
 				          io_server_count, 
+                          &key_count,
 				          HISTORY,
 				          NULL, NULL);
 	        if (ret < 0)
@@ -253,43 +285,17 @@ int main(int argc, char **argv)
         }
 
         /* format requested OID */
-        if (perf_matrix[srv][smp].valid_flag)
+        if (perf_matrix[srv][key_count] != 0)
         {
-            /* valid measurement */
-            if (!strcmp(cmd_buffer, OID_READ))
+            int k;
+            /* this is a valid measurement */
+            for(k = 0; k < max_keys &&
+                    strcmp(cmd_buffer, key_table[k].key_oid); k++);
+            /* out of for loop k equals selected key */
+            if (k <= max_keys)
             {
-                returnType = "INTEGER";
-                returnValue = perf_matrix[srv][smp].read;
-            }
-            else if (!strcmp(cmd_buffer, OID_WRITE))
-            {
-                returnType = "INTEGER";
-                returnValue = perf_matrix[srv][smp].write;
-            }
-            else if (!strcmp(cmd_buffer, OID_MREAD))
-            {
-                returnType = "COUNTER";
-                returnValue = perf_matrix[srv][smp].metadata_read;
-            }
-            else if (!strcmp(cmd_buffer, OID_MWRITE))
-            {
-                returnType = "COUNTER";
-                returnValue = perf_matrix[srv][smp].metadata_write;
-            }
-            else if (!strcmp(cmd_buffer, OID_DSPACE))
-            {
-                returnType = "COUNTER";
-                returnValue = perf_matrix[srv][smp].dspace_queue;
-            }
-            else if (!strcmp(cmd_buffer, OID_KEYVAL))
-            {
-                returnType = "COUNTER";
-                returnValue = perf_matrix[srv][smp].keyval_queue;
-            }
-            else if (!strcmp(cmd_buffer, OID_REQSCHED))
-            {
-                returnType = "INTEGER";
-                returnValue = perf_matrix[srv][smp].reqsched;
+                returnType = key_table[k].key_type;
+                returnValue = perf_matrix[srv][key_table[k].key_number];
             }
             else
             {
@@ -306,9 +312,9 @@ int main(int argc, char **argv)
             fflush(stdout);
             continue;
         }
-        fprintf(stdout, "%s\n%u\n", returnType, returnValue);
+        fprintf(stdout, "%s\n%llu\n", returnType, returnValue);
         fflush(stdout);
-        /* wait for next command */
+        /* return to top for next command */
     }
 
     PVFS_sys_finalize();

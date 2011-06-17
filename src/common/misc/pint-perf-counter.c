@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/**
+ * a perf counter (pc) has a linked list of samples (pc->sample) that
+ * in turn has a start time, and interval, and a pointer to an array of 
+ * counters.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
@@ -15,18 +21,58 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
+#include "pint-util.h"
 #include "gossip.h"
 
 #define PINT_PERF_REALLOC_ARRAY(__pc, __tmp_ptr, __src_ptr, __new_history, __type) \
 {                                                                      \
-    __tmp_ptr = (__type*)malloc(__new_history*sizeof(__type));         \
+    __tmp_ptr = (__type *)malloc(__new_history * sizeof(__type));      \
     if(!__tmp_ptr)                                                     \
         return(-PVFS_ENOMEM);                                          \
-    memset(__tmp_ptr, 0, (__new_history*sizeof(__type)));              \
+    memset(__tmp_ptr, 0, (__new_history * sizeof(__type)));            \
     memcpy(__tmp_ptr, __src_ptr,                                       \
-        (__pc->history_size*sizeof(__type)));                          \
+        (__pc->history_size * sizeof(__type)));                        \
     free(__src_ptr);                                                   \
     __src_ptr = __tmp_ptr;                                             \
+}
+
+/**
+ * track performance counters for the server 
+ * keys must be defined here in order based on the 
+ * enumeration in include/pvfs2-mgmt.h
+ */
+static struct PINT_perf_key key_array[] =
+{
+    {"bytes read", PINT_PERF_READ, PINT_PERF_PRESERVE},
+    {"bytes written", PINT_PERF_WRITE, PINT_PERF_PRESERVE},
+    {"metadata reads", PINT_PERF_METADATA_READ, PINT_PERF_PRESERVE},
+    {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
+    {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
+    {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
+    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
+    {"requests received ", PINT_PERF_REQUESTS, PINT_PERF_PRESERVE},
+    {NULL, 0, 0},
+};
+
+/**
+ * this utility removes all of the samples from a perf counter
+ * this is mostly for cleanup in case of a memory alloc error
+ */
+void PINT_free_pc (struct PINT_perf_counter *pc)
+{
+    struct PINT_perf_sample *tmp, *tmp2;
+    if (!pc)
+        return;
+    tmp = pc->sample;
+    while(tmp)
+    {
+        if (tmp->value)
+            free (tmp->value);
+        tmp2 = tmp;
+        tmp = tmp->next;
+        free (tmp2);
+    }
+    free(pc);
 }
 
 /** 
@@ -35,15 +81,15 @@
  * PINT_perf_finalize()
  * \returns pointer to perf counter on success, NULL on failure
  */
-struct PINT_perf_counter* PINT_perf_initialize(
-    struct PINT_perf_key* key_array) /**< NULL terminated array of keys */
+struct PINT_perf_counter *PINT_perf_initialize( int default_history_size,
+                                                int default_interval)
 {
-    struct PINT_perf_counter* pc = NULL;
-    struct PINT_perf_key* key = NULL;
+    struct PINT_perf_counter *pc = NULL;
+    struct PINT_perf_key *key = NULL;
     int i;
-    struct timeval tv;
+    struct PINT_perf_sample *tmp;
 
-    pc = (struct PINT_perf_counter*)malloc(sizeof(struct PINT_perf_counter));
+    pc = (struct PINT_perf_counter *)malloc(sizeof(struct PINT_perf_counter));
     if(!pc)
     {
         return(NULL);
@@ -52,7 +98,7 @@ struct PINT_perf_counter* PINT_perf_initialize(
     gen_mutex_init(&pc->mutex);
     pc->key_array = key_array;
 
-    key = &key_array[pc->key_count];
+    key = &key_array[pc->key_count]; /* key count is zero */
     while(key->key_name)
     {
         /* keys must be in order from zero */
@@ -75,66 +121,55 @@ struct PINT_perf_counter* PINT_perf_initialize(
         return(NULL);
     }
 
-    pc->history_size = PERF_DEFAULT_HISTORY_SIZE;
+    /* running will be used to decide if we should start an update process */
+    pc->history_size = default_history_size;
+    pc->running = (pc->history_size > 1);
+    pc->interval = default_interval;
 
-    /* allocate time arrays */
-    pc->start_time_array_ms =
-            (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-    if(!pc->start_time_array_ms)
+    /* create a simple linked list of samples, each with a value array */
+    tmp = (struct PINT_perf_sample *)malloc(sizeof (struct PINT_perf_sample));
+    if(!tmp)
     {
         gen_mutex_destroy(&pc->mutex);
         free(pc);
         return(NULL);
     }
-    pc->interval_array_ms = 
-            (uint64_t*)malloc(PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-    if(!pc->interval_array_ms)
+    memset(tmp, 0, sizeof(struct PINT_perf_sample));
+    tmp->next = NULL;
+    tmp->value = (int64_t *)malloc(pc->key_count * sizeof(int64_t));
+    if(!tmp->value)
     {
-        free(pc->start_time_array_ms);
         gen_mutex_destroy(&pc->mutex);
-        free(pc);
+        PINT_free_pc(pc);
         return(NULL);
     }
-    memset(pc->start_time_array_ms, 0,
-            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-    memset(pc->interval_array_ms, 0,
-            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-        
-    /* allocate value matrix */
-    pc->value_matrix = (int64_t**)malloc(pc->key_count*sizeof(int64_t*));
-    if(!pc->value_matrix)
+    memset(tmp->value, 0, pc->key_count * sizeof(int64_t));
+    pc->sample = tmp;
+    for (i = pc->history_size - 1; i > 0 && tmp; i--)
     {
-        free(pc->start_time_array_ms);
-        free(pc->interval_array_ms);
-        gen_mutex_destroy(&pc->mutex);
-        free(pc);
-        return(NULL);
-    }
-
-    for(i=0; i<pc->key_count; i++)
-    {
-        pc->value_matrix[i] =
-                (int64_t*)malloc(pc->history_size*sizeof(int64_t));
-        if(!pc->value_matrix[i])
+        tmp->next = (struct PINT_perf_sample *)
+                        malloc(sizeof (struct PINT_perf_sample));
+        if(!tmp->next)
         {
-            for(i=i-1; i>= 0; i--)
-            {
-                free(pc->value_matrix[i]);
-            }
-            free(pc->value_matrix);
-            free(pc->start_time_array_ms);
-            free(pc->interval_array_ms);
             gen_mutex_destroy(&pc->mutex);
-            free(pc);
+            PINT_free_pc(pc);
             return(NULL);
         }
-        memset(pc->value_matrix[i], 0, pc->history_size*sizeof(int64_t));
+        memset(tmp->next, 0, sizeof(struct PINT_perf_sample));
+        tmp->next->next = NULL;
+        tmp->next->value = (int64_t *)malloc(pc->key_count * sizeof(int64_t));
+        if(!tmp->value)
+        {
+            gen_mutex_destroy(&pc->mutex);
+            PINT_free_pc(pc);
+            return(NULL);
+        }
+        memset(tmp->next->value, 0, pc->key_count * sizeof(int64_t));
+        tmp = tmp->next;
     }
 
     /* set initial timestamp */
-    gettimeofday(&tv, NULL);
-    pc->start_time_array_ms[0] = ((uint64_t)tv.tv_sec)*1000 +
-	tv.tv_usec/1000;
+    pc->sample->start_time_ms = PINT_util_get_time_ms();
 
     return(pc);
 }
@@ -147,28 +182,28 @@ void PINT_perf_reset(
     struct PINT_perf_counter* pc)
 {
     int i;
-    struct timeval tv;
+    struct PINT_perf_sample *s;
 
     gen_mutex_lock(&pc->mutex);
 
-    /* zero out all fields */
-    memset(pc->start_time_array_ms, 0,
-            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-    memset(pc->interval_array_ms, 0,
-            PERF_DEFAULT_HISTORY_SIZE*sizeof(uint64_t));
-    for(i=0; i<pc->key_count; i++)
+    if (!pc || !pc->sample || !pc->sample->value)
+        return;
+    for(s = pc->sample; s; s = s->next)
     {
-        if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
+        /* zero out all fields */
+        memset(&s->start_time_ms, 0, sizeof(uint64_t));
+        memset(&s->interval_ms, 0, sizeof(uint64_t));
+        for(i = 0; i < pc->key_count; i++)
         {
-            memset(pc->value_matrix[i], 0, pc->history_size*sizeof(int64_t));
+            if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
+            {
+                memset(&s->value[i], 0, sizeof(int64_t));
+            }
         }
     }
 
     /* set initial timestamp */
-    gettimeofday(&tv, NULL);
-    pc->start_time_array_ms[0] = ((uint64_t)tv.tv_sec)*1000 +
-	tv.tv_usec/1000;
-
+    s->start_time_ms = PINT_util_get_time_ms();
     gen_mutex_unlock(&pc->mutex);
 
     return;
@@ -178,21 +213,9 @@ void PINT_perf_reset(
  * destroys a perf counter instance
  */
 void PINT_perf_finalize(
-        struct PINT_perf_counter* pc)    /**< pointer to counter instance */
+        struct PINT_perf_counter *pc)    /**< pointer to counter instance */
 {
-    int i;
-
-    for(i=0; i<pc->key_count; i++)
-    {
-        free(pc->value_matrix[i]);
-    }
-    free(pc->value_matrix);
-    free(pc->start_time_array_ms);
-    free(pc->interval_array_ms);
-    gen_mutex_destroy(&pc->mutex);
-    free(pc);
-    pc = NULL;
-    
+    PINT_free_pc(pc);
     return;
 }
 
@@ -205,13 +228,17 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
                         int64_t value,
                         enum PINT_perf_ops op)
 {
-    if(!pc)
+    int64_t tmp; /* this is for debugging purposes */
+
+    if(!pc || !pc->sample || !pc->sample->value)
     {
         /* do nothing if perf counter is not initialized */
         return;
     }
 
     gen_mutex_lock(&pc->mutex);
+
+    tmp = pc->sample->value[key];
 
     if(key >= pc->key_count)
     {
@@ -222,25 +249,25 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
     switch(op)
     {
         case PINT_PERF_ADD:
-            pc->value_matrix[key][0] = pc->value_matrix[key][0] + value;
+            pc->sample->value[key] += value;
             break;
         case PINT_PERF_SUB:
-            pc->value_matrix[key][0] = pc->value_matrix[key][0] - value;
+            pc->sample->value[key] -= value;
             break;
         case PINT_PERF_SET:
-            pc->value_matrix[key][0] = value;
+            pc->sample->value[key] = value;
             break;
     }
+
+#if 0
+/* debug code shows counters being manipulated */
+gossip_err("COUNT %d %lld was %lld is now %lld\n", key, value,
+        tmp, pc->sample->value[key]);
+#endif
 
     gen_mutex_unlock(&pc->mutex);
     return;
 }
-
-#ifdef __PVFS2_DISABLE_PERF_COUNTERS__
-    #define PINT_perf_count(w,x,y,z) do{}while(0)
-#else
-    #define PINT_perf_count __PINT_perf_count
-#endif
 
 /** 
  * rolls over the current history window
@@ -248,48 +275,40 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
 void PINT_perf_rollover( struct PINT_perf_counter* pc)
 {
     int i;
-    struct timeval tv;
     uint64_t int_time;
+    struct PINT_perf_sample *head, *tail;
 
-    if(!pc)
+    if(!pc || !pc->sample || !pc->sample->value)
     {
         /* do nothing if perf counter is not initialized */
         return;
     }
 
-    gettimeofday(&tv, NULL);
-    int_time = ((uint64_t)tv.tv_sec)*1000 + tv.tv_usec/1000;
+    int_time = PINT_util_get_time_ms();
 
     gen_mutex_lock(&pc->mutex);
 
-    /* rotate all values back one */
-    if(pc->history_size > 1)
+    /* rotate newest sample to the back */
+    head = pc->sample;
+    for(tail = head; tail && tail->next; tail = tail->next);
+    if(head != tail)
     {
-        for(i=0; i<pc->key_count; i++)
-        {
-            memmove(&pc->value_matrix[i][1], &pc->value_matrix[i][0],
-                    ((pc->history_size-1)*sizeof(int64_t)));
-        }
-        memmove(&pc->interval_array_ms[1], &pc->interval_array_ms[0],
-                ((pc->history_size-1)*sizeof(uint64_t)));
-        memmove(&pc->start_time_array_ms[1], &pc->start_time_array_ms[0],
-                ((pc->history_size-1)*sizeof(uint64_t)));
-        if(int_time > pc->start_time_array_ms[1])
-        {
-            pc->interval_array_ms[1] = int_time - pc->start_time_array_ms[1];
-        }
+        /* move head to the tail */
+        pc->sample = head->next;
+        tail->next = head;
+        head->next = NULL;
+        memcpy(pc->sample, tail->next, sizeof(struct PINT_perf_sample));
     }
 
     /* reset times for next interval */
-    pc->start_time_array_ms[0] = int_time;
-    pc->interval_array_ms[0] = 0;
+    pc->sample->start_time_ms = int_time;
+    pc->sample->interval_ms = 0;
 
-    for(i=0; i<pc->key_count; i++)
+    for(i = 0; i < pc->key_count; i++)
     {
-        /* reset next interval's value, unless preserve flag set */
         if(!(pc->key_array[i].flag & PINT_PERF_PRESERVE))
         {
-            pc->value_matrix[i][0] = 0;
+            memset(&pc->sample->value[i], 0, sizeof(int64_t));
         }
     }
 
@@ -306,54 +325,82 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                          enum PINT_perf_option option,
                          unsigned int arg)
 {
-    uint64_t* tmp_unsigned;
-    int64_t* tmp_signed;
-    int i;
-
-    if(!pc)
+    if(!pc || !pc->sample || !pc->sample->value)
     {
         /* do nothing if perf counter is not initialized */
         return 0;
     }
 
+    if (arg < 1)
+    {
+        /* bad argument */
+        return(-PVFS_EINVAL);
+    }
+
     gen_mutex_lock(&pc->mutex);
     switch(option)
     {
-        case PINT_PERF_HISTORY_SIZE:
-            if(arg <= pc->history_size)
+    case PINT_PERF_HISTORY_SIZE:
+        if(arg <= pc->history_size)
+        {
+            while(arg < pc->history_size)
             {
-                pc->history_size = arg;
-            }
-            else
-            {
-                /* we have to reallocate everything */
-                /* NOTE: these macros will return error if needed, and
-                 * counter instance will still be operational
-                 */
-                PINT_PERF_REALLOC_ARRAY(pc,
-                        tmp_unsigned,
-                        pc->start_time_array_ms,
-                        arg,
-                        uint64_t);
-                PINT_PERF_REALLOC_ARRAY(pc,
-                        tmp_unsigned,
-                        pc->interval_array_ms,
-                        arg,
-                        uint64_t);
-                for(i=0; i<pc->key_count; i++)
+                struct PINT_perf_sample *s;
+                /* remove one sample from list */
+                s = pc->sample->next;
+                if (s)
                 {
-                    PINT_PERF_REALLOC_ARRAY(pc,
-                            tmp_signed,
-                            pc->value_matrix[i],
-                            arg,
-                            int64_t);
+                    /* removing just behind first sample */
+                    pc->sample->next = s->next;
+                    s->next = NULL;
+                    free(s->value);
+                    free(s);
+                    pc->history_size--;
                 }
-                pc->history_size = arg;
+                else
+                {
+                    /* something is wrong */
+                    gen_mutex_unlock(&pc->mutex);
+                    return(-PVFS_EINVAL);
+                }
             }
-            break;
-        default:
-            gen_mutex_unlock(&pc->mutex);
-            return(-PVFS_EINVAL);
+            /* if history_size is now 1 stop the rollover SM */
+        }
+        else
+        {
+            while(arg > pc->history_size)
+            {
+                struct PINT_perf_sample *s;
+                /* add one sample to list */
+                s = (struct PINT_perf_sample *)
+                        malloc(sizeof(struct PINT_perf_sample));
+                if(!s)
+                {
+                    gen_mutex_unlock(&pc->mutex);
+                    return(-PVFS_ENOMEM);
+                }
+                memset(s, 0, sizeof(sizeof(struct PINT_perf_sample)));
+                s->value = (int64_t *)
+                        malloc(pc->key_count * sizeof(int64_t));
+                if(!s->value);
+                {
+                    free(s);
+                    gen_mutex_unlock(&pc->mutex);
+                    return(-PVFS_ENOMEM);
+                }
+                memset(s->value, 0,
+                        sizeof(pc->key_count * sizeof(int64_t)));
+                /* adding just after first sample */
+                s->next = pc->sample->next;
+                pc->sample->next = s;
+                pc->history_size++;
+            }
+            /* if not running start rollover SM */
+        }
+        break;
+    default:
+        gen_mutex_unlock(&pc->mutex);
+        return(-PVFS_EINVAL);
     }
     
     gen_mutex_unlock(&pc->mutex);
@@ -377,15 +424,15 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
     gen_mutex_lock(&pc->mutex);
     switch(option)
     {
-        case PINT_PERF_HISTORY_SIZE:
-            *arg = pc->history_size;
-            break;
-        case PINT_PERF_KEY_COUNT:
-            *arg = pc->key_count;
-            break;
-        default:
-            gen_mutex_unlock(&pc->mutex);
-            return(-PVFS_EINVAL);
+    case PINT_PERF_HISTORY_SIZE:
+        *arg = pc->history_size;
+        break;
+    case PINT_PERF_KEY_COUNT:
+        *arg = pc->key_count;
+        break;
+    default:
+        gen_mutex_unlock(&pc->mutex);
+        return(-PVFS_EINVAL);
     }
     
     gen_mutex_unlock(&pc->mutex);
@@ -394,22 +441,34 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
 
 /**
  * retrieves measurement history
+ *
+ * This copies the data from the samples (stored in a linked list) into
+ * a temporary array where they can be inspected without worry of update
+ * this array will store up to max_key counters PLUS two time values, the
+ * start time and intervale, both as ms counts.  The samples might have
+ * more or less keys in them, and the system might have more or less
+ * samples than space in the array.
+ *
+ * the array is really a 2D Matrix (keys+times vs history) but is treated
+ * as a 1D array because the sizes aren't well known until runtime, and
+ * even then can change.  This results in some 2D indexing (i*max_key+2) 
+ * in the loop where
+ * data is copied from the samples to the value_array.  Also the location
+ * of the time stampls is generally index max_key, and max_key+1
  */
 void PINT_perf_retrieve(
-        struct PINT_perf_counter* pc,    /**< performance counter */
-        int64_t** value_matrix, /**< 2d matrix to fill in with measurements */
-        uint64_t* start_time_array_ms,   /**< array of start times */
-        uint64_t* interval_array_ms,     /**< array of interval lengths */
-        int max_key,                     /**< max key value (1st dimension) */
-        int max_history)                 /**< max history (2nd dimension) */
+        struct PINT_perf_counter* pc,    /* performance counter */
+        int64_t *value_array,            /* array of output measurements */
+        int max_key,                     /* max key value (1st dimension) */
+        int max_history)                 /* max history (2nd dimension) */
 {
     int i;
     int tmp_max_key;
     int tmp_max_history;
-    struct timeval tv;
     uint64_t int_time;
+    struct PINT_perf_sample *s;
 
-    if(!pc)
+    if(!pc || !pc->sample || !pc->sample->value)
     {
         /* do nothing if perf counter is not initialized */
         return;
@@ -428,67 +487,77 @@ void PINT_perf_retrieve(
 
     if(max_key > pc->key_count || max_history > pc->history_size)
     {
-        /* zero out value matrix, we won't use all fields */
-        for(i=0; i<max_key; i++)
-        {
-            memset(value_matrix[i], 0, (max_history*sizeof(int64_t)));
-        }
-    }
-
-    if(max_history > pc->history_size)
-    {
-        /* zero out time arrays, we won't use all fields */
-        memset(start_time_array_ms, 0, (max_history*sizeof(uint64_t)));
-        memset(interval_array_ms, 0, (max_history*sizeof(uint64_t)));
+        memset(value_array, 0,
+                (max_history * (max_key + 2) * sizeof(int64_t)));
     }
 
     /* copy data out */
-    for(i=0; i<tmp_max_key; i++)
+    /* running sample list, and counting at the same time */
+    /* i is the sample index, they keys of each sample stay together */
+    /* there are max_key+2 spaces in the destination for each sample */
+    /* but we will only copy tmp_max_key and the time stamps - which */
+    /* should be less than or equal to the space available */
+    /* normally, max_key == tmp_max_key */
+    for(i = 0, s = pc->sample; i < tmp_max_history && s; i++, s = s->next)
     {
-        memcpy(value_matrix[i], pc->value_matrix[i],
-                (tmp_max_history*sizeof(int64_t)));
+        /* copy counters */
+        memcpy(&value_array[i * (max_key + 2)], s->value,
+                            (tmp_max_key * sizeof(int64_t)));
+        /* copy time codes */
+        value_array[(i * (max_key + 2)) + max_key] = s->start_time_ms;
+        value_array[(i * (max_key + 2)) + max_key + 1] = s->interval_ms;
     }
-    memcpy(start_time_array_ms, pc->start_time_array_ms,
-            (tmp_max_history*sizeof(uint64_t)));
-    memcpy(interval_array_ms, pc->interval_array_ms,
-            (tmp_max_history*sizeof(uint64_t)));
+
+#if 0
+/* debug code prints first sample to log */
+{int k; for(k=0;k<max_key;k++)
+gossip_err("sample value[%d] = %lld\n",k,pc->sample->value[k]);}
+#endif
     
     gen_mutex_unlock(&pc->mutex);
 
     /* fill in interval length for newest interval */
-    gettimeofday(&tv, NULL);
-    int_time = ((uint64_t)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
-    if(int_time > start_time_array_ms[0])
+    int_time = PINT_util_get_time_ms();
+    if(int_time > value_array[max_key])
     {
-        interval_array_ms[0] = int_time - start_time_array_ms[0];
+        value_array[max_key + 1] = int_time - value_array[max_key];
     }
+
+    /* auto-rollover when data is retrieved */
+    /* this may obviate last step above */
+    PINT_perf_rollover(pc);
     
     return;
 }
 
-char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
+char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
                                int max_size)
 {
     int total_size = 0;
     int line_size = 0;
     int actual_size = 0;
-    char* tmp_str;
-    char* position;
+    char *tmp_str;
+    char *position;
     int i, j;
     uint64_t int_time;
-    struct timeval tv;
     time_t tmp_time_t;
     struct tm tmp_tm;
     int ret;
+    struct PINT_perf_sample *s = NULL;
+
+    if (!pc || !pc->sample || !pc->sample->value)
+    {
+        return NULL;
+    }
 
     gen_mutex_lock(&pc->mutex);
     
-    line_size = 26 + (24*pc->history_size); 
-    total_size = (pc->key_count+2)*line_size + 1;
+    line_size = 26 + (24 * pc->history_size); 
+    total_size = (pc->key_count + 2) * line_size + 1;
     
     actual_size = PVFS_util_min(total_size, max_size);
 
-    if((actual_size/line_size) < 3)
+    if((actual_size / line_size) < 3)
     {
         /* don't bother trying to display anything, can't fit any results in
          * that size
@@ -496,7 +565,7 @@ char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
         return(NULL);
     }
 
-    tmp_str = (char*)malloc(actual_size*sizeof(char));
+    tmp_str = (char *)malloc(actual_size * sizeof(char));
     if(!tmp_str)
     {
         gen_mutex_unlock(&pc->mutex);
@@ -507,16 +576,16 @@ char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
     /* start times */
     sprintf(position, "%-24.24s: ", "Start times (hr:min:sec)");
     position += 25;
-    for(i=0; i<pc->history_size; i++)
+    for(i = 0, s = pc->sample; i < pc->history_size && s; i++, s = s->next)
     {
-        if(pc->start_time_array_ms[i])
+        PVFS_time start_i = (PVFS_time)s->start_time_ms;
+        if(start_i)
         {
-            tmp_time_t = pc->start_time_array_ms[i]/1000;
+            tmp_time_t = start_i / 1000;
             localtime_r(&tmp_time_t, &tmp_tm);
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
-            sprintf(position, ".%03u", 
-                    (unsigned)(pc->start_time_array_ms[i]%1000));
+            sprintf(position, ".%03u", (unsigned)(start_i % 1000));
             position += 4;
         }
         else
@@ -529,26 +598,25 @@ char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
     position++;
 
     /* fill in interval length for newest interval */
-    gettimeofday(&tv, NULL);
-    int_time = ((uint64_t)tv.tv_sec) * 1000 + tv.tv_usec / 1000;
-    if(int_time > pc->start_time_array_ms[0])
+    int_time = PINT_util_get_time_ms();
+    if(int_time > pc->sample->interval_ms)
     {
-        pc->interval_array_ms[0] = int_time - pc->start_time_array_ms[0];
+        pc->sample->interval_ms = int_time - pc->sample->start_time_ms;
     }
 
     /* intervals */
     sprintf(position, "%-24.24s:", "Intervals (hr:min:sec)");
     position += 25;
-    for(i=0; i<pc->history_size; i++)
+    for(i = 0, s = pc->sample; i < pc->history_size && s; i++, s = s->next)
     {
-        if(pc->interval_array_ms[i])
+        PVFS_time interval_i = s->interval_ms;
+        if(interval_i)
         {
-            tmp_time_t = pc->interval_array_ms[i]/1000;
+            tmp_time_t = interval_i / 1000;
             gmtime_r(&tmp_time_t, &tmp_tm);
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
-            sprintf(position, ".%03u", 
-                    (unsigned)(pc->interval_array_ms[i]%1000));
+            sprintf(position, ".%03u", (unsigned)(interval_i % 1000));
             position += 4;
         }
         else
@@ -563,7 +631,7 @@ char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
 
     sprintf(position, "-------------------------");
     position += 25;
-    for(i=0; i<pc->history_size; i++)
+    for(i = 0; i < pc->history_size; i++)
     {
         sprintf(position, "--------------");
         position += 14;
@@ -572,13 +640,13 @@ char* PINT_perf_generate_text( struct PINT_perf_counter* pc,
     position++;
 
     /* values */
-    for(i=0; i<pc->key_count; i++)
+    for(i = 0; i < pc->key_count; i++)
     {
         sprintf(position, "%-24.24s:", pc->key_array[i].key_name);
         position += 25;
-        for(j=0; j<pc->history_size; j++)
+        for(j = 0, s = pc->sample; j < pc->history_size && s; j++, s = s->next)
         {
-            ret = snprintf(position, 15, " %13Ld", lld(pc->value_matrix[i][j]));
+            ret = snprintf(position, 15, " %13Ld", lld(s->value[i]));
             if(ret >= 15)
             {
                 sprintf(position, "%14.14s", "Overflow!");

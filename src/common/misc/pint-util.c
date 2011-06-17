@@ -391,6 +391,9 @@ char *PINT_util_get_object_type(int objtype)
     return obj_types[6];
 }
 
+/*
+ * this is just a wrapper for gettimeofday
+ */
 void PINT_util_get_current_timeval(struct timeval *tv)
 {
     gettimeofday(tv, NULL);
@@ -402,7 +405,9 @@ int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
         (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
 }
 
-
+/*
+ * this returns time in seconds
+ */
 PVFS_time PINT_util_get_current_time(void)
 {
     struct timeval t = {0,0};
@@ -412,6 +417,33 @@ PVFS_time PINT_util_get_current_time(void)
     current_time = (PVFS_time)t.tv_sec;
     return current_time;
 }
+
+/*
+ * this gets time in ms - warning, can roll over
+ */
+PVFS_time PINT_util_get_time_ms(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = ((PVFS_time)t.tv_sec) * 1000 + t.tv_usec / 1000;
+    return current_time;
+}
+
+/*
+ * this gets time in us - warning, can roll over
+ */
+PVFS_time PINT_util_get_time_us(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = ((PVFS_time)t.tv_sec) * 1000000 + t.tv_usec;
+    return current_time;
+}
+
 
 PVFS_time PINT_util_mktime_version(PVFS_time time)
 {

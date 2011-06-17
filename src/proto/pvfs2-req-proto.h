@@ -1540,46 +1540,50 @@ do {                                               \
 
 struct PVFS_servreq_mgmt_perf_mon
 {
-    uint32_t next_id;  /* next time stamp id we want to retrieve */
-    uint32_t count;    /* how many measurements we want */
+    uint32_t next_id;      /* next time stamp id we want to retrieve */
+    uint32_t key_count;    /* how many counters per measurements we want */
+    uint32_t count;        /* how many measurements we want */
 };
-endecode_fields_2_struct(
+endecode_fields_3_struct(
     PVFS_servreq_mgmt_perf_mon,
     uint32_t, next_id,
+    uint32_t, key_count,
     uint32_t, count);
 
-#define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,    \
-                                        __creds,  \
-                                        __next_id,\
-                                        __count,  \
-                                        __hints)  \
-do {                                              \
-    memset(&(__req), 0, sizeof(__req));           \
-    (__req).op = PVFS_SERV_MGMT_PERF_MON;         \
-    (__req).credentials = (__creds);              \
-    (__req).hints = (__hints);                    \
-    (__req).u.mgmt_perf_mon.next_id = (__next_id);\
-    (__req).u.mgmt_perf_mon.count = (__count);    \
+#define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,        \
+                                        __creds,      \
+                                        __next_id,    \
+                                        __key_count,  \
+                                        __count,      \
+                                        __hints)      \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_MGMT_PERF_MON;             \
+    (__req).credentials = (__creds);                  \
+    (__req).hints = (__hints);                        \
+    (__req).u.mgmt_perf_mon.next_id = (__next_id);    \
+    (__req).u.mgmt_perf_mon.key_count = (__key_count);\
+    (__req).u.mgmt_perf_mon.count = (__count);        \
 } while (0)
 
 struct PVFS_servresp_mgmt_perf_mon
 {
-    struct PVFS_mgmt_perf_stat* perf_array; /* array of statistics */
-    uint32_t perf_array_count;              /* size of above array */
-    /* next id to pick up from this point */
-    uint32_t suggested_next_id;
-    uint64_t end_time_ms;  /* end time for final array entry */
-    uint64_t cur_time_ms;  /* current time according to svr */
+    int64_t *perf_array;            /* array of statistics */
+    uint32_t perf_array_count;      /* size of above array */
+    uint32_t key_count;             /* number of keys in each sample */
+    uint32_t suggested_next_id;     /* next id to pick up from this point */
+    uint64_t end_time_ms;           /* end time for final array entry */
+    uint64_t cur_time_ms;           /* current time according to svr */
 };
 endecode_fields_5a_struct(
     PVFS_servresp_mgmt_perf_mon,
+    uint32_t, key_count,
     uint32_t, suggested_next_id,
-    skip4,,
     uint64_t, end_time_ms,
     uint64_t, cur_time_ms,
     skip4,,
     uint32_t, perf_array_count,
-    PVFS_mgmt_perf_stat, perf_array);
+    int64_t,  perf_array);
 #define extra_size_PVFS_servresp_mgmt_perf_mon \
     (PVFS_REQ_LIMIT_IOREQ_BYTES)
 
