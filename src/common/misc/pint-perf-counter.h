@@ -12,8 +12,8 @@
 #include "gen-locks.h"
 
 enum {
-    PERF_DEFAULT_TIME_INTERVAL_MSECS = 1000,
-    PERF_DEFAULT_HISTORY_SIZE       = 1,
+    PERF_DEFAULT_UPDATE_INTERVAL = 1000, /* msecs */
+    PERF_DEFAULT_HISTORY_SIZE    = 1,
 };
 
 /** flag that indicates that values for a
@@ -33,8 +33,9 @@ enum PINT_perf_ops
 /** enumeration of runtime options */
 enum PINT_perf_option
 {
-    PINT_PERF_HISTORY_SIZE = 1,  /**< sets/gets the history size */
-    PINT_PERF_KEY_COUNT = 2      /**< gets the key coung (cannot be set) */
+    PINT_PERF_HISTORY_SIZE = 1,   /**< sets/gets the history size */
+    PINT_PERF_KEY_COUNT = 2,      /**< gets the key count (cannot be set) */
+    PINT_PERF_UPDATE_INTERVAL = 3 /**< sets/gets the update interval */
 };
 
 /** describes a single key to be stored in the perf counter interface */
@@ -66,11 +67,13 @@ struct PINT_perf_counter
     struct PINT_perf_sample *sample;     /**< list of samples for this counter */
 };
 
+
 /** server-wide perf counter structure */
+extern struct PINT_perf_key server_keys[];
+
 extern struct PINT_perf_counter *PINT_server_pc;
 
-struct PINT_perf_counter* PINT_perf_initialize(
-        int history_size, int update_interval);
+struct PINT_perf_counter* PINT_perf_initialize(struct PINT_perf_key *key);
 
 void PINT_perf_finalize(
         struct PINT_perf_counter* pc);

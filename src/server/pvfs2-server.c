@@ -1127,11 +1127,17 @@ static int server_initialize_subsystems(
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
                             /* hist size should be in server config too */
-    PINT_server_pc = PINT_perf_initialize(PINT_PERF_HISTORY_SIZE,
-                                        server_config.perf_update_interval);
+    PINT_server_pc = PINT_perf_initialize(server_keys);
     if(!PINT_server_pc)
     {
         gossip_err("Error initializing performance counters.\n");
+        return(ret);
+    }
+    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, 
+                                        server_config.perf_update_interval);
+    if (ret < 0)
+    {
+        gossip_err("Error PINT_perf_set_info (update interval)\n");
         return(ret);
     }
     /* if history_size is greater than 1, start the rollover SM */

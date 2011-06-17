@@ -41,7 +41,7 @@
  * keys must be defined here in order based on the 
  * enumeration in include/pvfs2-mgmt.h
  */
-static struct PINT_perf_key key_array[] =
+struct PINT_perf_key server_keys[] =
 {
     {"bytes read", PINT_PERF_READ, PINT_PERF_PRESERVE},
     {"bytes written", PINT_PERF_WRITE, PINT_PERF_PRESERVE},
@@ -81,8 +81,7 @@ void PINT_free_pc (struct PINT_perf_counter *pc)
  * PINT_perf_finalize()
  * \returns pointer to perf counter on success, NULL on failure
  */
-struct PINT_perf_counter *PINT_perf_initialize( int default_history_size,
-                                                int default_interval)
+struct PINT_perf_counter *PINT_perf_initialize(struct PINT_perf_key *key_array)
 {
     struct PINT_perf_counter *pc = NULL;
     struct PINT_perf_key *key = NULL;
@@ -122,9 +121,9 @@ struct PINT_perf_counter *PINT_perf_initialize( int default_history_size,
     }
 
     /* running will be used to decide if we should start an update process */
-    pc->history_size = default_history_size;
+    pc->history_size = PERF_DEFAULT_HISTORY_SIZE;
     pc->running = (pc->history_size > 1);
-    pc->interval = default_interval;
+    pc->interval = PERF_DEFAULT_UPDATE_INTERVAL;
 
     /* create a simple linked list of samples, each with a value array */
     tmp = (struct PINT_perf_sample *)malloc(sizeof (struct PINT_perf_sample));
@@ -365,6 +364,7 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                 }
             }
             /* if history_size is now 1 stop the rollover SM */
+            pc->running = (pc->history_size > 1);
         }
         else
         {
@@ -396,7 +396,12 @@ int PINT_perf_set_info(  struct PINT_perf_counter* pc,
                 pc->history_size++;
             }
             /* if not running start rollover SM */
+            pc->running = (pc->history_size > 1);
         }
+        break;
+    case PINT_PERF_UPDATE_INTERVAL:
+        if (arg > 0)
+            pc->interval = arg;
         break;
     default:
         gen_mutex_unlock(&pc->mutex);
@@ -429,6 +434,9 @@ int PINT_perf_get_info( struct PINT_perf_counter* pc,
         break;
     case PINT_PERF_KEY_COUNT:
         *arg = pc->key_count;
+        break;
+    case PINT_PERF_UPDATE_INTERVAL:
+        *arg = pc->interval;
         break;
     default:
         gen_mutex_unlock(&pc->mutex);

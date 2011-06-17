@@ -3739,7 +3739,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
     };
 
     assert(opts);
-    opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
+    opts->perf_time_interval_secs = PERF_DEFAULT_UPDATE_INTERVAL / 1000;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
     while((ret = getopt_long(argc, argv, "ha:n:L:",
