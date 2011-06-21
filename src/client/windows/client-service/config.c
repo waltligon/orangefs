@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   Configuration file functions */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+   
+/*
+ * Configuration file functions 
+ */
 
 #include <Windows.h>
 #include <stdlib.h>

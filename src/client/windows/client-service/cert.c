@@ -1,10 +1,16 @@
-/* Copyright (C) 2011 Omnibond LLC
-   
-   Certificate functions - credentials are loaded from a 
-   certificate in the user's profile directory or a configured
-   directory. The (proxy) certificate contains the OrangeFS UID/GID
-   in its policy data field. A CA certificate is used to verify
-   the proxy certificate. */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ *  Certificate functions - credentials are loaded from a 
+ *  certificate in the user's profile directory or a configured
+ *  directory. The (proxy) certificate contains the OrangeFS UID/GID
+ *  in its policy data field. A CA certificate is used to verify
+ *  the proxy certificate. 
+ */
 
 #include <Windows.h>
 #include <Userenv.h>

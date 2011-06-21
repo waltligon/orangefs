@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   Configuration file function declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+   
+/* 
+ * Configuration file function declarations
+ */
 
 #ifndef __CONFIG_H
 #define __CONFIG_H

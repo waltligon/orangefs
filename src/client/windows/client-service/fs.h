@@ -1,5 +1,12 @@
-/* Copyright (C) 2010 Omnibond, LLC          * 
- * Client Service - file system declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+
+ /*
+  * Client Service - file system declarations
+  */
 
 #ifndef __FS_H
 #define __FS_H

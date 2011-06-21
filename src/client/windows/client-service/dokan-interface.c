@@ -1,9 +1,15 @@
-/* TODO: Copyright (C) Omnibond, LLC 2011 */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
 
-/* Dokan is a user-mode file system API like FUSE: http://dokan-dev.net/en/.
-   Most of the following functions are callbacks. dokan_loop starts the
-   Dokan thread. Functions are called as needed by Dokan (responding to
-   file system requests). */
+/* 
+ * Dokan is a user-mode file system API like FUSE: http://dokan-dev.net/en/.
+ * Most of the following functions are callbacks. dokan_loop starts the
+ * Dokan thread. Functions are called as needed by Dokan (responding to
+ * file system requests). 
+ */
 
 #include <Windows.h>
 #include <AccCtrl.h>

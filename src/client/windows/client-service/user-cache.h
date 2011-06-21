@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   User cache declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+   
+/* 
+ * User cache declarations 
+ */
 
 #ifndef __USER_CACHE_H
 #define __USER_CACHE_H

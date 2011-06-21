@@ -1,8 +1,14 @@
-/* Copyright (C) TODO
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
 
-   Client Service - file system routines 
-   These routines provide a layer of abstraction between the Dokan
-   callbacks (dokan-interface.c) and OrangeFS. */
+/* 
+ * Client Service - file system routines 
+ * These routines provide a layer of abstraction between the Dokan
+ * callbacks (dokan-interface.c) and OrangeFS. 
+ */
 
 #include <stdlib.h>
 #include <stdio.h>

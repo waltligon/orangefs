@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   Certificate support declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+
+/*
+ * Certificate support declarations 
+ */
 
 #ifndef __CERT_H
 #define __CERT_H

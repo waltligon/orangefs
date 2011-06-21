@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   LDAP support declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+
+/* 
+ * LDAP support declarations 
+ */
 
 #ifndef __LDAP_SUPPORT_H
 #define __LDAP_SUPPORT_H

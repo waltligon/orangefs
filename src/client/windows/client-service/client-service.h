@@ -1,5 +1,12 @@
-/* Copyright (C) 2011 Omnibond, LLC
-   Client service declarations */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
+   
+/*
+ * Client service declarations 
+ */
 
 #ifndef __CLIENT_SERVICE_H
 #define __CLIENT_SERVICE_H

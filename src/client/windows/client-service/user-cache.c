@@ -1,9 +1,15 @@
-/* Copyright (C) 2011 Omnibond, LLC
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
    
-   User cache functions - to speed credential lookup, the 
-   OrangeFS credentials (UID/GID) are cached with the username.
-   Cache entries from certificates expire when the certificate 
-   expires. */
+/*
+ * User cache functions - to speed credential lookup, the 
+ * OrangeFS credentials (UID/GID) are cached with the username.
+ * Cache entries from certificates expire when the certificate 
+ * expires.
+ */
 
 #include <Windows.h>
 #include <stdlib.h>

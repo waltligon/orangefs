@@ -1,5 +1,6 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2001-2011 Clemson University, The University of Chicago and
+ *               Omnibond LLC
  *
  * Changes by Acxiom Corporation to add relative path support to
  * PVFS_util_resolve(),

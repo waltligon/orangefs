@@ -1,8 +1,14 @@
-/* Copyright (C) 2010 Omnibond, Inc. */
+/*
+ * (C) 2010-2011 Clemson University and Omnibond LLC
+ *
+ * See COPYING in top-level directory.
+ */
 
-/* Client Service - service control functions 
-   * Install or remove OrangeFS Client service
-   * Run client as a service or console app */
+/* 
+ * Client Service - service control functions 
+ * -- Install or remove OrangeFS Client service
+ * -- Run client as a service or console app
+ */
 
 #include <Windows.h>
 #include <stdlib.h>

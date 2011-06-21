@@ -1,10 +1,13 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2001-2011 Clemson University, The University of Chicago and 
+ *               Omnibond LLC
  *
  * See COPYING in top-level directory.
  */
 
-/* Windows TCP/IP implementation of a BMI method */
+/* 
+ * Windows TCP/IP implementation of a BMI method 
+ */
 
 #include <WinSock2.h>
 
