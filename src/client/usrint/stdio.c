@@ -37,6 +37,7 @@ struct __dirstream {
 #define DIRSTREAM_MAGIC 0xfd100000
 #define DIRBUFSIZE (512*1024)
 #define ASIZE 256
+#define MAXTRIES 16 /* arbitrary - how many tries to get a unique file name */
 
 /** This function coverts from stream style mode to ssycall style flags
  *
@@ -1099,24 +1100,37 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 /**
  * mkdtemp makes a temp dir and returns an fd 
  */
-char * mkdtemp(char *template)
+char *mkdtemp(char *template)
 {
-    char *rc = NULL;
     int fd;
+    int len;
+    int rnum;
+    int try;
+
     if (!template)
     {
         errno = EINVAL;
         return NULL;
     }
-    rc = mktemp(template);
-    if (rc == NULL)
+    len = strlen(template);
+    if (!strncmp(&template[len-6],"XXXXXX",6))
     {
+        errno = EINVAL;
         return NULL;
     }
-    fd = mkdir(template, 0600);
-    if (fd < 0)
+    for(try = 0; try < MAXTRIES; try++)
     {
-        return NULL;
+        rnum = PINT_random() % 1000000;
+        sprintf(&template[len-6],"%06d", rnum);
+        fd = mkdir(template, 0700);
+        if (fd < 0)
+        {
+            if (errno == EEXIST)
+            {
+                continue;
+            }
+            return NULL;
+        }
     }
     return template;
 }
@@ -1126,19 +1140,36 @@ char * mkdtemp(char *template)
  */
 int mkstemp(char *template)
 {
-    char *ret;
     int fd;
+    int len;
+    int rnum;
+    int try;
+
     if (!template)
     {
         errno = EINVAL;
         return -1;
     }
-    ret = mktemp(template);
-    if (ret == NULL)
+    len = strlen(template);
+    if (!strncmp(&template[len-6],"XXXXXX",6))
     {
+        errno = EINVAL;
         return -1;
     }
-    fd = open(template, O_RDWR|O_EXCL|O_CREAT, 0600);
+    for(try = 0; try < MAXTRIES; try++)
+    {
+        rnum = PINT_random() % 1000000;
+        sprintf(&template[len-6],"%06d", rnum);
+        fd = open(template, O_RDWR|O_EXCL|O_CREAT, 0600);
+        if (fd < 0)
+        {
+            if (errno == EEXIST)
+            {
+                continue;
+            }
+            return -1;
+        }
+    }
     return fd;
 }
 
@@ -1260,8 +1291,8 @@ struct dirent64 *readdir64 (DIR *dir)
     {
         int bytes_read;
         /* read a block of dirents into the buffer */
-        bytes_read = getdents64(dir->fileno, dir->buf_base,
-                               (dir->buf_end - dir->buf_base));
+        bytes_read = getdents(dir->fileno, dir->buf_base,
+                             (dir->buf_end - dir->buf_base));
         dir->buf_act = dir->buf_base + bytes_read;
         dir->buf_ptr = dir->buf_base;
     }

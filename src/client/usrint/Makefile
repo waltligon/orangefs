@@ -3,7 +3,7 @@ PVFSDIR=../../../
 INCDIR=-I. -I$(PVFSDIR)/include
 LIBDIR=
 
-CFLAGS=$(INCDIR) $(LIBDIR)
+CFLAGS=-g -O0 $(INCDIR) $(LIBDIR)
 
 OBJS=iocommon.o openfile-util.o posix-pvfs.o posix.o stdio.o request.o
 
@@ -11,7 +11,7 @@ INCS=usrint.h iocommon.h posix-pvfs.h openfile-util.h posix-ops.h
 
 all: $(OBJS)
 
-clean: 
+clean::
 	rm *.o
 
 iocommon.o:$(INCS)

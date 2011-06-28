@@ -14,13 +14,14 @@
 #include <posix-ops.h>
 #include <openfile-util.h>
 
-static int pvfs_is_sys_initialized = 0; 
-
 #define PREALLOC 3
 static int descriptor_table_count = 0; 
 static int descriptor_table_size = 0; 
 static int next_descriptor = 0; 
 static pvfs_descriptor **descriptor_table; 
+static char rstate[256];  /* used for random number generation */
+
+posix_ops glibc_ops;
 
 pvfs_descriptor pvfs_stdin =
 {
@@ -64,21 +65,97 @@ pvfs_descriptor pvfs_stderr =
     .is_in_use = PVFS_FS
 };
 
+void load_glibc(void)
+{ 
+    glibc_ops.open = dlsym(RTLD_NEXT, "open");
+    glibc_ops.open64 = dlsym(RTLD_NEXT, "open64");
+    glibc_ops.openat = dlsym(RTLD_NEXT, "openat");
+    glibc_ops.openat64 = dlsym(RTLD_NEXT, "openat64");
+    glibc_ops.creat = dlsym(RTLD_NEXT, "creat");
+    glibc_ops.creat64 = dlsym(RTLD_NEXT, "creat64");
+    glibc_ops.unlink = dlsym(RTLD_NEXT, "unlink");
+    glibc_ops.unlinkat = dlsym(RTLD_NEXT, "unlinkat");
+    glibc_ops.rename = dlsym(RTLD_NEXT, "rename");
+    glibc_ops.renameat = dlsym(RTLD_NEXT, "renameat");
+    glibc_ops.read = dlsym(RTLD_NEXT, "read");
+    glibc_ops.pread = dlsym(RTLD_NEXT, "pread");
+    glibc_ops.readv = dlsym(RTLD_NEXT, "readv");
+    glibc_ops.pread64 = dlsym(RTLD_NEXT, "pread64");
+    glibc_ops.write = dlsym(RTLD_NEXT, "write");
+    glibc_ops.pwrite = dlsym(RTLD_NEXT, "pwrite");
+    glibc_ops.writev = dlsym(RTLD_NEXT, "writev");
+/*  glibc_ops.write64 = dlsym(RTLD_NEXT, "write64"); */
+    glibc_ops.lseek = dlsym(RTLD_NEXT, "lseek");
+    glibc_ops.lseek64 = dlsym(RTLD_NEXT, "lseek64");
+    glibc_ops.truncate = dlsym(RTLD_NEXT, "truncate");
+    glibc_ops.truncate64 = dlsym(RTLD_NEXT, "truncate64");
+    glibc_ops.ftruncate = dlsym(RTLD_NEXT, "ftruncate");
+    glibc_ops.ftruncate64 = dlsym(RTLD_NEXT, "ftruncate64");
+    glibc_ops.close = dlsym(RTLD_NEXT, "close");
+    glibc_ops.flush = dlsym(RTLD_NEXT, "flush");
+    glibc_ops.stat = dlsym(RTLD_NEXT, "stat");
+    glibc_ops.stat64 = dlsym(RTLD_NEXT, "stat64");
+    glibc_ops.fstat = dlsym(RTLD_NEXT, "fstat");
+    glibc_ops.fstat64 = dlsym(RTLD_NEXT, "fstat64");
+    glibc_ops.fstatat = dlsym(RTLD_NEXT, "fstatat");
+    glibc_ops.fstatat64 = dlsym(RTLD_NEXT, "fstatat64");
+    glibc_ops.lstat = dlsym(RTLD_NEXT, "lstat");
+    glibc_ops.lstat64 = dlsym(RTLD_NEXT, "lstat64");
+    glibc_ops.dup = dlsym(RTLD_NEXT, "dup");
+    glibc_ops.dup2 = dlsym(RTLD_NEXT, "dup2");
+    glibc_ops.chown = dlsym(RTLD_NEXT, "chown");
+    glibc_ops.fchown = dlsym(RTLD_NEXT, "fchown");
+    glibc_ops.fchownat = dlsym(RTLD_NEXT, "fchownat");
+    glibc_ops.lchown = dlsym(RTLD_NEXT, "lchown");
+    glibc_ops.chmod = dlsym(RTLD_NEXT, "chmod");
+    glibc_ops.fchmod = dlsym(RTLD_NEXT, "fchmod");
+    glibc_ops.fchmodat = dlsym(RTLD_NEXT, "fchmodat");
+    glibc_ops.lchmod = dlsym(RTLD_NEXT, "lchmod");
+    glibc_ops.mkdir = dlsym(RTLD_NEXT, "mkdir");
+    glibc_ops.mkdirat = dlsym(RTLD_NEXT, "mkdirat");
+    glibc_ops.rmdir = dlsym(RTLD_NEXT, "rmdir");
+    glibc_ops.readlink = dlsym(RTLD_NEXT, "readlink");
+    glibc_ops.readlinkat = dlsym(RTLD_NEXT, "readlinkat");
+    glibc_ops.symlink = dlsym(RTLD_NEXT, "symlink");
+    glibc_ops.symlinkat = dlsym(RTLD_NEXT, "symlinkat");
+    glibc_ops.link = dlsym(RTLD_NEXT, "link");
+    glibc_ops.linkat = dlsym(RTLD_NEXT, "linkat");
+    glibc_ops.readdir = dlsym(RTLD_NEXT, "readdir");
+    glibc_ops.getdents = dlsym(RTLD_NEXT, "getdents");
+    glibc_ops.access = dlsym(RTLD_NEXT, "access");
+    glibc_ops.faccessat = dlsym(RTLD_NEXT, "faccessat");
+    glibc_ops.flock = dlsym(RTLD_NEXT, "flock");
+    glibc_ops.fcntl = dlsym(RTLD_NEXT, "fcntl");
+    glibc_ops.sync = dlsym(RTLD_NEXT, "sync");
+    glibc_ops.fsync = dlsym(RTLD_NEXT, "fsync");
+    glibc_ops.fdatasync = dlsym(RTLD_NEXT, "fdatasync");
+    glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
+    glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
+    glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
+}
 
 /* 
  * Perform PVFS initialization tasks
  */ 
 
-int pvfs_sys_init() { 
+void pvfs_sys_init(void) { 
 	struct rlimit rl; 
 	int rc; 
+    static int pvfs_lib_init_flag = 0; 
 
-	/* initalize the file system */ 
-	PVFS_util_init_defaults(); 
+    if (pvfs_lib_init_flag)
+    {
+        return;
+    }
+    pvfs_lib_init_flag = 1; /* should only run this once */
+
+    /* this allows system calls to run */
+    load_glibc();
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
 
+    /* set up descriptor table */
 	descriptor_table_size = rl.rlim_max;
 	descriptor_table =
 			(pvfs_descriptor **)malloc(sizeof(pvfs_descriptor *) *
@@ -88,18 +165,20 @@ int pvfs_sys_init() {
     descriptor_table[0] = &pvfs_stdin;
     descriptor_table[1] = &pvfs_stdout;
     descriptor_table[2] = &pvfs_stderr;
+    descriptor_table_count = PREALLOC;
 	next_descriptor = PREALLOC;
 
-	/* Mark the initialization complete */ 
-	pvfs_is_sys_initialized = 1; 
-	return PVFS_FD_SUCCESS; 
+	/* initalize PVFS */ 
+	PVFS_util_init_defaults(); 
+
+    /* call other initialization routines */
+    PINT_initrand();
 }
 
 int pvfs_descriptor_table_size(void)
 {
     return descriptor_table_size;
 }
-
 
 /*
  * Allocate a new pvfs_descriptor
@@ -108,14 +187,23 @@ int pvfs_descriptor_table_size(void)
  pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops)
  {
  	int i; 
+    if (fsops == NULL)
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+    pvfs_sys_init();
+
+    /* table should be initialized now - check for available slot */
 	if (descriptor_table_count == (descriptor_table_size - PREALLOC))
 	{
+        errno = ENOMEM;
 		return NULL;
 	}
 
    /* find next empty slot in table */
 	for (i = next_descriptor; descriptor_table[i];
-			i = (i == descriptor_table_size - 1) ? PREALLOC : i++);
+			i = (i == descriptor_table_size - 1) ? PREALLOC : i + 1);
 
    /* found a slot */
 	descriptor_table[i] = malloc(sizeof(pvfs_descriptor));
@@ -123,7 +211,7 @@ int pvfs_descriptor_table_size(void)
 	{
 		return NULL;
 	}
-	next_descriptor = ((i == descriptor_table_size - 1) ? PREALLOC : i++);
+	next_descriptor = ((i == descriptor_table_size - 1) ? PREALLOC : i + 1);
 	descriptor_table_count++;
 
 	/* fill in descriptor */
@@ -139,7 +227,7 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[i]->token = 0;
 	descriptor_table[i]->is_in_use = PVFS_FS;
 
-   return descriptor_table[i];
+    return descriptor_table[i];
 }
 
 /*
@@ -147,6 +235,11 @@ int pvfs_descriptor_table_size(void)
  */
 int pvfs_dup_descriptor(int oldfd, int newfd)
 {
+    if (oldfd < 0 || oldfd >= descriptor_table_size)
+    {
+        errno = EBADF;
+        return -1;
+    }
     if (newfd == -1)
     {
         /* find next empty slot in table */
@@ -173,6 +266,11 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
  */
 pvfs_descriptor *pvfs_find_descriptor(int fd)
 {
+    if (fd < 0 || fd >= descriptor_table_size)
+    {
+        errno = EBADF;
+        return NULL;
+    }
 	return descriptor_table[fd];
 }
 
@@ -180,13 +278,18 @@ int pvfs_free_descriptor(int fd)
 {
     pvfs_descriptor *pd;
 
+    if (fd < 0 || fd >= descriptor_table_size)
+    {
+        errno = EBADF;
+        return -1;
+    }
     pd = descriptor_table[fd];
 
 	/* clear out table entry */
 	descriptor_table[fd] = NULL;
 
 	/* keep up with used descriptors */
-	descriptor_table_count++;
+	descriptor_table_count--;
 
     /* check if last copy */
     if (--(pd->dup_cnt) <= 0)
@@ -250,8 +353,10 @@ char * pvfs_qualify_path(const char *path)
     return newpath;
 }
 
-/* 
- *Determines if a path is part of a PVFS Filesystem 
+/**
+ * Determines if a path is part of a PVFS Filesystem 
+ *
+ * returns 1 if PVFS 0 otherwise
  */
 
 int is_pvfs_path(const char *path)
@@ -260,6 +365,10 @@ int is_pvfs_path(const char *path)
     char *directory = NULL ;
     char *str;
 
+    pvfs_sys_init();
+    memset(&file_system, 0, sizeof(file_system));
+    /* add current working dir to front of relative path */
+    /* and copy to temp string working area */
     if(path[0] != '/')
     {
         directory = getcwd(NULL, 0);
@@ -281,6 +390,7 @@ int is_pvfs_path(const char *path)
         strcpy(str, path);
     }
 
+    /* lop off the last segment of the path */
     int count;
     for(count = strlen(str) -2; count > 0; count--)
     {
@@ -295,22 +405,12 @@ int is_pvfs_path(const char *path)
     free(str);
     if(file_system.f_type == PVFS_FS)
     {
-#ifdef DEBUG
-       printf("IS PVFS_PATH\n");
-#endif
-       return true;
-    }
-    else if(file_system.f_type == LINUX_FS)
-    {
-#ifdef DEBUG
-        printf("IS NOT PVFS_PATH\n");
-#endif
-        return false;
+        return 1;
     }
     else
     {
-        printf("NO A LINUX OR PVFS FILE SYSTEM!! (BAILING OUT!!!)\n");
-        exit(1);
+        /* not PVFS assume the kernel can handle it */
+        return 0;
     }
 }
 
@@ -327,12 +427,17 @@ void pvfs_debug(char *fmt, ...)
  * Split a pathname into a directory and a filename.
  * If non-null is passed as the directory or filename,
  * the field will be allocated and filled with the correct value
+ *
+ * A slash at the end of the path is interpreted as no filename
+ * and is an error.  To parse the last dir in a path, remove this
+ * trailing slash.  No filename with no directory is OK.
  */
 int split_pathname( const char *path,
+                    int dirflag,
                     char **directory,
                     char **filename)
 {
-    int i;
+    int i, slashes = 0;
     int length = strlen("pvfs2");
 
     if (!path || !directory || !filename)
@@ -346,8 +451,22 @@ int split_pathname( const char *path,
 		path = &path[length];
     }
     /* Split path into a directory and filename */
-    length = strlen(path);
-    for (i = length - 1; i >= 0; --i)
+    length = strnlen(path, PVFS_NAME_MAX);
+    if (length == PVFS_NAME_MAX)
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    i = length - 1;
+    if (dirflag)
+    {
+        /* skip any trailing slashes */
+        for(; i >= 0 && path[i] == '/'; i--)
+        {
+            slashes++;
+        }
+    }
+    for (; i >= 0; i--)
     {
         if (path[i] == '/')
         {
@@ -366,10 +485,25 @@ int split_pathname( const char *path,
     {
         /* found no '/' path is all filename */
         *directory = NULL;
-        i++;
     }
+    i++;
     /* copy the filename */
-    *filename = malloc(length - i + 1);
+    fnlen = length - i - slashes
+    if (fnlen == 0)
+    {
+        filename = NULL;
+        if (!directory)
+        {
+            errno = EISDIR;
+        }
+        else
+        {
+            errno = ENOENT;
+        }
+        return = -1;
+    }
+    /* check flag to see if there are slashes to skip */
+    *filename = malloc(fnlen + 1);
     if (!*filename)
     {
         if (*directory)
@@ -380,9 +514,45 @@ int split_pathname( const char *path,
         *filename = NULL;
         return -1;
     }
-    strncpy(*filename, path + i + 1, length - i);
+    strncpy(*filename, path + i, length - i);
     (*filename)[length - i] = '\0';
     return 0;
+}
+
+void PINT_initrand(void)
+{
+    static int init_called = 0;
+    pid_t pid;
+    uid_t uid;
+    gid_t gid;
+    struct timeval time;
+    char *oldstate;
+    unsigned int seed;
+
+    if (init_called)
+    {
+        return;
+    }
+    init_called = 1;
+    pid = getpid();
+    uid = getuid();
+    gid = getgid();
+    gettimeofday(&time, NULL);
+    seed = (((pid << 16) ^ uid) ^ (gid << 8)) ^ time.tv_usec;
+    oldstate = initstate(seed, rstate, 256);
+    setstate(oldstate);
+}
+
+long int PINT_random(void)
+{
+    char *oldstate;
+    long int rndval;
+
+    PINT_initrand();
+    oldstate = setstate(rstate);
+    rndval = random();
+    setstate(oldstate);
+    return rndval;
 }
 
 /*

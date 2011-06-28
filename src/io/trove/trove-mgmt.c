@@ -88,7 +88,7 @@ static int trove_init_status = 0;
 int trove_initialize(TROVE_method_id method_id,
                      TROVE_method_callback method_callback,
                      char *data_path,
-		     		 char *meta_path,
+                     char *meta_path,
                      TROVE_ds_flags flags)
 {
     int ret = -TROVE_EALREADY;

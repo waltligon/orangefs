@@ -67,6 +67,10 @@ enum PINT_server_perf_keys
     PINT_PERF_METADATA_KEYVAL_OPS = 5,  /* metadata keyval ops */
     PINT_PERF_REQSCHED = 6,             /* instantaneous active requests */
     PINT_PERF_REQUESTS = 7,             /* requests received */
+    PINT_PERF_SMALL_READ = 8,           /* bytes read by small_io */
+    PINT_PERF_SMALL_WRITE = 9,          /* bytes written by small_io */
+    PINT_PERF_FLOW_READ = 10,           /* bytes read by flow */
+    PINT_PERF_FLOW_WRITE = 11,          /* bytes written by flow */
 };
 
 /* low level information about individual server level objects */

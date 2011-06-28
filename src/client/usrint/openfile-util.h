@@ -18,7 +18,7 @@
 
 int split_pathname( const char *path, char **directory, char **filename);
 
-int pvfs_sys_init(); 
+void pvfs_sys_init(void); 
 
 char *pvfs_qualify_path(const char *path);
 
@@ -51,4 +51,8 @@ int pvfs_create_file(const char *filename,
                             mode_t mode,
                             PVFS_object_ref parent_ref,
                             PVFS_object_ref *ref);
+
+void PINT_initrand(void);
+
+long int PINT_random(void);
 #endif

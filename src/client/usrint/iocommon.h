@@ -68,6 +68,8 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
                                mode_t file_permission,
                                PVFS_object_ref *pdir);
 
+int iocommon_truncate(PVFS_object_ref file_ref, off64_t length);
+
 off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset, PVFS_size unit_size, int whence);
 
 /*

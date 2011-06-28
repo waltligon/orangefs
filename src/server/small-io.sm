@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"
+#include "pint-perf-counter.h"
 
 %%
 
@@ -230,6 +231,28 @@ static PINT_sm_action small_io_check_size(
              * Just set to expected value from process_request for now */
             s_op->resp.u.small_io.result_size = s_op->u.small_io.result_bytes;
         }
+    }
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_READ,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_SMALL_READ,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+    }
+    else
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_WRITE,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_SMALL_WRITE,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
     }
 
     return SM_ACTION_COMPLETE;

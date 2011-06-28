@@ -51,6 +51,10 @@ struct PINT_perf_key server_keys[] =
     {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
     {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {"requests received ", PINT_PERF_REQUESTS, PINT_PERF_PRESERVE},
+    {"bytes read by small_io", PINT_PERF_SMALL_READ, PINT_PERF_PRESERVE},
+    {"bytes written by small_io", PINT_PERF_SMALL_WRITE, PINT_PERF_PRESERVE},
+    {"bytes read by flow", PINT_PERF_FLOW_READ, PINT_PERF_PRESERVE},
+    {"bytes written by flow", PINT_PERF_FLOW_WRITE, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 
@@ -227,7 +231,9 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
                         int64_t value,
                         enum PINT_perf_ops op)
 {
+#if 0
     int64_t tmp; /* this is for debugging purposes */
+#endif
 
     if(!pc || !pc->sample || !pc->sample->value)
     {
@@ -237,12 +243,14 @@ void __PINT_perf_count( struct PINT_perf_counter* pc,
 
     gen_mutex_lock(&pc->mutex);
 
+#if 0
     tmp = pc->sample->value[key];
+#endif
 
     if(key >= pc->key_count)
     {
         gossip_err("Error: PINT_perf_count(): invalid key.\n");
-        return;
+        goto errorout;
     }
 
     switch(op)
@@ -264,6 +272,7 @@ gossip_err("COUNT %d %lld was %lld is now %lld\n", key, value,
         tmp, pc->sample->value[key]);
 #endif
 
+errorout:
     gen_mutex_unlock(&pc->mutex);
     return;
 }

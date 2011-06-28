@@ -15,30 +15,6 @@
 #include <posix-pvfs.h>
 #include <openfile-util.h>
 
-static int pvfs_lib_init = 0; 
-
-posix_ops glibc_ops =
-{
-    .statfs = statfs
-};
-
-void load_glibc(void)
-{ 
-    pvfs_lib_init = 1; 
-    glibc_ops.open = dlsym(RTLD_NEXT, "open");
-    glibc_ops.open64 = dlsym(RTLD_NEXT, "open64");
-    glibc_ops.unlink = dlsym(RTLD_NEXT, "unlink");
-    glibc_ops.close = dlsym(RTLD_NEXT, "close");
-    glibc_ops.read = dlsym(RTLD_NEXT, "read");
-    glibc_ops.write = dlsym(RTLD_NEXT, "write");
-    glibc_ops.lseek = dlsym(RTLD_NEXT, "lseek");
-    glibc_ops.lseek64 = dlsym(RTLD_NEXT, "lseek64");
-    glibc_ops.pread = dlsym(RTLD_NEXT, "pread"); 
-    glibc_ops.pwrite = dlsym(RTLD_NEXT, "pwrite"); 
-    glibc_ops.readv = dlsym(RTLD_NEXT, "readv"); 
-    glibc_ops.writev = dlsym(RTLD_NEXT, "writev"); 
-}
-
 /*
  * SYSTEM CALLS
  */
@@ -53,10 +29,6 @@ int open(const char *path, int flags, ...)
     PVFS_hint hints;  /* need to figure out how to set default */
     pvfs_descriptor *pd;
     
-    if(!pvfs_lib_init) { 
-        load_glibc(); 
-    }
-
     va_start(ap, flags); 
     if (flags & O_CREAT)
         mode = va_arg(ap, mode_t); 
@@ -68,16 +40,12 @@ int open(const char *path, int flags, ...)
        hints = PVFS_HINT_NULL;
     va_end(ap); 
 
-    if(is_pvfs_path(path)) { 
-#ifdef DEBUG
-        printf("PVFS_OPEN\n"); 
-#endif
+    if (is_pvfs_path(path))
+    { 
         return pvfs_open(path, flags, mode, hints);
     }
-    else {
-#ifdef DEBUG
-        printf("GLIBC_OPEN\n"); 
-#endif
+    else
+    {
         pd = pvfs_alloc_descriptor(&glibc_ops);
         pd->posix_fd = pd->fsops->open(path, flags, mode);
         pd->flags = flags;
@@ -95,10 +63,6 @@ int open64(const char *path, int flags, ...)
     mode_t mode = 0; 
     PVFS_hint hints;  /* need to figure out how to set default */
     
-    if(!pvfs_lib_init) { 
-        load_glibc(); 
-    }
-
     va_start(ap, flags); 
     if (flags & O_HINTS)
         hints = va_arg(ap, PVFS_hint);
@@ -122,10 +86,6 @@ int openat64(int dirfd, const char *path, int flags, ...)
  */ 
 int creat(const char *path, mode_t mode)
 { 
-    if(!pvfs_lib_init) { 
-        load_glibc(); 
-    }
-
     return open(path, O_CREAT|O_WRONLY|O_TRUNC, mode); 
 }
 
@@ -134,10 +94,6 @@ int creat(const char *path, mode_t mode)
  */ 
 int creat64(const char *path, mode_t mode)
 { 
-    if(!pvfs_lib_init) { 
-        load_glibc(); 
-    }
-
     return open64(path, O_CREAT|O_WRONLY|O_TRUNC, mode); 
 }
 
@@ -146,19 +102,10 @@ int creat64(const char *path, mode_t mode)
  */
 int unlink(const char *path)
 {
-    if (!pvfs_lib_init) {
-        load_glibc();
-    }
     if (is_pvfs_path(path)) {
-#ifdef DEBUG
-        pvfs_debug("unlink: calling pvfs_unlink\n");
-#endif
         return pvfs_ops.unlink(path);
     }
     else {
-#ifdef DEBUG
-        pvfs_debug("unlink: calling glibc_ops.unlink\n");
-#endif
         return glibc_ops.unlink(path);
     }
 }
@@ -516,6 +463,11 @@ int lstat64(const char *path, struct stat64 *buf)
 int __lxstat64(int ver, const char *path, struct stat64 *buf)
 {
     return lstat64(path, buf);
+}
+
+int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
+{
+    return -1;
 }
 
 #if 0

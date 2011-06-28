@@ -58,7 +58,6 @@
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0
 #endif
-#define max(x, y) (((x) > (y)) ? (x) : (y))
 #define true   1 
 #define false  0 
 #define O_HINTS 02000000

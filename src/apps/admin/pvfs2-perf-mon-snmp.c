@@ -33,6 +33,10 @@
 #define OID_KEYVAL ".1.3.6.1.4.1.7778.5"
 #define OID_REQSCHED ".1.3.6.1.4.1.7778.6"
 #define OID_REQUESTS ".1.3.6.1.4.1.7778.7"
+#define OID_SMALL_READ ".1.3.6.1.4.1.7778.8"
+#define OID_SMALL_WRITE ".1.3.6.1.4.1.7778.9"
+#define OID_FLOW_READ ".1.3.6.1.4.1.7778.10"
+#define OID_FLOW_WRITE ".1.3.6.1.4.1.7778.11"
 
 #define INT_TYPE "INTEGER"
 #define CNT_TYPE "COUNTER"
@@ -60,6 +64,10 @@ static struct MGMT_perf_iod key_table[] =
    {OID_KEYVAL, CNT_TYPE, PINT_PERF_METADATA_KEYVAL_OPS, "Metadata KEYVAL Ops"},
    {OID_REQSCHED, INT_TYPE, PINT_PERF_REQSCHED, "Requests Active"},
    {OID_REQUESTS, CNT_TYPE, PINT_PERF_REQUESTS, "Requests Received"},
+   {OID_SMALL_READ, CNT_TYPE, PINT_PERF_SMALL_READ, "Bytes Read by Small_IO"},
+   {OID_SMALL_WRITE, CNT_TYPE, PINT_PERF_SMALL_WRITE, "Bytes Written by Small_IO"},
+   {OID_FLOW_READ, CNT_TYPE, PINT_PERF_FLOW_READ, "Bytes Read by Flow"},
+   {OID_FLOW_WRITE, CNT_TYPE, PINT_PERF_FLOW_WRITE, "Bytes Written by Flow"},
    {NULL, NULL, -1, NULL}   /* this halts the key count */
 };
 
@@ -292,7 +300,7 @@ int main(int argc, char **argv)
             for(k = 0; k < max_keys &&
                     strcmp(cmd_buffer, key_table[k].key_oid); k++);
             /* out of for loop k equals selected key */
-            if (k <= max_keys)
+            if (k < max_keys)
             {
                 returnType = key_table[k].key_type;
                 returnValue = perf_matrix[srv][key_table[k].key_number];
