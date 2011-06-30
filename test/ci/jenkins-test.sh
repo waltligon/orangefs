@@ -1,12 +1,15 @@
 #!/bin/bash
 
-export TEST_NAME=${1}.${2}.${3}                 # unique name
+export TEST_NAME=${1}.${2}.${3}.${4}.${5}                 # unique name
+export BUILD_TEST_NAME=${1}.${2}.${3}                 # unique name
 export OS=$2
 export VFS=$3
+export IO=$4
+export FS=$5
 
 # change the tests portion of the job URL to the build portion so we can find
 # the artifact with the binaries from the last successful build
-export BIN_NAME="${TEST_NAME}-bin.tar.bz2"
+export BIN_NAME="${BUILD_TEST_NAME}-bin.tar.bz2"
 export BIN_URL="$(echo ${JOB_URL} | sed s/-tests/-build/)lastSuccessfulBuild/artifact/${BIN_NAME}"
 
 export PVFS2_LOCATION=${WORKSPACE}/install      # install location
@@ -195,6 +198,7 @@ pvfs2_server_start() {
         --iospec="`hostname -s`:{3396-3399}" \
         --metaspec="`hostname -s`:{3396-3399}"  \
         --storage ${PVFS2_STORAGE} \
+        --trove-method=${IO:=alt-aio}
         --logging "none" \
         --logfile=${PVFS2_LOG}/pvfs2-server-${TEST_NAME}.log --quiet
     check_return $? "pvfs2-genconfig failed"
