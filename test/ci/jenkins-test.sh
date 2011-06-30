@@ -10,7 +10,7 @@ export FS=$5
 # change the tests portion of the job URL to the build portion so we can find
 # the artifact with the binaries from the last successful build
 export BIN_NAME="${BUILD_TEST_NAME}-bin.tar.bz2"
-export BIN_URL="$(echo ${JOB_URL} | sed s/-tests/-build/)lastSuccessfulBuild/artifact/${BIN_NAME}"
+export BIN_URL="$(echo ${JOB_URL} | sed s/-tests/-build/)lastSuccessfulBuild/artifact/${BIN_NAME} | sed s/io=[^,]*,//"
 
 export PVFS2_LOCATION=${WORKSPACE}/install      # install location
 export PVFS2_SRC=${WORKSPACE}                   # source tree
