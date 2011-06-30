@@ -16,7 +16,10 @@
 #define PVFS_FD_SUCCESS 0
 #define PVFS_FD_FAILURE -1
 
-int split_pathname( const char *path, char **directory, char **filename);
+int split_pathname(const char *path, 
+		   int dirflag,
+		   char **directory,
+		   char **filename);
 
 void pvfs_sys_init(void); 
 
@@ -27,10 +30,6 @@ int is_pvfs_path(const char *path);
 void pvfs_debug(char *fmt, ...); 
 
 void load_glibc(void); 
-
-int pvfs_split_pathname(const char *path,
-                               char **directory,
-                               char **filename); 
 
 int pvfs_lookup_dir(const char *directory,
                            PVFS_object_ref *ref,

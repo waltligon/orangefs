@@ -248,6 +248,11 @@ int pvfs_unlinkat (int dirfd, const char *path)
             return -1;
         }       
         pd = pvfs_find_descriptor(dirfd);
+        if (!pd)
+        {
+            errno = EBADF;
+            return -1;
+        }
         rc = iocommon_unlink(path, &pd->pvfs_ref);
     }
     return rc;
@@ -298,6 +303,11 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
             return -1;
         }
         olddes = pvfs_find_descriptor(olddirfd);
+        if (!olddes)
+        {
+            errno = EBADF;
+            return -1;
+        }
         absoldpath = (char *)oldpath;
     }
     else
@@ -313,6 +323,11 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
             return -1;
         }
         newdes = pvfs_find_descriptor(newdirfd);
+        if (!newdes)
+        {
+            errno = EBADF;
+            return -1;
+        }
         absnewpath = (char *)newpath;
     }
     else
@@ -451,6 +466,11 @@ static ssize_t pvfs_prdwr64(int fd,
 
     /* Find the descriptor */
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
 
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &mreq);
@@ -710,6 +730,11 @@ int pvfs_fstat(int fd, struct stat *buf)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_stat(pd, buf);
 }
 
@@ -726,6 +751,11 @@ int pvfs_fstat64(int fd, struct stat64 *buf)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_stat64(pd, buf);
 }
 
@@ -804,6 +834,11 @@ int pvfs_fstatat64(int fd, char *path, struct stat64 *buf, int flag)
             return -1;
         }
         pd = pvfs_find_descriptor(fd);
+        if (!pd)
+        {
+            errno = EBADF;
+            return -1;
+        }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
         rc = iocommon_stat64(pd2, buf);
         pvfs_close(pd2->fd);
@@ -900,6 +935,11 @@ int pvfs_fchown (int fd, uid_t owner, gid_t group)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_chown(pd, owner, group);
 }
 
@@ -999,6 +1039,11 @@ int pvfs_fchmod (int fd, mode_t mode)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_chmod(pd, mode);
 }
 
@@ -1104,6 +1149,11 @@ int pvfs_mkdirat (int dirfd, const char *path, mode_t mode)
             return -1;
         }
         pd = pvfs_find_descriptor(dirfd);
+        if (!pd)
+        {
+            errno = EBADF;
+            return -1;
+        }
         rc = iocommon_make_directory(path,
                                      (mode & ~mask_val & 0777),
                                      &pd->pvfs_ref);
@@ -1197,6 +1247,11 @@ int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath)
         return -1;
     }
     pd = pvfs_find_descriptor(newdirfd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_symlink(newpath, oldpath, &pd->pvfs_ref);
 }
 
@@ -1236,6 +1291,11 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_getdents(pd, dirp, count);
 }
 
@@ -1254,6 +1314,11 @@ int pvfs_faccessat (int fd, const char * path, int mode, int flags)
         return -1;
     }
     pd = pvfs_find_descriptor(fd);
+    if(!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
     return iocommon_access(path, mode, flags, &pd->pvfs_ref);
 }
 

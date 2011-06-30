@@ -437,7 +437,7 @@ int split_pathname( const char *path,
                     char **directory,
                     char **filename)
 {
-    int i, slashes = 0;
+    int i, fnlen, slashes = 0;
     int length = strlen("pvfs2");
 
     if (!path || !directory || !filename)
@@ -488,7 +488,7 @@ int split_pathname( const char *path,
     }
     i++;
     /* copy the filename */
-    fnlen = length - i - slashes
+    fnlen = length - i - slashes;
     if (fnlen == 0)
     {
         filename = NULL;
@@ -500,7 +500,7 @@ int split_pathname( const char *path,
         {
             errno = ENOENT;
         }
-        return = -1;
+        return -1;
     }
     /* check flag to see if there are slashes to skip */
     *filename = malloc(fnlen + 1);

@@ -988,7 +988,7 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
         attr.owner = owner;
         attr.mask |= PVFS_ATTR_SYS_UID;
     }
-    if (owner != -1)
+    if (group != -1)
     {
         attr.group = group;
         attr.mask |= PVFS_ATTR_SYS_GID;

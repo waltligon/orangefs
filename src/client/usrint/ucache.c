@@ -101,20 +101,20 @@ static int ucache_blk_cnt;
 
 static void add_free_mtbls(int blk)
 {
-	int i, start_blk;
+	int i, start_mtbl;
 	struct file_table_s *ftbl = &(ucache->ftbl);
 	union cache_block_u *b = &(ucache->b[blk]);
 
 	/* add mtbls in blk to ftbl free list */
 	if (blk == 0)
 	{
-		start_blk = 1; /* skip blk 0 ent 0 which is ftbl */
+		start_mtbl = 1; /* skip blk 0 ent 0 which is ftbl */
 	}
 	else
 	{
-		start_blk = 0;
+		start_mtbl = 0;
 	}
-	for (i = start_blk; i < MTBL_PER_BLOCK - 1; i++)
+	for (i = start_mtbl; i < MTBL_PER_BLOCK - 1; i++)
 	{
 		b->mtbl[i].free_list_blk = blk;
 		b->mtbl[i].free_list = i + 1;
@@ -122,7 +122,7 @@ static void add_free_mtbls(int blk)
 	b->mtbl[i].free_list_blk = ftbl->free_mtbl_blk;
 	b->mtbl[i].free_list = ftbl->free_mtbl_ent;
 	ftbl->free_mtbl_blk = blk;
-	ftbl->free_mtbl_ent = 0;
+	ftbl->free_mtbl_ent = start_mtbl;
 }
 
 void ucache_initialize(void)
@@ -167,7 +167,6 @@ static void init_memory_table(int blk, int ent)
 	int i;
 	struct mem_table_s *mtbl = &(ucache->b[blk].mtbl[ent]);
 
-	mtbl->flags = 0;
 	mtbl->lru_first = NIL;
 	mtbl->lru_last = NIL;
 	mtbl->dirty_list = NIL;
@@ -196,7 +195,6 @@ static void put_free_blk(int blk)
 
 static int get_free_fent(void)
 {
-	/* call init_memory_table here */
 }
 
 static void put_free_fent(void)
@@ -217,6 +215,7 @@ static struct mem_table *lookup_file(uint32_t fs_id, uint64_t handle)
 
 static struct mem_ent_s *insert_file(uint32_t fs_id, uint64_t handle)
 {
+	/* maybe call init_memory_table here */
 }
 
 static int remove_file(uint32_t fs_id, uint64_t handle)
