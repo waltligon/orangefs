@@ -198,7 +198,7 @@ pvfs2_server_start() {
         --iospec="`hostname -s`:{3396-3399}" \
         --metaspec="`hostname -s`:{3396-3399}"  \
         --storage ${PVFS2_STORAGE} \
-        --trove-method=${IO:=alt-aio}
+        --trove-method=${IO:=alt-aio} \
         --logging "none" \
         --logfile=${PVFS2_LOG}/pvfs2-server-${TEST_NAME}.log --quiet
     check_return $? "pvfs2-genconfig failed"
