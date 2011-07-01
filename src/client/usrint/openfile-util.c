@@ -110,7 +110,6 @@ void load_glibc(void)
     glibc_ops.chmod = dlsym(RTLD_NEXT, "chmod");
     glibc_ops.fchmod = dlsym(RTLD_NEXT, "fchmod");
     glibc_ops.fchmodat = dlsym(RTLD_NEXT, "fchmodat");
-    glibc_ops.lchmod = dlsym(RTLD_NEXT, "lchmod");
     glibc_ops.mkdir = dlsym(RTLD_NEXT, "mkdir");
     glibc_ops.mkdirat = dlsym(RTLD_NEXT, "mkdirat");
     glibc_ops.rmdir = dlsym(RTLD_NEXT, "rmdir");
@@ -173,6 +172,7 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
     PINT_initrand();
+    PVFS_perror_gossip_silent();
 }
 
 int pvfs_descriptor_table_size(void)

@@ -63,7 +63,6 @@ typedef struct posix_ops_s
     int (*chmod)(const char *path, mode_t mode);
     int (*fchmod)(int fd, mode_t mode);
     int (*fchmodat)(int fd, char *path, mode_t mode, int flag);
-    int (*lchmod)(const char *path, mode_t mode);
     int (*mkdir)(const char *path, mode_t mode);
     int (*mkdirat)(int dirfd, const char *path, mode_t mode);
     int (*rmdir)(const char *path);

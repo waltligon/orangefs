@@ -222,7 +222,7 @@ int pvfs_creat64(const char *path, mode_t mode, ...)
 /**
  * pvfs_unlink
  */
-int pvfs_unlink (const char *path)
+int pvfs_unlink(const char *path)
 {
     return iocommon_unlink(path, NULL);
 }
@@ -230,7 +230,7 @@ int pvfs_unlink (const char *path)
 /**
  * pvfs_unlinkat
  */
-int pvfs_unlinkat (int dirfd, const char *path)
+int pvfs_unlinkat(int dirfd, const char *path)
 {
     int rc;
     pvfs_descriptor *pd;
@@ -366,7 +366,7 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
         return -1;
     }
     rc = pvfs_prdwr64(fd, buf, count, pd->file_pointer, PVFS_IO_READ);
-    if (rc == -1)
+    if (rc < 0)
     {
         return -1;
     }
@@ -416,7 +416,7 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
         return -1;
     }
     rc = pvfs_prdwr64(fd, (void *)buf, count, pd->file_pointer, PVFS_IO_WRITE);
-    if (rc == -1)
+    if (rc < 0)
     {
         return -1;
     }
@@ -513,7 +513,7 @@ static ssize_t pvfs_rdwrv(int fd,
 
     rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq);
 
-    if(rc != -1)
+    if (rc >= 0)
     {
         pd->file_pointer += rc;
     }
@@ -568,7 +568,7 @@ int pvfs_truncate(const char *path, off_t length)
 /**
  * pvfs_truncate64
  */
-int pvfs_truncate64 (const char *path, off64_t length)
+int pvfs_truncate64(const char *path, off64_t length)
 {
     int rc;
     pvfs_descriptor *pd;
@@ -591,7 +591,7 @@ int pvfs_truncate64 (const char *path, off64_t length)
 /**
  * pvfs_ftruncate wrapper
  */
-int pvfs_ftruncate (int fd, off_t length)
+int pvfs_ftruncate(int fd, off_t length)
 {
     return pvfs_ftruncate64(fd, (off64_t) length);
 }
@@ -599,7 +599,7 @@ int pvfs_ftruncate (int fd, off_t length)
 /**
  * pvfs_ftruncate64
  */
-int pvfs_ftruncate64 (int fd, off64_t length)
+int pvfs_ftruncate64(int fd, off64_t length)
 {
     pvfs_descriptor *pd;
     
@@ -905,7 +905,7 @@ int pvfs_dup2(int oldfd, int newfd)
 /**
  * pvfs_chown
  */
-int pvfs_chown (const char *path, uid_t owner, gid_t group)
+int pvfs_chown(const char *path, uid_t owner, gid_t group)
 {
     int rc;
     char *newpath;
@@ -925,7 +925,7 @@ int pvfs_chown (const char *path, uid_t owner, gid_t group)
 /**
  * pvfs_fchown
  */
-int pvfs_fchown (int fd, uid_t owner, gid_t group)
+int pvfs_fchown(int fd, uid_t owner, gid_t group)
 {
     pvfs_descriptor *pd;
 
@@ -989,7 +989,7 @@ int pvfs_fchownat(int fd, char *path, uid_t owner, gid_t group, int flag)
 /**
  * pvfs_lchown
  */
-int pvfs_lchown (const char *path, uid_t owner, gid_t group)
+int pvfs_lchown(const char *path, uid_t owner, gid_t group)
 {
     int rc;
     char *newpath;
@@ -1009,7 +1009,7 @@ int pvfs_lchown (const char *path, uid_t owner, gid_t group)
 /**
  * pvfs_chmod
  */
-int pvfs_chmod (const char *path, mode_t mode)
+int pvfs_chmod(const char *path, mode_t mode)
 {
     int rc;
     char *newpath;
@@ -1029,7 +1029,7 @@ int pvfs_chmod (const char *path, mode_t mode)
 /**
  * pvfs_fchmod
  */
-int pvfs_fchmod (int fd, mode_t mode)
+int pvfs_fchmod(int fd, mode_t mode)
 {
     pvfs_descriptor *pd;
 
@@ -1057,22 +1057,11 @@ int pvfs_fchmodat(int fd, char *path, mode_t mode, int flag)
 
     if (path[0] == '/' || fd == AT_FDCWD)
     {
-        if (flag & AT_SYMLINK_NOFOLLOW)
-        {
-            rc = pvfs_lchmod(path, mode);
-        }
-        else
-        {
-            rc = pvfs_chmod(path, mode);
-        }
+        rc = pvfs_chmod(path, mode);
     }
     else
     {
         int flags = O_RDONLY;
-        if (flag & AT_SYMLINK_NOFOLLOW)
-        {
-            flags |= O_NOFOLLOW;
-        }
         if (fd < 0)
         {
             errno = EBADF;
@@ -1091,31 +1080,9 @@ int pvfs_fchmodat(int fd, char *path, mode_t mode, int flag)
 }
 
 /**
- * pvfs_fchmodat
- *
- * this is not a Linux syscall, but its useful above 
- */
-int pvfs_lchmod (const char *path, mode_t mode)
-{
-    int rc;
-    char *newpath;
-    pvfs_descriptor *pd;
-
-    newpath = pvfs_qualify_path(path);
-    pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (newpath != path)
-    {
-        free(newpath);
-    }
-    rc = iocommon_chmod(pd, mode);
-    pvfs_close(pd->fd);
-    return rc;
-}
-
-/**
  * pvfs_mkdir
  */
-int pvfs_mkdir (const char *path, mode_t mode)
+int pvfs_mkdir(const char *path, mode_t mode)
 {
     int rc;
     char *newpath;
@@ -1132,7 +1099,7 @@ int pvfs_mkdir (const char *path, mode_t mode)
 /**
  * pvfs_mkdirat
  */
-int pvfs_mkdirat (int dirfd, const char *path, mode_t mode)
+int pvfs_mkdirat(int dirfd, const char *path, mode_t mode)
 {
     int rc;
     pvfs_descriptor *pd, *pd2;
@@ -1164,7 +1131,7 @@ int pvfs_mkdirat (int dirfd, const char *path, mode_t mode)
 /**
  * pvfs_rmdir
  */
-int pvfs_rmdir (const char *path)
+int pvfs_rmdir(const char *path)
 {
     int rc;
     char *newpath;
@@ -1182,7 +1149,7 @@ int pvfs_rmdir (const char *path)
  * readlink fills buffer with contents of a symbolic link
  *
  */
-ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz)
+ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
 {
     int rc;
     char *newpath;
@@ -1200,7 +1167,7 @@ ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz)
     return rc;
 }
 
-int pvfs_readlinkat (int fd, const char *path, char *buf, size_t bufsiz)
+int pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
 {
     int rc;
     pvfs_descriptor *pd, *pd2;
@@ -1233,12 +1200,12 @@ int pvfs_readlinkat (int fd, const char *path, char *buf, size_t bufsiz)
     return rc;
 }
 
-int pvfs_symlink (const char *oldpath, const char *newpath)
+int pvfs_symlink(const char *oldpath, const char *newpath)
 {
     return iocommon_symlink(newpath, oldpath, NULL);
 }
 
-int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath)
+int pvfs_symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 {
     pvfs_descriptor *pd;
     if (newdirfd < 0)
@@ -1258,16 +1225,18 @@ int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath)
 /**
  * PVFS does not have hard links
  */
-ssize_t pvfs_link (const char *oldpath, const char *newpath)
+ssize_t pvfs_link(const char *oldpath, const char *newpath)
 {
+    fprintf(stderr, "pvfs_link not implemented\n");
 }
 
 /**
  * PVFS does not have hard links
  */
-int pvfs_linkat (const char *oldpath, int newdirfd,
+int pvfs_linkat(const char *oldpath, int newdirfd,
                  const char *newpath, int flags)
 {
+    fprintf(stderr, "pvfs_linkat not implemented\n");
 }
 
 /**
@@ -1299,12 +1268,12 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
     return iocommon_getdents(pd, dirp, count);
 }
 
-int pvfs_access (const char * path, int mode)
+int pvfs_access(const char * path, int mode)
 {
     return iocommon_access(path, mode, 0, NULL);
 }
 
-int pvfs_faccessat (int fd, const char * path, int mode, int flags)
+int pvfs_faccessat(int fd, const char * path, int mode, int flags)
 {
     pvfs_descriptor *pd;
 
@@ -1324,6 +1293,7 @@ int pvfs_faccessat (int fd, const char * path, int mode, int flags)
 
 int pvfs_flock(int fd, int op)
 {
+    fprintf(stderr, "pvfs_flock not implemented\n");
 }
 
 int pvfs_fcntl(int fd, int cmd, ...)
@@ -1331,23 +1301,31 @@ int pvfs_fcntl(int fd, int cmd, ...)
     va_list ap;
     long arg;
     struct flock *lock;
+    fprintf(stderr, "pvfs_fcntl not implemented\n");
 }
 
 /* sync all disk data */
 void pvfs_sync(void )
 {
+    fprintf(stderr, "pvfs_sync not implemented\n");
 }
 
 /* sync file, but not dir it is in */
 int pvfs_fsync(int fd)
 {
-    return 0; /* success */
+    int rc = 0;
+
+    rc = pvfs_flush(fd); /* as close as we have for now */
+    return rc;
 }
 
 /* does not sync file metadata */
 int pvfs_fdatasync(int fd)
 {
-    return 0; /* success */
+    int rc = 0;
+
+    rc = pvfs_flush(fd); /* as close as we have for now */
+    return rc;
 }
 
 /**
@@ -1416,7 +1394,6 @@ posix_ops pvfs_ops =
     .chmod = pvfs_chmod,
     .fchmod = pvfs_fchmod,
     .fchmodat = pvfs_fchmodat,
-    .lchmod = pvfs_lchmod,
     .mkdir = pvfs_mkdir,
     .mkdirat = pvfs_mkdirat,
     .rmdir = pvfs_rmdir,

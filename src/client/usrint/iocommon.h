@@ -22,10 +22,17 @@
 #define O_NOFOLLOW 0
 #endif
 
-// Base pvfs file handle info:
-// native-lib and mpi-io both wrap around pvfs_descriptor for their file table entries
+/* Base pvfs file handle info:
+ * native-lib and mpi-io both wrap around
+ * pvfs_descriptor for their file table entries
+ */
 
 #define PVFS_NULL_OBJ ((PVFS_object_ref *)NULL)
+
+/* this global is set when a pvfs specific error is returned
+ * and errno is set to EIO
+ */
+extern int pvfs_errno;
 
 /* prototypes */
 
