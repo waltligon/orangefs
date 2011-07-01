@@ -419,20 +419,20 @@ endecode_fields_1a_struct(
 #define extra_size_PVFS_servreq_tree_remove \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
-#define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                                  \
-                                 __creds,                                \
-                                 __fsid,                                 \
-                                 __num_data_files,                       \
-                                 __handle_array,                         \
-                                 __hints)                                \
-do {                                                                     \
-    memset(&(__req), 0, sizeof(__req));                                  \
-    (__req).op = PVFS_SERV_TREE_REMOVE;                                  \
-    (__req).hints = (__hints);                                           \
-    (__req).credentials = (__creds);                                     \
-    (__req).u.tree_remove.fs_id = (__fsid);                              \
-    (__req).u.tree_remove.num_data_files = (__num_data_files);           \
-    (__req).u.tree_remove.handle_array = (__handle_array);               \
+#define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                   \
+                                 __creds,                      \
+                                 __fsid,                       \
+                                 __num_data_files,             \
+                                 __handle_array,               \
+                                 __hints)                      \
+do {                                                           \
+    memset(&(__req), 0, sizeof(__req));                        \
+    (__req).op = PVFS_SERV_TREE_REMOVE;                        \
+    (__req).hints = (__hints);                                 \
+    (__req).credentials = (__creds);                           \
+    (__req).u.tree_remove.fs_id = (__fsid);                    \
+    (__req).u.tree_remove.num_data_files = (__num_data_files); \
+    (__req).u.tree_remove.handle_array = (__handle_array);     \
 } while (0)
 
 struct PVFS_servreq_tree_get_file_size
@@ -453,24 +453,26 @@ endecode_fields_3a_struct(
 #define extra_size_PVFS_servreq_tree_get_file_size \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
-#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                                \
-                                 __creds,                                          \
-                                 __fsid,                                           \
-                                 __caller_handle_index,                            \
-                                 __num_data_files,                                 \
-                                 __handle_array,                                   \
-                                 __retry_msgpair_at_leaf,                          \
-                                 __hints)                                          \
-do {                                                                               \
-    memset(&(__req), 0, sizeof(__req));                                            \
-    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                                     \
-    (__req).hints = (__hints);                                                     \
-    (__req).credentials = (__creds);                                               \
-    (__req).u.tree_get_file_size.fs_id = (__fsid);                                 \
-    (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index);    \
-    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);              \
-    (__req).u.tree_get_file_size.handle_array = (__handle_array);                  \
-    (__req).u.tree_get_file_size.retry_msgpair_at_leaf = (__retry_msgpair_at_leaf);\
+#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                    \
+                                 __creds,                              \
+                                 __fsid,                               \
+                                 __caller_handle_index,                \
+                                 __num_data_files,                     \
+                                 __handle_array,                       \
+                                 __retry_msgpair_at_leaf,              \
+                                 __hints)                              \
+do {                                                                   \
+    memset(&(__req), 0, sizeof(__req));                                \
+    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                         \
+    (__req).hints = (__hints);                                         \
+    (__req).credentials = (__creds);                                   \
+    (__req).u.tree_get_file_size.fs_id = (__fsid);                     \
+    (__req).u.tree_get_file_size.caller_handle_index =                 \
+        (__caller_handle_index);                                       \
+    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);  \
+    (__req).u.tree_get_file_size.handle_array = (__handle_array);      \
+    (__req).u.tree_get_file_size.retry_msgpair_at_leaf =               \
+        (__retry_msgpair_at_leaf);\
 } while (0)
 
 struct PVFS_servresp_tree_get_file_size
