@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <errno.h>
+#include <uuid/uuid.h>
 #endif
 
 #ifndef INT32_MAX
@@ -121,7 +122,7 @@ enum PVFS_encoding_type
 /* basic types used by storage subsystem */
 
 /** Unique identifier for an object on a PVFS2 file system. */
-typedef uint64_t PVFS_handle;
+typedef uuid_t PVFS_handle;
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -132,8 +133,15 @@ typedef uint64_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
 
 
-#define encode_PVFS_handle encode_uint64_t
-#define decode_PVFS_handle decode_uint64_t
+#define encode_PVFS_handle(pptr,pbuf) do { \
+    memcpy(*(pptr), pbuf, sizeof(PVFS_handle)); \
+} while (0)
+
+#define decode_PVFS_handle(pptr,pbuf) do { \
+    memcpy(pbuf, *(pptr), sizeof(PVFS_handle)); \
+} while (0)
+
+
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
 #define decode_PVFS_ds_position decode_uint64_t
@@ -487,7 +495,8 @@ endecode_fields_2(
 /* max extended attribute name len as imposed by the VFS and exploited for the
  * upcall request types.
  * NOTE: Please retain them as multiples of 8 even if you wish to change them
- * This is *NECESSARY* for supporting 32 bit user-space binaries on a 64-bit kernel.
+ * This is *NECESSARY* for supporting 32 bit user-space binaries on a 64-bit 
+ * kernel.
  * Due to implementation within DBPF, this really needs to be PVFS_NAME_MAX,
  * which it was the same value as, but no reason to let it break if that
  * changes in the future.
