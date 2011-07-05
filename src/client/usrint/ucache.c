@@ -148,7 +148,7 @@ void ucache_initialize(void)
 	}
 	ucache->b[ucache_blk_cnt - 1].mtbl[0].free_list = NIL;
 	/* set up file hash table */
-	for (i = 0; i < FILE_TABLE_HASH_MAX - 1; i++)
+	for (i = 0; i < FILE_TABLE_HASH_MAX; i++)
 	{
 		ucache->ftbl.file[i].mtbl_blk = NIL;
 		ucache->ftbl.file[i].mtbl_ent = NIL;
@@ -172,7 +172,7 @@ static void init_memory_table(int blk, int ent)
 	mtbl->dirty_list = NIL;
 	mtbl->num_blocks = 0;
 	/* set up hash table */
-	for (i = 0; i < MEM_TABLE_HASH_MAX - 1; i++)
+	for (i = 0; i < MEM_TABLE_HASH_MAX; i++)
 	{
 		mtbl->mem[i].item = NIL;
 	}
@@ -185,18 +185,16 @@ static void init_memory_table(int blk, int ent)
 	mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL;
 }
 
-static int get_free_blk(void) /*should eviction go in this function or outside? */
+static int get_free_blk(void)
 {
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	//printf("free_blk = %d\n", ftbl->free_blk);
-	if(ftbl->free_blk!=NIL){
-		int ret = ftbl->free_blk;
-		//ucache->b[ftbl->free_blk].mtbl[0].free_list_blk = NIL;
- 		ftbl->free_blk = ucache->b[ftbl->free_blk].mtbl[0].free_list; //questions about mtbl indexes?
+	int ret = ftbl->free_blk;
+	if(ret!=NIL){
+ 		ftbl->free_blk = ucache->b[ret].mtbl[0].free_list; 
 		return ret;
 	}
 	else{
-		//evict LRU block and return its index
+		/*	EVICT?	*/
 		return NIL;
 	}
 }
@@ -204,35 +202,87 @@ static int get_free_blk(void) /*should eviction go in this function or outside? 
 static void put_free_blk(int blk)
 {
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	int temp = ftbl->free_blk;
+	ucache->b[blk].mtbl[0].free_list = ftbl->free_blk;
+	ucache->b[blk].mtbl[0].free_list_blk = NIL;	/*	necessary?	*/
 	ftbl->free_blk = blk;
-
-	ucache->b[ftbl->free_blk].mtbl[0].free_list = temp;
-	//ucache->b[ftbl->free_blk].mtbl[0].free_list_blk
-
 }
 
 static int get_free_fent(void)
 {
-	
-
-
+	struct file_table_s *ftbl = &(ucache->ftbl);
+	int ret = ftbl->free_list;
+	if(ret!=NIL){
+		ftbl->free_list = ftbl->file[ret].next;
+		return ret;
+	}
+	else{
+		/*	EVICT?	*/
+		return NIL;
+	}
 }
 
 static void put_free_fent(int fent)
 {
+	struct file_table_s *ftbl = &(ucache->ftbl);
+	ftbl->file[fent].next = ftbl->free_list;
+	ftbl->free_list = fent;
 }
 
 static int get_free_ment(struct mem_table_s *mtbl)
 {
+	int ret = mtbl->free_list;
+	if(ret!=NIL){
+		mtbl->free_list = mtbl->mem[ret].next;
+		return ret;
+	}
+	else{
+		/*	EVICT?	*/
+		return NIL;
+	}
 }
 
 static void put_free_ment(struct mem_table_s *mtbl, int ent)
 {
+	mtbl->mem[ent].next = mtbl->free_list;
+	mtbl->free_list = ent;
+}
+
+/** Hash Function - also in quickhash library in: pvfs2/src/common/quickhash/quickhash.h
+ * derived from an algorithm found in Aho, Sethi and Ullman's
+ * {Compilers: Principles, Techniques and Tools}, published by Addison-Wesley. 
+ * This algorithm comes from P.J. Weinberger's C compiler. 
+ */
+static inline int hash(void *k, int table_size)
+{
+    const char *str = (char *)k;
+    uint32_t g, h = 0;
+
+    while(*str)
+    {
+        h = (h << 4) + *str++;
+        if((g = (h & 0xF0UL)))
+        {
+            h ^= g >> 24;
+            h ^= g;
+        }
+    }
+
+    return (int)(h & ((uint64_t)(table_size - 1)));
 }
 
 static struct mem_table *lookup_file(uint32_t fs_id, uint64_t handle)
 {
+/*
+//given the fs_id and handle locate the appropriate mtbl
+	
+	//hash info and determine index
+
+		//if index ==NIL , use this index and point the nexts to NIL
+
+			//return mtbl
+		//else procede to correct link at that particular index and point nexts to NIL
+			//return mtbl
+*/
 }
 
 static struct mem_ent_s *insert_file(uint32_t fs_id, uint64_t handle)
