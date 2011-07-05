@@ -2,6 +2,7 @@
 #include <sys/shm.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <stdio.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -270,19 +271,39 @@ static inline int hash(void *k, int table_size)
     return (int)(h & ((uint64_t)(table_size - 1)));
 }
 
+
 static struct mem_table *lookup_file(uint32_t fs_id, uint64_t handle)
 {
-/*
-//given the fs_id and handle locate the appropriate mtbl
-	
+	struct file_table_s *ftbl = &(ucache->ftbl);
+
+	char str[25]; //94/4 + 1
+	int index;
+
+	//convert identifiers into concatenated hex string to be sent to hash function  	
+	sprintf(str, "%08lX%016llX", (long unsigned int)fs_id, (long long unsigned int)handle);
+
 	//hash info and determine index
+	index = hash(str, FILE_TABLE_HASH_MAX);
 
-		//if index ==NIL , use this index and point the nexts to NIL
+	//keep current ptr
+	struct file_ent_s *current = &(ftbl->file[index]);
 
-			//return mtbl
-		//else procede to correct link at that particular index and point nexts to NIL
-			//return mtbl
-*/
+	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){
+		//iterate ..examining the fs_id and handles
+		while(current!=0){//stop when ids match or next is NIL
+			if(current->tag_id==fs_id && current->tag_handle==handle){//ids match
+				return (struct mem_table *)&(ucache->b[current->mtbl_blk].mtbl[current->mtbl_ent]);
+			}
+			current = &(ftbl->file[current->next]);
+		}
+		return (struct mem_table *)0;
+	}
+	else{
+		if(current->tag_id==fs_id && current->tag_handle==handle){//ids match
+			return (struct mem_table *)&(ucache->b[current->mtbl_blk].mtbl[current->mtbl_ent]);
+		}
+		return (struct mem_table *)0;
+	} 	 
 }
 
 static struct mem_ent_s *insert_file(uint32_t fs_id, uint64_t handle)
