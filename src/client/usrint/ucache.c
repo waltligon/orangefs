@@ -72,7 +72,7 @@ struct file_ent_s
 	uint16_t next;		/* next mtbl in chain */
 };
 
-/** A has table to find caches for specific files
+/** A hash table to find caches for specific files
  *
  *  Keyed on fs_id/handle of the file
  */
@@ -185,19 +185,41 @@ static void init_memory_table(int blk, int ent)
 	mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL;
 }
 
-static int get_free_blk(void)
+static int get_free_blk(void) /*should eviction go in this function or outside? */
 {
+	struct file_table_s *ftbl = &(ucache->ftbl);
+	//printf("free_blk = %d\n", ftbl->free_blk);
+	if(ftbl->free_blk!=NIL){
+		int ret = ftbl->free_blk;
+		//ucache->b[ftbl->free_blk].mtbl[0].free_list_blk = NIL;
+ 		ftbl->free_blk = ucache->b[ftbl->free_blk].mtbl[0].free_list; //questions about mtbl indexes?
+		return ret;
+	}
+	else{
+		//evict LRU block and return its index
+		return NIL;
+	}
 }
 
 static void put_free_blk(int blk)
 {
+	struct file_table_s *ftbl = &(ucache->ftbl);
+	int temp = ftbl->free_blk;
+	ftbl->free_blk = blk;
+
+	ucache->b[ftbl->free_blk].mtbl[0].free_list = temp;
+	//ucache->b[ftbl->free_blk].mtbl[0].free_list_blk
+
 }
 
 static int get_free_fent(void)
 {
+	
+
+
 }
 
-static void put_free_fent(void)
+static void put_free_fent(int fent)
 {
 }
 
