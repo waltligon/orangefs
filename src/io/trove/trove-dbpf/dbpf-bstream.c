@@ -166,7 +166,7 @@ static void aio_progress_notification(union sigval sig)
             }
 
             ref.fs_id = op_p->coll_p->coll_id;
-            ref.handle = op_p->handle;
+            uuid_copy(ref.handle, op_p->handle);
 
             gen_mutex_lock(&dbpf_update_size_lock);
             ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);
@@ -881,7 +881,9 @@ inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     */
     if (opcode == LIO_WRITE)
     {
-        TROVE_object_ref ref = {handle, coll_id};
+        TROVE_object_ref ref;
+        uuid_copy(ref.handle, handle);
+        ref.fs_id = coll_id;
         gen_mutex_lock(&dbpf_attr_cache_mutex);
         dbpf_attr_cache_remove(ref);
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
@@ -1360,7 +1362,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     q_op_p = (dbpf_queued_op_t *)op_p->u.b_resize.queued_op_ptr;
 
     ref.fs_id = op_p->coll_p->coll_id;
-    ref.handle = op_p->handle;
+    uuid_copy(ref.handle, op_p->handle);
 
     gen_mutex_lock(&dbpf_update_size_lock);
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, &attr);

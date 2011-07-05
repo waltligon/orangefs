@@ -379,8 +379,9 @@ int dbpf_attr_cache_insert(
     {
         if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
         {
-            TROVE_object_ref sacrificial_lamb_key =
-                {TROVE_HANDLE_NULL, TROVE_COLL_ID_NULL};
+            TROVE_object_ref sacrificial_lamb_key;
+            uuid_clear(sacrificial_lamb_key.handle);
+            sacrificial_lamb_key.fs_id = TROVE_COLL_ID_NULL;
             /*
               we have the lock, so we can safely remove
               any element in this cache at this point;
@@ -410,7 +411,7 @@ int dbpf_attr_cache_insert(
               at 0, as *something* must be in the hash table
             */
             if ((i == s_key_to_attr_table->table_size) &&
-                (sacrificial_lamb_key.handle == TROVE_HANDLE_NULL))
+                (uuid_is_null(sacrificial_lamb_key.handle)))
             {
                 i = 0;
                 goto hashtable_linear_scan;

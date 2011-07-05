@@ -238,7 +238,6 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL    ((PVFS_context_id)-1)
-#define PVFS_HANDLE_NULL     ((PVFS_handle)0)
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
 #define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
 #define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
