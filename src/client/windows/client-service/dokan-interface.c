@@ -455,7 +455,7 @@ static int get_requestor_credentials(PDOKAN_FILE_INFO file_info,
         {
             /* can't locate credentials for requesting user */
             DbgPrint("   get_requestor_credentials:  user %s not found\n", user_name);
-            return -ERROR_USER_PROFILE_LOAD;
+            ret = -ERROR_USER_PROFILE_LOAD;
         }
         else if (goptions->user_mode == USER_MODE_CERT)
         {
