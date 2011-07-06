@@ -156,42 +156,12 @@ static void put_free_ment(struct mem_table_s *mtbl, int ent)
 	mtbl->free_list = ent;
 }
 
-/** Hash Function - 
- * Also in quickhash library in: pvfs2/src/common/quickhash/quickhash.h
- * derived from an algorithm found in Aho, Sethi and Ullman's
- * {Compilers: Principles, Techniques and Tools}, published by Addison-Wesley. 
- * This algorithm comes from P.J. Weinberger's C compiler. 
- */
-static inline int hash(void *k, int table_size)
-{
-    const char *str = (char *)k;
-    uint32_t g, h = 0;
-    while(*str)
-    {
-        h = (h << 4) + *str++;
-        if((g = (h & 0xF0UL)))
-        {
-            h ^= g >> 24;
-            h ^= g;
-        }
-    }
-    return (int)(h & ((uint64_t)(table_size - 1)));
-}
-
-
 static struct mem_table *lookup_file(uint32_t fs_id, uint64_t handle)
 {
 	struct file_table_s *ftbl = &(ucache->ftbl);
 	struct file_ent_s *current;	/* Current ptr for iteration	*/
-	char ids_as_string[25];	/*	(32+64)/4 + 1 (for null byte)	*/
 	int index;		/*	index into file hash table	*/
-	/*	convert identifiers into concatenated hex string to be sent 
-	*	to hash function
-	*/  	
-	sprintf(ids_as_string, "%08lX%016llX",(long unsigned int)fs_id, 
-		(long long unsigned int)handle);
-	/*	Determine index	into hash table	*/
-	index = hash(ids_as_string, FILE_TABLE_HASH_MAX);
+	index = handle % FILE_TABLE_HASH_MAX;
 	current = &(ftbl->file[index]);
 	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){
 		/*	Iterate and examine the fs_id and handle.
@@ -239,19 +209,12 @@ static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent){
 		}
 }
 
-static struct mem_ent_s *insert_file(uint32_t fs_id, uint64_t handle)
+static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
 {
 	struct file_table_s *ftbl = &(ucache->ftbl);
 	struct file_ent_s *current;	/* Current ptr for iteration	*/
-	char ids_as_string[25];	/*	(32+64)/4 + 1 (for null byte)	*/
-	int index;		/*	index into file hash table	*/
-	/*	convert identifiers into concatenated hex string to be sent 
-	*	to hash function
-	*/  	  	
-	sprintf(ids_as_string, "%08lX%016llX", (long unsigned int)fs_id, 
-		(long long unsigned int)handle);
-	/*	Determine index	into hash table	*/
-	index = hash(ids_as_string, FILE_TABLE_HASH_MAX);
+	/*	index into file hash table	*/
+	int index = handle % FILE_TABLE_HASH_MAX;
 	current = &(ftbl->file[index]);	
 	/*	Insert at index, relocating head data if necessary.	*/
 	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){ /* relocating! */
@@ -270,43 +233,81 @@ static struct mem_ent_s *insert_file(uint32_t fs_id, uint64_t handle)
 		}
 		else{	/*	No free file entries available: policy?	*/
 			/*	Evict or return NIL	*/
-			return (struct mem_ent_s *)NIL;
+			return (struct mem_table_s *)NIL;
 		}
 	}
 	/*	Get next free mem_table	*/
 	uint32_t free_mtbl_blk;
 	uint16_t free_mtbl_ent;	
 	/* Is there a free memory table available? */
-	if(get_next_free_mtbl(&free_mtbl_blk, &free_mtbl_ent)){
+	if(get_next_free_mtbl(&free_mtbl_blk, &free_mtbl_ent)==1){
 		/*	Update fent with it's new mtbl: blk and ent */
 		current->mtbl_blk = free_mtbl_blk;
 		current->mtbl_ent = free_mtbl_ent;
 		/*	Initialize Memory Table	*/
 		init_memory_table(free_mtbl_blk, free_mtbl_ent);
-
-		/* Copy data from file into mem entries	*/
-		//... then return
-
-
-
 		return &(ucache->b[current->mtbl_blk].mtbl[
-			current->mtbl_ent].mem[0]);
+			current->mtbl_ent]);
 	}
 	else{	/*	No free mtbl available: policy?	*/
 		/*	Evict or return NIL	*/
-		return (struct mem_ent_s *)NIL;
+		return (struct mem_table_s *)NIL;
 	}
 }
 
+//Needs work
 static int remove_file(uint32_t fs_id, uint64_t handle)
 {
-	//remove the link from the linked list
+	struct file_table_s *ftbl = &(ucache->ftbl);
+	struct file_ent_s *current;	/* Current ptr for iteration	*/
+	uint32_t file_mtbl_blk = NIL;
+	uint16_t file_mtbl_ent = NIL;
+	/*	index into file hash table	*/
+	int index = handle % FILE_TABLE_HASH_MAX;
+	current = &(ftbl->file[index]);
+	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){ /* links present */
+		/*	Iterate and examine the fs_id and handle.
+		*	stop when matched or next is NIL	*/
+		while((int)current!=NIL){	
+			if(current->tag_id==fs_id && 
+				current->tag_handle==handle){
+				file_mtbl_blk = current->mtbl_blk;
+				file_mtbl_ent = current->mtbl_ent;
+			}
+			current = &(ftbl->file[current->next]);
+		}
+	}
+	else{	/* No links present	*/
+		if(current->tag_id==fs_id && current->tag_handle==handle){
+			file_mtbl_blk = current->mtbl_blk;
+			file_mtbl_ent = current->mtbl_ent;
+		}
+	} 	
+	//Verify we've recieved the necesasry info
+	if(file_mtbl_blk==NIL || file_mtbl_ent==NIL){
+		return NIL;
+	}
+	/*	add mem_table back to free list	*/
+	/*	First: store temp copy of current head	*/
+	uint32_t tmp_blk = ftbl->free_mtbl_blk;
+	uint16_t tmp_ent = ftbl->free_mtbl_ent;
 
+	//Need current block and ent corresponding to file to be removed
+	ftbl->free_mtbl_blk = file_mtbl_blk;
+	ftbl->free_mtbl_ent = file_mtbl_ent;
+	
+	//Set nexts
+//	ftbl->free_mtbl_blk
 
+	//put_free_fent(index);
+	return(1);
 }
 
 static void *lookup_mem(struct mem_table_s *mtbl, uint64_t offset)
 {
+
+
+
 }
 
 static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset)
