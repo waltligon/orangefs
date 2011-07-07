@@ -170,7 +170,7 @@ static PINT_sm_action prelude_getattr_if_needed(
      * operate on a specific handle, so there is nothing we can do
      * here
      */
-    if (uuid_is_null(s_op->target_handle) )
+    if (PVFS_handle_is_null(s_op->target_handle) )
     {
 
         js_p->error_code = 0;
@@ -592,7 +592,7 @@ static PINT_sm_action prelude_check_acls_if_needed(
      * return -PVFS_EACCESS 
      */
     if (s_op->target_fs_id == PVFS_FS_ID_NULL
-        || uuid_is_null(s_op->target_handle) )
+        || PVFS_handle_is_null(s_op->target_handle) )
     {
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;

@@ -124,6 +124,10 @@ enum PVFS_encoding_type
 /** Unique identifier for an object on a PVFS2 file system. */
 typedef uuid_t PVFS_handle;
 
+#define PVFS_handle_clear(u) uuid_clear(u)
+#define PVFS_handle_copy(dst, src) uuid_copy(dst, src)
+#define PVFS_handle_is_null(u) uuid_is_null(u)
+
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
  *  PVFS2 file systems reachable by a given client.

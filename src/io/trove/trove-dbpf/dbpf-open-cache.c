@@ -295,7 +295,7 @@ int dbpf_open_cache_get(
 	/* have an entry to work with; fill in and place in used list */
 	tmp_entry->ref_ct = 1;
 	tmp_entry->coll_id = coll_id;
-	tmp_entry->handle = handle;
+	PVFS_handle_copy(tmp_entry->handle, handle);
 
         ret = open_fd(&(tmp_entry->fd), coll_id, handle, type);
         if (ret < 0)

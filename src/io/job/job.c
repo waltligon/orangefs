@@ -3028,7 +3028,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     }
     jd->hints = hints;
     jd->job_user_ptr = user_ptr;
-    uuid_clear(jd->u.trove.handle);
+    PVFS_handle_clear(jd->u.trove.handle);
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
@@ -3065,7 +3065,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        uuid_copy(out_status_p->handle, jd->u.trove.handle);
+        PVFS_handle_copy(out_status_p->handle, jd->u.trove.handle);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3119,7 +3119,7 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
         return 1;
     }
     jd->job_user_ptr = user_ptr;
-    uuid_clear(jd->u.trove.handle);
+    PVFS_handle_clear(jd->u.trove.handle);
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = trove_thread_mgr_callback;
@@ -5071,7 +5071,7 @@ static void fill_status(struct job_desc *jd,
             status->actual_size = *jd->u.trove.out_size_p;
         status->vtag = jd->u.trove.vtag;
         status->coll_id = jd->u.trove.fsid;
-        uuid_copy(status->handle, jd->u.trove.handle);
+        PVFS_handle_copy(status->handle, jd->u.trove.handle);
         status->position = jd->u.trove.position;
         status->count = jd->u.trove.count;
         status->type = jd->u.trove.type;
@@ -5493,7 +5493,7 @@ int job_precreate_pool_fill(
     jd->hints = hints;
     jd->trove_callback.fn = precreate_pool_fill_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
-    uuid_copy(jd->u.precreate_pool.precreate_pool, precreate_pool);
+    PVFS_handle_copy(jd->u.precreate_pool.precreate_pool, precreate_pool);
     jd->u.precreate_pool.precreate_handle_array = precreate_handle_array;
     jd->u.precreate_pool.precreate_handle_count = precreate_handle_count;
     jd->u.precreate_pool.precreate_handle_index = 0;
@@ -5544,7 +5544,7 @@ int job_precreate_pool_lookup_server(
         /* only sleep for pools of the type we need to fulfill the request */
         if(!strcmp(pool->host, host) && (pool->pool_type == type) )
         {
-            uuid_copy(*pool_handle, pool->pool_handle);
+            PVFS_handle_copy(*pool_handle, pool->pool_handle);
             gen_mutex_unlock(&precreate_pool_mutex);
             return(0);
         }
@@ -5642,7 +5642,7 @@ int job_precreate_pool_register_server(
         return(-ENOMEM);
     }
 
-    uuid_copy(tmp_pool->pool_handle, pool_handle);
+    PVFS_handle_copy(tmp_pool->pool_handle, pool_handle);
     tmp_pool->pool_count = count;
     tmp_pool->pool_type = type;
     gossip_debug(GOSSIP_JOB_DEBUG, 
@@ -5748,7 +5748,8 @@ int job_precreate_pool_check_level(
                 jd->job_user_ptr = user_ptr;
                 jd->context_id = context_id;
                 jd->status_user_tag = status_user_tag;
-                uuid_copy(jd->u.precreate_pool.precreate_pool, precreate_pool);
+                PVFS_handle_copy(jd->u.precreate_pool.precreate_pool, 
+                                 precreate_pool);
                 jd->u.precreate_pool.fsid = fsid;
                 jd->u.precreate_pool.low_threshold = low_threshold;
                 *id = jd->job_id;
@@ -6214,7 +6215,7 @@ int job_precreate_pool_iterate_handles(
     {
         /* we got all of the handles out of the pool */
         /* pass back pool handle by itself and go to next pool */
-        uuid_copy(handle_array[0], pool->pool_handle);
+        PVFS_handle_copy(handle_array[0], pool->pool_handle);
         /* skip to next pool */
         pool_index++;
         out_status_p->position = pool_index << 32;

@@ -284,7 +284,7 @@ static int extentlist_coalesce_extent(
  * reduced by one and possibly * deleted altogether
  *
  */
-TROVE_handle extentlist_get_and_dec_extent(
+TROVE_handle *extentlist_get_and_dec_extent(
     struct TROVE_handle_extentlist *elist)
 {
     /* get the extent from the index 
@@ -296,8 +296,9 @@ TROVE_handle extentlist_get_and_dec_extent(
      */
     struct TROVE_handle_extent **e = NULL;
     struct TROVE_handle_extent *ext = NULL;
-    TROVE_handle handle = TROVE_HANDLE_NULL;
+    TROVE_handle handle;
 
+    PVFS_handle_clear(handle);
     e = avlgethighest(elist->index);
 
     /* could either be called w/o calling the setup functions, or we
@@ -311,7 +312,7 @@ TROVE_handle extentlist_get_and_dec_extent(
 
     assert(ext->first <= ext->last);
 
-    handle = ext->last;
+    PVFS_handle_copy(handle, ext->last);
 
     if (ext->first  == ext->last)
     {
@@ -342,21 +343,23 @@ TROVE_handle extentlist_get_and_dec_extent(
  *   
  *   0 (an invalid handle) if error
  */
-TROVE_handle extentlist_get_from_extent(
+TROVE_handle *extentlist_get_from_extent(
     struct TROVE_handle_extentlist *elist, 
     TROVE_extent *extent)
 {
-    TROVE_handle handle = TROVE_HANDLE_NULL;
+    TROVE_handle handle;
+    
+    PVFS_handle_clear(handle)l;
 
     handle = avltree_extent_search_in_range(elist->index, extent);
-    if (handle == TROVE_HANDLE_NULL)
+    if ( PVFS_handle_is_null(handle) )
     {
-        return TROVE_HANDLE_NULL;
+        return NULL;
     }
 
     if (extentlist_handle_remove(elist, handle) == -1)
     {
-        return TROVE_HANDLE_NULL;
+        return NULL;
     }
     return handle;
 }
@@ -370,7 +373,9 @@ int extentlist_peek_handles(
     int ret = -TROVE_EINVAL;
     struct TROVE_handle_extent **e = NULL;
     struct TROVE_handle_extent *ext = NULL;
-    TROVE_handle handle = TROVE_HANDLE_NULL;
+    TROVE_handle handle;
+    
+    PVFS_handle_clear(handle);
 
     if (!elist || !out_handle_array || !returned_handle_count)
     {
@@ -389,13 +394,13 @@ int extentlist_peek_handles(
     ext = *e;
     assert(ext->first <= ext->last);
 
-    handle = ext->last;
+    PVFS_handle_copy(handle);
     do
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "extentlist_peek_handles: "
                      "providing handle %llu\n", llu(handle));
 
-        out_handle_array[(*returned_handle_count)++] = handle;
+        PVFS_handle_copy(out_handle_array[(*returned_handle_count)++], handle);
 
         if (*returned_handle_count == max_num_handles)
         {

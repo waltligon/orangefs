@@ -176,7 +176,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref;
-    uuid_copy(ref.handle, handle);
+    PVFS_handle_copy(ref.handle, handle);
     ref.fs_id = coll_id;
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
@@ -255,12 +255,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
     TROVE_object_ref ref;
-    uuid_copy(ref.handle, op_p->handle);
+    PVFS_handle_copy(ref.handle, op_p->handle);
     ref.fs_id = op_p->coll_p->coll_id;
 
     memset(&key, 0, sizeof(key));
 
-    uuid_copy(key_entry.handle, op_p->handle);
+    PVFS_handle_copy(key_entry.handle, op_p->handle);
     memcpy(key_entry.key, 
            op_p->u.k_read.key->buffer, 
            op_p->u.k_read.key->buffer_sz);
@@ -399,7 +399,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref;
-    uuid_copy(ref.handle, op_p->handle);
+    PVFS_handle_copy(ref.handle, op_p->handle);
     ref.fs_id = op_p->coll_p->coll_id;
     u_int32_t dbflags = 0;
     struct dbpf_keyval_db_entry key_entry;
@@ -413,7 +413,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                      (char *)op_p->u.k_write.key.buffer);
     }
 
-    uuid_copy(key_entry.handle, op_p->handle);
+    PVFS_handle_copy(key_entry.handle, op_p->handle);
 
     assert(op_p->u.k_write.key.buffer_sz <= DBPF_MAX_KEY_LENGTH);
     memcpy(key_entry.key, 
@@ -731,7 +731,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
 
     if(op_p->flags & TROVE_KEYVAL_HANDLE_COUNT)
     {
-        uuid_copy(key_entry.handle, op_p->handle);
+        PVFS_handle_copy(key_entry.handle, op_p->handle);
         memset(&key, 0, sizeof(key));
         memset(&data, 0, sizeof(data));
         key.flags = DB_DBT_USERMEM;
@@ -1170,7 +1170,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 
     for(i = 0; i < op_p->u.k_read_list.count; i++)
     {
-        uuid_copy(key_entry.handle, op_p->handle);
+        PVFS_handle_copy(key_entry.handle, op_p->handle);
         memcpy(key_entry.key, 
                op_p->u.k_read_list.key_array[i].buffer,
                op_p->u.k_read_list.key_array[i].buffer_sz);
@@ -1276,11 +1276,11 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref;
-    uuid_copy(ref.handle, op_p->handle);
+    PVFS_handle_copy(ref.handle, op_p->handle);
     ref.fs_id = op_p->coll_p->coll_id;
     int k;
     char tmpdata[PVFS_NAME_MAX];
-    uuid_copy(key_entry.handle, op_p->handle);
+    PVFS_handle_copy(key_entry.handle, op_p->handle);
 
     /* read each key to see if it is present */
     for (k = 0; k < op_p->u.k_write_list.count; k++)
@@ -1652,7 +1652,7 @@ static int dbpf_keyval_do_remove(
                  llu(handle), key->buffer_sz, key->buffer_sz, (char *)key->buffer);
     #endif
 
-    uuid_copy(key_entry.handle, handle);
+    PVFS_handle_copy(key_entry.handle, handle);
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
 
     memset(&db_key, 0, sizeof(db_key));
@@ -1837,7 +1837,7 @@ static int dbpf_keyval_iterate_cursor_get(
     char dummy_data[PVFS_NAME_MAX];
     int key_sz;
 
-    uuid_copy(key_entry.handle, handle);
+    PVFS_handle_copy(key_entry.handle, handle);
 
     assert(key->buffer_sz >= 0);
     if(key->buffer_sz != 0)
@@ -1988,7 +1988,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     struct dbpf_keyval_db_entry key_entry;
 
     memset(&key_entry, 0, sizeof(key_entry));
-    uuid_copy(key_entry.handle, op_p->handle);
+    PVFS_handle_copy(key_entry.handle, op_p->handle);
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &key_entry;
@@ -2034,7 +2034,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
 
     if(op_p->flags & TROVE_KEYVAL_HANDLE_COUNT)
     {
-        uuid_copy(key_entry.handle, op_p->handle);
+        PVFS_handle_copy(key_entry.handle, op_p->handle);
         memset(&key, 0, sizeof(key));
         memset(&data, 0, sizeof(data));
         key.flags = DB_DBT_USERMEM;

@@ -1925,7 +1925,7 @@ int server_post_unexpected_recv(job_status_s *js_p)
         s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
-        uuid_clear(s_op->target_handle);
+        PVFS_handle_clear(s_op->target_handle);
         s_op->target_fs_id = PVFS_FS_ID_NULL;
         /* Add an unexpected s_ops to the list */
         qlist_add_tail(&s_op->next, &posted_sop_list);
@@ -2093,7 +2093,7 @@ int server_state_machine_alloc_noreq(
         }
         tmp_op = PINT_sm_frame(*new_op, PINT_FRAME_CURRENT);
         tmp_op->op = op;
-        uuid_clear(tmp_op->target_handle);
+        PVFS_handle_clear(tmp_op->target_handle);
         tmp_op->target_fs_id = PVFS_FS_ID_NULL;
 
         /* NOTE: We do not add these state machines to the 
@@ -2636,7 +2636,7 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
             return(ret < 0 ? ret : js.error_code);
         }
 
-        uuid_copy(*pool_handle, js.handle);
+        PVFS_handle_copy(*pool_handle, js.handle);
 
         /* store reference to pool handle as collection eattr */
         ret = job_trove_fs_seteattr(fsid, &key, &val, TROVE_SYNC, NULL, 0, &js, 
@@ -2778,7 +2778,7 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
                  s_op->u.precreate_pool_refiller.host, type, llu(pool_handle),
                  user_opts->precreate_batch_size[index], index);
 
-    uuid_copy(s_op->u.precreate_pool_refiller.pool_handle, pool_handle);
+    PVFS_handle_copy(s_op->u.precreate_pool_refiller.pool_handle, pool_handle);
     s_op->u.precreate_pool_refiller.fsid = fsid;
     s_op->u.precreate_pool_refiller.type = type;
     s_op->u.precreate_pool_refiller.host_addr = addr;

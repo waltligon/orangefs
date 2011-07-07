@@ -148,7 +148,7 @@ int PINT_server_req_get_object_ref(
     if(!PINT_server_req_table[req->op].params->get_object_ref)
     {
         *fs_id = 0;
-        uuid_clear(*handle);
+        PVFS_handle_clear(*handle);
         return 0;
     }
     else

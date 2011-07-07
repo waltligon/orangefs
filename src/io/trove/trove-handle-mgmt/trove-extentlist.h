@@ -60,9 +60,9 @@ void extentlist_free(
 int extentlist_merge(
     struct TROVE_handle_extentlist *dest,
     struct TROVE_handle_extentlist *src);
-TROVE_handle extentlist_get_and_dec_extent(
+TROVE_handle *extentlist_get_and_dec_extent(
     struct TROVE_handle_extentlist *elist);
-TROVE_handle extentlist_get_from_extent(
+TROVE_handle *extentlist_get_from_extent(
     struct TROVE_handle_extentlist *elist, 
     TROVE_extent *extent);
 int extentlist_peek_handles(
