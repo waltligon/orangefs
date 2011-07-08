@@ -1,7 +1,5 @@
-
 #include "ucache.h"
 
-/** this is the master pointer to the cache */
 static union user_cache_u *ucache;
 static int ucache_blk_cnt;
 
@@ -36,15 +34,24 @@ void ucache_initialize(void)
 	int key, id, i;
 	char *key_file_path;
 
+	/*	Note: had to set: kernel.shmmax amd kernel.shmall	*/
+
 	/* set up shared memory region */
 	key_file_path = GET_KEY_FILE;
 	key = ftok(key_file_path, PROJ_ID);
+	printf("key:\t\t\t0x%x\n", key);
 	id = shmget(key, CACHE_SIZE, CACHE_FLAGS);
+	printf("id:\t\t\t%d\n", id);
 	ucache = shmat(id, NULL, AT_FLAGS);
+	printf("ucache ptr:\t\t0x%x\n", (unsigned int)ucache);
 	ucache_blk_cnt = BLOCKS_IN_CACHE;
+
+	/*	Error Reporting	*/
+
 	/* initialize mtbl free list table */
 	ucache->ftbl.free_mtbl_blk = NIL;
 	ucache->ftbl.free_mtbl_ent = NIL;
+
 	add_free_mtbls(0);
 	/* set up list of free blocks */
 	ucache->ftbl.free_blk = 1;
@@ -58,11 +65,15 @@ void ucache_initialize(void)
 	{
 		ucache->ftbl.file[i].mtbl_blk = NIL;
 		ucache->ftbl.file[i].mtbl_ent = NIL;
+		ucache->ftbl.file[i].next = NIL;
+		//printf("next = %u\n", ucache->ftbl.file[i].next);
 	}
 	/* set up list of free hash table entries */
 	ucache->ftbl.free_list = FILE_TABLE_HASH_MAX;
 	for (i = FILE_TABLE_HASH_MAX; i < FILE_TABLE_ENTRY_COUNT - 1; i++)
 	{
+		ucache->ftbl.file[i].mtbl_blk = NIL;
+		ucache->ftbl.file[i].mtbl_ent = NIL;
 		ucache->ftbl.file[i].next = i+1;
 	}
 	ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL;
@@ -94,8 +105,8 @@ static void init_memory_table(int blk, int ent)
 static int get_free_blk(void)
 {
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	int ret = ftbl->free_blk;
-	if(ret!=NIL){
+	uint32_t ret = ftbl->free_blk;
+	if((int32_t)ret!=NIL){
 		/* Use zero since free_blks have no ititialized mem tables */
  		ftbl->free_blk = ucache->b[ret].mtbl[0].free_list; 
 		return ret;
@@ -118,29 +129,42 @@ static void put_free_blk(int blk)
 
 static int get_free_fent(void)
 {
+	printf("trying to get free file entry...\n");
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	int ret = ftbl->free_list;
-	if(ret!=NIL){
+	uint16_t ret = ftbl->free_list;
+	if((int16_t)ret!=NIL){
 		ftbl->free_list = ftbl->file[ret].next;
+		printf("\tfree file entry index = %d\n", ret);
 		return ret;
 	}
 	else{
 		/*	EVICT?	*/
+		printf("\terror getting free file entry...\n");
 		return NIL;
 	}
 }
 
 static void put_free_fent(int fent)
 {
+	printf("freeing file entry = %d\n", fent);
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	ftbl->file[fent].next = ftbl->free_list;
-	ftbl->free_list = fent;
+	ftbl->file[fent].tag_handle = NIL;
+	ftbl->file[fent].tag_id = NIL;
+	printf("\ttag_id\t\t0X%X\n", NIL);
+	printf("\ttag_handle\t0X%llX\n", ftbl->file[fent].tag_handle);
+	if(fent>(FILE_TABLE_HASH_MAX-1)){
+		ftbl->file[fent].next = ftbl->free_list;
+		ftbl->free_list = fent;
+	}
+	else{
+		ftbl->file[fent].next = NIL;
+	}
 }
 
 static int get_free_ment(struct mem_table_s *mtbl)
 {
-	int ret = mtbl->free_list;
-	if(ret!=NIL){
+	uint16_t ret = mtbl->free_list;
+	if((int16_t)ret!=NIL){
 		mtbl->free_list = mtbl->mem[ret].next;
 		return ret;
 	}
@@ -156,33 +180,74 @@ static void put_free_ment(struct mem_table_s *mtbl, int ent)
 	mtbl->free_list = ent;
 }
 
-static struct mem_table *lookup_file(uint32_t fs_id, uint64_t handle)
+static struct mem_table_s *lookup_file(
+	uint32_t fs_id, 
+	uint64_t handle,
+	uint32_t *file_mtbl_blk,	/* Can be NULL if not desired	*/
+	uint16_t *file_mtbl_ent,	/* Can be NULL if not desired	*/
+	uint16_t *file_ent_index	/* Can be NULL if not desired	*/
+)
 {
+	printf("performing lookup...\n");
 	struct file_table_s *ftbl = &(ucache->ftbl);
 	struct file_ent_s *current;	/* Current ptr for iteration	*/
-	int index;		/*	index into file hash table	*/
+	int index;			/* Index into file hash table	*/
 	index = handle % FILE_TABLE_HASH_MAX;
+	printf("\thashed index: %d\n", index);
+	if(file_ent_index){
+		*file_ent_index = index;
+	}
 	current = &(ftbl->file[index]);
-	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){
+	/*	Is there a link?	*/
+	printf("\tcurrent->next = %d\n", (int16_t)current->next);
+	if((int16_t)current->next!=-1){
 		/*	Iterate and examine the fs_id and handle.
 		*	stop when matched or next is NIL	*/
-		while((int)current!=NIL){	
+		while(1){
 			if(current->tag_id==fs_id && 
 				current->tag_handle==handle){
-				return (struct mem_table *)&(ucache->b[
+				printf("\tFile located in chain\n");
+				if(file_mtbl_blk!=NULL){
+					*file_mtbl_blk = current->mtbl_blk;
+				}
+				if(file_mtbl_ent!=NULL){
+					*file_mtbl_ent = current->mtbl_ent;
+				}
+				return (struct mem_table_s *)&(ucache->b[
 					current->mtbl_blk].mtbl[
 					current->mtbl_ent]);
 			}
-			current = &(ftbl->file[current->next]);
+			if(file_ent_index){
+				*file_ent_index = current->next;
+			}
+			if((int16_t)current->next!=-1){
+				current = &(ftbl->file[current->next]);	
+				printf("\tIterating across the chain, next=%d\n", current->next);	
+			}
+			else{
+				break;
+			}
 		}
-		return (struct mem_table *)NIL;
+		printf("\tlookup error: mtbl not found1\n");
+		return (struct mem_table_s *)NIL;
 	}
 	else{
+		printf("\tno chain detected\n");
+		printf("\tcurrent->tag_id\t\t0X%X\n\tfs_id\t\t\t0X%X\n", current->tag_id, fs_id);
+		printf("\tcurrent->tag_handle\t0X%llX\n\thandle\t\t\t0X%llX\n", current->tag_handle, handle);
 		if(current->tag_id==fs_id && current->tag_handle==handle){
-			return (struct mem_table *)&(ucache->b[
+			if(file_mtbl_blk!=NULL){
+				*file_mtbl_blk = current->mtbl_blk;
+			}
+			if(file_mtbl_ent!=NULL){
+				*file_mtbl_ent = current->mtbl_ent;
+			}
+			printf("\tfile entry match\n");
+			return (struct mem_table_s *)&(ucache->b[
 				current->mtbl_blk].mtbl[current->mtbl_ent]);
 		}
-		return (struct mem_table *)NIL;
+		printf("\tlookup error: mtbl not found2!\n");
+		return (struct mem_table_s *)NIL;
 	} 	 
 }
 
@@ -192,7 +257,7 @@ static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent){
 		*free_mtbl_blk = ftbl->free_mtbl_blk;
 		*free_mtbl_ent = ftbl->free_mtbl_ent;
 		/* is free mtbl_blk available? */
-		if(*free_mtbl_blk!=NIL && *free_mtbl_ent!=NIL){ 
+		if((int32_t)*free_mtbl_blk!=NIL && (int16_t)*free_mtbl_ent!=NIL){ 
 			ftbl->free_mtbl_blk = ucache->b[*free_mtbl_blk].
 				mtbl[*free_mtbl_ent].free_list_blk;
 			ftbl->free_mtbl_ent = ucache->b[*free_mtbl_blk].
@@ -211,46 +276,61 @@ static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent){
 
 static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
 {
+	printf("trying to insert file...\n");
 	struct file_table_s *ftbl = &(ucache->ftbl);
 	struct file_ent_s *current;	/* Current ptr for iteration	*/
 	/*	index into file hash table	*/
 	int index = handle % FILE_TABLE_HASH_MAX;
+	printf("\thashed index: %d\n", index);
 	current = &(ftbl->file[index]);	
 	/*	Insert at index, relocating head data if necessary.	*/
-	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){ /* relocating! */
+
+	/*	Need to relocate data?	*/
+	if((int32_t)current->mtbl_blk!=NIL && (int16_t)current->mtbl_ent!=NIL){ /* relocating! */
+		printf("\tmust relocate head data\n");
 		/*	get free file entry and update ftbl	*/
 		uint16_t free_fent = get_free_fent();
-		if(free_fent!=NIL){
-			/*	copy data @ index to new file entry	*/
-			memcpy ((void *)&(ftbl->file[free_fent]),
-				(void *)&current,
-				sizeof(struct file_ent_s));		
-			/*	insert file data @ index	*/
-			current->tag_id = fs_id;
-			current->tag_handle = handle;
+		if((int16_t)free_fent!=NIL){
+			/*	copy data from 1 struct to the other	*/
+			ftbl->file[free_fent] = *current;	
+			/*	These should match	*/
 			/*	point new head's "next" to former head	*/
 			current->next = free_fent;	
+			printf("\tnew head's next = %d\n", current->next);
 		}
 		else{	/*	No free file entries available: policy?	*/
 			/*	Evict or return NIL	*/
+			printf("\terror: no free file entries");
 			return (struct mem_table_s *)NIL;
 		}
+	}
+	else{
+		printf("\tno head data @ index\n");
 	}
 	/*	Get next free mem_table	*/
 	uint32_t free_mtbl_blk;
 	uint16_t free_mtbl_ent;	
 	/* Is there a free memory table available? */
 	if(get_next_free_mtbl(&free_mtbl_blk, &free_mtbl_ent)==1){
+		/*	insert file data @ index	*/
+		current->tag_id = fs_id;
+		current->tag_handle = handle;
 		/*	Update fent with it's new mtbl: blk and ent */
 		current->mtbl_blk = free_mtbl_blk;
 		current->mtbl_ent = free_mtbl_ent;
+
+		//current->next = NIL;
 		/*	Initialize Memory Table	*/
 		init_memory_table(free_mtbl_blk, free_mtbl_ent);
+		printf("\trecieved free memory table: 0X%X\n", 
+			(unsigned int)&(ucache->b[current->mtbl_blk].mtbl[
+			current->mtbl_ent]));
 		return &(ucache->b[current->mtbl_blk].mtbl[
 			current->mtbl_ent]);
 	}
 	else{	/*	No free mtbl available: policy?	*/
 		/*	Evict or return NIL	*/
+		printf("\terror: no free memory tables available");
 		return (struct mem_table_s *)NIL;
 	}
 }
@@ -258,48 +338,38 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
 //Needs work
 static int remove_file(uint32_t fs_id, uint64_t handle)
 {
+	printf("trying to remove file...\n");
 	struct file_table_s *ftbl = &(ucache->ftbl);
-	struct file_ent_s *current;	/* Current ptr for iteration	*/
-	uint32_t file_mtbl_blk = NIL;
-	uint16_t file_mtbl_ent = NIL;
-	/*	index into file hash table	*/
-	int index = handle % FILE_TABLE_HASH_MAX;
-	current = &(ftbl->file[index]);
-	if(current->mtbl_blk!=NIL && current->mtbl_ent!=NIL){ /* links present */
-		/*	Iterate and examine the fs_id and handle.
-		*	stop when matched or next is NIL	*/
-		while((int)current!=NIL){	
-			if(current->tag_id==fs_id && 
-				current->tag_handle==handle){
-				file_mtbl_blk = current->mtbl_blk;
-				file_mtbl_ent = current->mtbl_ent;
-			}
-			current = &(ftbl->file[current->next]);
-		}
-	}
-	else{	/* No links present	*/
-		if(current->tag_id==fs_id && current->tag_handle==handle){
-			file_mtbl_blk = current->mtbl_blk;
-			file_mtbl_ent = current->mtbl_ent;
-		}
-	} 	
-	//Verify we've recieved the necesasry info
-	if(file_mtbl_blk==NIL || file_mtbl_ent==NIL){
+	int32_t file_mtbl_blk;
+	int16_t file_mtbl_ent;
+	int16_t file_ent_index;
+	struct mem_table_s *mtbl = lookup_file(fs_id, handle, 
+		&file_mtbl_blk, &file_mtbl_ent, &file_ent_index);
+	/*	Verify we've recieved the necessary info	*/
+	if((int32_t)file_mtbl_blk==NIL || (int16_t)file_mtbl_ent==NIL){
+		printf("\tremoval error: no matching mtbl\n");
 		return NIL;
 	}
 	/*	add mem_table back to free list	*/
-	/*	First: store temp copy of current head	*/
+	/*	Temporarily store copy of current head (the new next)	*/
 	uint32_t tmp_blk = ftbl->free_mtbl_blk;
 	uint16_t tmp_ent = ftbl->free_mtbl_ent;
 
-	//Need current block and ent corresponding to file to be removed
+	/*	newly free mtbl becomes new head of free mtbl list	*/
 	ftbl->free_mtbl_blk = file_mtbl_blk;
 	ftbl->free_mtbl_ent = file_mtbl_ent;
-	
-	//Set nexts
-//	ftbl->free_mtbl_blk
 
-	//put_free_fent(index);
+	/* Point to the next free mtbl (the former head)	*/
+	mtbl->free_list_blk = tmp_blk;
+	mtbl->free_list = tmp_ent;
+	
+	/*	Free the file entry	*/
+	put_free_fent(file_ent_index);
+	printf("\tremoval sucessful\n");
+	//print the values to ensure they really got set
+	printf("\ttag_id\t\t0X%X\n", ftbl->file[file_ent_index].tag_id);
+	printf("\ttag_handle\t0X%llX\n", ftbl->file[file_ent_index].tag_handle);
+
 	return(1);
 }
 
@@ -316,6 +386,55 @@ static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset)
 
 static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
 {
+}
+
+void simple_test_1(void){
+	ucache_initialize();
+	/*	Check Global Data	*/
+	printf("address of ucache ptr:\t0x%x\n", (unsigned int)&ucache);
+	printf("ucache ptr:\t\t0x%x\n", (unsigned int)ucache);
+	printf("ftbl ptr:\t\t0x%x\n", (unsigned int)&(ucache->ftbl));
+	printf("cache initialized...\n\n");
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+	insert_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+	remove_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+}
+
+void simple_test_2(void){
+	ucache_initialize();
+	/*	Check Global Data	*/
+	printf("address of ucache ptr:\t0x%x\n", (unsigned int)&ucache);
+	printf("ucache ptr:\t\t0x%x\n", (unsigned int)ucache);
+	printf("ftbl ptr:\t\t0x%x\n", (unsigned int)&(ucache->ftbl));
+	printf("cache initialized...\n\n");
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAC9, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAA8B, NULL, NULL, NULL);
+	insert_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA);
+	insert_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAC9);
+	insert_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAA8B);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAC9, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAA8B, NULL, NULL, NULL);
+	remove_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA);
+	remove_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAC9);
+	remove_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAA8B);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAAA, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAAC9, NULL, NULL, NULL);
+	lookup_file(0XAAAAAAAA, 0XAAAAAAAAAAAAAA8B, NULL, NULL, NULL);
+}
+
+/*	Note: When unsigned ints are set to NIL, their values are based on type:
+		ex:	16		0xFFFF	
+			32		0XFFFFFFFF
+			64		0XFFFFFFFFFFFFFFFF 
+		ALL EQUAL THE SIGNED REPRESENTATION OF -1, CALLED NIL.	*/
+int main(){
+	//simple_test_1();
+	simple_test_2();
+	return 0;
 }
 
 /* externally visible API */
