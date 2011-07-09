@@ -124,11 +124,13 @@ enum PVFS_encoding_type
 /** Unique identifier for an object on a PVFS2 file system. */
 typedef uuid_t PVFS_handle;
 
-#define PVFS_handle_clear(u) uuid_clear(u)
-#define PVFS_handle_compuare(u1, u2) uuid_compare(u1, u2)
-#define PVFS_handle_copy(dst, src) uuid_copy(dst, src)
-#define PVFS_handle_is_null(u) uuid_is_null(u)
-#define PVFS_handle_unparse(u, s) uuid_unparse(u, s)
+#define PVFS_handle_clear(u)            uuid_clear(u)
+#define PVFS_handle_compare(u1, u2)    uuid_compare(u1, u2)
+#define PVFS_handle_copy(dst, src)      uuid_copy(dst, src)
+#define PVFS_handle_generate(u)         uuid_generate(u)
+#define PVFS_handle_is_null(u)          uuid_is_null(u)
+#define PVFS_handle_unparse(u, s)       uuid_unparse(u, s)
+#define PVFS_HANDLE_STRING_LEN          37
 
 /* takes uuid and pointer to unsigned int */
 #define PVFS_handle_to_hash(u, h) do { \
@@ -136,9 +138,6 @@ typedef uuid_t PVFS_handle;
     for( i=0; i < 16; i++ )            \
         *h &= u[i];                    \
 } while(0)
-
-
-#define PVFS_HANDLE_STRING_LEN 37
 
 
 /** Identifier for a specific PVFS2 file system; administrator

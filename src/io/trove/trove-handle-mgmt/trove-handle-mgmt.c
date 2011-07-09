@@ -1,28 +1,28 @@
-///* 
-// * (C) 2001 Clemson University and The University of Chicago 
-// *
-// * See COPYING in top-level directory.
-// */
-//
-//#include <stdlib.h>
-//#include <stdio.h>
-//#include <string.h>
-//#include <assert.h>
-//#include <sys/time.h>
-//
-//#include "trove.h"
-//#include "quickhash.h"
-//#include "extent-utils.h"
-//#include "trove-ledger.h"
-//#include "trove-handle-mgmt.h"
-//#include "gossip.h"
-//#include "gen-locks.h"
-//#include "pvfs2-internal.h"
-//
-///*
-//  this is an internal structure and shouldn't be used
-//  by anyone except this module
-//*/
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/time.h>
+
+#include "trove.h"
+#include "quickhash.h"
+#include "extent-utils.h"
+#include "trove-ledger.h"
+#include "trove-handle-mgmt.h"
+#include "gossip.h"
+#include "gen-locks.h"
+#include "pvfs2-internal.h"
+
+/*
+  this is an internal structure and shouldn't be used
+  by anyone except this module
+*/
 //typedef struct
 //{
 //    struct qlist_head hash_link;
@@ -360,25 +360,14 @@
 //    return ret;
 //}
 //
-//TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
-//{
-//    handle_ledger_t *ledger = NULL;
-//    struct qlist_head *hash_link = NULL;
-//    TROVE_handle handle = TROVE_HANDLE_NULL;
-//
-//    gen_mutex_lock(&trove_handle_mutex);
-//    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
-//    if (hash_link)
-//    {
-//        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-//        if (ledger && (ledger->have_valid_ranges == 1))
-//        {
-//            handle = trove_ledger_handle_alloc(ledger->ledger);
-//        }
-//    }
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return handle;
-//}
+int trove_handle_alloc(TROVE_coll_id coll_id, TROVE_handle *handle)
+{
+    TROVE_handle_generate(*handle);
+
+    /* FIX: needs bookkeeping */
+
+    return 0;
+}
 //
 //TROVE_handle trove_handle_alloc_from_range(
 //    TROVE_coll_id coll_id,
@@ -507,26 +496,15 @@
 //    return ret;
 //}
 //
-//int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
-//{
-//    int ret = -1;
-//    handle_ledger_t *ledger = NULL;
-//    struct qlist_head *hash_link = NULL;
-//
-//    gen_mutex_lock(&trove_handle_mutex);
-//    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
-//    if (hash_link)
-//    {
-//        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-//        if (ledger)
-//        {
-//            ret = trove_ledger_handle_free(ledger->ledger, handle);
-//        }
-//    }
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return ret;
-//}
-//
+int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
+{
+    int ret = 0;
+
+    /* FIX: needs bookkeeping */
+
+    return ret;
+}
+
 ///* trove_handle_get_statistics()
 // *
 // * retrieves handle usage statistics from given collection; right now

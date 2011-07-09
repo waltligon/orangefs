@@ -31,16 +31,16 @@
 //  returns a valid TROVE_handle on success and TROVE_HANDLE_NULL
 //  otherwise (e.g.. no more free handles)
 //*/
-//TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id);
-//
+int trove_handle_alloc(TROVE_coll_id coll_id, TROVE_handle *handle);
+
 ///*
 //  returns a valid TROVE_handle from the range-set given in the
 //  PVFS_handle_extent_array; TROVE_HANDLE_NULL otherwise
-//*/
+// */
 //TROVE_handle trove_handle_alloc_from_range(
 //    TROVE_coll_id, 
 //    TROVE_handle_extent_array *extent_array);
-//
+
 ///*
 //  fills in some number of handles that are not removed from the handle
 //  allocator's free list and guarantees that subsequent calls to
@@ -71,10 +71,10 @@
 //    TROVE_coll_id coll_id,
 //    TROVE_handle handle);
 //
-//int trove_handle_free(
-//    TROVE_coll_id coll_id,
-//    TROVE_handle handle);
-//
+int trove_handle_free(
+    TROVE_coll_id coll_id,
+    TROVE_handle handle);
+
 //int trove_handle_mgmt_finalize(void);
 //
 //int trove_handle_get_statistics(

@@ -1178,7 +1178,7 @@ static int hash_handle_compare(
 
     my_list = qlist_entry(link, struct req_sched_list,
 			  hash_link);
-    if (my_list->handle == *real_handle)
+    if (PVFS_handle_compare(my_list->handle, *real_handle) == 0)
     {
 	return (1);
     }

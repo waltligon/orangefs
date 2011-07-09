@@ -60,28 +60,32 @@ static PINT_sm_action statfs_do_statfs(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     TROVE_context_id tmp_context;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
-    /* first try to gather handle statistics */
-    ret = trove_handle_get_statistics(
-        s_op->req->u.statfs.fs_id,
-        &s_op->resp.u.statfs.stat.handles_available_count);
+/* this will need to be refactored since there is no longer a specific, set of
+ * handles a server controls */
 
-    if (ret < 0)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
+//    struct server_configuration_s *user_opts = get_server_config_struct();
 
-    /* find out how many total handles this server controls */
-    ret = PINT_cached_config_get_server_handle_count(
-        user_opts->host_id, s_op->req->u.statfs.fs_id,
-        &s_op->resp.u.statfs.stat.handles_total_count);
-    if(ret < 0)
-    {   
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
+//    /* first try to gather handle statistics */
+//    ret = trove_handle_get_statistics(
+//        s_op->req->u.statfs.fs_id,
+//        &s_op->resp.u.statfs.stat.handles_available_count);
+//
+//    if (ret < 0)
+//    {
+//        js_p->error_code = ret;
+//        return SM_ACTION_COMPLETE;
+//    }
+//
+//    /* find out how many total handles this server controls */
+//    ret = PINT_cached_config_get_server_handle_count(
+//        user_opts->host_id, s_op->req->u.statfs.fs_id,
+//        &s_op->resp.u.statfs.stat.handles_total_count);
+//    if(ret < 0)
+//    {   
+//        js_p->error_code = ret;
+//        return SM_ACTION_COMPLETE;
+//    }
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);

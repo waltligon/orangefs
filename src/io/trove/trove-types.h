@@ -47,6 +47,19 @@ typedef PVFS_statfs		   TROVE_statfs;
 typedef PVFS_coll_getinfo_options  TROVE_coll_getinfo_options;
 typedef PVFS_object_ref            TROVE_object_ref;
 
+/* PVFS_handle to TROVE_handle helper function mappings */
+#define TROVE_handle_clear(u)           PVFS_handle_clear(u)
+#define TROVE_handle_compare(u1, u2)    PVFS_handle_compuare(u1, u2)
+#define TROVE_handle_copy(dst, src)     PVFS_handle_copy(dst, src)
+#define TROVE_handle_generate(u)        PVFS_handle_generate(u)
+#define TROVE_handle_is_null(u)         PVFS_handle_is_null(u)
+#define TROVE_handle_unparse(u, s)      PVFS_handle_unparse(u, s)
+#define TROVE_handle_to_hash(u, h)      PVFS_handle_to_hash(u, h)
+
+#define TROVE_HANDLE_STRING_LEN         PVFS_HANDLE_STRING_LEN 
+
+
+
 typedef enum
 {
     TROVE_METHOD_DBPF = 0,
