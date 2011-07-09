@@ -532,7 +532,7 @@ static int hash_key(void *key, int table_size)
     TROVE_object_ref *ref = (TROVE_object_ref *)key;
 
     tmp = (ref->fs_id << 12);
-    tmp += ref->handle;
+    PVFS_handle_to_hash(ref->handle, &tmp);
     tmp = (tmp % table_size);
 
     return ((int)tmp);

@@ -201,7 +201,7 @@ static int check_stuffed(
     const char* svr_name;
     int i;
 
-    s_op->resp.u.create.metafile_handle = js_p->handle;
+    PVFS_handle_copy(s_op->resp.u.create.metafile_handle, js_p->handle);
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
         llu(js_p->handle));
@@ -576,8 +576,8 @@ static PINT_sm_action setup_local_datafile_handles(
 
     if(s_op->resp.u.create.stuffed)
     {
-        s_op->resp.u.create.datafile_handles[0] = 
-            s_op->u.create.handle_array_local[0];
+        PVFS_handle_copy(s_op->resp.u.create.datafile_handles[0], 
+                         s_op->u.create.handle_array_local[0]);
         js_p->error_code = 0;
         return(SM_ACTION_COMPLETE);
     }
@@ -588,8 +588,8 @@ static PINT_sm_action setup_local_datafile_handles(
             /* find local server positions and set handles */
             if(!strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
-                s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array_local[tmp_index];
+                PVFS_handle_copy(s_op->resp.u.create.datafile_handles[i],
+                                 s_op->u.create.handle_array_local[tmp_index]);
                 tmp_index++;
             }
         }
@@ -616,8 +616,8 @@ static PINT_sm_action write_keyvals(
             /* find remote server positions and set handles */
             if(strcmp(s_op->u.create.io_servers[i], config->host_id))
             {
-                s_op->resp.u.create.datafile_handles[i] = 
-                    s_op->u.create.handle_array_remote[tmp_index];
+                PVFS_handle_copy(s_op->resp.u.create.datafile_handles[i], 
+                                 s_op->u.create.handle_array_remote[tmp_index]);
                 tmp_index++;
             }
         }
@@ -854,7 +854,7 @@ static inline int PINT_get_object_ref_create(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.create.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(*handle);
     return 0;
 };
 

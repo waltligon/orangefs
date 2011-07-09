@@ -196,7 +196,9 @@ static PINT_sm_action setup_batch_create_fn(
         NULL);
 
     msg_p->fs_id = s_op->u.precreate_pool_refiller.fsid;
-    msg_p->handle = s_op->u.precreate_pool_refiller.handle_extent_array.extent_array[0].first;
+    PVFS_handle_copy(msg_p->handle,
+                     s_op->u.precreate_pool_refiller.handle_extent_array.
+                        extent_array[0].first);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = batch_create_comp_fn;
 
@@ -286,8 +288,9 @@ static int batch_create_comp_fn(void *v_p,
 
     for(i = 0; i<resp_p->u.batch_create.handle_count; i++)
     {
-        s_op->u.precreate_pool_refiller.precreate_handle_array[i] = 
-            resp_p->u.batch_create.handle_array[i];
+        PVFS_handle_copy(s_op->u.precreate_pool_refiller.
+                            precreate_handle_array[i], 
+                         resp_p->u.batch_create.handle_array[i]);
 
         gossip_debug(GOSSIP_SERVER_DEBUG,
             "Got batch created handle: %llu from: %s\n",

@@ -171,7 +171,8 @@ static PINT_sm_action listattr_setup_getattr(
         getattr_op->req = s_op->req;
         /* need to fill in the input parameters to the getattr nested machine */
         getattr_op->u.getattr.fs_id = s_op->req->u.listattr.fs_id;
-        getattr_op->u.getattr.handle = s_op->req->u.listattr.handles[i];
+        PVFS_handle_copy(getattr_op->u.getattr.handle, 
+                         s_op->req->u.listattr.handles[i]);
         getattr_op->u.getattr.attrmask = s_op->req->u.listattr.attrmask;
 
         ret = PINT_sm_push_frame(smcb, GETATTR, getattr_op);
@@ -283,7 +284,7 @@ static inline int PINT_get_object_ref_listattr(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.listattr.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(*handle);
     return 0;
 };
 

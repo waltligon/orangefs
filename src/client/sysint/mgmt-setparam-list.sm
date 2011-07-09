@@ -185,7 +185,7 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
             sm_p->hints);
 
         msg_p->fs_id = sm_p->u.setparam_list.fs_id;
-        msg_p->handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(msg_p->handle);
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 
         switch(sm_p->u.setparam_list.param)

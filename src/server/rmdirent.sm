@@ -267,8 +267,8 @@ static PINT_sm_action rmdirent_setup_resp(
           we return the handle from the directory entry in the
           response
         */
-	s_op->resp.u.rmdirent.entry_handle =
-            s_op->u.rmdirent.entry_handle;
+	PVFS_handle_copy(s_op->resp.u.rmdirent.entry_handle,
+                         s_op->u.rmdirent.entry_handle);
 	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  succeeded; returning handle %llu in response\n",
 		     llu(s_op->resp.u.rmdirent.entry_handle));

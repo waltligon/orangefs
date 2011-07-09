@@ -150,7 +150,7 @@ static inline int PINT_get_object_ref_statfs(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.statfs.fs_id;
-    PVFS_handle_clear((uuit_t)*handle);
+    PVFS_handle_clear(*handle);
     return 0;
 }
 

@@ -385,7 +385,7 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     id_gen_fast_register(out_id, tmp_element);
     tmp_element->id = *out_id;
     tmp_element->state = REQ_QUEUED;
-    tmp_element->handle = handle;
+    PVFS_handle_copy(tmp_element->handle, handle);
     tmp_element->list_head = NULL;
     tmp_element->access_type = access_type;
     tmp_element->mode_change = 0;
@@ -419,7 +419,7 @@ int PINT_req_sched_post(enum PVFS_server_op op,
 	    return (-ENOMEM);
 	}
 
-	tmp_list->handle = handle;
+	PVFS_handle_copy(tmp_list->handle, handle);
 	INIT_QLIST_HEAD(&(tmp_list->req_list));
 
 	qhash_add(req_sched_table, &(handle), &(tmp_list->hash_link));
@@ -588,7 +588,7 @@ int PINT_req_sched_post_timer(
     id_gen_fast_register(out_id, tmp_element);
     tmp_element->id = *out_id;
     tmp_element->state = REQ_TIMING;
-    tmp_element->handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(tmp_element->handle);
     gettimeofday(&tmp_element->tv, NULL);
     tmp_element->list_head = NULL;
     tmp_element->mode_change = 0;
@@ -1151,9 +1151,12 @@ static int hash_handle(
      *
      */
     unsigned long tmp = 0;
-    PVFS_handle *real_handle = handle;
+    PVFS_handle real_handle;
+    
+    PVFS_handle_copy(real_handle, *(PVFS_handle *)handle);
 
-    tmp += (*(real_handle));
+    
+    PVFS_handle_to_hash(real_handle, &tmp);
     tmp = tmp % table_size;
 
     return ((int) tmp);

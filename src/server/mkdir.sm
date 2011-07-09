@@ -149,7 +149,7 @@ static PINT_sm_action mkdir_setattrib(
     PVFS_ds_attributes *ds_attr = NULL;
 
     /* save the handle from the mkdir in the response */
-    s_op->resp.u.mkdir.handle = js_p->handle;
+    PVFS_handle_copy(s_op->resp.u.mkdir.handle, js_p->handle);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %llu\n",
                  llu(js_p->handle));
@@ -219,7 +219,7 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     js_p->error_code = 0;
 
 
-    s_op->u.mkdir.dirent_handle = js_p->handle;
+    PVFS_handle_copy(s_op->u.mkdir.dirent_handle, js_p->handle);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
                  llu(s_op->u.mkdir.dirent_handle));
@@ -250,7 +250,7 @@ static PINT_sm_action mkdir_write_dirdata_handle(
 static int mkdir_error(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    s_op->resp.u.mkdir.handle = 0;
+    PVFS_handle_clear(s_op->resp.u.mkdir.handle);
 
     if (js_p->error_code > -1)
     {
@@ -311,7 +311,7 @@ static inline int PINT_get_object_ref_mkdir(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.mkdir.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(*handle);
     return 0;
 };
 

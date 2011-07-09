@@ -1052,6 +1052,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
       for (col=0; col<meta->dfile_count; col++)
       {
          index = (row*meta->dfile_count) + col;
+         /* cleanup and fix 
          if ( s_op->u.getattr.mirror_dfile_status_array[index] == UINT64_HIGH )
             meta->mirror_dfile_array[index] = 0;
          gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -1060,6 +1061,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
                       ,index
                       ,llu(meta->mirror_dfile_array[index])
                       ,llu(s_op->u.getattr.mirror_dfile_status_array[index]));
+         */
       }
    }
 
@@ -1475,7 +1477,7 @@ static PINT_sm_action getattr_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    s_op->u.getattr.handle = s_op->req->u.getattr.handle;
+    PVFS_handle_copy(s_op->u.getattr.handle, s_op->req->u.getattr.handle);
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
     s_op->u.getattr.err_array = NULL;

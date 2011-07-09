@@ -226,7 +226,7 @@ static PINT_sm_action initialize_structures(struct PINT_smcb *smcb
 
     memset(respmir_p,0,sizeof(*respmir_p));
 
-    respmir_p->src_handle        = reqmir_p->src_handle;
+    PVFS_handle_copy(respmir_p->src_handle, reqmir_p->src_handle);
     respmir_p->src_server_nr     = reqmir_p->src_server_nr;
     respmir_p->dst_count         = reqmir_p->dst_count;
 
@@ -353,7 +353,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb
        PINT_sm_msgpair_state *msg_p = &(msgarray_op->msgarray[i]);
 
        msg_p->fs_id      = reqmir_p->fs_id;
-       msg_p->handle     = reqmir_p->dst_handle[i];
+       PVFS_handle_copy(msg_p->handle, reqmir_p->dst_handle[i]);
        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
        msg_p->comp_fn    = write_comp_fn;    
 
@@ -583,7 +583,8 @@ static PINT_sm_action post_ack_and_flow (struct PINT_smcb *smcb
        PINT_flow_reset(jobs[i].flow_desc);
 
        jobs[i].flow_desc->src.endpoint_id     = TROVE_ENDPOINT;
-       jobs[i].flow_desc->src.u.trove.handle  = reqmir_p->src_handle;
+       PVFS_handle_copy(jobs[i].flow_desc->src.u.trove.handle, 
+                        reqmir_p->src_handle);
        jobs[i].flow_desc->src.u.trove.coll_id = reqmir_p->fs_id;
 
        jobs[i].flow_desc->dest.endpoint_id   = BMI_ENDPOINT;
@@ -1026,7 +1027,7 @@ static inline int PINT_get_object_ref_mirror( struct PVFS_server_req *req
                                              ,PVFS_handle *handle )
 {
    *fs_id  = req->u.mirror.fs_id;
-   *handle = req->u.mirror.src_handle;
+   PVFS_handle_copy(*handle, req->u.mirror.src_handle);
     return 0;
 };
 

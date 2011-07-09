@@ -208,21 +208,23 @@ static PINT_sm_action lookup_read_object_metadata(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
-    PVFS_handle handle = PVFS_HANDLE_NULL;
+    PVFS_handle handle;
     PVFS_ds_attributes *ds_attr = NULL;
+
+    PVFS_handle_clear(handle);
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.handle;
+        PVFS_handle_copy(handle, s_op->req->u.lookup_path.handle);
         ds_attr = &(s_op->u.lookup.ds_attr_array[0]);
     }
     else
     {
-        handle = s_op->resp.u.lookup_path.handle_array[
-            s_op->u.lookup.seg_nr-1];
+        PVFS_handle_copy(handle, s_op->resp.u.lookup_path.handle_array[
+            s_op->u.lookup.seg_nr-1]);
         ds_attr = &(s_op->u.lookup.ds_attr_array[
                         s_op->u.lookup.seg_nr - 1]);
     }
@@ -231,7 +233,7 @@ static PINT_sm_action lookup_read_object_metadata(
     s_op->u.lookup.handle_ct++;
 
     /* Copy the fsid and handle to the s_op structure for the acl check */
-    s_op->target_handle = handle;
+    PVFS_handle_copy(s_op->target_handle, handle);
     s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
 
     /* get the dspace attributes/metadata */
@@ -376,7 +378,7 @@ static PINT_sm_action lookup_check_acls_if_needed(
      * return -PVFS_EACCESS 
      */
     if (s_op->target_fs_id == PVFS_FS_ID_NULL
-        || s_op->target_handle == PVFS_HANDLE_NULL)
+        || PVFS_handle_is_null(s_op->target_handle))
     {
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
@@ -493,18 +495,20 @@ static PINT_sm_action lookup_read_directory_entry_handle(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PVFS_handle handle = PVFS_HANDLE_NULL;
+    PVFS_handle handle;
     job_id_t j_id;
+
+    PVFS_handle_clear( handle );
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
     {
-        handle = s_op->req->u.lookup_path.handle;
+        PVFS_handle_copy(handle, s_op->req->u.lookup_path.handle);
     }
     else
     {
-        handle = s_op->resp.u.lookup_path.handle_array[
-            s_op->u.lookup.seg_nr-1];
+        PVFS_handle_copy(handle, s_op->resp.u.lookup_path.handle_array[
+            s_op->u.lookup.seg_nr-1]);
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,

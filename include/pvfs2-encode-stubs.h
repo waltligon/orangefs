@@ -73,6 +73,8 @@
 
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2) struct endecode_fake_struct
 
+#define encode_enum_union_3_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2, ut3, un3, en3) struct endecode_fake_struct
+
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 
 #endif  /* __PVFS2_ENCODE_STUBS_H */

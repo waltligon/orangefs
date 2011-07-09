@@ -90,8 +90,9 @@ static PINT_sm_action setup_prelude(
 
     /* get the object to remove, the access and scheduling policies */
     s_op->target_fs_id = s_op->req->u.batch_remove.fs_id;
-    s_op->target_handle =
-        s_op->req->u.batch_remove.handles[s_op->u.batch_remove.handle_index];
+    PVFS_handle_copy(s_op->target_handle,
+                     s_op->req->u.batch_remove.handles[
+                        s_op->u.batch_remove.handle_index]);
 
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
@@ -116,7 +117,7 @@ static PINT_sm_action setup_remove(
     memset(remove_op, 0, sizeof(*remove_op));
 
     remove_op->u.remove.fs_id = s_op->target_fs_id;
-    remove_op->u.remove.handle = s_op->target_handle;
+    PVFS_handle_copy(remove_op->u.remove.handle,  s_op->target_handle);
 
     ret = PINT_sm_push_frame(smcb, 0, remove_op);
     if(ret < 0)

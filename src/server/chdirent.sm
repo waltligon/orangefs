@@ -196,11 +196,11 @@ static PINT_sm_action chdirent_change_directory_entry(
 
     js_p->error_code = 0;
 
-    s_op->u.chdirent.new_dirent_handle =
-        s_op->req->u.chdirent.new_dirent_handle;
+    PVFS_handle_copy(s_op->u.chdirent.new_dirent_handle,
+                     s_op->req->u.chdirent.new_dirent_handle);
 
-    if (s_op->u.chdirent.old_dirent_handle ==
-        s_op->u.chdirent.new_dirent_handle)
+    if (PVFS_handle_compare(s_op->u.chdirent.old_dirent_handle,
+                            s_op->u.chdirent.new_dirent_handle) == 0)
     {
         /* FIXME: return an error since a dirent is
            being changed to itself (?) */
@@ -300,8 +300,8 @@ static PINT_sm_action chdirent_setup_resp(
     if (js_p->error_code == 0)
     {
 	/* return original dirent handle in the response */
-	s_op->resp.u.chdirent.old_dirent_handle =
-            s_op->u.chdirent.old_dirent_handle;
+	PVFS_handle_copy(s_op->resp.u.chdirent.old_dirent_handle,
+                         s_op->u.chdirent.old_dirent_handle);
 
 	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  succeeded; returning handle %llu in response\n",

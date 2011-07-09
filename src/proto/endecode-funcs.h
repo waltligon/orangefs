@@ -833,5 +833,29 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
     }                                                                         \
 };
 
+#define encode_enum_union_3_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2, ut3, un3, en3) \
+static inline void encode_##name(char **pptr, const struct name *x)           \
+{                                                                             \
+    encode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: encode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: encode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: encode_##ut2(pptr, &x->uname.un2); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};                                                                            \
+static inline void decode_##name(char **pptr, struct name *x)                 \
+{                                                                             \
+    decode_enum(pptr, &x->ename);                                             \
+    switch(x->ename)                                                          \
+    {                                                                         \
+        case en1: decode_##ut1(pptr, &x->uname.un1); break;                   \
+        case en2: decode_##ut2(pptr, &x->uname.un2); break;                   \
+        case en3: decode_##ut2(pptr, &x->uname.un2); break;                   \
+        default: assert(0);                                                   \
+    }                                                                         \
+};
+
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 

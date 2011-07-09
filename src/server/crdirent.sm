@@ -106,7 +106,7 @@ static PINT_sm_action crdirent_validate(
     char *ptr = NULL;
 
     if ((s_op->u.crdirent.name == NULL) ||
-        (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
+        (PVFS_handle_is_null(s_op->u.crdirent.parent_handle)))
     {
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
@@ -355,8 +355,10 @@ static PINT_sm_action crdirent_setup_op(
         s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
-    s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
-    s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.handle;
+    PVFS_handle_copy(s_op->u.crdirent.new_handle, 
+                     s_op->req->u.crdirent.new_handle);
+    PVFS_handle_copy(s_op->u.crdirent.parent_handle,
+                     s_op->req->u.crdirent.handle);
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
 

@@ -92,8 +92,8 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (js_p->error_code == 0)
     {
-        s_op->resp.u.mgmt_get_dirdata_handle.handle =
-            s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
+        PVFS_handle_copy(s_op->resp.u.mgmt_get_dirdata_handle.handle,
+                         s_op->u.mgmt_get_dirdata_handle.dirdata_handle);
 
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "  Found dirdata handle %llu of parent "
@@ -102,7 +102,7 @@ static PINT_sm_action mgmt_get_dirdata_handle_setup_resp(
     }
     else
     {
-        s_op->resp.u.mgmt_get_dirdata_handle.handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(s_op->resp.u.mgmt_get_dirdata_handle.handle);
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to retrieve dirdata "
                      "handle from parent %llu\n",

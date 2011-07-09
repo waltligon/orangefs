@@ -172,8 +172,10 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             gossip_debug(GOSSIP_SERVER_DEBUG,
                      "tree_communicate_partition_handles: local handle = %llu\n",
                      llu(handle_array[i]));
-            s_op->u.tree_communicate.handle_array_local[
-                 s_op->u.tree_communicate.handle_array_local_count] = handle_array[i];
+            PVFS_handle_copy(s_op->u.tree_communicate.handle_array_local[
+                                s_op->u.tree_communicate.
+                                    handle_array_local_count],
+                            handle_array[i]);
             s_op->u.tree_communicate.local_join_size[
                  s_op->u.tree_communicate.handle_array_local_count] = i;
             s_op->u.tree_communicate.handle_array_local_count++;
@@ -183,8 +185,10 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             gossip_debug(GOSSIP_SERVER_DEBUG,
                      "tree_communicate_partition_handles: remote handle = %llu\n",
                      llu(handle_array[i]));
-            s_op->u.tree_communicate.handle_array_remote[
-                 s_op->u.tree_communicate.handle_array_remote_count] = handle_array[i];
+            PVFS_handle_copy(s_op->u.tree_communicate.handle_array_remote[
+                                s_op->u.tree_communicate.
+                                    handle_array_remote_count],
+                             handle_array[i]);
             s_op->u.tree_communicate.remote_join_size[
                  s_op->u.tree_communicate.handle_array_remote_count] = i;
             s_op->u.tree_communicate.handle_array_remote_count++;
@@ -351,8 +355,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                     break;
             }
             msg_p->fs_id = fs_id;
-            msg_p->handle =
-            s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server];
+            PVFS_handle_copy(msg_p->handle,
+                             s_op->u.tree_communicate.handle_array_remote[
+                                i*num_files_per_server]);
 
             /* if the logical file is mirrored, then we want the mirroring logic
              * to handle retries, when we are processing the leaf of the tree, 
@@ -723,7 +728,7 @@ static inline int PINT_get_object_ref_tree_remove(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.tree_remove.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(*handle);
     return 0;
 };
 
@@ -740,7 +745,7 @@ static inline int PINT_get_object_ref_tree_get_file_size(
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     *fs_id = req->u.tree_get_file_size.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(*handle);
     return 0;
 };
 

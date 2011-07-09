@@ -85,7 +85,7 @@ static inline int PINT_get_object_ref_##req_name(                        \
     struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
 {                                                                        \
     *fs_id = req->u.req_name.fs_id;                                      \
-    *handle = req->u.req_name.handle;                                    \
+    PVFS_handle_copy(*handle, req->u.req_name.handle);                   \
     return 0;                                                            \
 }
 

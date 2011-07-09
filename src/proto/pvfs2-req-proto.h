@@ -313,7 +313,7 @@ do {                                      \
     (__req).hints = (__hints);            \
     (__req).credentials = (__creds);      \
     (__req).u.remove.fs_id = (__fsid);    \
-    (__req).u.remove.handle = (__handle); \
+    PVFS_handle_copy((__req).u.remove.handle, (__handle)); \
 } while (0)
 
 struct PVFS_servreq_batch_remove
@@ -567,20 +567,20 @@ endecode_fields_3_struct(
     PVFS_fs_id, fs_id,
     uint32_t, attrmask);
 
-#define PINT_SERVREQ_GETATTR_FILL(__req,   \
-                                  __creds, \
-                                  __fsid,  \
-                                  __handle,\
-                                  __amask, \
-                                  __hints) \
-do {                                       \
-    memset(&(__req), 0, sizeof(__req));    \
-    (__req).op = PVFS_SERV_GETATTR;        \
-    (__req).credentials = (__creds);       \
-    (__req).hints = (__hints);             \
-    (__req).u.getattr.fs_id = (__fsid);    \
-    (__req).u.getattr.handle = (__handle); \
-    (__req).u.getattr.attrmask = (__amask);\
+#define PINT_SERVREQ_GETATTR_FILL(__req,                    \
+                                  __creds,                  \
+                                  __fsid,                   \
+                                  __handle,                 \
+                                  __amask,                  \
+                                  __hints)                  \
+do {                                                        \
+    memset(&(__req), 0, sizeof(__req));                     \
+    (__req).op = PVFS_SERV_GETATTR;                         \
+    (__req).credentials = (__creds);                        \
+    (__req).hints = (__hints);                              \
+    (__req).u.getattr.fs_id = (__fsid);                     \
+    PVFS_handle_copy((__req).u.getattr.handle, (__handle)); \
+    (__req).u.getattr.attrmask = (__amask);                 \
 } while (0)
 
 struct PVFS_servresp_getattr
@@ -1243,7 +1243,7 @@ do {                                                  \
     (__req).credentials        = (__creds);           \
     (__req).hints              = (__hints);           \
     (__req).u.io.fs_id         = (__fsid);            \
-    (__req).u.io.handle        = (__handle);          \
+    PVFS_handle_copy((__req).u.io.handle, (__handle));\
     (__req).u.io.io_type       = (__io_type);         \
     (__req).u.io.flow_type     = (__flow_type);       \
     (__req).u.io.server_nr       = (__datafile_nr);   \

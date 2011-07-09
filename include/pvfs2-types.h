@@ -125,8 +125,21 @@ enum PVFS_encoding_type
 typedef uuid_t PVFS_handle;
 
 #define PVFS_handle_clear(u) uuid_clear(u)
+#define PVFS_handle_compuare(u1, u2) uuid_compare(u1, u2)
 #define PVFS_handle_copy(dst, src) uuid_copy(dst, src)
 #define PVFS_handle_is_null(u) uuid_is_null(u)
+#define PVFS_handle_unparse(u, s) uuid_unparse(u, s)
+
+/* takes uuid and pointer to unsigned int */
+#define PVFS_handle_to_hash(u, h) do { \
+    int i = 0;                         \
+    for( i=0; i < 16; i++ )            \
+        *h &= u[i];                    \
+} while(0)
+
+
+#define PVFS_HANDLE_STRING_LEN 37
+
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -551,7 +564,8 @@ enum PVFS_server_param
 enum PVFS_mgmt_param_type
 {
     PVFS_MGMT_PARAM_TYPE_UINT64,
-    PVFS_MGMT_PARAM_TYPE_STRING
+    PVFS_MGMT_PARAM_TYPE_STRING,
+    PVFS_MGMT_PARAM_TYPE_HANDLE
 } ;
 
 struct PVFS_mgmt_setparam_value
@@ -561,14 +575,16 @@ struct PVFS_mgmt_setparam_value
     {
         uint64_t value;
         char *string_value;
+        PVFS_handle handle_value;
     } u;
 };
 
-encode_enum_union_2_struct(
+encode_enum_union_3_struct(
     PVFS_mgmt_setparam_value,
     type, u,
     uint64_t, value,        PVFS_MGMT_PARAM_TYPE_UINT64,
-    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING);
+    string,   string_value, PVFS_MGMT_PARAM_TYPE_STRING,
+    PVFS_handle, handle_value, PVFS_MGMT_PARAM_TYPE_HANDLE);
 
 enum PVFS_server_mode
 {

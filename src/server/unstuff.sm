@@ -249,8 +249,8 @@ static PINT_sm_action get_handles(
     }
 
     /* the very first handle should be our current stuffed handle */
-    s_op->u.unstuff.dfile_array[0] 
-        = s_op->resp.u.unstuff.attr.u.meta.dfile_array[0];
+    PVFS_handle_copy(s_op->u.unstuff.dfile_array[0],
+                     s_op->resp.u.unstuff.attr.u.meta.dfile_array[0]);
 
     if(s_op->u.unstuff.num_dfiles_req == 1)
     {
@@ -423,7 +423,8 @@ static PINT_sm_action getattr_setup(
     getattr_op->req = s_op->req;
     /* need to fill in the input parameters to the getattr nested machine */
     getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
-    getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
+    PVFS_handle_copy(getattr_op->u.getattr.handle,
+                     s_op->req->u.unstuff.handle);
     getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);

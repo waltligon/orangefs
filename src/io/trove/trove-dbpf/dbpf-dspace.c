@@ -125,6 +125,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     int ret;
     PINT_event_type event_type;
     PINT_event_id event_id = 0;
+    PVFS_handle handle;
 
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -133,12 +134,21 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+    if( handle_p == NULL )
+    {
+        PVFS_handle_clear(handle);
+    }
+    else
+    {
+        PVFS_handle_copy(handle, *handle_p);
+    }
+
     ret = dbpf_op_init_queued_or_immediate(
         &op,
         &q_op_p,
         DSPACE_CREATE,
         coll_p,
-        (handle_p ? *handle_p : TROVE_HANDLE_NULL),
+        handle,
         dbpf_dspace_create_op_svc,
         flags,
         NULL,
@@ -192,63 +202,26 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_handle new_handle = TROVE_HANDLE_NULL;
-    TROVE_extent cur_extent;
+    TROVE_handle new_handle;
+    char new_handle_string[PVFS_HANDLE_STRING_LEN] = { 0 };
+   
+    PVFS_handle_clear(new_handle);
 
-    cur_extent = op_p->u.d_create.extent_array.extent_array[0];
 
-    /* check if we got a single specific handle */
-    if ((op_p->u.d_create.extent_array.extent_count == 1) &&
-        (cur_extent.first == cur_extent.last))
+    if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
     {
-        /*
-          check if we MUST use the exact handle value specified;
-          if caller requests a specific handle, honor it
-        */
-        if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
-        {
-            /*
-              we should probably handle this error nicely;
-              right now, it will fail later (gracefully) if this
-              fails since the handle will already exist, but
-              since we know it here, handle it here ?
-            */
-            new_handle = cur_extent.first;
-            trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
-            gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle was FORCED "
-                         "to be %llu\n", llu(new_handle));
-        }
-        else if (cur_extent.first == TROVE_HANDLE_NULL)
-        {
-            /*
-              if we got TROVE_HANDLE_NULL, the caller doesn't care
-              where the handle comes from
-            */
-            new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
-        }
-    }
-    else
-    {
-        /*
-          otherwise, we have to try to allocate a handle from
-          the specified range that we're given
-        */
-        new_handle = trove_handle_alloc_from_range(
-            op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
-    }
+        gossip_debug(GOSSIP_TROVE_DEBUG, "Can't force handle, ignoring\n");
+    } 
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %llu "
-                 "(cur_extent is %llu - %llu)\n",
-                 op_p->u.d_create.extent_array.extent_count,
-                 llu(new_handle), llu(cur_extent.first),
-                 llu(cur_extent.last));
-    /*
-      if we got a zero handle, we're either completely out of handles
-      -- or else something terrible has happened
-    */
-    if (new_handle == TROVE_HANDLE_NULL)
+    new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
+
+    PVFS_handle_unparse(new_handle, new_handle_string);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: new_handle is %s\n",
+                 __func__, new_handle_string);
+
+    if ( PVFS_handle_is_null(new_handle) )
     {
-        gossip_err("Error: handle allocator returned a zero handle.\n");
+        gossip_err("%s: handle allocator returned a zero handle.\n", __func__);
         return(-TROVE_ENOSPC);
     }
 

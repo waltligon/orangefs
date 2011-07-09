@@ -221,13 +221,15 @@ static PINT_sm_action io_start_flow(
         s_op->u.io.flow_d->src.endpoint_id = BMI_ENDPOINT;
         s_op->u.io.flow_d->src.u.bmi.address = s_op->addr;
         s_op->u.io.flow_d->dest.endpoint_id = TROVE_ENDPOINT;
-        s_op->u.io.flow_d->dest.u.trove.handle = s_op->req->u.io.handle;
+        PVFS_handle_copy(s_op->u.io.flow_d->dest.u.trove.handle, 
+                         s_op->req->u.io.handle);
         s_op->u.io.flow_d->dest.u.trove.coll_id = s_op->req->u.io.fs_id;
     }
     else if (s_op->req->u.io.io_type == PVFS_IO_READ)
     {
         s_op->u.io.flow_d->src.endpoint_id = TROVE_ENDPOINT;
-        s_op->u.io.flow_d->src.u.trove.handle = s_op->req->u.io.handle;
+        PVFS_handle_copy(s_op->u.io.flow_d->src.u.trove.handle,
+                         s_op->req->u.io.handle);
         s_op->u.io.flow_d->src.u.trove.coll_id = s_op->req->u.io.fs_id;
         s_op->u.io.flow_d->dest.endpoint_id = BMI_ENDPOINT;
         s_op->u.io.flow_d->dest.u.bmi.address = s_op->addr;
