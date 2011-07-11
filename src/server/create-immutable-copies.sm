@@ -559,508 +559,510 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb,
            imm_p->io_servers_required * sizeof(char*));
     imm_p->remote_io_servers_count = 0;
 
-   /*populate the io_servers array with server_names:                         */
-   /*Step 1:  Always start by using the server names associated with the      */
-   /*         original datahandles, keeping the order in tact.                */
-   /*Step 2:  If additional servers are needed, then tap into the list of     */
-   /*         servers running in the file system and grab those that are not  */
-   /*         currently in the io_servers list.                               */
+    /* populate the io_servers array with server_names:
+     * Step 1:  Always start by using the server names associated with the
+     *          original datahandles, keeping the order in tact.
+     * Step 2:  If additional servers are needed, then tap into the list of
+     *          servers running in the file system and grab those that are not
+     *          currently in the io_servers list. */
 
-   /*Step 1*/   
-   for (i=0; i<imm_p->dfile_count; i++)
-   {
-      ret = PINT_cached_config_get_server_name( imm_p->io_servers[i], 
-                                                sizeof(server_name)-1,
-                                                imm_p->handle_array_base[i],
-                                                imm_p->fs_id );
-      if (ret)
-      {
-         js_p->error_code = ret;
-         goto error_exit;
-      }
-      gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of server_name is %s "
-                                       "for handle %llu\n"
-                                      ,imm_p->io_servers[i]
-                                      ,llu(imm_p->handle_array_base[i]));
-   }/*end for*/
+    /* Step 1 */   
+    for (i=0; i<imm_p->dfile_count; i++)
+    {
+        ret = PINT_cached_config_get_server_name( imm_p->io_servers[i], 
+                                                  sizeof(server_name)-1,
+                                                  imm_p->handle_array_base[i],
+                                                  imm_p->fs_id );
+        if (ret)
+        {
+            js_p->error_code = ret;
+            goto error_exit;
+        }
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tValue of server_name is %s "
+                                          "for handle %llu\n",
+                                          imm_p->io_servers[i],
+                                          llu(imm_p->handle_array_base[i]));
+    } /* end for */
 
-   /*Step 2*/
-   if (imm_p->io_servers_required > imm_p->dfile_count)
-   {
-      ret = get_server_names(imm_p);
-      if (ret)
-      {
-          gossip_lerr("Unable to populate io_servers list.\n");
-          js_p->error_code = ret;
-          goto error_exit;
-      }
-   }
+    /* Step 2 */
+    if (imm_p->io_servers_required > imm_p->dfile_count)
+    {
+        ret = get_server_names(imm_p);
+        if (ret)
+        {
+            gossip_lerr("Unable to populate io_servers list.\n");
+            js_p->error_code = ret;
+            goto error_exit;
+        }
+    }
 
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tconfig->host_id is %s.\n"
-                                   ,config->host_id);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tconfig->host_id is %s.\n",
+                                      config->host_id);
       
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\timm_p->io_servers_required : %d\n"
-                                   ,imm_p->io_servers_required);
-   for (i=0; i<imm_p->io_servers_required; i++)
-   {
-      char *server_name = imm_p->io_servers[i];
-      if (strncmp(server_name,config->host_id,SERVER_NAME_MAX-1) == 0)
-      {/*local*/
-         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tprocessing local....\n");
-         imm_p->local_io_servers[imm_p->handle_array_copies_local_count] =
-             malloc( SERVER_NAME_MAX );
-         if ( !imm_p->local_io_servers[imm_p->handle_array_copies_local_count] )
-         {
-              js_p->error_code = -PVFS_ENOMEM;
-              goto error_exit;
-         }
-         memset(imm_p->local_io_servers[imm_p->handle_array_copies_local_count]
-               ,0
-               ,SERVER_NAME_MAX);
-         memcpy(imm_p->local_io_servers[imm_p->handle_array_copies_local_count],
-                server_name,SERVER_NAME_MAX-1);
-         if ( i < imm_p->dfile_count )
-         {
-            imm_p->handle_array_base_local[imm_p->handle_array_base_local_count] 
-            =
-            imm_p->handle_array_base[i];
-            imm_p->handle_array_base_local_count++;
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal source handle(%d):%llu\n"
-              ,imm_p->handle_array_base_local_count
-    ,llu(imm_p->handle_array_base_local[imm_p->handle_array_base_local_count]));
-         }
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\timm_p->io_servers_required : %d\n",
+                                      imm_p->io_servers_required);
+    for (i=0; i<imm_p->io_servers_required; i++)
+    {
+        char *server_name = imm_p->io_servers[i];
+        if (strncmp(server_name, config->host_id, SERVER_NAME_MAX-1) == 0)
+        { /* local */
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tprocessing local....\n");
+            imm_p->local_io_servers[imm_p->handle_array_copies_local_count] =
+                malloc( SERVER_NAME_MAX );
+            if ( !imm_p->local_io_servers[ 
+                    imm_p->handle_array_copies_local_count] )
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                goto error_exit;
+            }
+            memset( imm_p->local_io_servers[
+                    imm_p->handle_array_copies_local_count],
+                    0,
+                    SERVER_NAME_MAX);
+            memcpy(imm_p->local_io_servers[
+                    imm_p->handle_array_copies_local_count],
+                    server_name, SERVER_NAME_MAX-1);
+            if ( i < imm_p->dfile_count )
+            {
+                imm_p->handle_array_base_local[
+                    imm_p->handle_array_base_local_count] 
+                    = imm_p->handle_array_base[i];
+                imm_p->handle_array_base_local_count++;
+                gossip_debug(GOSSIP_MIRROR_DEBUG, 
+                             "\tlocal source handle(%d):%llu\n",
+                             imm_p->handle_array_base_local_count,
+                             llu(imm_p->handle_array_base_local[
+                                imm_p->handle_array_base_local_count]));
+            }
 
-         imm_p->handle_array_copies_local_count++;
-      } 
-      else
-      {/*remote*/
-         imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count] =
-             malloc( SERVER_NAME_MAX );
-         if (!imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count])
-         {
-               js_p->error_code = -PVFS_ENOMEM;
-               goto error_exit;
-         }
-        memset(imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count]
-              ,0
-              ,SERVER_NAME_MAX);
-        memcpy(imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count]
-              ,server_name,SERVER_NAME_MAX-1);
-         imm_p->handle_array_copies_remote_count++;
-      }/*end if*/
-   }/*end for*/
+            imm_p->handle_array_copies_local_count++;
+        } 
+        else
+        {   /*remote*/
+            imm_p->remote_io_servers[imm_p->handle_array_copies_remote_count] =
+                malloc( SERVER_NAME_MAX );
+            if ( ! imm_p->remote_io_servers[
+                    imm_p->handle_array_copies_remote_count])
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                goto error_exit;
+            }
+            memset(imm_p->remote_io_servers[
+                imm_p->handle_array_copies_remote_count], 0, SERVER_NAME_MAX);
+            memcpy(imm_p->remote_io_servers[
+                imm_p->handle_array_copies_remote_count],
+                server_name, SERVER_NAME_MAX-1);
+            imm_p->handle_array_copies_remote_count++;
+        } /* end if */
+    } /* end for */
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLocal: %d\tRemote: %d\n"
-                                   ,imm_p->handle_array_copies_local_count
-                                   ,imm_p->handle_array_copies_remote_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tLocal: %d\tRemote: %d\n",
+                                      imm_p->handle_array_copies_local_count,
+                                      imm_p->handle_array_copies_remote_count);
 
-   imm_p->local_io_servers_count = imm_p->handle_array_copies_local_count;
-   imm_p->remote_io_servers_count = imm_p->handle_array_copies_remote_count;
+    imm_p->local_io_servers_count = imm_p->handle_array_copies_local_count;
+    imm_p->remote_io_servers_count = imm_p->handle_array_copies_remote_count;
 
-   for (i=0; i<imm_p->local_io_servers_count; i++)
-   {
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal_io_servers[%d]: %s\n",i,
-          imm_p->local_io_servers[i]);
-   }
-   for (i=0; i<imm_p->remote_io_servers_count; i++)
-   {
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tremote_io_servers[%d]: %s\n",i,
-          imm_p->remote_io_servers[i]);
-   }
+    for (i=0; i<imm_p->local_io_servers_count; i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal_io_servers[%d]: %s\n", i,
+                     imm_p->local_io_servers[i]);
+    }
+   
+    for (i=0; i<imm_p->remote_io_servers_count; i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tremote_io_servers[%d]: %s\n", i,
+            imm_p->remote_io_servers[i]);
+    }
 
-
-   /*allocate and initialize space for local and remote handle arrays*/
-   if (imm_p->handle_array_copies_local_count)
-   {
-      imm_p->handle_array_copies_local = 
-        malloc( imm_p->handle_array_copies_local_count * 
-                imm_p->copies * sizeof(PVFS_handle));
-     if ( !imm_p->handle_array_copies_local )
-      {
-         js_p->error_code = -PVFS_ENOMEM;
-         goto error_exit;
-      }
-   }
-   if (imm_p->handle_array_copies_remote_count)
-   {
-      imm_p->handle_array_copies_remote = 
+    /* allocate and initialize space for local and remote handle arrays */
+    if (imm_p->handle_array_copies_local_count)
+    {
+        imm_p->handle_array_copies_local = 
+            malloc( imm_p->handle_array_copies_local_count * 
+                    imm_p->copies * sizeof(PVFS_handle));
+        if ( !imm_p->handle_array_copies_local )
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            goto error_exit;
+        }
+    }
+    if (imm_p->handle_array_copies_remote_count)
+    {
+        imm_p->handle_array_copies_remote = 
         malloc( imm_p->handle_array_copies_remote_count * 
                 imm_p->copies * sizeof(PVFS_handle));
-      if ( !imm_p->handle_array_copies_remote )
-      {
-         js_p->error_code = -PVFS_ENOMEM;
-         goto error_exit;
-      }
-      
-   }/*end if*/
+        if ( !imm_p->handle_array_copies_remote )
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            goto error_exit;
+        }
+    } /* end if */
 
-   memset(imm_p->handle_array_copies_local 
-         ,0
-         ,imm_p->handle_array_copies_local_count  * 
-          imm_p->copies * sizeof(PVFS_handle));
-   memset(imm_p->handle_array_copies_remote
-         ,0
-         ,imm_p->handle_array_copies_remote_count * 
-          imm_p->copies * sizeof(PVFS_handle));
+    memset(imm_p->handle_array_copies_local, 0,
+           imm_p->handle_array_copies_local_count  * 
+            imm_p->copies * sizeof(PVFS_handle));
+    memset(imm_p->handle_array_copies_remote, 0,
+           imm_p->handle_array_copies_remote_count * 
+             imm_p->copies * sizeof(PVFS_handle));
 
 error_exit:
-   /*all other memory will be freed in the "cleanup" action.*/
-   free(sm_p->key_a);
-   free(sm_p->val_a);
-   free(sm_p->error_a);
-   sm_p->key_a = sm_p->val_a = NULL;
-   sm_p->error_a = NULL;
+    /* all other memory will be freed in the "cleanup" action. */
+    free(sm_p->key_a);
+    free(sm_p->val_a);
+    free(sm_p->error_a);
+    sm_p->key_a = sm_p->val_a = NULL;
+    sm_p->error_a = NULL;
 
-   return SM_ACTION_COMPLETE;
-}/*end action inspect_source_info*/
+    return SM_ACTION_COMPLETE;
+} /* end action inspect_source_info */
 
 
 
-/*We must get the bstream size for any datahandles that reside on this server.*/
-/*This scenario occurs when a metadata and i/o server are one of the same or  */
-/*a metadata server and i/o server are running on the same machine.  I think  */
-/*this is outdated now, but I check for it anyway.                            */
-static PINT_sm_action obtain_local_handle_sizes(struct PINT_smcb *smcb
-                                               ,job_status_s *js_p)
+/* We must get the bstream size for any datahandles that reside on this server.
+ * This scenario occurs when a metadata and i/o server are one of the same or  
+ * a metadata server and i/o server are running on the same machine.  I think  
+ * this is outdated now, but I check for it anyway. */
+static PINT_sm_action obtain_local_handle_sizes(struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing obtain_local_handle_sizes....\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG,
+                "Executing obtain_local_handle_sizes....\n");
 
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   job_id_t job_id;
-   int ret = 0;
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    job_id_t job_id;
+    int ret = 0;
 
-   js_p->error_code = 0;
+    js_p->error_code = 0;
 
+    /*Do we have any local handles?*/
+    if (imm_p->handle_array_copies_local_count == 0)
+        return SM_ACTION_COMPLETE;
 
-   /*Do we have any local handles?*/
-   if (imm_p->handle_array_copies_local_count == 0)
-       return SM_ACTION_COMPLETE;
-
-   sm_p->error_a = malloc(imm_p->handle_array_base_local_count *
+    sm_p->error_a = malloc(imm_p->handle_array_base_local_count *
                            sizeof(PVFS_error) );
-   if (!sm_p->error_a)
-   {
-      js_p->error_code = -PVFS_ENOMEM;
-      goto error_exit;
-   }
+    if (!sm_p->error_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
 
-   imm_p->ds_attr_a = malloc(imm_p->handle_array_base_local_count *
-                             sizeof(PVFS_ds_attributes));
-   if (!imm_p->ds_attr_a)
-   {
-      js_p->error_code = -PVFS_ENOMEM;
-      goto error_exit;
-   }
+    imm_p->ds_attr_a = malloc(imm_p->handle_array_base_local_count *
+                              sizeof(PVFS_ds_attributes));
+    if (!imm_p->ds_attr_a)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        goto error_exit;
+    }
    
-   ret = job_trove_dspace_getattr_list(imm_p->fs_id
-                                      ,imm_p->handle_array_base_local_count
-                                      ,imm_p->handle_array_base_local
-                                      ,smcb
-                                      ,sm_p->error_a
-                                      ,imm_p->ds_attr_a
-                                      ,0
-                                      ,js_p
-                                      ,&job_id
-                                      ,server_job_context
-                                      ,NULL);
-   return ret;
+    ret = job_trove_dspace_getattr_list(imm_p->fs_id,
+                                        imm_p->handle_array_base_local_count,
+                                        imm_p->handle_array_base_local,
+                                        smcb,
+                                        sm_p->error_a,
+                                        imm_p->ds_attr_a,
+                                        0,
+                                        js_p,
+                                        &job_id,
+                                        server_job_context,
+                                        NULL);
+    return ret;
 
 
 error_exit:
-   if (sm_p->error_a)
-      free(sm_p->error_a);
-   sm_p->error_a = NULL;
+    if (sm_p->error_a)
+        free(sm_p->error_a);
+    sm_p->error_a = NULL;
 
-   return SM_ACTION_COMPLETE;
-}/*end action obtain_local_handle_sizes*/
+    return SM_ACTION_COMPLETE;
+}/* end action obtain_local_handle_sizes */
 
 
 
-static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb
-                                                ,job_status_s *js_p)
+static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing inspect_local_handle_sizes..\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG, 
+                 "Executing inspect_local_handle_sizes..\n");
 
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int i,j;
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    int i,j;
 
+    /* Do we have any local handles? */
+    if (imm_p->handle_array_copies_local_count == 0)
+        return SM_ACTION_COMPLETE;
 
-   /*Do we have any local handles?*/
-   if (imm_p->handle_array_copies_local_count == 0)
-       return SM_ACTION_COMPLETE;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tchecking for errors....\n");
+   
+    /* check for errors */
+    for (i=0; i<imm_p->handle_array_base_local_count; i++)
+    {
+        if (sm_p->error_a[i])
+        {
+            js_p->error_code = sm_p->error_a[i];
+            free(sm_p->error_a);
+            sm_p->error_a = NULL;
+            return SM_ACTION_COMPLETE;
+        }
+    } /* end for */
+    js_p->error_code = 0;
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tchecking for errors....\n");
-   /*check for errors*/
-   for (i=0; i<imm_p->handle_array_base_local_count; i++)
-   {
-       if (sm_p->error_a[i])
-       {
-          js_p->error_code = sm_p->error_a[i];
-          free(sm_p->error_a);
-          sm_p->error_a = NULL;
-          return SM_ACTION_COMPLETE;
-       }
-   }/*end for*/
-   js_p->error_code = 0;
+    imm_p->bstream_array_base_local = malloc(imm_p->dfile_count *
+                                             sizeof(PVFS_size));
+    if (!imm_p->bstream_array_base_local)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        free(sm_p->error_a);
+        sm_p->error_a = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(imm_p->bstream_array_base_local, 0, 
+           imm_p->dfile_count * sizeof(PVFS_size));
 
-   imm_p->bstream_array_base_local = malloc(imm_p->dfile_count *
-                                            sizeof(PVFS_size));
-   if (!imm_p->bstream_array_base_local)
-   {
-       js_p->error_code = -PVFS_ENOMEM;
-       free(sm_p->error_a);
-       sm_p->error_a = NULL;
-       return SM_ACTION_COMPLETE;
-   }
-   memset(imm_p->bstream_array_base_local
-         ,0
-         ,imm_p->dfile_count * sizeof(PVFS_size));
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "\tpopulating bstream_array_base_local...\n");
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG
-               ,"\tpopulating bstream_array_base_local...\n");
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_base_local_count:%d\n"
-                                   ,imm_p->handle_array_base_local_count);
-   /*populate bstream_array_base_local*/
-   for (i=0; i<imm_p->handle_array_base_local_count; i++)
-   {
-       for (j=0; j<imm_p->dfile_count; j++)
-       {
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal handle(%d):%llu"
-                                             "\tbase handle(%d):%llu\n"
-               ,i,llu(imm_p->handle_array_base_local[i])
-               ,j,llu(imm_p->handle_array_base[j]) );
-            if (imm_p->handle_array_base_local[i] == imm_p->handle_array_base[j])
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_base_local_count:%d\n",
+                                     imm_p->handle_array_base_local_count);
+    /* populate bstream_array_base_local */
+    for (i=0; i<imm_p->handle_array_base_local_count; i++)
+    {
+        for (j=0; j<imm_p->dfile_count; j++)
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG, "\tlocal handle(%d):%llu"
+                                              "\tbase handle(%d):%llu\n",
+                         i, llu(imm_p->handle_array_base_local[i]),
+                         j, llu(imm_p->handle_array_base[j]) );
+            if (imm_p->handle_array_base_local[i] == 
+                imm_p->handle_array_base[j])
             {
               imm_p->bstream_array_base_local[j] = 
-              imm_p->ds_attr_a[i].u.datafile.b_size;
-              gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle:%llu\tsize:%d\n"
-                  ,llu(imm_p->handle_array_base_local[i])
-                  ,(int)imm_p->bstream_array_base_local[j] );
+                imm_p->ds_attr_a[i].u.datafile.b_size;
+              gossip_debug(GOSSIP_MIRROR_DEBUG, "\thandle:%llu\tsize:%d\n",
+                           llu(imm_p->handle_array_base_local[i]),
+                           (int)imm_p->bstream_array_base_local[j] );
             }
-       }/*end for*/
-   }/*end for*/
+        } /* end for */
+    } /* end for */
 
    free(sm_p->error_a);
    sm_p->error_a = NULL;
 
    return SM_ACTION_COMPLETE;
-}/*end action inspect_local_handle_sizes*/
+} /* end action inspect_local_handle_sizes */
 
 
 
-static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
-                                               ,job_status_s *js_p)
+static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb,
+                                                job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing create_local_datahandles....\n");
+   gossip_debug(GOSSIP_MIRROR_DEBUG, 
+                "Executing create_local_datahandles....\n");
 
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   job_id_t job_id;
-   int ret = 0;
-   int i;
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    job_id_t job_id;
+    int ret = 0;
+    int i;
 
-   PVFS_handle_extent_array data_handle_ext_array;
-   server_configuration_s *config = get_server_config_struct();
+    PVFS_handle_extent_array data_handle_ext_array;
+    server_configuration_s *config = get_server_config_struct();
 
+    js_p->error_code = 0;
 
-   js_p->error_code = 0;
+    /* Do we have any local handles? */
+    if (imm_p->handle_array_copies_local_count == 0)
+        return SM_ACTION_COMPLETE;
 
-   /*Do we have any local handles?*/
-   if (imm_p->handle_array_copies_local_count == 0)
-       return SM_ACTION_COMPLETE;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "Target handle: %llu\tTarget FS ID: %d\n",
+                 llu(imm_p->metadata_handle),imm_p->fs_id);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "dfile count: %d\n",imm_p->dfile_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "stuffed size: %d\n",
+                 sm_p->target_object_attr->u.meta.stuffed_size);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"hint.flags: %llu\n",
+                 llu(sm_p->target_object_attr->u.meta.hint.flags));
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n",
+                 sm_p->target_object_attr->u.meta.dfile_array);
 
+    /* find local IO extent array for this file system for metadata host */
+    ret = PINT_cached_config_get_server( imm_p->fs_id,
+                                         config->host_id,
+                                         PINT_SERVER_TYPE_IO,
+                                         &data_handle_ext_array );
+    if (ret)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    } 
+    for (i=0;i<data_handle_ext_array.extent_count;i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "Extent Range %d:\tfirst  %llu"
+                                          "\tlast  %llu\n",
+                     i, llu(data_handle_ext_array.extent_array[i].first),
+                     llu(data_handle_ext_array.extent_array[i].last));
+    }
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Target handle: %llu\tTarget FS ID: %d\n"
-                                   ,llu(imm_p->metadata_handle),imm_p->fs_id);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile count: %d\n",imm_p->dfile_count);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"stuffed size: %d\n"
-                                ,sm_p->target_object_attr->u.meta.stuffed_size);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"hint.flags: %llu\n"
-                             ,llu(sm_p->target_object_attr->u.meta.hint.flags));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile array P: %p\n"
-                                 ,sm_p->target_object_attr->u.meta.dfile_array);
-
-   /*find local IO extent array for this file system for metadata host*/
-   ret = PINT_cached_config_get_server( imm_p->fs_id
-                                       ,config->host_id
-                                       ,PINT_SERVER_TYPE_IO
-                                       ,&data_handle_ext_array );
-   if (ret)
-   {
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
-   } 
-   for (i=0;i<data_handle_ext_array.extent_count;i++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"Extent Range %d:\tfirst  %llu"
-                                        "\tlast  %llu\n"
-                             ,i,llu(data_handle_ext_array.extent_array[i].first)
-                            ,llu(data_handle_ext_array.extent_array[i].last)  );
-   }
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of copies: %d \tlocation:%p\n"
-                                   ,imm_p->copies,&imm_p->copies);
-
-
-   /*create local datahandles - will be used as destination handles for copies*/
-   ret = job_trove_dspace_create_list( imm_p->fs_id
-                                      ,&data_handle_ext_array
-                                      ,imm_p->handle_array_copies_local
-                                      ,imm_p->handle_array_copies_local_count *
-                                       imm_p->copies
-                                      ,PVFS_TYPE_DATAFILE
-                                      ,NULL
-                                      ,TROVE_SYNC
-                                      ,smcb
-                                      ,0
-                                      ,js_p
-                                      ,&job_id
-                                      ,server_job_context
-                                      ,NULL );
-   return ret;
-} /*end action create_local_datahandles*/
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of copies: %d \tlocation:%p\n",
+                                      imm_p->copies,&imm_p->copies);
 
 
+    /*i create local datahandles - will be used as destination handles for 
+     * copies*/
+    ret = job_trove_dspace_create_list( imm_p->fs_id,
+                                        &data_handle_ext_array,
+                                        imm_p->handle_array_copies_local,
+                                        imm_p->handle_array_copies_local_count *
+                                        imm_p->copies,
+                                        PVFS_TYPE_DATAFILE,
+                                        NULL,
+                                        TROVE_SYNC,
+                                        smcb,
+                                        0,
+                                        js_p,
+                                        &job_id,
+                                        server_job_context,
+                                        NULL );
+    return ret;
+} /* end action create_local_datahandles */
 
 
-static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb
-                                                ,job_status_s *js_p)
+static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing create_remote_datahandles...\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int ret = 0,i;
-   job_id_t job_id;
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing create_remote_datahandles...\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    int ret = 0,i;
+    job_id_t job_id;
 
-   js_p->error_code = 0;
+    js_p->error_code = 0;
+
+    if (imm_p->handle_array_copies_remote_count == 0)
+        return SM_ACTION_COMPLETE;
+
+    int rows = imm_p->copies;
+    int cols = imm_p->handle_array_copies_remote_count;
+
+    imm_p->my_remote_servers = malloc(sizeof(char *) * rows * cols);
+    if (!imm_p->my_remote_servers)
+    {
+        gossip_lerr("Error allocating imm_p->my_remote_servers.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(imm_p->my_remote_servers,0,sizeof(char *) * rows * cols);
+
+    /* setup my_remote_servers[copy,remote#] = remote server name.  This will
+     * allow job_precreate_pool to return handle_array_copies_remote where   
+     * [copy,remote#] = remote handle.  We end up with a list of remotes for 
+     * each copy in original distribution order. */  
+    for (i=0; i<(rows*cols); i++)
+    {
+        imm_p->my_remote_servers[i] = imm_p->remote_io_servers[i%cols];
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\tremote_io_servers[%d]:%s "
+                                          "my_remote_servers[%d]:%s\n",
+                                          (i%cols),
+                                          imm_p->remote_io_servers[i%cols],
+                                          i,
+                                          imm_p->my_remote_servers[i]);
+    }
+
+    ret = job_precreate_pool_get_handles(imm_p->fs_id,
+                                         rows*cols,
+                                         PVFS_TYPE_DATAFILE,
+                                         (const char **)
+                                            imm_p->my_remote_servers,
+                                         imm_p->handle_array_copies_remote,
+                                         0,
+                                         smcb,
+                                         0,
+                                         js_p,
+                                         &job_id,
+                                         server_job_context,
+                                         NULL);
+    return ret;
+} /* end action create_remote_datahandles */
 
 
-   if (imm_p->handle_array_copies_remote_count == 0)
-       return SM_ACTION_COMPLETE;
-
-   int rows = imm_p->copies;
-   int cols = imm_p->handle_array_copies_remote_count;
-
-   imm_p->my_remote_servers = malloc(sizeof(char *) * rows * cols);
-   if (!imm_p->my_remote_servers)
-   {
-       gossip_lerr("Error allocating imm_p->my_remote_servers.\n");
-       js_p->error_code = -PVFS_ENOMEM;
-       return SM_ACTION_COMPLETE;
-   }
-   memset(imm_p->my_remote_servers,0,sizeof(char *) * rows * cols);
-
-   /*setup my_remote_servers[copy,remote#] = remote server name.  This will */
-   /*allow job_precreate_pool to return handle_array_copies_remote where    */
-   /*[copy,remote#] = remote handle.  We end up with a list of remotes for  */
-   /*each copy in original distribution order.                              */
-   for (i=0; i<(rows*cols); i++)
-   {
-       imm_p->my_remote_servers[i] = imm_p->remote_io_servers[i%cols];
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tremote_io_servers[%d]:%s "
-                                        "my_remote_servers[%d]:%s\n"
-                                       ,(i%cols)
-                                       ,imm_p->remote_io_servers[i%cols]
-                                       ,i
-                                       ,imm_p->my_remote_servers[i]);
-   }
-
-  ret = job_precreate_pool_get_handles(imm_p->fs_id
-                                       ,rows*cols,
-                                       PVFS_TYPE_DATAFILE,
-                                       (const char **)imm_p->my_remote_servers
-                                       ,imm_p->handle_array_copies_remote
-                                       ,0
-                                       ,smcb
-                                       ,0
-                                       ,js_p
-                                       ,&job_id
-                                       ,server_job_context
-                                       ,NULL);
-   return ret;
-}/*end action create_remote_datahandles*/
-
-
-
-
-static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
-                                              ,job_status_s *js_p)
+static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb,
+                                               job_status_s *js_p)
 {
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing setup_datahandle_copies...\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   server_configuration_s *config = get_server_config_struct();
-   int i,j,k;
-   
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing setup_datahandle_copies...\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    server_configuration_s *config = get_server_config_struct();
+    int i, j, k;
+    
+    js_p->error_code = 0;
 
-   js_p->error_code = 0;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tRemote destination handles:\n");
+    int rows = imm_p->copies;
+    int cols = imm_p->handle_array_copies_remote_count;
+    for (i=0; i<(rows*cols); i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\tRemote handle(%d):%llu\n",
+                                          i,
+                                          llu(imm_p->
+                                            handle_array_copies_remote[i]));
+    }
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tRemote destination handles:\n");
-   int rows = imm_p->copies;
-   int cols = imm_p->handle_array_copies_remote_count;
-   for (i=0; i<(rows*cols); i++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tRemote handle(%d):%llu\n"
-                                    ,i
-                                    ,llu(imm_p->handle_array_copies_remote[i]));
-   }
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tLocal destination handles:\n");
+    cols = imm_p->handle_array_copies_local_count;
+    for (i=0; i<(rows*cols); i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\tLocal handle(%d):%llu\n",
+                                          i,
+                                          llu(imm_p->
+                                              handle_array_copies_local[i]));
+    }
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLocal destination handles:\n");
-   cols = imm_p->handle_array_copies_local_count;
-   for (i=0; i<(rows*cols); i++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tLocal handle(%d):%llu\n"
-                                    ,i
-                                    ,llu(imm_p->handle_array_copies_local[i]));
-   }
+    for (i=0, j=0, k=0; i < (imm_p->io_servers_required * imm_p->copies); i++)
+    {
+        if ( strncmp(imm_p->io_servers[i%imm_p->io_servers_required],
+                     config->host_id,SERVER_NAME_MAX-1) == 0 )
+        { /* local */
+            memcpy(&imm_p->handle_array_copies[i],
+                   &imm_p->handle_array_copies_local[j],sizeof(PVFS_handle));
+            j++;
+        }
+        else
+        { /* remote */
+            memcpy(&imm_p->handle_array_copies[i],
+                   &imm_p->handle_array_copies_remote[k],sizeof(PVFS_handle));
+            k++;
+        }       
+    } /* end for */
 
-   for (i=0,j=0,k=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
-   {
-      if ( strncmp(imm_p->io_servers[i%imm_p->io_servers_required]
-                 ,config->host_id,SERVER_NAME_MAX-1) == 0 )
-      {/*local*/
-          memcpy(&imm_p->handle_array_copies[i]
-                ,&imm_p->handle_array_copies_local[j],sizeof(PVFS_handle));
-          j++;
-      }
-      else
-      {/*remote*/
-          memcpy(&imm_p->handle_array_copies[i]
-                ,&imm_p->handle_array_copies_remote[k],sizeof(PVFS_handle));
-          k++;
-      }       
-   }/*end for*/
+    for (i=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\thandle_array_copies[%d]:  %llu.\n",
+                                          i,
+                                          llu(imm_p->handle_array_copies[i]));
+    }
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tnumber of io servers required: %d\n",
+                                      imm_p->io_servers_required);
+                                    
+    /* create and initialize the writes_completed array */
+    imm_p->writes_completed = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
+                                                         * imm_p->copies);
+    if (!imm_p->writes_completed)
+    {
+        gossip_lerr("Unable to allocate imm_p->writes_completed.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(imm_p->writes_completed, UINT64_HIGH, sizeof(PVFS_handle) *
+           imm_p->dfile_count * imm_p->copies);
 
-   for (i=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies[%d]:  %llu.\n"
-                                       ,i
-                                       ,llu(imm_p->handle_array_copies[i]));
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tnumber of io servers required: %d\n"
-                                   ,imm_p->io_servers_required);
-
-   /*create and initialize the writes_completed array*/
-   imm_p->writes_completed = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
-                                                        * imm_p->copies);
-   if (!imm_p->writes_completed)
-   {
-      gossip_lerr("Unable to allocate imm_p->writes_completed.\n");
-      js_p->error_code = -PVFS_ENOMEM;
-      return SM_ACTION_COMPLETE;
-   }
-   memset(imm_p->writes_completed,UINT64_HIGH,sizeof(PVFS_handle) 
-                                            * imm_p->dfile_count
-                                            * imm_p->copies);
-
-   /*the retry count is used to monitor how many times we retry a write. */
-   /*this value is incremented in the check_for_retries state.           */
+   /* the retry count is used to monitor how many times we retry a write. 
+    * this value is incremented in the check_for_retries state. */
    imm_p->retry_count = 0;
 
    return SM_ACTION_COMPLETE;
-}/*end action setup_datahandle_copies*/
+} /* end action setup_datahandle_copies */
 
 
 static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
