@@ -12,7 +12,6 @@
 
 #include "trove.h"
 #include "quickhash.h"
-#include "extent-utils.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
@@ -253,113 +252,40 @@
 //    return(0);
 //}
 //
-//int trove_handle_mgmt_initialize()
-//{
-//    /*
-//      due to weird trove_initialize usages; this will always succeed
-//      unless the hash table initialization really fails.
-//    */
-//    int ret = 0;
-//    gen_mutex_lock(&trove_handle_mutex);
+int trove_handle_mgmt_initialize()
+{
+    /*
+      due to weird trove_initialize usages; this will always succeed
+      unless the hash table initialization really fails.
+    */
+    int ret = 0;
+    gen_mutex_lock(&trove_handle_mutex);
+
+    /* FIX: do some book keeping */
+
+    gen_mutex_unlock(&trove_handle_mutex);
+    return ret;
+}
 //
-//    if (s_fsid_to_ledger_table == NULL)
-//    {
-//        s_fsid_to_ledger_table = qhash_init(hash_fsid_compare,
-//                                            hash_fsid,67);
-//        ret = (s_fsid_to_ledger_table ? 0 : -1);
-//    }
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return ret;
-//}
-//
-//int trove_set_handle_ranges(TROVE_coll_id coll_id,
-//                            TROVE_context_id context_id,
-//                            char *handle_range_str)
-//{
-//    int ret = -TROVE_EINVAL;
-//    PINT_llist *extent_list = NULL;
-//    handle_ledger_t *ledger = NULL;
-//
-//    gen_mutex_lock(&trove_handle_mutex);
-//    if (handle_range_str)
-//    {
-//        extent_list = PINT_create_extent_list(handle_range_str);
-//        if (extent_list)
-//        {
-//            /*
-//              get existing ledger management struct if any;
-//              create otherwise
-//            */
-//            ledger = get_or_add_handle_ledger(coll_id);
-//            if (ledger)
-//            {
-//                /* assert the internal ledger struct is valid */
-//                assert(ledger->ledger);
-//		
-//		/* tell trove what are our valid ranges are */
-//		ret = trove_map_handle_ranges(
-//                    extent_list, ledger->ledger);
-//		if (ret != 0)
-//                {
-//                    gen_mutex_unlock(&trove_handle_mutex);
-//                    return ret;
-//                }
-//
-//                ret = trove_check_handle_ranges(
-//                    coll_id,context_id,extent_list,ledger->ledger);
-//		if (ret != 0)
-//                {
-//                    gen_mutex_unlock(&trove_handle_mutex);
-//                    return ret;
-//                }
-//                else
-//                {
-//                    ledger->have_valid_ranges = 1;
-//                }
-//            }
-//            PINT_release_extent_list(extent_list);
-//        }
-//    }
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return ret;
-//}
-//
-///*
-// * trove_set_handle_timeout: controls how long a handle, once freed,
-// * will sit on the sidelines before returning to the pool of
-// * avaliable handles 
-// */
-//int trove_set_handle_timeout(TROVE_coll_id coll_id,
-//                             TROVE_context_id context_id,
-//                             struct timeval *timeout)
-//{
-//    int ret = -1;
-//    handle_ledger_t *ledger = NULL;
-//
-//    gen_mutex_lock(&trove_handle_mutex);
-//    ledger = get_or_add_handle_ledger(coll_id);
-//    if (ledger)
-//    {
-//	/* assert the internal ledger struct is valid */
-//	assert(ledger->ledger);
-//
-//	/*
-//          tell trove how long the timeout should be.
-//          if 0 is specified, use a reasonable default value
-//        */
-//        timeout->tv_sec = ((timeout->tv_sec == 0) ?
-//                           TROVE_DEFAULT_HANDLE_PURGATORY_SEC :
-//                           timeout->tv_sec);
-//	ret = trove_ledger_set_timeout(ledger->ledger, timeout);
-//
-//        gossip_debug(GOSSIP_TROVE_DEBUG, "- set handle re-use "
-//                     "timeout to %d seconds (ret=%d)\n",
-//                     (int)timeout->tv_sec, ret);
-//    }
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return ret;
-//}
-//
+/*
+ * trove_set_handle_timeout: controls how long a handle, once freed,
+ * will sit on the sidelines before returning to the pool of
+ * avaliable handles 
+ */
+int trove_set_handle_timeout(TROVE_coll_id coll_id,
+                             TROVE_context_id context_id,
+                             struct timeval *timeout)
+{
+    int ret = -1;
+
+    gen_mutex_lock(&trove_handle_mutex);
+
+    /* FIX: booking used here to manage timeouts (if we want them) */
+
+    gen_mutex_unlock(&trove_handle_mutex);
+    return ret;
+}
+
 int trove_handle_alloc(TROVE_coll_id coll_id, TROVE_handle *handle)
 {
     TROVE_handle_generate(*handle);
@@ -541,41 +467,18 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
 //	return(-PVFS_ENOENT);
 //    }
 //}
-//
-//int trove_handle_mgmt_finalize()
-//{
-//    int i;
-//    handle_ledger_t *ledger = NULL;
-//    struct qlist_head *hash_link = NULL;
-//
-//    gen_mutex_lock(&trove_handle_mutex);
-//    /*
-//      this is an exhaustive and slow iterate.  speed this up
-//      if 'finalize' is something that will be done frequently.
-//    */
-//    for (i = 0; i < s_fsid_to_ledger_table->table_size; i++)
-//    {
-//        do
-//        {
-//            hash_link =
-//                qhash_search_and_remove_at_index(s_fsid_to_ledger_table, i);
-//            if (hash_link)
-//            {
-//                ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
-//                assert(ledger);
-//                assert(ledger->ledger);
-//
-//                trove_handle_ledger_free(ledger->ledger);
-//                free(ledger);
-//            }
-//        } while(hash_link);
-//    }
-//    qhash_finalize(s_fsid_to_ledger_table);
-//    s_fsid_to_ledger_table = NULL;
-//
-//    gen_mutex_unlock(&trove_handle_mutex);
-//    return 0;
-//}
+
+int trove_handle_mgmt_finalize()
+{
+    int i;
+
+    gen_mutex_lock(&trove_handle_mutex);
+
+    /* FIX: add book keeping */
+
+    gen_mutex_unlock(&trove_handle_mutex);
+    return 0;
+}
 //
 ///*
 // * Local variables:

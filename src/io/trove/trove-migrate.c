@@ -269,7 +269,7 @@ static double wtime(void)
 int trove_migrate (TROVE_method_id method_id, const char* data_path,
 		   const char* meta_path)
 {
-    TROVE_ds_position pos;
+    TROVE_rec_position pos;
     TROVE_coll_id     coll_id;
     TROVE_op_id       op_id;
     TROVE_keyval_s    name = {0};
@@ -281,13 +281,14 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
     int               incremental;
     int               i;
     int               migrated;
+    unsigned int      pos_flag;
 #ifdef DEBUG_MIGRATE_PERF
     double            s,e;
     s = wtime();
 #endif
 
     count          = 1;
-    pos            = TROVE_ITERATE_START;
+    pos_flag       = TROVE_ITERATE_START;
     name.buffer    = malloc(PATH_MAX);
     name.buffer_sz = PATH_MAX;
 
@@ -303,6 +304,7 @@ int trove_migrate (TROVE_method_id method_id, const char* data_path,
     {
         ret = trove_collection_iterate(method_id,
                                        &pos,
+                                       &pos_flag,
                                        &name,
                                        &coll_id,
                                        &count,
@@ -740,10 +742,13 @@ static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
     TROVE_op_id delattr_op_id, getattr_op_id, setattr_op_id;
     TROVE_ds_state state;
     PVFS_BMI_addr_t* addr_array = NULL;
-    PVFS_handle handle = PVFS_HANDLE_NULL;
+    PVFS_handle handle;
 
     struct server_configuration_s *user_opts = get_server_config_struct();
     assert(user_opts);
+
+
+    TROVE_handle_clear(handle);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %d, %s, %s\n", 
                  __func__, coll_id, data_path, meta_path);

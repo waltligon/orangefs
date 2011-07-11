@@ -20,19 +20,13 @@
 #include "gossip.h"
 #include "server-config.h"
 #include "str-utils.h"
-#include "extent-utils.h"
-#include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-event.h"
 
 static char *lost_and_found_string = "lost+found";
 
-static TROVE_handle s_used_handles[4] =
-{
-    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL,
-    TROVE_HANDLE_NULL, TROVE_HANDLE_NULL
-};
+static TROVE_handle s_used_handles[4];
 
 #define mkspace_print(v, format, f...)              \
 do {                                                \
@@ -58,56 +52,6 @@ static int handle_is_excluded(
         num_handles_to_exclude--;
     }
     return excluded;
-}
-
-static void get_handle_extent_from_ranges(
-    char *handle_ranges, TROVE_handle_extent *out_extent,
-    TROVE_handle *handles_to_exclude, int num_handles_to_exclude)
-{
-    PINT_llist *cur = NULL;
-    TROVE_handle_extent *tmp_extent = NULL;
-    PINT_llist *extent_list = NULL;
-
-    if (handle_ranges && out_extent)
-    {
-        out_extent->first = TROVE_HANDLE_NULL;
-        out_extent->last = TROVE_HANDLE_NULL;
-
-        extent_list = PINT_create_extent_list(handle_ranges);
-        if (extent_list)
-        {
-            cur = extent_list;
-            while(cur)
-            {
-                tmp_extent = PINT_llist_head(cur);
-                if (!tmp_extent)
-                {
-                    break;
-                }
-
-                /*
-                  allow any handle range in this list that can allow
-                  at least the single handle allocation to pass.  a
-                  range of 1 is ok, so long as it's not a handle that
-                  was previously allocated (i.e. in the specified
-                  excluded list)
-                */
-                if (((tmp_extent->last - tmp_extent->first) > 0) ||
-                    ((tmp_extent->last > 0) &&
-                     (tmp_extent->last == tmp_extent->first) &&
-                     !handle_is_excluded(
-                         tmp_extent->last, handles_to_exclude,
-                         num_handles_to_exclude)))
-                {
-                    out_extent->first = tmp_extent->first;
-                    out_extent->last = tmp_extent->last;
-                    break;
-                }
-                cur = PINT_llist_next(cur);
-            }
-            PINT_release_extent_list(extent_list);
-        }
-    }
 }
 
 int pvfs2_mkspace(
@@ -148,6 +92,13 @@ int pvfs2_mkspace(
                    data_handle_ranges : "NONE"));
 
     new_root_handle = root_handle;
+
+    /* clear out the 4 s_used_handles defined globally. should re-visit if
+     * they really need to be global */
+    for( i=0; i < 4; i++ )
+    {
+        PVFS_handle_clear( s_used_handles[i] );
+    }
 
     /*
       if we're only creating a collection inside an existing

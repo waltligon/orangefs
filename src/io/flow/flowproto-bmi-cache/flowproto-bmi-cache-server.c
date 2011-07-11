@@ -1104,7 +1104,7 @@ static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op )
 	if ( op == BMI_TO_CACHE )  /* write */
 	{
 		desc2.coll_id = qitem->parent->dest.u.trove.coll_id;
-		desc2.handle = qitem->parent->dest.u.trove.handle;
+		PVFS_handle_copy(desc2.handle, qitem->parent->dest.u.trove.handle);
 		desc2.context_id = global_trove_context;
 
 		/* TODO: if we use intemediate buffer, change here */
@@ -1129,7 +1129,7 @@ static int bmi_cache_init_cache_req(struct fp_queue_item *qitem, int op )
 	else /* read */
 	{
 		desc1.coll_id = qitem->parent->dest.u.trove.coll_id;
-		desc1.handle = qitem->parent->dest.u.trove.handle;
+		PVFS_handle_copy(desc1.handle, qitem->parent->dest.u.trove.handle);
 		desc1.context_id = global_trove_context;
 
 		/* TODO: if we use intemediate buffer, change here */

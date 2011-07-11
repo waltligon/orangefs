@@ -5,7 +5,6 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/digest.c \
 	  $(DIR)/xattr-utils.c \
           $(DIR)/mmap-ra-cache.c \
-	  $(DIR)/extent-utils.c \
 	  $(DIR)/errno-mapping.c \
 	  $(DIR)/pvfs2-util.c \
           $(DIR)/pvfs2-debug.c \
@@ -25,7 +24,6 @@ LIBSRC += $(DIR)/server-config.c \
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \
-	     $(DIR)/extent-utils.c \
 	     $(DIR)/errno-mapping.c \
 	     $(DIR)/mkspace.c \
              $(DIR)/pvfs2-debug.c \

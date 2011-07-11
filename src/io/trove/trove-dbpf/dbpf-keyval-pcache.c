@@ -92,12 +92,12 @@ static int dbpf_keyval_pcache_compare(
 
     if(key_entry->handle == link_entry->handle &&
        key_entry->pos.session == link_entry->pos.session && 
-       key_entry->pos.count == linux_entry.pos.count)
+       key_entry->pos.count == link_entry->pos.count)
         return 1;
     return 0;
 }
     
-/* hash from http://burtleburtle.net/bob/hash/evahash.html */
+/* hash from http://burtleburtle.net/bob/hash/evahash.html 
 #define mix(a,b,c) \
 do { \
   a=a-b;  a=a-c;  a=a^(c>>13); \
@@ -109,20 +109,39 @@ do { \
       a=a-b;  a=a-c;  a=a^(c>>3);  \
       b=b-c;  b=b-a;  b=b^(a<<10); \
       c=c-a;  c=c-b;  c=c^(b>>15); \
-} while(0)
+} while(0) */
+
+/* 64 bit version */
+ #define mix64(a,b,c) \
+ { \
+    a=a-b;  a=a-c;  a=a^(c>>43); \
+    b=b-c;  b=b-a;  b=b^(a<<9);  \
+    c=c-a;  c=c-b;  c=c^(b>>8);  \
+    a=a-b;  a=a-c;  a=a^(c>>38); \
+    b=b-c;  b=b-a;  b=b^(a<<23); \
+    c=c-a;  c=c-b;  c=c^(b>>5);  \
+    a=a-b;  a=a-c;  a=a^(c>>35); \
+    b=b-c;  b=b-a;  b=b^(a<<49); \
+    c=c-a;  c=c-b;  c=c^(b>>11); \
+    a=a-b;  a=a-c;  a=a^(c>>12); \
+    b=b-c;  b=b-a;  b=b^(a<<18); \
+    c=c-a;  c=c-b;  c=c^(b>>22); \
+ }
+
 
 static int dbpf_keyval_pcache_hash(
     void * key, int size)
 {
     struct dbpf_keyval_pcache_entry * key_entry =
         (struct dbpf_keyval_pcache_entry *)key;
+    uint64_t a = 0, b = 0, c = 0;
 
     /* FIX: needs refactored for both handle and pos.session/pos.count */
-    uint32_t a = (uint32_t)(key_entry->handle >> 32);
-    uint32_t b = (uint32_t)(key_entry->handle & 0x00000000FFFFFFFF);
-    uint64_t c = key_entry->pos.session;
+    TROVE_handle_to_hash(key_entry->handle, &a);
+    b = key_entry->pos.session;
+    c = key_entry->pos.count;
 
-    mix(a,b,c);
+    mix64(a,b,c);
     return (int)(c & (DBPF_KEYVAL_PCACHE_TABLE_SIZE-1));
 }
 
@@ -144,7 +163,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     struct dbpf_keyval_pcache_key key;
     int ret, status;
 
-    key.handle = handle;
+    TROVE_handle_copy(key.handle, handle);
 
     /* this used to be a 64 bit number where the top 32 bits were a 
      * session id and the bottom 32 were a count. that's replaced with 
@@ -159,15 +178,15 @@ int PINT_dbpf_keyval_pcache_lookup(
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
-                         "handle: %llu, pos: session(%u), count(%u)\n",
-                         llu(handle), pos.session, pos.count);
+                         "handle: %llu, pos: session(%lluu), count(%lluu)\n",
+                         llu(handle), llu(pos.session), llu(pos.count));
         }
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
-                         "handle: %llu, pos: session(%u), count(%u)\n",
-                         ret, llu(handle), pos.session, pos.count);
+                         "handle: %llu, pos: session(%llu), count(%llu)\n",
+                         ret, llu(handle), llu(pos.session), llu(pos.count));
         }
 
         gen_mutex_unlock(&pcache->mutex);
@@ -180,8 +199,8 @@ int PINT_dbpf_keyval_pcache_lookup(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
-                 "handle: %llu, pos: session(%u), count(%u)\n",
-                 llu(handle), pos.session, pos.count);
+                 "handle: %llu, pos: session(%llu), count(%llu)\n",
+                 llu(handle), llu(pos.session), llu(pos.count));
 
     return 0;
 }
@@ -206,7 +225,7 @@ int PINT_dbpf_keyval_pcache_insert(
         return -PVFS_ENOMEM;
     }
 
-    key.handle = handle;
+    TROVE_handle_copy(key.handle, handle);
     memcpy(&key.pos, &pos, sizeof(PVFS_kv_position));
 
     gen_mutex_lock(&pcache->mutex);
@@ -217,7 +236,7 @@ int PINT_dbpf_keyval_pcache_insert(
         PINT_tcache_delete(pcache->tcache, tentry);
     }
 
-    entry->handle = handle;
+    TROVE_handle_copy(entry->handle,  handle);
     memcpy(&entry->pos, &pos, sizeof(PVFS_kv_position));
     memcpy(entry->keyname, keyname, length);
     entry->keylen = length;
@@ -230,8 +249,8 @@ int PINT_dbpf_keyval_pcache_insert(
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
-                     "handle: %llu, pos: %llu\n",
-                     ret, llu(handle), llu(pos));
+                     "handle: %llu, pos: session(%llu), count(%llu)\n",
+                     ret, llu(handle), llu(pos.session), llu(pos.count));
 
         gen_mutex_unlock(&pcache->mutex);
         free(entry);
@@ -241,8 +260,8 @@ int PINT_dbpf_keyval_pcache_insert(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "
-                 "handle: %llu, pos: %llu\n",
-                 llu(handle), llu(pos));
+                 "handle: %llu, pos: session(%llu), count(%llu)\n",
+                 llu(handle), llu(pos.session), llu(pos.count));
 
     return 0;
 }

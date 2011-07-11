@@ -30,7 +30,6 @@
 #include "pint-dist-utils.h"
 #include "ncache.h"
 #include "pvfs2-internal.h"
-#include "extent-utils.h"
 
 #define	MAX_PARTITIONS	2
 

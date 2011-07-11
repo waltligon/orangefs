@@ -20,7 +20,6 @@
 #include "trove.h"
 #include "server-config.h"
 #include "quickhash.h"
-#include "extent-utils.h"
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
 

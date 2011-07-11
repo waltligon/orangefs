@@ -13,7 +13,6 @@
 
 #include "pvfs2-types.h"
 #include "str-utils.h"
-#include "extent-utils.h"
 
 /* PINT_create_extent_list()
  *

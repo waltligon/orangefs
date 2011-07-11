@@ -60,8 +60,9 @@ struct precreate_pool_desc
     int first_callback_flag;
     TROVE_keyval_s* key_array;
     PVFS_ds_flags flags;
-    PVFS_ds_position position;
-    PVFS_ds_position pool_index;
+    PVFS_kv_position kv_position;
+    unsigned int position_flag;
+    //PVFS_ds_position pool_index;
     int count;
     PVFS_ds_type type;              /* ds type of operation */
     

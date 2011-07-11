@@ -378,8 +378,7 @@ int dbpf_collection_setinfo(TROVE_method_id method_id,
                          "dbpf collection %d - Setting collection handle "
                          "ranges to %s\n", 
                          (int) coll_id, (char *)parameter);
-            ret = trove_set_handle_ranges(
-                coll_id, context_id, (char *)parameter);
+            /* FIX: anything left to do here when we don't have ranges? */
             break;
         case TROVE_COLLECTION_HANDLE_TIMEOUT:
             gossip_debug(GOSSIP_TROVE_DEBUG, 
@@ -1043,7 +1042,7 @@ int dbpf_collection_create(char *collname,
                            TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, error = 0, i = 0;
-    TROVE_handle zero = TROVE_HANDLE_NULL;
+    TROVE_handle zero; 
     struct dbpf_storage *sto_p;
     struct dbpf_collection_db_entry db_data;
     DB *db_p = NULL;
@@ -1051,6 +1050,8 @@ int dbpf_collection_create(char *collname,
     struct stat dirstat;
     struct stat dbstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
+
+    TROVE_handle_clear(zero);
 
     if (my_storage_p == NULL)
     {
@@ -1496,7 +1497,7 @@ collection_remove_failure:
     return ret;
 }
 
-int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+int dbpf_collection_iterate(TROVE_rec_position *inout_position_p,
                             unsigned int *inout_position_flag_p,
                             TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
@@ -1544,7 +1545,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
         memset(&key, 0, sizeof(key));
         key.data = name_array[0].buffer;
         key.ulen = name_array[0].buffer_sz;
-        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p.record;
+        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p;
         key.size = sizeof(db_recno_t);
         key.flags |= DB_DBT_USERMEM;
 
@@ -1637,7 +1638,7 @@ return_ok:
             ret = -dbpf_db_error_to_trove_error(ret);
         }
 
-        *inout_position_p.record = recno;
+        *inout_position_p = recno;
         *inout_position_flag_p = TROVE_ITERATE_AT_POINT;
     }
     /*

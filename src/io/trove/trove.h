@@ -156,7 +156,7 @@ int trove_collection_lookup(
 
 int trove_collection_iterate(
     TROVE_method_id method_id,
-    TROVE_ds_position *inout_position_p,
+    TROVE_rec_position *inout_position_p,
     unsigned int *inout_position_flag_p,
     TROVE_keyval_s *name_array,
     TROVE_coll_id *coll_id_array,

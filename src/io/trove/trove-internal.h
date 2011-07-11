@@ -429,7 +429,8 @@ struct TROVE_mgmt_ops
 
     int (*collection_clear)(TROVE_coll_id coll_id);
 
-    int (*collection_iterate)(TROVE_ds_position *inout_position_p,
+    int (*collection_iterate)(TROVE_rec_position *inout_position_p,
+                              unsigned int *inout_position_flag_p,
 			      TROVE_keyval_s *name_array,
 			      TROVE_coll_id *coll_id_array,
 			      int *inout_count_p,

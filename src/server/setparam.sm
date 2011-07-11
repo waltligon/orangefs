@@ -187,7 +187,7 @@ static PINT_sm_action setparam_cleanup(
 static int check_fs_id(PVFS_fs_id fs_id)
 {
     int ret = -PVFS_ENOENT, count = 1;
-    TROVE_ds_position pos;
+    TROVE_rec_position pos = 0;
     unsigned int pos_flag = TROVE_ITERATE_START;
     TROVE_keyval_s name;
     TROVE_coll_id tmp_coll;

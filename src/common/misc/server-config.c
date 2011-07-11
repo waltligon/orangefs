@@ -20,12 +20,12 @@
 #include "job.h"
 #include "trove.h"
 #include "gossip.h"
-#include "extent-utils.h"
 #include "mkspace.h"
 #include "pint-distribution.h"
 #include "pvfs2-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
+#include "str-utils.h"
 
 #ifdef WITH_OPENSSL
 #include "openssl/evp.h"
@@ -2591,20 +2591,19 @@ DOTCONF_CB(get_db_cache_type)
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-    unsigned long long int tmp_var;
-    int ret = -1;
+    PVFS_handle tmp_var;
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
-    ret = sscanf(cmd->data.str, "%llu", &tmp_var);
-    if(ret != 1)
+
+    if( PVFS_handle_parse(cmd->data.str, tmp_var ) == -1 )
     {
-        return("RootHandle does not have a long long unsigned value.\n");
+        return("RootHandle could not be parsed.\n");
     }
-    fs_conf->root_handle = (PVFS_handle)tmp_var;
+    PVFS_handle_copy(fs_conf->root_handle, tmp_var);
     return NULL;
 }
 
@@ -3206,18 +3205,25 @@ static int is_root_handle_in_a_meta_range(
     struct filesystem_configuration_s *fs)
 {
     int ret = 0;
+
+/* won't do this with UUIDs
+ *
     PINT_llist *cur = NULL;
     PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 
+
+
     if (config && is_populated_filesystem_configuration(fs))
     {
+*/
         /*
           check if the root handle is within one of the
           specified meta host's handle ranges for this fs;
           a root handle can't exist in a data handle range!
         */
+/*
         cur = fs->meta_handle_ranges;
         while(cur)
         {
@@ -3239,6 +3245,7 @@ static int is_root_handle_in_a_meta_range(
                 break;
             }
 
+
             extent_list = PINT_create_extent_list(
                 cur_h_mapping->handle_range);
             if (!extent_list)
@@ -3257,6 +3264,7 @@ static int is_root_handle_in_a_meta_range(
             cur = PINT_llist_next(cur);
         }
     }
+*/
     return ret;
 }
 
@@ -3402,7 +3410,7 @@ static void copy_filesystem(
         assert(dest_fs->file_system_name);
 
         dest_fs->coll_id = src_fs->coll_id;
-        dest_fs->root_handle = src_fs->root_handle;
+        PVFS_handle_copy(dest_fs->root_handle, src_fs->root_handle);
         dest_fs->default_num_dfiles = src_fs->default_num_dfiles;
 
         dest_fs->flowproto = src_fs->flowproto;
@@ -4424,7 +4432,7 @@ static int is_root_handle_in_my_range(
 {
     int ret = 0;
     PINT_llist *cur = NULL;
-    PINT_llist *extent_list = NULL;
+    //PINT_llist *extent_list = NULL;
     char *cur_host_id = (char *)0;
     host_handle_mapping_s *cur_h_mapping = NULL;
 
@@ -4459,6 +4467,8 @@ static int is_root_handle_in_my_range(
             /* only check if this is *our* range */
             if (strcmp(config->host_id,cur_host_id) == 0)
             {
+            /* Don't do this with UUIDs
+             *
                 extent_list = PINT_create_extent_list(
                     cur_h_mapping->handle_range);
                 if (!extent_list)
@@ -4474,6 +4484,7 @@ static int is_root_handle_in_my_range(
                 {
                     break;
                 }
+              */
             }
             cur = PINT_llist_next(cur);
         }
@@ -4489,11 +4500,13 @@ int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config)
 {
     int ret = 1;
-    PVFS_handle root_handle = 0;
+    PVFS_handle root_handle;
     int create_collection_only = 0;
     PINT_llist *cur = NULL;
     char *cur_meta_handle_range, *cur_data_handle_range = NULL;
     filesystem_configuration_s *cur_fs = NULL;
+
+    PVFS_handle_clear(root_handle);
 
     if (config)
     {
@@ -4531,8 +4544,9 @@ int PINT_config_pvfs2_mkspace(
               if it is, we're responsible for creating it on disk when
               creating the storage space
             */
-            root_handle = (is_root_handle_in_my_range(config, cur_fs) ?
-                           cur_fs->root_handle : PVFS_HANDLE_NULL);
+            is_root_handle_in_my_range(config, cur_fs) ?
+                PVFS_handle_copy(root_handle, cur_fs->root_handle) : 
+                PVFS_handle_clear(root_handle);
 
             /*
               for the first fs/collection we encounter, create the

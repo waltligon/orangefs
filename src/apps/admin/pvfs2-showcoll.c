@@ -579,8 +579,9 @@ static int print_collections(void)
     TROVE_op_id op_id;
     TROVE_coll_id coll_id;
     TROVE_keyval_s name;
-    TROVE_ds_position pos;
+    TROVE_rec_position pos;
     char *coll_name;
+    unsigned int pos_flag;
 
     coll_name = malloc(PATH_MAX);
     if (coll_name == NULL) return -1;
@@ -590,7 +591,7 @@ static int print_collections(void)
     name.buffer_sz = PATH_MAX;
     name.read_sz   = 0;
     count = 1;
-    pos = TROVE_ITERATE_START;
+    pos_flag = TROVE_ITERATE_START;
 
     fprintf(stdout, "Storage space %s and %s collections:\n",
 	    data_path, meta_path);
@@ -598,6 +599,7 @@ static int print_collections(void)
     while (count > 0) {
 	ret = trove_collection_iterate(TROVE_METHOD_DBPF,
                                        &pos,
+                                       &pos_flag,
 				       &name,
 				       &coll_id,
 				       &count,

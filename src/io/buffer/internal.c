@@ -110,7 +110,7 @@ NCAC_req_t *NCAC_rwreq_build( NCAC_desc_t *desc, NCAC_optype optype)
     }
 
     ncac_req->coll_id 		= desc->coll_id;
-    ncac_req->handle  		= desc->handle;
+    PVFS_handle_copy(ncac_req->handle, desc->handle);
     ncac_req->context_id  	= desc->context_id;
 
     /* inode */
@@ -748,8 +748,10 @@ static inline struct inode *search_inode_list (PVFS_handle handle)
 {
 	int inode_index;
 	struct inode * cur;
+        long unsigned int h_hash = 0;
 
-	inode_index = handle % MAX_INODE_NUM;
+        PVFS_handle_to_hash(handle, &h_hash);
+	inode_index = h_hash % MAX_INODE_NUM;
 
 	cur = inode_arr[inode_index]; 
 	while ( NULL != cur ) {
@@ -771,8 +773,11 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 {
 	struct inode *inode;
 	int inode_index;
+        long unsigned int h_hash;
 
-	inode_index = handle % MAX_INODE_NUM;
+        PVFS_handle_to_hash( handle, &h_hash);
+
+	inode_index = h_hash % MAX_INODE_NUM;
 
 	/* search the inode list with the index of "inode_index" */
 	inode = search_inode_list (handle);
@@ -789,7 +794,7 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 		inode->nrpages = 0;
 		inode->nr_dirty = 0;
 		inode->coll_id = coll_id;
-		inode->handle = handle;
+		PVFS_handle_copy(inode->handle, handle);
 		inode->context_id = context_id;
 
 		init_single_radix_tree(&inode->page_tree, NCAC_dev.get_value, NCAC_dev.max_b);

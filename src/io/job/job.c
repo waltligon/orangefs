@@ -97,11 +97,12 @@ struct precreate_pool_get_trove
 {
     struct job_desc* jd; /* parent job descriptor */
     /* variables needed per keyval_iterate_keys() call */
-    PVFS_ds_position pos;
+    PVFS_kv_position pos;
     PVFS_ds_keyval key;
     int count;
     struct PINT_thread_mgr_trove_callback trove_callback;
     struct precreate_pool* pool;
+    unsigned int pos_flag;
 };
 #endif /* __PVFS2_TROVE_SUPPORT__ */
 
@@ -1404,7 +1405,7 @@ int job_flow_cancel(job_id_t id, job_context_id context_id)
 }
 
 int job_trove_bstream_write_list(TROVE_coll_id coll_id,
-                                 TROVE_handle handle,
+                                 PVFS_handle handle,
                                  char **mem_offset_array,
                                  TROVE_size *mem_size_array,
                                  int mem_count,
@@ -2725,7 +2726,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
  */
 int job_trove_keyval_iterate(PVFS_fs_id coll_id,
                              PVFS_handle handle,
-                             PVFS_ds_position position,
+                             PVFS_kv_position position,
+                             unsigned int position_flag,
                              PVFS_ds_keyval * key_array,
                              PVFS_ds_keyval * val_array,
                              int count,
@@ -2758,7 +2760,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
-    jd->u.trove.position = position;
+    jd->u.trove.kv_position = position;
+    jd->u.trove.position_flag = position_flag;
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
@@ -2768,9 +2771,10 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
-                               &(jd->u.trove.position), key_array, val_array,
-                               &(jd->u.trove.count), flags, jd->u.trove.vtag,
-                               user_ptr_internal,
+                               &(jd->u.trove.kv_position), 
+                               &(jd->u.trove.position_flag), key_array, 
+                               val_array, &(jd->u.trove.count), flags, 
+                               jd->u.trove.vtag, user_ptr_internal,
                                global_trove_context, &(jd->u.trove.id), hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -2793,7 +2797,9 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        out_status_p->position = jd->u.trove.position;
+        memcpy(&out_status_p->kv_position, &jd->u.trove.kv_position,
+               sizeof(TROVE_kv_position));
+        out_status_p->position_flag = jd->u.trove.position_flag;
         out_status_p->count = jd->u.trove.count;
         dealloc_job_desc(jd);
         jd = NULL;
@@ -2851,7 +2857,8 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     jd->hints = hints;
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
-    jd->u.trove.position = position;
+    memcpy(&out_status_p->kv_position, &jd->u.trove.kv_position, 
+        sizeof(PVFS_kv_position));
     jd->u.trove.position_flag = position_flag;
     jd->u.trove.count = count;
     jd->context_id = context_id;
@@ -2862,7 +2869,8 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(coll_id, handle,
-                               &(jd->u.trove.position), key_array,
+                               &(jd->u.trove.kv_position), 
+                               &(jd->u.trove.position_flag), key_array,
                                &(jd->u.trove.count), flags, jd->u.trove.vtag,
                                user_ptr_internal,
                                global_trove_context, &(jd->u.trove.id), hints);
@@ -2887,7 +2895,9 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        out_status_p->position = jd->u.trove.position;
+        memcpy(&out_status_p->kv_position, &jd->u.trove.kv_position, 
+               sizeof(PVFS_kv_position));
+        out_status_p->position_flag = jd->u.trove.position_flag;
         out_status_p->count = jd->u.trove.count;
         dealloc_job_desc(jd);
         jd = NULL;
@@ -2941,7 +2951,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
-    jd->u.trove.position = position;
+    PVFS_handle_copy(jd->u.trove.ds_position, position);
     jd->u.trove.position_flag = position_flag;
     jd->u.trove.count = count;
     jd->context_id = context_id;
@@ -2952,7 +2962,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
-                               &(jd->u.trove.position), 
+                               &(jd->u.trove.ds_position), 
                                &(jd->u.trove.position_flag), handle_array, 
                                &(jd->u.trove.count), flags, 
                                jd->u.trove.vtag, user_ptr_internal,
@@ -2978,7 +2988,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        out_status_p->position = jd->u.trove.position;
+        PVFS_handle_copy(out_status_p->ds_position, jd->u.trove.ds_position);
+        out_status_p->position_flag = jd->u.trove.position_flag;
         out_status_p->count = jd->u.trove.count;
         dealloc_job_desc(jd);
         jd = NULL;
@@ -5077,7 +5088,9 @@ static void fill_status(struct job_desc *jd,
         status->vtag = jd->u.trove.vtag;
         status->coll_id = jd->u.trove.fsid;
         PVFS_handle_copy(status->handle, jd->u.trove.handle);
-        status->position = jd->u.trove.position;
+        PVFS_handle_copy(status->ds_position, jd->u.trove.ds_position);
+        memcpy(&(status->kv_position), &(jd->u.trove.kv_position), 
+            sizeof(PVFS_kv_position));
         status->count = jd->u.trove.count;
         status->type = jd->u.trove.type;
         break;
@@ -5094,8 +5107,9 @@ static void fill_status(struct job_desc *jd,
     case JOB_PRECREATE_POOL:
         status->error_code = jd->u.precreate_pool.error_code;
         status->count = jd->u.precreate_pool.count;
-        status->position = jd->u.precreate_pool.pool_index << 32;
-        status->position |= jd->u.precreate_pool.position;
+        memcpy(&status->kv_position, &jd->u.precreate_pool.kv_position,
+            sizeof(PVFS_kv_position));
+        status->position_flag = jd->u.precreate_pool.position_flag;
         break;
     }
 
@@ -6037,8 +6051,10 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             struct precreate_pool, list_link);
 
         tmp_trove_array[i].jd = jd;
-        /* FIX: position stuff changed to use small int and flag */
-        tmp_trove_array[i].pos = PVFS_ITERATE_START;
+
+        tmp_trove_array[i].pos.session = 0;
+        tmp_trove_array[i].pos.count = 0;
+        tmp_trove_array[i].pos_flag = PVFS_ITERATE_START;
         tmp_trove_array[i].count = 1;
         tmp_trove_array[i].key.buffer 
             = &jd->u.precreate_pool.precreate_handle_array[i];
@@ -6095,6 +6111,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             fs->fsid, 
             tmp_trove_array[i].pool->pool_handle,
             &tmp_trove_array[i].pos,
+            &tmp_trove_array[i].pos_flag,
             &tmp_trove_array[i].key,
             &tmp_trove_array[i].count,
             tmp_trove_array[i].jd->u.precreate_pool.flags|
@@ -6151,7 +6168,7 @@ int job_precreate_pool_iterate_handles(
     PVFS_kv_position local_position;
     unsigned int local_position_flag = position_flag;
     struct qlist_head* iterator;
-    PVFS_ds_position tmp_index = 1;
+    long unsigned int tmp_index = 1, pool_index = 0;
     struct precreate_pool* pool = NULL;
     int ret;
     struct job_desc *jd = NULL;
@@ -6160,9 +6177,7 @@ int job_precreate_pool_iterate_handles(
     int i;
     struct fs_pool* fs;
 
-    /* low order bits are the trove iterate position */
     local_position.count = position.count;
-    /* high order bits tell us which pool we are on */
     local_position.session = position.session;
 
     /* we start indexing at one and reserve 0 for the special start and end
@@ -6259,7 +6274,7 @@ int job_precreate_pool_iterate_handles(
     }
     jd->job_user_ptr = user_ptr;
     jd->hints = hints;
-    memcpy(&jd->u.precreate_pool.position, &local_position, 
+    memcpy(&(jd->u.precreate_pool.kv_position), &local_position, 
            sizeof(PVFS_kv_position));
     jd->u.precreate_pool.position_flag = local_position_flag;
     jd->u.precreate_pool.count = count;
@@ -6272,7 +6287,7 @@ int job_precreate_pool_iterate_handles(
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(fsid, pool->pool_handle,
-                               &(jd->u.precreate_pool.position), 
+                               &(jd->u.precreate_pool.kv_position), 
                                &(jd->u.precreate_pool.position_flag),
                                jd->u.precreate_pool.key_array, 
                                &(jd->u.precreate_pool.count), flags, NULL,
@@ -6300,8 +6315,8 @@ int job_precreate_pool_iterate_handles(
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        memcpy(out_status_p->kv_position, jd->u.precreate_pool.position,
-               sizeof(PVFS_kv_position));
+        memcpy(&(out_status_p->kv_position), 
+                &(jd->u.precreate_pool.kv_position), sizeof(PVFS_kv_position));
         out_status_p->position_flag = jd->u.precreate_pool.position_flag;
         out_status_p->count = jd->u.precreate_pool.count;
         free(jd->u.precreate_pool.key_array);

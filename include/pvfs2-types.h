@@ -125,14 +125,17 @@ enum PVFS_encoding_type
 typedef uuid_t PVFS_handle;
 
 #define PVFS_handle_clear(u)            uuid_clear(u)
-#define PVFS_handle_compare(u1, u2)    uuid_compare(u1, u2)
+#define PVFS_handle_compare(u1, u2)     uuid_compare(u1, u2)
 #define PVFS_handle_copy(dst, src)      uuid_copy(dst, src)
 #define PVFS_handle_generate(u)         uuid_generate(u)
 #define PVFS_handle_is_null(u)          uuid_is_null(u)
+#define PVFS_handle_parse(s, u)         uuid_parse(s, u)
 #define PVFS_handle_unparse(u, s)       uuid_unparse(u, s)
 #define PVFS_HANDLE_STRING_LEN          37
 
 /* takes uuid and pointer to unsigned int */
+/* FIX: this is terrible, need a real way to hash the handles into a 
+ * well distributed 64 bit space */
 #define PVFS_handle_to_hash(u, h) do { \
     int i = 0;                         \
     for( i=0; i < 16; i++ )            \
