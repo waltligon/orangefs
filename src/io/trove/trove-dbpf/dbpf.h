@@ -190,7 +190,8 @@ int PINT_dbpf_keyval_iterate(
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
     int *count,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
+    unsigned int pos_flag,
     PINT_dbpf_keyval_iterate_callback callback);
 
 int PINT_dbpf_dspace_remove_keyval(
@@ -285,6 +286,7 @@ struct dbpf_dspace_iterate_handles_op
 {
     TROVE_handle *handle_array;
     TROVE_ds_position *position_p;
+    unsigned int *position_flag_p;
     int *count_p;
 };
 
@@ -366,7 +368,8 @@ struct dbpf_keyval_iterate_op
 {
     TROVE_keyval_s *key_array;
     TROVE_keyval_s *val_array;
-    TROVE_ds_position *position_p;
+    TROVE_kv_position *position_p;
+    unsigned int *position_flag_p;
     int *count_p;
     /* vtag? */
 };
@@ -374,7 +377,8 @@ struct dbpf_keyval_iterate_op
 struct dbpf_keyval_iterate_keys_op
 {
     TROVE_keyval_s *key_array;
-    TROVE_ds_position *position_p;
+    TROVE_kv_position *position_p;
+    unsigned int *position_flag_p;
     int *count_p;
     /* vtag? */
 };
@@ -723,6 +727,7 @@ int dbpf_collection_lookup(char *collname,
 int dbpf_collection_clear(TROVE_coll_id coll_id);
 
 int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+                            unsigned int *inout_postition_flag_p,
                             TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
                             int *inout_count_p,

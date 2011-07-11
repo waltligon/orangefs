@@ -35,7 +35,9 @@ struct trove_desc
     PVFS_fs_id fsid;
     PVFS_error state;
     PVFS_handle handle;
-    PVFS_ds_position position;
+    PVFS_ds_position ds_position;
+    PVFS_kv_position kv_position;
+    unsigned int position_flag;
     PVFS_ds_attributes attr;
     PVFS_ds_type type;
     int count;

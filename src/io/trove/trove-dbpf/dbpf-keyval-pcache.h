@@ -27,14 +27,14 @@ void PINT_dbpf_keyval_pcache_finalize(PINT_dbpf_keyval_pcache * cache);
 int PINT_dbpf_keyval_pcache_lookup(
     PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
     const void ** keyname,
     int * length);
 
 int PINT_dbpf_keyval_pcache_insert( 
     PINT_dbpf_keyval_pcache *pcache,
     TROVE_handle handle,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
     const char * keyname,
     int length);
 

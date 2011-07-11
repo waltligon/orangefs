@@ -258,6 +258,11 @@ static PINT_sm_action remove_get_dirent_count(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
+    PVFS_kv_position pos;
+    unsigned int pos_flag;
+
+    memset(&pos, 0, sizeof(PVFS_kv_position));
+    pos_flag = PVFS_ITERATE_START;
 
     if (js_p->error_code)
     {
@@ -269,8 +274,8 @@ static PINT_sm_action remove_get_dirent_count(
     ret = job_trove_keyval_iterate_keys(
         s_op->req->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
-        /* FIX: position stuff changed to use small int and flag */
-        PVFS_ITERATE_START,
+        pos,
+        pos_flag,
         &s_op->u.remove.key,
         1,
         0,

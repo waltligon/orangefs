@@ -125,7 +125,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     int ret;
     PINT_event_type event_type;
     PINT_event_id event_id = 0;
-    PVFS_handle handle;
+    TROVE_handle handle;
 
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -136,11 +136,11 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 
     if( handle_p == NULL )
     {
-        PVFS_handle_clear(handle);
+        TROVE_handle_clear(handle);
     }
     else
     {
-        PVFS_handle_copy(handle, *handle_p);
+        TROVE_handle_copy(handle, *handle_p);
     }
 
     ret = dbpf_op_init_queued_or_immediate(
@@ -204,7 +204,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
     TROVE_handle new_handle;
    
-    PVFS_handle_clear(new_handle);
+    TROVE_handle_clear(new_handle);
 
     if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
     {
@@ -213,7 +213,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     trove_handle_alloc(op_p->coll_p->coll_id, &new_handle);
 
-    if ( PVFS_handle_is_null(new_handle) )
+    if ( TROVE_handle_is_null(new_handle) )
     {
         gossip_err("%s: handle allocator returned a zero handle.\n", __func__);
         return(-TROVE_ENOSPC);
@@ -230,7 +230,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    PVFS_handle_copy(*op_p->u.d_create.out_handle_p, new_handle);
+    TROVE_handle_copy(*op_p->u.d_create.out_handle_p, new_handle);
     return DBPF_OP_COMPLETE;
 }
 
@@ -352,7 +352,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
           if we got a zero handle, we're either completely out of handles
           -- or else something terrible has happened
         */
-        if (PVFS_handle_is_null(new_handle))
+        if (TROVE_handle_is_null(new_handle))
         {
             gossip_err("Error: handle allocator returned a zero handle.\n");
             return(-TROVE_ENOSPC);
@@ -366,7 +366,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
             /* release any handles we grabbed so far */
             for(j=0; j<=i; j++)
             {
-                if( ! PVFS_handle_is_null(
+                if( ! TROVE_handle_is_null(
                                 op_p->u.d_create_list.out_handle_array_p[j] ) )
                 {
                     memset(&key, 0, sizeof(key));
@@ -382,7 +382,7 @@ static int dbpf_dspace_create_list_op_svc(struct dbpf_op *op_p)
             return(ret);
         }
 
-        PVFS_handle_copy(op_p->u.d_create_list.out_handle_array_p[i], 
+        TROVE_handle_copy(op_p->u.d_create_list.out_handle_array_p[i], 
                          new_handle);
     }
 
@@ -487,7 +487,10 @@ static int remove_one_handle(
 {
     int count = 0;
     int ret = -TROVE_EINVAL;
+    TROVE_kv_position pos;
     DBT key;
+
+    memset(&pos, 0, sizeof(TROVE_kv_position));
 
     memset(&key, 0, sizeof(key));
     key.data = &ref.handle;
@@ -534,6 +537,7 @@ static int remove_one_handle(
         NULL,
         NULL,
         &count,
+        pos,
         TROVE_ITERATE_START,
         PINT_dbpf_dspace_remove_keyval);
     if(ret != 0 && ret != -TROVE_ENOENT)
@@ -557,11 +561,11 @@ static int dbpf_dspace_remove_list_op_svc(struct dbpf_op *op_p)
     int i;
 
     ref.fs_id = op_p->coll_p->coll_id;
-    PVFS_handle_copy(ref.handle, op_p->handle);
+    TROVE_handle_copy(ref.handle, op_p->handle);
 
     for(i=0; i<op_p->u.d_remove_list.count; i++)
     {
-        PVFS_handle_copy(ref.handle, op_p->u.d_remove_list.handle_array[i]);
+        TROVE_handle_copy(ref.handle, op_p->u.d_remove_list.handle_array[i]);
         ref.fs_id = op_p->coll_p->coll_id;
         
         /* if error_p is NULL, assume that the caller is ignoring errors */
@@ -598,7 +602,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL;
 
     ref.fs_id = op_p->coll_p->coll_id;
-    PVFS_handle_copy(ref.handle, op_p->handle);
+    TROVE_handle_copy(ref.handle, op_p->handle);
 
     ret = remove_one_handle(ref, op_p->coll_p);
     if(ret < 0)
@@ -639,6 +643,7 @@ int PINT_dbpf_dspace_remove_keyval(
 
 static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
                                        TROVE_ds_position *position_p,
+                                       unsigned int *position_flag_p,
                                        TROVE_handle *handle_array,
                                        int *inout_count_p,
                                        TROVE_ds_flags flags,
@@ -654,7 +659,7 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     TROVE_handle handle;
     int ret;
 
-    PVFS_handle_clear(handle);
+    TROVE_handle_clear(handle);
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -680,7 +685,8 @@ static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 
    /* initialize op-specific members */
     op_p->u.d_iterate_handles.handle_array = handle_array;
-    op_p->u.d_iterate_handles.position_p = position_p;
+    TROVE_handle_copy(*op_p->u.d_iterate_handles.position_p, handle);
+    op_p->u.d_iterate_handles.position_flag_p = position_flag_p;
     op_p->u.d_iterate_handles.count_p = inout_count_p;
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
@@ -701,7 +707,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     uint32_t dbpagesize = TROVE_DEFAULT_DB_PAGESIZE;
     TROVE_ds_attributes attr;
 
-    if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
+    if (*op_p->u.d_iterate_handles.position_flag_p == TROVE_ITERATE_END)
     {
         /* already hit end of keyval space; return 1 */
         *op_p->u.d_iterate_handles.count_p = 0;
@@ -727,7 +733,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      * the database (first record) when used with DB_NEXT, so we don't
      * need to position with DB_FIRST.
      */
-    if (*op_p->u.d_iterate_handles.position_p != TROVE_ITERATE_START)
+    if ( (*op_p->u.d_iterate_handles.position_flag_p == TROVE_ITERATE_AT_POINT)
+          && (!TROVE_handle_is_null(dummy_handle)) )
     {
         /* we need to position the cursor before we can read new
          * entries.  we will go ahead and read the first entry as
@@ -735,8 +742,10 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          * remainder in this or the above case.
          */
         memset(&key, 0, sizeof(key));
-        /* FIX: position_p stuff is broken */
-        dummy_handle = *op_p->u.d_iterate_handles.position_p;
+
+        /* if position_flag_p is set to TROVE_ITERATE_AT_POINT, the value
+         * in position_p represents the handle to start at */
+        TROVE_handle_copy(dummy_handle, *op_p->u.d_iterate_handles.position_p);
         key.data  = &dummy_handle;
         key.size  = key.ulen = sizeof(TROVE_handle);
         key.flags |= DB_DBT_USERMEM;
@@ -755,11 +764,12 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
             gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
+                       llu(*(TROVE_handle *)
+                       op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
-    else
+    else if( *op_p->u.d_iterate_handles.position_flag_p == TROVE_ITERATE_START )
     {
         memset(&key, 0, sizeof(key));
         key.data  = &dummy_handle;
@@ -785,8 +795,17 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
     }
+    else
+    {
+        gossip_err("%s: invalid position_flag_p value (%u) or null handle "
+                   " with TROVE_ITERATE_AT_POINT flag, returning\n",
+                   __func__,  *op_p->u.d_iterate_handles.position_flag_p);
+        ret = TROVE_EINVAL;
+        goto return_error;
+    }
 
-    PVFS_handle_copy(op_p->u.d_iterate_handles.handle_array[i],
+
+    TROVE_handle_copy(op_p->u.d_iterate_handles.handle_array[i],
                      dummy_handle);
     ++i;
 
@@ -882,8 +901,9 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             }
 
             /* check for duplicates */
-            if(i > 0 && *(TROVE_handle*)tmp_handle == 
-                          op_p->u.d_iterate_handles.handle_array[i-1])
+            if(i > 0 && 
+               (TROVE_handle_compare(*(TROVE_handle*)tmp_handle,  
+                    op_p->u.d_iterate_handles.handle_array[i-1]) == 0 ))
             {
                 gossip_err("Warning: got duplicate handle %llu.\n", 
                            llu(*(TROVE_handle*)tmp_handle));
@@ -925,20 +945,26 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                 goto get_next;
             }
 
-            if(*(TROVE_handle*)tmp_handle == 
-                op_p->u.d_iterate_handles.handle_array[
-                    *op_p->u.d_iterate_handles.count_p])
+            if( TROVE_handle_compare( *(TROVE_handle*)tmp_handle,
+                    op_p->u.d_iterate_handles.handle_array[
+                        *op_p->u.d_iterate_handles.count_p]) == 0 )
             {
                 gossip_err("Warning: found duplicate handle: %llu\n", 
                            llu(*(TROVE_handle*)tmp_handle));
                 gossip_err("Warning: skipping entry.\n");
             }
 
-        } while (sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr) ||
-           *(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]);
+        } while ( (sizeof_handle != sizeof(TROVE_handle)) ||
+                  (sizeof_attr != sizeof(attr)) ||
+                  (TROVE_handle_compare(*(TROVE_handle*)tmp_handle,
+                      op_p->u.d_iterate_handles.handle_array[
+                          *op_p->u.d_iterate_handles.count_p])==0));
 
-        *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
+        /* store current handle and set the flag to indicate iteration should
+         * continue at this handle */
+        TROVE_handle_copy(*op_p->u.d_iterate_handles.position_p, 
+                          *(TROVE_handle *)tmp_handle);
+        *op_p->u.d_iterate_handles.position_flag_p = TROVE_ITERATE_AT_POINT;
         goto return_ok;
     }
 
@@ -968,20 +994,25 @@ get_next:
                      "failure @ recno\n");
         ret = -dbpf_db_error_to_trove_error(ret);
     }
-    if(*op_p->u.d_iterate_handles.count_p > 0 && 
-        dummy_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+    if( (*op_p->u.d_iterate_handles.count_p > 0) && 
+        (TROVE_handle_compare(dummy_handle, 
+                             op_p->u.d_iterate_handles.handle_array[
+                                 *op_p->u.d_iterate_handles.count_p]) == 0) )
     {
         gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
         gossip_err("Warning: skipping entry.\n");
         (*op_p->u.d_iterate_handles.count_p)--;
     }
-    *op_p->u.d_iterate_handles.position_p = dummy_handle;
+    TROVE_handle_copy(*op_p->u.d_iterate_handles.position_p, 
+                      dummy_handle); 
+    *op_p->u.d_iterate_handles.position_flag_p = TROVE_ITERATE_AT_POINT;
 
 return_ok:
     if (ret == DB_NOTFOUND)
     {
         /* if off the end of the database, return TROVE_ITERATE_END */
-        *op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
+        TROVE_handle_clear(*op_p->u.d_iterate_handles.position_p);
+        *op_p->u.d_iterate_handles.position_flag_p = TROVE_ITERATE_END;
     }
     /* 'position' points to record we just read, or is set to END */
 
@@ -1526,7 +1557,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
             continue;
         }
 
-        PVFS_handle_copy(ref.handle, op_p->u.d_getattr_list.handle_array[i]);
+        TROVE_handle_copy(ref.handle, op_p->u.d_getattr_list.handle_array[i]);
         ref.fs_id = op_p->coll_p->coll_id;
 
         op_p->u.d_getattr_list.error_p[i] = dbpf_dspace_attr_get(
@@ -2199,7 +2230,7 @@ static int dbpf_dspace_create_store_handle(
     }
 
     /* add retrieved ds_attr to dbpf_attr cache here */
-    PVFS_handle_copy(ref.handle, new_handle);
+    TROVE_handle_copy(ref.handle, new_handle);
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_insert(ref, &attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);

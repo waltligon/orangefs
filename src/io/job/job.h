@@ -30,15 +30,18 @@ typedef intptr_t job_aint;
 typedef struct job_status
 {
     /* the comments indicate which type of job will fill in which fields */
-    job_aint status_user_tag;   /* tag supplied by caller */
-    int error_code;		/* returned by all operations */
-    PVFS_size actual_size;	/* resize, bmi_recv */
-    PVFS_vtag *vtag;		/* most trove operations */
-    PVFS_ds_position position;	/* iterate, iterate_keys, iterate_handles */
-    PVFS_handle handle;		/* dspace_create */
-    PVFS_ds_type type;		/* dspace_verify */
-    PVFS_fs_id coll_id;		/* fs_lookup */
-    int count;			/* keyval_iterate, iterate_handles */
+    job_aint status_user_tag;       /* tag supplied by caller */
+    int error_code;		    /* returned by all operations */
+    PVFS_size actual_size;	    /* resize, bmi_recv */
+    PVFS_vtag *vtag;		    /* most trove operations */
+    PVFS_ds_position ds_position;   /* iterate_handles */
+    PVFS_kv_position kv_position;   /* iterate_keys,  iterate_handles */
+    PVFS_rec_position rec_position; /* iterate */
+    unsigned int position_flag;     /* flag for positions */
+    PVFS_handle handle;		    /* dspace_create */
+    PVFS_ds_type type;		    /* dspace_verify */
+    PVFS_fs_id coll_id;		    /* fs_lookup */
+    int count;			    /* keyval_iterate, iterate_handles */
 }
 job_status_s;
 
@@ -462,7 +465,8 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
 /* iterate through all of the key/value pairs for a data space */
 int job_trove_keyval_iterate(PVFS_fs_id coll_id,
                              PVFS_handle handle,
-                             PVFS_ds_position position,
+                             PVFS_kv_position position,
+                             unsigned int position_flag,
                              PVFS_ds_keyval * key_array,
                              PVFS_ds_keyval * val_array,
                              int count,
@@ -478,7 +482,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 /* iterate through all of the keys for a data space */
 int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
                                   PVFS_handle handle,
-                                  PVFS_ds_position position,
+                                  PVFS_kv_position position,
+                                  unsigned int position_flag,
                                   PVFS_ds_keyval * key_array,
                                   int count,
                                   PVFS_ds_flags flags,
@@ -493,6 +498,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 /* iterates through all handles in a collection */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
                                      PVFS_ds_position position,
+                                     unsigned int position_flag,
                                      PVFS_handle* handle_array,
                                      int count,
                                      PVFS_ds_flags flags,
@@ -672,7 +678,8 @@ int job_precreate_pool_check_level(
 
 int job_precreate_pool_iterate_handles(
     PVFS_fs_id fsid,
-    PVFS_ds_position position,
+    PVFS_kv_position position,
+    unsigned int position_flag,
     PVFS_handle* handle_array,
     int count,
     PVFS_ds_flags flags,

@@ -23,7 +23,7 @@ extern "C" {
     do { \
         (_op).type = _type; \
         (_op).state = OP_NOT_QUEUED; \
-        (_op).handle = _handle; \
+        TROVE_handle_copy((_op).handle, _handle); \
         (_op).coll_p = _coll_p; \
         (_op).svc_fn = _svc_fn; \
         (_op).user_ptr = _user_ptr; \

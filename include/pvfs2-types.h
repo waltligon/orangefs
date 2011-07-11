@@ -145,7 +145,18 @@ typedef uuid_t PVFS_handle;
  *  PVFS2 file systems reachable by a given client.
  */
 typedef int32_t PVFS_fs_id;
-typedef uint64_t PVFS_ds_position;
+typedef PVFS_handle PVFS_ds_position;
+typedef struct {
+    uint64_t count;
+    uint64_t session;
+} PVFS_kv_position;
+endecode_fields_2(
+    PVFS_kv_position,
+    uint64_t, count,
+    uint64_t, session);
+
+typedef uint32_t PVFS_rec_position;
+
 typedef int32_t PVFS_ds_flags;
 
 
@@ -160,8 +171,10 @@ typedef int32_t PVFS_ds_flags;
 
 #define encode_PVFS_fs_id encode_int32_t
 #define decode_PVFS_fs_id decode_int32_t
-#define decode_PVFS_ds_position decode_uint64_t
-#define encode_PVFS_ds_position encode_uint64_t
+#define decode_PVFS_ds_position decode_PVFS_handle
+#define encode_PVFS_ds_position encode_PVFS_handle
+#define decode_PVFS_rec_position decode_uint32_t
+#define encode_PVFS_rec_position encode_uint32_t
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
@@ -257,8 +270,9 @@ inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
 #define PVFS_FS_ID_NULL       ((PVFS_fs_id)0)
 #define PVFS_OP_NULL         ((PVFS_id_gen_t)0)
 #define PVFS_BMI_ADDR_NULL ((PVFS_BMI_addr_t)0)
-#define PVFS_ITERATE_START    (INT32_MAX - 1)
-#define PVFS_ITERATE_END      (INT32_MAX - 2)
+#define PVFS_ITERATE_START      1
+#define PVFS_ITERATE_END        2
+#define PVFS_ITERATE_AT_POINT   3
 #define PVFS_READDIR_START PVFS_ITERATE_START
 #define PVFS_READDIR_END   PVFS_ITERATE_END
 

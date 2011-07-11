@@ -153,20 +153,22 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
  */
 struct PVFS_sysresp_readdir_s
 {
-    PVFS_ds_position token;
+    PVFS_kv_position token;
+    uint32_t token_flag;
     PVFS_dirent *dirent_array;
-    uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size 
+                                      structure */
     uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 
 /** Holds results of a readdirplus operation (position token, directory version
- *  information, array of directory entries, array of stat error codes and array of
- *  attribute information).
+ *  information, array of directory entries, array of stat error codes and 
+ *  array of attribute information).
  */
 struct PVFS_sysresp_readdirplus_s
 {
-    PVFS_ds_position token;
+    PVFS_kv_position token;
     PVFS_dirent   *dirent_array;
     uint32_t        pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
     uint64_t       directory_version;
@@ -329,7 +331,8 @@ PVFS_error PVFS_sys_mkdir(
 
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
+    uint32_t token_flag,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
@@ -358,7 +361,7 @@ PVFS_error PVFS_isys_readdirplus(
 
 PVFS_error PVFS_sys_readdirplus(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,

@@ -133,12 +133,12 @@ static int dbpf_keyval_iterate_get_first_entry(
 
 static int dbpf_keyval_iterate_step_to_position(
     TROVE_handle handle, 
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
     DBC * dbc_p);
 
 static int dbpf_keyval_iterate_skip_to_position(
     TROVE_handle handle, 
-    TROVE_ds_position pos, 
+    TROVE_kv_position pos, 
     PINT_dbpf_keyval_pcache *pcache,
     DBC * dbc_p);
 
@@ -794,7 +794,8 @@ static int dbpf_keyval_validate(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
                                TROVE_handle handle,
-                               TROVE_ds_position *position_p,
+                               TROVE_kv_position *position_p,
+                               unsigned int *position_flag_p,
                                TROVE_keyval_s *key_array,
                                TROVE_keyval_s *val_array,
                                int *inout_count_p,
@@ -837,6 +838,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
     op_p->u.k_iterate.key_array = key_array;
     op_p->u.k_iterate.val_array = val_array;
     op_p->u.k_iterate.position_p = position_p;
+    op_p->u.k_iterate.position_flag_p = position_flag_p;
     op_p->u.k_iterate.count_p = inout_count_p;
     op_p->hints = hints;
 
@@ -876,16 +878,16 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                   "dbpf_keyval_iterate_op_svc: starting: fsid: %u, "
-                  "handle: %llu, pos: %llu\n", 
+                  "handle: %llu, pos_flag: %u\n", 
                  op_p->coll_p->coll_id, 
                  llu(op_p->handle),
-                 llu(*op_p->u.k_iterate.position_p));
+                 *op_p->u.k_iterate.position_flag_p);
     
     /* if they passed in that they are at the end, return 0.
      * this seems silly maybe, but it makes while (count) loops
      * work right.
      */
-    if (*op_p->u.k_iterate.position_p == TROVE_ITERATE_END)
+    if (*op_p->u.k_iterate.position_flag_p == TROVE_ITERATE_END)
     {
         *op_p->u.k_iterate.count_p = 0;
         return 1;
@@ -903,10 +905,11 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
                                    op_p->u.k_iterate.val_array,
                                    &count,
                                    *op_p->u.k_iterate.position_p,
+                                   *op_p->u.k_iterate.position_flag_p,
                                    tmp_callback);
     if (ret == -TROVE_ENOENT)
     {
-        *op_p->u.k_iterate.position_p = TROVE_ITERATE_END;
+        *op_p->u.k_iterate.position_flag_p = TROVE_ITERATE_END;
     }
     else if(ret != 0)
     {
@@ -914,17 +917,17 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     }
     else
     {
-        if(*op_p->u.k_iterate.position_p == TROVE_ITERATE_START)
+        if(*op_p->u.k_iterate.position_flag_p == TROVE_ITERATE_START)
         {
-            *op_p->u.k_iterate.position_p = count;
+            (*op_p->u.k_iterate.position_p).count = count;
             /* store a session identifier in the top 32 bits */
             tmp_pos += readdir_session;
-            *op_p->u.k_iterate.position_p += (tmp_pos << 32);
+            (*op_p->u.k_iterate.position_p).session = tmp_pos;
             readdir_session++;
         }
         else
         {
-            *op_p->u.k_iterate.position_p += count;
+            (*op_p->u.k_iterate.position_p).count += count;
         }
 
         if(count != 0)
@@ -935,7 +938,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
             ret = PINT_dbpf_keyval_pcache_insert(
                 op_p->coll_p->pcache, 
                 op_p->handle,
-                *op_p->u.k_iterate.position_p,
+                (*op_p->u.k_iterate.position_p),
                 op_p->u.k_iterate.key_array[count-1].buffer, 
                 op_p->u.k_iterate.key_array[count-1].read_sz);
         }
@@ -944,7 +947,8 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         {
             for(i=0; i<count; i++)
             {
-                ret = dbpf_keyval_handle_info_ops(op_p, DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
+                ret = dbpf_keyval_handle_info_ops(op_p, 
+                        DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
                 if(ret < 0)
                 {
                     return(ret);
@@ -957,15 +961,18 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                  "dbpf_keyval_iterate_op_svc: finished: "
-                 "position: %llu, count: %d\n", 
-                 llu(*op_p->u.k_iterate.position_p), *op_p->u.k_iterate.count_p);
+                 "position: session(%llu) count(%llu), count: %d\n", 
+                 llu((*op_p->u.k_iterate.position_p).session), 
+                 llu((*op_p->u.k_iterate.position_p).count), 
+                 *op_p->u.k_iterate.count_p);
 
     return 1;
 }
 
 static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
                                     TROVE_handle handle,
-                                    TROVE_ds_position *position_p,
+                                    TROVE_kv_position *position_p,
+                                    unsigned int *position_flag_p,
                                     TROVE_keyval_s *key_array,
                                     int *inout_count_p,
                                     TROVE_ds_flags flags,
@@ -1006,6 +1013,7 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
  /* initialize op-specific members */
     op_p->u.k_iterate_keys.key_array = key_array;
     op_p->u.k_iterate_keys.position_p = position_p;
+    op_p->u.k_iterate_keys.position_flag_p = position_flag_p;
     op_p->u.k_iterate_keys.count_p = inout_count_p;
     op_p->hints = hints;
 
@@ -1044,7 +1052,7 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
      * this seems silly maybe, but it makes while (count) loops
      * work right.
      */
-    if (*op_p->u.k_iterate_keys.position_p == TROVE_ITERATE_END)
+    if (*op_p->u.k_iterate_keys.position_flag_p == TROVE_ITERATE_END)
     {
         *op_p->u.k_iterate_keys.count_p = 0;
         return 1;
@@ -1063,10 +1071,11 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
                                    NULL,
                                    &count,
                                    *op_p->u.k_iterate_keys.position_p,
+                                   *op_p->u.k_iterate_keys.position_flag_p,
                                    tmp_callback);
     if (ret == -TROVE_ENOENT)
     {
-        *op_p->u.k_iterate_keys.position_p = TROVE_ITERATE_END;
+        *op_p->u.k_iterate_keys.position_flag_p = TROVE_ITERATE_END;
     }
     else if(ret != 0)
     {
@@ -1074,13 +1083,13 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
     }
     else
     {
-        if(*op_p->u.k_iterate_keys.position_p == TROVE_ITERATE_START)
+        if(*op_p->u.k_iterate_keys.position_flag_p == TROVE_ITERATE_START)
         {
-            *op_p->u.k_iterate_keys.position_p = count;
+            (*op_p->u.k_iterate_keys.position_p).count = count;
         }
         else
         {
-            *op_p->u.k_iterate_keys.position_p += count;
+            (*op_p->u.k_iterate_keys.position_p).count += count;
         }
 
         if(count != 0 && *op_p->u.k_iterate_keys.count_p != 0)
@@ -1096,7 +1105,8 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
         {
             for(i=0; i<count; i++)
             {
-                ret = dbpf_keyval_handle_info_ops(op_p, DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
+                ret = dbpf_keyval_handle_info_ops(op_p, 
+                    DBPF_KEYVAL_HANDLE_COUNT_DECREMENT);
                 if(ret < 0)
                 {
                     return(ret);
@@ -1496,7 +1506,8 @@ int PINT_dbpf_keyval_iterate(
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
     int *count,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
+    unsigned int pos_flag,
     PINT_dbpf_keyval_iterate_callback callback)
 {
 
@@ -1525,7 +1536,7 @@ int PINT_dbpf_keyval_iterate(
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    if(pos == TROVE_ITERATE_START)
+    if(pos_flag == TROVE_ITERATE_START)
     {
         ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
         if(ret != 0)
@@ -1724,14 +1735,12 @@ static int dbpf_keyval_iterate_get_first_entry(
 
 static int dbpf_keyval_iterate_skip_to_position(
     TROVE_handle handle,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
     PINT_dbpf_keyval_pcache *pcache,
     DBC * dbc_p)
 {
     int ret = 0;
     TROVE_keyval_s key;
-
-    assert(pos != TROVE_ITERATE_START);
 
     memset(&key, 0, sizeof(TROVE_keyval_s));
 
@@ -1747,7 +1756,7 @@ static int dbpf_keyval_iterate_skip_to_position(
         /* strip the session out of the position; we need to use a true
          * integer offset if we get past the cache
          */
-        pos = pos & 0xffffffff;
+        pos.session = 0;
         return dbpf_keyval_iterate_step_to_position(handle, pos, dbc_p);
     }
 
@@ -1775,14 +1784,12 @@ static int dbpf_keyval_iterate_skip_to_position(
 
 static int dbpf_keyval_iterate_step_to_position(
     TROVE_handle handle,
-    TROVE_ds_position pos,
+    TROVE_kv_position pos,
     DBC * dbc_p)
 {
     int i = 0;
     int ret;
     TROVE_keyval_s key;
-
-    assert(pos != TROVE_ITERATE_START);
 
     ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
     if(ret != 0)
@@ -1790,7 +1797,7 @@ static int dbpf_keyval_iterate_step_to_position(
         return ret;
     }
 
-    for(i = 0; i < pos; ++i)
+    for(i = 0; i < pos.count; ++i)
     {
         memset(&key, 0, sizeof(TROVE_keyval_s));
 

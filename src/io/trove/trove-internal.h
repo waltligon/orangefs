@@ -181,7 +181,8 @@ struct TROVE_keyval_ops
     int (*keyval_iterate)(
 			  TROVE_coll_id coll_id,
 			  TROVE_handle handle,
-			  TROVE_ds_position *inout_position_p,
+			  TROVE_kv_position *inout_position_p,
+			  unsigned int *inout_position_flag_p,
 			  TROVE_keyval_s *out_key_array,
 			  TROVE_keyval_s *out_val_array,
 			  int *inout_count_p,
@@ -195,7 +196,8 @@ struct TROVE_keyval_ops
     int (*keyval_iterate_keys)(
 			       TROVE_coll_id coll_id,
 			       TROVE_handle handle,
-			       TROVE_ds_position *inout_position_p,
+			       TROVE_kv_position *inout_position_p,
+			       unsigned int *inout_position_flag_p,
 			       TROVE_keyval_s *out_key_array,
 			       int *inout_count_p,
 			       TROVE_ds_flags flags,
@@ -300,6 +302,7 @@ struct TROVE_dspace_ops
     int (*dspace_iterate_handles)(
 			 	  TROVE_coll_id coll_id,
 				  TROVE_ds_position *position_p,
+                                  unsigned int *position_flag_p,
 			 	  TROVE_handle *handle_array,
 				  int *inout_count_p,
 		 		  TROVE_ds_flags flags,

@@ -97,7 +97,8 @@ machine pvfs2_client_sysint_readdir_sm
  */
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
-    PVFS_ds_position token, 
+    PVFS_kv_position token, 
+    uint32_t token_flag,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
@@ -142,12 +143,14 @@ PVFS_error PVFS_isys_readdir(
     sm_p->u.readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
+    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), 
+                  &ref.handle);
 
     /* point the sm dirent array and outcount to the readdir response field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
     sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
     sm_p->readdir.token = &resp->token;
+    sm_p->readdir.token_flag = &resp->token;
     sm_p->readdir.directory_version = &resp->directory_version;
 
     sm_p->readdir.pos_token = sm_p->u.readdir.pos_token = token;
@@ -169,7 +172,8 @@ PVFS_error PVFS_isys_readdir(
  */
 PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
-    PVFS_ds_position token, 
+    PVFS_kv_position token, 
+    uint32_t token_flag,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
@@ -180,7 +184,7 @@ PVFS_error PVFS_sys_readdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
 
-    ret = PVFS_isys_readdir(ref, token, pvfs_dirent_incount,
+    ret = PVFS_isys_readdir(ref, token, token_flag, pvfs_dirent_incount,
                             credentials, resp, &op_id, hints, NULL);
     if (ret)
     {
@@ -255,6 +259,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         sm_p->u.readdir.pos_token,
+        sm_p->u.readdir.pos_token_flag,
         sm_p->u.readdir.dirent_limit,
         sm_p->hints);
 
@@ -295,11 +300,14 @@ static int readdir_msg_comp_fn(void *v_p,
 
     /* convert servresp_readdir response to a sysresp_readdir obj */
 
-    *(sm_p->readdir.token) = resp_p->u.readdir.token;
+    memcpy(&(sm_p->readdir.token), &(resp_p->u.readdir.token),
+           sizeof(PVFS_kv_position));
     *(sm_p->readdir.directory_version) =
         resp_p->u.readdir.directory_version;
     *(sm_p->readdir.dirent_outcount) =
         resp_p->u.readdir.dirent_count;
+    *(sm_p->readdir.token_flag( = resp_p->u.readdir.token_flag;
+
     if (*(sm_p->readdir.dirent_outcount) > 0)
     {
         int dirent_array_len =

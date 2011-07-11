@@ -1497,6 +1497,7 @@ collection_remove_failure:
 }
 
 int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+                            unsigned int *inout_position_flag_p,
                             TROVE_keyval_s *name_array,
                             TROVE_coll_id *coll_id_array,
                             int *inout_count_p,
@@ -1513,7 +1514,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
     struct dbpf_collection_db_entry db_entry;
 
     /* if caller passed that they're are at the end, return 0 */
-    if (*inout_position_p == TROVE_ITERATE_END)
+    if (*inout_position_flag_p == TROVE_ITERATE_END)
     {
         *inout_count_p = 0;
         return 1;
@@ -1531,7 +1532,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
     }
 
     /* see keyval iterate for discussion of this implementation */
-    if (*inout_position_p != TROVE_ITERATE_START)
+    if (*inout_position_flag_p == TROVE_ITERATE_AT_POINT )
     {
         /* need to position cursor before reading.  note that this
          * will actually position the cursor over the last thing that
@@ -1543,7 +1544,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
         memset(&key, 0, sizeof(key));
         key.data = name_array[0].buffer;
         key.ulen = name_array[0].buffer_sz;
-        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p;
+        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p.record;
         key.size = sizeof(db_recno_t);
         key.flags |= DB_DBT_USERMEM;
 
@@ -1563,6 +1564,13 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
             ret = -dbpf_db_error_to_trove_error(ret);
             goto return_error;
         }
+    }
+    else if (*inout_position_flag_p != TROVE_ITERATE_START)
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: invalid position_flag_p (%u)\n",
+                     __func__, *inout_position_flag_p);
+        ret = -TROVE_EINVAL;
+        goto return_error;
     }
 
     for (i = 0; i < *inout_count_p; i++)
@@ -1593,7 +1601,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 return_ok:
     if (ret == DB_NOTFOUND)
     {
-        *inout_position_p = TROVE_ITERATE_END;
+        *inout_position_flag_p = TROVE_ITERATE_END;
     }
     else
     {
@@ -1629,9 +1637,8 @@ return_ok:
             ret = -dbpf_db_error_to_trove_error(ret);
         }
 
-        assert(recno != TROVE_ITERATE_START &&
-               recno != TROVE_ITERATE_END);
-        *inout_position_p = recno;
+        *inout_position_p.record = recno;
+        *inout_position_flag_p = TROVE_ITERATE_AT_POINT;
     }
     /*
        'position' points us to the record we just read, or is set to

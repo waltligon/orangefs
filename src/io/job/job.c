@@ -2818,7 +2818,8 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
  */
 int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
                              PVFS_handle handle,
-                             PVFS_ds_position position,
+                             PVFS_kv_position position,
+                             unsigned int position_flag,
                              PVFS_ds_keyval * key_array,
                              int count,
                              PVFS_ds_flags flags,
@@ -2851,6 +2852,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->u.trove.position = position;
+    jd->u.trove.position_flag = position_flag;
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
@@ -2909,6 +2911,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
  */
 int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     PVFS_ds_position position,
+    unsigned int position_flag,
     PVFS_handle* handle_array,
     int count,
     PVFS_ds_flags flags,
@@ -2939,6 +2942,7 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->u.trove.position = position;
+    jd->u.trove.position_flag = position_flag;
     jd->u.trove.count = count;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
@@ -2948,9 +2952,10 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
-                               &(jd->u.trove.position), handle_array,
-                               &(jd->u.trove.count), flags, jd->u.trove.vtag,
-                               user_ptr_internal,
+                               &(jd->u.trove.position), 
+                               &(jd->u.trove.position_flag), handle_array, 
+                               &(jd->u.trove.count), flags, 
+                               jd->u.trove.vtag, user_ptr_internal,
                                global_trove_context, &(jd->u.trove.id));
 #else
     gossip_err("Error: Trove support not enabled.\n");
@@ -6130,7 +6135,8 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
  */
 int job_precreate_pool_iterate_handles(
     PVFS_fs_id fsid,
-    PVFS_ds_position position,
+    PVFS_kv_position position,
+    unsigned int position_flag,
     PVFS_handle* handle_array,
     int count,
     PVFS_ds_flags flags,
@@ -6142,8 +6148,8 @@ int job_precreate_pool_iterate_handles(
     job_context_id context_id,
     PVFS_hint hints)
 {
-    PVFS_ds_position local_position;
-    PVFS_ds_position pool_index;
+    PVFS_kv_position local_position;
+    unsigned int local_position_flag = position_flag;
     struct qlist_head* iterator;
     PVFS_ds_position tmp_index = 1;
     struct precreate_pool* pool = NULL;
@@ -6155,23 +6161,24 @@ int job_precreate_pool_iterate_handles(
     struct fs_pool* fs;
 
     /* low order bits are the trove iterate position */
-    local_position = position & 0xffffffff;
+    local_position.count = position.count;
     /* high order bits tell us which pool we are on */
-    pool_index = position >> 32;
+    local_position.session = position.session;
 
     /* we start indexing at one and reserve 0 for the special start and end
      * values for the entire set of pools
      */
-    if(pool_index == 0)
+    if(local_position.session == 0)
     {
         /* FIX: position stuff changed to use small int and flag */
-        if(local_position == PVFS_ITERATE_START)
+        if(local_position_flag == PVFS_ITERATE_START)
         {
             pool_index = 1;
         }
         else
         {
-            gossip_err("Error: invalid position given to job_precreate_pool_iterate_handles().\n");
+            gossip_err("Error: invalid position given to "
+                       "job_precreate_pool_iterate_handles().\n");
             out_status_p->error_code = -PVFS_EINVAL;
             return(1);
         }
@@ -6188,8 +6195,7 @@ int job_precreate_pool_iterate_handles(
         gen_mutex_unlock(&precreate_pool_mutex);
         out_status_p->error_code = 0;
         out_status_p->count = 0;
-        /* FIX: position stuff changed to use small int and flag */
-        out_status_p->position = PVFS_ITERATE_END;
+        out_status_p->position_flag = PVFS_ITERATE_END;
         return(1);
     }
 
@@ -6210,22 +6216,19 @@ int job_precreate_pool_iterate_handles(
         gen_mutex_unlock(&precreate_pool_mutex);
         out_status_p->error_code = 0;
         out_status_p->count = 0;
-        /* FIX: position stuff changed to use small int and flag */
-        out_status_p->position = PVFS_ITERATE_END;
+        out_status_p->position_flag = PVFS_ITERATE_END;
         return(1);
     }
 
-    /* FIX: position stuff changed to use small int and flag */
-    if(local_position == PVFS_ITERATE_END)
+    if(local_position_flag == PVFS_ITERATE_END)
     {
         /* we got all of the handles out of the pool */
         /* pass back pool handle by itself and go to next pool */
         PVFS_handle_copy(handle_array[0], pool->pool_handle);
         /* skip to next pool */
         pool_index++;
-        out_status_p->position = pool_index << 32;
-        /* FIX: position stuff changed to use small int and flag */
-        out_status_p->position |= PVFS_ITERATE_START;
+        out_status_p->kv_position.session = pool_index;
+        out_status_p->position_flag = PVFS_ITERATE_START;
         out_status_p->count = 1;
         out_status_p->error_code = 0;
         gen_mutex_unlock(&precreate_pool_mutex);
@@ -6240,7 +6243,8 @@ int job_precreate_pool_iterate_handles(
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
-    jd->u.precreate_pool.key_array = malloc(count * sizeof(*jd->u.precreate_pool.key_array));
+    jd->u.precreate_pool.key_array = 
+        malloc(count * sizeof(*jd->u.precreate_pool.key_array));
     if(!jd->u.precreate_pool.key_array)
     {
         gen_mutex_unlock(&precreate_pool_mutex);
@@ -6255,10 +6259,11 @@ int job_precreate_pool_iterate_handles(
     }
     jd->job_user_ptr = user_ptr;
     jd->hints = hints;
-    jd->u.precreate_pool.position = local_position;
+    memcpy(&jd->u.precreate_pool.position, &local_position, 
+           sizeof(PVFS_kv_position));
+    jd->u.precreate_pool.position_flag = local_position_flag;
     jd->u.precreate_pool.count = count;
     jd->u.precreate_pool.precreate_handle_array = handle_array;
-    jd->u.precreate_pool.pool_index = pool_index;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
     jd->trove_callback.fn = precreate_pool_iterate_callback;
@@ -6268,6 +6273,7 @@ int job_precreate_pool_iterate_handles(
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate_keys(fsid, pool->pool_handle,
                                &(jd->u.precreate_pool.position), 
+                               &(jd->u.precreate_pool.position_flag),
                                jd->u.precreate_pool.key_array, 
                                &(jd->u.precreate_pool.count), flags, NULL,
                                user_ptr_internal, 
@@ -6294,8 +6300,9 @@ int job_precreate_pool_iterate_handles(
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        out_status_p->position = pool_index << 32;
-        out_status_p->position |= jd->u.precreate_pool.position;
+        memcpy(out_status_p->kv_position, jd->u.precreate_pool.position,
+               sizeof(PVFS_kv_position));
+        out_status_p->position_flag = jd->u.precreate_pool.position_flag;
         out_status_p->count = jd->u.precreate_pool.count;
         free(jd->u.precreate_pool.key_array);
         dealloc_job_desc(jd);

@@ -922,21 +922,24 @@ struct PVFS_servreq_readdir
 {
     PVFS_handle handle;     /* handle of dir object */
     PVFS_fs_id fs_id;       /* file system */
-    PVFS_ds_position token; /* dir offset */
+    PVFS_kv_position token; /* dir offset */
+    uint32_t token_flag;
     uint32_t dirent_count;  /* desired # of entries */
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_readdir,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     uint32_t, dirent_count,
-    PVFS_ds_position, token);
+    PVFS_kv_position, token,
+    uint32_t, token_flag);
 
 #define PINT_SERVREQ_READDIR_FILL(__req,              \
                                   __creds,            \
                                   __fsid,             \
                                   __handle,           \
                                   __token,            \
+                                  __token_flag,       \
                                   __dirent_count,     \
                                   __hints)            \
 do {                                                  \
@@ -946,21 +949,25 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.readdir.fs_id = (__fsid);               \
     (__req).u.readdir.handle = (__handle);            \
-    (__req).u.readdir.token = (__token);              \
+    memcpy( &(__req).u.readdir.token). &(__token),    \
+            sizeof(PVFS_kv_position);                 \
+    (__req).u.readdir.token_flag = (__token_flag);    \
     (__req).u.readdir.dirent_count = (__dirent_count);\
 } while (0);
 
 struct PVFS_servresp_readdir
 {
-    PVFS_ds_position token;  /* new dir offset */
+    PVFS_kv_position token;  /* new dir offset */
+    uint32_t token_flag;  /* new dir offset */
     /* array of directory entries */
     PVFS_dirent *dirent_array;
     uint32_t dirent_count;   /* # of entries retrieved */
     uint64_t directory_version;
 };
-endecode_fields_3a_struct(
+endecode_fields_4a_struct(
     PVFS_servresp_readdir,
-    PVFS_ds_position, token,
+    PVFS_kv_position, token,
+    uint32_t, token_flag,
     uint64_t, directory_version,
     skip4,,
     uint32_t, dirent_count,
@@ -1589,48 +1596,64 @@ endecode_fields_5a_struct(
 
 /* mgmt_iterate_handles ***************************************/
 /* iterates through handles stored on server */
-
+/* not currently implemented to allow mixing of kv and ds positions,
+ * flags specific which to fill */
 struct PVFS_servreq_mgmt_iterate_handles
 {
     PVFS_fs_id fs_id;
     int32_t handle_count;
     int32_t flags;
-    PVFS_ds_position position;
+    PVFS_kv_position kv_position;
+    PVFS_ds_position ds_position;
+    uint32_t position_flag;
 };
-endecode_fields_4_struct(
+endecode_fields_7_struct(
     PVFS_servreq_mgmt_iterate_handles,
     PVFS_fs_id, fs_id,
     int32_t, handle_count,
     int32_t, flags,
-    PVFS_ds_position, position);
+    PVFS_kv_position, kv_position,
+    PVFS_ds_position, ds_position,
+    skip4,,
+    uint32_t, position_flag);
 
-#define PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(__req,              \
-                                        __creds,                   \
-                                        __fs_id,                   \
-                                        __handle_count,            \
-                                        __position,                \
-                                        __flags,                   \
-                                        __hints)                   \
-do {                                                               \
-    memset(&(__req), 0, sizeof(__req));                            \
-    (__req).op = PVFS_SERV_MGMT_ITERATE_HANDLES;                   \
-    (__req).credentials = (__creds);                               \
-    (__req).hints = (__hints);                                     \
-    (__req).u.mgmt_iterate_handles.fs_id = (__fs_id);              \
-    (__req).u.mgmt_iterate_handles.handle_count = (__handle_count);\
-    (__req).u.mgmt_iterate_handles.position = (__position),        \
-    (__req).u.mgmt_iterate_handles.flags = (__flags);              \
+#define PINT_SERVREQ_MGMT_ITERATE_HANDLES_FILL(__req,                 \
+                                        __creds,                      \
+                                        __fs_id,                      \
+                                        __handle_count,               \
+                                        __kv_position,                \
+                                        __ds_position,                \
+                                        __position_flag,              \
+                                        __flags,                      \
+                                        __hints)                      \
+do {                                                                  \
+    memset(&(__req), 0, sizeof(__req));                               \
+    (__req).op = PVFS_SERV_MGMT_ITERATE_HANDLES;                      \
+    (__req).credentials = (__creds);                                  \
+    (__req).hints = (__hints);                                        \
+    (__req).u.mgmt_iterate_handles.fs_id = (__fs_id);                 \
+    (__req).u.mgmt_iterate_handles.handle_count = (__handle_count);   \
+    (__req).u.mgmt_iterate_handles.position_flag = (__position_flag); \
+    memcpy(&(__req).u.mgmt_iterate_handles.kv_position,               \
+            &(__position_flag), sizeof(PVFS_kv_position));            \
+    memcpy(&(__req).u.mgmt_iterate_handles.ds_position,               \
+            &(__position_flag), sizeof(PVFS_ds_position));            \
+    (__req).u.mgmt_iterate_handles.flags = (__flags);                 \
 } while (0)
 
 struct PVFS_servresp_mgmt_iterate_handles
 {
-    PVFS_ds_position position;
+    PVFS_kv_position kv_position;
+    PVFS_ds_position ds_position;
+    unsigned int position_flag;
     PVFS_handle *handle_array;
     int handle_count;
 };
-endecode_fields_2a_struct(
+endecode_fields_4a_struct(
     PVFS_servresp_mgmt_iterate_handles,
-    PVFS_ds_position, position,
+    PVFS_kv_position, kv_position,
+    PVFS_ds_position, ds_position,
+    uint32_t, position_flag, 
     skip4,,
     int32_t, handle_count,
     PVFS_handle, handle_array);
@@ -1862,18 +1885,20 @@ do {                                       \
 
 struct PVFS_servreq_listeattr
 {
-    PVFS_handle handle;     /* handle of dir object */
-    PVFS_fs_id  fs_id;      /* file system */
-    PVFS_ds_position token; /* offset */
-    uint32_t     nkey;      /* desired number of keys to read */
-    PVFS_size   *keysz;     /* array of key buffer sizes */
+    PVFS_handle handle;         /* handle of dir object */
+    PVFS_fs_id  fs_id;          /* file system */
+    PVFS_kv_position token;     /* offset */
+    uint32_t    token_flag;    /* flags defining token meaning */
+    uint32_t    nkey;           /* desired number of keys to read */
+    PVFS_size   *keysz;         /* array of key buffer sizes */
 };
-endecode_fields_4a_struct(
+endecode_fields_5a_struct(
     PVFS_servreq_listeattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    PVFS_kv_position, token,
     skip4,,
-    PVFS_ds_position, token,
+    uint32_t, token_flag,
     uint32_t, nkey,
     PVFS_size, keysz);
 #define extra_size_PVFS_servreq_listeattr \
@@ -1884,6 +1909,7 @@ endecode_fields_4a_struct(
                                   __fsid,             \
                                   __handle,           \
                                   __token,            \
+                                  __token_flag,       \
                                   __nkey,             \
                                   __size_array,       \
                                   __hints)            \
@@ -1894,21 +1920,25 @@ do {                                                  \
     (__req).hints = (__hints);                        \
     (__req).u.listeattr.fs_id = (__fsid);             \
     (__req).u.listeattr.handle = (__handle);          \
-    (__req).u.listeattr.token = (__token);            \
+    memcpy( &(__req).u.listeattr.token, &(__token),   \
+           sizeof(PVFS_kv_position));                 \
+    (__req).u.listeattr.token_flag = (__token_flag);  \
     (__req).u.listeattr.nkey = (__nkey);              \
     (__req).u.listeattr.keysz = (__size_array);       \
 } while (0);
 
 struct PVFS_servresp_listeattr
 {
-    PVFS_ds_position token;  /* new dir offset */
+    PVFS_kv_position token;  /* new dir offset */
+    uint32_t token_flag;
     uint32_t nkey;   /* # of keys retrieved */
     PVFS_ds_keyval *key; /* array of keys returned */
 };
-endecode_fields_2a_struct(
+endecode_fields_3a_struct(
     PVFS_servresp_listeattr,
-    PVFS_ds_position, token,
+    PVFS_kv_position, token,
     skip4,,
+    uint32_t, token_flag,
     uint32_t, nkey,
     PVFS_ds_keyval, key);
 #define extra_size_PVFS_servresp_listeattr \

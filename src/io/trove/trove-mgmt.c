@@ -225,6 +225,7 @@ int trove_collection_lookup(TROVE_method_id method_id,
 
 int trove_collection_iterate(TROVE_method_id method_id,
                              TROVE_ds_position *inout_position_p,
+                             unsigned int *inout_position_flag_p,
                              TROVE_keyval_s *name_array,
                              TROVE_coll_id *coll_id_array,
                              int *inout_count_p,
@@ -234,8 +235,8 @@ int trove_collection_iterate(TROVE_method_id method_id,
                              TROVE_op_id *out_op_id_p)
 {
     int ret = mgmt_method_table[method_id]->collection_iterate(
-        inout_position_p, name_array, coll_id_array, inout_count_p,
-        flags, vtag, user_ptr, out_op_id_p);
+        inout_position_p, inout_position_flag_pname_array, coll_id_array, 
+        inout_count_p, flags, vtag, user_ptr, out_op_id_p);
 
     return ((ret < 0) ? ret : 1);
 }

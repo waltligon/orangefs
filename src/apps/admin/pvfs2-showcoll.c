@@ -256,8 +256,10 @@ static int print_dspaces(TROVE_coll_id coll_id,
     TROVE_handle harray[64];
     TROVE_op_id op_id;
     TROVE_ds_state state;
-
-    pos = TROVE_ITERATE_START;
+    unsigned int pos_flag;
+   
+    PVFS_handle_clear(pos);
+    pos_flag = TROVE_ITERATE_START;
     count = 64;
 
     while (count > 0) {
@@ -265,6 +267,7 @@ static int print_dspaces(TROVE_coll_id coll_id,
 
 	ret = trove_dspace_iterate_handles(coll_id,
 					   &pos,
+                                           &pos_flag,
 					   harray,
 					   &count,
 					   0 /* flags */,

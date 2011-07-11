@@ -35,8 +35,9 @@
 
 enum
 {
-    TROVE_ITERATE_START = PVFS_ITERATE_START,
-    TROVE_ITERATE_END   = PVFS_ITERATE_END 
+    TROVE_ITERATE_START     = PVFS_ITERATE_START,
+    TROVE_ITERATE_END       = PVFS_ITERATE_END,
+    TROVE_ITERATE_AT_POINT  = PVFS_ITERATE_AT_POINT
 };
 
 enum
@@ -156,6 +157,7 @@ int trove_collection_lookup(
 int trove_collection_iterate(
     TROVE_method_id method_id,
     TROVE_ds_position *inout_position_p,
+    unsigned int *inout_position_flag_p,
     TROVE_keyval_s *name_array,
     TROVE_coll_id *coll_id_array,
     int *inout_count_p,
@@ -302,7 +304,8 @@ int trove_keyval_validate(
 int trove_keyval_iterate(
 			 TROVE_coll_id coll_id,
 			 TROVE_handle handle,
-			 TROVE_ds_position *position_p,
+			 TROVE_kv_position *position_p,
+                         unsigned int *position_flag_p,
 			 TROVE_keyval_s *key_array,
 			 TROVE_keyval_s *val_array,
 			 int *inout_count_p,
@@ -316,7 +319,8 @@ int trove_keyval_iterate(
 int trove_keyval_iterate_keys(
 			      TROVE_coll_id coll_id,
 			      TROVE_handle handle,
-			      TROVE_ds_position *position_p,
+			      TROVE_kv_position *position_p,
+                              unsigned int *position_flag_p,
 			      TROVE_keyval_s *key_array,
 			      int *inout_count_p,
 			      TROVE_ds_flags flags,
@@ -425,6 +429,7 @@ int trove_dspace_remove_list(TROVE_coll_id coll_id,
 
 int trove_dspace_iterate_handles(TROVE_coll_id coll_id,
 				 TROVE_ds_position *position_p,
+                                 unsigned int *position_flag_p,
 				 TROVE_handle *handle_array,
 				 int *inout_count_p,
 				 TROVE_ds_flags flags,

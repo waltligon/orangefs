@@ -161,6 +161,7 @@ static PINT_sm_action listeattr_list_eattrib(
         s_op->req->u.listeattr.fs_id,
         s_op->req->u.listeattr.handle,
         s_op->req->u.listeattr.token,
+        s_op->req->u.listeattr.token_flag,
         s_op->resp.u.listeattr.key,
         s_op->req->u.listeattr.nkey,
         0,
@@ -211,7 +212,7 @@ static PINT_sm_action listeattr_check_resp(
     /* Nothing was requested? then fill token to hold the max available keys */
     if (s_op->resp.u.listeattr.nkey == 0)
     {
-        s_op->resp.u.listeattr.token = js_p->count;
+        s_op->resp.u.listeattr.token.count = js_p->count;
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -223,7 +224,8 @@ static PINT_sm_action listeattr_check_resp(
         num_found = s_op->resp.u.listeattr.nkey;
     }
 
-    s_op->resp.u.listeattr.token = js_p->position;
+    memcpy(&(s_op->resp.u.listeattr.token.count), &(js_p->kv_position.count),
+           sizeof(PVFS_kv_position));
     s_op->resp.u.listeattr.nkey = num_found;
 
     if(num_found == 0)

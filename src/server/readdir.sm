@@ -194,15 +194,15 @@ static PINT_sm_action readdir_iterate_on_entries(
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
-        "\n\ttoken=%llu, count=%d\n",
+        "\n\ttoken_flag=%u, count=%d\n",
         llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
-        llu(s_op->req->u.readdir.token),
+        s_op->req->u.readdir.token_flag,
         s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(
         s_op->req->u.readdir.fs_id, s_op->u.readdir.dirent_handle,
-        s_op->req->u.readdir.token, s_op->key_a, s_op->val_a,
-        s_op->req->u.readdir.dirent_count, 
+        s_op->req->u.readdir.token, s_op->req->u.readdir.token_flag,
+        s_op->key_a, s_op->val_a, s_op->req->u.readdir.dirent_count, 
         0, 
         NULL, smcb, 0, js_p,
         &j_id, server_job_context, s_op->req->hints);
@@ -238,7 +238,10 @@ static PINT_sm_action readdir_setup_resp(
      * to fill this and send it back because the system
      * interface users could break because of this...
      */
-    s_op->resp.u.readdir.token = js_p->position;
+    memcpy(&s_op->resp.u.readdir.token, &js_p->kv_position, 
+           sizeof(TROVE_kv_position));
+    s_op->resp.u.readdir.token_flag = js_p->position_flag;
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

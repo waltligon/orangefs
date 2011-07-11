@@ -431,9 +431,12 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
     int               i, j, k;
     int               outstanding_op_count;
     int               immediate_completion;
+    unsigned int      pos_flag;
 
     base_count = 10000;
-    
+   
+    TROVE_handle_clear(pos);
+
     handles = malloc(sizeof(TROVE_handle)*base_count);
     if (!handles)
     {
@@ -505,7 +508,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
         goto complete;
     }
 
-    pos = TROVE_ITERATE_START;
+    pos_flag = TROVE_ITERATE_START;
 
     do
     {
@@ -514,6 +517,7 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
 
         ret = trove_dspace_iterate_handles(coll_id,
                                            &pos,
+                                           &pos_flag,
                                            handles,
                                            &handle_count,
                                            0,
@@ -524,8 +528,8 @@ static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
         if (ret < 0)
         {
             gossip_err("trove_dspace_iterate_handles failed: \
-ret=%d coll=%d pos=%lld handles=%p count=%d context=%lld op=%lld\n",
-                       ret, coll_id, llu(pos), handles, handle_count,
+ret=%d coll=%d pos_flag=%lld handles=%p count=%d context=%lld op=%lld\n",
+                       ret, coll_id, llu(pos_flag), handles, handle_count,
                        llu(context_id), llu(iterate_op_id));
             goto complete;
         }

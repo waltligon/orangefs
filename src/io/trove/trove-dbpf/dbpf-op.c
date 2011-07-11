@@ -40,7 +40,7 @@ void dbpf_queued_op_init(
     q_op_p->state = 0;
     q_op_p->op.type = type;
     q_op_p->op.state = OP_NOT_QUEUED;
-    q_op_p->op.handle = handle;
+    TROVE_handle_copy(q_op_p->op.handle, handle);
     q_op_p->op.coll_p = coll_p;
     q_op_p->op.svc_fn = svc_fn;
     q_op_p->op.user_ptr = user_ptr;

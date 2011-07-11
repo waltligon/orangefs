@@ -39,6 +39,8 @@ typedef PVFS_ds_flags              TROVE_ds_flags;
 typedef PVFS_ds_keyval             TROVE_keyval_s;
 typedef PVFS_ds_keyval_handle_info TROVE_keyval_handle_info;
 typedef PVFS_ds_position           TROVE_ds_position;
+typedef PVFS_kv_position           TROVE_kv_position;
+typedef PVFS_rec_position          TROVE_rec_position;
 typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
 typedef PVFS_ds_attributes         TROVE_ds_attributes;
 typedef PVFS_error                 TROVE_ds_state;
@@ -49,7 +51,7 @@ typedef PVFS_object_ref            TROVE_object_ref;
 
 /* PVFS_handle to TROVE_handle helper function mappings */
 #define TROVE_handle_clear(u)           PVFS_handle_clear(u)
-#define TROVE_handle_compare(u1, u2)    PVFS_handle_compuare(u1, u2)
+#define TROVE_handle_compare(u1, u2)    PVFS_handle_compare(u1, u2)
 #define TROVE_handle_copy(dst, src)     PVFS_handle_copy(dst, src)
 #define TROVE_handle_generate(u)        PVFS_handle_generate(u)
 #define TROVE_handle_is_null(u)         PVFS_handle_is_null(u)

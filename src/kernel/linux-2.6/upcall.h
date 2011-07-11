@@ -87,6 +87,7 @@ typedef struct
 {
     PVFS_object_ref refn;
     PVFS_ds_position token;
+    uint32_t token_flag;
     int32_t max_dirent_count;
     int32_t buf_index;
 } pvfs2_readdir_request_t;

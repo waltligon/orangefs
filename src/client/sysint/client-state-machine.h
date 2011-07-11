@@ -268,7 +268,8 @@ struct PINT_client_flush_sm
 
 struct PINT_client_readdir_sm
 {
-    PVFS_ds_position pos_token;         /* input parameter */
+    PVFS_kv_position pos_token;         /* input parameter */
+    unsigned int pos_token_flag;        /* input parameter */
     int dirent_limit;                   /* input parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
 };
@@ -281,7 +282,8 @@ struct handle_to_index {
 
 struct PINT_client_readdirplus_sm
 {
-    PVFS_ds_position pos_token;         /* input parameter */
+    PVFS_kv_position pos_token;         /* input parameter */
+    unsigned int pos_token_flag;        /* input parameter */
     int dirent_limit;                   /* input parameter */
     int attrmask;                       /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
