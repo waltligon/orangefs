@@ -1234,6 +1234,7 @@ static int PINT_handle_wrangler_load_handles(
             goto load_handles_error;
         }
 
+        /* FIX: position stuff changed to use small int and flag */
         position_array[i] = PVFS_ITERATE_START;
         handle_count_array[i] = HANDLE_BATCH;
     }
@@ -1276,6 +1277,7 @@ static int PINT_handle_wrangler_load_handles(
                 handle_count_array[i];
 
             /* are there more handles? */
+            /* FIX: position stuff changed to use small int and flag */
             if (position_array[i] != PVFS_ITERATE_END)
             {
                 more_handles = 1;
@@ -1298,6 +1300,7 @@ static int PINT_handle_wrangler_load_handles(
     /* now look for reserved handles from each server */
     for (i = 0; i < server_count; i++)
     {
+        /* FIX: position stuff changed to use small int and flag */
         position_array[i] = PVFS_ITERATE_START;
         handle_count_array[i] = HANDLE_BATCH;
     }
@@ -1334,6 +1337,7 @@ static int PINT_handle_wrangler_load_handles(
             }
 
             /* are there more handles? */
+            /* FIX: position stuff changed to use small int and flag */
             if (position_array[i] != PVFS_ITERATE_END)
             {
                 more_handles = 1;

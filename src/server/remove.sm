@@ -269,6 +269,7 @@ static PINT_sm_action remove_get_dirent_count(
     ret = job_trove_keyval_iterate_keys(
         s_op->req->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
+        /* FIX: position stuff changed to use small int and flag */
         PVFS_ITERATE_START,
         &s_op->u.remove.key,
         1,

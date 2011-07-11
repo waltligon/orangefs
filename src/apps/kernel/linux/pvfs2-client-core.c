@@ -2721,6 +2721,7 @@ static inline void package_downcall_members(
                     vfs_request->response.listeattr.nkey;
                 if (vfs_request->in_upcall.req.listxattr.requested_count == 0)
                 {
+                    /* FIX: position stuff changed to use small int and flag */
                     vfs_request->out_downcall.resp.listxattr.token = 
                         PVFS_ITERATE_START;
                 }

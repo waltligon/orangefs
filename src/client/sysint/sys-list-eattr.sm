@@ -264,6 +264,7 @@ static int list_eattr_comp_fn(
                 sm_p->u.listeattr.resp_p->nkey);
         /* Copy the token and reset it */
         sm_p->u.listeattr.resp_p->nkey = sm_p->u.listeattr.resp_p->token;
+        /* FIX: position stuff changed to use small int and flag */
         sm_p->u.listeattr.resp_p->token = PVFS_ITERATE_START;
         return 0;
     }

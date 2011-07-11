@@ -102,6 +102,7 @@ int pvfs2_listeattr(int nkey, PVFS_ds_keyval *key_p,
   PVFS_sysresp_listeattr resp_listeattr;
   PVFS_object_ref parent_ref;
   PVFS_credentials credentials;
+  /* FIX: position stuff changed to use small int and flag */
   PVFS_ds_position token = PVFS_ITERATE_START;
 
   /* translate local path into pvfs2 relative path */

@@ -736,7 +736,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
          */
         memset(&key, 0, sizeof(key));
         /* FIX: position_p stuff is broken */
-        //dummy_handle, = *op_p->u.d_iterate_handles.position_p;
+        dummy_handle = *op_p->u.d_iterate_handles.position_p;
         key.data  = &dummy_handle;
         key.size  = key.ulen = sizeof(TROVE_handle);
         key.flags |= DB_DBT_USERMEM;
@@ -780,12 +780,14 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
             gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)op_p->u.d_iterate_handles.position_p));
+                       llu(*(TROVE_handle *)
+                           op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
     }
 
-    op_p->u.d_iterate_handles.handle_array[i] = dummy_handle;
+    PVFS_handle_copy(op_p->u.d_iterate_handles.handle_array[i],
+                     dummy_handle);
     ++i;
 
     start_size = ((sizeof(TROVE_handle) + sizeof(attr)) *
@@ -872,16 +874,19 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             if(sizeof_handle != sizeof(TROVE_handle) ||
                sizeof_attr != sizeof(attr))
             {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: got invalid handle or key size in "
+                           "dbpf_dspace_iterate_handles().\n");
                 gossip_err("Warning: skipping entry.\n");
                 i--;
                 continue;
             }
 
             /* check for duplicates */
-            if(i > 0 && *(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[i-1])
+            if(i > 0 && *(TROVE_handle*)tmp_handle == 
+                          op_p->u.d_iterate_handles.handle_array[i-1])
             {
-                gossip_err("Warning: got duplicate handle %llu.\n", llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: got duplicate handle %llu.\n", 
+                           llu(*(TROVE_handle*)tmp_handle));
                 gossip_err("Warning: skipping entry.\n");
                 i--;
                 continue;
@@ -908,7 +913,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             if(sizeof_handle != sizeof(TROVE_handle) ||
                sizeof_attr != sizeof(attr))
             {
-                gossip_err("Warning: got invalid handle or key size in dbpf_dspace_iterate_handles().\n");
+                gossip_err("Warning: got invalid handle or key size in "
+                           "dbpf_dspace_iterate_handles().\n");
                 gossip_err("Warning: skipping entry.\n");
             }
             DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
@@ -919,9 +925,12 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                 goto get_next;
             }
 
-            if(*(TROVE_handle*)tmp_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+            if(*(TROVE_handle*)tmp_handle == 
+                op_p->u.d_iterate_handles.handle_array[
+                    *op_p->u.d_iterate_handles.count_p])
             {
-                gossip_err("Warning: found duplicate handle: %llu\n", llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: found duplicate handle: %llu\n", 
+                           llu(*(TROVE_handle*)tmp_handle));
                 gossip_err("Warning: skipping entry.\n");
             }
 

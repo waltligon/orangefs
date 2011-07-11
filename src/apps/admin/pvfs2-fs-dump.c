@@ -346,6 +346,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     for (i=0; i < server_count; i++)
     {
 	hcount_array[i] = HANDLE_BATCH;
+        /* FIX: position stuff changed to use small int and flag */
 	position_array[i] = PVFS_ITERATE_START;
     }
 
@@ -403,6 +404,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 	more_flag = 0;
 	for (i = 0; i < server_count; i++)
 	{
+            /* FIX: position stuff changed to use small int and flag */
 	    if (position_array[i] != PVFS_ITERATE_END)
 	    {
 		more_flag = 1;

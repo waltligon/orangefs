@@ -180,6 +180,7 @@ static PINT_sm_action mgmt_iterate_handles_list_setup_msgpair(
 skipped:
 	/* skip servers that have already reached end */
 	/* TODO: use a better #define or something for ITERATE_END */
+        /* FIX: position stuff changed to use small int and flag */
 	if(sm_p->u.iterate_handles_list.position_array[j]
 	    == PVFS_ITERATE_END)
 	{

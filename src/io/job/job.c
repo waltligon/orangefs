@@ -6032,6 +6032,7 @@ static void precreate_pool_get_handles_try_post(struct job_desc* jd)
             struct precreate_pool, list_link);
 
         tmp_trove_array[i].jd = jd;
+        /* FIX: position stuff changed to use small int and flag */
         tmp_trove_array[i].pos = PVFS_ITERATE_START;
         tmp_trove_array[i].count = 1;
         tmp_trove_array[i].key.buffer 
@@ -6163,6 +6164,7 @@ int job_precreate_pool_iterate_handles(
      */
     if(pool_index == 0)
     {
+        /* FIX: position stuff changed to use small int and flag */
         if(local_position == PVFS_ITERATE_START)
         {
             pool_index = 1;
@@ -6186,6 +6188,7 @@ int job_precreate_pool_iterate_handles(
         gen_mutex_unlock(&precreate_pool_mutex);
         out_status_p->error_code = 0;
         out_status_p->count = 0;
+        /* FIX: position stuff changed to use small int and flag */
         out_status_p->position = PVFS_ITERATE_END;
         return(1);
     }
@@ -6207,10 +6210,12 @@ int job_precreate_pool_iterate_handles(
         gen_mutex_unlock(&precreate_pool_mutex);
         out_status_p->error_code = 0;
         out_status_p->count = 0;
+        /* FIX: position stuff changed to use small int and flag */
         out_status_p->position = PVFS_ITERATE_END;
         return(1);
     }
 
+    /* FIX: position stuff changed to use small int and flag */
     if(local_position == PVFS_ITERATE_END)
     {
         /* we got all of the handles out of the pool */
@@ -6219,6 +6224,7 @@ int job_precreate_pool_iterate_handles(
         /* skip to next pool */
         pool_index++;
         out_status_p->position = pool_index << 32;
+        /* FIX: position stuff changed to use small int and flag */
         out_status_p->position |= PVFS_ITERATE_START;
         out_status_p->count = 1;
         out_status_p->error_code = 0;

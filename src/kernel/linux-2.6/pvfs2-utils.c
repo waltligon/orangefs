@@ -1089,6 +1089,7 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
     }
     if (inode)
     {
+        /* FIX: position stuff changed to use small int and flag */
         PVFS_ds_position token = PVFS_ITERATE_START;
 
         pvfs2_inode = PVFS2_I(inode);
@@ -1164,6 +1165,7 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
                 }
                 /* Since the buffer was large enough, we might have to continue fetching more keys! */
                 token = new_op->downcall.resp.listxattr.token;
+                /* FIX: position stuff changed to use small int and flag */
                 if (token != PVFS_ITERATE_END)
                     goto try_again;
             }
