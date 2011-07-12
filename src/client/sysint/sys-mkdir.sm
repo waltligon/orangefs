@@ -662,8 +662,13 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
+#ifdef WIN32
+        _snprintf((char*)sm_p->u.mkdir.val_array[cur_index].buffer,
+            16, "%d", sm_p->getattr.attr.u.dir.hint.dfile_count);
+#else
         snprintf((char*)sm_p->u.mkdir.val_array[cur_index].buffer,
             16, "%d", sm_p->getattr.attr.u.dir.hint.dfile_count);
+#endif
         sm_p->u.mkdir.val_array[cur_index].buffer_sz = 
             strlen((char*)sm_p->u.mkdir.val_array[cur_index].buffer) + 1;
 

@@ -14,7 +14,9 @@
 
 #include <stdio.h>
 #include <errno.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -86,7 +88,7 @@ int main(
 
     /* set debugging stuff */
     gossip_enable_stderr();
-    gossip_set_debug_mask(0, GOSSIP_BMI_DEBUG_ALL);
+    gossip_set_debug_mask(1, GOSSIP_BMI_DEBUG_ALL);
 
     /* convert address to bmi method type by prefixing bmi_ */
     cp = strchr(user_opts->hostid, ':');
@@ -98,7 +100,7 @@ int main(
     method[4+len] = '\0';
 
     /* initialize local interface */
-    ret = BMI_initialize(method, NULL, 0);
+    ret = BMI_initialize(NULL, NULL, 0);
     if (ret < 0)
     {
 	errno = -ret;
@@ -326,7 +328,74 @@ int main(
     return (0);
 }
 
+#ifdef WIN32
+static struct options *parse_args(
+    int argc,
+    char *argv[])
+{
+    int argi = 1;
 
+    /* getopt stuff */
+    char flags[] = "h:";
+    int one_opt = 0;
+
+    struct options *tmp_opts = NULL;
+    int len = -1;
+
+    /* create storage for the command line options */
+    tmp_opts = (struct options *) malloc(sizeof(struct options));
+    if (!tmp_opts)
+    {
+	goto parse_args_error;
+    }
+
+    tmp_opts->hostid = NULL;
+
+    /* look at command line arguments */
+    while (argi < argc)
+    {
+        if (strcmp(argv[argi], "-h") == 0)
+        {
+            len = strlen(argv[++argi]) + 1;
+            tmp_opts->hostid = (char *) malloc(len);
+            if (tmp_opts->hostid == NULL)
+            {
+                goto parse_args_error;
+            }
+            memcpy(tmp_opts->hostid, argv[argi], len);
+            argi++;
+        }
+        else {
+            goto parse_args_error;
+        }
+    }
+
+    /* if we didn't get a host argument, fill in a default: */
+    if (tmp_opts->hostid == NULL) {
+        len = (strlen(DEFAULT_HOSTID)) + 1;
+        if ((tmp_opts->hostid = (char *) malloc(len)) == NULL)
+        {
+            goto parse_args_error;
+        }
+        memcpy(tmp_opts->hostid, DEFAULT_HOSTID, len);
+    }
+
+    return (tmp_opts);
+
+  parse_args_error:
+
+    /* if an error occurs, just free everything and return NULL */
+    if (tmp_opts)
+    {
+	if (tmp_opts->hostid)
+	{
+	    free(tmp_opts->hostid);
+	}
+	free(tmp_opts);
+    }
+    return (NULL);
+}
+#else
 static struct options *parse_args(
     int argc,
     char *argv[])
@@ -391,6 +460,7 @@ static struct options *parse_args(
     }
     return (NULL);
 }
+#endif
 
 /*
  * Local variables:

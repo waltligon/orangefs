@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -154,6 +156,77 @@ int PINT_server_get_config(
     return(error);
 }
 
+#ifdef WIN32
+static int server_parse_config(
+    struct server_configuration_s *config,
+    char *fs_config_buf,
+    uint32_t fs_config_buf_size)
+{
+    int ret = 1, template_index = 1;
+    char temp_path[MAX_PATH], temp_file[MAX_PATH];
+    DWORD rc = 1, use_temp_path, bytes;
+    HANDLE hFile;
+
+    if (config == NULL)
+    {
+        return ret;
+    }
+
+    assert(fs_config_buf);
+
+    /* get the path to the TEMP directory */
+    use_temp_path = GetTempPath(MAX_PATH, temp_path);
+    if (use_temp_path)
+    {
+        /* get temporary file name in TEMP directory */
+        use_temp_path = GetTempFileName(temp_path, 
+                                        "__pvfs_fs_config", 0, temp_file);
+    }
+
+    if (!use_temp_path)
+    {
+        /* get temporary file name in current directory */
+        rc = GetTempFileName(".", "__pvfs_fs_config", 0, temp_file);
+    }
+
+    if (!rc)
+    {
+        gossip_err("Error: Cannot create temporary "
+                   "configuration files!\n");
+        return ret;
+    }
+
+    hFile = CreateFile(temp_file, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                       FILE_ATTRIBUTE_NORMAL, NULL);
+
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        gossip_err("Error: Cannot create temporary "
+                   "configuration files!\n");
+        return ret;
+    }
+
+    assert(!fs_config_buf[fs_config_buf_size - 1]);
+
+    rc = WriteFile(hFile, fs_config_buf, fs_config_buf_size - 1, &bytes, NULL);
+    
+    CloseHandle(hFile);
+    
+    if (rc && (bytes == fs_config_buf_size - 1))
+    {
+        ret = PINT_parse_config(config, temp_file, NULL);
+    }
+    else
+    {
+        gossip_err("Failed to write fs.conf buffer to temp file: %s: %d\n",
+                   temp_file, GetLastError());
+    }    
+
+    DeleteFile(temp_file);
+
+    return ret;
+}
+#else
 static int server_parse_config(
     struct server_configuration_s *config,
     char *fs_config_buf,
@@ -209,6 +282,7 @@ static int server_parse_config(
     }
     return ret;
 }
+#endif
 
 static PINT_sm_action server_get_config_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)

@@ -8,10 +8,16 @@
 #include <stdlib.h>
 #include <client.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+
+#ifdef WIN32
+#define snprintf    _snprintf
+#endif
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations

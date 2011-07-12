@@ -200,9 +200,13 @@ static int mgmt_remove_object_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
     PINT_smcb *smcb = v_p;
+#ifdef WIN32
+    PINT_client_sm *sm_p =
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+#else
     PINT_client_sm *sm_p __attribute__((unused)) =
         PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
-
+#endif
     assert(resp_p->op == PVFS_SERV_MGMT_REMOVE_OBJECT);
 
     if (resp_p->status == 0)

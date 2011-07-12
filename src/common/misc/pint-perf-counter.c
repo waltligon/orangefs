@@ -12,7 +12,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <time.h>
@@ -559,6 +561,9 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
     uint64_t int_time;
     time_t tmp_time_t;
     struct tm tmp_tm;
+#ifdef WIN32
+    struct tm *ptmp_tm;
+#endif
     int ret;
     struct PINT_perf_sample *s = NULL;
 
@@ -599,7 +604,12 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
         if(start_i)
         {
             tmp_time_t = start_i / 1000;
+#ifdef WIN32
+            ptmp_tm = localtime(&tmp_time_t);
+            tmp_tm = *ptmp_tm;
+#else
             localtime_r(&tmp_time_t, &tmp_tm);
+#endif
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", (unsigned)(start_i % 1000));
@@ -630,7 +640,11 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
         if(interval_i)
         {
             tmp_time_t = interval_i / 1000;
+#ifdef WIN32
+            gmtime_s(&tmp_tm, &tmp_time_t);
+#else
             gmtime_r(&tmp_time_t, &tmp_tm);
+#endif
             strftime(position, 11, "  %H:%M:%S", &tmp_tm);
             position += 10;
             sprintf(position, ".%03u", (unsigned)(interval_i % 1000));
@@ -663,7 +677,11 @@ char *PINT_perf_generate_text( struct PINT_perf_counter* pc,
         position += 25;
         for(j = 0, s = pc->sample; j < pc->history_size && s; j++, s = s->next)
         {
+#ifdef WIN32
+            ret = _snprintf(position, 15, " %13Ld", lld(s->value[i]));
+#else
             ret = snprintf(position, 15, " %13Ld", lld(s->value[i]));
+#endif
             if(ret >= 15)
             {
                 sprintf(position, "%14.14s", "Overflow!");

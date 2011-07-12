@@ -22,7 +22,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "acache.h"
 #include "ncache.h"

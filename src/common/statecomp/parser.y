@@ -18,6 +18,10 @@
 
 #include "statecomp.h"
 
+#ifdef WIN32
+#define _STDLIB_H  /* mark stdlib.h included */
+#endif
+
 /* We never use this, disable default. */
 #define YY_LOCATION_PRINT 0
 

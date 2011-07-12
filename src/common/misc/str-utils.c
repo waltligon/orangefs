@@ -11,6 +11,14 @@
 #include <ctype.h>
 #include <assert.h>
 
+#ifdef WIN32
+#include "wincommon.h"
+
+#define index(s, c)    strchr(s, c)
+#define snprintf(b, c, f, ...)    _snprintf(b, c, f, __VA_ARGS__)
+#define strdup(s)    _strdup(s)
+#endif
+
 #include "str-utils.h"
 
 /* PINT_string_count_segments()
@@ -219,7 +227,9 @@ int PINT_parse_handle_ranges(
        `\0' but **endptr is `\0' on return, the entire string  is
        valid.  */ 
     out_extent->first = out_extent->last =
-#ifdef HAVE_STRTOULL
+#if defined(WIN32)
+        (PVFS_handle)_strtoui64(p, &endchar, 0);
+#elif defined(HAVE_STRTOULL)
         (PVFS_handle)strtoull(p, &endchar, 0);
 #else
         (PVFS_handle)strtoul(p, &endchar, 0);
@@ -234,7 +244,9 @@ int PINT_parse_handle_ranges(
 
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
-#ifdef HAVE_STRTOULL
+#if defined(WIN32)
+        out_extent->last = (PVFS_handle)_strtoui64(p, &endchar, 0);
+#elif defined(HAVE_STRTOULL)
 	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
 #else
 	    out_extent->last = (PVFS_handle)strtoul(p, &endchar, 0);
@@ -335,7 +347,7 @@ int PINT_get_next_path(char *path, char **newpath, int skip)
         return (-PVFS_EINVAL);
     }
 
-    *newpath = malloc(pathlen - delimiter1);
+    *newpath = (char *) malloc(pathlen - delimiter1);
     if (*newpath == NULL)
     {
         return (-PVFS_ENOMEM);
@@ -523,6 +535,140 @@ int PINT_remove_base_dir(
     return ret;
 }
 
+#if 0
+/* Initial Windows version -- not yet sure about file path format */
+/* PINT_remove_dir_prefix()
+ * 
+ * Strips prefix directory out of the path, output includes beginning
+ * backslash
+ *
+ * path and prefix must start with \\path or X:\
+ *
+ * Parameters:
+ * pathname     - pointer to directory string (absolute)
+ * prefix       - pointer to prefix dir string (absolute)
+ * out_path     - pointer to output dir string
+ * max_out_len  - max length of out_base_dir buffer
+ *
+ * All incoming arguments must be valid and non-zero
+ *
+ * Returns 0 on success; -errno on failure
+ *
+ * Example inputs and outputs/return values:
+ *
+ * pathname: \\mnt\pvfs2\foo, prefix: \\mnt\pvfs2
+ *     out_path: \foo, returns 0
+ * pathname: \\mnt\pvfs2\foo, prefix: \\mnt\pvfs2\
+ *     out_path: \foo, returns 0
+ * pathname: \\mnt\pvfs2\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: \foo\bar, returns 0
+ * pathname: X:\mnt\pvfs2\foo\bar, prefix: X:\ (or X:)
+ *     out_path: \mnt\pvfs2\foo\bar, returns 0
+ *
+ * invalid pathname input examples:
+ * pathname: \\mnt\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_ENOENT
+ * pathname: \\mnt\pvfs2fake\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_ENOENT
+ * pathname: \\mnt\foo\bar, prefix: mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_EINVAL
+ * pathname: mnt\foo\bar, prefix: \\mnt\pvfs2
+ *     out_path: undefined, returns -PVFS_EINVAL
+ * out_max_len not large enough for buffer, returns -PVFS_ENAMETOOLONG
+ */
+int PINT_remove_dir_prefix(
+    const char *pathname,
+    const char *prefix,
+    char *out_path,
+    int out_max_len)
+{
+    int ret = -PVFS_EINVAL;
+    int valid;
+    int prefix_len, pathname_len;
+    int cut_index;
+
+    if (!pathname || !prefix || strlen(pathname) < 2 || strlen(prefix) < 2 ||
+        !out_path || !out_max_len)
+    {
+        return ret;
+    }
+
+    /* make sure we are given absolute paths */
+    valid = pathname[0] >= 'A' && pathname[0] <= 'z' &&
+            pathname[1] == ':' &&
+            prefix[0] >= 'A' && prefix[0] <= 'z' &&
+            prefix[1] == ':';
+    if (!valid)
+    {
+        valid = (strncmp(pathname, "\\\\", 2) == 0) &&
+                (strncmp(prefix, "\\\\", 2) == 0);
+    }
+
+    if (!valid)
+    {
+        return ret;
+    }
+
+    prefix_len = strlen(prefix);
+    pathname_len = strlen(pathname);
+
+        /* account for trailing slashes on prefix */
+    while (prefix[prefix_len - 1] == '\\')
+    {
+        prefix_len--;
+    }
+
+    /* if prefix_len is now zero, then prefix must have been root
+     * directory; return copy of entire pathname
+     */
+    if (prefix_len == 0)
+    {
+        cut_index = 0;
+    }
+    else
+    {
+        /* make sure prefix would fit in pathname */
+        if (prefix_len > (pathname_len + 1))
+            return (-PVFS_ENOENT);
+    
+        if (strncmp(prefix, pathname, prefix_len) == 0)
+        {
+            /* apparent match; see if next element is a slash */
+            if ((pathname[prefix_len] != '\\') &&
+                (pathname[prefix_len] != '\0'))
+               return (-PVFS_ENOENT);
+
+            /* this was indeed a match */
+            /* in the case of no trailing slash cut_index will point to the end
+             * of "prefix" (NULL).   */
+            cut_index = prefix_len;
+        }
+        else 
+        {
+            return (-PVFS_ENOENT);
+        }
+    }
+
+    /* if we hit this point, then we were successful */
+
+    /* is the buffer large enough? */
+    if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
+        return (-PVFS_ENAMETOOLONG);
+
+    /* try to handle the case of no trailing slash */
+    if (pathname[cut_index] == '\0')
+    {
+        out_path[0] = '\\';
+        out_path[1] = '\0';
+    }
+    else
+        /* copy out appropriate part of pathname */
+        strcpy(out_path, &(pathname[cut_index]));
+
+    return 0;
+}
+
+#endif
 /* PINT_remove_dir_prefix()
  *
  * Strips prefix directory out of the path, output includes beginning

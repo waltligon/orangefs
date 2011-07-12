@@ -12,6 +12,16 @@
 #include "pvfs2-util.h"
 #include "gossip.h"
 
+#ifdef WIN32
+#include "wincommon.h"
+
+#define snprintf(b, c, f, ...)    _snprintf(b, c, f, __VA_ARGS__)
+
+/* error codes not defined on Windows */
+#define EREMOTE    66
+#define EHOSTDOWN  112
+#endif
+
 #define MAX_PVFS_STRERROR_LEN 256
 
 /* macro defined in include/pvfs2-types.h */
@@ -41,8 +51,10 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
             strncpy(buf, tmpbuf, (size_t)limit);
         }
         ret = (tmpbuf ? 0 : -1);
-#else
-	ret = (long int)strerror_r(tmp, buf, (size_t)limit);
+#elif defined(WIN32)
+        ret = (int) strerror_s(buf, (size_t) limit, tmp);
+#else 
+        ret = (long int)strerror_r(tmp, buf, (size_t)limit);
 #endif
     }
     return ret;

@@ -195,15 +195,15 @@ int PINT_dist_register_param_offset(const char* dist_name,
 int PINT_dist_unregister_param_offset(const char *dist_name, 
                                       const char *param_name)
 {
-    int i = 0;
+    int i = 0, dlen, plen;
 
     if( !dist_name || !param_name )
     {
         return -EINVAL;
     }
 
-    int dlen = strlen(dist_name) + 1;
-    int plen = strlen(param_name) + 1;
+    dlen = strlen(dist_name) + 1;
+    plen = strlen(param_name) + 1;
 
     for( i = 0; i < PINT_dist_param_table_entries; i++ )
     {

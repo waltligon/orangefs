@@ -8,11 +8,16 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#ifdef WIN32
+#include <io.h>
+#endif
 
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
@@ -1549,6 +1554,9 @@ DOTCONF_CB(get_tcp_buffer_send)
     return NULL;
 }
 
+#ifdef WIN32
+#define strcasecmp   stricmp
+#endif
 DOTCONF_CB(get_tcp_bind_specific)
 {
     struct server_configuration_s *config_s =
@@ -4005,13 +4013,21 @@ static int cache_config_files(
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
+#ifdef WIN32
+    char working_dir[MAX_PATH+1];
+#else
     char *working_dir = NULL;
+#endif
     char *my_global_fn = NULL;
     char buf[512] = {0};
 
     assert(config_s);
 
+#ifdef WIN32
+    GetCurrentDirectory(MAX_PATH+1, working_dir);
+#else
     working_dir = getenv("PWD");
+#endif
 
     /* pick some filenames if not provided */
     my_global_fn = ((global_config_filename != NULL) ?
@@ -4039,7 +4055,11 @@ open_global_config:
     else
     {
         assert(working_dir);
+#ifdef WIN32
+        _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
+#else
         snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
+#endif
         my_global_fn = buf;
         goto open_global_config;
     }

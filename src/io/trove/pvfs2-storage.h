@@ -23,6 +23,9 @@ typedef enum PVFS_coll_getinfo_options_e PVFS_coll_getinfo_options;
 struct PVFS_vtag_s
 {
     /* undefined */
+#ifdef WIN32
+    int field;
+#endif
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 /* key/value descriptor definition moved to include/pvfs2-types.h */

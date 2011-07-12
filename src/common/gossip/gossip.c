@@ -15,10 +15,16 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
-#include <syslog.h>
 #include <stdlib.h>
 #include <time.h>
+
+#ifdef WIN32
+#include "wincommon.h"
+#else
+#include <syslog.h>
 #include <sys/time.h>
+#endif
+
 #include "pvfs2-config.h"
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
@@ -49,7 +55,9 @@ int gossip_facility = GOSSIP_STDERR;
 static FILE *internal_log_file = NULL;
 
 /* syslog priority setting */
+#ifndef WIN32
 static int internal_syslog_priority = LOG_INFO;
+#endif
 
 /* what type of timestamp to put on logs */
 static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
@@ -83,6 +91,16 @@ static int gossip_disable_syslog(
  *
  *  \return 0 on success, -errno on failure.
  */
+#ifdef WIN32
+/** Only a stub on Windows
+ *  TODO: possibly add logging to Windows Event Log
+ */
+int gossip_enable_syslog(
+    int priority)
+{
+    return 0;
+}
+#else
 int gossip_enable_syslog(
     int priority)
 {
@@ -105,6 +123,7 @@ int gossip_enable_syslog(
 
     return 0;
 }
+#endif
 
 /** Turns on logging to stderr.
  *
@@ -425,6 +444,18 @@ void gossip_backtrace(void)
  *
  * returns 0 on success, -errno on failure
  */
+#ifdef WIN32
+/** Only a stub on Windows
+ *  TODO: possibly add logging to Windows Event Log
+ */
+static int gossip_debug_syslog(
+    char prefix,
+    const char *format,
+    va_list ap)
+{
+    return 0;
+}
+#else
 static int gossip_debug_syslog(
     char prefix,
     const char *format,
@@ -449,6 +480,7 @@ static int gossip_debug_syslog(
 
     return 0;
 }
+#endif
 
 int gossip_debug_fp(FILE *fp, char prefix, 
                     enum gossip_logstamp ts, const char *format, ...)
@@ -474,7 +506,7 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
     const char *format, va_list ap, enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;
-    int bsize = sizeof(buffer);
+    int bsize = sizeof(buffer), temp_size;
     int ret = -EINVAL;
     struct timeval tv;
     time_t tp;
@@ -504,10 +536,16 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld (%ld)] ", (long)tv.tv_usec, 
-                    gen_thread_self());
-            bptr += 30;
-            bsize -= 30;
+            bptr += 8;
+#ifdef WIN32
+            temp_size = sprintf(bptr, ".%03ld (%4ld)] ", (long)tv.tv_usec / 1000,
+                           GetThreadId(GetCurrentThread()));
+#else
+            temp_size = sprintf(bptr, ".%06ld (%ld)] ", (long)tv.tv_usec, 
+                           gen_thread_self());
+#endif
+            bptr += temp_size;
+            bsize -= temp_size;
             break;
 
         case GOSSIP_LOGSTAMP_NONE:
@@ -542,6 +580,17 @@ static int gossip_debug_fp_va(FILE *fp, char prefix,
  *
  * returns 0 on success, -errno on failure
  */
+#ifdef WIN32
+/** just a stub on Windows
+ *  TODO: possibly add errors to Windows Event Log
+ */
+static int gossip_err_syslog(
+    const char *format,
+    va_list ap)
+{
+    return 0;
+}
+#else
 static int gossip_err_syslog(
     const char *format,
     va_list ap)
@@ -558,7 +607,7 @@ static int gossip_err_syslog(
 
     return 0;
 }
-
+#endif
 
 /* gossip_disable_stderr()
  * 
@@ -596,12 +645,23 @@ static int gossip_disable_file(
  *
  * returns 0 on success, -errno on failure
  */
+#ifdef WIN32
+/** just a stub on Windows
+ * TODO: Possibly add logging to Windows Event Log
+ */
+static int gossip_disable_syslog(
+    void)
+{
+    return 0;
+}
+#else
 static int gossip_disable_syslog(
     void)
 {
     closelog();
     return 0;
 }
+#endif
 
 /*
  * Local variables:

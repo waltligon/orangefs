@@ -14,11 +14,15 @@
 
 #include <stdio.h>
 #include <errno.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <netinet/in.h>
 #include <sys/time.h>
+#endif
 #include <time.h>
 #include <math.h>
 
@@ -68,7 +72,10 @@ struct options
         int  crc;
 };
 
-
+#ifdef WIN32
+/* performance counter frequency */
+LARGE_INTEGER freq;
+#endif
 /**************************************************************
  * Internal utility functions
  */
@@ -106,6 +113,11 @@ int main(int argc, char **argv)
         /* set debugging stuff */
         gossip_enable_stderr();
         gossip_set_debug_mask(0, GOSSIP_BMI_DEBUG_ALL);
+
+#ifdef WIN32
+        /* get performance counter frequency */
+        QueryPerformanceFrequency(&freq);
+#endif
 
         /* initialize local interface (default options) */
         if (opts->which == SERVER)
@@ -212,6 +224,9 @@ static int do_server(struct options *opts, bmi_context_id *context)
 
         BMI_unexpected_free(peer_addr, request_info.buffer);
 
+#ifdef WIN32
+        server_addr = (PVFS_BMI_addr_t) 0;
+#endif
         ret = BMI_get_info(server_addr, BMI_CHECK_MAXSIZE,
                            (void *)&max_bytes);
         if (ret < 0) {
@@ -398,8 +413,13 @@ static int do_client(struct options *opts, bmi_context_id *context)
         int                     iterations      = 0;
         int                     msg_len         = 0;
         int                     run             = 0;
+#ifdef WIN32
+        LARGE_INTEGER           start;
+        LARGE_INTEGER           end;
+#else
         struct timeval          start;
         struct timeval          end;
+#endif
         double                  *val            = NULL;
         double                  lat             = 0.0;
         double                  min             = 99999.9;
@@ -519,7 +539,11 @@ static int do_client(struct options *opts, bmi_context_id *context)
         }
 
         /* make sure server has posted first recv */
+#ifdef WIN32
+        Sleep(1000);
+#else
         sleep(1);
+#endif
 
         fprintf(stdout, "     Bytes        usecs         MB/s       StdDev          Min          Max\n");
 
@@ -529,9 +553,16 @@ static int do_client(struct options *opts, bmi_context_id *context)
                 iterations = bytes_to_iterations(bytes);
 
                 for (i=0; i < iterations; i++) {
-
+#ifdef WIN32
+                        offset = rand() % (max_bytes - bytes - 1);
+#else
                         offset = random() % (max_bytes - bytes - 1);
+#endif
+#ifdef WIN32
+                        QueryPerformanceCounter(&start);
+#else
                         gettimeofday(&start, NULL);
+#endif
 
 #ifdef HAVE_LIBZ
                         if(opts->crc)
@@ -609,13 +640,21 @@ static int do_client(struct options *opts, bmi_context_id *context)
                             }
                         }
 #endif
+#ifdef WIN32
+                        QueryPerformanceCounter(&end);
+#else
                         gettimeofday(&end, NULL);
+#endif
 
                         if (!warmup) {
+#ifdef WIN32
+                                val[i] = ((double) end.QuadPart - (double) start.QuadPart) / (double) freq.QuadPart;
+#else
                                 val[i] =  (double) end.tv_sec + 
                                           (double) end.tv_usec * 0.000001;
                                 val[i] -= (double) start.tv_sec + 
                                           (double) start.tv_usec * 0.000001;
+#endif
                                 lat += val[i];
                         }
                 }
@@ -683,6 +722,93 @@ static void get_method(struct options *opts)
         return;
 }
 
+#ifdef WIN32
+static struct options *parse_args(int argc, char *argv[])
+{
+
+        struct options *opts = NULL;
+        int argi = 1;
+
+        /* create storage for the command line options */
+        opts = (struct options *) calloc(1, sizeof(struct options));
+        if (!opts) {
+            goto parse_args_error;
+        }
+    
+        /* look at command line arguments */
+        while (argi < argc) {
+                if (strcmp(argv[argi], "-h") == 0)
+                {
+                        opts->hostid = (char *) strdup(argv[++argi]);
+                        if (opts->hostid == NULL) {
+                	        goto parse_args_error;
+                        }
+                        get_method(opts);
+                        argi++;
+                }
+                else if (strcmp(argv[argi], "-s") == 0)
+                {                
+                        if (opts->which == CLIENT) {
+                                fprintf(stderr, "use -s OR -c, not both\n");
+                	        goto parse_args_error;
+                        }
+                        opts->which = SERVER;
+                        argi++;
+                }
+                else if (strcmp(argv[argi], "-c") == 0)
+                {
+                        if (opts->which == SERVER) {
+                                fprintf(stderr, "use -s OR -c, not both\n");
+                	        goto parse_args_error;
+                        }
+                        opts->which = CLIENT;
+                        argi++;
+                }
+                else if (strcmp(argv[argi], "-u") == 0)
+                {
+                        opts->test = UNEXPECTED;
+                        argi++;
+                }
+                else if (strcmp(argv[argi], "-r") == 0)
+                {
+                        opts->crc = 1;
+                        argi++;
+                }
+                else 
+                {
+                        break;
+                }
+        }
+    
+        /* if we didn't get a host argument, bail: */
+        if (opts->hostid == NULL) {
+                fprintf(stderr, "you must specify -h\n");
+                goto parse_args_error;
+        }
+        if (opts->method == NULL) {
+                fprintf(stderr, "you must use a valid HOST_URI\n");
+                goto parse_args_error;
+        }
+        if (opts->which == 0) {
+                fprintf(stderr, "you must specify -s OR -c\n");
+                goto parse_args_error;
+        }
+
+        return (opts);
+
+parse_args_error:
+
+        /* if an error occurs, just free everything and return NULL */
+        if (opts) {
+                if (opts->hostid) {
+                        free(opts->hostid);
+                }
+                free(opts);
+        }
+        return (NULL);
+}
+
+#else
 static struct options *parse_args(int argc, char *argv[])
 {
 
@@ -761,6 +887,7 @@ parse_args_error:
         }
         return (NULL);
 }
+#endif
 
 /*
  * vim:expandtab:shiftwidth=8:tabstop=8:

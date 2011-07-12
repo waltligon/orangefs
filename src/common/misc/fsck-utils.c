@@ -6,7 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <ctype.h>
 #include <assert.h>
 
@@ -17,6 +19,140 @@
 
 #define SERVER_CONFIG_BUFFER_SIZE 5000
 #define FS_CONFIG_BUFFER_SIZE 10000
+
+#ifdef WIN32
+int PVFS_fsck_initialize(
+    const struct PINT_fsck_options* options,
+    const PVFS_credentials* creds,
+    const PVFS_fs_id* cur_fs)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dfile(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_handle* handle,
+    const PVFS_fs_id* cur_fs,
+    const PVFS_credentials* creds,
+    PVFS_size* dfile_total_size)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dfile_attr(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_metafile(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_object_ref* obj_ref,
+    const PVFS_sysresp_getattr* attributes,
+    const PVFS_credentials* creds)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_metafile_attr(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_symlink(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_object_ref* obj_ref, 
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_symlink_attr(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_symlink_target(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dirdata(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_handle* handle, 
+    const PVFS_fs_id* cur_fs, 
+    const PVFS_credentials* creds)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dirdata_attr(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dir(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_object_ref* obj_ref, 
+    const PVFS_sysresp_getattr* attributes, 
+    const PVFS_credentials* creds,
+    PVFS_dirent* directory_entries)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dir_attr(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_sysresp_getattr* attributes)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_validate_dir_ent(
+    const struct PINT_fsck_options* fsck_options,
+    const char* filename)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_finalize(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_fs_id* cur_fs,
+    const PVFS_credentials* cred)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_get_attributes(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_object_ref* object_ref,
+    const PVFS_credentials* cred,
+    PVFS_sysresp_getattr* sysresp_getattr)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+int PVFS_fsck_check_server_configs(
+    const struct PINT_fsck_options* fsck_options,
+    const PVFS_credentials* cred,
+    const PVFS_fs_id* fs_id)
+{
+    return -PVFS_EOPNOTSUPP;
+}
+
+#else
+/** 
+ * Just stub functions out on Windows 
+ */
 
 /** \file
  *  \ingroup fsckutils
@@ -1656,6 +1792,7 @@ static void set_return_code(
         *ret = retval;
     }
 }
+#endif  /* WIN32 */
 
 /* @} */
 

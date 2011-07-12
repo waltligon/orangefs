@@ -25,7 +25,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "statecomp.h"
 
@@ -35,6 +37,13 @@ int yyparse (void *);
 #else
 int yyparse (void);
 #endif
+#endif
+
+#ifdef WIN32
+#define __func__    __FUNCTION__
+#define unlink      _unlink
+
+extern int yyparse();
 #endif
 
 /*

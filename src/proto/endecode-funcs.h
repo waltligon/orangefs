@@ -14,6 +14,13 @@
 
 #include "src/io/bmi/bmi-byteswap.h"
 #include <stdint.h>
+#ifdef WIN32
+typedef uint32_t u_int32_t;
+typedef uint64_t u_int64_t;
+
+/* typeof not available on Windows */
+#define typeof(t)   t
+#endif
 #include <assert.h>
 
 /*
@@ -799,6 +806,17 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
+#ifdef WIN32
+#define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
+static void encode_func_##__name__(char **pptr, void *x) \
+{ \
+    encode_##__name__(pptr, (__type__ *)x); \
+}; \
+static void decode_func_##__name__(char **pptr, void *x) \
+{ \
+    decode_##__name__(pptr, (__type__ *)x); \
+}
+#else
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
 __attribute__((unused)) \
 static void encode_func_##__name__(char **pptr, void *x) \
@@ -810,6 +828,7 @@ static void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
 }
+#endif
 
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)                         \
 static inline void encode_##name(char **pptr, const struct name *x)           \
@@ -832,6 +851,9 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         default: assert(0);                                                   \
     }                                                                         \
 };
+
+#ifdef WIN32
+#endif
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 

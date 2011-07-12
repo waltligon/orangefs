@@ -14,10 +14,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
-#include <unistd.h>
 #include <sys/types.h>
+#ifndef WIN32
+#include <unistd.h>
 #include <sys/time.h>
 #include <libgen.h>
+#endif
 
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"

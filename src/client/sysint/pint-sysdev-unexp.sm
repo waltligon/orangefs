@@ -7,9 +7,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef WIN32
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/time.h>
+#endif
+#include <fcntl.h>
 
 #include "state-machine.h"
 #include "client-state-machine.h"

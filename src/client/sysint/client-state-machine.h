@@ -264,6 +264,9 @@ struct PINT_client_io_sm
 
 struct PINT_client_flush_sm
 {
+#ifdef WIN32
+    int field;
+#endif
 };
 
 struct PINT_client_readdir_sm

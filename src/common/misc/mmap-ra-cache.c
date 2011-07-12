@@ -9,8 +9,10 @@
 #include <time.h>
 #include <assert.h>
 #include <errno.h>
+#ifndef WIN32
 #include <sys/resource.h>
 #include <unistd.h>
+#endif
 
 #include "pvfs2.h"
 #include "gossip.h"

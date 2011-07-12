@@ -8,10 +8,14 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <time.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -108,8 +112,11 @@ int PINT_cached_config_initialize(void)
     gettimeofday(&tv, NULL);
     seed += tv.tv_sec;
     seed += tv.tv_usec;
-
+#ifdef WIN32
+    seed += GetCurrentProcessId();
+#else
     seed += getpid();
+#endif
 
     ret = gethostname(hostname, HOST_NAME_MAX);
     if(ret == 0)
@@ -1056,6 +1063,7 @@ int PINT_cached_config_map_to_server(
     }
 
     *server_addr = tmp_entry->server_addr;
+
     return(0);
 }
 

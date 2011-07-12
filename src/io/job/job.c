@@ -7,8 +7,10 @@
 /* this file contains a skeleton implementation of the job interface */
 
 #include <errno.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
@@ -5340,10 +5342,14 @@ static void do_one_work_cycle_all(int idle_time_ms)
          * don't have a single thing to do.  Sleep here to prevent busy
          * spins.
          */
+#ifdef WIN32
+        Sleep(idle_time_ms);
+#else
         struct timespec ts;
          ts.tv_sec = idle_time_ms/1000;
          ts.tv_nsec = (idle_time_ms%1000)*1000*1000;
          nanosleep(&ts, NULL);
+#endif
     }
 
     gen_mutex_unlock(&work_cycle_mutex);

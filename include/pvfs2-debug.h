@@ -76,6 +76,7 @@
 #define GOSSIP_DIRECTIO_DEBUG          ((uint64_t)1 << 54)
 #define GOSSIP_MGMT_DEBUG              ((uint64_t)1 << 55)
 #define GOSSIP_MIRROR_DEBUG            ((uint64_t)1 << 56)
+#define GOSSIP_WIN_CLIENT_DEBUG        ((uint64_t)1 << 57)
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
@@ -216,6 +217,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     {"directio", GOSSIP_DIRECTIO_DEBUG},
     /* Debug mirroring process */
     {"mirror",GOSSIP_MIRROR_DEBUG},
+    /* Windows client */
+    {"win_client", GOSSIP_WIN_CLIENT_DEBUG},
     /* Everything except the periodic events.  Useful for debugging */
     { "verbose",
       (__DEBUG_ALL & ~(GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_STATE_MACHINE_DEBUG |

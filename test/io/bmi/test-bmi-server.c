@@ -14,7 +14,9 @@
 
 #include <stdio.h>
 #include <errno.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <stdlib.h>
 #include <string.h>
 
@@ -239,6 +241,65 @@ int main(
 }
 
 
+#ifdef WIN32
+static struct options *parse_args(
+    int argc,
+    char *argv[])
+{
+    int argi = 1, len;
+    struct options *tmp_opts = malloc(sizeof(struct options));
+    if (!tmp_opts)
+    {
+        goto parse_args_error;
+    }
+
+    /* defaults */
+    tmp_opts->hostid = NULL;
+
+    while (argi < argc)
+    {
+        if (strcmp(argv[argi], "-h") == 0)
+        {
+            len = strlen(argv[++argi]) + 1;
+            tmp_opts->hostid = (char *) malloc(len);
+            if (tmp_opts->hostid == NULL)
+            {
+                goto parse_args_error;
+            }
+            memcpy(tmp_opts->hostid, argv[argi], len);
+            argi++;
+        }
+        else {
+            goto parse_args_error;
+        }
+    }
+
+    /* if we didn't get a host argument, fill in a default: */
+    if (tmp_opts->hostid == NULL) {
+        len = (strlen(DEFAULT_HOSTID)) + 1;
+        if ((tmp_opts->hostid = malloc(len)) == NULL)
+        {
+            goto parse_args_error;
+        }
+        memcpy(tmp_opts->hostid, DEFAULT_HOSTID, len);
+    }
+
+    return (tmp_opts);
+
+  parse_args_error:
+
+    /* if an error occurs, just free everything and return NULL */
+    if (tmp_opts)
+    {
+	if (tmp_opts->hostid)
+	{
+	    free(tmp_opts->hostid);
+	}
+	free(tmp_opts);
+    }
+    return (NULL);
+}
+#else
 static struct options *parse_args(
     int argc,
     char *argv[])
@@ -300,6 +361,7 @@ static struct options *parse_args(
     }
     return (NULL);
 }
+#endif
 
 /*
  * Local variables:

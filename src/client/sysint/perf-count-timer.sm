@@ -7,9 +7,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifndef WIN32
 #include <unistd.h>
-#include <fcntl.h>
 #include <sys/time.h>
+#endif
+#include <fcntl.h>
 
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
@@ -80,11 +82,19 @@ static PINT_sm_action perf_count_timer_do_work(
         tmp_text = PINT_perf_generate_text(sm_p->u.perf_count_timer.pc, 4096);
         if(tmp_text)
         {
+#ifdef WIN32
+            token = strtok(tmp_text, delim);  /* thread-safe */
+#else
             token = strtok_r(tmp_text, delim, &ptr);
+#endif
             while(token)
             {
                 gossip_perf_log("%s\n", token);
+#ifdef WIN32
+                token = strtok(NULL, delim);
+#else
                 token = strtok_r(NULL, delim, &ptr);
+#endif
             }
             free(tmp_text);
         }

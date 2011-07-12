@@ -17,8 +17,10 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <pwd.h>
 #include <grp.h>
+#endif
 #include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
@@ -308,7 +310,7 @@ struct PINT_server_create_copies_op
     /*source remote server names in distribution*/
     char **remote_io_servers;
 
-    /*source local server names in distribution*/;                
+    /*source local server names in distribution*/                
     char **local_io_servers;
 
     /*number of source server names in the distribution*/                     
@@ -708,16 +710,32 @@ typedef struct PINT_server_op
  * no return value
  */
 #ifdef GOSSIP_DISABLE_DEBUG
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
+#else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+#endif
+#else
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, __VA_ARGS__)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
     PINT_server_access_debug(__s_op, __mask, format, ##f)
 #endif
+#endif
 
+#ifdef WIN32
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...);
+#else
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
+#endif
 
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;

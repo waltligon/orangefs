@@ -25,6 +25,20 @@
 #include "pvfs2-internal.h"
 #include "state-machine.h"
 
+#ifdef WIN32
+#define gossip_err_unless_quiet(format, ...) \
+do {\
+    if(mop->params.quiet_flag)\
+    {\
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, format, __VA_ARGS__); \
+    }\
+    else \
+    {\
+        gossip_err(format, __VA_ARGS__); \
+    }\
+} while(0)
+
+#else
 #define gossip_err_unless_quiet(format, f...) \
 do {\
     if(mop->params.quiet_flag)\
@@ -32,6 +46,7 @@ do {\
     else \
         gossip_err(format, ##f); \
 } while(0)
+#endif
 
 enum
 {

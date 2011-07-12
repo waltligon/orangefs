@@ -8,26 +8,44 @@
  */
 
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef WIN32
 #include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/uio.h>
+#endif
 #include <assert.h>
+#ifndef WIN32
 #include <sys/mman.h>
+#endif
+
+#ifdef WIN32
+#include <io.h>
+
+/* define our own iovec */
+struct iovec {
+    void   *iov_base;
+    size_t iov_len;
+};
+#endif
 
 #include "pint-mem.h"
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-dev.h"
+#ifndef WIN32
 #include "pvfs2-dev-proto.h"
+#endif
 #include "pvfs2-internal.h"
 
 #ifdef WITH_LINUX_KMOD
@@ -171,7 +189,11 @@ void PINT_dev_finalize(void)
 {
     if (pdev_fd > -1)
     {
+#ifdef WIN32
+        _close(pdev_fd);
+#else
         close(pdev_fd);
+#endif
         pdev_fd = -1;
     }
 }
@@ -609,11 +631,15 @@ int PINT_dev_write_list(
     enum PINT_dev_buffer_type buffer_type,
     PVFS_id_gen_t tag)
 {
-    struct iovec io_array[8];
+    struct iovec io_array[10];
     int io_count = 3;
     int i;
     int ret = -1;
     int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
+#ifdef WIN32
+    char *buffer, *b;
+    size_t bsize = 0;
+#endif
     
     /* lets be reasonable about list size :) */
     /* two vecs are taken up by magic nr and tag */
@@ -650,8 +676,35 @@ int PINT_dev_write_list(
         io_count++;
     }
 
-    ret = writev(pdev_fd, io_array, io_count);
+#ifdef WIN32
+    /* we must write one buffer on Windows */
+    /* compute buffer size */
+    for (i = 0; i < io_count; i++)
+    {
+        bsize += io_array[i].iov_len;
+    }
 
+    /* allocate buffer */
+    buffer = (char *) malloc(bsize);
+    if (buffer == NULL)
+    {
+        return (-PVFS_ENOMEM);
+    }
+
+    /* copy multiple vectors into buffer */
+    for (i = 0, b = buffer; i < io_count; i++)
+    {
+        memcpy(b, io_array[i].iov_base, io_array[i].iov_len);
+        b += io_array[i].iov_len;
+    }
+
+    /* write the buffer */
+    ret = _write(pdev_fd, buffer, bsize);
+    
+    free(buffer);
+#else
+    ret = writev(pdev_fd, io_array, io_count);
+#endif
     return ((ret < 0) ? -(PVFS_EIO|PVFS_ERROR_DEV) : 0);
 }
 
