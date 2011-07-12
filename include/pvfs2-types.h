@@ -134,12 +134,13 @@ typedef uuid_t PVFS_handle;
 #define PVFS_HANDLE_STRING_LEN          37
 
 /* takes uuid and pointer to unsigned int */
-/* FIX: this is terrible, need a real way to hash the handles into a 
- * well distributed 64 bit space */
-#define PVFS_handle_to_hash(u, h) do { \
-    int i = 0;                         \
-    for( i=0; i < 16; i++ )            \
-        *h &= u[i];                    \
+/* the PVFS_handle is split in half and XORed to fold its bits
+ * resulting in a evenly distributed 64-bit hash code */
+#define PVFS_handle_to_hash(u, h) do {                                               \
+    uint64_t upper_handle, lower_handle;                                             \
+    memcpy(&upper_handle, u, (sizeof(PVFS_handle) / 2));                             \
+    memcpy(&lower_handle, u + (sizeof(PVFS_handle) / 2), (sizeof(PVFS_handle) / 2)); \
+    *h = upper_handle ^ lower_handle;                                                \
 } while(0)
 
 
