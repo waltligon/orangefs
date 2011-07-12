@@ -147,7 +147,7 @@ PVFS_error PVFS_isys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
-    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+    if ((PVFS_handle_is_null(parent_ref.handle)) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
         (object_name == NULL) || (resp == NULL))
     {
@@ -361,6 +361,7 @@ static int create_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    int i = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_create_comp_fn\n");
 
@@ -372,8 +373,8 @@ static int create_comp_fn(void *v_p,
     }
 
     /* otherwise, just stash the newly created meta handle */
-    sm_p->u.create.metafile_handle =
-        resp_p->u.create.metafile_handle;
+    PVFS_handle_copy(sm_p->u.create.metafile_handle,
+        resp_p->u.create.metafile_handle);
     sm_p->u.create.datafile_count = resp_p->u.create.datafile_count;
     sm_p->u.create.datafile_handles = malloc(
         sizeof(*sm_p->u.create.datafile_handles) *
@@ -382,10 +383,12 @@ static int create_comp_fn(void *v_p,
     {
         return -PVFS_ENOMEM;
     }
-    memcpy(sm_p->u.create.datafile_handles,
-           resp_p->u.create.datafile_handles,
-           (sizeof(*sm_p->u.create.datafile_handles) *
-           resp_p->u.create.datafile_count));
+
+    for( i=0; i < resp_p->u.create.datafile_count; i++ )
+    {
+        PVFS_handle_copy(sm_p->u.create.datafile_handles[i],
+                         resp_p->u.create.datafile_handles[i]);
+    }
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
 
     gossip_debug(
@@ -463,7 +466,8 @@ static PINT_sm_action create_create_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = meta_handle_extent_array.extent_array[0].first;
+    PVFS_handle_copy(msg_p->handle, 
+        meta_handle_extent_array.extent_array[0].first);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_comp_fn;
     msg_p->req.u.create.attr.u.meta.dfile_count = 0;
@@ -508,7 +512,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->object_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
@@ -564,7 +568,7 @@ static PINT_sm_action create_cleanup(
 
     if (sm_p->error_code == 0)
     {
-        metafile_ref.handle = sm_p->u.create.metafile_handle;
+        PVFS_handle_copy(metafile_ref.handle, sm_p->u.create.metafile_handle);
         metafile_ref.fs_id = sm_p->object_ref.fs_id;
 
         /* fill in outgoing response fields */
@@ -595,7 +599,8 @@ static PINT_sm_action create_cleanup(
         if(sm_p->u.create.dist)
         {
             sm_p->u.create.attr.u.meta.dist = sm_p->u.create.dist;
-            sm_p->u.create.attr.u.meta.dist_size = PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
+            sm_p->u.create.attr.u.meta.dist_size = 
+                PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
             sm_p->u.create.attr.mask |= PVFS_ATTR_META_DIST;
         }
 
@@ -993,7 +998,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                 sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
-            msg_p->handle = sm_p->u.create.metafile_handle;
+            PVFS_handle_copy(msg_p->handle, sm_p->u.create.metafile_handle);
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
 
@@ -1010,7 +1015,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
                 sm_p->hints);
 
             msg_p->fs_id = sm_p->object_ref.fs_id;
-            msg_p->handle = sm_p->u.create.datafile_handles[i];
+            PVFS_handle_copy(msg_p->handle, sm_p->u.create.datafile_handles[i]);
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
 

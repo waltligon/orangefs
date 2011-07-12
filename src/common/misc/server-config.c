@@ -126,7 +126,6 @@ const char *contextchecker(command_t *cmd, unsigned long mask);
 
 /* internal helper functions */
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
-static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
@@ -152,12 +151,6 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias,
     int *index);
-static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    PINT_llist *list,
-    char *alias);
-static int build_extent_array(
-    char *handle_range_str,
-    PVFS_handle_extent_array *handle_extent_array);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
@@ -2700,26 +2693,14 @@ DOTCONF_CB(get_alias_list)
 
 DOTCONF_CB(get_range_list)
 {
-    int i = 0, is_new_handle_mapping = 0;
+    int i = 0;
     struct filesystem_configuration_s *fs_conf = NULL;
-    struct host_handle_mapping_s *handle_mapping = NULL;
-    PINT_llist **handle_range_list = NULL;
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
+    PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
-
-    handle_range_list = ((config_s->configuration_context ==
-                          CTX_METAHANDLERANGES) ?
-                         &fs_conf->meta_handle_ranges :
-                         &fs_conf->data_handle_ranges);
-
-    if (*handle_range_list == NULL)
-    {
-        *handle_range_list = PINT_llist_new();
-    }
 
     for(i = 0; i < cmd->arg_count; i += 2)
     {
@@ -2728,62 +2709,6 @@ DOTCONF_CB(get_range_list)
             i++;
             assert(cmd->data.list[i]);
 
-            if (is_valid_handle_range_description(cmd->data.list[i]))
-            {
-                handle_mapping = get_or_add_handle_mapping(
-                    *handle_range_list, cmd->data.list[i-1]);
-                if (!handle_mapping)
-                {
-                    return("Error: Alias allocation failed; "
-                               "aborting alias handle range addition!\n");
-                }
-
-                if (!handle_mapping->alias_mapping)
-                {
-                    is_new_handle_mapping = 1;
-                    handle_mapping->alias_mapping =
-                        find_host_alias_ptr_by_alias(
-                            config_s, cmd->data.list[i-1], NULL);
-                }
-
-                assert(handle_mapping->alias_mapping ==
-                       find_host_alias_ptr_by_alias(
-                           config_s, cmd->data.list[i-1], NULL));
-
-                if (!handle_mapping->handle_range &&
-                    !handle_mapping->handle_extent_array.extent_array)
-                {
-                    handle_mapping->handle_range =
-                        strdup(cmd->data.list[i]);
-
-                    /* build the extent array, based on range */
-                    build_extent_array(
-                        handle_mapping->handle_range,
-                        &handle_mapping->handle_extent_array);
-                }
-                else
-                {
-                    char *new_handle_range = PINT_merge_handle_range_strs(
-                        handle_mapping->handle_range, cmd->data.list[i]);
-                    free(handle_mapping->handle_range);
-                    handle_mapping->handle_range = new_handle_range;
-
-                    /* re-build the extent array, based on range */
-                    free(handle_mapping->handle_extent_array.extent_array);
-                    build_extent_array(handle_mapping->handle_range,
-                                       &handle_mapping->handle_extent_array);
-                }
-
-                if (is_new_handle_mapping)
-                {
-                    PINT_llist_add_to_tail(*handle_range_list,
-                                      (void *)handle_mapping);
-                }
-            }
-            else
-            {
-                return("Error in handle range description.\n");
-            }
         }
         else
         {
@@ -3164,34 +3089,6 @@ static int is_valid_alias(PINT_llist * host_aliases, char *str)
     return ret;
 }
 
-static int is_valid_handle_range_description(char *h_range)
-{
-    int ret = 0;
-    int len = 0;
-    char *ptr = (char *)0;
-    char *end = (char *)0;
-
-    if (h_range)
-    {
-        len = strlen(h_range);
-        end = (h_range + len);
-
-        for(ptr = h_range; ptr < end; ptr++)
-        {
-            if (!isdigit((int)*ptr) && (*ptr != ',') &&
-                (*ptr != ' ') && (*ptr != '-'))
-            {
-                break;
-            }
-        }
-        if (ptr == end)
-        {
-            ret = 1;
-        }
-    }
-    return ret;
-}
-
 static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs)
 {
@@ -3400,10 +3297,6 @@ static void copy_filesystem(
     struct filesystem_configuration_s *dest_fs,
     struct filesystem_configuration_s *src_fs)
 {
-    PINT_llist *cur = NULL;
-    struct host_handle_mapping_s *cur_h_mapping = NULL;
-    struct host_handle_mapping_s *new_h_mapping = NULL;
-
     if (dest_fs && src_fs)
     {
         dest_fs->file_system_name = strdup(src_fs->file_system_name);
@@ -3416,75 +3309,9 @@ static void copy_filesystem(
         dest_fs->flowproto = src_fs->flowproto;
         dest_fs->encoding = src_fs->encoding;
 
-        dest_fs->meta_handle_ranges = PINT_llist_new();
-        dest_fs->data_handle_ranges = PINT_llist_new();
-
         if(src_fs->secret_key)
         {
             dest_fs->secret_key = strdup(src_fs->secret_key);
-        }
-
-        assert(dest_fs->meta_handle_ranges);
-        assert(dest_fs->data_handle_ranges);
-
-        /* copy all meta handle ranges */
-        cur = src_fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-
-            new_h_mapping = (struct host_handle_mapping_s *)
-                malloc(sizeof(struct host_handle_mapping_s));
-            assert(new_h_mapping);
-
-            /* these are pointers into another struct with a different
-             * lifetime, do not copy */
-            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
-
-            new_h_mapping->handle_range =
-                strdup(cur_h_mapping->handle_range);
-            assert(new_h_mapping->handle_range);
-
-            build_extent_array(new_h_mapping->handle_range,
-                               &new_h_mapping->handle_extent_array);
-
-            PINT_llist_add_to_tail(
-                dest_fs->meta_handle_ranges, new_h_mapping);
-
-            cur = PINT_llist_next(cur);
-        }
-
-        /* copy all data handle ranges */
-        cur = src_fs->data_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-
-            new_h_mapping = (struct host_handle_mapping_s *)
-                malloc(sizeof(struct host_handle_mapping_s));
-            assert(new_h_mapping);
-
-            new_h_mapping->alias_mapping = cur_h_mapping->alias_mapping;
-
-            new_h_mapping->handle_range =
-                strdup(cur_h_mapping->handle_range);
-            assert(new_h_mapping->handle_range);
-
-            build_extent_array(new_h_mapping->handle_range,
-                               &new_h_mapping->handle_extent_array);
-
-            PINT_llist_add_to_tail(
-                dest_fs->data_handle_ranges, new_h_mapping);
-
-            cur = PINT_llist_next(cur);
         }
 
         /* if the optional hints are used, copy them too */
@@ -3602,91 +3429,6 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     }
     if(index) *index = ind - 1;
     return ret;
-}
-
-static struct host_handle_mapping_s *get_or_add_handle_mapping(
-    PINT_llist *list,
-    char *alias)
-{
-    PINT_llist *cur = list;
-    struct host_handle_mapping_s *ret = NULL;
-    struct host_handle_mapping_s *handle_mapping = NULL;
-
-    while(cur)
-    {
-        handle_mapping = PINT_llist_head(cur);
-        if (!handle_mapping)
-        {
-            break;
-        }
-        assert(handle_mapping->alias_mapping);
-        assert(handle_mapping->alias_mapping->host_alias);
-        assert(handle_mapping->handle_range);
-
-        if (strcmp(handle_mapping->alias_mapping->host_alias,
-                   alias) == 0)
-        {
-            ret = handle_mapping;
-            break;
-        }
-        cur = PINT_llist_next(cur);
-    }
-
-    if (!ret)
-    {
-        ret = (host_handle_mapping_s *)
-            malloc(sizeof(struct host_handle_mapping_s));
-        if (ret)
-        {
-            memset(ret,0,sizeof(struct host_handle_mapping_s));
-        }
-    }
-    return ret;
-}
-
-static int build_extent_array(
-    char *handle_range_str,
-    PVFS_handle_extent_array *handle_extent_array)
-{
-    int i = 0, status = 0, num_extents = 0;
-    PVFS_handle_extent cur_extent;
-
-    if (handle_range_str && handle_extent_array)
-    {
-        /* first pass, find out how many extents there are total */
-        while(PINT_parse_handle_ranges(handle_range_str,
-                                       &cur_extent, &status))
-        {
-            num_extents++;
-        }
-
-        if (num_extents)
-        {
-            handle_extent_array->extent_count = num_extents;
-            handle_extent_array->extent_array = (PVFS_handle_extent *)
-                malloc(num_extents * sizeof(PVFS_handle_extent));
-            if (!handle_extent_array->extent_array)
-            {
-                gossip_err("Error: failed to alloc %d extents\n",
-                           handle_extent_array->extent_count);
-                return -1;
-            }
-            memset(handle_extent_array->extent_array,0,
-                   (num_extents * sizeof(PVFS_handle_extent)));
-
-            /* reset opaque handle parsing state for next iteration */
-            status = 0;
-
-            /* second pass, fill in the extent array */
-            while(PINT_parse_handle_ranges(handle_range_str,
-                                           &cur_extent, &status))
-            {
-                handle_extent_array->extent_array[i] = cur_extent;
-                i++;
-            }
-        }
-    }
-    return 0;
 }
 
 #ifdef USE_TRUSTED

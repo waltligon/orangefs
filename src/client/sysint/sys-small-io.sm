@@ -118,8 +118,8 @@ static PINT_sm_action small_io_setup_msgpairs(
 
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        datafile_handle = attr->u.meta.dfile_array[
-            sm_p->u.io.datafile_index_array[i]];
+        PVFS_handle_copy(datafile_handle,
+            attr->u.meta.dfile_array[sm_p->u.io.datafile_index_array[i]]);
 
         gossip_debug(GOSSIP_IO_DEBUG, "   small_io_setup_msgpairs: "
                      "handle: %llu\n", llu(datafile_handle));
@@ -197,7 +197,7 @@ static PINT_sm_action small_io_setup_msgpairs(
             sm_p->hints);
 
         msg_p->fs_id  = sm_p->object_ref.fs_id;
-        msg_p->handle = datafile_handle;
+        PVFS_handle_copy(msg_p->handle, datafile_handle);
 
         /*if we are processing a read request and the source file has mirrored
          *handles, then bypass msgpairarray's retry mechanism.  SMALL-IO will
@@ -226,7 +226,8 @@ static PINT_sm_action small_io_setup_msgpairs(
 
         /*store the original datahandle for later use.*/
         server_nr = msg_p->req.u.small_io.server_nr;
-        sm_p->u.io.small_io_ctx[server_nr].original_datahandle = msg_p->handle;
+        PVFS_handle_copy(sm_p->u.io.small_io_ctx[server_nr].original_datahandle,
+                         msg_p->handle);
     }
 
     js_p->error_code = 0;
@@ -492,8 +493,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         if (ctx->retry_original)
         {
             ctx->retry_original = 0;
-            msg->handle                = ctx->original_datahandle;
-            msg->req.u.small_io.handle = ctx->original_datahandle;
+            PVFS_handle_copy(msg->handle, ctx->original_datahandle);
+            PVFS_handle_copy(msg->req.u.small_io.handle,
+                             ctx->original_datahandle);
             msg->svr_addr = 0;
             ret = PINT_cached_config_map_to_server(&msg->svr_addr
                                                   ,msg->handle
@@ -520,7 +522,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
             index = (copies*meta->dfile_count) + server_nr;
             if (meta->mirror_dfile_array[index] != 0)
             {  /* we have found a valid mirrored handle */
-               msg->handle = meta->mirror_dfile_array[index];
+               PVFS_handle_copy(msg->handle, meta->mirror_dfile_array[index]);
                break;
             }
         }
@@ -530,11 +532,12 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         */
         if ( copies == meta->mirror_copies_count )
         {
-           msg->handle = ctx->original_datahandle;
+           PVFS_handle_copy(msg->handle, ctx->original_datahandle);
            ctx->retry_original = 0;
            ctx->current_copies_count = 0;
            sm_p->u.io.retry_count++;
-           msg->req.u.small_io.handle = ctx->original_datahandle;
+           PVFS_handle_copy(msg->req.u.small_io.handle, 
+                            ctx->original_datahandle);
            msg->svr_addr = 0;
            ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
                                                ,msg->handle
@@ -551,11 +554,11 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         }/*end if we have to use the original*/
 
         /* Otherwise, use the discovered mirrored handle */
-        msg->req.u.small_io.handle = msg->handle;
+        PVFS_handle_copy(msg->req.u.small_io.handle, msg->handle);
         msg->svr_addr = 0;
-        ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
-                                            ,msg->handle
-                                            ,msg->fs_id);
+        ret = PINT_cached_config_map_to_server(&(msg->svr_addr),
+                                               msg->handle,
+                                               msg->fs_id);
         if (ret)
         {
            gossip_lerr("Unable to determine the server address "
@@ -601,7 +604,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         j++;
 
         new_msg->fs_id       = msg->fs_id;
-        new_msg->handle      = msg->handle;
+        PVFS_handle_copy(new_msg->handle, msg->handle);
         new_msg->comp_fn     = msg->comp_fn;
         new_msg->svr_addr    = msg->svr_addr;
         new_msg->req         = msg->req;

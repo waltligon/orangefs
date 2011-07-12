@@ -567,7 +567,7 @@ PVFS_error PVFS_sys_lookup(
 
     if (name && resp)
     {
-        parent.handle = 0;
+        PVFS_handle_clear(parent.handle);
         parent.fs_id = fs_id;
 
         ret = PINT_cached_config_get_root_handle(
@@ -581,7 +581,7 @@ PVFS_error PVFS_sys_lookup(
         /* special case root handle lookup, since we already know it */
         if (strcmp(name, "/") == 0)
         {
-            resp->ref.handle = parent.handle;
+            PVFS_handle_copy(resp->ref.handle, parent.handle);
             resp->ref.fs_id = fs_id;
             ret = 0;
         }
@@ -628,7 +628,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
                  cur_seg->seg_name);
 
     parent_ref.fs_id = cur_seg->seg_starting_refn.fs_id;
-    parent_ref.handle = cur_seg->seg_starting_refn.handle;
+    PVFS_handle_copy(parent_ref.handle, cur_seg->seg_starting_refn.handle);
 
     ret = PINT_ncache_get_cached_entry(cur_seg->seg_name, &object_ref,
                                        &parent_ref);
@@ -639,7 +639,7 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
                      cur_seg->seg_name, llu(object_ref.handle),
                      object_ref.fs_id);
 
-        cur_seg->seg_resolved_refn.handle = object_ref.handle;
+        PVFS_handle_copy(cur_seg->seg_resolved_refn.handle, object_ref.handle);
         cur_seg->seg_resolved_refn.fs_id = object_ref.fs_id;
         js_p->error_code = 0;  /* hit */
     } else {
@@ -704,7 +704,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
         seg_to_lookup, llu(cur_seg->seg_starting_refn.handle));
 
     msg_p->fs_id = cur_seg->seg_starting_refn.fs_id;
-    msg_p->handle = cur_seg->seg_starting_refn.handle;
+    PVFS_handle_copy(msg_p->handle, cur_seg->seg_starting_refn.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
@@ -1162,7 +1162,8 @@ static int lookup_segment_lookup_comp_fn(
             cur_seg->seg_starting_refn = last_resolved_refn;
         }
 
-        last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
+        PVFS_handle_copy(last_resolved_refn.handle, 
+            resp_p->u.lookup_path.handle_array[i]);
         last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
 
         cur_seg->seg_resolved_refn = last_resolved_refn;

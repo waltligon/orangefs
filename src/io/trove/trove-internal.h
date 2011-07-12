@@ -256,7 +256,6 @@ struct TROVE_dspace_ops
 {
     int (*dspace_create)(
 			 TROVE_coll_id coll_id,
-                         TROVE_handle_extent_array *extent_array,
 			 TROVE_handle *handle,
 			 TROVE_ds_type type,
 			 TROVE_keyval_s *hint, /* TODO: figure out what this is! */
@@ -268,7 +267,6 @@ struct TROVE_dspace_ops
 
      int (*dspace_create_list)(
 			 TROVE_coll_id coll_id,
-                         TROVE_handle_extent_array *extent_array,
 			 TROVE_handle *handle_array,
 			 int count,
 			 TROVE_ds_type type,

@@ -467,6 +467,9 @@
 /* Define if file_operations struct has unlocked_ioctl member */
 #undef HAVE_UNLOCKED_IOCTL_HANDLER
 
+/* Define to 1 if you have the <uuid/uuid.h> header file. */
+#undef HAVE_UUID_UUID_H
+
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 

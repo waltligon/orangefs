@@ -788,8 +788,11 @@ static int acache_hash_key(void* key, int table_size)
 {
     PVFS_object_ref* real_key = (PVFS_object_ref*)key;
     int tmp_ret = 0;
+    long unsigned int h_hash = 0;
 
-    tmp_ret = (real_key->handle)%table_size;
+    PVFS_handle_to_hash(real_key->handle, &h_hash);
+
+    tmp_ret = h_hash % table_size;
     return(tmp_ret);
 }
   

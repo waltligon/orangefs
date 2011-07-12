@@ -175,7 +175,7 @@ PVFS_error PVFS_isys_getattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getattr entered\n");
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if (PVFS_handle_is_null(ref.handle) ||
         (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
@@ -311,7 +311,7 @@ static PINT_sm_action getattr_acache_lookup(
 
     object_ref = sm_p->getattr.object_ref;
 
-    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(!PVFS_handle_is_null(object_ref.handle));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
 
     gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %llu fsid %d\n",
@@ -490,7 +490,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     object_ref = sm_p->getattr.object_ref;
 
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(!PVFS_handle_is_null(object_ref.handle));
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(
@@ -502,7 +502,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
         sm_p->hints);
     
     msg_p->fs_id = object_ref.fs_id;
-    msg_p->handle = object_ref.handle;
+    PVFS_handle_copy(msg_p->handle, object_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
@@ -752,7 +752,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 
     for (i=0; i<getattr->mir_ctx_count; i++)
     {
-       getattr->mir_ctx_array[i].original_datahandle = attr->u.meta.dfile_array[i];
+       PVFS_handle_copy(getattr->mir_ctx_array[i].original_datahandle,
+                        attr->u.meta.dfile_array[i]);
        getattr->mir_ctx_array[i].original_server_nr = i;
     }
 
@@ -794,7 +795,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
             sm_p->hints);
 
     msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
-    msg_p->handle = handles[0];
+    PVFS_handle_copy(msg_p->handle, handles[0]);
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
@@ -1028,7 +1029,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(
         if (ctx->retry_original)
         {
             ctx->retry_original = 0;
-            tmp_handles[j]   = ctx->original_datahandle;
+            PVFS_handle_copy(tmp_handles[j], ctx->original_datahandle);
             tmp_server_nr[j] = ctx->original_server_nr;
             j++;
             continue;
@@ -1045,7 +1046,8 @@ static PINT_sm_action getattr_datafile_getattr_retry(
             index = (copies*meta->dfile_count) + server_nr;
             if (meta->mirror_dfile_array[index] != 0)
             {  /* we have found a valid mirrored handle */
-               tmp_handles[j]   = meta->mirror_dfile_array[index];
+               PVFS_handle_copy(tmp_handles[j], 
+                                meta->mirror_dfile_array[index]);
                tmp_server_nr[j] = server_nr;
                j++;
                break;
@@ -1057,7 +1059,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(
         */
         if ( copies == meta->mirror_copies_count )
         {
-           tmp_handles[j]   = ctx->original_datahandle;
+           PVFS_handle_copy(tmp_handles[j], ctx->original_datahandle);
            tmp_server_nr[j] = ctx->original_server_nr;
            j++;
            ctx->retry_original = 0;
@@ -1082,7 +1084,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(
     tree->num_data_files = retry_msg_count;
     
     /*replace values in old message request*/
-    msg->handle = tmp_handles[0];
+    PVFS_handle_copy(msg->handle, tmp_handles[0]);
     msg->svr_addr=0;
     ret = PINT_cached_config_map_to_server(&msg->svr_addr
                                           ,msg->handle

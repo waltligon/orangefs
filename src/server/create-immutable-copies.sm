@@ -914,7 +914,6 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
 
    /*create local datahandles - will be used as destination handles for copies*/
    ret = job_trove_dspace_create_list( imm_p->fs_id
-                                      ,&data_handle_ext_array
                                       ,imm_p->handle_array_copies_local
                                       ,imm_p->handle_array_copies_local_count *
                                        imm_p->copies

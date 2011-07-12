@@ -116,7 +116,7 @@ PVFS_error PVFS_isys_truncate(
     PINT_client_sm *sm_p = NULL;
 
     if ((ref.fs_id == PVFS_FS_ID_NULL) ||
-        (ref.handle == PVFS_HANDLE_NULL))
+        (PVFS_handle_is_null(ref.handle)) )
     {
         gossip_err("invalid (NULL) required argument\n");
         return ret;
@@ -261,7 +261,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
           structure
         */
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = attr->u.meta.dfile_array[i];
+        PVFS_handle_copy(msg_p->handle, attr->u.meta.dfile_array[i]);
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
     }
@@ -417,7 +417,7 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
             PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->object_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = unstuff_comp_fn;
 

@@ -87,7 +87,6 @@ static int batch_create_create(
 
     ret = job_trove_dspace_create_list(
         s_op->req->u.batch_create.fs_id,
-        &s_op->req->u.batch_create.handle_extent_array,
         s_op->resp.u.batch_create.handle_array,
         s_op->req->u.batch_create.object_count,
         s_op->req->u.batch_create.object_type,

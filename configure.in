@@ -1104,6 +1104,12 @@ else
    AC_MSG_RESULT(no)
 fi
 
+dnl check for uuid 
+AC_CHECK_HEADERS
+AC_CHECK_HEADERS(uuid/uuid.h,
+    LDFLAGS="$LDFLAGS -luuid"
+                )
+
 dnl Which form of strerror?
 AC_MSG_CHECKING([for GNU-style strerror_r])
 AC_TRY_COMPILE(

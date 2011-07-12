@@ -393,7 +393,9 @@ struct PINT_client_mgmt_iterate_handles_list_sm
     PVFS_id_gen_t *addr_array;
     PVFS_handle **handle_matrix;
     int *handle_count_array;
-    PVFS_ds_position *position_array;
+    PVFS_ds_position *ds_position_array;
+    PVFS_kv_position *kv_position_array;
+    unsigned int *position_flag_array;
     PVFS_error_details *details;
     int flags;
 };
@@ -465,14 +467,14 @@ typedef struct PINT_sm_getattr_state
     
 } PINT_sm_getattr_state;
 
-#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
-    do { \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref.fs_id = (_objref).fs_id; \
-        (_state).object_ref.handle = (_objref).handle; \
-        (_state).req_attrmask = _mask; \
-        (_state).ref_type = _reftype; \
-        (_state).flags = _flags; \
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags)  \
+    do {                                                                      \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state));                  \
+        (_state).object_ref.fs_id = (_objref).fs_id;                          \
+        PVFS_handle_copy((_state).object_ref.handle, (_objref).handle);       \
+        (_state).req_attrmask = _mask;                                        \
+        (_state).ref_type = _reftype;                                         \
+        (_state).flags = _flags;                                              \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
@@ -517,7 +519,8 @@ struct PINT_client_deleattr_sm
 
 struct PINT_client_listeattr_sm
 {
-    PVFS_ds_position pos_token;         /* input parameter */
+    PVFS_kv_position pos_token;         /* input parameter */
+    uint32_t pos_token_flag;            /* input parameter */
     int32_t nkey;                       /* input parameter */
     PVFS_size *size_array;              /* Input/Output */
     PVFS_sysresp_listeattr *resp_p;     /* Output */
@@ -543,9 +546,11 @@ typedef struct
 {
     PVFS_dirent **dirent_array;
     uint32_t      *dirent_outcount;
-    PVFS_ds_position *token;
+    PVFS_kv_position *token;
+    uint32_t         *token_flag;  /* out parameter */
     uint64_t         *directory_version;
-    PVFS_ds_position pos_token;     /* input parameter */
+    PVFS_kv_position pos_token;     /* input parameter */
+    uint32_t        pos_token_flag; /* input paramter */
     int32_t      dirent_limit;      /* input parameter */
 } PINT_sm_readdir_state;
 

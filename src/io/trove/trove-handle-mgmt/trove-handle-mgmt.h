@@ -1,16 +1,16 @@
-///*
-// * (C) 2001 Clemson University and The University of Chicago
-// *
-// * See COPYING in top-level directory.
-// */
-//
-//#ifndef __TROVE_HANDLE_MGMT_H
-//#define __TROVE_HANDLE_MGMT_H
-//
-//#define MAX_NUM_VERIFY_HANDLE_COUNT        4096
-//
-//#define TROVE_DEFAULT_HANDLE_PURGATORY_SEC 360
-//
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#ifndef __TROVE_HANDLE_MGMT_H
+#define __TROVE_HANDLE_MGMT_H
+
+#define MAX_NUM_VERIFY_HANDLE_COUNT        4096
+
+#define TROVE_DEFAULT_HANDLE_PURGATORY_SEC 360
+
 /*
  # public methods.  all methods return -1 on error; 0 on success unless
  # otherwise noted
@@ -76,13 +76,13 @@ int trove_handle_mgmt_finalize(void);
 //    TROVE_coll_id coll_id,
 //    uint64_t *free_count);
 //
-//#endif /* __TROVE_HANDLE_MGMT_H */
-//
-///*
-// * Local variables:
-// *  c-indent-level: 4
-// *  c-basic-offset: 4
-// * End:
-// *
-// * vim: ts=8 sts=4 sw=4 expandtab
-// */
+#endif /* __TROVE_HANDLE_MGMT_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

@@ -212,7 +212,8 @@ typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
 /** Holds results of a listeattr_list operation (keys of object). */
 struct PVFS_sysresp_listeattr_s
 {
-    PVFS_ds_position token;
+    PVFS_kv_position token;
+    uint32_t token_flag;
     int32_t         nkey;
     PVFS_ds_keyval *key_array;
 };
@@ -332,7 +333,7 @@ PVFS_error PVFS_sys_mkdir(
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_kv_position token,
-    uint32_t token_flag,
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
@@ -342,7 +343,8 @@ PVFS_error PVFS_isys_readdir(
 
 PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
@@ -350,7 +352,8 @@ PVFS_error PVFS_sys_readdir(
 
 PVFS_error PVFS_isys_readdirplus(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,
@@ -362,6 +365,7 @@ PVFS_error PVFS_isys_readdirplus(
 PVFS_error PVFS_sys_readdirplus(
     PVFS_object_ref ref,
     PVFS_kv_position token,
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,
@@ -628,7 +632,8 @@ PVFS_error PVFS_sys_deleattr(
 
 PVFS_error PVFS_isys_listeattr(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
+    uint32_t token_flag,
     int32_t nkey,
     const PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp,
@@ -638,7 +643,8 @@ PVFS_error PVFS_isys_listeattr(
 
 PVFS_error PVFS_sys_listeattr(
     PVFS_object_ref ref,
-    PVFS_ds_position token,
+    PVFS_kv_position token,
+    uint32_t token_flag,
     int32_t nkey,
     const PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp,

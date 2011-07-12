@@ -3014,7 +3014,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
-                            PVFS_handle_extent_array *handle_extent_array,
                             PVFS_ds_type type,
                             void *hint,
                             PVFS_ds_flags flags,
@@ -3055,7 +3054,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
-                              handle_extent_array,
                               &(jd->u.trove.handle),
                               type,
                               hint, flags,
@@ -3104,7 +3102,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_create_list(PVFS_fs_id coll_id,
-                            PVFS_handle_extent_array *handle_extent_array,
                             PVFS_handle* out_handle_array,
                             int count,
                             PVFS_ds_type type,
@@ -3144,7 +3141,6 @@ int job_trove_dspace_create_list(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create_list(coll_id,
-                              handle_extent_array,
                               out_handle_array,
                               count,
                               type,

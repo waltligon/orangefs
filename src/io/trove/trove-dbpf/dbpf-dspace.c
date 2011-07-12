@@ -108,7 +108,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p);
 
 static int dbpf_dspace_create(TROVE_coll_id coll_id,
-                              TROVE_handle_extent_array *extent_array,
                               TROVE_handle *handle_p,
                               TROVE_ds_type type,
                               TROVE_keyval_s *hint,
@@ -136,7 +135,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 
     if( handle_p == NULL )
     {
-        TROVE_handle_clear(handle);
+        return -TROVE_EINVAL;
     }
     else
     {
@@ -160,11 +159,6 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return ret;
     }
 
-    if (!extent_array || (extent_array->extent_count < 1))
-    {
-        return -TROVE_EINVAL;
-    }
-
     event_type = trove_dbpf_dspace_create_event_id;
     DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
@@ -172,23 +166,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                      PINT_HINT_GET_RANK(hints),
                      PINT_HINT_GET_OP_ID(hints));
 
-    /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
-     * in dbpf_queue_or_service in the case of immediate completion */
-    op_p->u.d_create.extent_array.extent_count =
-        extent_array->extent_count;
-    op_p->u.d_create.extent_array.extent_array =
-        malloc(extent_array->extent_count * sizeof(TROVE_extent));
     op_p->hints = hints;
-
-    if (op_p->u.d_create.extent_array.extent_array == NULL)
-    {
-        return -TROVE_ENOMEM;
-    }
-
-    memcpy(op_p->u.d_create.extent_array.extent_array,
-           extent_array->extent_array,
-           extent_array->extent_count * sizeof(TROVE_extent));
-
     op_p->u.d_create.out_handle_p = handle_p;
     op_p->u.d_create.type = type;
 
@@ -215,7 +193,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     if ( TROVE_handle_is_null(new_handle) )
     {
-        gossip_err("%s: handle allocator returned a zero handle.\n", __func__);
+        gossip_err("%s: handle allocator returned a null handle.\n", __func__);
         return(-TROVE_ENOSPC);
     }
 
@@ -236,7 +214,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
 /* FIX: remove extent array */
 static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
-                              TROVE_handle_extent_array *extent_array,
                               TROVE_handle *handle_array_p,
                               int count,
                               TROVE_ds_type type,
@@ -287,33 +264,12 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return ret;
     }
 
-    if (!extent_array || (extent_array->extent_count < 1))
-    {
-        return -TROVE_EINVAL;
-    }
-
     event_type = trove_dbpf_dspace_create_event_id;
     DBPF_EVENT_START(coll_p, q_op_p, event_type, &event_id,
                      PINT_HINT_GET_CLIENT_ID(hints),
                      PINT_HINT_GET_REQUEST_ID(hints),
                      PINT_HINT_GET_RANK(hints),
                      PINT_HINT_GET_OP_ID(hints));
-
-    /* this array is freed in dbpf-op.c:dbpf_queued_op_free, or
-     * in dbpf_queue_or_service in the case of immediate completion */
-    op_p->u.d_create_list.extent_array.extent_count =
-        extent_array->extent_count;
-    op_p->u.d_create_list.extent_array.extent_array =
-        malloc(extent_array->extent_count * sizeof(TROVE_extent));
-
-    if (op_p->u.d_create_list.extent_array.extent_array == NULL)
-    {
-        return -TROVE_ENOMEM;
-    }
-
-    memcpy(op_p->u.d_create_list.extent_array.extent_array,
-           extent_array->extent_array,
-           extent_array->extent_count * sizeof(TROVE_extent));
 
     op_p->u.d_create_list.out_handle_array_p = handle_array_p;
     op_p->u.d_create_list.count = count;

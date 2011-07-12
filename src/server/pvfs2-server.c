@@ -2622,7 +2622,7 @@ static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
         }
 
         /* create a trove object for the pool */
-        ret = job_trove_dspace_create(fsid, &ext_array, PVFS_TYPE_INTERNAL,
+        ret = job_trove_dspace_create(fsid, PVFS_TYPE_INTERNAL,
             NULL, TROVE_SYNC, NULL, 0, &js, &job_id, server_job_context, NULL);
         while(ret == 0)
         {

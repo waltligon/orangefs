@@ -108,7 +108,8 @@ machine pvfs2_client_readdirplus_sm
  */
 PVFS_error PVFS_isys_readdirplus(
     PVFS_object_ref ref,
-    PVFS_ds_position token, 
+    PVFS_kv_position token, 
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,
@@ -123,7 +124,7 @@ PVFS_error PVFS_isys_readdirplus(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdirplus entered\n");
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if ((PVFS_handle_is_null(ref.handle)) ||
         (ref.fs_id == PVFS_FS_ID_NULL) ||
         (resp == NULL))
     {
@@ -149,11 +150,14 @@ PVFS_error PVFS_isys_readdirplus(
     }
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    /* FIX: this needs to be changed to be like readdir w.r.t token/token_flag
+     * usage */
     PINT_init_msgarray_params(sm_p, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
-    /* point the sm dirent array and outcount to the readdirplus response field */
+    /* point the sm dirent array and outcount to the readdirplus response 
+     * field */
     sm_p->readdir.dirent_array = &resp->dirent_array;
     sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
     sm_p->readdir.token = &resp->token;
@@ -189,7 +193,8 @@ PVFS_error PVFS_isys_readdirplus(
  */
 PVFS_error PVFS_sys_readdirplus(
     PVFS_object_ref ref,
-    PVFS_ds_position token, 
+    PVFS_kv_position token, 
+    uint32_t *token_flag_p,
     int32_t pvfs_dirent_incount,
     const PVFS_credentials *credentials,
     uint32_t attrmask,
@@ -201,7 +206,7 @@ PVFS_error PVFS_sys_readdirplus(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdirplus entered\n");
 
-    ret = PVFS_isys_readdirplus(ref, token, pvfs_dirent_incount,
+    ret = PVFS_isys_readdirplus(ref, token, token_flag_p, pvfs_dirent_incount,
                             credentials, attrmask, resp, &op_id, NULL, hints);
     if (ret)
     {
@@ -380,7 +385,8 @@ static int create_partition_handles(PVFS_fs_id fsid, int input_handle_count,
                 err = -PVFS_ENOMEM;
                 break;
             }
-            (*per_server_handles)[svr_index][(*per_server_handle_count)[svr_index] - 1] = input_handle_array[i].handle;
+            PVFS_handle_copy( (*per_server_handles)[svr_index][(*per_server_handle_count)[svr_index] - 1],
+                             input_handle_array[i].handle);
         }
         if (i != input_handle_count)
             break;
@@ -455,8 +461,8 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
 
     for (i = 0; i < sm_p->u.readdirplus.nhandles; i++)
     {
-        sm_p->u.readdirplus.input_handle_array[i].handle = 
-                readdirplus_resp->dirent_array[i].handle;
+        PVFS_handle_copy(sm_p->u.readdirplus.input_handle_array[i].handle, 
+            readdirplus_resp->dirent_array[i].handle);
         sm_p->u.readdirplus.input_handle_array[i].handle_index = i;
         /* aux index is not used for meta handles */
         sm_p->u.readdirplus.input_handle_array[i].aux_index = -1;
@@ -524,7 +530,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(struct PINT_smcb *sm
             sm_p->u.readdirplus.handles[i],
             sm_p->hints);
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(msg_p->handle);
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdirplus_fetch_attrs_comp_fn;
         msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];
@@ -676,9 +682,12 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
              }
              for (j = 0; j < sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_count; j++) 
              {
-                 sm_p->u.readdirplus.input_handle_array[nhandles].handle = 
-                    sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array[j];
-                 sm_p->u.readdirplus.input_handle_array[nhandles].handle_index = i;
+                 PVFS_handle_copy(
+                    sm_p->u.readdirplus.input_handle_array[nhandles].handle,
+                    sm_p->u.readdirplus.obj_attr_array[i].u.meta.dfile_array[j]
+                                 );
+                 sm_p->u.readdirplus.input_handle_array[nhandles].handle_index =
+                    i;
                  sm_p->u.readdirplus.input_handle_array[nhandles].aux_index = j;
                  nhandles++;
              }
@@ -745,7 +754,7 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
             sm_p->u.readdirplus.handles[i],
             sm_p->hints);
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(msg_p->handle);
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = readdirplus_fetch_sizes_comp_fn;
         msg_p->svr_addr = sm_p->u.readdirplus.server_addresses[i];

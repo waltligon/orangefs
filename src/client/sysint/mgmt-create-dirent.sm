@@ -79,9 +79,9 @@ PVFS_error PVFS_imgmt_create_dirent(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_create_dirent entered\n");
 
-    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+    if ((PVFS_handle_is_null(parent_ref.handle)) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
-        (entry_handle == PVFS_HANDLE_NULL) || !entry)
+        (PVFS_handle_is_null(entry_handle)) || !entry)
     {
         gossip_err("invalid (NULL) required argument\n");
         return ret;
@@ -102,7 +102,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_create_dirent.entry = entry;
-    sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
+    PVFS_handle_copy(sm_p->u.mgmt_create_dirent.entry_handle, entry_handle);
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
@@ -190,7 +190,7 @@ static int mgmt_create_dirent_setup_msgpair(
         sm_p->hints);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->parent_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mgmt_create_dirent_comp_fn;
 

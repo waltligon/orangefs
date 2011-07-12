@@ -11494,6 +11494,34 @@ else
 $as_echo "no" >&6; }
 fi
 
+for ac_header
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+for ac_header in uuid/uuid.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "uuid/uuid.h" "ac_cv_header_uuid_uuid_h" "$ac_includes_default"
+if test "x$ac_cv_header_uuid_uuid_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_UUID_UUID_H 1
+_ACEOF
+ LDFLAGS="$LDFLAGS -luuid"
+	 SERVER_LDFLAGS="$LDFLAGS -luuid"
+
+fi
+
+done
+
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for GNU-style strerror_r" >&5
 $as_echo_n "checking for GNU-style strerror_r... " >&6; }
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext

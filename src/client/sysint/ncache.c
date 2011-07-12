@@ -239,7 +239,7 @@ int PINT_ncache_get_cached_entry(
                  "ncache: get_cached_entry(): [%s]\n",entry);
   
     entry_key.entry_name = entry;
-    entry_key.parent_ref.handle = parent_ref->handle;
+    PVFS_handle_copy(entry_key.parent_ref.handle, parent_ref->handle);
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
     gen_mutex_lock(&ncache_mutex);
@@ -304,7 +304,7 @@ void PINT_ncache_invalidate(
     gen_mutex_lock(&ncache_mutex);
   
     entry_key.entry_name = entry;
-    entry_key.parent_ref.handle = parent_ref->handle;
+    PVFS_handle_copy(entry_key.parent_ref.handle, parent_ref->handle);
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
     /* find out if the entry is in the cache */
@@ -370,9 +370,9 @@ int PINT_ncache_update(
         return(-PVFS_ENOMEM);
     }
 
-    tmp_payload->parent_ref.handle = parent_ref->handle;
+    PVFS_handle_copy(tmp_payload->parent_ref.handle, parent_ref->handle);
     tmp_payload->parent_ref.fs_id = parent_ref->fs_id;
-    tmp_payload->entry_ref.handle = entry_ref->handle;
+    PVFS_handle_copy(tmp_payload->entry_ref.handle, entry_ref->handle);
     tmp_payload->entry_ref.fs_id = entry_ref->fs_id;
 
     tmp_payload->entry_status = 0;
@@ -387,7 +387,7 @@ int PINT_ncache_update(
     gen_mutex_lock(&ncache_mutex);
 
     entry_key.entry_name = entry;
-    entry_key.parent_ref.handle = parent_ref->handle;
+    PVFS_handle_copy(entry_key.parent_ref.handle, parent_ref->handle);
     entry_key.parent_ref.fs_id = parent_ref->fs_id;
 
     /* find out if the entry is already in the cache */
@@ -499,14 +499,16 @@ static int ncache_hash_key(void* key, int table_size)
 {
     struct ncache_key* real_key = (struct ncache_key*) key;
     int tmp_ret = 0;
-    unsigned int sum = 0, i = 0;
+    unsigned int sum = 0, i = 0, h_hash = 0;
 
     while(real_key->entry_name[i] != '\0')
     {
         sum += (unsigned int) real_key->entry_name[i];
         i++;
     }
-    sum += real_key->parent_ref.handle + real_key->parent_ref.fs_id;
+
+    PVFS_handle_to_hash(real_key->parent_ref.handle, &h_hash);
+    sum += h_hash + real_key->parent_ref.fs_id;
     tmp_ret =  sum % table_size;
     return(tmp_ret);
 }

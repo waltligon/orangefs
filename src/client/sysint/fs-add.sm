@@ -633,7 +633,7 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
         PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
-        msg_p->handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(msg_p->handle);
         /* only try once to retrieve a config file from each server */
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = server_fetch_config_comp_fn;

@@ -89,7 +89,7 @@ PVFS_error PVFS_isys_seteattr_list(
         }/*end for*/
     } /*end if*/
 
-    if ((ref.handle == PVFS_HANDLE_NULL) ||
+    if ((PVFS_handle_is_null(ref.handle)) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
     {
         gossip_err("invalid (NULL) required argument\n");
@@ -206,7 +206,7 @@ static PINT_sm_action set_eattr_setup_msgpair(
             );
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->object_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = set_eattr_comp_fn;
 

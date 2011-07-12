@@ -511,7 +511,6 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
 
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
-                            PVFS_handle_extent_array *handle_extent_array,
                             PVFS_ds_type type,
                             void *hint,
                             PVFS_ds_flags flags,
@@ -524,7 +523,6 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 
 /* create a set of new data space objects */
 int job_trove_dspace_create_list(PVFS_fs_id coll_id,
-			    PVFS_handle_extent_array *handle_extent_array,
                             PVFS_handle* out_handle_arry,
                             int count,
 			    PVFS_ds_type type,

@@ -61,7 +61,7 @@ int PINT_lookup_parent(
             gossip_err("Invalid dirname (no leading '/')\n");
         }
         gossip_err("cannot get parent directory of %s\n", filename);
-        *handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(*handle);
         return ret;
     }
 
@@ -70,11 +70,11 @@ int PINT_lookup_parent(
     if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n", buf);
-        *handle = PVFS_HANDLE_NULL;
+        PVFS_handle_clear(*handle);
         return ret;
     }
 
-    *handle = resp_look.ref.handle;
+    PVFS_handle_copy(*handle, resp_look.ref.handle);
     return 0;
 }
 

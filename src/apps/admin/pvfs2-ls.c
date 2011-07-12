@@ -439,7 +439,7 @@ void print_entry(
             /* missing attributes (possibly for . or .. entries); get them
              * the old fashioned way
              */
-            ref.handle = handle;
+            PVFS_handle_copy(ref.handle, handle);
             ref.fs_id = fs_id;
 
             memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));

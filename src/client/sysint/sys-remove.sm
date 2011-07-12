@@ -163,7 +163,7 @@ PVFS_error PVFS_isys_remove(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_remove entered\n");
 
-    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+    if ((PVFS_handle_is_null(parent_ref.handle)) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
         (object_name == NULL))
     {
@@ -282,7 +282,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->parent_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_rmdirent_comp_fn;
 
@@ -333,7 +333,7 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    PVFS_handle_copy(msg_p->handle, sm_p->parent_ref.handle);
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_crdirent_comp_fn;
 
@@ -362,11 +362,12 @@ static int remove_rmdirent_comp_fn(
 
     if (resp_p->status == 0)
     {
-        assert(resp_p->u.rmdirent.entry_handle != PVFS_HANDLE_NULL);
+        assert(!PVFS_handle_is_null(resp_p->u.rmdirent.entry_handle));
         assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
 
         /* pull handle out of response, also copy in fs_id from before */
-        sm_p->object_ref.handle = resp_p->u.rmdirent.entry_handle;
+        PVFS_handle_copy(sm_p->object_ref.handle, 
+                         resp_p->u.rmdirent.entry_handle);
         sm_p->object_ref.fs_id  = sm_p->parent_ref.fs_id;
 
         gossip_debug(

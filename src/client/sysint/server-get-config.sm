@@ -242,7 +242,7 @@ static PINT_sm_action server_get_config_setup_msgpair(
     PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
 
     msg_p->fs_id = PVFS_FS_ID_NULL;
-    msg_p->handle = PVFS_HANDLE_NULL;
+    PVFS_handle_clear(msg_p->handle);
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = server_get_config_comp_fn;
     msg_p->svr_addr = serv_addr;

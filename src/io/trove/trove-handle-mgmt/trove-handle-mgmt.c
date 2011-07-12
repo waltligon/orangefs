@@ -12,7 +12,6 @@
 
 #include "trove.h"
 #include "quickhash.h"
-#include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
 #include "gen-locks.h"
@@ -38,7 +37,7 @@
 //static int hash_fsid(void *fsid, int table_size);
 //static int hash_fsid_compare(void *key, struct qlist_head *link);
 //
-//static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
 //
 ///* trove_check_handle_ranges:
 // *  internal function to verify that handles
@@ -470,8 +469,6 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
 
 int trove_handle_mgmt_finalize()
 {
-    int i;
-
     gen_mutex_lock(&trove_handle_mutex);
 
     /* FIX: add book keeping */
@@ -479,12 +476,12 @@ int trove_handle_mgmt_finalize()
     gen_mutex_unlock(&trove_handle_mutex);
     return 0;
 }
-//
-///*
-// * Local variables:
-// *  c-indent-level: 4
-// *  c-basic-offset: 4
-// * End:
-// *
-// * vim: ts=8 sts=4 sw=4 expandtab
-// */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

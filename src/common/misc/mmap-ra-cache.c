@@ -260,9 +260,12 @@ int pvfs2_mmap_ra_cache_finalize(void)
 static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
+    unsigned long h_hash = 0;
     PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
-    tmp += ((refn->handle << 2) | (refn->fs_id));
+    /* FIX: clean this up to be a reasonable hash */
+    PVFS_handle_to_hash(refn->handle, &h_hash);
+    tmp += ((h_hash) | (refn->fs_id));
     tmp = (tmp % table_size);
 
     return ((int)tmp);

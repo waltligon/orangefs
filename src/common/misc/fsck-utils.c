@@ -364,7 +364,7 @@ int PVFS_fsck_validate_dfile(
     }
 
     /* Build the needed PVFS_Object reference needed for API calls */
-    obj_ref.handle = *handle;
+    PVFS_handle_copy(obj_ref.handle, *handle);
     obj_ref.fs_id = *cur_fs;
 
     /* Check for existence of attributes */
@@ -486,7 +486,7 @@ int PVFS_fsck_validate_metafile(
     for (i = 0; i < attributes->attr.dfile_count; i++)
     {
         err = PVFS_fsck_validate_dfile(fsck_options,
-                                     &df_handles[i],
+                                     (const PVFS_handle *)&df_handles[i],
                                      &obj_ref->fs_id,
                                      creds, &dfiles_total_size);
         if(err < 0)
@@ -679,7 +679,7 @@ int PVFS_fsck_validate_dirdata(
 
     memset(&dirdata_attributes, 0, sizeof(dirdata_attributes));
 
-    obj_ref.handle = *handle;
+    PVFS_handle_copy(obj_ref.handle, *handle);
     obj_ref.fs_id = *cur_fs;
 
     if (fsck_options->check_stranded_objects)
@@ -756,7 +756,8 @@ int PVFS_fsck_validate_dir(
     int i = 0;
     int err = 0;
     int current_dir_entry = 0;
-    PVFS_ds_position token = PVFS_READDIR_START;
+    PVFS_kv_position token;
+    unsigned int token_flag = PVFS_READDIR_START;
     PVFS_sysresp_readdir readdir_resp;
     PVFS_handle dirdata_handle;
 
@@ -787,8 +788,8 @@ int PVFS_fsck_validate_dir(
         return(err);
     }
 
-    err = PVFS_fsck_validate_dirdata
-        (fsck_options, &dirdata_handle, &obj_ref->fs_id, creds);
+    err = PVFS_fsck_validate_dirdata(fsck_options, 
+        (const PVFS_handle *)&dirdata_handle, &obj_ref->fs_id, creds);
     if(err < 0)
     {
         gossip_err("Error: directory dirdata is invalid\n");
@@ -802,9 +803,10 @@ int PVFS_fsck_validate_dir(
         memset(&readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
 
         err = PVFS_sys_readdir(*obj_ref,
-                             token,
-                             MAX_DIR_ENTS,
-                             (PVFS_credentials *) creds, &readdir_resp, NULL);
+                               token,
+                               &token_flag,
+                               MAX_DIR_ENTS,
+                               (PVFS_credentials *) creds, &readdir_resp, NULL);
         if(err < 0)
         {
             gossip_err("Error: could not read directory entries\n");
@@ -816,8 +818,8 @@ int PVFS_fsck_validate_dir(
             strncpy(directory_entries[current_dir_entry].d_name,
                     readdir_resp.dirent_array[i].d_name, PVFS_NAME_MAX + 1);
 
-            directory_entries[current_dir_entry].handle = 
-                readdir_resp.dirent_array[i].handle;
+            PVFS_handle_copy(directory_entries[current_dir_entry].handle,
+                             readdir_resp.dirent_array[i].handle);
             current_dir_entry++;
 
             if (fsck_options->check_dir_entry_names)
@@ -836,7 +838,7 @@ int PVFS_fsck_validate_dir(
         }
 
         free(readdir_resp.dirent_array);
-        token = readdir_resp.token;
+        memcpy(&token, &readdir_resp.token, sizeof(PVFS_kv_position));
 
     } while (readdir_resp.pvfs_dirent_outcount == MAX_DIR_ENTS);
 
@@ -1065,6 +1067,7 @@ static int PINT_handle_wrangler_load_handles(
     int i = 0;
     int *handle_count_array = NULL;
     PVFS_ds_position *position_array = NULL;
+    unsigned int *position_flag_array = NULL;
     int more_handles = 0;
     int err = 0;
 
@@ -1144,6 +1147,14 @@ static int PINT_handle_wrangler_load_handles(
         goto load_handles_error;
     }
 
+    position_flag_array = (unsigned int *) calloc(server_count, 
+                                                  sizeof(unsigned int));
+    if( position_flag_array == NULL )
+    {
+        ret = -PVFS_ENOMEM;
+        goto load_handles_error;
+    }
+
     PINT_handle_wrangler_handlelist.list_array =
         (PVFS_handle **) calloc(server_count, sizeof(PVFS_handle *));
     if (PINT_handle_wrangler_handlelist.list_array == NULL)
@@ -1198,7 +1209,8 @@ static int PINT_handle_wrangler_load_handles(
     }
     memset(handle_matrix, 0, server_count*sizeof(PVFS_handle*));
 
-    /* populating a nice "handlelist" struct with all this various handle data */
+    /* populating a nice "handlelist" struct with all this various handle 
+     * data */
     for (i = 0; i < server_count; i++)
     {
         PINT_handle_wrangler_handlelist.size_array[i] =
@@ -1235,7 +1247,7 @@ static int PINT_handle_wrangler_load_handles(
         }
 
         /* FIX: position stuff changed to use small int and flag */
-        position_array[i] = PVFS_ITERATE_START;
+        position_flag_array[i] = PVFS_ITERATE_START;
         handle_count_array[i] = HANDLE_BATCH;
     }
 
@@ -1248,6 +1260,8 @@ static int PINT_handle_wrangler_load_handles(
                                              handle_matrix,
                                              handle_count_array,
                                              position_array,
+                                             NULL,
+                                             position_flag_array,
                                              PINT_handle_wrangler_handlelist.addr_array,
                                              server_count,
                                              0,
@@ -1268,9 +1282,9 @@ static int PINT_handle_wrangler_load_handles(
             int j = 0;
             for (j = 0; j < handle_count_array[i]; j++)
             {
-                PINT_handle_wrangler_handlelist.list_array[i]
-                    [PINT_handle_wrangler_handlelist.used_array[i] + j] =
-                    handle_matrix[i][j];
+                PVFS_handle_copy(PINT_handle_wrangler_handlelist.list_array[i]
+                    [PINT_handle_wrangler_handlelist.used_array[i] + j],
+                    handle_matrix[i][j]);
             }
 
             PINT_handle_wrangler_handlelist.used_array[i] +=
@@ -1278,7 +1292,7 @@ static int PINT_handle_wrangler_load_handles(
 
             /* are there more handles? */
             /* FIX: position stuff changed to use small int and flag */
-            if (position_array[i] != PVFS_ITERATE_END)
+            if (position_flag_array[i] != PVFS_ITERATE_END)
             {
                 more_handles = 1;
             }
@@ -1301,7 +1315,7 @@ static int PINT_handle_wrangler_load_handles(
     for (i = 0; i < server_count; i++)
     {
         /* FIX: position stuff changed to use small int and flag */
-        position_array[i] = PVFS_ITERATE_START;
+        position_flag_array[i] = PVFS_ITERATE_START;
         handle_count_array[i] = HANDLE_BATCH;
     }
 
@@ -1312,6 +1326,8 @@ static int PINT_handle_wrangler_load_handles(
                                              handle_matrix,
                                              handle_count_array,
                                              position_array,
+                                             NULL,
+                                             position_flag_array,
                                              PINT_handle_wrangler_handlelist.addr_array,
                                              server_count,
                                              PVFS_MGMT_RESERVED,
@@ -1332,13 +1348,13 @@ static int PINT_handle_wrangler_load_handles(
             int j = 0;
             for (j = 0; j < handle_count_array[i]; j++)
             {
-                PINT_handle_wrangler_remove_handle(&handle_matrix[i][j],
-                    cur_fs);
+                PINT_handle_wrangler_remove_handle(
+                    (const PVFS_handle *)&(handle_matrix[i][j]), cur_fs);
             }
 
             /* are there more handles? */
             /* FIX: position stuff changed to use small int and flag */
-            if (position_array[i] != PVFS_ITERATE_END)
+            if (position_flag_array[i] != PVFS_ITERATE_END)
             {
                 more_handles = 1;
                 handle_count_array[i] = HANDLE_BATCH;
@@ -1391,6 +1407,8 @@ load_handles_success:
     }
     if(position_array)
         free(position_array);
+    if(position_flag_array)
+        free(position_flag_array);
     if(handle_count_array)
         free(handle_count_array);
     if(stat_array)
@@ -1418,7 +1436,8 @@ static int PINT_handle_wrangler_remove_handle(
     int found = 0;
 
     /* find which server the handle is on */
-    ret = PINT_cached_config_map_to_server(&server_addr, *handle, *cur_fs);
+    ret = PINT_cached_config_map_to_server(&server_addr, 
+        *(PVFS_handle *)handle, *cur_fs);
     if(ret < 0)
     {
         PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);
@@ -1542,7 +1561,8 @@ static int PINT_handle_wrangler_display_stranded_handles(
         {
             if (!PINT_handle_wrangler_handlelist.list_array_seen[i][j])
             {
-                pref.handle = PINT_handle_wrangler_handlelist.list_array[i][j];
+                PVFS_handle_copy(pref.handle, 
+                    PINT_handle_wrangler_handlelist.list_array[i][j]);
                 pref.fs_id = *cur_fs;
 
                 if(!header)

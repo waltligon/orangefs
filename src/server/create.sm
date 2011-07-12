@@ -175,7 +175,6 @@ static int create_metafile(
 
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
-        &meta_handle_ext_array,
         PVFS_TYPE_METAFILE,
         NULL,
         0,
@@ -383,7 +382,6 @@ static int create_local_datafiles(
      */
     ret = job_trove_dspace_create_list(
         s_op->req->u.create.fs_id,
-        &data_handle_ext_array,
         s_op->u.create.handle_array_local,
         s_op->u.create.handle_array_local_count,
         PVFS_TYPE_DATAFILE,
