@@ -18,12 +18,12 @@
 #define PROJ_ID 61
 #define BLOCKS_IN_CACHE 512
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
+#define AT_FLAGS 0
 #define SVSHM_MODE   (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6) 
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
 
-#define AT_FLAGS 0
-
 #define NIL (-1)
+#define DBG 0
 
 /** A link for one block of memory in a files hash table
  *
@@ -101,6 +101,31 @@ union user_cache_u
 	struct file_table_s ftbl;
 	union cache_block_u b[0]; /* actual size of this varies */
 };
+
+/*	Function Declarations	*/
+static void add_free_mtbls(int blk);
+void ucache_initialize(void);
+static void init_memory_table(int blk, int ent);
+static int get_free_blk(void);
+static void put_free_blk(int blk);
+static int get_free_fent(void);
+static void put_free_fent(int fent);
+static int get_free_ment(struct mem_table_s *mtbl);
+static void put_free_ment(struct mem_table_s *mtbl, int ent);
+static struct mem_table_s *lookup_file(
+	uint32_t fs_id, 
+	uint64_t handle,
+	uint32_t *file_mtbl_blk,		/* Can be NULL if not desired	*/
+	uint16_t *file_mtbl_ent,		/* Can be NULL if not desired	*/
+	uint16_t *file_ent_index,	/* Can be NULL if not desired	*/
+	uint16_t *file_ent_prev_index	/* Can be NULL if not desired	*/
+);
+static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
+static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
+static int remove_file(uint32_t fs_id, uint64_t handle);
+static void *lookup_mem(struct mem_table_s *mtbl, uint64_t offset);
+static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset);
+static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
 
 #endif 
 
