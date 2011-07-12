@@ -320,7 +320,7 @@ int main(int argc, char **argv)
             fflush(stdout);
             continue;
         }
-        fprintf(stdout, "%s\n%llu\n", returnType, llu(returnValue));
+        fprintf(stdout, "%s\n%llu\n", returnType, returnValue);
         fflush(stdout);
         /* return to top for next command */
     }
