@@ -206,7 +206,8 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
-    SERVER_PRECREATE_INIT  = (1 << 18),
+    SERVER_PRECREATE_INIT      = (1 << 18),
+    SERVER_MIRROR_INIT         = (1 << 19),
 } PINT_server_status_flag;
 
 typedef enum
@@ -270,6 +271,11 @@ struct PINT_server_mirror_op
 };
 typedef struct PINT_server_mirror_op PINT_server_mirror_op;
 
+/* This variable is used by the mirroring logic in create-immutable-copies.sm */
+/* to resolve a 3-way logic problem.                                          */
+/* It only needs to be initialized once when the server starts up.            */
+PVFS_handle MIRROR_HANDLE_INIT;
+
 /* Source refers to the handle being copied, and destination refers to        */
 /* its copy.                                                                  */
 struct PINT_server_create_copies_op
@@ -294,9 +300,9 @@ struct PINT_server_create_copies_op
     /*number of copies desired. value of user.pvfs2.mirror.copies attribute*/
     uint32_t copies;
 
-    /*successful/failed writes array in order of source handles         */
-    /*0=>successful  !UINT64_HIGH=>failure   UINT64_HIGH=>initial state */
-    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]     */
+    /*successful/failed writes array in order of source handles                       */
+    /*0=>successful  !MIRROR_HANDLE_INIT=>failure   MIRROR_HANDLE_INIT=>initial state */
+    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]                   */
     PVFS_handle *writes_completed;
 
     /*number of attempts at writing handles*/

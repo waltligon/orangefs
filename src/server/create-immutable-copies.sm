@@ -24,8 +24,7 @@
 
 /*all bits turned on*/
 //static uint64_t UINT64_HIGH = 0xffffffffffffffffULL; 
-static const uuid_t UUID_INIT;
-PVFS_handle_generate(UUID_INIT);
+extern PVFS_handle MIRROR_HANDLE_INIT;
 
 /*attribute keys used for the mirroring process*/
 static char handle_key[]     = USER_PVFS2_MIRROR_HANDLES;
@@ -1065,7 +1064,7 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
       return SM_ACTION_COMPLETE;
    }
    for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
-       PVFS_handle_copy(imm_p->writes_completed[i],UUID_INIT);
+       PVFS_handle_copy(imm_p->writes_completed[i],MIRROR_HANDLE_INIT);
    //memset(imm_p->writes_completed,UINT64_HIGH,sizeof(PVFS_handle) 
    //                                         * imm_p->dfile_count
    //                                         * imm_p->copies);
@@ -1132,7 +1131,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
            index = (imm_p->copies * row) + cols;
            /* cleanup and fix */
            /*this will capture UINT64_HIGH or handle*/
-           if (     (PVFS_handle_compare(imm_p->writes_completed[index],UUID_INIT) == 0)
+           if (     (PVFS_handle_compare(imm_p->writes_completed[index],MIRROR_HANDLE_INIT) == 0)
                 || !(PVFS_handle_is_null(imm_p->writes_completed[index])  )
            //if (   imm_p->writes_completed[index] > 0
            //        || imm_p->writes_completed[index] == UINT64_HIGH)
@@ -1193,7 +1192,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        index = imm_p->copies*src; /*first copy for this source*/
        
        //if (imm_p->writes_completed[index] == UINT64_HIGH)
-        if ( PVFS_handle_compare(imm_p->writes_completed[index],UUID_INIT) == 0 )
+        if ( PVFS_handle_compare(imm_p->writes_completed[index],MIRROR_HANDLE_INIT) == 0 )
        {
           /*handle_array_copies[copy,server#] is accessed as a two-dimensional*/
           /*array where a row represents a copy and columns represent the     */
@@ -1437,7 +1436,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
            } else
            {
                //imm_p->writes_completed[index] = UINT64_HIGH;
-               PVFS_handle_copy(imm_p->writes_completed[index],UUID_INIT);
+               PVFS_handle_copy(imm_p->writes_completed[index],MIRROR_HANDLE_INIT);
            } 
        }
 

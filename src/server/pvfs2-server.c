@@ -166,6 +166,8 @@ static int precreate_pool_count(
 
 static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id);
 
+static int mirror_initialize(void);
+
 
 struct server_configuration_s *PINT_get_server_config(void)
 {
@@ -662,6 +664,7 @@ static int server_setup_process_environment(int background)
  * - initializes the job subsystem
  *   - gets a job context
  * - initialize the request scheduler
+ * - initializes mirroring
  */
 static int server_initialize_subsystems(
     PINT_server_status_flag *server_status_flag)
@@ -1170,6 +1173,15 @@ static int server_initialize_subsystems(
 
     *server_status_flag |= SERVER_PRECREATE_INIT;
 
+    ret = mirror_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error initializing the mirroring system.\n");
+        return(ret);
+    }
+
+    *server_status_flag |= SERVER_MIRROR_INIT;
+
     return ret;
 }
 
@@ -1640,6 +1652,10 @@ static int server_shutdown(
         free(server_job_id_array);
         free(server_completed_job_p_array);
         free(server_job_status_array);
+    }
+
+    if (status & SERVER_MIRROR_INIT)
+    { /* noop - currently there is nothing to shutdown */
     }
 
     if(siglevel == 0 && ret != 0)
@@ -2794,6 +2810,17 @@ static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
 
     return(0);
 }
+
+static int mirror_initialize(void)
+{
+    PVFS_handle_generate(MIRROR_HANDLE_INIT);
+
+    if ( PVFS_handle_is_null(MIRROR_HANDLE_INIT) )
+       return(1);
+    else
+       return(0);   
+}
+
 
 /*
  * Local variables:
