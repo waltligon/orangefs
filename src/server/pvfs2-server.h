@@ -207,7 +207,6 @@ typedef enum
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
     SERVER_PRECREATE_INIT      = (1 << 18),
-    SERVER_MIRROR_INIT         = (1 << 19),
 } PINT_server_status_flag;
 
 typedef enum
@@ -271,11 +270,6 @@ struct PINT_server_mirror_op
 };
 typedef struct PINT_server_mirror_op PINT_server_mirror_op;
 
-/* This variable is used by the mirroring logic in create-immutable-copies.sm */
-/* to resolve a 3-way logic problem.                                          */
-/* It only needs to be initialized once when the server starts up.            */
-PVFS_handle MIRROR_HANDLE_INIT;
-
 /* Source refers to the handle being copied, and destination refers to        */
 /* its copy.                                                                  */
 struct PINT_server_create_copies_op
@@ -301,9 +295,14 @@ struct PINT_server_create_copies_op
     uint32_t copies;
 
     /*successful/failed writes array in order of source handles                       */
-    /*0=>successful  !MIRROR_HANDLE_INIT=>failure   MIRROR_HANDLE_INIT=>initial state */
+    /*0=>successful  !0=>failure   UINT64_HIGH=>initial state                         */
     /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]                   */
-    PVFS_handle *writes_completed;
+    //PVFS_handle *writes_completed;
+    struct writes_completed_s 
+    {
+       PVFS_error  status;
+       PVFS_handle handle;
+    } *writes_completed;
 
     /*number of attempts at writing handles*/
     int retry_count;
@@ -547,7 +546,7 @@ struct PINT_server_getattr_op
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
     int num_dfiles_req;
-    PVFS_handle *mirror_dfile_status_array;
+    PVFS_error *mirror_dfile_status_array;
 };
 
 struct PINT_server_listattr_op
