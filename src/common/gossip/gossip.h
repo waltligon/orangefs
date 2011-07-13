@@ -27,7 +27,9 @@
 #ifndef __KERNEL__
 #include <stdint.h>
 #include <stdarg.h>
-/* #include "syslog.h" */
+#ifndef WIN32
+#include "syslog.h"
+#endif
 #endif
 #include "pvfs2-config.h"
 
