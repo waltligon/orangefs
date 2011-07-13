@@ -1123,13 +1123,11 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
 
        /* writes_completed indicates the status of each copy for each source: */
        /* 0 ==> completed, 1 ==> incomplete, STATUS_INIT ==> initial state.   */
-       /* If incomplete, the value stored in the array is the destination     */
+       /* If incomplete, the value stored is the handle is the destination    */
        /* handle.                                                             */
        for (row=src,cols=0; cols<imm_p->copies; cols++)
        {
            index = (imm_p->copies * row) + cols;
-           /* cleanup and fix */
-
 
            if ( imm_p->writes_completed[index].status == 1 ||
                 imm_p->writes_completed[index].status == STATUS_INIT    )
@@ -1148,7 +1146,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        if (cols==imm_p->copies)
        {
           gossip_debug(GOSSIP_MIRROR_DEBUG,"\tThis source[%d] has all "
-                                           "complete writes.\n"
+                                           "completed writes.\n"
                                           ,src);
           continue;
        }
@@ -1188,7 +1186,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
                         imm_p->handle_array_base[src]);
 
        
-       /* In the initial state or when all writes have failed, get destination*/
+       /* In the initial state or when ALL writes have failed, get destination*/
        /* handles from handle_array_copies array.  Otherwise, use the handles */
        /* stored in the writes_completed array.                               */
        index = imm_p->copies*src; /*first copy for this source*/
@@ -1211,7 +1209,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
             req->u.mirror.wcIndex[row]     = index + wc;
             req->u.mirror.dst_count++;
           }
-       } else {
+       } else { /*status == 1*/
           for (row=src,cols=0,i=0; cols<imm_p->copies; cols++,i++)
           {
               index = (imm_p->copies*row) + cols;
