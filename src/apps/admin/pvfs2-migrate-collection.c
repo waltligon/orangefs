@@ -692,7 +692,9 @@ static int translate_0_0_1(
     TROVE_op_id op_id;
     TROVE_context_id trove_context = -1;
     char current_path[PATH_MAX];
+    TROVE_handle handle;
 
+    PVFS_handle_clear(handle);
     /* rename old collection */
     snprintf(current_path, PATH_MAX, "%s/%08x", meta_storage_space, coll_id);
 
@@ -732,7 +734,7 @@ static int translate_0_0_1(
 	meta_storage_space,
         coll_name,
         coll_id, 
-        TROVE_HANDLE_NULL,
+        handle,
         handle_range,
         NULL,
         1,
@@ -1082,8 +1084,6 @@ static int translate_dspace_attr_0_0_1(
     TROVE_op_id op_id;
     int count = 0;
     TROVE_ds_state state;
-    TROVE_handle_extent cur_extent;
-    TROVE_handle_extent_array extent_array;
     TROVE_handle new_handle;
     TROVE_handle* tmp_handle;
     PVFS_ds_storedattr_0_0_1* tmp_attr;
@@ -1167,13 +1167,9 @@ static int translate_dspace_attr_0_0_1(
             if(verbose) printf("VERBOSE Migrating attributes for handle: %llu, type: %d\n", 
                 llu(*tmp_handle), (int)tmp_attr->type);
 
-            cur_extent.first = cur_extent.last = *tmp_handle;
-            extent_array.extent_count = 1;
-            extent_array.extent_array = &cur_extent;
-
             state = 0;
             ret = trove_dspace_create(
-                coll_id, &extent_array, &new_handle,
+                coll_id, &new_handle,
                 tmp_attr->type, NULL,
                 (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
                 NULL, trove_context, &op_id, NULL);
@@ -1201,7 +1197,7 @@ static int translate_dspace_attr_0_0_1(
              * because the alignment changed after 0.0.1
              */
             new_attr.fs_id = tmp_attr->fs_id;
-            new_attr.handle = tmp_attr->handle;
+            PVFS_handle_copy(new_attr.handle, tmp_attr->handle);
             new_attr.type = tmp_attr->type;
             new_attr.uid = tmp_attr->uid;
             new_attr.gid = tmp_attr->gid;
@@ -1283,22 +1279,8 @@ static int translate_keyvals_0_0_1(
             if(strcmp(tmp_ent->d_name, ".") && strcmp(tmp_ent->d_name, ".."))
             {
                 /* scan the handle value out of the file name */
-#if SIZEOF_LONG_INT == 4
-                ret = sscanf(tmp_ent->d_name, "%llx.keyval",
-                    &(llu(tmp_handle)));
-#elif SIZEOF_LONG_INT == 8
-                ret = sscanf(tmp_ent->d_name, "%lx.keyval",
-                    &(tmp_handle));
-#else
-#error Unexpected sizeof(long int)
-#endif
-                if(ret != 1)
-                {
-                    fprintf(stderr, "Error: malformed file name %s in %s\n",
-                        tmp_ent->d_name, bucket_dir);
-                    closedir(tmp_dir);
-                    return(-1);
-                }
+                PVFS_handle_unparse(tmp_handle, (char *)tmp_ent->d_name);
+
                 snprintf(keyval_db, PATH_MAX, "%s/keyvals/%.8d/%s",
                     old_coll_path, i, tmp_ent->d_name);
                 /* translate each keyval db to new format */

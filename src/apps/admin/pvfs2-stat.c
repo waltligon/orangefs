@@ -223,7 +223,7 @@ static int do_stat(const char             * pszFile,
       return -1;
    }
 
-   ref.handle = lk_response.ref.handle;
+   PVFS_handle_copy(ref.handle, lk_response.ref.handle);
    ref.fs_id  = fs_id;
    
    ret = PVFS_sys_getattr(ref, 

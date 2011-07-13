@@ -732,7 +732,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
             PVFS_perror("PVFS_sys_lookup", ret);
             return (-1);
         }
-        ref.handle = resp_lookup.ref.handle;
+        PVFS_handle_copy(ref.handle, resp_lookup.ref.handle);
         ref.fs_id = resp_lookup.ref.fs_id;
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));

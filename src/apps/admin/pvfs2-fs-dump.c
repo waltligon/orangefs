@@ -246,7 +246,9 @@ int build_handlelist(PVFS_fs_id cur_fs,
     int  *hcount_array;
     unsigned long *handle_count_array;
     unsigned long *total_count_array;
-    PVFS_ds_position *position_array;
+    PVFS_ds_position *ds_position_array;
+    PVFS_kv_position *kv_position_array;
+    unsigned int *position_flag_array;
     struct PVFS_mgmt_server_stat *stat_array;
     struct PVFS_mgmt_setparam_value param_value;
 
@@ -313,12 +315,24 @@ int build_handlelist(PVFS_fs_id cur_fs,
 	perror("malloc");
 	return -1;
     }
-    position_array = (PVFS_ds_position *) calloc(server_count, sizeof(PVFS_ds_position));
-    if (position_array == NULL)
+    ds_position_array = 
+        (PVFS_ds_position *) calloc(server_count, sizeof(PVFS_ds_position));
+    if (ds_position_array == NULL)
     {
 	perror("malloc");
 	return -1;
     }
+    kv_position_array = 
+        (PVFS_kv_position *) calloc(server_count, sizeof(PVFS_kv_position));
+    if (kv_position_array == NULL)
+    {
+	perror("malloc");
+	return -1;
+    }
+
+    position_flag_array = (unsigned int *) calloc(server_count, 
+                                                  sizeof(unsigned int));
+
     /* total_count_array */
     total_count_array = (unsigned long *) calloc(server_count, sizeof(unsigned long));
     if (total_count_array == NULL)
@@ -346,8 +360,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
     for (i=0; i < server_count; i++)
     {
 	hcount_array[i] = HANDLE_BATCH;
-        /* FIX: position stuff changed to use small int and flag */
-	position_array[i] = PVFS_ITERATE_START;
+	position_flag_array[i] = PVFS_ITERATE_START;
     }
 
     /* iterate until we have retrieved all handles */
@@ -357,7 +370,9 @@ int build_handlelist(PVFS_fs_id cur_fs,
 					     creds,
 					     handle_matrix,
 					     hcount_array,
-					     position_array,
+					     ds_position_array,
+					     kv_position_array,
+                                             position_flag_array,
 					     addr_array,
 					     server_count,
                                              0,
@@ -405,7 +420,7 @@ int build_handlelist(PVFS_fs_id cur_fs,
 	for (i = 0; i < server_count; i++)
 	{
             /* FIX: position stuff changed to use small int and flag */
-	    if (position_array[i] != PVFS_ITERATE_END)
+	    if (position_flag_array[i] != PVFS_ITERATE_END)
 	    {
 		more_flag = 1;
 		break;
@@ -429,7 +444,9 @@ int build_handlelist(PVFS_fs_id cur_fs,
     free(handle_count_array);
     free(hcount_array);
     free(total_count_array);
-    free(position_array);
+    free(ds_position_array);
+    free(kv_position_array);
+    free(position_flag_array);
 
     handlelist_finished_adding_handles();
     free(stat_array);
@@ -492,18 +509,18 @@ int descend(PVFS_fs_id cur_fs,
 	    struct options *opts_p)
 {
     int i, count, ret;
-    PVFS_ds_position token;
+    PVFS_kv_position token;
+    unsigned int token_flag;
     PVFS_sysresp_readdir readdir_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref entry_ref;
 
     count = 64;
 
-    token = 0;
+    token_flag = PVFS_READDIR_START;
     do {
         memset(&readdir_resp, 0, sizeof(PVFS_sysresp_readdir));
-        ret = PVFS_sys_readdir(pref,
-                         (!token ? PVFS_READDIR_START : token),
+        ret = PVFS_sys_readdir(pref, token, &token_flag,
                          count,
                          creds,
                          &readdir_resp, NULL);
@@ -514,10 +531,10 @@ int descend(PVFS_fs_id cur_fs,
             char *cur_file;
             PVFS_handle cur_handle;
 
-            cur_handle = readdir_resp.dirent_array[i].handle;
+            PVFS_handle_copy(cur_handle, readdir_resp.dirent_array[i].handle);
             cur_file   = readdir_resp.dirent_array[i].d_name;
 
-            entry_ref.handle = cur_handle;
+            PVFS_handle_copy(entry_ref.handle, cur_handle);
             entry_ref.fs_id  = cur_fs;
 
             if ((ret = PVFS_sys_getattr(entry_ref,
@@ -565,7 +582,7 @@ int descend(PVFS_fs_id cur_fs,
 
             handlelist_remove_handle(cur_handle, server_idx);
         }
-        token = readdir_resp.token;
+        memcpy(&token, &readdir_resp.token, sizeof(PVFS_kv_position));
         if (readdir_resp.pvfs_dirent_outcount)
         {
             free(readdir_resp.dirent_array);
@@ -650,7 +667,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
         PVFS_object_ref entry_ref;
         char* fmt_string;
 
-        entry_ref.handle = handle;
+        PVFS_handle_copy(entry_ref.handle, handle);
         entry_ref.fs_id  = cur_fs;
         /* only remaining handles are dirdata */
         PVFS_sys_getattr(entry_ref,
@@ -744,7 +761,8 @@ static void handlelist_add_handles(PVFS_handle *handles,
     }
 
     for (i = 0; i < handle_count; i++) {
-	handlelist_list[server_idx][start_off + i] = handles[i];
+	PVFS_handle_copy(handlelist_list[server_idx][start_off + i],
+            handles[i]);
     }
 
     handlelist_used[server_idx] += handle_count;
@@ -795,8 +813,8 @@ static void handlelist_remove_handle(PVFS_handle handle, int server_idx)
 	    if (i < (handlelist_used[server_idx] - 1))
 	    {
 		/* move last entry to this position before decrement */
-		handlelist_list[server_idx][i] =
-		    handlelist_list[server_idx][handlelist_used[server_idx]-1];
+		PVFS_handle_copy(handlelist_list[server_idx][i],
+		    handlelist_list[server_idx][handlelist_used[server_idx]-1]);
 		
 	    }
 	    handlelist_used[server_idx]--;
@@ -820,7 +838,8 @@ static int handlelist_return_handle(PVFS_handle *handle_p, int *server_idx_p)
     for (i = 0; i < handlelist_server_count; i++)
     {
 	if (handlelist_used[i] > 0) {
-	    *handle_p = handlelist_list[i][handlelist_used[i]-1];
+	    PVFS_handle_copy(*handle_p, 
+                handlelist_list[i][handlelist_used[i]-1]);
 	    handlelist_used[i]--;
 	    *server_idx_p = i;
 	    return 0;

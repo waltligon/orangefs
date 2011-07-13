@@ -264,7 +264,7 @@ int validate_pvfs_object(
                 PVFS_object_ref obj_ref;
                 char new_path[PVFS_SEGMENT_MAX];
 
-                obj_ref.handle = directory_entries[j].handle;
+                PVFS_handle_copy(obj_ref.handle, directory_entries[j].handle);
                 obj_ref.fs_id = *cur_fs;
 
                 /* build full path name of the next object */

@@ -222,7 +222,7 @@ static int parse_args(int argc, char **argv)
 	    case 'd':
 		/* TODO: USE BIGGER VALUE */
 		got_dspace_handle = 1;
-		dspace_handle = strtol(optarg, NULL, 16);
+		PVFS_handle_parse(optarg, dspace_handle);
                 break;
 	    case 'v':
 		verbose = 1;
@@ -363,7 +363,8 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 				TROVE_ds_type type)
 {
     int ret, count;
-    TROVE_ds_position pos;
+    TROVE_kv_position pos;
+    unsigned int pos_flag;
     TROVE_keyval_s key, val;
     TROVE_op_id op_id;
     TROVE_ds_state state;
@@ -390,8 +391,7 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
         return -1;
     }
 
-
-    pos = TROVE_ITERATE_START;
+    pos_flag = TROVE_ITERATE_START;
     count = 1;
 
     while (count > 0) {
@@ -402,6 +402,7 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 	ret = trove_keyval_iterate(coll_id,
 				   handle,
 				   &pos,
+                                   &pos_flag,
 				   &key,
 				   &val,
 				   &count,

@@ -177,7 +177,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
     {
         PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
         servers[ret] = (char *) calloc(1, PVFS_MAX_SERVER_ADDR_LEN);
-        handles[ret] = *ptr;
+        PVFS_handle_copy(handles[ret], *ptr);
         if (servers[ret] == NULL)
         {
             break;
@@ -409,7 +409,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
             PVFS_perror("PVFS_sys_lookup", ret);
             return (-1);
         }
-        ref.handle = resp_lookup.ref.handle;
+        PVFS_handle_copy(ref.handle, resp_lookup.ref.handle);
         ref.fs_id = resp_lookup.ref.fs_id;
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));

@@ -289,7 +289,7 @@ static int make_directory(PVFS_credentials     * credentials,
         }
     }
     
-    parent_ref.handle = resp_lookup.ref.handle;
+    PVFS_handle_copy(parent_ref.handle, resp_lookup.ref.handle);
     parent_ref.fs_id  = resp_lookup.ref.fs_id;
 
     /* Clear out any info from previous calls */

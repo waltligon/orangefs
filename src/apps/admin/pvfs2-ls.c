@@ -487,7 +487,8 @@ int do_list(
     PVFS_sysresp_getattr getattr_response;
     PVFS_credentials credentials;
     PVFS_object_ref ref;
-    PVFS_ds_position token;
+    PVFS_kv_position token;
+    unsigned int token_flag = 0;
     uint64_t dir_version = 0;
     double begin = 0., end;
     subdir *current, *head = NULL, *tail = NULL;
@@ -510,10 +511,11 @@ int do_list(
         return -1;
     }
 
-    ref.handle = lk_response.ref.handle;
+    PVFS_handle_copy(ref.handle, lk_response.ref.handle);
     ref.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
+    memset(&token, 0, sizeof(PVFS_kv_position));
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
     if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
                          &credentials, &getattr_response, NULL) == 0)
@@ -559,12 +561,12 @@ int do_list(
 
     if (do_timing)
         begin = Wtime();
-    token = 0;
+    token_flag = PVFS_READDIR_START;
     do
     {
         memset(&rdplus_response, 0, sizeof(PVFS_sysresp_readdirplus));
         ret = PVFS_sys_readdirplus(
-                ref, (!token ? PVFS_READDIR_START : token),
+                ref, token, &token_flag,
                 pvfs_dirent_incount, &credentials,
                 (opts->list_long) ? 
                 PVFS_ATTR_SYS_ALL : PVFS_ATTR_SYS_ALL_NOSIZE,
@@ -603,7 +605,8 @@ int do_list(
         for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
         {
             cur_file = rdplus_response.dirent_array[i].d_name;
-            cur_handle = rdplus_response.dirent_array[i].handle;
+            PVFS_handle_copy(cur_handle, 
+                rdplus_response.dirent_array[i].handle);
 
             print_entry(cur_file, cur_handle, fs_id,
                     &rdplus_response.attr_array[i],
@@ -642,7 +645,7 @@ int do_list(
                 }
             }
         }
-        token = rdplus_response.token;
+        memcpy(&token, &rdplus_response.token, sizeof(PVFS_kv_position));
 
         if (rdplus_response.pvfs_dirent_outcount)
         {

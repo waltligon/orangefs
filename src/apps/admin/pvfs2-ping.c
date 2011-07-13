@@ -207,7 +207,7 @@ int main(int argc, char **argv)
     printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
-    PVFS_hanlde_copy(param_value.u.handle_value, resp_lookup.ref.handle);
+    PVFS_handle_copy(param_value.u.handle_value, resp_lookup.ref.handle);
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server

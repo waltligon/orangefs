@@ -132,13 +132,11 @@ static options_t *parse_args(int argc, char **argv)
 	    case 'o':
           do_object:
                 tmp_opts->remove_object_only = 1;
-                tmp_opts->object_handle =
-                    (PVFS_handle)strtoull(optarg, NULL,10);
+                PVFS_handle_parse(optarg, tmp_opts->object_handle);
 		break;
 	    case 'p':
           do_parent:
-                tmp_opts->parent_handle =
-                    (PVFS_handle)strtoull(optarg, NULL,10);
+                PVFS_handle_parse( optarg, tmp_opts->parent_handle );
 		break;
             case 'd':
           do_dirent:
@@ -174,8 +172,8 @@ int main(int argc, char **argv)
     ref.fs_id = user_opts->fs_id;
     if (user_opts->remove_object_only)
     {
-        ref.handle = user_opts->object_handle;
-        if ((ref.handle == PVFS_HANDLE_NULL) ||
+        PVFS_handle_copy(ref.handle, user_opts->object_handle);
+        if ((PVFS_handle_is_null(ref.handle)) ||
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid object reference specified: "
@@ -185,8 +183,8 @@ int main(int argc, char **argv)
     }
     else
     {
-        ref.handle = user_opts->parent_handle;
-        if ((ref.handle == PVFS_HANDLE_NULL) ||
+        PVFS_handle_copy(ref.handle, user_opts->parent_handle);
+        if (PVFS_handle_is_null(ref.handle) ||
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid parent reference specified: "

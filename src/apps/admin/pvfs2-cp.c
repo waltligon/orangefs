@@ -497,7 +497,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 		PVFS_perror("PVFS_sys_lookup", ret);
 		return (-1);
 	    }
-	    parent_ref.handle = resp_lookup.ref.handle;
+	    PVFS_handle_copy(parent_ref.handle, resp_lookup.ref.handle);
 	    parent_ref.fs_id = resp_lookup.ref.fs_id;
 
 	    while (!PINT_string_next_segment(srcname, &segp, &segstate))

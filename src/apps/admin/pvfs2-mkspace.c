@@ -36,7 +36,7 @@ typedef struct
 } options_t;
 
 static int default_verbose = 0;
-static PVFS_handle default_root_handle = PVFS_HANDLE_NULL;
+static PVFS_handle default_root_handle;
 static int default_collection_only = 0;
 static char default_meta_ranges[PATH_MAX] = "4-2147483650";
 static char default_data_ranges[PATH_MAX] = "2147483651-4294967297";
@@ -165,13 +165,7 @@ static int parse_args(int argc, char **argv, options_t *opts)
 		break;
 	    case 'r':
           do_root_handle:
-#ifdef HAVE_STRTOULL
-		opts->root_handle = (PVFS_handle)
-                    strtoull(optarg, NULL, 10);
-#else
-		opts->root_handle = (PVFS_handle)
-                    strtoul(optarg, NULL, 10);
-#endif
+		PVFS_handle_parse(optarg, opts->root_handle);
 		break;
 	    case 'M':
           do_meta_handle_range:
@@ -296,7 +290,7 @@ int main(int argc, char **argv)
     if (opts.use_defaults)
     {
         opts.verbose = default_verbose;
-        opts.root_handle = default_root_handle;
+        PVFS_handle_copy(opts.root_handle, default_root_handle);
         opts.collection_only = default_collection_only;
         strncpy(opts.meta_ranges, default_meta_ranges, PATH_MAX);
         strncpy(opts.data_ranges, default_data_ranges, PATH_MAX);
