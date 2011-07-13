@@ -29,8 +29,7 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
-
-static uint64_t UINT64_HIGH = 0xffffffffffffffffLL;
+#include "pvfs2-mirror.h"
 
 PINT_server_trove_keys_s Trove_Special_Keys[] =
 {
@@ -922,8 +921,8 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
    s_op->key_a[1].buffer_sz = Trove_Special_Keys[MIRROR_STATUS_KEY].size;
 
    /* setup buffer space for handle statuses */
-   s_op->val_a[1].buffer = malloc(sizeof(PVFS_handle) *
-                                  meta->dfile_count   *
+   s_op->val_a[1].buffer = malloc(sizeof(PVFS_error) *
+                                  meta->dfile_count  *
                                   meta->mirror_copies_count);
    if (!s_op->val_a[1].buffer)
    {
@@ -931,11 +930,11 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
        js_p->error_code = -PVFS_ENOMEM;
        goto error_exit;
    }
-   memset(s_op->val_a[1].buffer,0,sizeof(PVFS_handle) *
-                                  meta->dfile_count   *
+   memset(s_op->val_a[1].buffer,0,sizeof(PVFS_error) *
+                                  meta->dfile_count  *
                                   meta->mirror_copies_count);
-   s_op->val_a[1].buffer_sz = sizeof(PVFS_handle) *
-                              meta->dfile_count   *
+   s_op->val_a[1].buffer_sz = sizeof(PVFS_error) *
+                              meta->dfile_count  *
                               meta->mirror_copies_count;
 
    
@@ -1044,7 +1043,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
    s_op->val_a[0].buffer = s_op->val_a[1].buffer = NULL;
 
    /* Check the mirroring status for each handle.  If the status is non-zero,
-    * the handle is not valid, so put a null in the mirrory array for that
+    * the handle is not valid, so put a null in the mirror array for that
     * handle.  Otherwise, do nothing.
    */
    for (row=0; row<meta->mirror_copies_count; row++)
@@ -1052,16 +1051,14 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
       for (col=0; col<meta->dfile_count; col++)
       {
          index = (row*meta->dfile_count) + col;
-         /* cleanup and fix 
-         if ( s_op->u.getattr.mirror_dfile_status_array[index] == UINT64_HIGH )
-            meta->mirror_dfile_array[index] = 0;
+         if ( s_op->u.getattr.mirror_dfile_status_array[index] == STATUS_INIT )
+              meta->mirror_dfile_array[index] = 0;
          gossip_debug(GOSSIP_MIRROR_DEBUG,
                       "\tmirror handle[%d]:%llu \t"
-                      "status:%llu\n"
+                      "status:%d\n"
                       ,index
                       ,llu(meta->mirror_dfile_array[index])
-                      ,llu(s_op->u.getattr.mirror_dfile_status_array[index]));
-         */
+                      ,s_op->u.getattr.mirror_dfile_status_array[index]);
       }
    }
 

@@ -20,4 +20,6 @@ typedef enum MIRROR_MODE_t MIRROR_MODE;
 #define USER_PVFS2_MIRROR_STATUS  "user.pvfs2.mirror.status"
 #define USER_PVFS2_MIRROR_MODE    "user.pvfs2.mirror.mode"
 
+static PVFS_error STATUS_INIT __attribute__((unused)) = -1;
+
 #endif /* __MIRROR_H */

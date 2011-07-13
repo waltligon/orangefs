@@ -240,12 +240,12 @@ int main(int argc, char **argv)
         {
              int copies = *(int *)user_opts->val[1].buffer;
              int dfile_count = src.u.pvfs2.attr.dfile_count;
-             PVFS_handle *status = (PVFS_handle *)user_opts->val[0].buffer;
+             PVFS_error *status = (PVFS_error *)user_opts->val[0].buffer;
              for (i=0; i<(dfile_count * copies); i++)
-                 printf("src handle(%d) : status(%s) : value(%llu)\n"
+                 printf("src handle(%d) : status(%s) : value(%d)\n"
                        ,i
                        ,status[i]==0?"usable":"UNusable"
-                       ,llu(status[i]));
+                       ,status[i]);
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.mode"
                            , sizeof("user.pvfs2.mirror.mode")) == 0)

@@ -22,10 +22,6 @@
 
 /*Global Variables*/
 
-/*all bits turned on*/
-//static uint64_t UINT64_HIGH = 0xffffffffffffffffULL; 
-extern PVFS_handle MIRROR_HANDLE_INIT;
-
 /*attribute keys used for the mirroring process*/
 static char handle_key[]     = USER_PVFS2_MIRROR_HANDLES;
 static char copy_count_key[] = USER_PVFS2_MIRROR_COPIES;
@@ -1055,8 +1051,8 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
                                    ,imm_p->io_servers_required);
 
    /*create and initialize the writes_completed array*/
-   imm_p->writes_completed = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
-                                                        * imm_p->copies);
+   imm_p->writes_completed = malloc(sizeof(struct writes_completed_s) * imm_p->dfile_count
+                                                                      * imm_p->copies);
    if (!imm_p->writes_completed)
    {
       gossip_lerr("Unable to allocate imm_p->writes_completed.\n");
@@ -1064,7 +1060,10 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
       return SM_ACTION_COMPLETE;
    }
    for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
-       PVFS_handle_copy(imm_p->writes_completed[i],MIRROR_HANDLE_INIT);
+   {
+       imm_p->writes_completed[i].status = STATUS_INIT;
+       PVFS_handle_clear(imm_p->writes_completed[i].handle);
+   }
    //memset(imm_p->writes_completed,UINT64_HIGH,sizeof(PVFS_handle) 
    //                                         * imm_p->dfile_count
    //                                         * imm_p->copies);
@@ -1123,18 +1122,21 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tWorking on src #%d\n",src);
 
        /* writes_completed indicates the status of each copy for each source: */
-       /* 0 ==> completed, + ==> incomplete, UINT64_HIGH ==> initial state.   */
+       /* 0 ==> completed, 1 ==> incomplete, STATUS_INIT ==> initial state.   */
        /* If incomplete, the value stored in the array is the destination     */
        /* handle.                                                             */
        for (row=src,cols=0; cols<imm_p->copies; cols++)
        {
            index = (imm_p->copies * row) + cols;
            /* cleanup and fix */
-           /*this will capture UINT64_HIGH or handle*/
-           if (     (PVFS_handle_compare(imm_p->writes_completed[index],MIRROR_HANDLE_INIT) == 0)
-                || !(PVFS_handle_is_null(imm_p->writes_completed[index])  )
+
+
+           if ( imm_p->writes_completed[index].status == 1 ||
+                imm_p->writes_completed[index].status == STATUS_INIT    )
+                
            //if (   imm_p->writes_completed[index] > 0
            //        || imm_p->writes_completed[index] == UINT64_HIGH)
+
               break;
        }
 
@@ -1192,7 +1194,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
        index = imm_p->copies*src; /*first copy for this source*/
        
        //if (imm_p->writes_completed[index] == UINT64_HIGH)
-        if ( PVFS_handle_compare(imm_p->writes_completed[index],MIRROR_HANDLE_INIT) == 0 )
+	if ( imm_p->writes_completed[index].status == STATUS_INIT )
        {
           /*handle_array_copies[copy,server#] is accessed as a two-dimensional*/
           /*array where a row represents a copy and columns represent the     */
@@ -1214,10 +1216,11 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
           {
               index = (imm_p->copies*row) + cols;
               //if (imm_p->writes_completed[index] > 0)
-               if ( !PVFS_handle_is_null(imm_p->writes_completed[index]) )
+              //if ( !PVFS_handle_is_null(imm_p->writes_completed[index]) )
+		if ( imm_p->writes_completed[index].status > 0 )
               {
                  PVFS_handle_copy(req->u.mirror.dst_handle[i],
-                                  imm_p->writes_completed[index]);
+                                  imm_p->writes_completed[index].handle);
                  req->u.mirror.wcIndex[i] = index;
                  req->u.mirror.dst_count++;
               }
@@ -1428,15 +1431,18 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
                && respmir->write_status_code[i] == 0)
            {
                //imm_p->writes_completed[index] = 0;
-               PVFS_handle_clear(imm_p->writes_completed[index]);
+		imm_p->writes_completed[index].status = 0;
+                PVFS_handle_clear(imm_p->writes_completed[index].handle);
            } else if (error_code == 0)
            {
-               PVFS_handle_copy(imm_p->writes_completed[index], 
-                                reqmir->dst_handle[i]);
+                imm_p->writes_completed[index].status = 1;
+                PVFS_handle_copy(imm_p->writes_completed[index].handle
+                                ,reqmir->dst_handle[i]);
            } else
            {
                //imm_p->writes_completed[index] = UINT64_HIGH;
-               PVFS_handle_copy(imm_p->writes_completed[index],MIRROR_HANDLE_INIT);
+		imm_p->writes_completed[index].status = STATUS_INIT;
+		PVFS_handle_clear(imm_p->writes_competed[index].handle);
            } 
        }
 
@@ -1488,7 +1494,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
      {
        index = (imm_p->dfile_count * i) + j;
        char PVFS_handle_string[PVFS_HANDLE_STRING_LEN];
-       uuid_unparse(imm_p->writes_completed[index],PVFS_handle_string);
+       PVFS_handle_unparse(imm_p->writes_completed[index].handle,PVFS_handle_string);
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t[%d][%d]:%s\n"
                                        ,i,j
                                        ,PVFS_handle_string);
@@ -1523,7 +1529,7 @@ static PINT_sm_action check_for_retries (struct PINT_smcb *smcb
    for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
    {
        char PVFS_handle_string[PVFS_handle_string_len] = {0};
-       PVFS_handle_unparse(imm_p->writes_completed[i],PVFS_handle_string);
+       PVFS_handle_unparse(imm_p->writes_completed[i].handle,PVFS_handle_string);
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_complete[%d]:%s\n"
                                        ,i,PVFS_handle_string);
        //if (imm_p->writes_completed[i] != 0)
@@ -1610,30 +1616,30 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
    strcpy(sm_p->key_a[i].buffer,status_key);
    sm_p->key_a[i].buffer_sz = sizeof(status_key);
 
-   sm_p->val_a[i].buffer = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
-                                                      * imm_p->copies);
+   sm_p->val_a[i].buffer = malloc(sizeof(PVFS_error) * imm_p->dfile_count
+                                                     * imm_p->copies);
    if (!sm_p->val_a[i].buffer)
       goto error_exit;
-   sm_p->val_a[i].buffer_sz = sizeof(PVFS_handle) * imm_p->dfile_count 
-                                                  * imm_p->copies;
-   memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed
-                               ,sm_p->val_a[i].buffer_sz);
-   
+   sm_p->val_a[i].buffer_sz = sizeof(PVFS_error) * imm_p->dfile_count 
+                                                 * imm_p->copies;
+   for (j=0; j<imm_p->dfile_count*imm_p->copies; j++)
+   {
+   	//memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed
+        //                       ,sm_p->val_a[i].buffer_sz);
+	sm_p->val_a[i].buffer[j] = imm_p->writes_completed[j].status;
+   }
    /*verify inputs*/
    i=0; assert(i<key_count);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tVerify inputs BEFORE call to trove...\n");
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsize of buffer : %d\n"
                                    ,sm_p->key_a[i].buffer_sz);
-   PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
-   char PVFS_handle_string[PVFS_HANDLE_STRING_LEN];
+   PVFS_error *myStatus = (PVFS_error *)sm_p->val_a[i].buffer;
    for (j=0; j<(imm_p->dfile_count*imm_p->copies); j++)
    {
-       memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LEN);
-       PVFS_handle_unparse(myHandle[j],PVFS_handle_string);
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%s\n"
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tstatus(%d):%d\n"
        ,j
-       ,PVFS_handle_string);
+       ,myStatus[j]);
    }
 
    i++; assert(i<key_count);
