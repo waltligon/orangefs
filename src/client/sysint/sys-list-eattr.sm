@@ -266,7 +266,7 @@ static int list_eattr_comp_fn(
     else
     {
         gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr returned %llu keys\n",
-                sm_p->u.listeattr.resp_p->token.count);
+                (long long unsigned int)sm_p->u.listeattr.resp_p->token.count);
         /* Copy the token and reset it */
         sm_p->u.listeattr.resp_p->token_flag = PVFS_ITERATE_START;
         return 0;
