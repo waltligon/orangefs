@@ -22,6 +22,8 @@
 
 /*Global Variables*/
 
+static char PVFS_handle_string[PVFS_HANDLE_STRING_LEN]={0};
+
 /*attribute keys used for the mirroring process*/
 static char handle_key[]     = USER_PVFS2_MIRROR_HANDLES;
 static char copy_count_key[] = USER_PVFS2_MIRROR_COPIES;
@@ -224,7 +226,6 @@ static PINT_sm_action initialize_structures (struct PINT_smcb *smcb
       return SM_ACTION_COMPLETE;
    }
 
-   memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LENGTH);
    PVFS_handle_unparse(imm_p->metadata_handle,PVFS_handle_string);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tdfile_count: %d\tmetadata_handle: %s"
                                     "\tfs_id: %u"
@@ -581,7 +582,6 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
          js_p->error_code = ret;
          goto error_exit;
       }
-      memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LENGTH);
       PVFS_handle_unparse(imm_p->handle_array_base[i],PVFS_handle_string);
       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of server_name is %s "
                                        "for handle %s\n"
@@ -633,7 +633,7 @@ static PINT_sm_action inspect_source_info (struct PINT_smcb *smcb
                 imm_p->handle_array_base[i]);
 
             imm_p->handle_array_base_local_count++;
-            PVFS_handle_unparse(imm_p->handle_array_base_local[imm_p->handle_array_base_local_count
+            PVFS_handle_unparse(imm_p->handle_array_base_local[imm_p->handle_array_base_local_count]
                                ,PVFS_handle_string);
             gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal source handle(%d):%s\n"
               ,imm_p->handle_array_base_local_count
@@ -1440,7 +1440,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
            {
                //imm_p->writes_completed[index] = UINT64_HIGH;
 		imm_p->writes_completed[index].status = STATUS_INIT;
-		PVFS_handle_clear(imm_p->writes_competed[index].handle);
+		PVFS_handle_clear(imm_p->writes_completed[index].handle);
            } 
        }
 
@@ -1526,12 +1526,11 @@ static PINT_sm_action check_for_retries (struct PINT_smcb *smcb
    /*Are there any writes to retry?*/
    for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
    {
-       char PVFS_handle_string[PVFS_handle_string_len] = {0};
        PVFS_handle_unparse(imm_p->writes_completed[i].handle,PVFS_handle_string);
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_complete[%d]:%s\n"
                                        ,i,PVFS_handle_string);
        //if (imm_p->writes_completed[i] != 0)
-        if ( !PVFS_handle_is_null(imm_p->writes_completed[i]) )
+        if ( !PVFS_handle_is_null(imm_p->writes_completed[i].handle) )
        {
           js_p->error_code = RETRY;
           return SM_ACTION_COMPLETE;
@@ -1624,7 +1623,9 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
    {
    	//memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed
         //                       ,sm_p->val_a[i].buffer_sz);
-	sm_p->val_a[i].buffer[j] = imm_p->writes_completed[j].status;
+	memcpy(&((PVFS_error *)(sm_p->val_a[i].buffer))[j]
+              ,&(imm_p->writes_completed[j].status)
+              ,sizeof(PVFS_error));
    }
    /*verify inputs*/
    i=0; assert(i<key_count);
@@ -1632,12 +1633,13 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsize of buffer : %d\n"
                                    ,sm_p->key_a[i].buffer_sz);
-   PVFS_error *myStatus = (PVFS_error *)sm_p->val_a[i].buffer;
+   PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
    for (j=0; j<(imm_p->dfile_count*imm_p->copies); j++)
    {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tstatus(%d):%d\n"
+       PVFS_handle_unparse(myHandle[j],PVFS_handle_string);
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%s\n"
        ,j
-       ,myStatus[j]);
+       ,PVFS_handle_string);
    }
 
    i++; assert(i<key_count);
@@ -1651,14 +1653,12 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
                                    ,sm_p->keyval_count);
 
    i++; assert(i<key_count);
-   PVFS_handle *myStatus = (PVFS_handle *)sm_p->val_a[i].buffer;
+   PVFS_error *myStatus = (PVFS_error *)(sm_p->val_a[i].buffer);
    for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
    {
-       memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LEN);
-       PVFS_handle_unparse(myStatus[j],PVFS_handle_string);
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle(%d):status(%s)\n"
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle(%d):status(%d)\n"
                                        ,j
-                                       ,PVFS_handle_string);
+                                       ,myStatus[j]);
    }
 
    /*store keys*/
@@ -1739,8 +1739,7 @@ static PINT_sm_action check_store_job (struct PINT_smcb *smcb
 
    if (js_p->error_code)
    {
-      memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LENGTH);
-      PVFS_handle_unparse(imm_p->metadata_handle);
+      PVFS_handle_unparse(imm_p->metadata_handle,PVFS_handle_string);
       gossip_err("Unable to store datahandles and number of copies for this "
                  "mirror operation.\n");
       gossip_err("\tMeta data handle is %s\n",PVFS_handle_string);
@@ -2048,8 +2047,7 @@ static PVFS_handle *reorganize_copy_handles(
 
    for (i=0; i<(in_cols*rows); i++)
    {
-       memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LEN);
-       PVFS_unparse(copies_in[i],PVFS_handle_string);
+       PVFS_handle_unparse(copies_in[i],PVFS_handle_string);
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies(%d):%s\n"
                                        ,(int)i
                                        ,PVFS_handle_string);
@@ -2072,7 +2070,6 @@ static PVFS_handle *reorganize_copy_handles(
    {
        for (j=0; j<out_cols; j++)
        {
-           memset(PVFS_handle_string,0,PVFS_HANDLE_STRING_LENGTH);
            PVFS_handle_unparse(copies_out[(i*out_cols)+j],PVFS_handle_string);
            gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t(%d,%d):%s\n"
                                 ,(int)i,(int)j

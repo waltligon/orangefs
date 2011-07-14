@@ -1052,7 +1052,7 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
       {
          index = (row*meta->dfile_count) + col;
          if ( s_op->u.getattr.mirror_dfile_status_array[index] == STATUS_INIT )
-              meta->mirror_dfile_array[index] = 0;
+              PVFS_handle_clear(meta->mirror_dfile_array[index]);
          gossip_debug(GOSSIP_MIRROR_DEBUG,
                       "\tmirror handle[%d]:%llu \t"
                       "status:%d\n"
