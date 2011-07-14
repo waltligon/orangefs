@@ -726,8 +726,8 @@ error_exit:
 static PINT_sm_action obtain_local_handle_sizes(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,
-                "Executing obtain_local_handle_sizes....\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG,
+                 "Executing obtain_local_handle_sizes....\n");
 
     struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
     PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
@@ -736,7 +736,7 @@ static PINT_sm_action obtain_local_handle_sizes(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-    /*Do we have any local handles?*/
+    /* Do we have any local handles? */
     if (imm_p->handle_array_copies_local_count == 0)
         return SM_ACTION_COMPLETE;
 
@@ -1057,612 +1057,627 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb,
     memset(imm_p->writes_completed, UINT64_HIGH, sizeof(PVFS_handle) *
            imm_p->dfile_count * imm_p->copies);
 
-   /* the retry count is used to monitor how many times we retry a write. 
-    * this value is incremented in the check_for_retries state. */
-   imm_p->retry_count = 0;
+    /* the retry count is used to monitor how many times we retry a write. 
+     * this value is incremented in the check_for_retries state. */
+    imm_p->retry_count = 0;
 
-   return SM_ACTION_COMPLETE;
+    return SM_ACTION_COMPLETE;
 } /* end action setup_datahandle_copies */
 
 
 static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing copy_data....\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   server_configuration_s *config = get_server_config_struct();
-   filesystem_configuration_s *fs = 
-                                    PINT_config_find_fs_id(config,imm_p->fs_id);
-   int ret = 0;
-   int src,row,cols,i,index,wc;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing copy_data....\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    server_configuration_s *config = get_server_config_struct();
+    filesystem_configuration_s *fs = PINT_config_find_fs_id( config, 
+        imm_p->fs_id);
+    int ret = 0;
+    int src, row, cols, i, index, wc;
 
-   /*this variable helps to understand the logic better.  it is a redeclara- */
-   /*tion of the one dimensional imm_p->handle_array_copies and can be ac-   */
-   /*cessed as handle_array_copies[copies,dfile_count].                      */
-   PVFS_handle *handle_array_copies[imm_p->copies];
-   memset(handle_array_copies,0,sizeof(PVFS_handle) * imm_p->copies);
-   ONE_DIM_TO_TWO_DIMS(imm_p->handle_array_copies
-                      ,handle_array_copies
-                      ,imm_p->copies,imm_p->io_servers_required
-                      ,PVFS_handle);
+    /* this variable helps to understand the logic better.  it is a 
+     * redeclaration of the one dimensional imm_p->handle_array_copies and can 
+     * be accessed as handle_array_copies[copies,dfile_count]. */
+    PVFS_handle *handle_array_copies[imm_p->copies];
+    memset(handle_array_copies,0,sizeof(PVFS_handle) * imm_p->copies);
+    ONE_DIM_TO_TWO_DIMS(imm_p->handle_array_copies,
+                        handle_array_copies,
+                        imm_p->copies,imm_p->io_servers_required,
+                        PVFS_handle);
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tone dim to two dims:\n");
-   for (row=0; row<imm_p->copies; row++)
-   {
-       for (cols=0; cols<imm_p->io_servers_required; cols++)
-        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle_array_copies[%d][%d] : "
-                                         "%llu\n"
-                                        ,row,cols
-                                        ,llu(handle_array_copies[row][cols]));
-   }
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tone dim to two dims:\n");
+    for (row=0; row<imm_p->copies; row++)
+    {
+        for (cols=0; cols<imm_p->io_servers_required; cols++)
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\thandle_array_copies[%d][%d] : "
+                                          "%llu\n",
+                                          row,cols, 
+                                          llu(handle_array_copies[row][cols]));
+    }
 
-   js_p->error_code = 0;
+    js_p->error_code = 0;
 
-   /*for each source handle[src], create a MIRROR request containing a set of */ 
-   /*destination handles.                                                     */
-   for (src=0; src<imm_p->dfile_count; src++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tWorking on src #%d\n",src);
+    /* for each source handle[src], create a MIRROR request containing a set 
+     * of destination handles. */
+    for (src=0; src<imm_p->dfile_count; src++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tWorking on src #%d\n",src);
 
-       /* writes_completed indicates the status of each copy for each source: */
-       /* 0 ==> completed, + ==> incomplete, UINT64_HIGH ==> initial state.   */
-       /* If incomplete, the value stored in the array is the destination     */
-       /* handle.                                                             */
-       for (row=src,cols=0; cols<imm_p->copies; cols++)
-       {
-           index = (imm_p->copies * row) + cols;
-           /*this will capture UINT64_HIGH or handle*/
-           if (   imm_p->writes_completed[index] > 0
-               || imm_p->writes_completed[index] == UINT64_HIGH)
-              break;
-       }
+        /* writes_completed indicates the status of each copy for each source:
+         * 0 ==> completed, + ==> incomplete, UINT64_HIGH ==> initial state.
+         * If incomplete, the value stored in the array is the destination 
+         * handle. */
+        for (row=src,cols=0; cols<imm_p->copies; cols++)
+        {
+            index = (imm_p->copies * row) + cols;
+            /* this will capture UINT64_HIGH or handle */
+            if ( imm_p->writes_completed[index] > 0
+                 || imm_p->writes_completed[index] == UINT64_HIGH)
+                break;
+        }
 
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of cols is %d\n",cols);
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tValue of imm_p->copies is %d.\n"
-                                       ,imm_p->copies);
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tValue of cols is %d\n",cols);
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tValue of imm_p->copies is %d.\n",
+                                         imm_p->copies);
  
-       /*if all copies for this source are zero ==> process next source.*/ 
-       if (cols==imm_p->copies)
-       {
-          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tThis source[%d] has all "
-                                           "complete writes.\n"
-                                          ,src);
-          continue;
-       }
+        /* if all copies for this source are zero ==> process next source. */ 
+        if (cols==imm_p->copies)
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG, "\tThis source[%d] has all "
+                                              "complete writes.\n", src);
+            continue;
+        }
 
-       struct PVFS_server_req *req = malloc(sizeof(struct PVFS_server_req));
-       if (!req)
-       {
-           gossip_lerr("Unable to allocate PVFS_server_req.\n");
-           js_p->error_code = -PVFS_ENOMEM;
-           return SM_ACTION_COMPLETE;
-       }
-       memset(req,0,sizeof(struct PVFS_server_req));
+        struct PVFS_server_req *req = malloc(sizeof(struct PVFS_server_req));
+        if (!req)
+        {
+            gossip_lerr("Unable to allocate PVFS_server_req.\n");
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(req,0,sizeof(struct PVFS_server_req));
 
-       req->u.mirror.dst_handle = malloc(sizeof(PVFS_handle) * imm_p->copies);
-       if ( !req->u.mirror.dst_handle)
-       {
+        req->u.mirror.dst_handle = malloc(sizeof(PVFS_handle) * imm_p->copies);
+        if ( !req->u.mirror.dst_handle)
+        {
             gossip_lerr("Unable to allocate mirror.dst_handle.\n");
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
-       }
-       memset(req->u.mirror.dst_handle,0,sizeof(PVFS_handle) * imm_p->copies);
+        }
+        memset(req->u.mirror.dst_handle, 0, 
+            sizeof(PVFS_handle) * imm_p->copies);
 
-       /*index into the writes_completed array for each destination handle*/
-       req->u.mirror.wcIndex = malloc(sizeof(uint32_t) * imm_p->copies);
-       if ( !req->u.mirror.wcIndex )
-       {
+        /* index into the writes_completed array for each destination handle */
+        req->u.mirror.wcIndex = malloc(sizeof(uint32_t) * imm_p->copies);
+        if ( !req->u.mirror.wcIndex )
+        {
             gossip_lerr("Unable to allocate mirror.wcIndex.\n");
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
-       }
-       memset(req->u.mirror.wcIndex,0,sizeof(uint32_t) * imm_p->copies);
+        }
+        memset(req->u.mirror.wcIndex,0,sizeof(uint32_t) * imm_p->copies);
  
-       req->op = PVFS_SERV_MIRROR;
-       req->credentials = sm_p->req->credentials;
+        req->op = PVFS_SERV_MIRROR;
+        req->credentials = sm_p->req->credentials;
 
-       req->u.mirror.src_handle    = imm_p->handle_array_base[src];
+        req->u.mirror.src_handle    = imm_p->handle_array_base[src];
 
        
-       /* In the initial state or when all writes have failed, get destination*/
-       /* handles from handle_array_copies array.  Otherwise, use the handles */
-       /* stored in the writes_completed array.                               */
-       index = imm_p->copies*src; /*first copy for this source*/
-       if (imm_p->writes_completed[index] == UINT64_HIGH)
-       {
-          /*handle_array_copies[copy,server#] is accessed as a two-dimensional*/
-          /*array where a row represents a copy and columns represent the     */
-          /*destination handles,in order of the original file distribution. We*/
-          /*map the source handle[i], which is also in distribution order,    */
-          /*to handle_arrray_copies[0,i+1],[1,i+2],..,[n-1,(i+y)-1], where n  */
-          /*is the number of copies and y is the number of handles in one copy*/
-          for (wc=0,row=0,cols=(src+1)%imm_p->io_servers_required;
+        /* In the initial state or when all writes have failed, get destination
+         * handles from handle_array_copies array.  Otherwise, use the handles 
+         * stored in the writes_completed array. */
+        index = imm_p->copies*src; /* first copy for this source */
+        if (imm_p->writes_completed[index] == UINT64_HIGH)
+        {
+            /* handle_array_copies[copy,server#] is accessed as a 
+             * two-dimensional array where a row represents a copy and columns 
+             * represent the destination handles,in order of the original file 
+             * distribution. We map the source handle[i], which is also in 
+             * distribution order, to 
+             * handle_arrray_copies[0,i+1],[1,i+2],..,[n-1,(i+y)-1], where n
+             * is the number of copies and y is the number of handles in one 
+             * copy */
+            for (wc=0,row=0,cols=(src+1)%imm_p->io_servers_required;
                row < imm_p->copies;
                wc++,row++,cols=(cols+1)%imm_p->io_servers_required)
-          {
-            req->u.mirror.dst_handle[row] = handle_array_copies[row][cols];
-            req->u.mirror.wcIndex[row]     = index + wc;
-            req->u.mirror.dst_count++;
-          }
-       } else {
-          for (row=src,cols=0,i=0; cols<imm_p->copies; cols++,i++)
-          {
-              index = (imm_p->copies*row) + cols;
-              if (imm_p->writes_completed[index] > 0)
-              {
-                 req->u.mirror.dst_handle[i] = imm_p->writes_completed[index];
-                 req->u.mirror.wcIndex[i] = index;
-                 req->u.mirror.dst_count++;
-              }
-          }
-       }
-       req->u.mirror.fs_id         = imm_p->fs_id;
-       req->u.mirror.dist          = imm_p->dist;
-       req->u.mirror.src_server_nr = src;
-       req->u.mirror.flow_type     = fs->flowproto;
-       req->u.mirror.encoding      = fs->encoding;
+            {
+                req->u.mirror.dst_handle[row] = handle_array_copies[row][cols];
+                req->u.mirror.wcIndex[row] = index + wc;
+                req->u.mirror.dst_count++;
+            }
+        } 
+        else 
+        {
+            for (row=src,cols=0,i=0; cols<imm_p->copies; cols++,i++)
+            {
+                index = (imm_p->copies*row) + cols;
+                if (imm_p->writes_completed[index] > 0)
+                {
+                    req->u.mirror.dst_handle[i] = 
+                        imm_p->writes_completed[index];
+                    req->u.mirror.wcIndex[i] = index;
+                    req->u.mirror.dst_count++;
+                }
+            }
+        }
+        req->u.mirror.fs_id = imm_p->fs_id;
+        req->u.mirror.dist = imm_p->dist;
+        req->u.mirror.src_server_nr = src;
+        req->u.mirror.flow_type = fs->flowproto;
+        req->u.mirror.encoding = fs->encoding;
 
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\treq->: src:%llu\tfs_id:%d"
-                                        "\tdist name:%s\tsrc server_nr:%d\n"
-                                       ,llu(req->u.mirror.src_handle)
-                                       ,req->u.mirror.fs_id
-                                       ,req->u.mirror.dist->dist_name
-                                       ,req->u.mirror.src_server_nr );
-       for (i=0; i<req->u.mirror.dst_count; i++)
-           gossip_debug(GOSSIP_MIRROR_DEBUG,"\treq->dst_handle[%d] : %llu\n"
-                                           ,i
-                                           ,llu(req->u.mirror.dst_handle[i]));
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\treq->: src:%llu\tfs_id:%d"
+                                          "\tdist name:%s\tsrc server_nr:%d\n",
+                                          llu(req->u.mirror.src_handle),
+                                          req->u.mirror.fs_id,
+                                          req->u.mirror.dist->dist_name,
+                                          req->u.mirror.src_server_nr );
+        for (i=0; i<req->u.mirror.dst_count; i++)
+            gossip_debug(GOSSIP_MIRROR_DEBUG, "\treq->dst_handle[%d] : %llu\n",
+                                              i,
+                                              llu(req->u.mirror.dst_handle[i]));
 
-       struct PINT_server_op *mirror_op = 
-                              malloc(sizeof(struct PINT_server_op));
-       if (!mirror_op)
-       {
-           gossip_lerr("Error allocating mirror_op");
-           js_p->error_code = -PVFS_ENOMEM;
-           return SM_ACTION_COMPLETE;
-       }
-       memset(mirror_op,0,sizeof(struct PINT_server_op));
+        struct PINT_server_op *mirror_op = 
+            malloc(sizeof(struct PINT_server_op));
+        if (!mirror_op)
+        {
+            gossip_lerr("Error allocating mirror_op");
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(mirror_op, 0, sizeof(struct PINT_server_op));
 
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tabout to allocate mirror_op...\n");
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\tabout to allocate mirror_op...\n");
 
-       if (imm_p->bstream_array_base_local)
-          req->u.mirror.bsize = imm_p->bstream_array_base_local[src];
-       mirror_op->req = req;
-       mirror_op->op  = req->op;
-       mirror_op->addr = sm_p->addr;/*get addr for this server*/
+        if (imm_p->bstream_array_base_local)
+        {
+            req->u.mirror.bsize = imm_p->bstream_array_base_local[src];
+        }
 
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op->req(%p)\n"
-                                       ,mirror_op->req);
+        mirror_op->req = req;
+        mirror_op->op  = req->op;
+        mirror_op->addr = sm_p->addr; /* get addr for this server */
 
-       if ( strncmp(imm_p->io_servers[src]
-                   ,config->host_id
-                   ,SERVER_NAME_MAX-1) == 0 )
-       {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmirror_op->req(%p)\n",
+                                          mirror_op->req);
 
-           gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is local.\n");
-           PINT_sm_push_frame(smcb, LOCAL_SRC, mirror_op);
-       }
-       else
-       {
-          /*setup msgpairarray call.  This msgpair represents a connection */
-          /*between the meta server and a remote IO server.  The request   */
-          /*for the remote IO server is PVFS_SERV_MIRROR, which will read  */
-          /*data residing on that server and write it to a destination     */
-          /*handle specified in the request.  The response returned from   */
-          /*this msgpair will indicate if the copy was successful.         */
-          gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is remote.\n");
+        if ( strncmp(imm_p->io_servers[src], config->host_id, 
+                     SERVER_NAME_MAX-1) == 0 )
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is local.\n");
+            PINT_sm_push_frame(smcb, LOCAL_SRC, mirror_op);
+        }
+        else
+        {
+            /* setup msgpairarray call.  This msgpair represents a connection
+             * between the meta server and a remote IO server.  The request   
+             * for the remote IO server is PVFS_SERV_MIRROR, which will read
+             * data residing on that server and write it to a destination
+             * handle specified in the request.  The response returned from
+             * this msgpair will indicate if the copy was successful. */
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is remote.\n");
 
-          PINT_sm_msgarray_op *msgarray_op = &(mirror_op->msgarray_op);
+            PINT_sm_msgarray_op *msgarray_op = &(mirror_op->msgarray_op);
 
-          memset(msgarray_op,0,sizeof(PINT_sm_msgarray_op));
-          msgarray_op->msgarray = &msgarray_op->msgpair;
-          msgarray_op->count = 1;
-          PINT_sm_msgpair_state *msg_p = &msgarray_op->msgpair;
+            memset(msgarray_op,0,sizeof(PINT_sm_msgarray_op));
+            msgarray_op->msgarray = &msgarray_op->msgpair;
+            msgarray_op->count = 1;
+            PINT_sm_msgpair_state *msg_p = &msgarray_op->msgpair;
 
-          msg_p->req        = *req;
-          msg_p->fs_id      = req->u.mirror.fs_id;
-          msg_p->handle     = req->u.mirror.src_handle;
-          msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-          msg_p->comp_fn    = mirror_comp_fn;
+            msg_p->req = *req;
+            msg_p->fs_id = req->u.mirror.fs_id;
+            msg_p->handle = req->u.mirror.src_handle;
+            msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+            msg_p->comp_fn = mirror_comp_fn;
 
-          /*setup msgarray parameters*/
-          PINT_serv_init_msgarray_params(mirror_op,req->u.mirror.fs_id);
+            /* setup msgarray parameters */
+            PINT_serv_init_msgarray_params(mirror_op,req->u.mirror.fs_id);
 
-          /*determine the BMI svr address for the source handle*/
-          ret = PINT_cached_config_map_to_server(&msg_p->svr_addr
-                                                ,msg_p->handle
-                                                ,msg_p->fs_id );
-          if (ret)
-          {
-              gossip_err("Failed to map address\n");
-              js_p->error_code = -1;
-              return SM_ACTION_COMPLETE;
-          }
+            /* determine the BMI svr address for the source handle */
+            ret = PINT_cached_config_map_to_server(&msg_p->svr_addr, 
+                                                   msg_p->handle,
+                                                   msg_p->fs_id );
+            if (ret)
+            {
+                gossip_err("Failed to map address\n");
+                js_p->error_code = -1;
+                return SM_ACTION_COMPLETE;
+            }
 
-          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmsg_p->req.op:%d"
-                                           "\tmsg_p->fs_id:%d"
-                                           "\tmsg_p->handle:%llu\n"
-                                           ,msg_p->req.op
-                                           ,msg_p->fs_id
-                                           ,llu(msg_p->handle) );
+            gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmsg_p->req.op:%d"
+                                              "\tmsg_p->fs_id:%d"
+                                              "\tmsg_p->handle:%llu\n",
+                                              msg_p->req.op,
+                                              msg_p->fs_id,
+                                              llu(msg_p->handle) );
 
-          PINT_sm_push_frame(smcb, REMOTE_SRC, mirror_op);
-       }
-   }/*end for (src)*/
+            PINT_sm_push_frame(smcb, REMOTE_SRC, mirror_op);
+        }
+   } /* end for (src) */
 
 
    return SM_ACTION_COMPLETE;
-}/*end action copy_data*/
+} /* end action copy_data */
 
 
-
-
-static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
-                                         ,job_status_s *js_p)
+static PINT_sm_action check_copy_results (struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_copy_results....\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int task_id, error_code, remaining, i, j, index;
-   struct PINT_server_op       *mirror_op = NULL;
-   struct PVFS_servresp_mirror *respmir   = NULL;
-   struct PVFS_servreq_mirror  *reqmir    = NULL;   
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_copy_results....\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    int task_id, error_code, remaining, i, j, index;
+    struct PINT_server_op *mirror_op = NULL;
+    struct PVFS_servresp_mirror *respmir = NULL;
+    struct PVFS_servreq_mirror  *reqmir = NULL;   
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tjs_p->error_code:%d\n"
-                                   ,js_p->error_code);
-   js_p->error_code = 0;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tjs_p->error_code:%d\n",
+                                      js_p->error_code);
+    js_p->error_code = 0;
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsm_p->op:%d\n",sm_p->op);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsmcb->base_frame:%d"
-                                    "\tsmcb->frame_count:%d\n"
-                                   ,smcb->base_frame,smcb->frame_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tsm_p->op:%d\n",sm_p->op);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tsmcb->base_frame:%d"
+                                      "\tsmcb->frame_count:%d\n",
+                                      smcb->base_frame,smcb->frame_count);
 
-   /*the pjmp should have pushed at least one frame*/
-   assert(smcb->frame_count > (smcb->base_frame+1));
+    /* the pjmp should have pushed at least one frame */
+    assert(smcb->frame_count > (smcb->base_frame+1));
 
-  do {
-       mirror_op=PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
-       respmir = &(mirror_op->resp.u.mirror);
-       reqmir  = &(mirror_op->req->u.mirror);
+    do 
+    {
+        mirror_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+        respmir = &(mirror_op->resp.u.mirror);
+        reqmir = &(mirror_op->req->u.mirror);
 
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op->op:%d"
-                                        "\ttask_id:%d"
-                                        "\terror_code:%d(%0x)"
-                                        "\tremaining:%d\n"
-                                       ,mirror_op->op
-                                       ,task_id
-                                       ,error_code,error_code
-                                       ,remaining);
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tresp.src_handle:%llu "
-                                        "\tresp.src_server_nr:%d\n"
-                                   ,llu(respmir->src_handle)
-                                   ,respmir->src_server_nr );
-       for (i=0; i<respmir->dst_count; i++)
-       {
-           gossip_debug(GOSSIP_MIRROR_DEBUG
-                                ,"\t\tbytes_written[%d]:%d\n"
-                                 "\t\twrite_status_codde[%d]:%d\n"
-                                ,i
-                                ,respmir->bytes_written[i]
-                                ,i
-                                ,respmir->write_status_code[i]);
-       }
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmirror_op->op:%d"
+                                          "\ttask_id:%d"
+                                          "\terror_code:%d(%0x)"
+                                          "\tremaining:%d\n"
+                                          mirror_op->op,
+                                          task_id,
+                                          error_code, error_code,
+                                          remaining);
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tresp.src_handle:%llu "
+                                          "\tresp.src_server_nr:%d\n",
+                                          llu(respmir->src_handle),
+                                          respmir->src_server_nr );
+        for (i=0; i<respmir->dst_count; i++)
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG, "\t\tbytes_written[%d]:%d\n" 
+                                              "\t\twrite_status_codde[%d]:%d\n",
+                                              i,
+                                              respmir->bytes_written[i],
+                                              i,
+                                              respmir->write_status_code[i]);
+        }
 
-       /*if error_code != 0, then NONE of the writes requested in this msgpair*/
-       /*array executed, so we do not need to check the individual status     */
-       /*codes.                                                               */
-       if (error_code)
-       {
-           js_p->error_code = error_code; /*respmir has no valid data in it.*/
-       } else {
-           /*check the write status for each destination associated with this */
-           /*particular source handle.                                        */
-           for (i=0; i<respmir->dst_count; i++)
-           {
-              if (js_p->error_code)
-              {
-                  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tStatus already "
-                                                   "established:%d(0x%0x)\n"
-                                                  ,js_p->error_code
-                                                  ,js_p->error_code);
-              }
-              else if (respmir->write_status_code[i])
-              {
-                  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tStatus came from error_"
-                                                   "code %d(0x%0x)\n"
-                                                  ,error_code
-                                                  ,error_code);
-                  js_p->error_code = respmir->write_status_code[i];
-              }
-              else
-              {
-                  gossip_debug(GOSSIP_MIRROR_DEBUG,"\tStatus is still zero(%d)"
-                                                   "\n"
-                                                  ,js_p->error_code);
-              }
-           }/*end for*/
-       }/*end if*/
-
-
-       for (i=0; i<reqmir->dst_count; i++)
-       {
-           index = reqmir->wcIndex[i];
-           if (   error_code == 0  /*this will short circuit if false*/
-               && respmir->write_status_code[i] == 0)
-           {
-               imm_p->writes_completed[index] = 0;
-           } else if (error_code == 0)
-           {
-               imm_p->writes_completed[index] = reqmir->dst_handle[i];
-           } else
-           {
-               imm_p->writes_completed[index] = UINT64_HIGH;
-           } 
-       }
-
-       switch(task_id)
-       {
-          case LOCAL_SRC:
-          {
-             gossip_debug(GOSSIP_MIRROR_DEBUG,
-                                            "\tReturning from LOCAL call...\n");
-             break;
-          }
-          case REMOTE_SRC:
-          {
-             /*the destory can be moved into cleanup_msgpairarray, if none of*/
-             /*its values are needed in this function.                       */
-             PINT_msgpairarray_destroy(&(mirror_op->msgarray_op));
-             gossip_debug(GOSSIP_MIRROR_DEBUG,
-                                            "\tReturning from REMOTE call .\n");
-             break;
-          }
-       }/*end switch*/
-
-       /*cleanup request/response allocations for mirror request*/
-       if (reqmir->dst_handle)
-           free(reqmir->dst_handle);
-       if (reqmir->wcIndex)
-           free(reqmir->wcIndex);
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror_op->req(%p)\n"
-                                       ,mirror_op->req);
-       free(mirror_op->req);
-
-       if (respmir->bytes_written)
-          free(respmir->bytes_written);
-       if (respmir->write_status_code)
-          free(respmir->write_status_code);
-
-       free(mirror_op);
-  } while (remaining > (smcb->base_frame+1));
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tfinal value of js_p->error_code:%d(%0x)\n"
-                                   ,js_p->error_code, js_p->error_code);
-
-   /*if one of the writes failed, js_p->error_code will contain an error.*/
-
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_completed array[src,server#]:\n");
-   for (i=0; i<imm_p->dfile_count; i++)
-   {
-     for (j=0; j<imm_p->copies; j++)
-     {
-       index = (imm_p->dfile_count * i) + j;
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t[%d][%d]:%llu\n"
-                                       ,i,j
-                                       ,llu(imm_p->writes_completed[index]));
-     }
-   }
-
-   return SM_ACTION_COMPLETE;
-}/*end action check_copy_results*/
+        /* if error_code != 0, then NONE of the writes requested in this 
+         * msgpair
+         * array executed, so we do not need to check the individual status 
+         * codes. */
+        if (error_code)
+        {
+            js_p->error_code = error_code; /* respmir has no valid data in it.*/
+        } 
+        else 
+        {
+            /* check the write status for each destination associated with 
+             * this particular source handle. */
+            for (i=0; i<respmir->dst_count; i++)
+            {
+                if (js_p->error_code)
+                {
+                    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tStatus already "
+                                                      "established:%d(0x%0x)\n"
+                                 js_p->error_code, js_p->error_code);
+                }
+                else if (respmir->write_status_code[i])
+                {
+                    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tStatus came from "
+                                                      "error_code %d(0x%0x)\n",
+                                                      error_code
+                                                      error_code);
+                    js_p->error_code = respmir->write_status_code[i];
+                }
+                else
+                {
+                    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tStatus is still "
+                                 "zero(%d)\n", js_p->error_code);
+                }
+            } /* end for */
+        } /* end if */
 
 
-static PINT_sm_action check_for_retries (struct PINT_smcb *smcb
-                                        ,job_status_s *js_p)
+        for (i=0; i<reqmir->dst_count; i++)
+        {
+            index = reqmir->wcIndex[i];
+            if ( error_code == 0  /* this will short circuit if false */
+                 && respmir->write_status_code[i] == 0 )
+            {
+                imm_p->writes_completed[index] = 0;
+            } 
+            else if (error_code == 0)
+            {
+                imm_p->writes_completed[index] = reqmir->dst_handle[i];
+            } 
+            else
+            {
+                imm_p->writes_completed[index] = UINT64_HIGH;
+            } 
+        }
+
+        switch(task_id)
+        {
+            case LOCAL_SRC:
+            {
+                gossip_debug(GOSSIP_MIRROR_DEBUG, "\tReturning from LOCAL "
+                             "call...\n");
+                break;
+            }
+            case REMOTE_SRC:
+            {
+                /* the destory can be moved into cleanup_msgpairarray, if 
+                 * none of its values are needed in this function. */
+                PINT_msgpairarray_destroy(&(mirror_op->msgarray_op));
+                gossip_debug(GOSSIP_MIRROR_DEBUG, "\tReturning from REMOTE "
+                             "call .\n");
+                break;
+            }
+        } /* end switch */
+
+        /* cleanup request/response allocations for mirror request */
+        if (reqmir->dst_handle)
+            free(reqmir->dst_handle);
+        if (reqmir->wcIndex)
+            free(reqmir->wcIndex);
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\tmirror_op->req(%p)\n",
+                                          mirror_op->req);
+        free(mirror_op->req);
+
+        if (respmir->bytes_written)
+            free(respmir->bytes_written);
+        if (respmir->write_status_code)
+            free(respmir->write_status_code);
+
+        free(mirror_op);
+    } while (remaining > (smcb->base_frame+1));
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tfinal value of js_p->error_code: "
+                                      "%d(%0x)\n", js_p->error_code, 
+                                      js_p->error_code);
+
+    /* if one of the writes failed, js_p->error_code will contain an error. */
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\twrites_completed array[src,server#]"
+                                      ":\n");
+    for (i=0; i<imm_p->dfile_count; i++)
+    {
+        for (j=0; j<imm_p->copies; j++)
+        {
+            index = (imm_p->dfile_count * i) + j;
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t[%d][%d]:%llu\n", i, j,
+                         llu(imm_p->writes_completed[index]));
+        }
+    }
+
+    return SM_ACTION_COMPLETE;
+} /* end action check_copy_results */
+
+
+static PINT_sm_action check_for_retries (struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_for_retries....\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   int i;
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing check_for_retries....\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    int i;
 
-   imm_p->retry_count++;
+    imm_p->retry_count++;
 
-   /*Have we hit the retry limit?*/
-   if (imm_p->retry_count >= WRITE_RETRY_LIMIT)
-   {
-       js_p->error_code = 0;
-       return SM_ACTION_COMPLETE;
-   }
+    /* Have we hit the retry limit? */
+    if (imm_p->retry_count >= WRITE_RETRY_LIMIT)
+    {
+        js_p->error_code = 0;
+        return SM_ACTION_COMPLETE;
+    }
 
-   /*Are there any writes to retry?*/
-   for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\twrites_complete[%d]:%llu\n"
-                                       ,i,llu(imm_p->writes_completed[i]));
-       if (imm_p->writes_completed[i] != 0)
-       {
-          js_p->error_code = RETRY;
-          return SM_ACTION_COMPLETE;
-       }
-   }
+    /* Are there any writes to retry? */
+    for (i=0; i<(imm_p->dfile_count * imm_p->copies); i++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\twrites_complete[%d]:%llu\n",
+                                          i,llu(imm_p->writes_completed[i]));
+        if (imm_p->writes_completed[i] != 0)
+        {
+            js_p->error_code = RETRY;
+            return SM_ACTION_COMPLETE;
+        }
+    }
    
-   js_p->error_code = 0;
-   return SM_ACTION_COMPLETE;
-}/*end state check_for_retries*/
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+} /* end state check_for_retries */
 
 
-
-static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb
-                                        ,job_status_s *js_p)
+static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
 {   
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing store_mirror_info....\n");
-   struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
-   PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   PVFS_handle *reorg_handles = NULL;
-   int  key_count = 3;
-   int ret = 0,i,j;
-   job_id_t job_id;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "Executing store_mirror_info....\n");
+    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
+    PVFS_handle *reorg_handles = NULL;
+    int  key_count = 3;
+    int ret = 0,i,j;
+    job_id_t job_id;
 
-   js_p->error_code = 0;
+    js_p->error_code = 0;
 
-   /*put copy handles in proper distribution order*/
-   reorg_handles = reorganize_copy_handles(imm_p);
-   if (!reorg_handles)
-   {
-      gossip_lerr("Unable to create reorg_handles array.\n");
-      js_p->error_code = -PVFS_ENOMEM;
-      return SM_ACTION_COMPLETE;
-   }
+    /* put copy handles in proper distribution order */
+    reorg_handles = reorganize_copy_handles(imm_p);
+    if (!reorg_handles)
+    {
+        gossip_lerr("Unable to create reorg_handles array.\n");
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
 
-   /*setup key/val pairs*/
-   sm_p->keyval_count = key_count;
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of copies:%d \tlocation:%p\n"
-                                   ,imm_p->copies,&imm_p->copies);
+    /* setup key/val pairs */
+    sm_p->keyval_count = key_count;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of copies:%d \tlocation:%p\n",
+                                      imm_p->copies,&imm_p->copies);
 
-   sm_p->key_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
-   sm_p->val_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
+    sm_p->key_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
+    sm_p->val_a = malloc(sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
 
-   if (!sm_p->key_a || !sm_p->val_a)
+    if (!sm_p->key_a || !sm_p->val_a)
+        goto error_exit;
+
+    memset(sm_p->key_a, 0, sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
+    memset(sm_p->val_a, 0, sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
+
+    /* setup user.pvfs2.mirror.handles */
+    i=0; 
+    assert(i<key_count);
+    sm_p->key_a[i].buffer = malloc(sizeof(handle_key));
+    if (!sm_p->key_a[i].buffer)
+        goto error_exit;
+    strcpy(sm_p->key_a[i].buffer, handle_key);
+    sm_p->key_a[i].buffer_sz = sizeof(handle_key);
+
+    sm_p->val_a[i].buffer = reorg_handles;
+    sm_p->val_a[i].buffer_sz = 
+        sizeof(PVFS_handle) * imm_p->dfile_count * imm_p->copies; 
+
+    /* setup user.pvfs2.mirror.copies */
+    i++; 
+    assert(i<key_count);
+    sm_p->key_a[i].buffer = malloc(sizeof(copy_count_key));
+    if (!sm_p->key_a[i].buffer)
+        goto error_exit;
+    
+    strcpy(sm_p->key_a[i].buffer,copy_count_key);
+    sm_p->key_a[i].buffer_sz = sizeof(copy_count_key);
+
+    sm_p->val_a[i].buffer = malloc(sizeof(imm_p->copies));
+    if (!sm_p->val_a[i].buffer)
       goto error_exit;
-
-   memset(sm_p->key_a,0,sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
-   memset(sm_p->val_a,0,sizeof(PVFS_ds_keyval) * sm_p->keyval_count);
-
-   /*setup user.pvfs2.mirror.handles*/
-   i=0; assert(i<key_count);
-   sm_p->key_a[i].buffer = malloc(sizeof(handle_key));
-   if (!sm_p->key_a[i].buffer)
-      goto error_exit;
-   strcpy(sm_p->key_a[i].buffer,handle_key);
-   sm_p->key_a[i].buffer_sz = sizeof(handle_key);
-
-   sm_p->val_a[i].buffer = reorg_handles;
-   sm_p->val_a[i].buffer_sz = sizeof(PVFS_handle) * imm_p->dfile_count
-                                                  * imm_p->copies; 
-
-   /*setup user.pvfs2.mirror.copies*/
-   i++; assert(i<key_count);
-   sm_p->key_a[i].buffer = malloc(sizeof(copy_count_key));
-   if (!sm_p->key_a[i].buffer)
-      goto error_exit;
-   strcpy(sm_p->key_a[i].buffer,copy_count_key);
-   sm_p->key_a[i].buffer_sz = sizeof(copy_count_key);
-
-   sm_p->val_a[i].buffer = malloc(sizeof(imm_p->copies));
-   if (!sm_p->val_a[i].buffer)
-      goto error_exit;
-   sm_p->val_a[i].buffer_sz = sizeof(imm_p->copies);
-   memcpy(sm_p->val_a[i].buffer,&(imm_p->copies),sm_p->val_a[i].buffer_sz);
-
-   /*setup user.pvfs2.mirror.status*/
-   i++; assert(i<key_count);
-   sm_p->key_a[i].buffer = malloc(sizeof(status_key));
-   if (!sm_p->key_a[i].buffer)
-      goto error_exit;
-   strcpy(sm_p->key_a[i].buffer,status_key);
-   sm_p->key_a[i].buffer_sz = sizeof(status_key);
-
-   sm_p->val_a[i].buffer = malloc(sizeof(PVFS_handle) * imm_p->dfile_count
-                                                      * imm_p->copies);
-   if (!sm_p->val_a[i].buffer)
-      goto error_exit;
-   sm_p->val_a[i].buffer_sz = sizeof(PVFS_handle) * imm_p->dfile_count 
-                                                  * imm_p->copies;
-   memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed
-                               ,sm_p->val_a[i].buffer_sz);
    
-   /*verify inputs*/
-   i=0; assert(i<key_count);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tVerify inputs BEFORE call to trove...\n");
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tsize of buffer : %d\n"
-                                   ,sm_p->key_a[i].buffer_sz);
-   PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
-   for (j=0; j<(imm_p->dfile_count*imm_p->copies); j++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n"
-       ,j
-       ,llu(myHandle[j]));
-   }
+    sm_p->val_a[i].buffer_sz = sizeof(imm_p->copies);
+    memcpy(sm_p->val_a[i].buffer ,&(imm_p->copies), sm_p->val_a[i].buffer_sz);
 
-   i++; assert(i<key_count);
-   int *myCount = (int *)sm_p->val_a[i].buffer;
-   sm_p->val_a[i].buffer_sz = sizeof(int);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s:%d \tpointer:%p \tbuffer size:%d\n"
-                                   ,(char *)sm_p->key_a[i].buffer
-                                   ,*myCount,myCount
-                                   ,sm_p->val_a[i].buffer_sz);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey count:%d\n"
-                                   ,sm_p->keyval_count);
+    /* setup user.pvfs2.mirror.status */
+    i++; 
+    assert(i<key_count);
+    sm_p->key_a[i].buffer = malloc(sizeof(status_key));
+    if (!sm_p->key_a[i].buffer)
+        goto error_exit;
+   
+    strcpy(sm_p->key_a[i].buffer,status_key);
+    sm_p->key_a[i].buffer_sz = sizeof(status_key);
 
-   i++; assert(i<key_count);
-   PVFS_handle *myStatus = (PVFS_handle *)sm_p->val_a[i].buffer;
-   for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle(%d):status(%llu)\n"
-                                       ,j
-                                       ,llu(myStatus[j]));
-   }
+    sm_p->val_a[i].buffer = 
+        malloc(sizeof(PVFS_handle) * imm_p->dfile_count * imm_p->copies);
+    if (!sm_p->val_a[i].buffer)
+        goto error_exit;
+    sm_p->val_a[i].buffer_sz = 
+        sizeof(PVFS_handle) * imm_p->dfile_count * imm_p->copies;
+    memcpy(sm_p->val_a[i].buffer,imm_p->writes_completed,
+        sm_p->val_a[i].buffer_sz);
+   
+    /* verify inputs */
+    i=0; 
+    assert(i<key_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, 
+                 "\tVerify inputs BEFORE call to trove...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s\n",(char *)sm_p->key_a[i].buffer);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tsize of buffer : %d\n",
+                 sm_p->key_a[i].buffer_sz);
+    PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
+    for (j=0; j<(imm_p->dfile_count*imm_p->copies); j++)
+    {
+     gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n", j, 
+                  llu(myHandle[j]));
+    }
 
-   /*store keys*/
-   ret = job_trove_keyval_write_list( imm_p->fs_id
-                                     ,imm_p->metadata_handle
-                                     ,sm_p->key_a
-                                     ,sm_p->val_a
-                                     ,sm_p->keyval_count
-                                 ,TROVE_SYNC /*trove flags*/
-                                     ,NULL
-                                     ,smcb
-                                     ,0
-                                     ,js_p
-                                     ,&job_id
-                                     ,server_job_context
-                                     ,NULL);
+    i++; 
+    assert(i<key_count);
+   
+    int *myCount = (int *)sm_p->val_a[i].buffer;
+    sm_p->val_a[i].buffer_sz = sizeof(int);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s:%d \tpointer:%p \tbuffer size:%d\n",
+                                      (char *)sm_p->key_a[i].buffer,
+                                      *myCount,myCount,
+                                      sm_p->val_a[i].buffer_sz);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tkey count:%d\n", sm_p->keyval_count);
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of ret from call to trove : %d\n"
-                                   ,ret);
+    i++; 
+    assert(i<key_count);
+    PVFS_handle *myStatus = (PVFS_handle *)sm_p->val_a[i].buffer;
+    for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "\thandle(%d):status(%llu)\n",
+                                          j, llu(myStatus[j]));
+    }
 
-   i=0; assert(i<key_count);
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tVerify inputs AFTER call to trove...\n");
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s\n",(char *)sm_p->key_a[i].buffer);
-   for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
-   {
-       PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n"
-       ,j
-       ,llu(myHandle[j]));
-   }
+    /* store keys */
+    ret = job_trove_keyval_write_list( imm_p->fs_id,
+                                       imm_p->metadata_handle,
+                                       sm_p->key_a,
+                                       sm_p->val_a,
+                                       sm_p->keyval_count,
+                                       TROVE_SYNC, /*trove flags*/
+                                       NULL,
+                                       smcb,
+                                       0,
+                                       js_p,
+                                       &job_id,
+                                       server_job_context,
+                                       NULL);
 
-   i++; assert(i<key_count);
-   myCount = (int *)sm_p->val_a[i].buffer;
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\t%s:%d \tpointer:%p\n"
-                                   ,(char *)sm_p->key_a[i].buffer
-                                   ,*myCount
-                                   ,sm_p->val_a[i].buffer);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tvalue of ret from call to trove : "
+                                      "%d\n", ret);
+
+    i=0; 
+    assert(i<key_count);
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\tVerify inputs AFTER call to "
+                 "trove...\n");
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s\n",(char *)sm_p->key_a[i].buffer);
+    for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
+    {
+        PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
+        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%llu\n", j,
+                     llu(myHandle[j]));
+    }
+
+    i++; 
+    assert(i<key_count);
+    myCount = (int *)sm_p->val_a[i].buffer;
+    gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s:%d \tpointer:%p\n",
+                                      (char *)sm_p->key_a[i].buffer,
+                                      *myCount,
+                                      sm_p->val_a[i].buffer);
 
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of ret from trove call : %d\n"
-                                   ,ret);
-   return (ret);
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of ret from trove call : %d\n",
+                 ret);
+    return (ret);
 
 error_exit:
-   for (i=0; i<sm_p->keyval_count; i++)
-   {
-       if (sm_p->key_a && sm_p->key_a[i].buffer)
-          free(sm_p->key_a[i].buffer);
-       if (sm_p->val_a && sm_p->val_a[i].buffer)
-          free(sm_p->val_a[i].buffer);
-   }
+    for (i=0; i<sm_p->keyval_count; i++)
+    {
+        if (sm_p->key_a && sm_p->key_a[i].buffer)
+            free(sm_p->key_a[i].buffer);
+        if (sm_p->val_a && sm_p->val_a[i].buffer)
+            free(sm_p->val_a[i].buffer);
+    }
 
-   if (sm_p->key_a)
-      free(sm_p->key_a);
-   if (sm_p->val_a)
-      free(sm_p->val_a);
+    if (sm_p->key_a)
+        free(sm_p->key_a);
+    if (sm_p->val_a)
+        free(sm_p->val_a);
 
-   js_p->error_code = -PVFS_ENOMEM;
-   return SM_ACTION_COMPLETE;
-}/*end action store_mirror_info*/
-
+    js_p->error_code = -PVFS_ENOMEM;
+    return SM_ACTION_COMPLETE;
+} /* end action store_mirror_info */
 
 
 static PINT_sm_action check_store_job (struct PINT_smcb *smcb
