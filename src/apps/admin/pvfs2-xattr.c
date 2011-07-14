@@ -32,6 +32,8 @@
 
 #define VALBUFSZ 1024
 
+static char PVFS_handle_string[PVFS_HANDLE_STRING_LEN]={0};
+
 /* extended attribute name spaces supported in PVFS2 */
 const char *PINT_eattr_namespaces[] =
 {
@@ -226,7 +228,8 @@ int main(int argc, char **argv)
              int dfile_count = src.u.pvfs2.attr.dfile_count;
              for (i=0; i<(copies * dfile_count); i++)
              {
-                 printf("Handle(%d):%llu\n",i,llu(myHandles[i]));
+                 PVFS_handle_unparse(myHandles[i],PVFS_handle_string);
+                 printf("Handle(%d):%s\n",i,PVFS_handle_string);
              }
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.copies"
