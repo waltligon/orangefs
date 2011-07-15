@@ -17,7 +17,7 @@
 #define MTBL_PER_BLOCK 16
 #define GET_KEY_FILE "/etc/fstab"
 #define PROJ_ID 61
-#define BLOCKS_IN_CACHE 1024
+#define BLOCKS_IN_CACHE 512
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
 #define SVSHM_MODE   (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6) 
