@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -16,14 +17,16 @@
 #define MTBL_PER_BLOCK 16
 #define GET_KEY_FILE "/etc/fstab"
 #define PROJ_ID 61
-#define BLOCKS_IN_CACHE 512
+#define BLOCKS_IN_CACHE 1024
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
 #define SVSHM_MODE   (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6) 
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
 
 #define NIL (-1)
-#define DBG 0
+#define DBG 1
+#define F_EVICT 1	/*	Evict files if necessary	*/
+#define M_EVICT 1	/*	Evict memory entries if necessary	*/
 
 /** A link for one block of memory in a files hash table
  *
@@ -36,7 +39,7 @@ struct mem_ent_s
 	uint16_t next;		/* use for hash table chain */
 	uint16_t dirty_next;	/* if dirty used in dirty list */
 	uint16_t lru_next;	/* used in lru list */
-	uint16_t lur_prev;	/* used in lru list */
+	uint16_t lru_prev;	/* used in lru list */
 };
 
 /** A cache for a specific file
@@ -123,10 +126,39 @@ static struct mem_table_s *lookup_file(
 static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
 static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
 static int remove_file(uint32_t fs_id, uint64_t handle);
-static void *lookup_mem(struct mem_table_s *mtbl, uint64_t offset);
+static void *lookup_mem(struct mem_table_s *mtbl, 
+					uint64_t offset, 
+					uint32_t *item_index,
+					uint16_t *mem_ent_index,
+					uint16_t *mem_ent_prev_index
+);
 static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset);
 static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
+/* externally visible API */
+#if 0
+int ucache_open_file(PVFS_object_ref *handle)
+{
+}
 
+void *ucache_lookup(PVFS_object_ref *handle, uint64_t offset)
+{
+}
+
+void *ucache_insert(PVFS_object_ref *handle, uint64_t offset)
+{
+}
+
+int ucache_remove(PVFS_object_ref *handle, uint64_t offset)
+{
+}
+
+int ucache_flush(PVFS_object_ref *handle)
+{
+}
+
+int ucache_close_file(PVFS_object_ref *handle)
+{
+}
+#endif
 #endif 
-
 
