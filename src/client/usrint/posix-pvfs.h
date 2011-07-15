@@ -32,7 +32,7 @@ int pvfs_creat64(const char *path, mode_t mode, ...);
 /* pvfs_unlink */
 int pvfs_unlink (const char *path);
 
-int pvfs_unlinkat (int dirfd, const char *path);
+int pvfs_unlinkat (int dirfd, const char *path, int flags);
 
 int pvfs_rename(const char *oldpath, const char *newpath);
 
@@ -71,6 +71,8 @@ int pvfs_truncate(const char *path, off_t length);
 
 int pvfs_truncate64 (const char *path, off64_t length);
 
+int pvfs_fallocate(int fd, off_t offset, off_t length);
+
 int pvfs_ftruncate (int fd, off_t length);
 
 int pvfs_ftruncate64 (int fd, off64_t length);
@@ -105,7 +107,7 @@ int pvfs_chown (const char *path, uid_t owner, gid_t group);
 
 int pvfs_fchown (int fd, uid_t owner, gid_t group);
 
-int pvfs_fchownat(int fd, char *path, uid_t owner, gid_t group, int flag);
+int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag);
 
 int pvfs_lchown (const char *path, uid_t owner, gid_t group);
 
@@ -113,10 +115,7 @@ int pvfs_chmod (const char *path, mode_t mode);
 
 int pvfs_fchmod (int fd, mode_t mode);
 
-int pvfs_fchmodat(int fd, char *path, mode_t mode, int flag);
-
-/* this is not a Linux syscall, but its useful above */
-int pvfs_lchmod (const char *path, mode_t mode);
+int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag);
 
 int pvfs_mkdir (const char *path, mode_t mode);
 
@@ -136,14 +135,16 @@ int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath);
 ssize_t pvfs_link (const char *oldpath, const char *newpath);
 
 /* PVFS does not have hard links */
-int pvfs_linkat (const char *oldpath, int newdirfd,
-                 const char *newpath, int flags);
+int pvfs_linkat (int olddirfd, const char *oldpath,
+                 int newdirfd, const char *newpath, int flags);
 
 /* this reads exactly one dirent, count is ignored */
 int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count);
 
 /* this reads multiple dirents, up to count */
 int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count);
+
+int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count);
 
 int pvfs_access (const char * path, int mode);
 
@@ -161,6 +162,56 @@ int pvfs_fsync(int fd);
 
 /* does not sync file metadata */
 int pvfs_fdatasync(int fd);
+
+int pvfs_fadvise(int fd, off_t offset, off_t len, int advice);
+
+int pvfs_fadvise64(int fd, off64_t offset, off64_t len, int advice);
+
+int pvfs_statfs(const char *path, struct statfs *buf);
+
+int pvfs_statfs64(const char *path, struct statfs64 *buf);
+
+int pvfs_fstatfs(int fd, struct statfs *buf);
+
+int pvfs_fstatfs64(int fd, struct statfs64 *buf);
+
+int pvfs_mknod(const char *path, mode_t mode, dev_t dev);
+
+int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev);
+
+ssize_t pvfs_sendfile(int outfd, int infd, off_t offset, size_t count);
+
+ssize_t pvfs_sendfile64(int outfd, int infd, off64_t offset, size_t count);
+
+int pvfs_setxattr(const char *path, const char *name,
+                   const void *value, size_t size, int flags);
+
+int pvfs_lsetxattr(const char *path, const char *name,
+                   const void *value, size_t size, int flags);
+
+int pvfs_fsetxattr(int fd, const char *name,
+                   const void *value, size_t size, int flags);
+
+int pvfs_getxattr(const char *path, const char *name,
+                  void *value, size_t size);
+
+int pvfs_lgetxattr(const char *path, const char *name,
+                   void *value, size_t size);
+
+int pvfs_fgetxattr(int fd, const char *name,
+                   void *value, size_t size);
+
+int pvfs_listxattr(const char *path, char *list, size_t size);
+
+int pvfs_llistxattr(const char *path, char *list, size_t size);
+
+int pvfs_flistxattr(int fd, char *list, size_t size);
+
+int pvfs_removexattr(const char *path, const char *name);
+
+int pvfs_lremovexattr(const char *path, const char *name);
+
+int pvfs_fremovexattr(int fd, const char *name);
 
 mode_t pvfs_umask(mode_t mask);
 

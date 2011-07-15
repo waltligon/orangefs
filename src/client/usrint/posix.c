@@ -40,16 +40,33 @@ int open(const char *path, int flags, ...)
        hints = PVFS_HINT_NULL;
     va_end(ap); 
 
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if (is_pvfs_path(path))
     { 
+        /* this handles setup of the descriptor */
+        flags |= O_NOTPVFS; /* try to open non-pvfs files too */
         return pvfs_open(path, flags, mode, hints);
     }
     else
     {
+        int rc;
+        struct stat sbuf;
+        /* descrptor unknown to FS here so we must set it up */
+        rc = pd->fsops->open(path, flags & 01777777, mode);
+        if (rc < 0)
+        {
+            return rc;
+        }
         pd = pvfs_alloc_descriptor(&glibc_ops);
-        pd->posix_fd = pd->fsops->open(path, flags, mode);
+        pd->is_in_use = PVFS_FS;
+        pd->true_fd = rc;
         pd->flags = flags;
-        pd->is_in_use = 1;
+        fstat(rc, &sbuf);
+        pd->mode = sbuf.st_mode;
         return pd->fd; 
     }
 }
@@ -59,26 +76,55 @@ int open(const char *path, int flags, ...)
  */
 int open64(const char *path, int flags, ...)
 { 
-    va_list ap; 
-    mode_t mode = 0; 
-    PVFS_hint hints;  /* need to figure out how to set default */
-    
-    va_start(ap, flags); 
-    if (flags & O_HINTS)
-        hints = va_arg(ap, PVFS_hint);
-    else
-        hints = PVFS_HINT_NULL;
-    va_end(ap); 
-
-    return open(path, flags|O_LARGEFILE, mode, hints); 
+    int fd;
+    va_list ap;
+    va_start(ap, flags);
+    fd = open(path, flags|O_LARGEFILE, ap); 
+    va_end(ap);
+    return fd;
 }
 
 int openat(int dirfd, const char *path, int flags, ...)
 {
+    int fd; 
+    pvfs_descriptor *pd; 
+    va_list ap;
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    va_start(ap, flags);
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        fd = open(path, flags, ap);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            fd = pd->fsops->openat(pd->true_fd, path, flags, ap);
+        }
+        else
+        {
+            errno = EBADF;
+            fd = -1;
+        }
+    }
+    va_end(ap);
+    return fd;
 }
 
 int openat64(int dirfd, const char *path, int flags, ...)
 {
+    int fd;
+    va_list ap;
+    va_start(ap, flags);
+    fd = openat(dirfd, path, flags|O_LARGEFILE, ap); 
+    va_end(ap);
+    return fd;
 }
 
 /*
@@ -102,6 +148,11 @@ int creat64(const char *path, mode_t mode)
  */
 int unlink(const char *path)
 {
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if (is_pvfs_path(path)) {
         return pvfs_ops.unlink(path);
     }
@@ -112,6 +163,31 @@ int unlink(const char *path)
 
 int unlinkat(int dirfd, const char *path, int flag)
 {
+    int rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        unlink(path);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->unlinkat(pd->true_fd, path, flag);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
 }
 
 /*
@@ -119,6 +195,53 @@ int unlinkat(int dirfd, const char *path, int flag)
  */
 int rename (const char *old, const char *new)
 {
+    int oldp, newp;
+    if (!old || !new)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    oldp = is_pvfs_path(old);
+    newp = is_pvfs_path(new);
+    if(oldp && newp)
+    { 
+        return pvfs_rename(old, new);
+    }
+    else if (!oldp && !newp)
+    {
+        return glibc_ops.rename(old, new);
+    }
+    else
+    {
+        errno = EXDEV;
+        return -1;
+    }
+}
+
+int renameat (int oldfd, const char *old, int newfd, const char *new)
+{
+    pvfs_descriptor *oldpd, *newpd;
+    oldpd = pvfs_find_descriptor(oldfd);
+    newpd = pvfs_find_descriptor(newfd);
+    if (!old || !new)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!oldpd || !newpd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (oldpd->fsops == newpd->fsops)
+    {
+        return oldpd->fsops->renameat(oldpd->true_fd, old, newpd->true_fd, new);
+    }
+    else
+    {
+        errno = EXDEV;
+        return -1;
+    }
 }
 
 /* READING and WRITING SYSTEM CALL */
@@ -134,13 +257,74 @@ ssize_t read(int fd, void *buf, size_t count)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->read(fd, buf, count);
-        if (rc > 0)
-            pd->file_pointer += rc;
+        rc = pd->fsops->read(pd->true_fd, buf, count);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+/*
+ * pread wrapper 
+ */
+ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    pd = pvfs_find_descriptor(fd); 
+    if (pd)
+    {
+        rc = pd->fsops->pread(pd->true_fd, (void *)buf, nbytes, offset); 
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+} 
+
+/*
+ * pread64 wrapper 
+ */
+ssize_t pread64(int fd, void *buf, size_t nbytes, off64_t offset)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    pd = pvfs_find_descriptor(fd); 
+    if (pd)
+    {
+        rc = pd->fsops->pread64(pd->true_fd, (void *)buf, nbytes, offset); 
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+/*
+ * readv wrapper 
+ */
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
+{ 
+    ssize_t rc;
+    pvfs_descriptor *pd; 
+    
+    pd = pvfs_find_descriptor(fd); 
+    if (pd)
+    {
+        rc = pd->fsops->readv(pd->true_fd, iov, iovcnt); 
+    }
+    else
+    {
+        errno = EBADF;
         rc = -1;
     }
     return rc;
@@ -157,43 +341,18 @@ ssize_t write(int fd, const void *buf, size_t count)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->write(fd, (void *)buf, count);
-        if (rc > 0)
-            pd->file_pointer += rc;
+        rc = pd->fsops->write(pd->true_fd, (void *)buf, count);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
 }
 
 /*
- * write wrapper 
- */
-ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset)
-{
-    ssize_t rc; 
-    pvfs_descriptor *pd; 
-    
-    pd = pvfs_find_descriptor(fd); 
-    if (pd)
-    {
-        rc = pd->fsops->pread(fd, (void *)buf, nbytes, offset); 
-        if (rc > 0)
-            pd->file_pointer += rc;
-    }
-    else
-    {
-        errno = EINVAL;
-        rc = -1;
-    }
-    return rc;
-} 
-
-/*
- * write wrapper 
+ * pwrite wrapper 
  */
 ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
 {
@@ -203,36 +362,32 @@ ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->pwrite(fd, buf, nbytes, offset);
-        if (rc > 0)
-            pd->file_pointer += rc;
+        rc = pd->fsops->pwrite(pd->true_fd, buf, nbytes, offset);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
 }
 
 /*
- * write wrapper 
+ * pwrite64 wrapper 
  */
-ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
-{ 
+ssize_t pwrite64(int fd, const void *buf, size_t nbytes, off64_t offset)
+{
     ssize_t rc;
-    pvfs_descriptor *pd; 
+    pvfs_descriptor *pd;
     
-    pd = pvfs_find_descriptor(fd); 
+    pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->readv(fd, iov, iovcnt); 
-        if (rc > 0)
-            pd->file_pointer += rc;
+        rc = pd->fsops->pwrite64(pd->true_fd, buf, nbytes, offset);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
@@ -255,7 +410,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
@@ -271,7 +426,7 @@ off_t lseek(int fd, off_t offset, int whence)
     off64_t rc = lseek64(fd, (off64_t)offset, whence);
     if (rc & 0xffffffff00000000LLU)
     {
-        errno = EINVAL;
+        errno = EFAULT;
         rc = -1;
     }
     return (off_t)rc;
@@ -288,9 +443,7 @@ off64_t lseek64(int fd, off64_t offset, int whence)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->lseek64(fd, offset, whence);
-        if (rc != -1)
-            pd->file_pointer = rc;
+        rc = pd->fsops->lseek64(pd->true_fd, offset, whence);
     }
     else
     {
@@ -302,27 +455,93 @@ off64_t lseek64(int fd, off64_t offset, int whence)
 
 int truncate(const char *path, off_t length)
 {
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_truncate(path, length);
+    }
+    else
+    {
+        return glibc_ops.truncate(path, length);
+    }
 }
 
 int truncate64(const char *path, off64_t length)
 {
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_truncate64(path, length);
+    }
+    else
+    {
+        return glibc_ops.truncate64(path, length);
+    }
 }
 
 int ftruncate(int fd, off_t length)
 {
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->ftruncate(pd->true_fd, length);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = (off64_t)-1;
+    }
+    return rc;
 }
 
 int ftruncate64(int fd, off64_t length)
 {
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->ftruncate64(pd->true_fd, length);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = (off64_t)-1;
+    }
+    return rc;
 }
 
+#ifdef _XOPEN_SOURCE
 int posix_fallocate(int fd, off_t offset, off_t length)
 {
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fallocate(pd->true_fd, offset, length);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = (off64_t)-1;
+    }
+    return rc;
 }
-
-int posix_fadvize(int fd, off_t offset, off_t length, int advice)
-{
-}
+#endif
 
 /*
  * close wrapper 
@@ -334,8 +553,8 @@ int close(int fd)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        pd->fsops->flush(pd->posix_fd);
-        pd->fsops->close(pd->posix_fd);
+        pd->fsops->flush(pd->true_fd);
+        pd->fsops->close(pd->true_fd);
         pvfs_free_descriptor(pd);
         return 0;
     }
@@ -348,11 +567,30 @@ int close(int fd)
 
 int flush(int fd)
 {
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->flush(pd->true_fd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = (off64_t)-1;
+    }
+    return rc;
 }
 
 /* various flavors of stat */
 int stat(const char *path, struct stat *buf)
 {
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if(is_pvfs_path(path))
     { 
         return pvfs_stat(path, buf);
@@ -370,6 +608,11 @@ int __xstat(int ver, const char *path, struct stat *buf)
 
 int stat64(const char *path, struct stat64 *buf)
 {
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if(is_pvfs_path(path))
     { 
         return pvfs_stat64(path, buf);
@@ -393,11 +636,11 @@ int fstat(int fd, struct stat *buf)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fstat(pd->posix_fd, buf);
+        rc = pd->fsops->fstat(pd->true_fd, buf);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
@@ -416,11 +659,11 @@ int fstat64(int fd, struct stat64 *buf)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fstat64(pd->posix_fd, buf);
+        rc = pd->fsops->fstat64(pd->true_fd, buf);
     }
     else
     {
-        errno = EINVAL;
+        errno = EBADF;
         rc = -1;
     }
     return rc;
@@ -433,6 +676,11 @@ int __fxstat64(int ver, int fd, struct stat64 *buf)
 
 int lstat(const char *path, struct stat *buf)
 {
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if(is_pvfs_path(path))
     { 
         return pvfs_lstat(path, buf);
@@ -450,6 +698,11 @@ int __lxstat(int ver, const char *path, struct stat *buf)
 
 int lstat64(const char *path, struct stat64 *buf)
 {
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
     if(is_pvfs_path(path))
     { 
         return pvfs_lstat64(path, buf);
@@ -465,138 +718,1013 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf)
     return lstat64(path, buf);
 }
 
+int dup(int oldfd)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(oldfd);
+    if (pd)
+    {
+        rc = pd->fsops->dup(pd->true_fd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int dup2(int oldfd, int newfd)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(oldfd);
+    if (pd)
+    {
+        rc = pd->fsops->dup2(pd->true_fd, newfd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int chown(const char *path, uid_t owner, gid_t group)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_chown(path, owner, group);
+    }
+    else
+    {
+        return glibc_ops.chown(path, owner, group);
+    }
+}
+
+int fchown(int fd, uid_t owner, gid_t group)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fchown(pd->true_fd, owner, group);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flag)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        chown(path, owner, group);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->fchownat(pd->true_fd, path, owner, group, flag);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+int lchown(const char *path, uid_t owner, gid_t group)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_lchown(path, owner, group);
+    }
+    else
+    {
+        return glibc_ops.lchown(path, owner, group);
+    }
+}
+
+int chmod(const char *path, mode_t mode)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_chmod(path, mode);
+    }
+    else
+    {
+        return glibc_ops.chmod(path, mode);
+    }
+}
+
+int fchmod(int fd, mode_t mode)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fchmod(pd->true_fd, mode);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fchmodat(int dirfd, const char *path, mode_t mode, int flag)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        chmod(path, mode);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->fchmodat(pd->true_fd, path, mode, flag);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+int mkdir(const char *path, mode_t mode)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_mkdir(path, mode);
+    }
+    else
+    {
+        return glibc_ops.mkdir(path, mode);
+    }
+}
+
+int mkdirat(int dirfd, const char *path, mode_t mode)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        mkdir(path, mode);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->mkdirat(pd->true_fd, path, mode);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+int rmdir(const char *path)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_rmdir(path);
+    }
+    else
+    {
+        return glibc_ops.rmdir(path);
+    }
+}
+
+ssize_t readlink(const char *path, char *buf, size_t bufsiz)
+{
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_readlink(path, buf, bufsiz);
+    }
+    else
+    {
+        return glibc_ops.readlink(path, buf, bufsiz);
+    }
+}
+
+int readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        readlink(path, buf, bufsiz);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->readlinkat(pd->true_fd, path, buf, bufsiz);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+ssize_t symlink(const char *oldpath, const char *newpath)
+{
+    if (!oldpath || !newpath)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(newpath))
+    { 
+        return pvfs_symlink(oldpath, newpath);
+    }
+    else
+    {
+        return glibc_ops.symlink(oldpath, newpath);
+    }
+}
+
+int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!oldpath || !newpath)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (newdirfd == AT_FDCWD || newpath[0] == '/')
+    {
+        symlink(oldpath, newpath);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(newdirfd);
+        if (pd)
+        {
+            rc = pd->fsops->symlinkat(oldpath, pd->true_fd, newpath);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+ssize_t link(const char *oldpath, const char *newpath)
+{
+    if (!oldpath || !newpath)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(oldpath))
+    { 
+        return pvfs_link(oldpath, newpath);
+    }
+    else
+    {
+        return glibc_ops.link(oldpath, newpath);
+    }
+}
+
+int linkat(int olddirfd, const char *old,
+           int newdirfd, const char *new, int flags)
+{
+    pvfs_descriptor *oldpd, *newpd;
+    oldpd = pvfs_find_descriptor(olddirfd);
+    newpd = pvfs_find_descriptor(newdirfd);
+    if (!old || !new)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (!oldpd || !newpd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (oldpd->fsops == newpd->fsops)
+    {
+        return oldpd->fsops->linkat(oldpd->true_fd, old,
+                                    newpd->true_fd, new, flags);
+    }
+    else
+    {
+        errno = EXDEV;
+        return -1;
+    }
+}
+
+int readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    if (!dirp)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->readdir(pd->true_fd, dirp, count);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
 int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    return -1;
+    int rc;
+    pvfs_descriptor *pd;
+    
+    if (!dirp)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->getdents(pd->true_fd, dirp, count);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
 }
 
-#if 0
-int dup()
+int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
 {
+    int rc;
+    pvfs_descriptor *pd;
+    
+    if (!dirp)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->getdents64(pd->true_fd, dirp, count);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
 }
-
-int dup2()
-{
-}
-
-int chown()
-{
-}
-
-int fchown()
-{
-}
-
-int fchownat()
-{
-}
-
-int lchown()
-{
-}
-
-int chmod()
-{
-}
-
-int fchmod()
-{
-}
-
-int fchmodat()
-{
-}
-
-int lchmod()
-{
-}
-
-int mkdir()
-{
-}
-
-int mdirat()
-{
-}
-
-int rmdir()
-{
-}
-
-ssize_t readlink()
-{
-}
-
-int readlinkat()
-{
-}
-
-ssize_t symlink()
-{
-}
-
-int symlinkat()
-{
-}
-
-ssize_t link()
-{
-}
-
-int linkat()
-{
-}
-
-#endif
 
 /* linux discourages using readdir system calls, so for now
  * we will leave them out - there are stdio calls that can
  * be used
  */
 
-#if 0
+int access(const char *path, int mode)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_access(path, mode);
+    }
+    else
+    {
+        return glibc_ops.access(path, mode);
+    }
+}
 
-int access (int fd, int op)
+int faccessat(int dirfd, const char *path, int mode, int flags)
+{
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        access(path, mode);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->faccessat(pd->true_fd, path, mode, flags);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+int flock(int fd, int op)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->flock(pd->true_fd, op);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fcntl(int fd, int cmd, ...)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    va_list ap;
+    
+    va_start(ap, cmd);
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fcntl(pd->true_fd, cmd, ap);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    va_end(ap);
+    return rc;
+}
+
+void sync(void)
+{
+    pvfs_sync();
+    glibc_ops.sync();
+}
+
+int fsync(int fd)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fsync(pd->true_fd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fdatasync(int fd)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fdatasync(pd->true_fd);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int posix_fadvise(int fd, off_t offset, off_t length, int advice)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fadvise(pd->true_fd, offset, length, advice);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fadvise(int fd, off_t offset, off_t len, int advice)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fadvise(pd->true_fd, offset, len, advice);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fadvise64(int fd, off64_t offset, off64_t len, int advice)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fadvise64(pd->true_fd, offset, len, advice);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int statfs(const char *path, struct statfs *buf)
+{
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_statfs(path, buf);
+    }
+    else
+    {
+        return glibc_ops.statfs(path, buf);
+    }
+}
+
+int statfs64(const char *path, struct statfs64 *buf)
+{
+    if (!path || !buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_statfs64(path, buf);
+    }
+    else
+    {
+        return glibc_ops.statfs64(path, buf);
+    }
+}
+
+int fstatfs(int fd, struct statfs *buf)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    if (!buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fstatfs(pd->true_fd, buf);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int fstatfs64(int fd, struct statfs64 *buf)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    if (!buf)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fstatfs64(pd->true_fd, buf);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int mknod(const char *path, mode_t mode, dev_t dev)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_mknod(path, mode, dev);
+    }
+    else
+    {
+        return glibc_ops.mknod(path, mode, dev);
+    }
+}
+
+int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
+{            
+    ssize_t rc; 
+    pvfs_descriptor *pd; 
+    
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if (dirfd == AT_FDCWD || path[0] == '/')
+    {
+        mknod(path, mode, dev);
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(dirfd);
+        if (pd)
+        {
+            rc = pd->fsops->mknodat(pd->true_fd, path, mode, dev);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+}
+
+ssize_t sendfile(int outfd, int infd, off_t offset, size_t count)
+{
+    return sendfile64(outfd, infd, (off64_t)offset, count);
+}
+
+ssize_t sendfile64(int outfd, int infd, off64_t offset, size_t count)
+{
+    int rc;
+    pvfs_descriptor *inpd, *outpd;
+    
+    inpd = pvfs_find_descriptor(infd);
+    outpd = pvfs_find_descriptor(outfd);
+    if (inpd && outpd)
+    {
+        rc = inpd->fsops->sendfile64(outpd->true_fd, inpd->true_fd,
+                                     offset, count);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int setxattr(const char *path, const char *name,
+             const void *value, size_t size, int flags)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_setxattr(path, name, value, size, flags);
+    }
+    else
+    {
+        return glibc_ops.setxattr(path, name, value, size, flags);
+    }
+}
+
+int lsetxattr(const char *path, const char *name,
+              const void *value, size_t size, int flags)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_lsetxattr(path, name, value, size, flags);
+    }
+    else
+    {
+        return glibc_ops.lsetxattr(path, name, value, size, flags);
+    }
+}
+
+int fsetxattr(int fd, const char *name,
+              const void *value, size_t size, int flags)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fsetxattr(pd->true_fd, name, value, size, flags);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int getxattr(const char *path, const char *name,
+             void *value, size_t size)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_getxattr(path, name, value, size);
+    }
+    else
+    {
+        return glibc_ops.getxattr(path, name, value, size);
+    }
+}
+
+int lgetxattr(const char *path, const char *name,
+              void *value, size_t size)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_lgetxattr(path, name, value, size);
+    }
+    else
+    {
+        return glibc_ops.lgetxattr(path, name, value, size);
+    }
+}
+
+int fgetxattr(int fd, const char *name, void *value,
+              size_t size)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fgetxattr(pd->true_fd, name, value, size);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int listxattr(const char *path, char *list, size_t size)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_listxattr(path, list, size);
+    }
+    else
+    {
+        return glibc_ops.listxattr(path, list, size);
+    }
+}
+
+int llistxattr(const char *path, char *list, size_t size)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_llistxattr(path, list, size);
+    }
+    else
+    {
+        return glibc_ops.llistxattr(path, list, size);
+    }
+}
+
+int flistxattr(int fd, char *list, size_t size)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->flistxattr(pd->true_fd, list, size);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+int removexattr(const char *path, const char *name)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_removexattr(path, name);
+    }
+    else
+    {
+        return glibc_ops.removexattr(path, name);
+    }
+}
+
+int lremovexattr(const char *path, const char *name)
+{
+    if (!path)
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    if(is_pvfs_path(path))
+    { 
+        return pvfs_lremovexattr(path, name);
+    }
+    else
+    {
+        return glibc_ops.lremovexattr(path, name);
+    }
+}
+
+int fremovexattr(int fd, const char *name)
+{
+    int rc;
+    pvfs_descriptor *pd;
+    
+    pd = pvfs_find_descriptor(fd);
+    if (pd)
+    {
+        rc = pd->fsops->fremovexattr(pd->true_fd, name);
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+mode_t umask(mode_t mask)
 {
 }
 
-int faccessat (int fd, int op)
+mode_t getumask(void)
 {
 }
 
-int flock (int fd, int op)
+int getdtablesize(void)
 {
 }
-
-int fcntl (int fd, int op)
-{
-}
-
-int sync (int fd, int op)
-{
-}
-
-int fsync (int fd, int op)
-{
-}
-
-int fdatasync (int fd, int op)
-{
-}
-
-int umask (int fd, int op)
-{
-}
-
-int getumask (int fd, int op)
-{
-}
-
-int getdtablesize (int fd, int op)
-{
-}
-
-#endif
 
 /*
  * Local variables:

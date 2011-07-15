@@ -27,7 +27,7 @@ pvfs_descriptor pvfs_stdin =
 {
     .fd = 0,
     .fsops = &glibc_ops,
-    .posix_fd = STDIN_FILENO,
+    .true_fd = STDIN_FILENO,
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_RDONLY,
@@ -41,7 +41,7 @@ pvfs_descriptor pvfs_stdout =
 {
     .fd = 1,
     .fsops = &glibc_ops,
-    .posix_fd = STDOUT_FILENO,
+    .true_fd = STDOUT_FILENO,
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_WRONLY | O_APPEND,
@@ -55,7 +55,7 @@ pvfs_descriptor pvfs_stderr =
 {
     .fd = 2,
     .fsops = &glibc_ops,
-    .posix_fd = STDERR_FILENO,
+    .true_fd = STDERR_FILENO,
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_WRONLY | O_APPEND,
@@ -84,13 +84,14 @@ void load_glibc(void)
     glibc_ops.write = dlsym(RTLD_NEXT, "write");
     glibc_ops.pwrite = dlsym(RTLD_NEXT, "pwrite");
     glibc_ops.writev = dlsym(RTLD_NEXT, "writev");
-/*  glibc_ops.write64 = dlsym(RTLD_NEXT, "write64"); */
+    glibc_ops.pwrite64 = dlsym(RTLD_NEXT, "pwrite64");
     glibc_ops.lseek = dlsym(RTLD_NEXT, "lseek");
     glibc_ops.lseek64 = dlsym(RTLD_NEXT, "lseek64");
     glibc_ops.truncate = dlsym(RTLD_NEXT, "truncate");
     glibc_ops.truncate64 = dlsym(RTLD_NEXT, "truncate64");
     glibc_ops.ftruncate = dlsym(RTLD_NEXT, "ftruncate");
     glibc_ops.ftruncate64 = dlsym(RTLD_NEXT, "ftruncate64");
+    glibc_ops.fallocate = dlsym(RTLD_NEXT, "posix_fallocate");
     glibc_ops.close = dlsym(RTLD_NEXT, "close");
     glibc_ops.flush = dlsym(RTLD_NEXT, "flush");
     glibc_ops.stat = dlsym(RTLD_NEXT, "stat");
@@ -121,6 +122,7 @@ void load_glibc(void)
     glibc_ops.linkat = dlsym(RTLD_NEXT, "linkat");
     glibc_ops.readdir = dlsym(RTLD_NEXT, "readdir");
     glibc_ops.getdents = dlsym(RTLD_NEXT, "getdents");
+    glibc_ops.getdents64 = dlsym(RTLD_NEXT, "getdents64");
     glibc_ops.access = dlsym(RTLD_NEXT, "access");
     glibc_ops.faccessat = dlsym(RTLD_NEXT, "faccessat");
     glibc_ops.flock = dlsym(RTLD_NEXT, "flock");
@@ -128,9 +130,81 @@ void load_glibc(void)
     glibc_ops.sync = dlsym(RTLD_NEXT, "sync");
     glibc_ops.fsync = dlsym(RTLD_NEXT, "fsync");
     glibc_ops.fdatasync = dlsym(RTLD_NEXT, "fdatasync");
+    glibc_ops.fadvise = dlsym(RTLD_NEXT, "fadvise");
+    glibc_ops.fadvise64 = dlsym(RTLD_NEXT, "fadvise64");
+    glibc_ops.statfs = dlsym(RTLD_NEXT, "statfs");
+    glibc_ops.statfs64 = dlsym(RTLD_NEXT, "statfs64");
+    glibc_ops.fstatfs = dlsym(RTLD_NEXT, "fstatfs");
+    glibc_ops.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    glibc_ops.mknod = dlsym(RTLD_NEXT, "mknod");
+    glibc_ops.mknodat = dlsym(RTLD_NEXT, "mknodat");
+    glibc_ops.sendfile = dlsym(RTLD_NEXT, "sendfile");
+    glibc_ops.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
+    glibc_ops.setxattr = dlsym(RTLD_NEXT, "setxattr");
+    glibc_ops.lsetxattr = dlsym(RTLD_NEXT, "lsetxattr");
+    glibc_ops.fsetxattr = dlsym(RTLD_NEXT, "fsetxattr");
+    glibc_ops.getxattr = dlsym(RTLD_NEXT, "getxattr");
+    glibc_ops.lgetxattr = dlsym(RTLD_NEXT, "lgetxattr");
+    glibc_ops.fgetxattr = dlsym(RTLD_NEXT, "fgetxattr");
+    glibc_ops.listxattr = dlsym(RTLD_NEXT, "listxattr");
+    glibc_ops.llistxattr = dlsym(RTLD_NEXT, "llistxattr");
+    glibc_ops.flistxattr = dlsym(RTLD_NEXT, "flistxattr");
+    glibc_ops.removexattr = dlsym(RTLD_NEXT, "removexattr");
+    glibc_ops.lremovexattr = dlsym(RTLD_NEXT, "lremovexattr");
+    glibc_ops.fremovexattr = dlsym(RTLD_NEXT, "fremovexattr");
     glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
     glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
     glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
+    glibc_ops.socket = dlsym(RTLD_NEXT, "socket");
+    glibc_ops.accept = dlsym(RTLD_NEXT, "accept");
+    glibc_ops.bind = dlsym(RTLD_NEXT, "bind");
+    glibc_ops.connect = dlsym(RTLD_NEXT, "connect");
+    glibc_ops.getpeername = dlsym(RTLD_NEXT, "getpeername");
+    glibc_ops.getsockname = dlsym(RTLD_NEXT, "getsockname");
+    glibc_ops.getsockopt = dlsym(RTLD_NEXT, "getsockopt");
+    glibc_ops.setsockopt = dlsym(RTLD_NEXT, "setsockopt");
+    glibc_ops.ioctl = dlsym(RTLD_NEXT, "ioctl");
+    glibc_ops.listen = dlsym(RTLD_NEXT, "listen");
+    glibc_ops.recv = dlsym(RTLD_NEXT, "recv");
+    glibc_ops.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
+    glibc_ops.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+    //glibc_ops.select = dlsym(RTLD_NEXT, "select");
+    //glibc_ops.FD_CLR = dlsym(RTLD_NEXT, "FD_CLR");
+    //glibc_ops.FD_ISSET = dlsym(RTLD_NEXT, "FD_ISSET");
+    //glibc_ops.FD_SET = dlsym(RTLD_NEXT, "FD_SET");
+    //glibc_ops.FD_ZERO = dlsym(RTLD_NEXT, "FD_ZERO");
+    //glibc_ops.pselect = dlsym(RTLD_NEXT, "pselect");
+    glibc_ops.send = dlsym(RTLD_NEXT, "send");
+    glibc_ops.sendto = dlsym(RTLD_NEXT, "sendto");
+    glibc_ops.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+    glibc_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
+    glibc_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
+
+/* PVFS does not implement socket ops */
+    pvfs_ops.socket = dlsym(RTLD_NEXT, "socket");
+    pvfs_ops.accept = dlsym(RTLD_NEXT, "accept");
+    pvfs_ops.bind = dlsym(RTLD_NEXT, "bind");
+    pvfs_ops.connect = dlsym(RTLD_NEXT, "connect");
+    pvfs_ops.getpeername = dlsym(RTLD_NEXT, "getpeername");
+    pvfs_ops.getsockname = dlsym(RTLD_NEXT, "getsockname");
+    pvfs_ops.getsockopt = dlsym(RTLD_NEXT, "getsockopt");
+    pvfs_ops.setsockopt = dlsym(RTLD_NEXT, "setsockopt");
+    pvfs_ops.ioctl = dlsym(RTLD_NEXT, "ioctl");
+    pvfs_ops.listen = dlsym(RTLD_NEXT, "listen");
+    pvfs_ops.recv = dlsym(RTLD_NEXT, "recv");
+    pvfs_ops.recvfrom = dlsym(RTLD_NEXT, "recvfrom");
+    pvfs_ops.recvmsg = dlsym(RTLD_NEXT, "recvmsg");
+    //pvfs_ops.select = dlsym(RTLD_NEXT, "select");
+    //pvfs_ops.FD_CLR = dlsym(RTLD_NEXT, "FD_CLR");
+    //pvfs_ops.FD_ISSET = dlsym(RTLD_NEXT, "FD_ISSET");
+    //pvfs_ops.FD_SET = dlsym(RTLD_NEXT, "FD_SET");
+    //pvfs_ops.FD_ZERO = dlsym(RTLD_NEXT, "FD_ZERO");
+    //pvfs_ops.pselect = dlsym(RTLD_NEXT, "pselect");
+    pvfs_ops.send = dlsym(RTLD_NEXT, "send");
+    pvfs_ops.sendto = dlsym(RTLD_NEXT, "sendto");
+    pvfs_ops.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
+    pvfs_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
+    pvfs_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
 }
 
 /* 
@@ -172,7 +246,7 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
     PINT_initrand();
-    PVFS_perror_gossip_silent();
+    //PVFS_perror_gossip_silent(); 
 }
 
 int pvfs_descriptor_table_size(void)
@@ -218,7 +292,7 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[i]->fd = i;
 	descriptor_table[i]->dup_cnt = 1;
 	descriptor_table[i]->fsops = fsops;
-	descriptor_table[i]->posix_fd = i;
+	descriptor_table[i]->true_fd = i;
 	descriptor_table[i]->pvfs_ref.fs_id = 0;
 	descriptor_table[i]->pvfs_ref.handle = 0;
 	descriptor_table[i]->flags = 0;

@@ -47,7 +47,10 @@ int iocommon_fsync(pvfs_descriptor *pvfs_info);
  * Find the PVFS handle to an object (file, dir sym) 
  * assumes an absoluate path
  */
-int iocommon_lookup_absolute(const char *abs_path, PVFS_object_ref *ref);
+int iocommon_lookup_absolute(const char *abs_path,
+                             PVFS_object_ref *ref,
+                             char *error_path,
+                             int error_path_size);
 
 /*
  * Lookup a file via the PVFS system interface
@@ -55,7 +58,9 @@ int iocommon_lookup_absolute(const char *abs_path, PVFS_object_ref *ref);
 int iocommon_lookup_relative(const char *rel_path,
                              PVFS_object_ref parent_ref,
                              int follow_links,
-                             PVFS_object_ref *ref );
+                             PVFS_object_ref *ref,
+                             char *error_path,
+                             int error_path_size);
 
 /*
  * Create a file via the PVFS system interface
@@ -64,7 +69,7 @@ int iocommon_create_file(const char *filename,
 			 mode_t file_permission,
 			 PVFS_hint file_creation_param,
                          PVFS_object_ref parent_ref,
-                         PVFS_object_ref *ref );
+                         PVFS_object_ref *ref);
 
 
 /* pvfs_open implementation, return file info in fd */
@@ -75,9 +80,13 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flag,
                                mode_t file_permission,
                                PVFS_object_ref *pdir);
 
-int iocommon_truncate(PVFS_object_ref file_ref, off64_t length);
+int iocommon_truncate(PVFS_object_ref file_ref,
+                      off64_t length);
 
-off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset, PVFS_size unit_size, int whence);
+off64_t iocommon_lseek(pvfs_descriptor *pd,
+                       off64_t offset,
+                       PVFS_size unit_size,
+                       int whence);
 
 /*
  * pvfs_unlink implementation
@@ -123,17 +132,17 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                           PVFS_sysresp_io *ret_resp,
                           PVFS_Request *ret_memory_req);
 
-int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
+int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask);
 
 int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr);
 
-int iocommon_stat(pvfs_descriptor *pd, struct stat *buf);
+int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);
 
 /*
  * The only difference here is that buf is stat64 which
  * means some of its fields are defined as different types
  */
-int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf);
+int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask);
 
 int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group);
 

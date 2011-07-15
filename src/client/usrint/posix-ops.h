@@ -18,7 +18,6 @@
 /** struct of pointers to methods for posix system calls */
 typedef struct posix_ops_s
 {   
-    int (*statfs)(const char *path, struct statfs *buf);
     int (*open)(const char *path, int flags, ...);
     int (*open64)(const char *path, int flags, ...);
     int (*openat)(int dirfd, const char *path, int flags, ...);
@@ -26,7 +25,7 @@ typedef struct posix_ops_s
     int (*creat)(const char *path, mode_t mode, ...);
     int (*creat64)(const char *path, mode_t mode, ...);
     int (*unlink)(const char *path);
-    int (*unlinkat)(int dirfd, const char *path);
+    int (*unlinkat)(int dirfd, const char *path, int flags);
     int (*rename)(const char *oldpath, const char *newpath);
     int (*renameat)(int olddirfd, const char *oldpath,
                     int newdirfd, const char *newpath);
@@ -37,13 +36,14 @@ typedef struct posix_ops_s
     ssize_t (*write)( int fd, const void *buf, size_t count);
     ssize_t (*pwrite)( int fd, const void *buf, size_t count, off_t offset);
     ssize_t (*writev)( int fd, const struct iovec *vector, int count);
-    ssize_t (*write64)( int fd, const void *buf, size_t count, off64_t offset);
+    ssize_t (*pwrite64)( int fd, const void *buf, size_t count, off64_t offset);
     off_t (*lseek)(int fd, off_t offset, int whence);
     off64_t (*lseek64)(int fd, off64_t offset, int whence);
     int (*truncate)(const char *path, off_t length);
     int (*truncate64)(const char *path, off64_t length);
     int (*ftruncate)(int fd, off_t length);
     int (*ftruncate64)(int fd, off64_t length);
+    int (*fallocate)(int fd, off_t offset, off_t length);
     int (*close)( int fd);
     int (*flush)(int fd);
     int (*stat)(const char *path, struct stat *buf);
@@ -58,11 +58,11 @@ typedef struct posix_ops_s
     int (*dup2)(int oldfd, int newfd);
     int (*chown)(const char *path, uid_t owner, gid_t group);
     int (*fchown)(int fd, uid_t owner, gid_t group);
-    int (*fchownat)(int fd, char *path, uid_t owner, gid_t group, int flag);
+    int (*fchownat)(int fd, const char *path, uid_t owner, gid_t group, int flag);
     int (*lchown)(const char *path, uid_t owner, gid_t group);
     int (*chmod)(const char *path, mode_t mode);
     int (*fchmod)(int fd, mode_t mode);
-    int (*fchmodat)(int fd, char *path, mode_t mode, int flag);
+    int (*fchmodat)(int fd, const char *path, mode_t mode, int flag);
     int (*mkdir)(const char *path, mode_t mode);
     int (*mkdirat)(int dirfd, const char *path, mode_t mode);
     int (*rmdir)(const char *path);
@@ -71,20 +71,79 @@ typedef struct posix_ops_s
     ssize_t (*symlink)(const char *oldpath, const char *newpath);
     int (*symlinkat)(const char *oldpath, int newdirfd, const char *newpath);
     ssize_t (*link)(const char *oldpath, const char *newpath);
-    int (*linkat)(const char *oldpath, int newdirfd,
-                  const char *newpath, int flags);
+    int (*linkat)(int olddirfd, const char *oldpath,
+                  int newdirfd, const char *newpath, int flags);
     int (*readdir)(unsigned int fd, struct dirent *dirp, unsigned int count);
     int (*getdents)(unsigned int fd, struct dirent *dirp, unsigned int count);
-    int (*access)(const char * path, int mode);
-    int (*faccessat)(int dirfd, const char * path, int mode, int flags);
+    int (*getdents64)(unsigned int fd, struct dirent64 *dirp, unsigned int count);
+    int (*access)(const char *path, int mode);
+    int (*faccessat)(int dirfd, const char *path, int mode, int flags);
     int (*flock)(int fd, int op);
     int (*fcntl)(int fd, int cmd, ...);
     void (*sync)(void);
     int (*fsync)(int fd);
     int (*fdatasync)(int fd);
+    int (*fadvise)(int fd, off_t offset, off_t len, int advice);
+    int (*fadvise64)(int fd, off64_t offset, off64_t len, int advice);
+    int (*statfs)(const char *path, struct statfs *buf);
+    int (*statfs64)(const char *path, struct statfs64 *buf);
+    int (*fstatfs)(int fd, struct statfs *buf);
+    int (*fstatfs64)(int fd, struct statfs64 *buf);
+    int (*mknod)(const char *path, mode_t mode, dev_t dev);
+    int (*mknodat)(int dirfd, const char *path, mode_t mode, dev_t dev);
+    ssize_t (*sendfile)(int outfd, int infd, off_t offset, size_t count);
+    ssize_t (*sendfile64)(int outfd, int infd, off64_t offset, size_t count);
+    int (*setxattr)(const char *path, const char *name,
+                    const void *value, size_t size, int flags);
+    int (*lsetxattr)(const char *path, const char *name,
+                     const void *value, size_t size, int flags);
+    int (*fsetxattr)(int fd, const char *name,
+                     const void *value, size_t size, int flags);
+    int (*getxattr)(const char *path, const char *name,
+                    void *value, size_t size);
+    int (*lgetxattr)(const char *path, const char *name,
+                     void *value, size_t size);
+    int (*fgetxattr)(int fd, const char *name, void *value, size_t size);
+    int (*listxattr)(const char *path, char *list, size_t size);
+    int (*llistxattr)(const char *path, char *list, size_t size);
+    int (*flistxattr)(int fd, char *list, size_t size);
+    int (*removexattr)(const char *path, const char *name);
+    int (*lremovexattr)(const char *path, const char *name);
+    int (*fremovexattr)(int fd, const char *name);
     mode_t (*umask)(mode_t mask);
     mode_t (*getumask)(void);
     int (*getdtablesize)(void);
+    /* socket operations */
+    int (*socket)(int dowmain, int type, int protocol);
+    int (*accept)(int sockfd, struct sockaddr *addr, socklen_t *alen);
+    int (*bind)(int sockfd, const struct sockaddr *addr, socklen_t alen);
+    int (*connect)(int sockfd, const struct sockaddr *addr, socklen_t alen);
+    int (*getpeername)(int sockfd, struct sockaddr *addr, socklen_t *alen);
+    int (*getsockname)(int sockfd, struct sockaddr *addr, socklen_t *alen);
+    int (*getsockopt)(int sockfd, int lvl, int oname,
+                      void *oval, socklen_t *olen);
+    int (*setsockopt)(int sockfd, int lvl, int oname,
+                      const void *oval, socklen_t olen);
+    int (*ioctl)(int fd, int request, ...);
+    int (*listen)(int sockfd, int backlog);
+    int (*recv)(int sockfd, void *buf, size_t len, int flags);
+    int (*recvfrom)(int sockfd, void *buf, size_t len, int flags,
+                    struct sockaddr *addr, socklen_t *alen);
+    int (*recvmsg)(int sockfd, struct msghdr *msg, int flags);
+    /* int (*select)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
+                  struct timeval *timeout); */
+    /* void (*FD_CLR)(int fd, fd_set *set); */
+    /* void (*FD_ISSET)(int fd, fd_set *set); */
+    /* void (*FD_SET)(int fd, fd_set *set); */
+    /* void (*FD_ZERO)(fd_set *set); */
+    /* int (*pselect)(int nfds, fd_set *rfds, fd_set *wfds, fd_set *efds,
+                   const struct timeval *timeout, const sigset_t *sigmask); */
+    int (*send)(int sockfd, const void *buf, size_t len, int flags);
+    int (*sendto)(int sockfd, const void *buf, size_t len, int flags,
+                  const struct sockaddr *addr, socklen_t alen);
+    int (*sendmsg)(int sockfd, const struct msghdr *msg, int flags);
+    int (*shutdown)(int sockfd, int how);
+    int (*socketpair)(int d, int type, int prtocol, int sv[2]);
 } posix_ops;
 
 extern posix_ops glibc_ops;
@@ -96,7 +155,7 @@ typedef struct pvfs_descriptor_s
     int fd;                   /**< file number in PVFS descriptor_table */
     int dup_cnt;              /**< number of table slots with this des */
     posix_ops *fsops;         /**< syscalls to use for this file */
-    int posix_fd;             /**< non-PVFS files, the true file number */
+    int true_fd;              /**< the true file number depending on FS */
     PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
     int flags;                /**< the open flags used for this file */
     int mode;                 /**< stat mode of the file - may be volatile */
@@ -109,3 +168,11 @@ typedef struct pvfs_descriptor_s PFILE; /* these are for posix interface */
 typedef struct pvfs_descriptor_s PDIR;
 
 #endif
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

@@ -168,8 +168,13 @@ static int flush_datafile_setup_msgpairarray(
 
     attr = &sm_p->getattr.attr;
     assert(attr);
-    assert(attr->mask & PVFS_ATTR_META_DFILES);
-    assert(attr->u.meta.dfile_count > 0);
+    if(!(attr->mask & PVFS_ATTR_META_DFILES) ||
+            !(attr->u.meta.dfile_count > 0))
+    {
+        /* this object does not have defiles - sync not supported */
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, (attr->u.meta.dfile_count + 1));
     if(ret != 0)

@@ -24,10 +24,13 @@
 
 #define MAX_PVFS_STRERROR_LEN 256
 
+/* static global controls whether pvfs_sys calls print user errors */
+static int pvfs_perror_gossip_silent = 0;
+
 /* macro defined in include/pvfs2-types.h */
 DECLARE_ERRNO_MAPPING_AND_FN();
 
-/*
+/**
   the pvfs analog to strerror_r that handles PVFS_error codes as well
   as errno error codes
 */
@@ -60,7 +63,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     return ret;
 }
 
-/* PVFS_perror()
+/** PVFS_perror()
  *
  * prints a message on stderr, consisting of text argument followed by
  * a colon, space, and error string for the given retcode.  NOTE: also
@@ -93,13 +96,33 @@ void PVFS_perror(const char *text, int retcode)
     return;
 }
 
-/* PVFS_perror_gossip()
+/** silences user error messages from system interface calls
+ */
+void PVFS_perror_gossip_silent(void)
+{
+    pvfs_perror_gossip_silent = 1;
+    return;
+}
+
+/** turns on user error messages from system interface calls
+ */
+void PVFS_perror_gossip_verbose(void)
+{
+    pvfs_perror_gossip_silent = 0;
+    return;
+}
+
+/** PVFS_perror_gossip()
  *
  * same as PVFS_perror, except that the output is routed through
  * gossip rather than stderr
  */
 void PVFS_perror_gossip(const char *text, int retcode)
 {
+    if (pvfs_perror_gossip_silent)
+    {
+        return;
+    }
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {
         char buf[MAX_PVFS_STRERROR_LEN] = {0};

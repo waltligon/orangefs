@@ -1126,14 +1126,16 @@ int BMI_testcontext(int incount,
     gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
+    {
 	return (bmi_errno_to_pvfs(-EINVAL));
+    }
 
     *outcount = 0;
 
-    if(tmp_active_method_count < 1)
+    if (tmp_active_method_count < 1)
     {
 	/* nothing active yet, just snooze and return */
-	if(max_idle_time_ms > 0)
+	if (max_idle_time_ms > 0)
 	{
 #ifdef WIN32
             Sleep(2);
@@ -1151,7 +1153,8 @@ int BMI_testcontext(int incount,
 
     while (position < incount && i < tmp_active_method_count)
     {
-        if (expected_method_usage[i].plan) {
+        if (expected_method_usage[i].plan)
+        {
             ret = active_method_table[i]->testcontext(
                 incount - position, 
                 &out_id_array[position],
@@ -1179,7 +1182,7 @@ int BMI_testcontext(int incount,
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
-	for(i=0; i<*outcount; i++)
+	for (i = 0; i < *outcount; i++)
 	{
 	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, 
 		"BMI_testcontext completing: %llu\n", llu(out_id_array[i]));

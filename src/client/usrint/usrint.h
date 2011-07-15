@@ -30,11 +30,14 @@
 #include <memory.h>
 #include <limits.h>
 #include <sys/types.h>
+#include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/resource.h>
 /* #include <sys/statvfs.h> /* struct statfs on OS X */
 #include <sys/vfs.h> /* struct statfs on Linux */
 #include <sys/stat.h>
 #include <sys/uio.h>
+#include <attr/xattr.h>
 #include <linux/types.h>
 /* #include <linux/dirent.h> diff source need diff versions */
 #include <time.h>
@@ -60,7 +63,8 @@
 #endif
 #define true   1 
 #define false  0 
-#define O_HINTS 02000000
+#define O_HINTS     02000000  /* PVFS hints are present */
+#define O_NOTPVFS   04000000  /* Open non-PVFS files if possible */
 
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
@@ -76,39 +80,52 @@ int pvfs_convert_iovec(const struct iovec *vector,
                        PVFS_Request *req,
                        void **buf);
 
-/* These are the standard function we are overloading in this lib */
-#if 0
-int open(const char *path, int flags, ...);
-int open64(const char *path, int flags, ...); 
-ssize_t write(int fd, const void *buf, size_t count);
-ssize_t read(int fd, void *buf, size_t count); 
-off_t lseek(int fd, off_t offset, int whence); 
-off64_t lseek64(int fd, off64_t offset, int whence); 
-ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset); 
-ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset); 
-ssize_t readv(int fd, const struct iovec *iov, int iovcnt); 
-ssize_t writev(int fd, const struct iovec *iov, int iovcnt)  ; 
-int unlink(const char *path);
-int close(int fd);
-
-FILE * fopen(const char * path, const char * mode) ;
-size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream); 
-size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream); 
-int fprintf(FILE *stream, const char *format, ...); 
-int fputs(const char *s, FILE *stream); 
-int fputc(int c, FILE *stream); 
-int fgetc(FILE *stream); 
-char *fgets(char *s, int size, FILE *stream); 
-void rewind(FILE *stream); 
-int fflush(FILE *stream); 
-int getc(FILE *stream); 
-int ungetc(int c, FILE *stream); 
-int fclose(FILE *stream); 
-
 /* MPI functions */ 
-int MPI_File_open(MPI_Comm comm, char *filename, int amode, MPI_Info info, MPI_File *mpi_fh); 
-int MPI_File_write(MPI_File mpi_fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status); 
+//int MPI_File_open(MPI_Comm comm, char *filename,
+//                    int amode, MPI_Info info, MPI_File *mpi_fh); 
+//int MPI_File_write(MPI_File mpi_fh, void *buf,
+//                    int count, MPI_Datatype datatype, MPI_Status *status); 
+
+/* Macros */
+
+#ifdef FD_SET
+#undef FD_SET
 #endif
+#define FD_SET(d,fdset)                 \
+do {                                    \
+    pvfs_descriptor *pd;                \
+    pd = pvfs_find_descriptor(d);       \
+    if (pd)                             \
+    {                                   \
+        __FD_SET(pd->true_fd,(fdset));  \
+    }                                   \
+} while(0)
+
+#ifdef FD_CLR
+#undef FD_CLR
+#endif
+#define FD_CLR(d,fdset)                 \
+do {                                    \
+    pvfs_descriptor *pd;                \
+    pd = pvfs_find_descriptor(d);       \
+    if (pd)                             \
+    {                                   \
+        __FD_CLR(pd->true_fd,(fdset));  \
+    }                                   \
+} while(0)
+
+#ifdef FD_ISSET
+#undef FD_ISSET
+#endif
+#define FD_ISSET(d,fdset)               \
+do {                                    \
+    pvfs_descriptor *pd;                \
+    pd = pvfs_find_descriptor(d);       \
+    if (pd)                             \
+    {                                   \
+        __FD_ISSET(pd->true_fd,(fdset));\
+    }                                   \
+} while(0)
 
 
 //typedef uint64_t off64_t;

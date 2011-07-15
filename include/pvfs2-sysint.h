@@ -91,9 +91,14 @@ typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 /**********************************************************************/
 
 /** Holds results of a lookup operation (reference to object). */
+/*  if error_path is passed in NULL then nothing returned on error */
+/*  otherwise up to error_path_size chars of unresolved path */
+/*  segments are passed out in null terminated string */
 struct PVFS_sysresp_lookup_s
 {
     PVFS_object_ref ref;
+    char *error_path;       /* on error, the unresolved path segments */
+    int error_path_size;    /* size of the buffer provided by the user */
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 

@@ -618,6 +618,8 @@ typedef struct {
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);
+void PVFS_perror_gossip_silent(void);
+void PVFS_perror_gossip_verbose(void);
 PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 PVFS_error PVFS_errno_to_error(int err);
 
@@ -723,6 +725,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EADDRNTFD  (5|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -843,6 +846,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "No address associated with name",                \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
+    "Path contains non-PVFS elements",                \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -853,6 +857,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
+    PVFS_ENOTPVFS,  /* 8 */                           \
 }
 
 /*
