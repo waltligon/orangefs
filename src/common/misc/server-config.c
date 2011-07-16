@@ -74,7 +74,6 @@ static DOTCONF_CB(check_this_server);
 static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
 #endif
-static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 
@@ -373,40 +372,6 @@ static const configoption_t options[] =
      */
     {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,
         CTX_DISTRIBUTION,NULL},
-
-    /* As logical files are created in pvfs, the data files and meta files
-     * that represent them are given filesystem unique handle values.  The
-     * user can specify a range of values (or set of ranges) 
-     * to be allocated to data files and meta files for a particular server,
-     * using the Range option in the DataHandleRanges and MetaHandleRanges
-     * contexts.  Note that in most cases, its easier to let the 
-     * pvfs2-genconfig script determine the best ranges to specify.
-     *
-     * This option specifies a range of handle values that can be used for 
-     * a particular pvfs server in a particular context (meta handles
-     * or data handles).  The DataHandleRanges and MetaHandleRanges contexts
-     * should contain one or more Range options.  The format is:
-     *
-     * Range {alias} {min value1}-{max value1}[, {min value2}-{max value2},...]
-     *
-     * Where {alias} is one of the alias strings already specified in the
-     * Aliases context.
-     *
-     * {min value} and {max value} are positive integer values that specify
-     * the range of possible handles that can be given out for that particular
-     * host.  {max value} must be less than 18446744073709551615 (UINT64_MAX).
-     *
-     * As shown in the specified format, multiple ranges can be specified for
-     * the same alias.  The format requires that max value of a given range
-     * is less than the min value of the next one, 
-     * i.e. {max value1}<{min value2}
-     * 
-     * Example of a Range option for data handles:
-     *
-     * Range mynode1 2147483651-4294967297
-     */
-    {"Range",ARG_LIST, get_range_list,NULL,
-        CTX_METAHANDLERANGES|CTX_DATAHANDLERANGES,NULL},
 
     /* Specifies the handle value for the root of the Filesystem.  This
      * is a required option in the Filesystem context.  The format is:
@@ -2476,33 +2441,6 @@ DOTCONF_CB(get_alias_list)
     }
     
     PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
-    return NULL;
-}
-
-DOTCONF_CB(get_range_list)
-{
-    int i = 0;
-    struct filesystem_configuration_s *fs_conf = NULL;
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-
-    fs_conf = (struct filesystem_configuration_s *)
-    PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
-
-    for(i = 0; i < cmd->arg_count; i += 2)
-    {
-        if (is_valid_alias(config_s->host_aliases, cmd->data.list[i]))
-        {
-            i++;
-            assert(cmd->data.list[i]);
-
-        }
-        else
-        {
-            return("Unrecognized alias.\n");
-        }
-    }
     return NULL;
 }
 

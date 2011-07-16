@@ -157,9 +157,8 @@ int main(int argc, char **argv)
             }
             fs_id = mnt->mntent_array[i].fs_id;
             
-            /* Retrieve the list of all servers for the fs id*/
-            rc = PVFS_mgmt_count_servers(fs_id, &creds, PVFS_MGMT_IO_SERVER,
-                                         &server_count);
+            /* Retrieve the list of all servers for the fs id */
+            rc = PVFS_mgmt_count_servers(fs_id, &creds, &server_count);
 
             if (0 != rc)
             {
@@ -167,7 +166,7 @@ int main(int argc, char **argv)
                 break;
             }
             server_addrs = malloc(server_count * sizeof(PVFS_BMI_addr_t));
-            rc = PVFS_mgmt_get_server_array(fs_id, &creds, PVFS_MGMT_IO_SERVER,
+            rc = PVFS_mgmt_get_server_array(fs_id, &creds,
                                             server_addrs, &server_count);
             if (0 != rc)
             {

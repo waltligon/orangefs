@@ -22,20 +22,17 @@ enum
     CTX_DEFAULTS         = (1 << 2),
     CTX_ALIASES          = (1 << 3),
     CTX_FILESYSTEM       = (1 << 4),
-    CTX_METAHANDLERANGES = (1 << 5),
-    CTX_DATAHANDLERANGES = (1 << 6),
-    CTX_STORAGEHINTS     = (1 << 7),
-    CTX_DISTRIBUTION     = (1 << 8),
-    CTX_SECURITY         = (1 << 9),
-    CTX_EXPORT           = (1 << 10),
-    CTX_SERVER_OPTIONS   = (1 << 11),
+    CTX_STORAGEHINTS     = (1 << 5),
+    CTX_DISTRIBUTION     = (1 << 6),
+    CTX_SECURITY         = (1 << 7),
+    CTX_EXPORT           = (1 << 8),
+    CTX_SERVER_OPTIONS   = (1 << 9),
 };
 
 typedef struct phys_server_desc
 {
     PVFS_BMI_addr_t addr;
     char *addr_string;
-    int server_type;
 } phys_server_desc_s;
 
 typedef struct host_alias_s
@@ -124,7 +121,7 @@ typedef struct server_configuration_s
 {
     char *host_id;
     int host_index;
-    char *server_alias;             /* the command line server-alias parameter */
+    char *server_alias;             /* the cli server-alias parameter */
     int my_server_options;
     char *data_path;                /* path to data storage directory */
     char *meta_path;                /* path to metadata storage directory */
@@ -136,7 +133,7 @@ typedef struct server_configuration_s
     int  server_job_flow_timeout;
     int  client_job_bmi_timeout; 
     int  client_job_flow_timeout;
-    int  client_retry_limit;        /* how many times to retry client operations */
+    int  client_retry_limit;        /* retry client operations count */
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */

@@ -285,8 +285,7 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
 
     assert(js_p->error_code == 0);
     fsid = sm_p->u.get_config.mntent->fs_id;
-    ret = PVFS_mgmt_count_servers(
-        fsid, sm_p->cred_p, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, &count);
+    ret = PVFS_mgmt_count_servers( fsid, sm_p->cred_p, &count );
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -308,7 +307,7 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
     }
 
     ret = PVFS_mgmt_get_server_array(fsid, sm_p->cred_p, 
-            PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, sm_p->fetch_config.addr_array, &count);
+            sm_p->fetch_config.addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -391,7 +390,7 @@ static void hash2str(unsigned char *hash, int hash_length, unsigned char *str)
 
 static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0, tmp;
+    int i, count, ret = 0, fs_conf_failed = 0, fs_conf_size_mismatch = 0;
     char **sha1_fs_digests = NULL;
     size_t digest_len;
     PVFS_fs_id fsid;
@@ -426,7 +425,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         {
             gossip_err("     FS config file on %s -> (size) %d\n", 
                    PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
-                   sm_p->fetch_config.addr_array[indexes[i]], &tmp),
+                   sm_p->fetch_config.addr_array[indexes[i]]),
                    sm_p->fetch_config.fs_config_buf_size[indexes[i]] - 1);
             ret = -PVFS_EINVAL;
         }
@@ -458,7 +457,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
             hash2str((unsigned char *) sha1_fs_digests[i], digest_len, str);
             gossip_err("     FS config file on %s -> (SHA1) %s\n", 
                    PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
-                   sm_p->fetch_config.addr_array[indexes[i]], &tmp), str);
+                   sm_p->fetch_config.addr_array[indexes[i]]), str);
         }
         ret = -PVFS_EINVAL;
         goto out;

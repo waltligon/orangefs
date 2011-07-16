@@ -224,8 +224,8 @@ static PINT_sm_action inspect_keyvals(
 static PINT_sm_action get_handles(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    int ret;
-    job_id_t j_id;
+    int ret = 0;
+    //job_id_t j_id;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     if(s_op->u.unstuff.layout.algorithm != PVFS_SYS_LAYOUT_ROUND_ROBIN)

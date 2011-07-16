@@ -141,9 +141,7 @@ int main(int argc, char **argv)
     PVFS_util_gen_credentials(&creds);
 
     /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-	&server_count);
+    ret = PVFS_mgmt_count_servers(cur_fs, &creds, &server_count);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -158,9 +156,7 @@ int main(int argc, char **argv)
 	perror("malloc");
 	return -1;
     }
-    ret = PVFS_mgmt_get_server_array(cur_fs, &creds, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-	addr_array, &server_count);
+    ret = PVFS_mgmt_get_server_array(cur_fs, &creds, addr_array, &server_count);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array", ret);
@@ -655,7 +651,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       int dot_fmt)
 {
     PVFS_handle handle;
-    int server_idx, tmp_type, flag = 1;
+    int server_idx, flag = 1;
 
     if (!dot_fmt) {
 	printf("remaining handles:\n");
@@ -699,8 +695,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
                 printf(fmt_string,
                        PVFS_mgmt_map_addr(cur_fs,
                                           creds,
-                                          addr_array[server_idx],
-                                          &tmp_type),
+                                          addr_array[server_idx]),
                        llu(handle));
             }
         }

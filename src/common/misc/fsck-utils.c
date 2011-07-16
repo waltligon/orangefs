@@ -129,7 +129,6 @@ int PVFS_fsck_check_server_configs(
     int ret = 0;
     int num_servers = 0;
     int i = 0;
-    int server_type = 0;
     PVFS_BMI_addr_t *addresses = NULL;
     char *fs_config = NULL;
     char *fs_config_diff = NULL;
@@ -146,7 +145,6 @@ int PVFS_fsck_check_server_configs(
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(*cur_fs,
                                 (PVFS_credentials *) creds,
-                                PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &num_servers);
     if(ret < 0)
     {
@@ -165,7 +163,6 @@ int PVFS_fsck_check_server_configs(
     ret = PVFS_mgmt_get_server_array(
         *cur_fs,
         (PVFS_credentials *) creds,
-        PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
         addresses, &num_servers);
     if(ret < 0)
     {
@@ -176,12 +173,10 @@ int PVFS_fsck_check_server_configs(
 
     for (i = 0; i < num_servers; i++)
     {
-        server_type = 0;
         server_name = NULL;
 
         /* get the pretty server name */
-        server_name = PINT_cached_config_map_addr(
-                        *cur_fs, addresses[i], &server_type);
+        server_name = PINT_cached_config_map_addr( *cur_fs, addresses[i]);
         assert(server_name);
 
         fs_config = calloc(FS_CONFIG_BUFFER_SIZE, sizeof(char));
@@ -1080,7 +1075,6 @@ static int PINT_handle_wrangler_load_handles(
     /* count how many servers we have */
     err = PVFS_mgmt_count_servers(*cur_fs,
                                 (PVFS_credentials *) creds,
-                                PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                 &server_count);
     if(err < 0)
     {
@@ -1101,7 +1095,6 @@ static int PINT_handle_wrangler_load_handles(
     /* get a list of the pvfs2 servers */
     err = PVFS_mgmt_get_server_array(*cur_fs,
                                (PVFS_credentials *) creds,
-                               PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                PINT_handle_wrangler_handlelist.addr_array,
                                &server_count);
     if(err < 0)
@@ -1543,7 +1536,6 @@ static int PINT_handle_wrangler_display_stranded_handles(
     int ret = 0;
     int i = 0;
     int j = 0;
-    int server_type = 0;
     PVFS_sysresp_getattr attributes;
     PVFS_object_ref pref;
     const char *server_name = NULL;
@@ -1553,9 +1545,8 @@ static int PINT_handle_wrangler_display_stranded_handles(
     for (i = 0; i < PINT_handle_wrangler_handlelist.num_servers; i++)
     {
         /* get the pretty server name */
-        server_name = PINT_cached_config_map_addr(
-            *cur_fs, PINT_handle_wrangler_handlelist.
-            addr_array[i], &server_type);
+        server_name = PINT_cached_config_map_addr(*cur_fs, 
+            PINT_handle_wrangler_handlelist.addr_array[i]);
 
         for (j = 0; j < PINT_handle_wrangler_handlelist.size_array[i]; j++)
         {

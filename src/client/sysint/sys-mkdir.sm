@@ -342,7 +342,6 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -355,9 +354,10 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    ret = PINT_cached_config_get_next_meta(
+    /* FIX: used to get extent array here */
+    ret = PINT_cached_config_get_next_server(
         sm_p->object_ref.fs_id,
-        &msg_p->svr_addr, &meta_handle_extent_array);
+        &msg_p->svr_addr);
 
     if (ret)
     {
@@ -370,13 +370,15 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
         msg_p->req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
-        meta_handle_extent_array,
         sm_p->u.mkdir.sys_attr,
         sm_p->hints);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
+    /* FIX: used to copy handle from extent_array */
+/*
     PVFS_handle_copy(msg_p->handle, 
                      meta_handle_extent_array.extent_array[0].first);
+ */
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 

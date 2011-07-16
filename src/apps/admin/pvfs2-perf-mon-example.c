@@ -57,12 +57,11 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
     PVFS_credentials creds;
-    int io_server_count;
+    int server_count;
     int64_t** perf_matrix;
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
     PVFS_BMI_addr_t *addr_array;
-    int tmp_type;
     uint64_t next_time;
     float bw;
 
@@ -83,8 +82,8 @@ int main(int argc, char **argv)
     }
 
     /* translate local path into pvfs2 relative path */
-    ret = PVFS_util_resolve(user_opts->mnt_point,
-        &cur_fs, pvfs_path, PVFS_NAME_MAX);
+    ret = PVFS_util_resolve(user_opts->mnt_point, &cur_fs, pvfs_path, 
+        PVFS_NAME_MAX);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_util_resolve", ret);
@@ -93,9 +92,8 @@ int main(int argc, char **argv)
 
     PVFS_util_gen_credentials(&creds);
 
-    /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
-	&io_server_count);
+    /* count how many servers we have */
+    ret = PVFS_mgmt_count_servers(cur_fs, &creds, &server_count);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers", ret);
@@ -103,13 +101,13 @@ int main(int argc, char **argv)
     }
 
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = (int64_t **)malloc(io_server_count*sizeof(int64_t *));
+    perf_matrix = (int64_t **)malloc(server_count*sizeof(int64_t *));
     if(!perf_matrix)
     {
 	perror("malloc");
 	return(-1);
     }
-    for(i=0; i<io_server_count; i++)
+    for(i=0; i<server_count; i++)
     {
 	perf_matrix[i] = (int64_t *)malloc(HISTORY * sizeof(int64_t));
 	if (perf_matrix[i] == NULL)
@@ -122,16 +120,16 @@ int main(int argc, char **argv)
     /* allocate an array to keep up with what iteration of statistics
      * we need from each server 
      */
-    next_id_array = (uint32_t *) malloc(io_server_count * sizeof(uint32_t));
+    next_id_array = (uint32_t *) malloc(server_count * sizeof(uint32_t));
     if (next_id_array == NULL)
     {
 	perror("malloc");
 	return -1;
     }
-    memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
+    memset(next_id_array, 0, server_count*sizeof(uint32_t));
 
     /* allocate an array to keep up with end times from each server */
-    end_time_ms_array = (uint64_t *)malloc(io_server_count * sizeof(uint64_t));
+    end_time_ms_array = (uint64_t *)malloc(server_count * sizeof(uint64_t));
     if (end_time_ms_array == NULL)
     {
 	perror("malloc");
@@ -140,7 +138,7 @@ int main(int argc, char **argv)
 
     /* build a list of servers to talk to */
     addr_array = (PVFS_BMI_addr_t *)
-	malloc(io_server_count * sizeof(PVFS_BMI_addr_t));
+	malloc(server_count * sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
     {
 	perror("malloc");
@@ -148,9 +146,8 @@ int main(int argc, char **argv)
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
 				     &creds,
-				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
-				     &io_server_count);
+				     &server_count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array", ret);
@@ -167,7 +164,7 @@ int main(int argc, char **argv)
 				      end_time_ms_array,
 				      addr_array,
 				      next_id_array,
-				      io_server_count, 
+				      server_count, 
                                       &key_cnt,
 				      HISTORY,
 				      NULL, NULL);
@@ -179,10 +176,10 @@ int main(int argc, char **argv)
 
 	printf("\nPVFS2 I/O server bandwith statistics (MB/sec):\n");
 	printf("==================================================\n");
-	for (i=0; i < io_server_count; i++)
+	for (i=0; i < server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i]));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -210,7 +207,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i]));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -241,7 +238,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i]));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -253,7 +250,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i]));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {

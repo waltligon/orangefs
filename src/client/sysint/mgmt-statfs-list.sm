@@ -277,7 +277,7 @@ static int statfs_list_comp_fn(void *v_p,
 
 	sm_stat->bmi_address = PVFS_mgmt_map_addr(
             sm_p->u.statfs_list.fs_id, sm_p->cred_p,
-            sm_p->msgarray_op.msgarray[i].svr_addr, &sm_stat->server_type);
+            sm_p->msgarray_op.msgarray[i].svr_addr);
 	assert(sm_stat->bmi_address);
 
 	assert(sm_stat->handles_total_count >=

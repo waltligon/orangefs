@@ -87,7 +87,6 @@ int main(int argc, char **argv)
 
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
-	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	&server_count);
     if (ret != 0)
     {
@@ -105,7 +104,6 @@ int main(int argc, char **argv)
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
 				     &creds, 
-				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 				     addr_array,
 				     &server_count);
     if (ret != 0)

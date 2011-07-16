@@ -155,7 +155,7 @@ int main(int argc, char **argv)
            "to all servers...\n",(long)cur_fs);
 
     ret = PVFS_mgmt_count_servers(
-        cur_fs, &creds, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
+        cur_fs, &creds, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -269,13 +269,11 @@ static int noop_all_servers(PVFS_fs_id fsid)
     int count;
     PVFS_BMI_addr_t* addr_array;
     int i;
-    int tmp;
  
     PVFS_util_gen_credentials(&creds);
 
-    printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_META_SERVER, &count);
+    printf("\n   servers:\n");
+    ret = PVFS_mgmt_count_servers( fsid, &creds, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -290,7 +288,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     }
 
     ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_META_SERVER, addr_array, &count);
+        fsid, &creds, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -300,7 +298,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
     for (i = 0; i < count; i++)
     {
 	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
+               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i]));
 	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
 	if (ret == 0)
 	{
@@ -309,48 +307,7 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	else
 	{
 	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
-                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	    return ret;
-	}
-    }
-    free(addr_array);
-
-    printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, &count);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return ret;
-    }
-    addr_array = (PVFS_BMI_addr_t *)malloc(
-        count * sizeof(PVFS_BMI_addr_t));
-    if (addr_array == NULL)
-    {
-	perror("malloc");
-	return -PVFS_ENOMEM;
-    }
-
-    ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return ret;
-    }
-
-    for (i = 0; i < count; i++)
-    {
-	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i], NULL);
-	if (ret == 0)
-	{
-	    printf("Ok\n");
-	}
-	else
-	{
-	    printf("Failure!\n");
+                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i]));
 	    return ret;
 	}
     }
@@ -370,15 +327,13 @@ static int print_config(PVFS_fs_id fsid)
     PVFS_credentials creds;
     int i;
     int ret = -1;
-    int tmp;
     int count;
     PVFS_BMI_addr_t *addr_array;
  
     PVFS_util_gen_credentials(&creds);
 
-    printf("\n   meta servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_META_SERVER, &count);
+    printf("\n   servers:\n");
+    ret = PVFS_mgmt_count_servers( fsid, &creds, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -392,8 +347,7 @@ static int print_config(PVFS_fs_id fsid)
 	return -PVFS_ENOMEM;
     }
 
-    ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_META_SERVER, addr_array, &count);
+    ret = PVFS_mgmt_get_server_array( fsid, &creds, addr_array, &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
@@ -402,39 +356,7 @@ static int print_config(PVFS_fs_id fsid)
 
     for (i=0; i<count; i++)
     {
-	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-    }
-    free(addr_array);
-
-    printf("\n   data servers:\n");
-    ret = PVFS_mgmt_count_servers(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, &count);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_count_servers()", ret);
-	return ret;
-    }
-    addr_array = (PVFS_BMI_addr_t *)malloc(
-        count * sizeof(PVFS_BMI_addr_t));
-    if (addr_array == NULL)
-    {
-	perror("malloc");
-	return -PVFS_ENOMEM;
-    }
-
-    ret = PVFS_mgmt_get_server_array(
-        fsid, &creds, PVFS_MGMT_IO_SERVER, addr_array, &count);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_get_server_array()", ret);
-	return ret;
-    }
-
-    for(i=0; i<count; i++)
-    {
-	printf("   %s\n",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
+	printf("   %s\n", PVFS_mgmt_map_addr(fsid, &creds, addr_array[i]));
     }
     free(addr_array);
 

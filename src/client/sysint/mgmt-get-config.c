@@ -41,7 +41,6 @@ int PVFS_mgmt_get_config(
     PVFS_sys_op_id op_id;
     struct server_configuration_s *config = NULL;
     struct PVFS_sys_mntent mntent;
-    int server_type = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_get_config entered\n");
 
@@ -68,7 +67,7 @@ int PVFS_mgmt_get_config(
     config = PINT_get_server_config_struct(*fsid);
 
     mntent.the_pvfs_config_server =
-        (char*)PINT_cached_config_map_addr(*fsid, *addr, &server_type);
+        (char*)PINT_cached_config_map_addr(*fsid, *addr);
 
     PINT_put_server_config_struct(config);
 

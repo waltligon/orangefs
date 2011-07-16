@@ -31,10 +31,9 @@
 const char *PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t addr,
-    int *server_type)
+    PVFS_BMI_addr_t addr)
 {
-    return PINT_cached_config_map_addr(fs_id, addr, server_type);
+    return PINT_cached_config_map_addr(fs_id, addr);
 }
 
 PVFS_error PVFS_mgmt_map_handle(
@@ -62,9 +61,7 @@ PVFS_error PVFS_mgmt_statfs_all(
     PVFS_BMI_addr_t *addr_array = NULL;
     int real_count = 0;
 
-    ret = PINT_cached_config_count_servers(
-        fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        &real_count);
+    ret = PINT_cached_config_count_servers(fs_id, &real_count);
 
     if (ret < 0)
     {
@@ -86,9 +83,7 @@ PVFS_error PVFS_mgmt_statfs_all(
     }
 
     /* generate default list of servers */
-    ret = PINT_cached_config_get_server_array(
-        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        addr_array, &real_count);
+    ret = PINT_cached_config_get_server_array(fs_id, addr_array, &real_count);
 
     if (ret < 0)
     {
@@ -121,8 +116,7 @@ PVFS_error PVFS_mgmt_setparam_all(
     int count = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
-    ret = PINT_cached_config_count_servers(
-        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
+    ret = PINT_cached_config_count_servers(fs_id, &count);
 
     if (ret < 0)
     {
@@ -137,10 +131,7 @@ PVFS_error PVFS_mgmt_setparam_all(
     }
 
     /* generate default list of servers */
-    ret = PINT_cached_config_get_server_array(
-        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        addr_array, &count);
-
+    ret = PINT_cached_config_get_server_array(fs_id, addr_array, &count);
     if (ret < 0)
     {
 	free(addr_array);
@@ -187,14 +178,12 @@ PVFS_error PVFS_mgmt_setparam_single(
 PVFS_error PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    int server_type,
     PVFS_BMI_addr_t *addr_array,
     int *inout_count_p)
 {
     PVFS_error ret = -PVFS_EINVAL;
 
-    ret = PINT_cached_config_get_server_array(
-        fs_id, server_type, addr_array, inout_count_p);
+    ret = PINT_cached_config_get_server_array(fs_id, addr_array, inout_count_p);
     return ret;
 }
 
@@ -208,12 +197,11 @@ PVFS_error PVFS_mgmt_get_server_array(
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    int server_type,
     int *count)
 {
     PVFS_error ret = -PVFS_EINVAL;
 
-    ret = PINT_cached_config_count_servers(fs_id, server_type, count);
+    ret = PINT_cached_config_count_servers(fs_id, count);
     return ret;
 }
 

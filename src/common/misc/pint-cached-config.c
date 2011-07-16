@@ -474,52 +474,6 @@ const char *PINT_cached_config_map_addr(
     return NULL;
 }
 
-
-/* PINT_cached_config_check_type()
- *
- * Retrieves the server type flags for a specified BMI addr string
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_cached_config_check_type(
-    PVFS_fs_id fsid,
-    const char *server_addr_str,
-    int* server_type)
-{
-    int ret = -PVFS_EINVAL, i = 0;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
-    if (!hash_link)
-    {
-        return(-PVFS_EINVAL);
-    }
-    cur_config_cache = qlist_entry(
-        hash_link, struct config_fs_cache_s, hash_link);
-    assert(cur_config_cache);
-    assert(cur_config_cache->fs);
-
-    ret = cache_server_array(fsid);
-    if (ret < 0)
-    {
-        return(ret);
-    }
-
-    /* run through general server list for a match */
-    for(i = 0; i < cur_config_cache->server_count; i++)
-    {
-        if (!(strcmp(cur_config_cache->server_array[i].addr_string,
-           server_addr_str)))
-        {
-            *server_type = cur_config_cache->server_array[i].server_type;
-            return(0);
-        }
-    }
-    return(-PVFS_EINVAL);
-}
-
-
 /* PINT_cached_config_count_servers()
  *
  * counts the number of physical servers of the specified type

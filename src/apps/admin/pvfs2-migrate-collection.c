@@ -688,7 +688,6 @@ static int translate_0_0_1(
     /* choose a handle range big enough to encompass anything pvfs2-genconfig
      * will create
      */
-    char handle_range[] = "4-64000000000";
     TROVE_op_id op_id;
     TROVE_context_id trove_context = -1;
     char current_path[PATH_MAX];
@@ -735,8 +734,6 @@ static int translate_0_0_1(
         coll_name,
         coll_id, 
         handle,
-        handle_range,
-        NULL,
         1,
         0);
     if(ret != 0)

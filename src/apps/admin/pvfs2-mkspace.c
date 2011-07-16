@@ -336,8 +336,7 @@ int main(int argc, char **argv)
         printf("opts.collection_only(%d).\n",opts.collection_only);
         ret = pvfs2_mkspace(opts.data_space, opts.meta_space,
 			    opts.collection, opts.coll_id, 
-			    opts.root_handle, opts.meta_ranges, 
-			    opts.data_ranges, opts.collection_only, 
+			    opts.root_handle, opts.collection_only, 
 			    opts.verbose);
     }
     return ret;

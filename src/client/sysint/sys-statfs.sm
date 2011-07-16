@@ -75,9 +75,7 @@ PVFS_error PVFS_isys_statfs(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* count the number of servers */
-    ret = PINT_cached_config_count_servers(
-        fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        &sm_p->u.statfs_list.count);
+    ret = PINT_cached_config_count_servers( fs_id, &sm_p->u.statfs_list.count);
     if (ret < 0)
     {
         PINT_smcb_free(smcb);
@@ -104,8 +102,7 @@ PVFS_error PVFS_isys_statfs(
 
     /* generate default list of servers */
     ret = PINT_cached_config_get_server_array(
-        fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-        sm_p->u.statfs_list.addr_array, &sm_p->u.statfs_list.count);
+        fs_id, sm_p->u.statfs_list.addr_array, &sm_p->u.statfs_list.count);
     if (ret < 0)
     {
         free(sm_p->u.statfs_list.addr_array);

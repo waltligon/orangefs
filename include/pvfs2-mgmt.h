@@ -120,13 +120,11 @@ enum
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    int server_type,
     int *count);
 
 PVFS_error PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    int server_type,
     PVFS_BMI_addr_t *addr_array,
     int *inout_count_p);
 
@@ -147,8 +145,7 @@ PVFS_error PVFS_mgmt_noop(
 const char* PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    PVFS_BMI_addr_t addr,
-    int* server_type);
+    PVFS_BMI_addr_t addr);
 
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,

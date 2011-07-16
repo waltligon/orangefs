@@ -234,7 +234,6 @@ void gui_comm_set_active_fs(
 
     ret = PVFS_mgmt_count_servers(cur_fsid,
                                   &creds,
-                                  PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
                                   &outcount);
     if (ret < 0)
     {
@@ -274,8 +273,7 @@ void gui_comm_set_active_fs(
     internal_addr_ct = outcount;
     ret = PVFS_mgmt_get_server_array(cur_fsid,
                                      &creds,
-                                     PVFS_MGMT_IO_SERVER |
-                                     PVFS_MGMT_META_SERVER, internal_addrs,
+                                     internal_addrs,
                                      &outcount);
     if (ret < 0)
     {
@@ -374,16 +372,13 @@ static int gui_comm_stats_collect(
 
         for (i = 0; i < internal_details->count_used; i++)
         {
-            int dummy;
-
             PVFS_strerror_r(internal_details->error[i].error, err_msg, 64);
             snprintf(msgbuf,
                      64,
                      "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
-                                        internal_details->error[i].addr,
-                                        &dummy),
+                                        internal_details->error[i].addr),
                      err_msg);
             gui_message_new(msgbuf);
         }
@@ -467,16 +462,13 @@ static int gui_comm_perf_collect(
 
         for (i = 0; i < internal_details->count_used; i++)
         {
-            int dummy;
-
             PVFS_strerror_r(internal_details->error[i].error, err_msg, 64);
             snprintf(msgbuf,
                      64,
                      "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
-                                        internal_details->error[i].addr,
-                                        &dummy),
+                                        internal_details->error[i].addr),
                     err_msg);
             gui_message_new(msgbuf);
         }

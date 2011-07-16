@@ -153,7 +153,7 @@ static int create_metafile(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
-    server_configuration_s *config = get_server_config_struct();
+    //server_configuration_s *config = get_server_config_struct();
 
     /* first state to check in, make sure the attr mask contains the dist bit. 
      * it's required later (not sure if we have to require it) but if we don't
@@ -166,10 +166,6 @@ static int create_metafile(
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
-
-    ret = PINT_cached_config_get_server(
-        s_op->req->u.create.fs_id,
-        config->host_id);
 
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
@@ -350,16 +346,6 @@ static int create_local_datafiles(
     {
         /* no local work to do */
         js_p->error_code = 0;
-        return(SM_ACTION_COMPLETE);
-    }
-
-    /* find local extent array */
-    ret = PINT_cached_config_get_server(
-        s_op->req->u.create.fs_id,
-        config->host_id);
-    if(ret < 0)
-    {
-        js_p->error_code = ret;
         return(SM_ACTION_COMPLETE);
     }
 
