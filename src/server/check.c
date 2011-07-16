@@ -76,21 +76,20 @@ int PINT_check_mode(
         /* see if object user permissions match access type */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-            "(%d) allows access type (%d) for user...\n", attr->perms, access_type);
-        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-            PVFS_U_READ))
+                     "(%d) allows access type (%d) for user...\n", 
+                     attr->perms, access_type);
+        if(access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_U_READ))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
-        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-            PVFS_U_WRITE))
+        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_U_WRITE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
-        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-            PVFS_U_EXECUTE))
+        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms & 
+                                                     PVFS_U_EXECUTE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
@@ -104,21 +103,20 @@ int PINT_check_mode(
 
     /* see if other bits allow access */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-        "(%d) allows access type (%d) by others...\n", attr->perms, access_type);
-    if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-        PVFS_O_READ))
+        "(%d) allows access type (%d) by others...\n", attr->perms, 
+        access_type);
+
+    if(access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_O_READ))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         return(0);
     }
-    if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-        PVFS_O_WRITE))
+    if(access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_O_WRITE))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         return(0);
     }
-    if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-        PVFS_O_EXECUTE))
+    if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms & PVFS_O_EXECUTE))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         return(0);
@@ -161,21 +159,21 @@ int PINT_check_mode(
     {
         /* see if object group permissions match access type */
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-            "(%d) allows access type (%d) for group...\n", attr->perms, access_type);
-        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-            PVFS_G_READ))
+            "(%d) allows access type (%d) for group...\n", 
+            attr->perms, access_type);
+
+        if(access_type == PINT_ACCESS_READABLE && (attr->perms & PVFS_G_READ))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
-        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-            PVFS_G_WRITE))
+        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms & PVFS_G_WRITE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
         if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-            PVFS_G_EXECUTE))
+                                                     PVFS_G_EXECUTE))
         {
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
@@ -183,7 +181,9 @@ int PINT_check_mode(
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
   
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "******PINT_check_mode: denying access\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+        "******PINT_check_mode: denying access\n");
+
     /* default case: access denied */
     return -PVFS_EACCES;
 }
@@ -308,16 +308,17 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     if (acl_size == 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. "
+                     "denying access\n");
         return -PVFS_EACCES;
     }
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
     acl_size--;
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
-    " %d (%d acl entries)\n",
-        (int) acl_size, 
-        (int) (acl_size / sizeof(pvfs2_acl_entry)));
+                 " %d (%d acl entries)\n",
+                 (int) acl_size, 
+                 (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
         uid, gid, want);
 
@@ -377,19 +378,21 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
             case PVFS2_ACL_OTHER:
                 if (found)
                 {
-                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
-                        "returning access denied\n");
+                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+                                 "(1) PINT_check_acls: returning access "
+                                 "denied\n");
                     return -PVFS_EACCES;
                 }
                 else
                     goto check_perm;
             default:
                 gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(2) PINT_check_acls: "
-                        "returning EIO\n");
+                             "returning EIO\n");
                 return -PVFS_EIO;
         }
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(3) PINT_check_acls: returning EIO\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(3) PINT_check_acls: "
+                 "returning EIO\n");
     return -PVFS_EIO;
 mask:
     /* search the remaining entries */

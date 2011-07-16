@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -219,7 +220,8 @@ static PINT_sm_action initialize_structures (struct PINT_smcb *smcb
    imm_p->fs_id = s_op->target_fs_id;
 
    /* Get the number of IO servers currently running for the given filesystem */
-   ret = PINT_cached_config_get_num_io(imm_p->fs_id,&(imm_p->io_servers_count));
+   ret = PINT_cached_config_get_num_servers(imm_p->fs_id, 
+        &(imm_p->io_servers_count));
    if (ret)
    {
       js_p->error_code = ret;
@@ -842,7 +844,8 @@ static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb
                                              "\tbase handle(%d):%llu\n"
                ,i,llu(imm_p->handle_array_base_local[i])
                ,j,llu(imm_p->handle_array_base[j]) );
-            if (imm_p->handle_array_base_local[i] == imm_p->handle_array_base[j])
+            if ( PVFS_handle_compare(imm_p->handle_array_base_local[i], 
+                                     imm_p->handle_array_base[j]) )
             {
               imm_p->bstream_array_base_local[j] = 
               imm_p->ds_attr_a[i].u.datafile.b_size;
@@ -870,10 +873,8 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
    job_id_t job_id;
    int ret = 0;
-   int i;
 
-   PVFS_handle_extent_array data_handle_ext_array;
-   server_configuration_s *config = get_server_config_struct();
+   //server_configuration_s *config = get_server_config_struct();
 
 
    js_p->error_code = 0;
@@ -894,23 +895,6 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
                                  ,sm_p->target_object_attr->u.meta.dfile_array);
 
    /*find local IO extent array for this file system for metadata host*/
-   ret = PINT_cached_config_get_server( imm_p->fs_id
-                                       ,config->host_id
-                                       ,PINT_SERVER_TYPE_IO
-                                       ,&data_handle_ext_array );
-   if (ret)
-   {
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
-   } 
-   for (i=0;i<data_handle_ext_array.extent_count;i++)
-   {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"Extent Range %d:\tfirst  %llu"
-                                        "\tlast  %llu\n"
-                             ,i,llu(data_handle_ext_array.extent_array[i].first)
-                            ,llu(data_handle_ext_array.extent_array[i].last)  );
-   }
-
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tvalue of copies: %d \tlocation:%p\n"
                                    ,imm_p->copies,&imm_p->copies);
 
@@ -942,7 +926,7 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb
    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
    int ret = 0,i;
-   job_id_t job_id;
+  // job_id_t job_id;
 
    js_p->error_code = 0;
 
@@ -977,18 +961,7 @@ static PINT_sm_action create_remote_datahandles (struct PINT_smcb *smcb
                                        ,imm_p->my_remote_servers[i]);
    }
 
-  ret = job_precreate_pool_get_handles(imm_p->fs_id
-                                       ,rows*cols,
-                                       PVFS_TYPE_DATAFILE,
-                                       (const char **)imm_p->my_remote_servers
-                                       ,imm_p->handle_array_copies_remote
-                                       ,0
-                                       ,smcb
-                                       ,0
-                                       ,js_p
-                                       ,&job_id
-                                       ,server_job_context
-                                       ,NULL);
+    /* FIX: used to call job_precreate_pool_get_handles here */
    return ret;
 }/*end action create_remote_datahandles*/
 
@@ -1031,14 +1004,14 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
       if ( strncmp(imm_p->io_servers[i%imm_p->io_servers_required]
                  ,config->host_id,SERVER_NAME_MAX-1) == 0 )
       {/*local*/
-          memcpy(&imm_p->handle_array_copies[i]
-                ,&imm_p->handle_array_copies_local[j],sizeof(PVFS_handle));
+            PVFS_handle_copy(imm_p->handle_array_copies[i], 
+                             imm_p->handle_array_copies_local[j] );
           j++;
       }
       else
       {/*remote*/
-          memcpy(&imm_p->handle_array_copies[i]
-                ,&imm_p->handle_array_copies_remote[k],sizeof(PVFS_handle));
+          PVFS_handle_copy(imm_p->handle_array_copies[i]
+                ,          imm_p->handle_array_copies_remote[k]);
           k++;
       }       
    }/*end for*/
@@ -1773,10 +1746,10 @@ static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb
 
    struct PINT_server_op *sm_p = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
    PINT_server_create_copies_op *imm_p = &(sm_p->u.create_copies);
-   job_id_t job_id;
-   int ret;  
+   //job_id_t job_id;
+   int ret = 0;  
    int tmpindex;
-   PVFS_handle pool_handle;
+   //PVFS_handle pool_handle;
 
    js_p->error_code = 0;
 
@@ -1798,28 +1771,8 @@ static PINT_sm_action replace_remote_datahandle_objects(struct PINT_smcb *smcb
 
    tmpindex = imm_p->handle_array_copies_remote_count;
 
-   /* find the pool that this handle belongs to */
-   ret = job_precreate_pool_lookup_server( imm_p->remote_io_servers[tmpindex],
-                                           PVFS_TYPE_DATAFILE, 
-                                          imm_p->fs_id
-                                          ,&pool_handle );
-   if (ret < 0)
-   {
-      imm_p->handle_array_copies_remote_count++;
-      js_p->error_code = ret;
-      return SM_ACTION_COMPLETE;
-   }
-
-   ret = job_precreate_pool_fill( pool_handle
-                                 ,imm_p->fs_id
-                                 ,&(imm_p->handle_array_copies_remote[tmpindex])
-                                 ,1
-                                 ,smcb
-                                 ,0
-                                 ,js_p
-                                 ,&job_id
-                                 ,server_job_context
-                                 ,NULL );
+    /* FIX: used to call job_precreate_pool_lookup_server here */
+    /* FIX: used to call job_precreate_pool_fill here */
 
    return ret;
 }/*end action replace_remote_datahandle_objects*/

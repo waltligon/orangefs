@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -43,32 +44,12 @@ typedef struct host_alias_s
     char *bmi_address;
 } host_alias_s;
 
-typedef struct host_handle_mapping_s
-{
-    struct host_alias_s *alias_mapping;
-    char *handle_range;
-
-    /*
-      the handle_range above, represented as a
-      PVFS_handle_extent_array type.  This is a
-      convenient type for sending/receiving over
-      the wire on create/mkdir requests.
-    */
-    PVFS_handle_extent_array handle_extent_array;
-} host_handle_mapping_s;
-
 typedef struct filesystem_configuration_s
 {
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
     int default_num_dfiles;
-
-    /* ptrs are type host_handle_mapping_s* */
-    PINT_llist *meta_handle_ranges;
-
-    /* ptrs are type host_handle_mapping_s* */
-    PINT_llist *data_handle_ranges;
 
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
     enum PVFS_encoding_type encoding;   /* encoding used for messages */
@@ -159,8 +140,6 @@ typedef struct server_configuration_s
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
-    uint32_t  *precreate_batch_size;    /* batch size for each ds type */
-    uint32_t  *precreate_low_threshold; /* threshold for each ds type */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -235,23 +214,6 @@ char *PINT_config_get_host_addr_ptr(
 char *PINT_config_get_host_alias_ptr(
     struct server_configuration_s *config_s,
     char *bmi_address);
-
-char *PINT_config_get_meta_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-
-int PINT_config_get_meta_handle_extent_array(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id,
-    PVFS_handle_extent_array *extent_array);
-
-char *PINT_config_get_data_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
-
-char *PINT_config_get_merged_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
 
 int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s);

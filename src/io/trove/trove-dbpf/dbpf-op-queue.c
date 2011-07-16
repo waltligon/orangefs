@@ -1,5 +1,6 @@
 /*
  * (C) 2002 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -346,13 +347,6 @@ int dbpf_queue_or_service(
         if(ret < 0)
         {
             goto exit;
-        }
-
-        /* only one that allocs anything, see dbpf_queued_op_free */
-        if(op_p->type == DSPACE_CREATE || op_p->type == DSPACE_CREATE_LIST)
-        {
-            free(op_p->u.d_create.extent_array.extent_array);
-            op_p->u.d_create.extent_array.extent_array = NULL;
         }
 
         ret = 1;

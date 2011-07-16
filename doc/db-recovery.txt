@@ -39,7 +39,7 @@ For keyval.db:
 ====================================================================
 #include <stdint.h>
 
-typedef uint64_t PVFS_handle;
+typedef uuid_t PVFS_handle;
 typedef PVFS_handle                TROVE_handle;
 
 #define PVFS_NAME_MAX            256
@@ -66,9 +66,9 @@ int PINT_trove_dbpf_keyval_compare(
     db_entry_a = (const struct dbpf_keyval_db_entry *) a->data;
     db_entry_b = (const struct dbpf_keyval_db_entry *) b->data;
 
-    if(db_entry_a->handle != db_entry_b->handle)
+    if(TROVE_handle_compare(db_entry_a->handle, db_entry_b->handle) != 0 )
     {
-        return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
+        return TROVE_handle_compare(db_entry_a->handle, db_entry_b->handle);
     }
 
     if(a->size > b->size)
@@ -99,7 +99,7 @@ For dataspace_attributes.db:
 
 #include <stdint.h>
 
-typedef uint64_t PVFS_handle;
+typedef uuid_t PVFS_handle;
 typedef PVFS_handle                TROVE_handle;
 
 int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b)
@@ -110,12 +110,7 @@ int PINT_trove_dbpf_ds_attr_compare(DB * dbp, const DBT * a, const DBT * b)
     handle_a = (const TROVE_handle *) a->data;
     handle_b = (const TROVE_handle *) b->data;
 
-    if(*handle_a == *handle_b)
-    {
-        return 0;
-    }
-
-    return (*handle_a > *handle_b) ? -1 : 1;
+    return TROVE_handle_compare(*handle_a, *handle_b);
 }
 
 if ((ret = dbp->set_bt_compare(dbp, PINT_trove_dbpf_ds_attr_compare)) != 0) {

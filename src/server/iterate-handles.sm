@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -89,26 +90,10 @@ static PINT_sm_action iterate_handles_do_work(
     
     if(s_op->req->u.mgmt_iterate_handles.flags == PVFS_MGMT_RESERVED)
     {
-        /* for now the only special case reserved handles are those that are
-         * allocated by precreate
-         */
         memcpy(&s_op->resp.u.mgmt_iterate_handles.kv_position,
 	       &s_op->req->u.mgmt_iterate_handles.kv_position, 
                sizeof(PVFS_kv_position));
-        ret = job_precreate_pool_iterate_handles(
-            s_op->req->u.mgmt_iterate_handles.fs_id,
-            s_op->resp.u.mgmt_iterate_handles.kv_position,
-            s_op->req->u.mgmt_iterate_handles.position_flag,
-            s_op->resp.u.mgmt_iterate_handles.handle_array,
-            s_op->req->u.mgmt_iterate_handles.handle_count,
-            0,
-            NULL,
-            smcb,
-            0,
-            js_p,
-            &tmp_id,
-            server_job_context,
-            s_op->req->hints);
+        /* FIX: used to call job_precreate_pool_iterate_handles here */
     }
     else if(s_op->req->u.mgmt_iterate_handles.flags == 0)
     {

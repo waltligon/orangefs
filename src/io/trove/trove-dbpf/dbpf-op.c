@@ -1,5 +1,6 @@
 /*
  * (C) 2002 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -52,12 +53,7 @@ void dbpf_queued_op_init(
 
 void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
 {
-    if (q_op_p->op.type == DSPACE_CREATE || q_op_p->op.type == DSPACE_CREATE_LIST)
-    {
-        free(q_op_p->op.u.d_create.extent_array.extent_array);
-        q_op_p->op.u.d_create.extent_array.extent_array = NULL;
-    }
-    else if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
+    if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
              (q_op_p->op.type == BSTREAM_WRITE_LIST))
     {
         if (q_op_p->op.u.b_rw_list.aiocb_array)

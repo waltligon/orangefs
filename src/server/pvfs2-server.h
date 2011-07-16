@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2011 Omnbiond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -61,9 +62,6 @@ extern job_context_id server_job_context;
 /* Specifies the number of handles to be preceated at a time from each
  * server using the batch create request.
  */
-#define PVFS2_PRECREATE_BATCH_SIZE_DEFAULT 512
-/* precreate pools will be topped off if they fall below this value */
-#define PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT 256
 
 /* types of permission checking that a server may need to perform for
  * incoming requests
@@ -206,7 +204,6 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
-    SERVER_PRECREATE_INIT      = (1 << 18),
 } PINT_server_status_flag;
 
 typedef enum
@@ -470,17 +467,6 @@ struct PINT_server_mgmt_remove_dirent_op
     PVFS_handle dirdata_handle;
 };
 
-struct PINT_server_precreate_pool_refiller_op
-{
-    PVFS_handle pool_handle;
-    PVFS_handle* precreate_handle_array;
-    PVFS_fs_id fsid;
-    char* host;
-    PVFS_BMI_addr_t host_addr;
-    PVFS_handle_extent_array handle_extent_array;
-    PVFS_ds_type type;
-};
-
 struct PINT_server_batch_create_op
 {
     int saved_error_code;
@@ -531,7 +517,6 @@ struct PINT_server_truncate_op
 struct PINT_server_mkdir_op
 {
     PVFS_fs_id fs_id;
-    PVFS_handle_extent_array handle_extent_array;
     PVFS_handle dirent_handle;
     PVFS_size init_dirdata_size;
 };
@@ -670,8 +655,6 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
-        struct PINT_server_precreate_pool_refiller_op
-            precreate_pool_refiller;
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;

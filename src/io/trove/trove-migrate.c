@@ -1,5 +1,6 @@
 /*
  * (C) 2009 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */       
@@ -48,10 +49,6 @@ op=%lld context=%lld count=%d state=%d\n",                      \
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
-static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
-				     const char* data_path,
-				     const char* meta_path);
-
 /*
  * Migration Table
  *
@@ -74,7 +71,6 @@ struct migration_s
 struct migration_s migration_table[] =
 {
     { 0, 1, 3, migrate_collection_0_1_3 },
-    { 0, 1, 4, migrate_collection_0_1_4 },
     { 0, 0, 0, NULL }
 };
 
@@ -709,199 +705,6 @@ context=%lld\n",
     if (user)
     {
         free(user);
-    }
-
-    return ret;
-}
-
-
-/*
- * migrate_collection_0_1_4
- *   coll_id   - collection id
- *   data_path - path to data storage
- *   meta_path - path to metadata storage
- *
- * Migrate existing precreate pool keys held in the collection attributes
- * to include the handle type (PVFS_TYPE_DATAFILE) in the key. Since prior
- * to this version only PVFS_TYPE_DATAFILE handles existed in a pool this
- * is an easy conversion to make 
- *
- * \return 0 on success, non-zero on failure
- */
-static int migrate_collection_0_1_4 (TROVE_coll_id coll_id, 
-				     const char* data_path,
-				     const char* meta_path)
-{
-    int ret=0, i=0, server_count=0, server_type=0, count=0, pool_key_len=0;
-    const char *host;
-    /* hostname + pool key string + handle type size */
-    char pool_key[PVFS_MAX_SERVER_ADDR_LEN + 28] = { 0 };
-    char type_string[11] = { 0 };
-    TROVE_context_id  context_id = PVFS_CONTEXT_NULL;
-    TROVE_keyval_s key, data;
-    TROVE_op_id delattr_op_id, getattr_op_id, setattr_op_id;
-    TROVE_ds_state state;
-    PVFS_BMI_addr_t* addr_array = NULL;
-    PVFS_handle handle;
-
-    struct server_configuration_s *user_opts = get_server_config_struct();
-    assert(user_opts);
-
-
-    TROVE_handle_clear(handle);
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %d, %s, %s\n", 
-                 __func__, coll_id, data_path, meta_path);
-
-    ret = trove_open_context(coll_id, &context_id);
-    if (ret < 0)
-    {
-        gossip_err("%s: trove_open_context failed: ret=%d coll=%d\n", __func__, 
-                    ret, coll_id);
-        return ret;
-    }
-
-    /* for completeness we will check even if this server claims it's not a 
-     * metadata server to make sure we get all precreate pool handles updated.
-     * If it doesn't have any defined then our geteattr calls will just return
-     * with no record, Also check all peer servers for a precreate pool for
-     * the same reason (and it's easier anyway). */
-    ret = PINT_cached_config_count_servers( coll_id, PINT_SERVER_TYPE_ALL, 
-                                            &server_count);
-    if(ret < 0)
-    {
-        gossip_err("%s: error: unable to count servers for fsid: %d\n",
-                   __func__, (int)coll_id);
-        return ret;
-    }
-
-    addr_array = calloc(server_count, sizeof(PVFS_BMI_addr_t));
-    if(!addr_array)
-    {
-        gossip_err("%s: error: unable to allocate addr array for precreate "
-                   "pools.\n", __func__);
-        ret = -PVFS_ENOMEM;
-        goto complete;
-    }
-
-    /* resolve addrs for each I/O server */
-    ret = PINT_cached_config_get_server_array(coll_id, PINT_SERVER_TYPE_ALL, 
-                                              addr_array, &server_count);
-    if(ret < 0)
-    {
-        gossip_err("%s: error: unable retrieve servers addrs\n", __func__);
-        goto complete;
-    }
-       
-    /* check each server for a precreate pool and check for only one pool since
-     * that's all there was prior to this version */
-    for(i=0; i<server_count; i++)
-    {
-        host = PINT_cached_config_map_addr(coll_id, addr_array[i], 
-                                           &server_type);
-        /* potential host with precreate pool entry */
-        memset(&key,  0, sizeof(key));
-        memset(&data, 0, sizeof(data));
-        memset(pool_key, 0, PVFS_MAX_SERVER_ADDR_LEN + 28);
-
-        pool_key_len = strlen(host) + strlen("precreate-pool-") + 1;
-        key.buffer = pool_key;
-        key.buffer_sz = pool_key_len;
-        key.read_sz = 0;
-
-        snprintf((char*)key.buffer, key.buffer_sz, "precreate-pool-%s", host);
-        data.buffer    = &handle;
-        data.buffer_sz = sizeof(handle);
-        data.read_sz = 0;
-
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: looking for pool key\n", 
-                     __func__);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key(%s)(%d)(%d)\n", 
-                     __func__, (char *)key.buffer, key.buffer_sz, key.read_sz);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: data(%s)(%d)(%d)\n", 
-                   __func__, (char *)data.buffer, data.buffer_sz, data.read_sz);
-        ret = trove_collection_geteattr(coll_id, &key, &data, 0, NULL, 
-                                        context_id, &getattr_op_id);
-        if (ret < 0)
-        {
-            gossip_err("%s: trove_collection_getattr failed for pool key %s "
-                       "ret=%d coll=%d context=%lld op=%lld\n", __func__,
-                       pool_key, ret, coll_id, llu(context_id), 
-                       llu(getattr_op_id));
-            continue;
-        } 
-        TROVE_DSPACE_WAIT(ret, coll_id, getattr_op_id, context_id, count, state,
-                          complete);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: found pool key\n", __func__);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: key(%s)(%d)(%d)\n", 
-                     __func__, (char *)key.buffer, key.buffer_sz, key.read_sz);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: data(%llu)(%d)(%d)\n", 
-                     __func__, llu(*(PVFS_handle *)data.buffer), data.buffer_sz,
-                     data.read_sz);
-
-        ret = trove_collection_deleattr(coll_id, &key, 0, NULL, context_id, 
-                                        &delattr_op_id);
-        if (ret < 0)
-        {
-            gossip_err("%s: trove_collection_delattr failed: \
-                       ret=%d coll=%d context=%lld op=%lld\n", __func__,
-                       ret, coll_id, llu(context_id), llu(delattr_op_id));
-            goto complete;
-        } 
-        TROVE_DSPACE_WAIT(ret, coll_id, delattr_op_id, context_id, count, state,
-                          complete);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: removed old pool key\n", 
-                     __func__);
-
-        /* munge to new key */
-        snprintf(type_string, 11, "%u", PVFS_TYPE_DATAFILE);
-        memset(pool_key, 0, PVFS_MAX_SERVER_ADDR_LEN + 28);
-        snprintf(pool_key, PVFS_MAX_SERVER_ADDR_LEN + 28,
-                 "precreate-pool-%s-%s", host, type_string);
-
-        /* reset the length to include room for the type */
-        pool_key_len = strlen(host) + strlen(type_string) +
-                       strlen("precreate-pool-") + 2;
-        key.buffer_sz  = pool_key_len;
- 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: adding new pool key (%s) -> "
-                     "(%llu)\n", __func__, (char *)key.buffer, 
-                     llu(*(PVFS_handle *)data.buffer));
-        ret = trove_collection_seteattr(coll_id, &key, &data, 0, NULL, 
-                                        context_id, &setattr_op_id);
-        if (ret < 0)
-        {
-            gossip_err("%s: trove_collection_setattr failed: \
-                       ret=%d coll=%d context=%lld op=%lld\n", __func__,
-                       ret, coll_id, llu(context_id), llu(setattr_op_id));
-            goto complete;
-        } 
-        TROVE_DSPACE_WAIT(ret, coll_id, setattr_op_id, context_id, count, state,
-                          complete);
-        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: successfully migrated pool %s\n",
-                     __func__, (char *)key.buffer);
-    } // for each server
-
-    /* if we just came out of the loop force ret to 0, we don't want a bad
-     * key lookup to spoil the whole migration (since it's expected) */
-    ret = 0; 
-
-complete:
-    if (context_id != PVFS_CONTEXT_NULL)
-    {
-        int rc = trove_close_context(coll_id, context_id);
-        if (rc < 0)
-        {
-            ret = rc;
-            gossip_err("%s: trove_close_context failed: ret=%d coll=%d " \
-                       "context=%lld\n", __func__, ret, coll_id, 
-                       llu(context_id));
-        }
-    }
-
-    if( addr_array )
-    {
-        free(addr_array);
     }
 
     return ret;

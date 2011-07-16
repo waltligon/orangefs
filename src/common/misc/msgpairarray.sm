@@ -490,7 +490,6 @@ static PINT_sm_action msgpairarray_completion_fn(
     int need_retry = 0;
     struct PINT_decoded_msg decoded_resp;
     const char* server_string = NULL;
-    int server_type;
 
     /* response structure (decoded) */
     struct PVFS_server_resp *resp_p = NULL;
@@ -518,7 +517,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             char s[1024];
             PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
             server_string = PINT_cached_config_map_addr(
-                msg_p->fs_id, msg_p->svr_addr, &server_type);
+                msg_p->fs_id, msg_p->svr_addr);
             if(!server_string)
             {
                 server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
@@ -670,7 +669,7 @@ static PINT_sm_action msgpairarray_completion_fn(
             } else {
                 char s[1024];
                 server_string = PINT_cached_config_map_addr(
-                    msg_p->fs_id, msg_p->svr_addr, &server_type);
+                    msg_p->fs_id, msg_p->svr_addr);
                 if(!server_string)
                 {
                     server_string = "[UNKNOWN]";
@@ -760,7 +759,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                           int actual_resp_sz,
                           struct PVFS_server_resp **resp_out_pp)
 {
-    int ret = -1, server_type = 0;
+    int ret = -1;
     const char *server_string;
 
     ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
@@ -780,7 +779,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
             if (fs_id != PVFS_FS_ID_NULL)
             {
                 server_string = PINT_cached_config_map_addr(
-                    fs_id, *svr_addr_p, &server_type);
+                    fs_id, *svr_addr_p);
                 gossip_err("   Server: %s.\n", server_string);
             }
             else

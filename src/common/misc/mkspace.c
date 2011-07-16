@@ -1,5 +1,6 @@
 /*
  * (C) 2002 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -42,8 +43,6 @@ int pvfs2_mkspace(
     char *collection,
     TROVE_coll_id coll_id,
     TROVE_handle root_handle,
-    char *meta_handle_ranges,
-    char *data_handle_ranges,
     int create_collection_only,
     int verbose)
 {
@@ -53,7 +52,6 @@ int pvfs2_mkspace(
     TROVE_keyval_s key, val;
     TROVE_ds_attributes_s attr;
     TROVE_context_id trove_context = -1;
-    char *merged_handle_ranges = NULL;
     TROVE_handle new_root_handle;
     TROVE_handle root_dirdata_handle;
     TROVE_handle lost_and_found_handle; 
@@ -64,12 +62,6 @@ int pvfs2_mkspace(
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
     mkspace_print(verbose,"Root Handle  : %llu\n",llu(root_handle));
-    mkspace_print(verbose,"Meta Handles : %s\n",
-                  (meta_handle_ranges && strlen(meta_handle_ranges) ?
-                   meta_handle_ranges : "NONE"));
-    mkspace_print(verbose,"Data Handles : %s\n",
-                  (data_handle_ranges && strlen(data_handle_ranges) ?
-                   data_handle_ranges : "NONE"));
 
     PVFS_handle_clear(new_root_handle);
     PVFS_handle_clear(root_dirdata_handle);
@@ -169,50 +161,6 @@ int pvfs2_mkspace(
         mkspace_print(verbose,"trove_open_context() failure.\n");
         return -1;
     }
-
-    /* merge the specified ranges to pass to the handle allocator */
-    if ((meta_handle_ranges && strlen(meta_handle_ranges)) &&
-        (data_handle_ranges && strlen(data_handle_ranges)))
-    {
-        merged_handle_ranges = PINT_merge_handle_range_strs(
-            meta_handle_ranges, data_handle_ranges);
-    }
-    else if (meta_handle_ranges && strlen(meta_handle_ranges))
-    {
-        merged_handle_ranges = strdup(meta_handle_ranges);
-    }
-    else if (data_handle_ranges && strlen(data_handle_ranges))
-    {
-        merged_handle_ranges = strdup(data_handle_ranges);
-    }
-
-    if (!merged_handle_ranges)
-    {
-        gossip_err("Failed to merge the handle range!  Format invalid\n");
-        return -1;
-    }
-
-    /*
-      set the trove handle ranges; this initializes the handle
-      allocator with the ranges we were told to use
-    */ 
-    ret = trove_collection_setinfo(
-        coll_id, trove_context, TROVE_COLLECTION_HANDLE_RANGES,
-        merged_handle_ranges);
-
-    if (ret < 0)
-    {
-	mkspace_print(verbose, "Error adding handle ranges: %s\n",
-                      merged_handle_ranges);
-        free(merged_handle_ranges);
-	return -1;
-    }
-
-    mkspace_print(verbose,"info: set handle ranges to %s\n",
-                  merged_handle_ranges);
-
-    free(merged_handle_ranges);
- 
 
     /*
       if a root_handle is specified, 1) create a dataspace to hold the

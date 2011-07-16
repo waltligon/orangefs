@@ -235,32 +235,19 @@ struct PVFS_servreq_batch_create
     PVFS_fs_id fs_id;
     PVFS_ds_type object_type;
     uint32_t object_count;
-
-    /*
-      an array of handle extents that we use to suggest to
-      the server from which handle range to allocate for the
-      newly created handle(s).  To request a single handle,
-      a single extent with first = last should be used.
-    */
-    PVFS_handle_extent_array handle_extent_array;
 };
-endecode_fields_5_struct(
+endecode_fields_4_struct(
     PVFS_servreq_batch_create,
     PVFS_fs_id, fs_id,
     PVFS_ds_type, object_type,
     uint32_t, object_count,
-    skip4,,
-    PVFS_handle_extent_array, handle_extent_array);
-
-#define extra_size_PVFS_servreq_batch_create \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+    skip4, );
 
 #define PINT_SERVREQ_BATCH_CREATE_FILL(__req,          \
                                  __creds,              \
                                  __fsid,               \
                                  __objtype,            \
                                  __objcount,           \
-                                 __ext_array,          \
                                  __hints)              \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
@@ -270,10 +257,6 @@ do {                                                   \
     (__req).u.batch_create.fs_id = (__fsid);           \
     (__req).u.batch_create.object_type = (__objtype);        \
     (__req).u.batch_create.object_count = (__objcount);      \
-    (__req).u.batch_create.handle_extent_array.extent_count =\
-        (__ext_array).extent_count;                    \
-    (__req).u.batch_create.handle_extent_array.extent_array =\
-        (__ext_array).extent_array;                    \
 } while (0)
 
 struct PVFS_servresp_batch_create
@@ -745,28 +728,16 @@ struct PVFS_servreq_mkdir
 {
     PVFS_fs_id fs_id;      /* file system */
     PVFS_object_attr attr; /* initial attributes */
-
-    /*
-      an array of handle extents that we use to suggest to
-      the server from which handle range to allocate for the
-      newly created handle(s).  To request a single handle,
-      a single extent with first = last should be used.
-    */
-    PVFS_handle_extent_array handle_extent_array;
 };
-endecode_fields_4_struct(
+endecode_fields_3_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
     skip4,,
-    PVFS_object_attr, attr,
-    PVFS_handle_extent_array, handle_extent_array);
-#define extra_size_PVFS_servreq_mkdir \
-    (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
+    PVFS_object_attr, attr);
 
 #define PINT_SERVREQ_MKDIR_FILL(__req,                 \
                                 __creds,               \
                                 __fs_id,               \
-                                __ext_array,           \
                                 __attr,                \
                                 __hints)               \
 do {                                                   \
@@ -775,10 +746,6 @@ do {                                                   \
     (__req).credentials = (__creds);                   \
     (__req).hints = (__hints);                         \
     (__req).u.mkdir.fs_id = __fs_id;                   \
-    (__req).u.mkdir.handle_extent_array.extent_count = \
-        (__ext_array).extent_count;                    \
-    (__req).u.mkdir.handle_extent_array.extent_array = \
-        (__ext_array).extent_array;                    \
     (__attr).objtype = PVFS_TYPE_DIRECTORY;            \
     (__attr).mask   |= PVFS_ATTR_SYS_TYPE;             \
     PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);\

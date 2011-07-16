@@ -26,9 +26,6 @@
 #include "pvfs2-storage.h"
 
 typedef PVFS_handle                TROVE_handle;
-typedef PVFS_handle_extent         TROVE_extent;
-typedef PVFS_handle_extent         TROVE_handle_extent;
-typedef PVFS_handle_extent_array   TROVE_handle_extent_array;
 typedef PVFS_size                  TROVE_size;
 typedef PVFS_offset                TROVE_offset;
 typedef PVFS_id_gen_t              TROVE_op_id;

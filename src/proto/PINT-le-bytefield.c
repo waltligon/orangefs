@@ -1,6 +1,7 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  * (C) 2003 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -116,11 +117,8 @@ static void lebf_initialize(void)
 		break;
 	    case PVFS_SERV_BATCH_CREATE:
 		/** can request a range of handles */
-		req.u.batch_create.handle_extent_array.extent_count = 0;
 		req.u.batch_create.object_count = 0;
 		resp.u.batch_create.handle_count = 0;
-		reqsize = extra_size_PVFS_servreq_batch_create;
-		respsize = extra_size_PVFS_servresp_batch_create;
 		break;
 	    case PVFS_SERV_CREATE:
 		/** can request a range of handles */
@@ -194,9 +192,7 @@ static void lebf_initialize(void)
 		/** nothing special */
 		break;
 	    case PVFS_SERV_MKDIR:
-		req.u.mkdir.handle_extent_array.extent_count = 0;
 		req.u.mkdir.attr.mask = 0;
-		reqsize = extra_size_PVFS_servreq_mkdir;
 		break;
 	    case PVFS_SERV_READDIR:
 		resp.u.readdir.directory_version = 0;
@@ -831,10 +827,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.create.layout.server_list.servers)
                     decode_free(req->u.create.layout.server_list.servers);
                 break;
-	    case PVFS_SERV_BATCH_CREATE:
-		decode_free(
-                    req->u.batch_create.handle_extent_array.extent_array);
-		break;
 
 	    case PVFS_SERV_IO:
 		decode_free(req->u.io.io_dist);
@@ -853,7 +845,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		break;
 
 	    case PVFS_SERV_MKDIR:
-		decode_free(req->u.mkdir.handle_extent_array.extent_array);
 		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
 		    decode_free(req->u.mkdir.attr.u.meta.dist);
 		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
@@ -916,6 +907,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
+	    case PVFS_SERV_BATCH_CREATE:
             case PVFS_SERV_BATCH_REMOVE:
             case PVFS_SERV_UNSTUFF:
             case PVFS_SERV_IMM_COPIES:

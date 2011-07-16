@@ -122,6 +122,7 @@ enum PVFS_encoding_type
 /* basic types used by storage subsystem */
 
 /** Unique identifier for an object on a PVFS2 file system. */
+#ifndef __KERNEL__
 typedef uuid_t PVFS_handle;
 
 #define PVFS_handle_clear(u)            uuid_clear(u)
@@ -136,13 +137,14 @@ typedef uuid_t PVFS_handle;
 /* takes uuid and pointer to unsigned int */
 /* the PVFS_handle is split in half and XORed to fold its bits
  * resulting in a evenly distributed 64-bit hash code */
-#define PVFS_handle_to_hash(u, h) do {                                               \
-    uint64_t upper_handle, lower_handle;                                             \
-    memcpy(&upper_handle, u, (sizeof(PVFS_handle) / 2));                             \
-    memcpy(&lower_handle, u + (sizeof(PVFS_handle) / 2), (sizeof(PVFS_handle) / 2)); \
-    *h = upper_handle ^ lower_handle;                                                \
+#define PVFS_handle_to_hash(u, h) do {                      \
+    uint64_t upper_handle, lower_handle;                    \
+    memcpy(&upper_handle, u, (sizeof(PVFS_handle) / 2));    \
+    memcpy(&lower_handle, u + (sizeof(PVFS_handle) / 2),    \
+        (sizeof(PVFS_handle) / 2));                         \
+    *h = upper_handle ^ lower_handle;                       \
 } while(0)
-
+#endif /* __KERNEL__ */
 
 /** Identifier for a specific PVFS2 file system; administrator
  *  must guarantee that these are unique in the context of all
@@ -196,29 +198,6 @@ typedef uint64_t PVFS_flags;
 #define decode_PVFS_permissions decode_uint32_t
 #define encode_PVFS_flags encode_uint64_t
 #define decode_PVFS_flags decode_uint64_t
-
-/* contiguous range of handles */
-typedef struct
-{
-    PVFS_handle first;
-    PVFS_handle last;
-} PVFS_handle_extent;
-endecode_fields_2(
-    PVFS_handle_extent,
-    PVFS_handle, first,
-    PVFS_handle, last);
-
-/* an array of contiguous ranges of handles */
-typedef struct
-{
-    uint32_t extent_count;
-    PVFS_handle_extent *extent_array;
-} PVFS_handle_extent_array;
-endecode_fields_1a(
-    PVFS_handle_extent_array,
-    skip4,,
-    uint32_t, extent_count,
-    PVFS_handle_extent, extent_array);
 
 /* Layout algorithm for converting from server lists in the config
  * to a list of servers to use to store datafiles for a file.

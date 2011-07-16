@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -46,7 +47,6 @@ extern struct PINT_server_req_params pvfs2_batch_create_params;
 extern struct PINT_server_req_params pvfs2_batch_remove_params;
 extern struct PINT_server_req_params pvfs2_unstuff_params;
 extern struct PINT_server_req_params pvfs2_stuffed_create_params;
-extern struct PINT_server_req_params pvfs2_precreate_pool_refiller_params;
 extern struct PINT_server_req_params pvfs2_mirror_params;
 extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
 extern struct PINT_server_req_params pvfs2_tree_remove_params;
@@ -92,7 +92,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 34 */ {PVFS_SERV_LISTATTR, &pvfs2_list_attr_params},
     /* 35 */ {PVFS_SERV_BATCH_CREATE, &pvfs2_batch_create_params},
     /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
-    /* 37 */ {PVFS_SERV_PRECREATE_POOL_REFILLER, &pvfs2_precreate_pool_refiller_params},
+    /* 37    REUSE */
     /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
     /* 39 */ {PVFS_SERV_MIRROR, &pvfs2_mirror_params},
     /* 40 */ {PVFS_SERV_IMM_COPIES, &pvfs2_create_immutable_copies_params},

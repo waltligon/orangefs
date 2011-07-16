@@ -192,7 +192,8 @@ static PINT_sm_action remove_next(
     }
 
     s_op->u.batch_remove.handle_index++;
-    if(s_op->u.batch_remove.handle_index < s_op->req->u.batch_remove.handle_count)
+    if (s_op->u.batch_remove.handle_index < 
+        s_op->req->u.batch_remove.handle_count)
     {
         js_p->error_code = REMOVE_NEXT;
     }

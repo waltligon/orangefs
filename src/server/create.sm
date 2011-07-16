@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -152,7 +153,6 @@ static int create_metafile(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t i;
-    PVFS_handle_extent_array meta_handle_ext_array;
     server_configuration_s *config = get_server_config_struct();
 
     /* first state to check in, make sure the attr mask contains the dist bit. 
@@ -169,9 +169,7 @@ static int create_metafile(
 
     ret = PINT_cached_config_get_server(
         s_op->req->u.create.fs_id,
-        config->host_id,
-        PINT_SERVER_TYPE_META,
-        &meta_handle_ext_array);
+        config->host_id);
 
     ret = job_trove_dspace_create(
         s_op->req->u.create.fs_id,
@@ -191,13 +189,11 @@ static int check_stuffed(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int server_type;
     server_configuration_s *config = get_server_config_struct();
     struct filesystem_configuration_s *fs_conf;
     PVFS_BMI_addr_t myaddr;
     PVFS_sys_layout *layout;
     int ret;
-    const char* svr_name;
     int i;
 
     PVFS_handle_copy(s_op->resp.u.create.metafile_handle, js_p->handle);
@@ -218,8 +214,7 @@ static int check_stuffed(
         }
     }
 
-    fs_conf = PINT_config_find_fs_id(config, 
-        s_op->req->u.create.fs_id);
+    fs_conf = PINT_config_find_fs_id(config, s_op->req->u.create.fs_id);
     if(!fs_conf)
     {
         js_p->error_code = -PVFS_EINVAL;
@@ -234,17 +229,11 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
-    /* is this metadata server also IO? */
-    svr_name = PINT_cached_config_map_addr(s_op->req->u.create.fs_id,
-                                myaddr, &server_type);
-    if(!svr_name)
-    {
-        js_p->error_code = ret;
-        return SM_ACTION_COMPLETE;
-    }
+    /* don't need to make sure it's meta, all are both */
 
     /* for now only support stuffing of ROUND_ROBIN layouts */
-    if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing && layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN)
+    if( fs_conf->file_stuffing && 
+        layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN)
     {    
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
@@ -321,7 +310,6 @@ static int create_local_datafiles(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
-    PVFS_handle_extent_array data_handle_ext_array;
     server_configuration_s *config = get_server_config_struct();
     int i;
     int tmp_index = 0;
@@ -368,9 +356,7 @@ static int create_local_datafiles(
     /* find local extent array */
     ret = PINT_cached_config_get_server(
         s_op->req->u.create.fs_id,
-        config->host_id,
-        PINT_SERVER_TYPE_IO,
-        &data_handle_ext_array);
+        config->host_id);
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -402,27 +388,15 @@ static PINT_sm_action request_datafiles(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
-    job_id_t j_id;
+    //job_id_t j_id;
 
     if(s_op->u.create.handle_array_remote_count == 0)
     {
         js_p->error_code = 0;
         return(SM_ACTION_COMPLETE);
     }
-
-    ret = job_precreate_pool_get_handles(
-        s_op->req->u.create.fs_id,
-        s_op->u.create.handle_array_remote_count,
-        PVFS_TYPE_DATAFILE,
-        s_op->u.create.remote_io_servers,
-        s_op->u.create.handle_array_remote,
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    
+    /* FIX: used to call job_precreate_pool_get_handles */
     return ret;
 }
 
@@ -492,8 +466,8 @@ static PINT_sm_action replace_remote_datafile_handles(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
-    job_id_t j_id;
-    PVFS_handle pool_handle;
+    //job_id_t j_id;
+    //PVFS_handle pool_handle;
 
     /* save the error code before we begin cleanup */
     if(!s_op->u.create.saved_error_code)
@@ -504,30 +478,10 @@ static PINT_sm_action replace_remote_datafile_handles(
     if(s_op->u.create.handle_index < s_op->u.create.handle_array_remote_count)
     {
         /* find pool that this handle belongs to */
-        ret = job_precreate_pool_lookup_server(
-            s_op->u.create.remote_io_servers[s_op->u.create.handle_index],
-            PVFS_TYPE_DATAFILE,
-            s_op->req->u.create.fs_id,
-            &pool_handle);
-        if(ret < 0)
-        {
-            s_op->u.create.handle_index++;
-            js_p->error_code = ret;
-            return(SM_ACTION_COMPLETE);
-        }
+        /* FIX: used to call job_precreate_pool_lookup_server here */
 
         /* return handle to pool */
-        ret = job_precreate_pool_fill(
-            pool_handle,
-            s_op->req->u.create.fs_id,
-            &s_op->u.create.handle_array_remote[s_op->u.create.handle_index],
-            1,
-            smcb,
-            0,
-            js_p,
-            &j_id,
-            server_job_context,
-            s_op->req->hints);
+        /* FIX: used to call job_precreate_pool_fill here */
 
         s_op->u.create.handle_index++;
         return(ret);

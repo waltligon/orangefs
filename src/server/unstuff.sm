@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  *
@@ -264,19 +265,7 @@ static PINT_sm_action get_handles(
     /* NOTE: we are leaving the existing resp attr structure alone until we
      * get a successful answer from get_handles() and commit to disk
      */
-    ret = job_precreate_pool_get_handles(
-        s_op->req->u.unstuff.fs_id,
-        (s_op->u.unstuff.num_dfiles_req-1),
-        PVFS_TYPE_DATAFILE,
-        NULL,
-        &s_op->u.unstuff.dfile_array[1],
-        0,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context,
-        s_op->req->hints);
+    /* FIX: used to call job_precreate_pool_get_handles here */
     return ret;
 }
 
@@ -286,7 +275,7 @@ static PINT_sm_action set_handles_on_object(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t j_id;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "job_precreate_pool_get_handles() returned %d\n", js_p->error_code);
+    /* FIX: changes to previous state may cause changes to be needed here */
 
     if(js_p->error_code < 0)
     {

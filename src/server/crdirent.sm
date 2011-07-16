@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -119,6 +120,7 @@ static PINT_sm_action crdirent_validate(
             llu(s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
+    /* FIX: should have a global function to check a string */
     ptr = s_op->u.crdirent.name;
     while (*ptr != '\0' && *ptr != '/' ) ptr++;
 
@@ -243,7 +245,7 @@ static PINT_sm_action crdirent_write_directory_entry(
     job_id_t i;
     TROVE_ds_flags keyval_flags;
 
-    assert(s_op->u.crdirent.dirent_handle);
+    assert(!PVFS_handle_is_null(s_op->u.crdirent.dirent_handle));
 
     js_p->error_code = 0;
 
@@ -320,7 +322,8 @@ static PINT_sm_action crdirent_update_directory_attr(
 
     memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
     dspace_attr = &s_op->attr;
-    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | PVFS_ATTR_COMMON_CTIME);
+    dspace_attr->mask |= (PVFS_ATTR_COMMON_ATIME | PVFS_ATTR_COMMON_MTIME | 
+                          PVFS_ATTR_COMMON_CTIME);
 
     PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
     ds_attr = &(s_op->ds_attr);
@@ -351,14 +354,18 @@ static PINT_sm_action crdirent_setup_op(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
-        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points "
+                      "to %llu\n", s_op->req->u.crdirent.name, 
+                      llu(s_op->req->u.crdirent.new_handle));
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
+
     PVFS_handle_copy(s_op->u.crdirent.new_handle, 
                      s_op->req->u.crdirent.new_handle);
+
     PVFS_handle_copy(s_op->u.crdirent.parent_handle,
                      s_op->req->u.crdirent.handle);
+
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
     s_op->u.crdirent.dir_attr_update_required = 0;
 

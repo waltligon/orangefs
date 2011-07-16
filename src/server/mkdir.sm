@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -112,12 +113,6 @@ static PINT_sm_action mkdir_create(
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
-
-    gossip_debug(
-        GOSSIP_MKDIR_DEBUG, " directory handle will "
-        "be in starting hrange[0] %llu-%llu\n",
-        llu(s_op->u.mkdir.handle_extent_array.extent_array[0].first),
-        llu(s_op->u.mkdir.handle_extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, 
@@ -268,8 +263,6 @@ static PINT_sm_action mkdir_prep_sm(
     PVFS_ds_attributes *ds_attr = NULL;
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
-    s_op->u.mkdir.handle_extent_array =
-        s_op->req->u.mkdir.handle_extent_array;
 
     a_p = &(s_op->req->u.mkdir.attr);
 

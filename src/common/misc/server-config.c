@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -53,10 +54,6 @@ static DOTCONF_CB(enter_export_options_context);
 static DOTCONF_CB(exit_export_options_context);
 static DOTCONF_CB(enter_server_options_context);
 static DOTCONF_CB(exit_server_options_context);
-static DOTCONF_CB(enter_mhranges_context);
-static DOTCONF_CB(exit_mhranges_context);
-static DOTCONF_CB(enter_dhranges_context);
-static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(enter_distribution_context);
 static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
@@ -108,8 +105,6 @@ static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
-static DOTCONF_CB(get_precreate_batch_size);
-static DOTCONF_CB(get_precreate_low_threshold);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_secret_key);
@@ -126,7 +121,6 @@ const char *contextchecker(command_t *cmd, unsigned long mask);
 
 /* internal helper functions */
 static int is_valid_alias(PINT_llist * host_aliases, char *str);
-static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
 static void copy_filesystem(
@@ -137,16 +131,9 @@ static int cache_config_files(
     char *global_config_filename);
 static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs);
-static int is_root_handle_in_a_meta_range(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
 static int is_valid_filesystem_configuration(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
-static char *get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs,
-    int meta_handle_range);
 static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias,
@@ -370,34 +357,6 @@ static const configoption_t options[] =
      */
     {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,
         CTX_STORAGEHINTS,NULL},
-
-    /* This context groups together the Range options that define valid values
-     * for meta handles on a per-host basis for this filesystem.
-     *
-     * The MetaHandleRanges context is required to be present in a
-     * Filesystem context.
-     */
-    {"<MetaHandleRanges>",ARG_NONE, enter_mhranges_context,NULL,
-        CTX_FILESYSTEM,NULL},
-
-    /* Specifies the end-tag for the MetaHandleRanges context.
-     */
-    {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,
-        CTX_METAHANDLERANGES,NULL},
-
-    /* This context groups together the Range options that define valid values
-     * for the data handles on a per-host basis for this filesystem.
-     *
-     * A DataHandleRanges context is required to be present in a
-     * Filesystem context.
-     */
-    {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,
-        CTX_FILESYSTEM,NULL},
-
-    /* Specifies the end-tag for the DataHandleRanges context.
-     */
-    {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,
-        CTX_DATAHANDLERANGES,NULL},
 
     /* Provides a context for defining the filesystem's default
      * distribution to use and the parameters to be set for that distribution.
@@ -671,16 +630,6 @@ static const configoption_t options[] =
       *  PVFS_TYPE_INTERNAL
       *
       */
-     {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
- 
-     /* Precreate pools will be "topped off" if they fall below this value. 
-      * One value is specified for each DS handle type. This parameter operates
-      * the same as the PrecreateBatchSize in that each count coorespends to 
-      * one DS handle type. The order of types is identical to the 
-      * PrecreateBatchSize defined above.  */
-     {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 16, 256, 16, 16, 16, 0"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
@@ -1445,58 +1394,6 @@ DOTCONF_CB(check_this_server)
     return NULL;
 }
 
-DOTCONF_CB(enter_mhranges_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_METAHANDLERANGES;
-    return NULL;
-}
-
-DOTCONF_CB(exit_mhranges_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    struct filesystem_configuration_s *fs_conf = NULL;
-
-    fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
-
-    if (!fs_conf->meta_handle_ranges)
-    {
-        return("No valid mhandle ranges added to file system.\n");
-    }
-    config_s->configuration_context = CTX_FILESYSTEM;
-    return NULL;
-}
-
-DOTCONF_CB(enter_dhranges_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = CTX_DATAHANDLERANGES;
-    return NULL;
-}
-
-DOTCONF_CB(exit_dhranges_context)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    struct filesystem_configuration_s *fs_conf = NULL;
-
-    fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    assert(fs_conf);
-
-    if (!fs_conf->data_handle_ranges)
-    {
-        return("No valid dhandle ranges added to file system.\n");
-    }
-    config_s->configuration_context = CTX_FILESYSTEM;
-    return NULL;
-}
-
 DOTCONF_CB(enter_distribution_context)
 {
     struct server_configuration_s *config_s = 
@@ -1578,115 +1475,6 @@ DOTCONF_CB(get_server_job_bmi_timeout)
         return NULL;
     }
     config_s->server_job_bmi_timeout = cmd->data.value;
-    return NULL;
-}
-
-DOTCONF_CB(get_precreate_batch_size)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
-    char **tokens;
-
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-
-    if (config_s->precreate_batch_size != NULL) 
-    {
-        free(config_s->precreate_batch_size);
-        config_s->precreate_batch_size = NULL;
-    }
-
-    /* so this seems silly but a config option of type ARG_LIST doesn't
-     * split on commas (which is claimed to be the delimiter) but on white 
-     * space. That could possibly be fixed. So, until it is we have to handle 
-     * the possibility of multiple arguments with some number of values per 
-     * argument. */
-    for(i = 0; i < cmd->arg_count; i++)
-    {
-        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
-        for(j = 0; j < token_count; ++j)
-        {
-            counts[count_count++] = atoi(tokens[j]);
-        }
-        PINT_free_string_list(tokens, token_count);
-    }
-
-    /* make sure we scrounged up the right number of values */
-    if( count_count != PVFS_DS_TYPE_COUNT ) 
-    {
-        return "PrecreateBatchSize must contain counts for each DS "
-               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
-               "SYMLINK, DIRDATA, INTERNAL\n";
-    }
-
-    config_s->precreate_batch_size = calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
-    if( config_s->precreate_batch_size == NULL )
-    {
-        return "PrecreateBatchSize malloc failure";
-    }
-
-    for( i = 0; i < count_count; i++ )
-    {
-        config_s->precreate_batch_size[i] = counts[i];
-    }
-
-    return NULL;
-}
-
-DOTCONF_CB(get_precreate_low_threshold)
-{
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
-    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
-    char **tokens;
-
-    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
-       config_s->my_server_options == 0)
-    {
-        return NULL;
-    }
-
-    if (config_s->precreate_low_threshold != NULL) 
-    {
-        free(config_s->precreate_low_threshold);
-        config_s->precreate_low_threshold = NULL;
-    }
-
-    /* handle multiple values per arguments, gross */
-    for(i = 0; i < cmd->arg_count; i++)
-    {
-        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
-        for(j = 0; j < token_count; ++j)
-        {
-            counts[count_count++] = atoi(tokens[j]);
-        }
-        PINT_free_string_list(tokens, token_count);
-    }
-
-    /* make sure we scrounged up the right number of values */
-    if( count_count != PVFS_DS_TYPE_COUNT ) 
-    {
-        return "PrecreateLowThreshold must contain counts for each DS "
-               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
-               "SYMLINK, DIRDATA, INTERNAL\n";
-    }
-
-    config_s->precreate_low_threshold = 
-        calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
-    if( config_s->precreate_low_threshold == NULL )
-    {
-        return "PrecreateLowThreshold malloc failure";
-    }
-
-    for( i = 0; i < count_count; i++ )
-    {
-        config_s->precreate_low_threshold[i] = counts[i];
-    }
-
     return NULL;
 }
 
@@ -2973,18 +2761,6 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->fs_config_buf = NULL;
         }
 
-        if(config_s->precreate_batch_size)
-        {
-            free(config_s->precreate_batch_size);
-            config_s->precreate_batch_size = NULL;
-        }
-
-        if(config_s->precreate_low_threshold)
-        {
-            free(config_s->precreate_low_threshold);
-            config_s->precreate_low_threshold = NULL;
-        }
-
         if (config_s->logfile)
         {
             free(config_s->logfile);
@@ -3093,115 +2869,15 @@ static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs)
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
-             fs->meta_handle_ranges && fs->data_handle_ranges &&
              fs->root_handle) ? 1 : 0);
 }
     
-static int is_root_handle_in_a_meta_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
-{
-    int ret = 0;
-
-/* won't do this with UUIDs
- *
-    PINT_llist *cur = NULL;
-    PINT_llist *extent_list = NULL;
-    char *cur_host_id = (char *)0;
-    host_handle_mapping_s *cur_h_mapping = NULL;
-
-
-
-    if (config && is_populated_filesystem_configuration(fs))
-    {
-*/
-        /*
-          check if the root handle is within one of the
-          specified meta host's handle ranges for this fs;
-          a root handle can't exist in a data handle range!
-        */
-/*
-        cur = fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            assert(cur_h_mapping->alias_mapping);
-            assert(cur_h_mapping->alias_mapping->host_alias);
-            assert(cur_h_mapping->alias_mapping->bmi_address);
-            assert(cur_h_mapping->handle_range);
-
-            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
-            if (!cur_host_id)
-            {
-                gossip_err("Invalid host ID for alias %s.\n",
-                           cur_h_mapping->alias_mapping->host_alias);
-                break;
-            }
-
-
-            extent_list = PINT_create_extent_list(
-                cur_h_mapping->handle_range);
-            if (!extent_list)
-            {
-                gossip_err("Failed to create extent list.\n");
-                break;
-            }
-
-            ret = PINT_handle_in_extent_list(
-                extent_list,fs->root_handle);
-            PINT_release_extent_list(extent_list);
-            if (ret == 1)
-            {
-                break;
-            }
-            cur = PINT_llist_next(cur);
-        }
-    }
-*/
-    return ret;
-}
-
 static int is_valid_filesystem_configuration(
     struct server_configuration_s *config,
     struct filesystem_configuration_s *fs)
 {
-    int ret = is_root_handle_in_a_meta_range(config,fs);
-    if (ret == 0)
-    {
-        gossip_err("RootHandle (%llu) is NOT within the meta handle "
-                   "ranges specified for this filesystem (%s).\n",
-                   llu(fs->root_handle),fs->file_system_name);
-    }
-    return ret;
-}
-
-static void free_host_handle_mapping(void *ptr)
-{
-    struct host_handle_mapping_s *h_mapping =
-        (struct host_handle_mapping_s *)ptr;
-    if (h_mapping)
-    {
-        /*
-          NOTE: h_mapping->alias_mapping is freed by free_host_alias,
-          as the pointer points into the config_s->host_aliases list;
-          it's not copied.
-        */
-        h_mapping->alias_mapping = NULL;
-
-        free(h_mapping->handle_range);
-        h_mapping->handle_range = NULL;
-
-        free(h_mapping->handle_extent_array.extent_array);
-        h_mapping->handle_extent_array.extent_count = 0;
-        h_mapping->handle_extent_array.extent_array = NULL;
-
-        free(h_mapping);
-        h_mapping = NULL;
-    }
+    /* FIX: need to determine what makes a valid fs config now */
+    return 0;
 }
 
 static void free_host_alias(void *ptr)
@@ -3230,10 +2906,6 @@ static void free_filesystem(void *ptr)
         free(fs->file_system_name);
         fs->file_system_name = NULL;
 
-        /* free all handle ranges */
-        PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
-        PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
-
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
         {
@@ -3258,7 +2930,8 @@ static void free_filesystem(void *ptr)
         /* free all root_squash_exception_hosts specifications */
         if (fs->root_squash_exceptions_hosts)
         {
-            free_list_of_strings(fs->root_squash_exceptions_count, &fs->root_squash_exceptions_hosts);
+            free_list_of_strings(fs->root_squash_exceptions_count, 
+                &fs->root_squash_exceptions_hosts);
             fs->root_squash_exceptions_count = 0;
         }
         if (fs->root_squash_exceptions_netmasks)
@@ -3591,157 +3264,6 @@ char *PINT_config_get_host_alias_ptr(
 }
 
 /*
- * Function: PINT_config_get_meta_handle_range_str
- *
- * Params:   struct server_configuration_s*,
- *           struct filesystem_configuration_s *fs
- *
- * Returns:  char * (handle range) on success; NULL on failure
- *
- * Synopsis: return the meta handle range (string) on the specified
- *           filesystem that matches the host specific configuration
- *           
- */
-char *PINT_config_get_meta_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
-{
-    return get_handle_range_str(config_s,fs,1);
-}
-
-int PINT_config_get_meta_handle_extent_array(
-    struct server_configuration_s *config_s,
-    PVFS_fs_id fs_id,
-    PVFS_handle_extent_array *extent_array)
-{
-    int ret = -1;
-    PINT_llist *cur = NULL;
-    char *my_alias = NULL;
-    filesystem_configuration_s *cur_fs = NULL;
-    struct host_handle_mapping_s *cur_h_mapping = NULL;
-
-    if (config_s && extent_array)
-    {
-        cur = config_s->file_systems;
-        while(cur)
-        {
-            cur_fs = PINT_llist_head(cur);
-            if (!cur_fs)
-            {
-                break;
-            }
-
-            if (cur_fs->coll_id == fs_id)
-            {
-                break;
-            }
-            cur = PINT_llist_next(cur);
-        }
-
-        if (cur_fs)
-        {
-            my_alias = PINT_config_get_host_alias_ptr(
-                config_s, config_s->host_id);
-            if (my_alias)
-            {
-                cur = cur_fs->meta_handle_ranges;
-
-                while(cur)
-                {
-                    cur_h_mapping = PINT_llist_head(cur);
-                    if (!cur_h_mapping)
-                    {
-                        break;
-                    }
-
-                    assert(cur_h_mapping->handle_range);
-                    assert(cur_h_mapping->alias_mapping);
-                    assert(cur_h_mapping->alias_mapping->host_alias);
-
-                    if (strcmp(cur_h_mapping->alias_mapping->host_alias,
-                               my_alias) == 0)
-                    {
-                        extent_array->extent_count = 
-                            cur_h_mapping->handle_extent_array.extent_count;
-                        extent_array->extent_array = malloc(
-                            (extent_array->extent_count *
-                             sizeof(PVFS_handle_extent)));
-                        assert(extent_array->extent_array);
-                        memcpy(extent_array->extent_array,
-                               cur_h_mapping->handle_extent_array.extent_array,
-                               (extent_array->extent_count *
-                                sizeof(PVFS_handle_extent)));
-
-                        ret = 0;
-                        break;
-                    }
-                    cur = PINT_llist_next(cur);
-                }
-            }
-        }
-    }
-    return ret;
-}
-
-
-/*
- * Function: PINT_config_get_data_handle_range_str
- *
- * Params:   struct server_configuration_s*,
- *           struct filesystem_configuration_s *fs
- *
- * Returns:  char * (handle range) on success; NULL on failure
- *
- * Synopsis: return the data handle range (string) on the specified
- *           filesystem that matches the host specific configuration
- *           
- */
-char *PINT_config_get_data_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
-{
-    return get_handle_range_str(config_s,fs,0);
-}
-
-/*
- * Function: PINT_config_get_merged_handle_range_str
- *
- * Params:   struct server_configuration_s*,
- *           struct filesystem_configuration_s *fs
- *
- * Returns:  char * (handle range) on success; NULL on failure
- *           NOTE: The returned string MUST be freed by the caller
- *           if it's a non-NULL value
- *
- * Synopsis: return the meta handle range and data handle range strings
- *           on the specified filesystem that matches the host specific
- *           configuration merged as one single handle range
- *           
- */
-char *PINT_config_get_merged_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
-{
-    char *merged_range = NULL;
-    char *mrange = get_handle_range_str(config_s,fs,1);
-    char *drange = get_handle_range_str(config_s,fs,0);
-
-    if (mrange && drange)
-    {
-        merged_range = PINT_merge_handle_range_strs(mrange, drange);
-    }
-    else if (mrange)
-    {
-        merged_range = strdup(mrange);
-    }
-    else if (drange)
-    {
-        merged_range = strdup(drange);
-    }
-    return merged_range;
-}
-
-/*
   verify that the config file exists.  if so, cache it in RAM so
   that getconfig will not have to re-read the file contents each time.
   returns 0 on success; 1 on failure.
@@ -3838,48 +3360,6 @@ open_global_config:
 
   error_exit:
     return 1;
-}
-
-static char *get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs,
-    int meta_handle_range)
-{
-    char *ret = (char *)0;
-    char *my_alias = (char *)0;
-    PINT_llist *cur = NULL;
-    struct host_handle_mapping_s *cur_h_mapping = NULL;
-
-    if (config_s && config_s->host_id && fs)
-    {
-        my_alias = PINT_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
-        if (my_alias)
-        {
-            cur = (meta_handle_range ? fs->meta_handle_ranges :
-                   fs->data_handle_ranges);
-            while(cur)
-            {
-                cur_h_mapping = PINT_llist_head(cur);
-                if (!cur_h_mapping)
-                {
-                    break;
-                }
-                assert(cur_h_mapping->alias_mapping);
-                assert(cur_h_mapping->alias_mapping->host_alias);
-                assert(cur_h_mapping->handle_range);
-
-                if (strcmp(cur_h_mapping->alias_mapping->host_alias,
-                           my_alias) == 0)
-                {
-                    ret = cur_h_mapping->handle_range;
-                    break;
-                }
-                cur = PINT_llist_next(cur);
-            }
-        }
-    }
-    return ret;
 }
 
 /*
@@ -4172,66 +3652,8 @@ static int is_root_handle_in_my_range(
     struct server_configuration_s *config,
     struct filesystem_configuration_s *fs)
 {
-    int ret = 0;
-    PINT_llist *cur = NULL;
-    //PINT_llist *extent_list = NULL;
-    char *cur_host_id = (char *)0;
-    host_handle_mapping_s *cur_h_mapping = NULL;
-
-    if (config && is_populated_filesystem_configuration(fs))
-    {
-        /*
-          check if the root handle is within one of the
-          specified meta host's handle ranges for this fs;
-          a root handle can't exist in a data handle range!
-        */
-        cur = fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = PINT_llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            assert(cur_h_mapping->alias_mapping);
-            assert(cur_h_mapping->alias_mapping->host_alias);
-            assert(cur_h_mapping->alias_mapping->bmi_address);
-            assert(cur_h_mapping->handle_range);
-
-            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
-            if (!cur_host_id)
-            {
-                gossip_err("Invalid host ID for alias %s.\n",
-                           cur_h_mapping->alias_mapping->host_alias);
-                break;
-            }
-
-            /* only check if this is *our* range */
-            if (strcmp(config->host_id,cur_host_id) == 0)
-            {
-            /* Don't do this with UUIDs
-             *
-                extent_list = PINT_create_extent_list(
-                    cur_h_mapping->handle_range);
-                if (!extent_list)
-                {
-                    gossip_err("Failed to create extent list.\n");
-                    break;
-                }
-
-                ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
-                PINT_release_extent_list(extent_list);
-                if (ret == 1)
-                {
-                    break;
-                }
-              */
-            }
-            cur = PINT_llist_next(cur);
-        }
-    }
-    return ret;
+    /* FIX: check if this server has the root handle */
+    return 0;
 }
 
 /*
@@ -4245,7 +3667,6 @@ int PINT_config_pvfs2_mkspace(
     PVFS_handle root_handle;
     int create_collection_only = 0;
     PINT_llist *cur = NULL;
-    char *cur_meta_handle_range, *cur_data_handle_range = NULL;
     filesystem_configuration_s *cur_fs = NULL;
 
     PVFS_handle_clear(root_handle);
@@ -4258,26 +3679,6 @@ int PINT_config_pvfs2_mkspace(
             cur_fs = PINT_llist_head(cur);
             if (!cur_fs)
             {
-                break;
-            }
-
-            cur_meta_handle_range = PINT_config_get_meta_handle_range_str(
-                config, cur_fs);
-            cur_data_handle_range = PINT_config_get_data_handle_range_str(
-                config, cur_fs);
-
-            /*
-              make sure have either a meta or data handle range (or
-              both).  if we have no handle range, the config is
-              broken.
-            */
-            if (!cur_meta_handle_range && !cur_data_handle_range)
-            {
-                gossip_err("Could not find handle range for host %s\n",
-                           config->host_id);
-                gossip_err("Please make sure that the host names in "
-                           "%s are consistent\n",
-                           config->fs_config_filename);
                 break;
             }
 
@@ -4303,8 +3704,7 @@ int PINT_config_pvfs2_mkspace(
 
             ret = pvfs2_mkspace(
                 config->data_path, config->meta_path, cur_fs->file_system_name,
-                cur_fs->coll_id, root_handle, cur_meta_handle_range,
-                cur_data_handle_range, create_collection_only, 1);
+                cur_fs->coll_id, root_handle, create_collection_only, 1);
 
             gossip_debug(
                 GOSSIP_SERVER_DEBUG,"\n*****************************\n");

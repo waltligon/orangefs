@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -641,84 +642,6 @@ int job_null(
     job_status_s * out_status_p,
     job_id_t * id,
     job_context_id context_id);
-
-int job_precreate_pool_fill(
-    PVFS_handle precreate_pool,
-    PVFS_fs_id fsid,
-    PVFS_handle* precreate_handle_array,
-    int precreate_handle_count,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id,
-    PVFS_hint hints);
- 
-int job_precreate_pool_fill_signal_error(
-    PVFS_handle precreate_pool,
-    PVFS_fs_id fsid,
-    int error_code,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id);
-
-int job_precreate_pool_check_level(
-    PVFS_handle precreate_pool,
-    PVFS_fs_id fsid,
-    int low_threshold,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id);
-
-int job_precreate_pool_iterate_handles(
-    PVFS_fs_id fsid,
-    PVFS_kv_position position,
-    unsigned int position_flag,
-    PVFS_handle* handle_array,
-    int count,
-    PVFS_ds_flags flags,
-    PVFS_vtag* vtag,
-    void* user_ptr,
-    job_aint status_user_tag,
-    job_status_s* out_status_p,
-    job_id_t* id,
-    job_context_id context_id,
-    PVFS_hint hints);
-
-int job_precreate_pool_get_handles(
-    PVFS_fs_id fsid,
-    int count,
-    PVFS_ds_type type,
-    const char** servers,
-    PVFS_handle* handle_array,
-    PVFS_ds_flags flags,
-    void *user_ptr,
-    job_aint status_user_tag,
-    job_status_s * out_status_p,
-    job_id_t * id,
-    job_context_id context_id,
-    PVFS_hint hints);
-
-int job_precreate_pool_register_server(
-    const char* host, 
-    PVFS_ds_type type,
-    PVFS_fs_id fsid, 
-    PVFS_handle pool_handle, 
-    int count,
-    uint32_t *batch_count);
- 
-int job_precreate_pool_lookup_server(
-    const char* host, 
-    PVFS_ds_type type,
-    PVFS_fs_id fsid, 
-    PVFS_handle* pool_handle);
-  
-void job_precreate_pool_set_index(
-    int server_index);
 
 /******************************************************************
  * job test/wait for completion functions

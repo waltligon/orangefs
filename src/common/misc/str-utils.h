@@ -1,5 +1,6 @@
 /* 
  * (C) 2001 Clemson University and The University of Chicago 
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -25,10 +26,6 @@ int PINT_string_next_segment(
     char *pathname,
     char **inout_segp,
     void **opaquep);
-int PINT_parse_handle_ranges(
-    char *range, 
-    PVFS_handle_extent *out_extent,
-    int *status);
 int PINT_get_next_path(
     char* path,
     char** newpath,

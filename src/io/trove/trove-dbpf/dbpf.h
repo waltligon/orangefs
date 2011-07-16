@@ -1,5 +1,6 @@
 /*
  * (C) 2002 Clemson University and The University of Chicago
+ * (C) 2011 Omnibond Systems
  *
  * See COPYING in top-level directory.
  */
@@ -264,7 +265,6 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
 
 struct dbpf_dspace_create_op
 {
-    TROVE_handle_extent_array extent_array;
     TROVE_handle *out_handle_p;
     TROVE_ds_type type;
     /* hint? */
@@ -272,7 +272,6 @@ struct dbpf_dspace_create_op
 
 struct dbpf_dspace_create_list_op
 {
-    TROVE_handle_extent_array extent_array;
     TROVE_handle *out_handle_array_p;
     TROVE_ds_type type;
     int count;
