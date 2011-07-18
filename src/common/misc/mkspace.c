@@ -26,7 +26,7 @@
 #include "pint-event.h"
 
 static char *lost_and_found_string = "lost+found";
-
+static char handle_s[37] = { 0 };
 static TROVE_handle s_used_handles[4];
 
 #define mkspace_print(v, format, f...)              \
@@ -57,11 +57,13 @@ int pvfs2_mkspace(
     TROVE_handle lost_and_found_handle; 
     TROVE_handle lost_and_found_dirdata_handle;
 
+    uuid_unparse(root_handle, handle_s);
+
     mkspace_print(verbose,"Data storage space     : %s\n",data_path);
     mkspace_print(verbose,"Metadata storage space : %s\n", meta_path);
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
-    mkspace_print(verbose,"Root Handle  : %llu\n",llu(root_handle));
+    mkspace_print(verbose,"Root Handle  : %s\n",handle_s);
 
     PVFS_handle_clear(new_root_handle);
     PVFS_handle_clear(root_dirdata_handle);

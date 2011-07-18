@@ -1204,21 +1204,6 @@ int dbpf_collection_create(char *collname,
         GOSSIP_TROVE_DEBUG, "wrote trove-dbpf version %s to "
         "collection attribute database\n", TROVE_DBPF_VERSION_VALUE);
 
-    /* store initial handle value */
-    memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
-    key.data = LAST_HANDLE_STRING;
-    key.size = sizeof(LAST_HANDLE_STRING);
-    data.data = &zero;
-    data.size = sizeof(zero);
-
-    ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0)
-    {
-        gossip_err("db_p->put failed writing initial handle value: %s\n",
-                   db_strerror(ret));
-        return -dbpf_db_error_to_trove_error(ret);
-    }
     db_p->sync(db_p, 0);
     db_close(db_p);
 

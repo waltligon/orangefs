@@ -205,7 +205,8 @@ int main(int argc, char **argv)
                     s_server_options.server_alias, PVFS2_VERSION);
 
     /* code to handle older two config file format */
-    ret = PINT_parse_config(&server_config, fs_conf, s_server_options.server_alias);
+    ret = PINT_parse_config(&server_config, fs_conf, 
+                            s_server_options.server_alias);
     if (ret)
     {
         gossip_err("Error: Please check your config files.\n");

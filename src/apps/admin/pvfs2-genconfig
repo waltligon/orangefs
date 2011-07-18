@@ -211,8 +211,6 @@ sub emit_defaults
     print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
     print $target "\tClientRetryLimit 5\n";
     print $target "\tClientRetryDelayMilliSecs 2000\n";
-    print $target "\tPrecreateBatchSize 0,32,512,32,32,32,0\n";
-    print $target "\tPrecreateLowThreshold 0,16,256,16,16,16,0\n";
 
     if(defined($default_storage))
     {
@@ -264,19 +262,10 @@ sub emit_filesystem
 {
     my ($target, $name, $fs_id, $root_handle, 
         $last_handle, $first_handle, $count,
-        $default_num_dfiles, $default_flow_buffer_size, $default_flow_buffer_count) = @_;
+        $default_num_dfiles, $default_flow_buffer_size, 
+        $default_flow_buffer_count) = @_;
 
-    # divide handle range space equally among servers ((2^63)-1 for now)
-    my($total_num_handles_available, $start, $end, $i, $step, $num_ranges, $stuffing);
-    $num_ranges = $count;
-    $total_num_handles_available = $last_handle->copy();
-    $total_num_handles_available->bsub($first_handle);
-    $total_num_handles_available->binc();
-
-    # since meta and data handle ranges must be split, increment
-    # num nodes for calculation purposes below
-    $step = $total_num_handles_available->copy();
-    $step->bdiv($num_ranges);
+    my($i, $stuffing);
 
     print $target "\n<Filesystem>\n";
     print $target "\tName $name\n";
@@ -303,36 +292,6 @@ sub emit_filesystem
         }
     }
     print $target "\tFileStuffing $stuffing\n";
-
-    print $target "\t<MetaHandleRanges>\n";
-    $start = $end = $first_handle->copy();
-    $start->bdec();
-    $end->bdec();
-
-    my @meta_aliases = get_aliases($META_ENDPOINT);
-    @meta_aliases = sort @meta_aliases;
-    foreach my $ma (@meta_aliases)
-    {
-        $start = $end->copy();
-        $start->binc();
-        $end->badd($step);
-        print $target "\t\tRange $ma $start-$end\n";
-    }
-
-    print $target "\t</MetaHandleRanges>\n";
-    print $target "\t<DataHandleRanges>\n";
-
-    my @io_aliases = get_aliases($IO_ENDPOINT);
-    @io_aliases = sort @io_aliases;
-    foreach my $ia (@io_aliases)
-    {
-        $start = $end->copy();
-        $start->binc();
-        $end->badd($step);
-        print $target "\t\tRange $ia $start-$end\n";
-    }
-    print $target "\t</DataHandleRanges>\n";
-
     print $target "\t<StorageHints>\n";
 
     # only in special cases would someone want to sync data (failover comes to
@@ -553,8 +512,6 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --server-job-timeout <NUM>        server job timeout value (seconds)
      --client-job-timeout <NUM>        server job timeout value (seconds)
      --trove-method <STRING>           specify a trove method
-     --first-handle <NUM>              first handle value to reserve
-     --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
      --fsid         <NUM>              fs identifier value
      --fsname <STRING>                 fs name
@@ -717,10 +674,22 @@ sub get_logstamp
 sub get_root_handle
 {
     my $root_handle;
+
+    my $uuidgen_cmd = `which uuidgen`;
+
     if ($opt_root_handle) {
         $root_handle = $opt_root_handle;
     } else {
-        $root_handle = 1048576;
+        if ($uuidgen_cmd eq "")
+        {
+            print STDERR "\nFailed to find uuidgen in PATH, using static " .
+                         "UUID\n\n";
+            $root_handle = "388619fb-23d4-4538-9aa8-5fa175d7ff55";
+        }
+        else
+        {
+            $root_handle = `$uuidgen_cmd`;
+        }
     }
     return $root_handle;
 }

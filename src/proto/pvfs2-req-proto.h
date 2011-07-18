@@ -23,7 +23,7 @@
  * compatibility (such as changing the semantics or protocol fields for an
  * existing request type)
  */
-#define PVFS2_PROTO_MAJOR 6
+#define PVFS2_PROTO_MAJOR 7
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */

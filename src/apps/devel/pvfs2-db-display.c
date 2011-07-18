@@ -44,6 +44,7 @@ typedef struct
 } options_t;
 
 static options_t opts;
+static char handle_s[37] = { 0 };
 
 int open_db( DB **db_p, char *path, int type, int flags);
 void close_db( DB *db_p );
@@ -266,9 +267,10 @@ void print_dspace( DBT key, DBT val )
  
     print_ds_type( v->type );
 
-    printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
+    uuid_unparse(v->handle, handle_s);
+    printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
-           v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
+           v->fs_id, handle_s, v->uid, v->gid, v->mode,
            llu(v->ctime), llu(v->mtime), llu(v->atime), val.size);
 
     /* union elements are not printed */
@@ -283,13 +285,16 @@ void print_keyval( DBT key, DBT val )
 
 
     k = key.data;
-    printf("(%llu)", llu(k->handle));
+    uuid_unparse(k->handle, handle_s);
+    printf("(%s)", handle_s);
+    printf("key.size: %d\n", key.size);
     if( key.size == 8 )
     {
         printf("()(%d) -> ", key.size);
     }
     else if( key.size == 16 )
     {
+        
         kh = *(uint64_t *)k->key;
         printf("(%llu)(%d) -> ", llu(kh), key.size);
     }

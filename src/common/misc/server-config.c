@@ -2815,7 +2815,7 @@ static int is_valid_filesystem_configuration(
     struct filesystem_configuration_s *fs)
 {
     /* FIX: need to determine what makes a valid fs config now */
-    return 0;
+    return 1;
 }
 
 static void free_host_alias(void *ptr)
@@ -3591,7 +3591,7 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs)
 {
     /* FIX: check if this server has the root handle */
-    return 0;
+    return 1;
 }
 
 /*

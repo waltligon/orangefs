@@ -31,9 +31,7 @@ extern "C" {
  * Major versions aren't either, but refer to architectural storage format changes.
  */
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.1.5"   
-
-#define LAST_HANDLE_STRING                                  "last_handle"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.2.0"   
 
 #ifdef HAVE_DB_DIRTY_READ
 #define TROVE_DB_DIRTY_READ DB_DIRTY_READ
