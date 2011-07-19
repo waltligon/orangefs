@@ -263,11 +263,12 @@ void print_dspace( DBT key, DBT val )
     k = *(uint64_t *)key.data;
     v = val.data;
 
-    printf("(%llu)(%d) -> ", llu(k), key.size);
+    TROVE_handle_unparse(*(TROVE_handle *)key.data, handle_s);
+    printf("(%s)(%d) -> ", handle_s, key.size);
  
     print_ds_type( v->type );
 
-    uuid_unparse(v->handle, handle_s);
+    TROVE_handle_unparse(v->handle, handle_s);
     printf("(fsid: %d)(handle: %s)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
            v->fs_id, handle_s, v->uid, v->gid, v->mode,
@@ -280,23 +281,20 @@ void print_dspace( DBT key, DBT val )
 void print_keyval( DBT key, DBT val )
 {
     struct dbpf_keyval_db_entry *k;
-    uint64_t vh, kh;
     uint32_t vi;
 
 
     k = key.data;
-    uuid_unparse(k->handle, handle_s);
+    TROVE_handle_unparse(k->handle, handle_s);
     printf("(%s)", handle_s);
-    printf("key.size: %d\n", key.size);
-    if( key.size == 8 )
+    if( key.size == 16 )
     {
         printf("()(%d) -> ", key.size);
     }
-    else if( key.size == 16 )
+    else if( key.size == 32 )
     {
-        
-        kh = *(uint64_t *)k->key;
-        printf("(%llu)(%d) -> ", llu(kh), key.size);
+        TROVE_handle_unparse(*(TROVE_handle *)k->key, handle_s);
+        printf("(%s)(%d) -> ", handle_s, key.size);
     }
     else
     {
@@ -305,8 +303,8 @@ void print_keyval( DBT key, DBT val )
 
     if( strncmp(k->key, "dh", 3) == 0 || strncmp(k->key, "de", 3) == 0 )
     {
-        vh = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vh), val.size);
+        TROVE_handle_unparse(*(TROVE_handle *)val.data, handle_s);
+        printf("(%s)(%d)\n", handle_s, val.size);
     }
 
     else if( strncmp(k->key, "md", 3) == 0 )
@@ -318,19 +316,20 @@ void print_keyval( DBT key, DBT val )
        char *dname = val.data + sizeof(uint32_t);
        printf("(%s)(%d)\n", dname, val.size );
     }
-
-    else if( strlen(k->key) > 2 && val.size == 8 )
+    
+    else if( strlen(k->key) > 2 && val.size == 16 )
     {
         /* should be cases of filename to handle */
-        vh = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vh), val.size );
+        TROVE_handle_unparse(*(TROVE_handle *)val.data, handle_s);
+        printf("(%s)(%d)\n", handle_s, val.size );
     }
- 
+    
     else if( (key.size == 8 || key.size == 16 ) && val.size == 4 )
     {
         vi = *(uint32_t *)val.data;
         printf("(%u)(%d)\n", vi, val.size );
     }
+    
 /*
  * not implemented
     elseif( strncmp(k->key. "st", 3) == 0 )
@@ -352,7 +351,7 @@ void print_keyval( DBT key, DBT val )
     else
     {
         /* just print out the size of the data, try not to segfault */
-        printf("(%d)\n",  val.size);
+        printf("unhandled(%d)\n",  val.size);
     }
 
     return;
@@ -361,13 +360,14 @@ void print_keyval( DBT key, DBT val )
 void print_collection_attr( DBT key, DBT val )
 {
     char *k, *vs;
-    uint64_t vu;
     k = key.data;
     printf("(%s)(%d) -> ", k, key.size);
-    if( val.size == 8 )
+
+
+    if( val.size == 16 )
     {
-        vu = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vu), val.size);
+        TROVE_handle_unparse(*(TROVE_handle*)val.data, handle_s);
+        printf("(%s)(%d)\n", handle_s, val.size);
     }
     else
     {

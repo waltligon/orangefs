@@ -190,9 +190,10 @@ DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
+LIBS += -luuid @LIBS@
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
-DEPLIBS := @LIBS@
+DEPLIBS += @LIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -316,7 +317,7 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread -luuid
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -1153,7 +1154,7 @@ endif
 
 	# install any development tools built
 	for i in $(notdir $(DEVELTOOLS)) ; do \
-		if [ -f $(srcdir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
+		if [ -f $(builddir)/src/apps/devel/$$i ]; then install -m 755 $(srcdir)/src/apps/devel/$$i $(bindir); fi;\
 	done
 
 	install -d $(sbindir)
