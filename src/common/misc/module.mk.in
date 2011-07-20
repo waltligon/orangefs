@@ -20,7 +20,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/fsck-utils.c \
 	  $(DIR)/pint-eattr.c \
 	  $(DIR)/pint-hint.c \
-	  $(DIR)/pint-mem.c
+	  $(DIR)/pint-mem.c \
+	  $(DIR)/pvfs2-handle-to-str.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \
@@ -38,7 +39,8 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-eattr.c \
 	     $(DIR)/pint-mem.c \
-	     $(DIR)/pint-hint.c
+	     $(DIR)/pint-hint.c \
+	     $(DIR)/pvfs2-handle-to-str.c
 
 LIBBMISRC += $(DIR)/str-utils.c \
 	  $(DIR)/pint-event.c \

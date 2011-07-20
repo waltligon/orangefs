@@ -46,6 +46,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pvfs2-handle-to-str.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -562,6 +563,13 @@ static int server_initialize(
     ret = server_setup_signal_handlers();
 
     *server_status_flag |= SERVER_SIGNAL_HANDLER_INIT;
+
+    ret = create_str_list(SERVER_HANDLE_LIST_SIZE);
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize the handle strings list\n");
+        return ret;
+    }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
@@ -1562,6 +1570,8 @@ static int server_shutdown(
         free(server_completed_job_p_array);
         free(server_job_status_array);
     }
+
+    destroy_str_list(); /* Destroy list used for printing handles */
 
     if(siglevel == 0 && ret != 0)
     {

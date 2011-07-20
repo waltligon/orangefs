@@ -29,6 +29,7 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "pvfs2-handle-to-str.h"
 
 PINT_smcb *g_smcb = NULL; 
 
@@ -224,6 +225,14 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     if (ret < 0)
     {
         gossip_lerr("Error initializing handle mapping interface\n");
+        goto error_exit;
+    }
+
+    /* initialize the list that stores buffers for handle printing */
+    ret = create_str_list(CLIENT_HANDLE_LIST_SIZE);
+    if (ret < 0)
+    {
+        gossip_lerr("Error: Could not initialize the handle strings list\n");
         goto error_exit;
     }
 

@@ -23,6 +23,7 @@
 #include "job-time-mgr.h"
 #include "pint-util.h"
 #include "pint-event.h"
+#include "pvfs2-handle-to-str.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -69,6 +70,8 @@ int PVFS_sys_finalize()
     PINT_release_pvfstab();
 
     gossip_disable();
+
+    destroy_str_list();
 
     PINT_client_state_machine_release(g_smcb);
 
