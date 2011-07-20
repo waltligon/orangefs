@@ -46,7 +46,6 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
-#include "pvfs2-handle-to-str.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

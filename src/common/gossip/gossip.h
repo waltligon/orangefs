@@ -26,6 +26,7 @@
 #include "syslog.h"
 #endif
 #include "pvfs2-config.h"
+#include "pvfs2-handle-to-str.h"
 
 /********************************************************************
  * Visible interface
