@@ -113,10 +113,11 @@ static PINT_sm_action readdir_read_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - reading metadata: [%llu,%d], "
+        GOSSIP_READDIR_DEBUG, " - reading metadata: [%s,%d], "
         "key=%s\n\t(sz=%d) val_buf=%p (sz=%d)\n",
-        llu(s_op->req->u.readdir.handle), s_op->req->u.readdir.fs_id,
-        (char *)s_op->key.buffer, s_op->key.buffer_sz,
+        PVFS_handle_to_str(s_op->req->u.readdir.handle),
+	s_op->req->u.readdir.fs_id,
+	(char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
 
     ret = job_trove_keyval_read(
@@ -193,9 +194,10 @@ static PINT_sm_action readdir_iterate_on_entries(
     }
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
+        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%s,%d], "
         "\n\ttoken_flag=%u, count=%d\n",
-        llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
+        PVFS_handle_to_str(s_op->u.readdir.dirent_handle),
+	s_op->req->u.readdir.fs_id,
         s_op->req->u.readdir.token_flag,
         s_op->req->u.readdir.dirent_count);
 

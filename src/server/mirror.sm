@@ -160,7 +160,7 @@ static PINT_sm_action inspect_inputs(struct PINT_smcb *smcb, job_status_s *js_p)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tREQUEST STRUCTURE EXISTS.\n");
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\trequest->op:%d"
-                                         "\tmirror.src_handle:%llu"
+                                         "\tmirror.src_handle:%s"
                                          "\tmirror.dst_count: %d"
                                          "\tmirror.fs_id:%d"
                                          "\tmirror.dist.name:%s"
@@ -168,7 +168,7 @@ static PINT_sm_action inspect_inputs(struct PINT_smcb *smcb, job_status_s *js_p)
                                          "\tmirror.src_server_nr:%d"
                                          "\n"
                                          ,s_op->req->op
-                                         ,llu(reqmir_p->src_handle) 
+                                         ,PVFS_handle_to_str(reqmir_p->src_handle) 
                                          ,reqmir_p->dst_count
                                          ,reqmir_p->fs_id
                                          ,reqmir_p->dist->dist_name
@@ -176,9 +176,9 @@ static PINT_sm_action inspect_inputs(struct PINT_smcb *smcb, job_status_s *js_p)
                                          ,reqmir_p->src_server_nr);
 
       for (i=0; i<reqmir_p->dst_count; i++)
-          gossip_debug(GOSSIP_MIRROR_DEBUG,"\treqmir->dst_handle[%d] : %llu\n"
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\treqmir->dst_handle[%d] : %s\n"
                                           ,i
-                                          ,llu(reqmir_p->dst_handle[i]));
+                                          ,PVFS_handle_to_str(reqmir_p->dst_handle[i]));
     }
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tds_attr.b_size:%d\n"
@@ -260,7 +260,7 @@ static PINT_sm_action initialize_structures(struct PINT_smcb *smcb
     if (s_op->req)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\trequest->op:%d"
-                                         "\tmirror.src_handle:%llu"
+                                         "\tmirror.src_handle:%s"
                                          "\tmirror.fs_id:%d"
                                          "\tmirror.dist.name:%s"
                                          "\tmirror.bsize:%d"
@@ -268,7 +268,7 @@ static PINT_sm_action initialize_structures(struct PINT_smcb *smcb
                                          "\tmirror.dst_count:%d"
                                          "\n"
                                          ,s_op->req->op
-                                         ,llu(reqmir_p->src_handle) 
+                                         ,PVFS_handle_to_str(reqmir_p->src_handle) 
                                          ,reqmir_p->fs_id
                                          ,reqmir_p->dist->dist_name
                                          ,reqmir_p->bsize
@@ -276,9 +276,9 @@ static PINT_sm_action initialize_structures(struct PINT_smcb *smcb
                                          ,reqmir_p->dst_count);
       for (i=0; i<reqmir_p->dst_count; i++)
       {
-          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror.dst_handle[%d] : %llu\n"
+          gossip_debug(GOSSIP_MIRROR_DEBUG,"\tmirror.dst_handle[%d] : %s\n"
                                           ,i
-                                          ,llu(reqmir_p->dst_handle[i]));
+                                          ,PVFS_handle_to_str(reqmir_p->dst_handle[i]));
       }
     }
 
@@ -946,8 +946,8 @@ static PINT_sm_action cleanup_mirror_work(struct PINT_smcb *smcb
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tOUT:js_p->error_code:%d\n"
                                     ,js_p->error_code);
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\trespmir_p->src_handle:%llu\n"
-                                    ,llu(respmir_p->src_handle));
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\trespmir_p->src_handle:%s\n"
+                                    ,PVFS_handle_to_str(respmir_p->src_handle));
    
     for (i=0; i<respmir_p->dst_count; i++)
     {

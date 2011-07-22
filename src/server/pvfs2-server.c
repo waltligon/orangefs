@@ -2209,11 +2209,11 @@ void PINT_server_access_debug(PINT_server_op * s_op,
         pw = getpwuid(s_op->req->credentials.uid);
         gr = getgrgid(s_op->req->credentials.gid);
         snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-            "%s.%s@%s H=%llu S=%p: %s: %s",
+            "%s.%s@%s H=%s S=%p: %s: %s",
             ((pw) ? pw->pw_name : "UNKNOWN"),
             ((gr) ? gr->gr_name : "UNKNOWN"),
             BMI_addr_rev_lookup_unexpected(s_op->addr),
-            llu(s_op->target_handle),
+            PVFS_handle_to_str(s_op->target_handle),
             s_op,
             PINT_map_server_op_to_string(s_op->req->op),
             format);

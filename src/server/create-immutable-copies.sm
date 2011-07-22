@@ -840,17 +840,17 @@ static PINT_sm_action inspect_local_handle_sizes(struct PINT_smcb *smcb
    {
        for (j=0; j<imm_p->dfile_count; j++)
        {
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal handle(%d):%llu"
-                                             "\tbase handle(%d):%llu\n"
-               ,i,llu(imm_p->handle_array_base_local[i])
-               ,j,llu(imm_p->handle_array_base[j]) );
+            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tlocal handle(%d):%s"
+                                             "\tbase handle(%d):%s\n"
+               ,i,PVFS_handle_to_str(imm_p->handle_array_base_local[i])
+               ,j,PVFS_handle_to_str(imm_p->handle_array_base[j]) );
             if ( PVFS_handle_compare(imm_p->handle_array_base_local[i], 
                                      imm_p->handle_array_base[j]) )
             {
               imm_p->bstream_array_base_local[j] = 
               imm_p->ds_attr_a[i].u.datafile.b_size;
-              gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle:%llu\tsize:%d\n"
-                  ,llu(imm_p->handle_array_base_local[i])
+              gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle:%s\tsize:%d\n"
+                  ,PVFS_handle_to_str(imm_p->handle_array_base_local[i])
                   ,(int)imm_p->bstream_array_base_local[j] );
             }
        }/*end for*/
@@ -884,8 +884,9 @@ static PINT_sm_action create_local_datahandles (struct PINT_smcb *smcb
        return SM_ACTION_COMPLETE;
 
 
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Target handle: %llu\tTarget FS ID: %d\n"
-                                   ,llu(imm_p->metadata_handle),imm_p->fs_id);
+   gossip_debug(GOSSIP_MIRROR_DEBUG,"Target handle: %s\tTarget FS ID: %d\n"
+                                   ,PVFS_handle_to_str(imm_p->metadata_handle)
+				   ,imm_p->fs_id);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"dfile count: %d\n",imm_p->dfile_count);
    gossip_debug(GOSSIP_MIRROR_DEBUG,"stuffed size: %d\n"
                                 ,sm_p->target_object_attr->u.meta.stuffed_size);
@@ -985,18 +986,18 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
    int cols = imm_p->handle_array_copies_remote_count;
    for (i=0; i<(rows*cols); i++)
    {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tRemote handle(%d):%llu\n"
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tRemote handle(%d):%s\n"
                                     ,i
-                                    ,llu(imm_p->handle_array_copies_remote[i]));
+                                    ,PVFS_handle_to_str(imm_p->handle_array_copies_remote[i]));
    }
 
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tLocal destination handles:\n");
    cols = imm_p->handle_array_copies_local_count;
    for (i=0; i<(rows*cols); i++)
    {
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tLocal handle(%d):%llu\n"
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\tLocal handle(%d):%s\n"
                                     ,i
-                                    ,llu(imm_p->handle_array_copies_local[i]));
+                                    ,PVFS_handle_to_str(imm_p->handle_array_copies_local[i]));
    }
 
    for (i=0,j=0,k=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
@@ -1017,9 +1018,9 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb
    }/*end for*/
 
    for (i=0; i<(imm_p->io_servers_required * imm_p->copies); i++)
-       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies[%d]:  %llu.\n"
+       gossip_debug(GOSSIP_MIRROR_DEBUG,"\thandle_array_copies[%d]:  %s.\n"
                                        ,i
-                                       ,llu(imm_p->handle_array_copies[i]));
+                                       ,PVFS_handle_to_str(imm_p->handle_array_copies[i]));
    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tnumber of io servers required: %d\n"
                                    ,imm_p->io_servers_required);
 

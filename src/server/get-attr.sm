@@ -330,8 +330,8 @@ static PINT_sm_action getattr_verify_attribs(
         case PVFS_TYPE_METAFILE:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
             gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "  Req handle %llu refers to a metafile\n",
-                         llu(s_op->u.getattr.handle));
+                         "  Req handle %s refers to a metafile\n",
+                         PVFS_handle_to_str(s_op->u.getattr.handle));
 
             if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
             {
@@ -391,9 +391,9 @@ static PINT_sm_action getattr_verify_attribs(
             resp_attr->u.data.size = s_op->ds_attr.u.datafile.b_size;
             resp_attr->mask |= PVFS_ATTR_DATA_ALL;
 
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+            gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %s refers to "
                          "a datafile (size = %lld).\n",
-                         llu(s_op->u.getattr.handle),
+                         PVFS_handle_to_str(s_op->u.getattr.handle),
                          lld(resp_attr->u.data.size));
             break;
         case PVFS_TYPE_DIRECTORY:
@@ -431,16 +431,16 @@ static PINT_sm_action getattr_verify_attribs(
         case PVFS_TYPE_DIRDATA:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
             gossip_debug(
-                GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+                GOSSIP_GETATTR_DEBUG, "  handle %s refers to "
                 "a dirdata object. doing nothing special\n",
-                llu(s_op->u.getattr.handle));
+                PVFS_handle_to_str(s_op->u.getattr.handle));
             assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
             break;
         case PVFS_TYPE_SYMLINK:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
             gossip_debug(
-                GOSSIP_GETATTR_DEBUG, "  handle %llu refers to a symlink.\n",
-                llu(s_op->u.getattr.handle));
+                GOSSIP_GETATTR_DEBUG, "  handle %s refers to a symlink.\n",
+                PVFS_handle_to_str(s_op->u.getattr.handle));
 
             /*
               we'll definitely have to fetch the symlink target in this
@@ -459,8 +459,8 @@ static PINT_sm_action getattr_verify_attribs(
              */
             gossip_err(
                 "Error: got unknown type when verifying attributes for "
-                "handle %llu.\n", 
-                llu(s_op->u.getattr.handle));
+                "handle %s.\n", 
+                PVFS_handle_to_str(s_op->u.getattr.handle));
             js_p->error_code = -PVFS_ENXIO;
             break;
     }
@@ -598,9 +598,10 @@ static PINT_sm_action getattr_read_metafile_hint(
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "  reading metafile hint (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->u.getattr.fs_id,
-		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 PVFS_handle_to_str(s_op->u.getattr.handle),
+		 (char *)s_op->key.buffer,
 		 s_op->key.buffer_sz, s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
@@ -659,8 +660,8 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
             (int)s_op->resp.u.getattr.attr.u.meta.dfile_count,
             (int)s_op->resp.u.getattr.attr.u.meta.dist_size);
 
-	gossip_err("handle: %llu (%llx), fsid: %d.\n",
-	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
+	gossip_err("handle: %s, fsid: %d.\n",
+	    PVFS_handle_to_str(s_op->u.getattr.handle),
 	    (int)s_op->u.getattr.fs_id);
 
         /*If we hit an error the DIST & DFILES are no longer valid*/
@@ -699,9 +700,10 @@ static PINT_sm_action getattr_read_metafile_datafile_handles_if_required(
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "  reading %d datafile handles (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
 		 dfile_count, s_op->u.getattr.fs_id,
-		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 PVFS_handle_to_str(s_op->u.getattr.handle),
+		 (char *)s_op->key.buffer,
 		 s_op->key.buffer_sz, s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
@@ -738,16 +740,16 @@ static PINT_sm_action getattr_read_mirrored_copies_count_if_required(
     if (!(resp->u.getattr.attr.mask & PVFS_ATTR_META_MIRROR_DFILES))
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tMirroring is NOT turned on "
-                                         "for this handle(%llu)..\n"
-                                        ,llu(s_op->u.getattr.handle));
+                                         "for this handle(%s)..\n"
+                                        ,PVFS_handle_to_str(s_op->u.getattr.handle));
         js_p->error_code = SKIP_NEXT_STATE;
 
         return SM_ACTION_COMPLETE;
     }
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"\tMirroring IS turned on for this "
-                                     "handle(%llu)...\n"
-                                    ,llu(s_op->u.getattr.handle));
+                                     "handle(%s)...\n"
+                                    ,PVFS_handle_to_str(s_op->u.getattr.handle));
 
     js_p->error_code = 0;
 
@@ -1054,10 +1056,10 @@ static PINT_sm_action getattr_mirrored_handles_safety_check(
          if ( s_op->u.getattr.mirror_dfile_status_array[index] == STATUS_INIT )
               PVFS_handle_clear(meta->mirror_dfile_array[index]);
          gossip_debug(GOSSIP_MIRROR_DEBUG,
-                      "\tmirror handle[%d]:%llu \t"
+                      "\tmirror handle[%d]:%s \t"
                       "status:%d\n"
                       ,index
-                      ,llu(meta->mirror_dfile_array[index])
+                      ,PVFS_handle_to_str(meta->mirror_dfile_array[index])
                       ,s_op->u.getattr.mirror_dfile_status_array[index]);
       }
    }
@@ -1135,7 +1137,7 @@ static PINT_sm_action getattr_read_metafile_distribution_if_required(
     if (s_op->resp.u.getattr.attr.u.meta.dist_size < 1)
     {
         gossip_err("Cannot Read Dist!  Got an invalid dist size for "
-                   "handle %llu,%d\n",llu(s_op->u.getattr.handle),
+                   "handle %s,%d\n",PVFS_handle_to_str(s_op->u.getattr.handle),
                    s_op->u.getattr.fs_id);
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
@@ -1271,8 +1273,9 @@ static PINT_sm_action interpret_metafile_distribution(
         PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
 
         if(resp_attr->u.meta.dist == 0) {
-            gossip_err("Found dist of 0 for handle %llu,%d\n",
-                    llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
+            gossip_err("Found dist of 0 for handle %s,%d\n",
+                    PVFS_handle_to_str(s_op->u.getattr.handle),
+		    s_op->u.getattr.fs_id);
             PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
             js_p->error_code = -PVFS_EIO;
             return SM_ACTION_COMPLETE;
@@ -1370,7 +1373,7 @@ static PINT_sm_action getattr_setup_resp(
         else
         {
             gossip_err("Failed to retrieve symlink target path for "
-                       "handle %llu,%d\n",llu(s_op->u.getattr.handle),
+                       "handle %s,%d\n",PVFS_handle_to_str(s_op->u.getattr.handle),
                        s_op->u.getattr.fs_id);
             PVFS_perror("Symlink retrieval failure",js_p->error_code);
 
@@ -1623,11 +1626,12 @@ static PINT_sm_action getattr_get_dir_hint(
 
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getxattr of %s,%s,%s "
-                 "of dir handle (coll_id = %d, handle = %llu\n",
+                 "of dir handle (coll_id = %d, handle = %s\n",
                  Trove_Special_Keys[DIST_NAME_KEY].key,
                  Trove_Special_Keys[DIST_PARAMS_KEY].key, 
                  Trove_Special_Keys[NUM_DFILES_KEY].key,
-                 s_op->u.getattr.fs_id, llu(s_op->u.getattr.handle));
+                 s_op->u.getattr.fs_id,
+		 PVFS_handle_to_str(s_op->u.getattr.handle));
 
     s_op->resp.u.getattr.attr.u.dir.hint.dist_params = 
         (char *) calloc(1, PVFS_REQ_LIMIT_DIST_BYTES);

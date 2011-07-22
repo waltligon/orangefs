@@ -146,8 +146,8 @@ static PINT_sm_action mkdir_setattrib(
     /* save the handle from the mkdir in the response */
     PVFS_handle_copy(s_op->resp.u.mkdir.handle, js_p->handle);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %llu\n",
-                 llu(js_p->handle));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %s\n",
+                 PVFS_handle_to_str(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
     PVFS_ds_init_time(ds_attr);
@@ -200,8 +200,8 @@ static PINT_sm_action mkdir_write_dirdata_handle(
 
     PVFS_handle_copy(s_op->u.mkdir.dirent_handle, js_p->handle);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
-                 llu(s_op->u.mkdir.dirent_handle));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %s\n",
+                 PVFS_handle_to_str(s_op->u.mkdir.dirent_handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -210,9 +210,10 @@ static PINT_sm_action mkdir_write_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%llu) "
-        "into parent dir (%llu)\n", llu(s_op->u.mkdir.dirent_handle),
-        llu(s_op->resp.u.mkdir.handle));
+        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%s) "
+        "into parent dir (%s)\n",
+	PVFS_handle_to_str(s_op->u.mkdir.dirent_handle),
+        PVFS_handle_to_str(s_op->resp.u.mkdir.handle));
 
     /* we don't sync here since we're going to anyway in the following
      * operation (setting the dirent count).

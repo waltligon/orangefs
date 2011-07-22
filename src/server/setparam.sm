@@ -92,7 +92,7 @@ static PINT_sm_action setparam_work(
             PVFS_handle_copy(tmp_handle, 
                              s_op->req->u.mgmt_setparam.value.u.handle_value);
             gossip_debug(GOSSIP_SERVER_DEBUG, " - ROOT_CHECK looking for"
-                         " handle %llu, on fs_id %d\n", llu(tmp_handle),
+                         " handle %s, on fs_id %d\n", PVFS_handle_to_str(tmp_handle),
                          s_op->req->u.mgmt_setparam.fs_id);
             ret = job_trove_dspace_verify(
                 s_op->req->u.mgmt_setparam.fs_id, tmp_handle,

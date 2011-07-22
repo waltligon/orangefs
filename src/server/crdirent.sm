@@ -114,10 +114,10 @@ static PINT_sm_action crdirent_validate(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-            "  got crdirent for %s (with handle %llu) in %llu\n",
+            "  got crdirent for %s (with handle %s) in %s\n",
             s_op->u.crdirent.name,
-            llu(s_op->u.crdirent.new_handle),
-            llu(s_op->u.crdirent.parent_handle));
+            PVFS_handle_to_str(s_op->u.crdirent.new_handle),
+            PVFS_handle_to_str(s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
     /* FIX: should have a global function to check a string */
@@ -262,9 +262,10 @@ static PINT_sm_action crdirent_write_directory_entry(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
-                 "for %s (handle = %llu) to dirdata dspace %llu\n",
-                 s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
-                 llu(s_op->u.crdirent.dirent_handle));
+                 "for %s (handle = %s) to dirdata dspace %s\n",
+                 s_op->u.crdirent.name,
+		 PVFS_handle_to_str(s_op->u.crdirent.new_handle),
+                 PVFS_handle_to_str(s_op->u.crdirent.dirent_handle));
 
     keyval_flags = TROVE_SYNC;
         
@@ -355,8 +356,8 @@ static PINT_sm_action crdirent_setup_op(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points "
-                      "to %llu\n", s_op->req->u.crdirent.name, 
-                      llu(s_op->req->u.crdirent.new_handle));
+                      "to %s\n", s_op->req->u.crdirent.name, 
+                      PVFS_handle_to_str(s_op->req->u.crdirent.new_handle));
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
 

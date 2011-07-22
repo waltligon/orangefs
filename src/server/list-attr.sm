@@ -139,8 +139,8 @@ static PINT_sm_action listattr_setup_getattr(
         if(s_op->u.listattr.errors[i])
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: dspace_getattr_list failed to get attrs for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                "listattr: dspace_getattr_list failed to get attrs for handle: %s\n", 
+                PVFS_handle_to_str(s_op->req->u.listattr.handles[i]));
             /* skip nested machine for this handle */
             continue;
         }
@@ -150,8 +150,8 @@ static PINT_sm_action listattr_setup_getattr(
         {
             s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                "listattr: failed to setup nested sm for handle: %s\n", 
+                PVFS_handle_to_str(s_op->req->u.listattr.handles[i]));
             continue;
         }
         memset(getattr_op, 0, sizeof(*getattr_op));
@@ -180,8 +180,8 @@ static PINT_sm_action listattr_setup_getattr(
         {
             s_op->u.listattr.errors[i] = -PVFS_ENOMEM;
             gossip_debug(GOSSIP_SERVER_DEBUG, 
-                "listattr: failed to setup nested sm for handle: %llu\n", 
-                llu(s_op->req->u.listattr.handles[i]));
+                "listattr: failed to setup nested sm for handle: %s\n", 
+                PVFS_handle_to_str(s_op->req->u.listattr.handles[i]));
             continue;
         }
 

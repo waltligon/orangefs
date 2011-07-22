@@ -194,8 +194,8 @@ static int check_stuffed(
 
     PVFS_handle_copy(s_op->resp.u.create.metafile_handle, js_p->handle);
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "Metafile handle created: %llu\n",
-        llu(js_p->handle));
+        GOSSIP_SERVER_DEBUG, "Metafile handle created: %s\n",
+        PVFS_handle_to_str(js_p->handle));
 
     assert(config);
 
@@ -714,8 +714,8 @@ static int setup_resp(
     if (js_p->error_code == 0)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
-                          "create: new metadata handle: %llu.\n",
-                          llu(s_op->resp.u.create.metafile_handle));
+                          "create: new metadata handle: %s.\n",
+                          PVFS_handle_to_str(s_op->resp.u.create.metafile_handle));
     }
 
     return SM_ACTION_COMPLETE;

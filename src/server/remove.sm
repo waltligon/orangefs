@@ -237,8 +237,9 @@ static PINT_sm_action remove_read_dirdata_handle(
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dirdata handle (coll_id = %d, "
-                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->req->u.remove.fs_id, llu(s_op->req->u.remove.handle),
+                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.remove.fs_id,
+		 PVFS_handle_to_str(s_op->req->u.remove.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -300,10 +301,10 @@ static PINT_sm_action remove_check_dirdata_entries(
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                          " detected non-empty "
-                         "directory (fsid: %u, handle: %llu) "
+                         "directory (fsid: %u, handle: %s) "
                          "-- returning error\n",
                          s_op->req->u.remove.fs_id,
-                         llu(s_op->req->u.remove.handle));
+                         PVFS_handle_to_str(s_op->req->u.remove.handle));
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
     }
@@ -330,8 +331,8 @@ static PINT_sm_action remove_remove_dirdata_dspace(
     int ret;
     job_id_t j_id;
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  removing dirdata dspace %llu\n",
-		 llu(s_op->u.remove.dirdata_handle));
+		 "  removing dirdata dspace %s\n",
+		 PVFS_handle_to_str(s_op->u.remove.dirdata_handle));
 
     ret = job_trove_dspace_remove(
         s_op->req->u.remove.fs_id,
@@ -359,7 +360,8 @@ static PINT_sm_action remove_remove_dspace(
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
-                 "object %llu,%d\n", s_op, llu(s_op->req->u.remove.handle),
+                 "object %s,%d\n", s_op,
+		 PVFS_handle_to_str(s_op->req->u.remove.handle),
                  s_op->req->u.remove.fs_id);
 
     ret = job_trove_dspace_remove(

@@ -210,10 +210,10 @@ static PINT_sm_action io_start_flow(
         (int)s_op->u.io.flow_d->file_data.server_ct);
 
     gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %lld, "
-        "aggregate_size: %lld, handle: %llu\n", 
+        "aggregate_size: %lld, handle: %s\n", 
         lld(s_op->u.io.flow_d->file_req_offset),
         lld(s_op->u.io.flow_d->aggregate_size),
-        llu(s_op->req->u.io.handle));
+        PVFS_handle_to_str(s_op->req->u.io.handle));
 
     /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)

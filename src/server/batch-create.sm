@@ -128,8 +128,8 @@ static int batch_create_cleanup(
         for(i=0; i<s_op->resp.u.batch_create.handle_count; i++)
         {
             gossip_debug(
-                GOSSIP_SERVER_DEBUG, "Batch created: %llu\n",
-                llu(s_op->resp.u.batch_create.handle_array[i]));
+                GOSSIP_SERVER_DEBUG, "Batch created: %s\n",
+                PVFS_handle_to_str(s_op->resp.u.batch_create.handle_array[i]));
         }
     }
 

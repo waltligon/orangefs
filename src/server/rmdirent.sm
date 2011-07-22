@@ -106,10 +106,10 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
-        "  reading dirdata handle (coll_id = 0x%x, handle = %llu, "
+        "  reading dirdata handle (coll_id = 0x%x, handle = %s, "
         "key = %s (%d), val_buf = %p (%d))\n",
         s_op->req->u.rmdirent.fs_id,
-        llu(s_op->req->u.rmdirent.handle),
+        PVFS_handle_to_str(s_op->req->u.rmdirent.handle),
         (char *)s_op->key.buffer,
         s_op->key.buffer_sz,
         s_op->val.buffer,
@@ -154,8 +154,8 @@ static int rmdirent_remove_directory_entry(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
-                 "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
-                 llu(s_op->u.rmdirent.dirdata_handle));
+                 "object (handle = %s)\n", s_op->req->u.rmdirent.entry,
+                 PVFS_handle_to_str(s_op->u.rmdirent.dirdata_handle));
 
     /* set the sync flag */
     flags = TROVE_SYNC;
@@ -270,8 +270,8 @@ static PINT_sm_action rmdirent_setup_resp(
 	PVFS_handle_copy(s_op->resp.u.rmdirent.entry_handle,
                          s_op->u.rmdirent.entry_handle);
 	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  succeeded; returning handle %llu in response\n",
-		     llu(s_op->resp.u.rmdirent.entry_handle));
+		     "  succeeded; returning handle %s in response\n",
+		     PVFS_handle_to_str(s_op->resp.u.rmdirent.entry_handle));
     }
     else
     {
