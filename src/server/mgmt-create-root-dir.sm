@@ -56,10 +56,14 @@ machine pvfs2_mgmt_create_root_dir_sm
     state check_for_request
     {
         run mgmt_create_root_dir_check_for_request;
+/*
         NO_REQ => change_to_admin_mode; 
+*/
+        NO_REQ => create_dist_dir_struct; 
         default => cleanup_noreq;    
     }
 
+/*
     state change_to_admin_mode
     {
         run mgmt_create_root_dir_change_to_admin_mode;
@@ -72,6 +76,7 @@ machine pvfs2_mgmt_create_root_dir_sm
         run mgmt_create_root_dir_response_release;
         default => create_dist_dir_struct;
     }
+*/
    
     state create_dist_dir_struct
     {
@@ -117,11 +122,15 @@ machine pvfs2_mgmt_create_root_dir_sm
     state write_keyval_to_meta_handle
     {
         run mgmt_create_root_dir_write_keyval_to_meta_handle;
+/*
         success => change_to_normal_mode;
+*/
+        success => mkdir_lost_and_found_setup_msgpair;
         default => cleanup_noreq;
     }
 
 
+/*
     state change_to_normal_mode
     {
         run mgmt_create_root_dir_change_to_normal_mode;
@@ -135,6 +144,7 @@ machine pvfs2_mgmt_create_root_dir_sm
         success => mkdir_lost_and_found_setup_msgpair;
         default => cleanup_noreq;
     }
+*/
 
     state mkdir_lost_and_found_setup_msgpair
     {
@@ -221,6 +231,7 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
     return SM_ACTION_COMPLETE;
 }
 
+#if 0
 /*
  * Function: mgmt_create_root_dir_change_to_admin_mode
  * Params:   server_op *b,
@@ -248,7 +259,7 @@ static PINT_sm_action mgmt_create_root_dir_change_to_admin_mode(
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
     return ret;
 }
-
+#endif
 
 
 
@@ -264,6 +275,7 @@ static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
     unsigned char *c;
     int i;
 
+    js_p->error_code = 0;
     attr = (&s_op->attr);
 
     /* use total # of meta servers as the num_total_dirdata_servers */
@@ -620,7 +632,7 @@ static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
 
 
 
-
+#if 0
 
 /*
  * Function: mgmt_create_root_dir_change_to_normal_mode
@@ -686,7 +698,7 @@ static PINT_sm_action mgmt_create_root_dir_response_release( struct PINT_smcb *s
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
     return ret;
 }
-
+#endif
 
 
 static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
