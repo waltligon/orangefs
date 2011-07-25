@@ -1482,7 +1482,7 @@ size_t pvfs_bufmap_copy_to_user_task_iovec(
         maddr = pvfs2_kmap(page);
         from_kaddr = pvfs2_kmap(from->page_array[from_page_index]);
         /* FIX */
-        copy_to_user(to_addr, maddr + to_offset, cur_copy_size );
+        copy_to_user(maddr + to_offset, from_kaddr, cur_copy_size );
         set_page_dirty_lock(page);
         pvfs2_kunmap(from->page_array[from_page_index]);
         pvfs2_kunmap(page);
