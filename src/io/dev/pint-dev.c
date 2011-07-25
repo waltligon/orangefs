@@ -246,8 +246,6 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         /* we would like to use a memaligned region that is a multiple
          * of the system page size
          */
- 
-        gossip_debug(GOSSIP_USER_DEV_DEBUG, "%s: requesting %u\n", total_size);
         ptr = PINT_mem_aligned_alloc(total_size, page_size);
         if (!ptr)
         {
