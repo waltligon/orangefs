@@ -33,11 +33,7 @@
 SERVICE_STATUS_HANDLE hstatus;
 SERVICE_STATUS service_status;
 
-#ifdef _DEBUG
-BOOL debug = TRUE;
-#else
 BOOL debug = FALSE;
-#endif
 
 int is_running = 0;
 int run_service = 0;  
@@ -415,9 +411,6 @@ void WINAPI service_main(DWORD argc, char *argv[])
     user_cache = qhash_init(user_compare, quickhash_string_hash, 257);
     
     gen_mutex_init(&user_cache_mutex);
-
-    /* default mount point */
-    strcpy(options->mount_point, "Z:");
 
     /* read from config file */
     ret = get_config(options, error_msg, 512);

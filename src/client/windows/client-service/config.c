@@ -331,9 +331,45 @@ parse_ldap_option_exit:
     return ret;
 }
 
+/* pick the first available drive, starting with E: 
+   drive must be able to store two chars (e.g. "F:") */
+char *get_default_mount_point(char *mount_point)
+{
+    DWORD mask, drive_bit;
+    char drive_char;
+
+    mount_point[0] = '\0';
+    mask = GetLogicalDrives();
+    if (mask != 0)
+    {
+        /* scan for an available drive (0 bit) */
+        drive_bit = 1 << 4; /* E: */
+        drive_char = 'E';
+        while (drive_char <= 'Z' &&
+               (mask & drive_bit))
+        {
+            drive_bit <<= 1;
+            drive_char++;
+        }
+        if (drive_char <= 'Z')
+        {
+            mount_point[0] = drive_char;
+            mount_point[1] = ':';
+            mount_point[2] = '\0';
+        }
+    }
+
+    /* will return empty string on error/no available drives
+       the program will either set a user-specified drive or 
+       abort later */
+
+    return mount_point;
+}
+
 void set_defaults(PORANGEFS_OPTIONS options)
 {
-    char module_dir[MAX_PATH];
+    char module_dir[MAX_PATH], mount_point[16];
+
 
     /* default CA and debug file paths */
     if (get_module_dir(module_dir) == 0)
@@ -353,7 +389,7 @@ void set_defaults(PORANGEFS_OPTIONS options)
     strcpy(options->ldap.gid_attr, "gidNumber");
 
     /* default mount point */
-    strcpy(options->mount_point, "Z:");
+    strcpy(options->mount_point, get_default_mount_point(mount_point));
 
 }
 
