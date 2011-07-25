@@ -243,13 +243,8 @@ enum PVFS_async_io_type
 #define PVFS2_GFP_FLAGS (GFP_KERNEL)
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 
-#ifdef CONFIG_HIGHMEM
 #define pvfs2_kmap(page) kmap(page)
 #define pvfs2_kunmap(page) kunmap(page)
-#else
-#define pvfs2_kmap(page) page_address(page)
-#define pvfs2_kunmap(page) do {} while(0)
-#endif /* CONFIG_HIGHMEM */
 
 /* pvfs2 xattr and acl related defines */
 #ifdef HAVE_XATTR

@@ -246,6 +246,8 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
         /* we would like to use a memaligned region that is a multiple
          * of the system page size
          */
+ 
+        gossip_debug(GOSSIP_USER_DEV_DEBUG, "%s: requesting %u\n", total_size);
         ptr = PINT_mem_aligned_alloc(total_size, page_size);
         if (!ptr)
         {
@@ -253,7 +255,6 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
             break;
         }
 
-#ifdef REDHAT_RELEASE_9
         /* fixes a corruption issue on linux 2.4 kernels where the buffers are
          * not being pinned in memory properly 
          */
@@ -262,7 +263,7 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
            gossip_err("Error: FAILED to mlock shared buffer\n");
            break;
         }
-#endif
+
         desc[i].ptr  = ptr;
         desc[i].total_size = total_size;
         desc[i].size = params[i].dev_buffer_size;
