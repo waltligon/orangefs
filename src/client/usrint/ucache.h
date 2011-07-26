@@ -24,7 +24,7 @@
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
 
 #define NIL (-1)
-#define DBG 1
+#define DBG 0
 #define F_EVICT 1	/*	Evict files if necessary	*/
 #define M_EVICT 1	/*	Evict memory entries if necessary	*/
 
@@ -109,7 +109,7 @@ union user_cache_u
 static void add_free_mtbls(int blk);
 void ucache_initialize(void);
 static void init_memory_table(int blk, int ent);
-static int get_free_blk(void);
+static uint16_t get_free_blk(void);
 static void put_free_blk(int blk);
 static int get_free_fent(void);
 static void put_free_fent(int fent);
@@ -124,6 +124,7 @@ static struct mem_table_s *lookup_file(
 	uint16_t *file_ent_prev_index	/* Can be NULL if not desired	*/
 );
 static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
+void evict_file(unsigned int index);
 static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
 static int remove_file(uint32_t fs_id, uint64_t handle);
 static void *lookup_mem(struct mem_table_s *mtbl, 
@@ -132,8 +133,20 @@ static void *lookup_mem(struct mem_table_s *mtbl,
 					uint16_t *mem_ent_index,
 					uint16_t *mem_ent_prev_index
 );
+void update_lru(struct mem_table_s *mtbl, uint16_t index);
+static int locate_max_mtbl(struct mem_table_s **mtbl);
+void evict_LRU(struct mem_table_s *mtbl);
+static void *set_item(struct mem_table_s *mtbl, 
+					uint64_t offset, 
+					uint16_t index
+);
 static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset);
 static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
+
+/*	can be removed later	*/
+void print_lru(struct mem_table_s *mtbl);
+void print_dirty(struct mem_table_s *mtbl);
+
 /* externally visible API */
 #if 0
 int ucache_open_file(PVFS_object_ref *handle)
