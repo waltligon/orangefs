@@ -359,6 +359,44 @@ int socketpair (int d, int type, int protocol, int sv[2])
     return rc;
 }
 
+int pipe(int filedes[2])
+{
+    int rc = 0;
+    pvfs_descriptor *f0, *f1;
+    int fa[2];
+    if(!filedes)
+    {
+        errno = EFAULT;
+        rc = -1;
+        goto errorout;
+    }   
+    rc = glibc_ops.pipe(fa);
+    if (rc < 0)
+    {
+        goto errorout;
+    }
+    f0 = pvfs_alloc_descriptor(&glibc_ops);
+    if (!f0)
+    {
+        goto errorout;
+    }
+    f1 = pvfs_alloc_descriptor(&glibc_ops);
+    if (!f1)
+    {
+        pvfs_free_descriptor(f0);
+        errno = EMFILE;
+        rc = -1;
+        goto errorout;
+    }
+    f0->true_fd = fa[0];
+    filedes[0] = f0->fd;
+    f1->true_fd = fa[1];
+    filedes[1] = f1->fd;
+    /* need to set mode and stuff appropriately */
+errorout:
+    return rc;
+}
+
 /*  
  * Local variables:
  *  c-indent-level: 4

@@ -213,6 +213,16 @@ int pvfs_lremovexattr(const char *path, const char *name);
 
 int pvfs_fremovexattr(int fd, const char *name);
 
+int pvfs_chdir(const char *path);
+
+int pvfs_fchdir(int fd);
+
+char *pvfs_getcwd(char *buf, size_t size);
+
+char *pvfs_get_current_dir_name(void);
+
+char *pvfs_getwd(char *buf);
+
 mode_t pvfs_umask(mode_t mask);
 
 mode_t pvfs_getumask(void);

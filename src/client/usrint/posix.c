@@ -1714,16 +1714,44 @@ int fremovexattr(int fd, const char *name)
     return rc;
 }
 
+int chdir(const char *path)
+{
+    return pvfs_chdir(path);
+}
+
+int fchdir(int fd)
+{
+    return pvfs_fchdir(fd);
+}
+
+char *getcwd(char *buf, size_t size)
+{
+    return pvfs_getcwd(buf, size);
+}
+
+char *get_current_dir_name(void)
+{
+    return pvfs_get_current_dir_name();
+}
+
+char *getwd(char *buf)
+{
+    return pvfs_getwd(buf);
+}
+
 mode_t umask(mode_t mask)
 {
+    return pvfs_umask(mask);
 }
 
 mode_t getumask(void)
 {
+    return pvfs_getumask();
 }
 
 int getdtablesize(void)
 {
+    return pvfs_getdtablesize();
 }
 
 /*

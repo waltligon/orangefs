@@ -144,6 +144,7 @@ typedef struct posix_ops_s
     int (*sendmsg)(int sockfd, const struct msghdr *msg, int flags);
     int (*shutdown)(int sockfd, int how);
     int (*socketpair)(int d, int type, int prtocol, int sv[2]);
+    int (*pipe)(int filedes[2]);
 } posix_ops;
 
 extern posix_ops glibc_ops;
@@ -162,6 +163,7 @@ typedef struct pvfs_descriptor_s
     off64_t file_pointer;     /**< offset from the beginning of the file */
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
     int is_in_use;            /**< PVFS_FS if this descriptor is valid */
+    char *dpath;              /**< path of an open directory for fchdir */
 } pvfs_descriptor;
 
 typedef struct pvfs_descriptor_s PFILE; /* these are for posix interface */

@@ -23,8 +23,13 @@
  * IOCOMMON_CHECK_ERR assumes the return code contains the
  * negative of the error code as encoded by PVFS sysint
  * functions and decodes these before jumping to errorout.
- * CHECK_ERR should be called after each sysint call to
- * correctly pass error codes.
+ * PVFS sysint calls always return error codes in the return
+ * value, but system calls inside them might set errno to
+ * a value that may or may not have meaning for the programmer
+ * calling this library.  Steps are taken to ensure errno
+ * is not modified unless the code in this lib wants to
+ * modify it.  CHECK_ERR should be called after each sysint
+ * call to correctly pass error codes.
  */
 extern PVFS_error PINT_errno_mapping[];
 #define IOCOMMON_RETURN_ERR(rc)                                 \
@@ -37,6 +42,7 @@ do {                                                            \
 
 #define IOCOMMON_CHECK_ERR(rc)                                  \
 do {                                                            \
+    errno = orig_errno;                                         \
     if ((rc) < 0)                                               \
     {                                                           \
         if (IS_PVFS_NON_ERRNO_ERROR(-(rc)))                     \
@@ -53,9 +59,10 @@ do {                                                            \
     }                                                           \
 } while (0)
 
-/* this is a global analog of errno for pvfs specific */
-/* errors errno is set to EIO and this si set to the */
-/* original code */
+/** this is a global analog of errno for pvfs specific
+ *  errors errno is set to EIO and this si set to the
+ *  original code 
+ */
 int pvfs_errno;
 
 void iocommon_cred(PVFS_credentials **credentials)
@@ -77,6 +84,7 @@ void iocommon_cred(PVFS_credentials **credentials)
 int iocommon_fsync(pvfs_descriptor *pd)
 {
     int rc = 0;
+    int orig_errno = errno;
     PVFS_credentials *credentials;
 
     pvfs_sys_init();
@@ -88,7 +96,7 @@ errorout:
     return rc;
 }
 
-/*
+/**
  * Find the PVFS handle to an object (file, dir sym) 
  * assumes an absoluate path
  */
@@ -98,6 +106,7 @@ int iocommon_lookup_absolute(const char *abs_path,
                              int error_path_size)
 {
     int rc = 0;
+    int orig_errno = errno;
     char pvfs_path[256];
     PVFS_fs_id lookup_fs_id;
     PVFS_credentials *credentials;
@@ -139,8 +148,10 @@ errorout:
     return rc;
 }
 
-/*
+/**
  * Lookup a file via the PVFS system interface
+ *
+ * Assumes we have already looked up part of the path
  */
 int iocommon_lookup_relative(const char *rel_path,
                              PVFS_object_ref parent_ref, /* by value */
@@ -150,6 +161,7 @@ int iocommon_lookup_relative(const char *rel_path,
                              int error_path_size)
 {
     int rc = 0;
+    int orig_errno = errno;
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
 
@@ -188,7 +200,7 @@ errorout:
     return rc;
 }
 
-/*
+/**
  * Create a file via the PVFS system interface
  */
 int iocommon_create_file(const char *filename,
@@ -198,6 +210,7 @@ int iocommon_create_file(const char *filename,
                          PVFS_object_ref *ref )
 {
     int rc = 0;
+    int orig_errno = errno;
     mode_t mode_mask;
     mode_t user_mode;
     PVFS_sys_attr attr;
@@ -306,15 +319,18 @@ errorout:
 }
 
 
-/* pvfs_open implementation, return file info in fd */
-/* assumes path is fully qualified */
-/* if pdir is not NULL, it is the parent directory */
-pvfs_descriptor *iocommon_open(const char *pathname, int flags,
+/** pvfs_open implementation, return file info in fd 
+ *  assumes path is fully qualified 
+ *  if pdir is not NULL, it is the parent directory 
+ */
+pvfs_descriptor *iocommon_open(const char *path,
+                               int flags,
                                PVFS_hint file_creation_param,
                                mode_t mode,
-                               PVFS_object_ref *pdir)
+                               pvfs_descriptor *pdir)
 {
     int rc = 0;
+    int orig_errno = errno;
     int follow_link;
     char *directory = NULL;
     char *filename = NULL;
@@ -336,7 +352,7 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
     iocommon_cred(&credentials);
 
     /* Split the path into a directory and file */
-    rc = split_pathname(pathname, 0, &directory, &filename);
+    rc = split_pathname(path, 0, &directory, &filename);
     IOCOMMON_RETURN_ERR(rc);
 
     /* Check the flags to determine if links are followed */
@@ -360,7 +376,7 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
         if (directory)
         {
             rc = iocommon_lookup_relative(directory,
-                                          *pdir,
+                                          pdir->pvfs_ref,
                                           follow_link,
                                           &parent_ref,
                                           NULL,
@@ -369,7 +385,7 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
         }
         else
         {
-            parent_ref = *pdir;
+            parent_ref = pdir->pvfs_ref;
         }
     }
 
@@ -385,6 +401,7 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
     if ((rc == 0) && (flags & O_EXCL) && (flags & O_CREAT))
     {
         /* File was found but EXCLUSIVE so fail */
+        rc = -1;
         errno = EEXIST;
         goto errorout;
     }
@@ -413,6 +430,8 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
             goto errorout;
         }
         /* file not found but create flag */
+        /* clear errno, it was not an error */
+        errno = orig_errno;
         rc = iocommon_create_file(filename,
                                   mode,
                                   file_creation_param,
@@ -464,6 +483,18 @@ pvfs_descriptor *iocommon_open(const char *pathname, int flags,
     if (attributes_resp.attr.objtype & PVFS_TYPE_DIRECTORY)
     {
         pd->mode |= S_IFDIR;
+        if (pdir)
+        {
+            pd->dpath = (char *)malloc(strlen(pdir->dpath) + strlen(path) + 2);
+            strcpy(pd->dpath, pdir->dpath);
+            strcat(pd->dpath, "/");
+            strcat(pd->dpath, path);
+        }
+        else
+        {
+            pd->dpath = (char *)malloc(strlen(path) + 1);
+            strcpy(pd->dpath, path);
+        }
     }
     if (attributes_resp.attr.objtype & PVFS_TYPE_SYMLINK)
     {
@@ -511,6 +542,7 @@ errorout:
 int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
 {
     int rc = 0;
+    int orig_errno = errno;
     PVFS_credentials *credentials;
 
     pvfs_sys_init();
@@ -530,6 +562,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             PVFS_size unit_size, int whence)
 {
     int rc = 0;
+    int orig_errno = errno;
 
     switch(whence)
     {
@@ -602,11 +635,12 @@ errorout:
  * 
  * dirflag indicates trying to remove a dir (rmdir)
  */
-int iocommon_remove (const char *pathname,
+int iocommon_remove (const char *path,
                      PVFS_object_ref *pdir, 
                      int dirflag)
 {
     int rc = 0;
+    int orig_errno = errno;
     char *parentdir = NULL;
     char *file = NULL;
     PVFS_object_ref parent_ref, file_ref;
@@ -622,7 +656,7 @@ int iocommon_remove (const char *pathname,
     pvfs_sys_init();
     iocommon_cred(&credentials);
 
-    rc = split_pathname(pathname, dirflag, &parentdir, &file);
+    rc = split_pathname(path, dirflag, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
 
     if (!pdir)
@@ -692,26 +726,27 @@ errorout:
 /**
  * wrapper for unlink
  */
-int iocommon_unlink(const char *pathname,
+int iocommon_unlink(const char *path,
                     PVFS_object_ref *pdir)
 {
-    return iocommon_remove(pathname, pdir, 0);
+    return iocommon_remove(path, pdir, 0);
 }
 
 /**
  * wrapper for rmdir
  */
-int iocommon_rmdir(const char *pathname,
+int iocommon_rmdir(const char *path,
                    PVFS_object_ref *pdir)
 {
-    return iocommon_remove(pathname, pdir, 1);
+    return iocommon_remove(path, pdir, 1);
 }
 
-/* if dir(s) are NULL, assume name is absolute */
+/** if dir(s) are NULL, assume name is absolute */
 int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
                     PVFS_object_ref *newpdir, const char *newpath)
 {
     int rc = 0;
+    int orig_errno = errno;
     char *olddir = NULL, *newdir = NULL, *oldname = NULL, *newname = NULL;
     PVFS_object_ref oldref, newref;
     PVFS_credentials *creds;
@@ -798,6 +833,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         //returned by nonblocking operations
 {
     int rc = 0;
+    int orig_errno = errno;
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
@@ -856,6 +892,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                           PVFS_Request *ret_memory_req)
 {
     int rc = 0;
+    int orig_errno = errno;
     PVFS_Request contig_memory_req;
     PVFS_credentials *credentials;
     PVFS_size req_size;
@@ -897,10 +934,14 @@ errorout:
     return rc;
 }
 
+/** Implelments an object attribute get or read
+ *
+ */
 int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
 {
-    int                  rc = 0;
-    PVFS_credentials     *credentials;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_credentials *credentials;
     PVFS_sysresp_getattr getattr_response;
 
     /* Initialize */
@@ -921,10 +962,14 @@ errorout:
     return rc;
 }
 
+/** Implelments an object attribute set or write
+ *
+ */
 int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
 {
-    int                  rc = 0;
-    PVFS_credentials     *credentials;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_credentials *credentials;
 
     /* check credentials */
     iocommon_cred(&credentials);
@@ -939,8 +984,8 @@ errorout:
 
 int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
 {
-    int                  rc = 0;
-    PVFS_sys_attr        attr;
+    int rc = 0;
+    PVFS_sys_attr attr;
 
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
@@ -985,8 +1030,9 @@ errorout:
  */
 int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
 {
-    int                  rc = 0;
-    PVFS_sys_attr        attr;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_sys_attr attr;
 
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
@@ -1027,8 +1073,9 @@ errorout:
 
 int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 {
-    int                  rc = 0;
-    PVFS_sys_attr        attr;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_sys_attr attr;
 
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
@@ -1050,8 +1097,9 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 
 int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
 {
-    int                  rc = 0;
-    PVFS_sys_attr        attr;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_sys_attr attr;
 
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
@@ -1068,6 +1116,7 @@ iocommon_make_directory(const char *pvfs_path,
                         PVFS_object_ref *pdir)
 {
     int rc = 0;
+    int orig_errno = errno;
     char *parentdir = NULL;
     char *filename = NULL;
     PVFS_sys_attr       attr;
@@ -1138,6 +1187,7 @@ errorout:
 int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
 {
     int                  rc = 0;
+    int orig_errno = errno;
     PVFS_sys_attr        attr;
 
     /* Initialize any variables */
@@ -1167,6 +1217,7 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
                      PVFS_object_ref *pdir)   /* suports symlinkat */
 {
     int rc = 0;
+    int orig_errno = errno;
     char *parentdir = NULL;
     char *filename = NULL;
     PVFS_sys_attr       attr;
@@ -1240,6 +1291,7 @@ int iocommon_getdents(pvfs_descriptor *pd,
                       unsigned int count)
 {
     int rc = 0;
+    int orig_errno = errno;
     int name_max;
     PVFS_credentials *credentials;
     PVFS_sysresp_readdir readdir_resp;
@@ -1292,7 +1344,65 @@ errorout:
     return rc;
 }
 
-/** Read entries from a directory.
+int iocommon_getdents64(pvfs_descriptor *pd,
+                      struct dirent64 *dirp,
+                      unsigned int count)
+{
+    int rc = 0;
+    int orig_errno = errno;
+    int name_max;
+    PVFS_credentials *credentials;
+    PVFS_sysresp_readdir readdir_resp;
+    PVFS_ds_position token;
+    int bytes = 0, i = 0;
+
+    if (pd->token == PVFS_READDIR_END)
+    {
+        return -1;  /* EOF */
+    }
+
+    if (!S_ISDIR(pd->mode))
+    {
+        errno = ENOENT;
+        return -1;
+    }
+
+    /* Initialize */
+    memset(&readdir_resp, 0, sizeof(readdir_resp));
+
+    iocommon_cred(&credentials);
+
+    token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
+
+    rc = PVFS_sys_readdir(pd->pvfs_ref,
+                          token,
+                          count,
+                          credentials,
+                          &readdir_resp,
+                          NULL);
+    IOCOMMON_CHECK_ERR(rc);
+
+    pd->token = readdir_resp.token;
+    name_max = PVFS_util_min(NAME_MAX, PVFS_NAME_MAX);
+    while(readdir_resp.pvfs_dirent_outcount--)
+    {
+        /* copy a PVFS_dirent to a struct dirent */
+        dirp->d_ino = (uint64_t)readdir_resp.dirent_array[i].handle;
+        dirp->d_off = (off64_t)pd->file_pointer;
+        dirp->d_reclen = sizeof(PVFS_dirent);
+        memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
+        dirp->d_name[name_max] = 0;
+        pd->file_pointer += sizeof(PVFS_dirent);
+        bytes += sizeof(PVFS_dirent);
+    }
+    free(readdir_resp.dirent_array);
+    return bytes;
+
+errorout:
+    return rc;
+}
+
+/* Read entries from a directory.
  *                  
  *  \param token opaque value used to track position in directory
  *         when more than one read is required.
@@ -1306,7 +1416,7 @@ PVFS_error PVFS_sys_readdir(
     PVFS_sysresp_readdir *resp,
     PVFS_hint hints)
  */          
-/** Read entries from a directory and their associated attributes
+/* Read entries from a directory and their associated attributes
  *  in an efficient manner.
  *  
  *  \param token opaque value used to track position in directory
@@ -1323,12 +1433,16 @@ PVFS_error PVFS_sys_readdirplus(
     PVFS_hint hints)
  */
 
+/** Checks to see if caller has the requested permissions
+ *
+ */
 int iocommon_access(const char *pvfs_path,
                     const int mode,
                     const int flags,
                     PVFS_object_ref *pdir)
 {
     int rc = 0;
+    int orig_errno = errno;
     char *parentdir = NULL;
     char *file = NULL;
     int followflag = PVFS2_LOOKUP_LINK_FOLLOW;
@@ -1443,6 +1557,7 @@ errorout:
 int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
 {
     int rc = 0;
+    int orig_errno = errno;
     int block_size = 2*1024*1024; /* optimal transfer size 2M */
     PVFS_credentials *credentials;
     PVFS_sysresp_statfs statfs_resp;
@@ -1477,6 +1592,7 @@ errorout:
 int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
 {
     int rc = 0;
+    int orig_errno = errno;
     int block_size = 2*1024*1024; /* optimal transfer size 2M */
     PVFS_credentials *credentials;
     PVFS_sysresp_statfs statfs_resp;
@@ -1512,6 +1628,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
                       off64_t offset, size_t count)
 {
     int rc = 0, bytes_read;
+    int orig_errno = errno;
     PVFS_Request mem_req, file_req;
     PVFS_credentials *credentials;
     char *buffer;
@@ -1552,17 +1669,21 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     }
 }
 
-/**
- * This is a routine to read extended attributes
+/** Implelments an extended attribute get or read
+ *
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
  */
-int iocommon_geteattr(PVFS_object_ref obj,
+int iocommon_geteattr(pvfs_descriptor *pd,
                       char *key_p,
                       void *val_p,
                       int size)
 {
-    int                  rc = 0;
-    PVFS_credentials     *credentials;
-    PVFS_ds_keyval       key, val;
+    int rc = 0;
+    int orig_errno = errno;
+    PVFS_credentials *credentials;
+    PVFS_ds_keyval key, val;
 
     /* Initialize */
     memset(&key, 0, sizeof(key));
@@ -1572,12 +1693,12 @@ int iocommon_geteattr(PVFS_object_ref obj,
     iocommon_cred(&credentials);
 
     key.buffer = key_p;
-    key.buffer_sz = strlen(key_p);
+    key.buffer_sz = strlen(key_p) + 1;
     val.buffer = val_p;
     val.buffer_sz = size;
 
     /* now get attributes */
-    rc = PVFS_sys_geteattr(obj,
+    rc = PVFS_sys_geteattr(pd->pvfs_ref,
                           credentials,
                           &key,
                           &val,
@@ -1589,19 +1710,26 @@ errorout:
     return rc;
 }
 
-/**
- * This is a routine to write extended attributes
+/** Implelments an extended attribute set or write
+ *
+ *  The flag can be used to control whether to overwrite
+ *  or create a new attribute.  The default is to create
+ *  if needed and overwrite if a previus value exists.
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
  */
-int iocommon_seteattr(PVFS_object_ref obj,
+int iocommon_seteattr(pvfs_descriptor *pd,
                       char *key_p,
                       void *val_p,
                       int size,
                       int flag)
 {
-    int                  rc = 0;
-    int                  pvfs_flag = 0;
-    PVFS_credentials     *credentials;
-    PVFS_ds_keyval       key, val;
+    int rc = 0;
+    int pvfs_flag = 0;
+    int orig_errno = errno;
+    PVFS_credentials *credentials;
+    PVFS_ds_keyval key, val;
 
     /* Initialize */
     memset(&key, 0, sizeof(key));
@@ -1611,7 +1739,7 @@ int iocommon_seteattr(PVFS_object_ref obj,
     iocommon_cred(&credentials);
 
     key.buffer = key_p;
-    key.buffer_sz = strlen(key_p);
+    key.buffer_sz = strlen(key_p) + 1;
     val.buffer = val_p;
     val.buffer_sz = size;
 
@@ -1625,13 +1753,157 @@ int iocommon_seteattr(PVFS_object_ref obj,
     }
 
     /* now set attributes */
-    rc = PVFS_sys_seteattr(obj,
+    rc = PVFS_sys_seteattr(pd->pvfs_ref,
                           credentials,
                           &key,
                           &val,
                           pvfs_flag,
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
+
+errorout:
+    return rc;
+}
+
+/** Implelments an extended attribute delete or remove
+ *
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
+ */
+int iocommon_deleattr(pvfs_descriptor *pd,
+                      char *key_p)
+{
+    int rc = 0;
+    int pvfs_flag = 0;
+    int orig_errno = errno;
+    PVFS_credentials *credentials;
+    PVFS_ds_keyval key;
+
+    /* Initialize */
+    memset(&key, 0, sizeof(key));
+
+    /* check credentials */
+    iocommon_cred(&credentials);
+
+    key.buffer = key_p;
+    key.buffer_sz = strlen(key_p) + 1;
+
+    /* now set attributes */
+    rc = PVFS_sys_deleattr(pd->pvfs_ref,
+                           credentials,
+                           &key,
+                           NULL);
+    IOCOMMON_CHECK_ERR(rc);
+
+errorout:
+    return rc;
+}
+
+/** Implelments an extended attribute key list
+ *
+ *  All of the keys for athe specified object are returned
+ *  in the specified buffer, NULL delimited.  The number
+ *  of keys is returned.  If the size passed in is 0, then
+ *  only the number of keys available is returned.
+ *  The PVFS server enforces namespaces as prefixes on the
+ *  attribute keys.  Thus they are not checked here.
+ *  Probably would be more efficient to do so.
+ */
+int iocommon_listeattr(pvfs_descriptor *pd,
+                       char *list,
+                       int size,
+                       int *numkeys)
+{
+    int rc = 0;
+    int orig_errno = errno;
+    int k, total_size, total_keys, max_keys;
+    int32_t nkey;
+    PVFS_ds_position token;
+    PVFS_credentials *credentials;
+    PVFS_sysresp_listeattr listeattr_resp;
+
+    /* Initialize */
+    memset(&listeattr_resp, 0, sizeof(listeattr_resp));
+    token = PVFS_ITERATE_START;
+    total_size = 0;
+    total_keys = 0;
+    nkey = 0;
+
+    /* check credentials */
+    iocommon_cred(&credentials);
+
+    /* find number of attributes */
+    rc = PVFS_sys_listeattr(pd->pvfs_ref,
+                            token,
+                            nkey,
+                            credentials,
+                            &listeattr_resp,
+                            NULL);
+    IOCOMMON_CHECK_ERR(rc);
+
+    /* get available keys */
+    nkey = listeattr_resp.nkey;
+
+    if (size == 0)
+    {
+        *numkeys = nkey;
+        goto errorout;
+    }
+
+    /* allocate key_array */
+    if (nkey < PVFS_MAX_XATTR_LISTLEN)
+    {
+        max_keys = PVFS_MAX_XATTR_LISTLEN;
+    }
+    else
+    {
+        max_keys = nkey;
+    }
+    listeattr_resp.key_array = (PVFS_ds_keyval *)malloc(max_keys *
+                                                    sizeof(PVFS_ds_keyval));
+    for (k = 0; k < max_keys; k++)
+    {
+        listeattr_resp.key_array[k].buffer_sz = PVFS_MAX_XATTR_NAMELEN;
+        listeattr_resp.key_array[k].buffer =
+                            (char *)malloc(PVFS_MAX_XATTR_NAMELEN);
+    }
+    
+    /* now list attributes */
+    do
+    {
+        token = listeattr_resp.token;
+        listeattr_resp.nkey = max_keys;
+        rc = PVFS_sys_listeattr(pd->pvfs_ref,
+                                token,
+                                nkey,
+                                credentials,
+                                &listeattr_resp,
+                                NULL);
+        IOCOMMON_CHECK_ERR(rc);
+
+        /* copy keys out to caller */
+        for (k = 0; k < listeattr_resp.nkey; k++)
+        {
+            if (total_size + listeattr_resp.key_array[k].read_sz > size)
+            {
+                total_size = size;
+                break; /* ran out of buffer space */
+            }
+            strncpy(list, listeattr_resp.key_array[k].buffer,
+                    listeattr_resp.key_array[k].read_sz);
+            list += listeattr_resp.key_array[k].read_sz;
+            total_size += listeattr_resp.key_array[k].read_sz;
+        }
+        total_keys += listeattr_resp.nkey;
+    } while (total_keys < nkey && listeattr_resp.nkey > 0 &&
+             total_size < size);
+    /* free key_array */
+    for (k = 0; k < max_keys; k++)
+    {
+        free(listeattr_resp.key_array[k].buffer);
+    }
+    free(listeattr_resp.key_array);
 
 errorout:
     return rc;

@@ -34,6 +34,7 @@ pvfs_descriptor pvfs_stdin =
     .mode = 0,
     .file_pointer = 0,
     .token = 0,
+    .dpath = NULL,
     .is_in_use = PVFS_FS
 };
 
@@ -48,6 +49,7 @@ pvfs_descriptor pvfs_stdout =
     .mode = 0,
     .file_pointer = 0,
     .token = 0,
+    .dpath = NULL,
     .is_in_use = PVFS_FS
 };
 
@@ -62,6 +64,7 @@ pvfs_descriptor pvfs_stderr =
     .mode = 0,
     .file_pointer = 0,
     .token = 0,
+    .dpath = NULL,
     .is_in_use = PVFS_FS
 };
 
@@ -152,9 +155,6 @@ void load_glibc(void)
     glibc_ops.removexattr = dlsym(RTLD_NEXT, "removexattr");
     glibc_ops.lremovexattr = dlsym(RTLD_NEXT, "lremovexattr");
     glibc_ops.fremovexattr = dlsym(RTLD_NEXT, "fremovexattr");
-    glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
-    glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
-    glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
     glibc_ops.socket = dlsym(RTLD_NEXT, "socket");
     glibc_ops.accept = dlsym(RTLD_NEXT, "accept");
     glibc_ops.bind = dlsym(RTLD_NEXT, "bind");
@@ -179,6 +179,7 @@ void load_glibc(void)
     glibc_ops.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
     glibc_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
     glibc_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
+    glibc_ops.pipe = dlsym(RTLD_NEXT, "pipe");
 
 /* PVFS does not implement socket ops */
     pvfs_ops.socket = dlsym(RTLD_NEXT, "socket");
@@ -205,6 +206,10 @@ void load_glibc(void)
     pvfs_ops.sendmsg = dlsym(RTLD_NEXT, "sendmsg");
     pvfs_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
     pvfs_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
+    pvfs_ops.pipe = dlsym(RTLD_NEXT, "pipe");
+    glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
+    glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
+    glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
 }
 
 /* 
@@ -243,6 +248,10 @@ void pvfs_sys_init(void) {
 
 	/* initalize PVFS */ 
 	PVFS_util_init_defaults(); 
+    if (errno == EINPROGRESS)
+    {
+        errno = 0;
+    }
 
     /* call other initialization routines */
     PINT_initrand();
@@ -299,6 +308,7 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[i]->mode = 0;
 	descriptor_table[i]->file_pointer = 0;
 	descriptor_table[i]->token = 0;
+	descriptor_table[i]->dpath = NULL;
 	descriptor_table[i]->is_in_use = PVFS_FS;
 
     return descriptor_table[i];
@@ -368,6 +378,10 @@ int pvfs_free_descriptor(int fd)
     /* check if last copy */
     if (--(pd->dup_cnt) <= 0)
     {
+        if (pd->dpath)
+        {
+            free(pd->dpath);
+        }
 	    /* free descriptor - wipe memory first */
 	    memset(pd, 0, sizeof(pvfs_descriptor));
 	    free(pd);
@@ -380,7 +394,7 @@ int pvfs_free_descriptor(int fd)
  * takes a path that is relative to the working dir and
  * expands it all the way to the root
  */
-char * pvfs_qualify_path(const char *path)
+char *pvfs_qualify_path(const char *path)
 {
     char *rc = NULL;
     int i = 1;
@@ -423,7 +437,9 @@ char * pvfs_qualify_path(const char *path)
         strncat(newpath, path, psz);
     }
     else
+    {
         newpath = (char *)path;
+    }
     return newpath;
 }
 
@@ -433,60 +449,68 @@ char * pvfs_qualify_path(const char *path)
  * returns 1 if PVFS 0 otherwise
  */
 
+#ifdef PVFS_ASSUME_MOUNT
 int is_pvfs_path(const char *path)
 {
     struct statfs file_system;
-    char *directory = NULL ;
-    char *str;
+    char *newpath = NULL ;
 
     pvfs_sys_init();
     memset(&file_system, 0, sizeof(file_system));
-    /* add current working dir to front of relative path */
-    /* and copy to temp string working area */
-    if(path[0] != '/')
-    {
-        directory = getcwd(NULL, 0);
-        str = malloc((strlen(directory) + 1) * sizeof(char));
-        if(!str)
-        {
-            return -1;
-        }
-        strcpy(str, directory);
-        free(directory);
-    }
-    else
-    {
-        str = malloc((strlen(path) + 1) * sizeof(char));
-        if(!str)
-        {
-            return -1;
-        }
-        strcpy(str, path);
-    }
-
+    
+    newpath = pvfs_qualify_path(path);
     /* lop off the last segment of the path */
     int count;
-    for(count = strlen(str) -2; count > 0; count--)
+    for(count = strlen(newpath) -2; count > 0; count--)
     {
-        if(str[count] == '/')
+        if(newpath[count] == '/')
         {
-            str[count] = '\0';
+            newpath[count] = '\0';
             break;
         }
     }
     /* this must call standard glibc statfs */
-    glibc_ops.statfs(str, &file_system);
-    free(str);
+    glibc_ops.statfs(newpath, &file_system);
+    if (newpath != path)
+    {
+        free(newpath);
+    }
     if(file_system.f_type == PVFS_FS)
     {
-        return 1;
+        return 1; /* PVFS */
     }
     else
     {
-        /* not PVFS assume the kernel can handle it */
-        return 0;
+        return 0; /* not PVFS assume the kernel can handle it */
     }
 }
+#else
+int is_pvfs_path(const char *path)
+{
+    int rc = 0;
+    PVFS_fs_id fs_id;
+    char pvfs_path[256];
+    char *newpath = NULL;
+
+    pvfs_sys_init();
+    newpath = pvfs_qualify_path(path);
+    rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, 256);
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+    if (rc < 0)
+    {
+        if (rc == -PVFS_ENOENT)
+        {
+            return 0; /* not a PVFS path */
+        }
+        errno = rc;
+        return -1; /* an error returned */
+    }
+    return 1; /* a PVFS path */
+}
+#endif
 
 void pvfs_debug(char *fmt, ...)
 {

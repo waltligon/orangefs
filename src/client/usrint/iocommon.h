@@ -78,7 +78,7 @@ int iocommon_create_file(const char *filename,
 pvfs_descriptor *iocommon_open(const char *pathname, int flag,
                                PVFS_hint file_creation_param,
                                mode_t file_permission,
-                               PVFS_object_ref *pdir);
+                               pvfs_descriptor *pdir);
 
 int iocommon_truncate(PVFS_object_ref file_ref,
                       off64_t length);

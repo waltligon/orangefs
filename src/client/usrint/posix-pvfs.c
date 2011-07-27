@@ -17,6 +17,7 @@
 #include <iocommon.h>
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
+static char pvfs_cwd[PVFS_PATH_MAX];
 
 /* actual implementation of read and write are in these static funcs */
 
@@ -157,7 +158,7 @@ int pvfs_openat(int dirfd, const char *path, int flags, ...)
         {
             return -1;
         }
-        fpd = iocommon_open(path, flags, hints, mode, &dpd->pvfs_ref);
+        fpd = iocommon_open(path, flags, hints, mode, dpd);
         if (!fpd)
         {
             return -1;
@@ -840,7 +841,7 @@ int pvfs_fstatat(int fd, char *path, struct stat *buf, int flag)
         {
             return -1;
         }
-        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
+        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
         rc = iocommon_stat(pd2, buf, PVFS_ATTR_SYS_ALL_NOHINT);
         pvfs_close(pd2->fd);
     }
@@ -884,7 +885,7 @@ int pvfs_fstatat64(int fd, char *path, struct stat64 *buf, int flag)
             errno = EBADF;
             return -1;
         }
-        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
+        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
         rc = iocommon_stat64(pd2, buf, PVFS_ATTR_SYS_ALL_NOHINT);
         pvfs_close(pd2->fd);
     }
@@ -1029,7 +1030,7 @@ int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag)
         {
             return -1;
         }
-        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
+        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
         rc = iocommon_chown(pd2, owner, group);
         pvfs_close(pd2->fd);
     }
@@ -1122,7 +1123,7 @@ int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag)
         {
             return -1;
         }
-        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
+        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
         rc = iocommon_chmod(pd2, mode);
         pvfs_close(pd2->fd);
     }
@@ -1239,7 +1240,7 @@ int pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
         {
             return -1;
         }
-        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, &pd->pvfs_ref);
+        pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
         if(!pd2)
         {
             return -1;
@@ -1340,9 +1341,20 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
 
 int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
 {
-    fprintf(stderr, "pvfs_getdents64 not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    pvfs_descriptor *pd;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    return iocommon_getdents64(pd, dirp, count);
 }
 
 int pvfs_access(const char *path, int mode)
@@ -1392,19 +1404,60 @@ int pvfs_flock(int fd, int op)
 
 int pvfs_fcntl(int fd, int cmd, ...)
 {
+    int rc = 0;
     va_list ap;
     long arg;
     struct flock *lock;
-    errno = ENOSYS;
-    fprintf(stderr, "pvfs_fcntl not implemented\n");
-    return -1;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    va_start(ap, cmd);
+    switch (cmd)
+    {
+    case F_DUPFD :
+    case F_GETFD :
+    case F_SETFD :
+        errno = ENOSYS;
+        fprintf(stderr, "pvfs_fcntl not implemented\n");
+        rc = -1;
+        break;
+    case F_GETFL :
+        rc = pd->flags;
+        break;
+    case F_SETFL :
+        pd-> flags = va_arg(ap, int);
+        break;
+    case F_GETLK :
+    case F_SETLK :
+    case F_SETLKW :
+    case F_GETOWN :
+    case F_SETOWN :
+    case F_GETSIG :
+    case F_SETSIG :
+    case F_GETLEASE :
+    case F_SETLEASE :
+    case F_NOTIFY :
+    default :
+        errno = ENOSYS;
+        fprintf(stderr, "pvfs_fcntl not implemented\n");
+        rc = -1;
+        break;
+    }
+    va_end(ap);
+
+errorout :
+    return rc;
 }
 
 /* sync all disk data */
 void pvfs_sync(void )
 {
-    errno = ENOSYS;
-    fprintf(stderr, "pvfs_sync not implemented\n");
+    return;
 }
 
 /* sync file, but not dir it is in */
@@ -1578,9 +1631,16 @@ int pvfs_setxattr(const char *path,
                   size_t size,
                   int flags)
 {
-    fprintf(stderr, "pvfs_setxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fsetxattr(fd, name, value, size, flags);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_lsetxattr(const char *path,
@@ -1589,9 +1649,16 @@ int pvfs_lsetxattr(const char *path,
                    size_t size,
                    int flags)
 {
-    fprintf(stderr, "pvfs_lsetxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fsetxattr(fd, name, value, size, flags);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_fsetxattr(int fd,
@@ -1600,9 +1667,17 @@ int pvfs_fsetxattr(int fd,
                    size_t size,
                    int flags)
 {
-    fprintf(stderr, "pvfs_fsetxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int rc = 0;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    rc = iocommon_seteattr(pd, name, value, size, flags);
+    return rc;
 }
 
 int pvfs_getxattr(const char *path,
@@ -1610,9 +1685,16 @@ int pvfs_getxattr(const char *path,
                   void *value,
                   size_t size)
 {
-    fprintf(stderr, "pvfs_getxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fgetxattr(fd, name, value, size);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_lgetxattr(const char *path,
@@ -1620,9 +1702,16 @@ int pvfs_lgetxattr(const char *path,
                    void *value,
                    size_t size)
 {
-    fprintf(stderr, "pvfs_lgetxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fgetxattr(fd, name, value, size);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_fgetxattr(int fd,
@@ -1630,61 +1719,214 @@ int pvfs_fgetxattr(int fd,
                    void *value,
                    size_t size)
 {
-    fprintf(stderr, "pvfs_fgetxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    return iocommon_geteattr(pd, name, value, size);
 }
 
 int pvfs_listxattr(const char *path,
                    char *list,
                    size_t size)
 {
-    fprintf(stderr, "pvfs_listxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_flistxattr(fd, list, size);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_llistxattr(const char *path,
                     char *list,
                     size_t size)
 {
-    fprintf(stderr, "pvfs_llistxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_flistxattr(fd, list, size);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_flistxattr(int fd,
                     char *list,
                     size_t size)
 {
-    fprintf(stderr, "pvfs_flistxattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int numkeys, rc = 0;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    rc = iocommon_listeattr(pd, list, size, &numkeys);
+    if (rc < 0)
+    {
+        return -1;
+    }
+    return numkeys;
 }
 
 int pvfs_removexattr(const char *path,
                      const char *name)
 {
-    fprintf(stderr, "pvfs_removexattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fremovexattr(fd, name);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_lremovexattr(const char *path,
                       const char *name)
 {
-    fprintf(stderr, "pvfs_lremovexattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    int fd, rc = 0;
+
+    fd = pvfs_open(path, O_RDWR | O_NOFOLLOW);
+    if (fd < 0)
+    {
+        return fd;
+    }
+    rc = pvfs_fremovexattr(fd, name);
+    pvfs_close(fd);
+    return rc;
 }
 
 int pvfs_fremovexattr(int fd,
                       const char *name)
 {
-    fprintf(stderr, "pvfs_fremovexattr not implemented\n");
-    errno = ENOSYS;
-    return -1;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    return iocommon_deleattr(pd, name);
 }
+
+/**
+ * pvfs chdir
+ */
+int pvfs_chdir(const char *path)
+{
+    int plen;
+
+    if (!path)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    plen = strlen(path);
+    if (plen > PVFS_PATH_MAX)
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    strcpy(pvfs_cwd, path);
+    return 0;
+}
+
+int pvfs_fchdir(int fd)
+{
+    int plen;
+    pvfs_descriptor *pd;
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || !pd->dpath)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    plen = strlen(pd->dpath);
+    if (plen > PVFS_PATH_MAX)
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    strcpy(pvfs_cwd, pd->dpath);
+    return 0;
+}
+
+char *pvfs_getcwd(char *buf, size_t size)
+{
+    int plen;
+    plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+    if (!buf)
+    {
+        /* malloc space */
+        buf = (char *)malloc(plen + 1);
+        if (!buf)
+        {
+            errno = ENOMEM;
+            return NULL;
+        }
+    }
+    else
+    {
+        if (size == 0)
+        {
+            errno = EINVAL;
+            return NULL;
+        }
+        if (size < plen + 1)
+        {
+            errno = ERANGE;
+            return NULL;
+        }
+    }
+    strcpy(buf, pvfs_cwd);
+    return buf;
+}
+
+char *pvfs_get_current_dir_name(void)
+{
+    int plen;
+    char *buf;
+    plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+    buf = (char *)malloc(plen + 1);
+    if (!buf)
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+    strcpy(buf, pvfs_cwd);
+    return buf;
+}
+
+char *pvfs_getwd(char *buf)
+{
+    if (!buf)
+    {
+        errno = EINVAL;
+        return NULL;
+    }
+    strncpy(buf, pvfs_cwd, PVFS_PATH_MAX);
+    return buf;
+}
+
 
 /**
  * pvfs_umask
