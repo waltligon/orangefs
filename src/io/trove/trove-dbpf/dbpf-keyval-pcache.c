@@ -90,7 +90,7 @@ static int dbpf_keyval_pcache_compare(
         (struct dbpf_keyval_pcache_entry *)
         (qhash_entry(link, struct PINT_tcache_entry, hash_link))->payload;
 
-    if(key_entry->handle == link_entry->handle &&
+    if(!(TROVE_handle_compare(key_entry->handle, link_entry->handle)) &&
        key_entry->pos.session == link_entry->pos.session && 
        key_entry->pos.count == link_entry->pos.count)
         return 1;

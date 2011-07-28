@@ -279,8 +279,8 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "warning: keyval read error on handle %llu and "
-                     "key=%*s (%s)\n", llu(op_p->handle),
+                     "warning: keyval read error on handle %s and "
+                     "key=%*s (%s)\n", PVFS_handle_to_str(op_p->handle),
                      op_p->u.k_read.key->buffer_sz,
                      (char *)op_p->u.k_read.key->buffer, 
                      db_strerror(ret));
@@ -407,8 +407,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     if(!(op_p->flags & TROVE_BINARY_KEY))
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "dbpf_keyval_write_op_svc: handle: %llu, key: %*s\n",
-                     llu(op_p->handle),
+                     "dbpf_keyval_write_op_svc: handle: %s, key: %*s\n",
+                     PVFS_handle_to_str(op_p->handle),
                      op_p->u.k_write.key.buffer_sz,
                      (char *)op_p->u.k_write.key.buffer);
     }
@@ -477,8 +477,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     if(!(op_p->flags & TROVE_BINARY_KEY))
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                     llu(key_entry.handle), 
+                     "keyval_db->put(handle= %s, key= %*s (%d)) size=%d\n",
+                     PVFS_handle_to_str(key_entry.handle), 
                      op_p->u.k_write.key.buffer_sz,
                      key_entry.key,
                      op_p->u.k_write.key.buffer_sz,
@@ -621,8 +621,8 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     if(!(op_p->flags & TROVE_BINARY_KEY))
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                     "dbpf_keyval_remove_op_svc: handle: %llu, key: %*s\n",
-                     llu(op_p->handle),
+                     "dbpf_keyval_remove_op_svc: handle: %s, key: %*s\n",
+                     PVFS_handle_to_str(op_p->handle),
                      op_p->u.k_remove.key.buffer_sz,
                      (char *)op_p->u.k_remove.key.buffer);
     }
@@ -759,8 +759,8 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         info.count -= remove_count;
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "[DBPF KEYVAL]: handle_info keyval_remove_list: handle: %llu, count: %d\n",
-                 llu(op_p->handle), info.count); 
+                 "[DBPF KEYVAL]: handle_info keyval_remove_list: handle: %s, count: %d\n",
+                 PVFS_handle_to_str(op_p->handle), info.count); 
 
         ret = op_p->coll_p->keyval_db->put(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
@@ -878,9 +878,9 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                   "dbpf_keyval_iterate_op_svc: starting: fsid: %u, "
-                  "handle: %llu, pos_flag: %u\n", 
+                  "handle: %s, pos_flag: %u\n", 
                  op_p->coll_p->coll_id, 
-                 llu(op_p->handle),
+                 PVFS_handle_to_str(op_p->handle),
                  *op_p->u.k_iterate.position_flag_p);
     
     /* if they passed in that they are at the end, return 0.
@@ -1364,8 +1364,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if(!(op_p->flags & TROVE_BINARY_KEY))
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                         "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                         llu(key_entry.handle), 
+                         "keyval_db->put(handle= %s, key= %*s (%d)) size=%d\n",
+                         PVFS_handle_to_str(key_entry.handle), 
                          op_p->u.k_write_list.key_array[k].buffer_sz,
                          key_entry.key,
                          op_p->u.k_write_list.key_array[k].buffer_sz,
@@ -1672,8 +1672,8 @@ static int dbpf_keyval_do_remove(
     db_key.flags = DB_DBT_USERMEM;
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "keyval_db->del(handle= %llu, key= %*s (%d)) size=%d\n",
-                 llu(key_entry.handle),
+                 "keyval_db->del(handle= %s, key= %*s (%d)) size=%d\n",
+                 PVFS_handle_to_str(key_entry.handle),
                  key->buffer_sz,
                  key_entry.key,
                  key->buffer_sz,
@@ -1908,8 +1908,9 @@ static int dbpf_keyval_iterate_cursor_get(
     if (ret != 0)
     {
         gossip_lerr("Failed to perform cursor get:"
-                    "\n\thandle: %llu\n\ttype: %d\n\tdb error: %s\n",
-                    llu(key_entry.handle), db_flags, db_strerror(ret));
+                    "\n\thandle: %s\n\ttype: %d\n\tdb error: %s\n",
+                    PVFS_handle_to_str(key_entry.handle),
+		    db_flags, db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -2019,8 +2020,9 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     }
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "[DBPF KEYVAL]: handle_info get: handle: %llu, count: %d\n",
-                 llu(op_p->handle), op_p->u.k_get_handle_info.info->count); 
+                 "[DBPF KEYVAL]: handle_info get: handle: %s, count: %d\n",
+                 PVFS_handle_to_str(op_p->handle), 
+		 op_p->u.k_get_handle_info.info->count); 
 
     return 1;
 }    
@@ -2070,8 +2072,8 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "[DBPF KEYVAL]: handle_info "
-                         "count increment: handle: %llu, value: %d\n",
-                         llu(op_p->handle), info.count);
+                         "count increment: handle: %s, value: %d\n",
+                         PVFS_handle_to_str(op_p->handle), info.count);
             info.count++;
         }
         else if(action == DBPF_KEYVAL_HANDLE_COUNT_DECREMENT)
@@ -2080,15 +2082,15 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
             {
                 gossip_lerr(
                      "[DBPF KEYVAL]: ERROR: handle_info "
-                     "count decrement: handle: %llu, value: %d\n",
-                     llu(op_p->handle), info.count);
+                     "count decrement: handle: %s, value: %d\n",
+                     PVFS_handle_to_str(op_p->handle), info.count);
             }
             assert(info.count > 0);
 
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "[DBPF KEYVAL]: handle_info "
-                         "count decrement: handle: %llu, value: %d\n",
-                         llu(op_p->handle), info.count);
+                         "count decrement: handle: %s, value: %d\n",
+                         PVFS_handle_to_str(op_p->handle), info.count);
             info.count--;
 
             if(info.count == 0)

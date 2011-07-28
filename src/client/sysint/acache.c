@@ -743,7 +743,7 @@ static int static_compare_key_entry(void* key, struct qhash_head* link)
     assert(tmp_entry);
   
     tmp_payload = (struct static_payload*)tmp_entry->payload;
-    if(real_key->handle == tmp_payload->refn.handle &&
+    if(!PVFS_handle_compare(real_key->handle, tmp_payload->refn.handle) &&
        real_key->fs_id == tmp_payload->refn.fs_id)
     {
         return(1);
@@ -769,7 +769,7 @@ static int acache_compare_key_entry(void* key, struct qhash_head* link)
     assert(tmp_entry);
   
     tmp_payload = (struct acache_payload*)tmp_entry->payload;
-    if(real_key->handle == tmp_payload->refn.handle &&
+    if(!PVFS_handle_compare(real_key->handle, tmp_payload->refn.handle) &&
        real_key->fs_id == tmp_payload->refn.fs_id)
     {
         return(1);

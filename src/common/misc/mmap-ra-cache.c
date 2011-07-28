@@ -286,7 +286,7 @@ static int hash_key_compare(void *key, struct qlist_head *link)
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);
 
-    return (((cache_elem->refn.handle == refn->handle) &&
+    return (((!PVFS_handle_compare(cache_elem->refn.handle, refn->handle)) &&
              (cache_elem->refn.fs_id == refn->fs_id)) ? 1 : 0);
 }
 

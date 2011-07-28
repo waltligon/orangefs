@@ -472,7 +472,7 @@ static int ncache_compare_key_entry(void* key, struct qhash_head* link)
      *   - parent_ref.fs_id
      *   - entry_name length
      */
-    if( real_key->parent_ref.handle  != tmp_payload->parent_ref.handle ||
+    if( PVFS_handle_compare(real_key->parent_ref.handle, tmp_payload->parent_ref.handle) ||
         real_key->parent_ref.fs_id   != tmp_payload->parent_ref.fs_id  ||
         strlen(real_key->entry_name) != strlen(tmp_payload->entry_name) )
     {

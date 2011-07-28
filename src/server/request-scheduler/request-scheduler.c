@@ -472,7 +472,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
                 gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent I/O, handle: %llu\n", llu(handle));
+                             "concurrent I/O, handle: %s\n",
+			     PVFS_handle_to_str(handle));
             }
             else
             {
@@ -505,7 +506,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
                 gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent read only, handle: %llu\n", llu(handle));
+                             "concurrent read only, handle: %s\n",
+			     PVFS_handle_to_str(handle));
             }
             else
             {
@@ -525,8 +527,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             tmp_element->state = REQ_SCHEDULED;
             tmp_element->access_type = PINT_SERVER_REQ_READONLY;
             gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                         "concurrent dirent op, handle: %llu\n", 
-                         llu(handle));
+                         "concurrent dirent op, handle: %s\n", 
+                         PVFS_handle_to_str(handle));
             ret = 1;
         }
 	else
@@ -541,14 +543,14 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED POSTING, handle: %llu, queue_element: %p\n",
-                 llu(handle), tmp_element);
+		 "REQ SCHED POSTING, handle: %s, queue_element: %p\n",
+                 PVFS_handle_to_str(handle), tmp_element);
 
     if (ret == 1)
     {
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-		     llu(handle), tmp_element);
+                     "handle: %s, queue_element: %p\n",
+		     PVFS_handle_to_str(handle), tmp_element);
     }
     sched_count++;
     return (ret);
@@ -721,8 +723,8 @@ int PINT_req_sched_unpost(
 			{
 			    gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED "
-                                "allowing concurrent I/O, handle: %llu\n",
-                                llu(next_element->handle));
+                                "allowing concurrent I/O, handle: %s\n",
+                                PVFS_handle_to_str(next_element->handle));
 			    next_element->state = REQ_READY_TO_SCHEDULE;
 			    qlist_add_tail(&(next_element->ready_link),
 					   &ready_queue);
@@ -829,7 +831,7 @@ int PINT_req_sched_release(
                             gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG,
                                 "REQ SCHED allowing concurrent I/O (release time), "
-                                "handle: %llu\n", llu(next_element->handle));
+                                "handle: %s\n", PVFS_handle_to_str(next_element->handle));
                             assert(next_element->state == REQ_QUEUED);
                             next_element->state = REQ_READY_TO_SCHEDULE;
                             qlist_add_tail(
@@ -856,7 +858,7 @@ int PINT_req_sched_release(
                             gossip_debug(
                                 GOSSIP_REQ_SCHED_DEBUG,
                                 "REQ SCHED allowing concurrent read only (release time), "
-                                "handle: %llu\n", llu(next_element->handle));
+                                "handle: %s\n", PVFS_handle_to_str(next_element->handle));
                             assert(next_element->state == REQ_QUEUED);
                             next_element->state = REQ_READY_TO_SCHEDULE;
                             qlist_add_tail(
@@ -870,8 +872,8 @@ int PINT_req_sched_release(
     }
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED RELEASING, handle: %llu, queue_element: %p\n",
-		 llu(tmp_element->handle), tmp_element);
+		 "REQ SCHED RELEASING, handle: %s, queue_element: %p\n",
+		 PVFS_handle_to_str(tmp_element->handle), tmp_element);
 
     /* destroy the released request element */
     free(tmp_element);
@@ -924,8 +926,8 @@ int PINT_req_sched_test(
 	*out_count_p = 1;
 	*out_status = 0;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-                     llu(tmp_element->handle), tmp_element);
+                     "handle: %s, queue_element: %p\n",
+                     PVFS_handle_to_str(tmp_element->handle), tmp_element);
 
         PINT_req_sched_do_change_mode(tmp_element);
         return (1);
@@ -1018,9 +1020,9 @@ int PINT_req_sched_testsome(
 	    out_status_array[*inout_count_p] = 0;
 	    (*inout_count_p)++;
 	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-			 "REQ SCHED SCHEDULING, handle: %llu, "
+			 "REQ SCHED SCHEDULING, handle: %s, "
                          "queue_element: %p\n",
-			 llu(tmp_element->handle), tmp_element);
+			 PVFS_handle_to_str(tmp_element->handle), tmp_element);
             PINT_req_sched_do_change_mode(tmp_element);
 	}
 	else if(tmp_element->state == REQ_TIMING)
@@ -1126,8 +1128,8 @@ int PINT_req_sched_testworld(
 	(*inout_count_p)++;
 	gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		     "REQ SCHED SCHEDULING, "
-                     "handle: %llu, queue_element: %p\n",
-		     llu(tmp_element->handle), tmp_element);
+                     "handle: %s, queue_element: %p\n",
+		     PVFS_handle_to_str(tmp_element->handle), tmp_element);
         PINT_req_sched_do_change_mode(tmp_element);
     }
     if (*inout_count_p > 0)
@@ -1146,11 +1148,8 @@ static int hash_handle(
     void *handle,
     int table_size)
 {
-    /* TODO: update this later with a better hash function,
-     * depending on what handles look like, for now just modding
-     *
-     */
-    unsigned long tmp = 0;
+    
+    uint64_t tmp = 0;
     PVFS_handle real_handle;
     
     PVFS_handle_copy(real_handle, *(PVFS_handle *)handle);
@@ -1164,7 +1163,7 @@ static int hash_handle(
 
 /* hash_handle_compare()
  *
- * performs a comparison of a hash table entro to a given key
+ * performs a comparison of a hash table entry to a given key
  * (used for searching)
  *
  * returns 1 if match found, 0 otherwise

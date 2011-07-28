@@ -21,6 +21,7 @@ static str_list_p handle_buf_list = NULL;
    will be valid. If the buffer must be kept alive, it
    would be best to allocate your own memory and call
    PVFS_handle_unparse();  */ 
+/* Note: include gossip.h" to see this function */
 char *PVFS_handle_to_str(PVFS_handle handle)
 {
 

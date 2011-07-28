@@ -192,7 +192,7 @@ int dbpf_open_cache_get(
     {
        gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the used-list with the "
                   "remove flag set.\n");
-       gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
+       gossip_err("\t\thandle:%s\n",PVFS_handle_to_str(tmp_entry->handle));
        gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
     }
 
@@ -204,7 +204,7 @@ int dbpf_open_cache_get(
         {
            gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the UNused-list with the "
                       "remove flag set.\n");
-           gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
+           gossip_err("\t\thandle:%s\n",PVFS_handle_to_str(tmp_entry->handle));
            gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
         }
     }
@@ -427,7 +427,7 @@ int dbpf_open_cache_remove(
             gossip_err("DBPF_OPEN_CACHE_REMOVE:  BINGO! Entry found in the USED_list when trying to "
                         "remove from the UNused_list.\n");
             gossip_err("\t\tused_list entry:\n");
-            gossip_err("\t\t\t     handle:%llu\n",llu(tmp_entry->handle));
+            gossip_err("\t\t\t     handle:%s\n",PVFS_handle_to_str(tmp_entry->handle));
             gossip_err("\t\t\t     ref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
             gossip_err("\t\t\tremove-flag:%d\n",tmp_entry->remove_flag);
             switch(tmp_entry->type)
@@ -487,8 +487,8 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: unused entry.\n");
         if (tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_REMOVE: handle:%llu found in the UNused list with"
-                      " remove-flag turned on\n",llu(tmp_entry->handle));
+           gossip_err("DBPF_OPEN_CACHE_REMOVE: handle:%s found in the UNused list with"
+                      " remove-flag turned on\n",PVFS_handle_to_str(tmp_entry->handle));
         }
         tmp_entry->remove_flag = 0;
 	if (tmp_entry->fd > -1)
@@ -535,8 +535,8 @@ static int open_fd(
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_fd: opening fd %llu\n",
-                 llu(handle));
+                 "dbpf_open_cache open_fd: opening fd %s\n",
+                 PVFS_handle_to_str(handle));
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->data_path, coll_id, llu(handle));

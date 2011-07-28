@@ -10,6 +10,7 @@
 #include "cache.h"
 #include "ncac-job.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 static void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock);
 static void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock);
@@ -782,7 +783,8 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 	/* search the inode list with the index of "inode_index" */
 	inode = search_inode_list (handle);
 
-	fprintf(stderr, "handle: %lld, index: %d, inode:%p\n", lld(handle), inode_index, inode);
+	fprintf(stderr, "handle: %s, index: %d, inode:%p\n",
+			PVFS_handle_to_str(handle), inode_index, inode);
 
 	if ( NULL == inode ){
 		inode=(struct inode*)malloc(sizeof(struct inode));
