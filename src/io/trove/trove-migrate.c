@@ -14,12 +14,18 @@
 #include "trove-dbpf/dbpf.h"
 #include "pint-cached-config.h"
 #include "server-config-mgr.h"
+#include "dist-dir-utils.h"
 
 #undef DEBUG_MIGRATE_PERF
+
 
 /*
  * Macros
  */
+
+/* from src/io/trove/trove-dbpf/dbpf-keyval.c */
+#define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
+
 #define TROVE_DSPACE_WAIT(ret, coll_id, op_id,                  \
                           context_id, op_count, state, label)   \
     while (ret == 0)                                            \
@@ -43,12 +49,32 @@ op=%lld context=%lld count=%d state=%d\n",                      \
     }
 
 /*
+ * keyval struct and variables
+ */
+
+/** default size of buffers to use for reading old db keys */
+int DEF_KEY_SIZE = 4096;
+/** default size of buffers to use for reading old db values */
+int DEF_DATA_SIZE = 8192;
+
+/* dbpf_keyval_db_entry in 0.1.5, no type field */
+struct dbpf_keyval_db_entry_0_1_5
+{
+    TROVE_handle handle;
+    char key[DBPF_MAX_KEY_LENGTH];
+};
+
+
+/*
  * Prototypes
  */
 static int migrate_collection_0_1_3 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
 static int migrate_collection_0_1_4 (TROVE_coll_id coll_id,
+				     const char* data_path,
+				     const char* meta_path);
+static int migrate_collection_0_1_5 (TROVE_coll_id coll_id,
 				     const char* data_path,
 				     const char* meta_path);
 
@@ -75,6 +101,7 @@ struct migration_s migration_table[] =
 {
     { 0, 1, 3, migrate_collection_0_1_3 },
     { 0, 1, 4, migrate_collection_0_1_4 },
+    { 0, 1, 5, migrate_collection_0_1_5 },
     { 0, 0, 0, NULL }
 };
 
@@ -894,5 +921,551 @@ complete:
         free(addr_array);
     }
 
+    return ret;
+}
+
+
+/* copy from src/io/trove/trove-dbpf/dbpf-mgmt.c
+ *
+ * dbpf_db_open()
+ *
+ * Internal function for opening the databases that are used to store
+ * basic information on a storage region.
+ *
+ * Returns NULL on error, passing a trove error type back in the
+ * integer pointed to by error_p.
+ */
+static DB *dbpf_db_open(
+    char *dbname, DB_ENV *envp, int *error_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2),
+    uint32_t flags)
+{
+    int ret = -TROVE_EINVAL;
+    DB *db_p = NULL;
+
+    if ((ret = db_create(&db_p, envp, 0)) != 0)
+    {
+        *error_p = -dbpf_db_error_to_trove_error(ret);
+        return NULL;
+    }
+
+    db_p->set_errpfx(db_p, "TROVE:DBPF:Berkeley DB");
+
+    if(compare_fn)
+    {
+        db_p->set_bt_compare(db_p, compare_fn);
+    }
+
+    if (flags && (ret = db_p->set_flags(db_p, flags)) != 0)
+    {
+        db_p->err(db_p, ret, "%s: set_flags", dbname);
+        *error_p = -dbpf_db_error_to_trove_error(ret);
+        db_close(db_p);
+        return NULL;
+    }
+
+    if ((ret = db_open(db_p, dbname, TROVE_DB_OPEN_FLAGS, 0)) != 0) 
+    {
+        *error_p = -dbpf_db_error_to_trove_error(ret);
+        db_close(db_p);
+        return NULL;
+    }
+    return db_p;
+}
+
+
+/*
+ * write_distdir_keyvals_0_1_5
+ *
+ * internal function to write distdir keyvals for dir handle and dirdata handle
+ *
+ * given a DIRENT_ENTRY key of a directory handle, write dist_dir_struct
+ * to both directory handle and dirdata handle, currently set the number 
+ * of handles to just include the local dirdata handle. More dirdata handles
+ * will be added during first split.
+ *
+ */
+static int write_distdir_keyvals_0_1_5 (
+	TROVE_coll_id coll_id, 
+	TROVE_context_id context_id,
+	DBT key, 
+	DBT val,
+	TROVE_ds_attributes_s *dir_ds_attr_p)
+{
+    PVFS_handle		    dir_handle, dirdata_handle;
+    TROVE_ds_attributes_s   dirdata_ds_attr;
+    struct dbpf_keyval_db_entry_0_1_5 *k;
+    TROVE_ds_state	    state;
+    TROVE_op_id		    op_id;
+    int			    count, keyval_count;
+    int			    ret;
+
+    TROVE_keyval_s	    *key_a = NULL, *val_a = NULL;
+    PVFS_dist_dir_attr	    meta_dist_dir_attr;
+    PVFS_dist_dir_attr	    dirdata_dist_dir_attr;
+    PVFS_dist_dir_bitmap    dist_dir_bitmap = NULL;
+
+    k = key.data;
+    dir_handle = k->handle;
+    dirdata_handle = *(PVFS_handle *)val.data;
+
+    /* copy and set dirdata_ds_attr */
+    memcpy(&dirdata_ds_attr, dir_ds_attr_p, sizeof(TROVE_ds_attributes_s));
+    dirdata_ds_attr.type = PVFS_TYPE_DIRDATA;
+
+    ret = trove_dspace_setattr(
+	    coll_id, dirdata_handle, &dirdata_ds_attr, TROVE_SYNC, NULL,
+	    context_id, &op_id, NULL);
+    if (ret < 0)
+    {
+	gossip_err("trove_dspace_setattr failed: \
+		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+		ret, coll_id, llu(dirdata_handle), 
+		llu(context_id), llu(op_id));
+	goto complete;
+    }
+
+    TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
+	    count, state, complete);
+
+
+    /* write distdir keyvals to both dir_handle and dirdata_handle */
+
+    /* init meta_dis_dir_attr and dirdata_dist_dir_attr 
+     * num_servers=1 (will ask for more dirdata handles when split)
+     * both have server_no=0, where metadata is never used */
+    ret = PINT_init_dist_dir_state(&meta_dist_dir_attr,
+	    &dist_dir_bitmap, 1, 0, 1);
+    assert(ret == 0);
+    PINT_dist_dir_attr_copyto(dirdata_dist_dir_attr, meta_dist_dir_attr);
+
+    keyval_count = 3;
+    key_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
+    if(!key_a)
+    {
+	gossip_err("keyval space create failed.\n");
+	ret = -1;
+	goto complete;
+    }
+    memset(key_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
+
+    val_a = malloc(sizeof(TROVE_keyval_s) * keyval_count);
+    if(!val_a)
+    {
+	gossip_err("keyval space create failed.\n");
+	ret = -1;
+	goto complete;
+    }
+    memset(val_a, 0, sizeof(TROVE_keyval_s) * keyval_count);
+
+    /* set keyval for directory meta handle */
+    key_a[0].buffer = DIST_DIR_ATTR_KEYSTR;
+    key_a[0].buffer_sz = DIST_DIR_ATTR_KEYLEN;
+
+    val_a[0].buffer = &meta_dist_dir_attr;
+    val_a[0].buffer_sz =
+	sizeof(meta_dist_dir_attr);
+
+    key_a[1].buffer = DIST_DIRDATA_BITMAP_KEYSTR;
+    key_a[1].buffer_sz = DIST_DIRDATA_BITMAP_KEYLEN;
+
+    val_a[1].buffer_sz =
+	meta_dist_dir_attr.bitmap_size *  /* bitmap_size = 1 */
+	sizeof(PVFS_dist_dir_bitmap_basetype);
+    val_a[1].buffer = dist_dir_bitmap;
+
+    key_a[2].buffer = DIST_DIRDATA_HANDLES_KEYSTR;
+    key_a[2].buffer_sz = DIST_DIRDATA_HANDLES_KEYLEN;
+
+    val_a[2].buffer = &dirdata_handle; /* only one dirdata server */
+    val_a[2].buffer_sz = meta_dist_dir_attr.num_servers * 
+	sizeof(dirdata_handle);
+
+    /* write to directory meta handle keyval space */
+    ret = trove_keyval_write_list(
+	    coll_id, dir_handle, key_a, val_a, keyval_count,
+	    TROVE_SYNC, 0, NULL,
+	    context_id, &op_id, NULL);
+    if (ret < 0)
+    {
+	gossip_err("trove_keyval_write_list failed: \
+		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+		ret, coll_id, llu(dir_handle), 
+		llu(context_id), llu(op_id));
+	goto complete;
+    }
+
+    TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
+	    count, state, complete);
+
+    /* adjust dist_dir_attr val_a */
+    val_a[0].buffer = &dirdata_dist_dir_attr;
+
+    /* write to dirdata handle keyval space */
+    ret = trove_keyval_write_list(
+	    coll_id, dirdata_handle, key_a, val_a, keyval_count,
+	    TROVE_SYNC, 0, NULL,
+	    context_id, &op_id, NULL);
+    if (ret < 0)
+    {
+	gossip_err("trove_keyval_write_list failed: \
+		ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+		ret, coll_id, llu(dirdata_handle), 
+		llu(context_id), llu(op_id));
+	goto complete;
+    }
+
+    TROVE_DSPACE_WAIT(ret, coll_id, op_id, context_id, \
+	    count, state, complete);
+
+complete:
+
+    if (dist_dir_bitmap)
+    {
+	free(dist_dir_bitmap);
+    }
+
+    if(key_a)
+    {
+	free(key_a);
+    }
+
+    if(val_a)
+    {
+	free(val_a);
+    }
+
+    return ret;
+}
+
+
+/*
+ * migrate_collection_0_1_5
+ *   coll_id   - collection id
+ *   data_path - path to data storage
+ *   meta_path - path to metadata storage
+ *
+ * rename old keyval db and create new keyval db.
+ * For each keyval db entry, add a type field in the key structure. 
+ * add distributed directory structure for directory and dirdata handle
+ * only set as one dirdata handle, will expand when splitting dirents.
+ *
+ * \return 0 on success, non-zero on failure
+ */
+static int migrate_collection_0_1_5 (TROVE_coll_id coll_id, 
+				     const char* data_path,
+				     const char* meta_path)
+{
+
+    TROVE_context_id  context_id = PVFS_CONTEXT_NULL;
+    TROVE_ds_state    state;
+    TROVE_op_id       keyval_op_id;
+    TROVE_op_id       getattr_op_id;
+    TROVE_ds_attributes_s ds_attr;
+    int               op_count;
+    int               ret, ret_db;
+
+    struct dbpf_collection  *coll_p = NULL;
+    char	    keyval_db_name[PATH_MAX];
+    char	    old_keyval_db_name[PATH_MAX];
+    DB		    *db_p = NULL;
+    DBT		    key, data;
+    DBC		    *dbc_p = NULL;
+    struct dbpf_keyval_db_entry_0_1_5 *k;
+    TROVE_keyval_s  t_key, t_val;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s:enter.\n ", __func__);
+
+    /* rename old keyval db, create new one */
+    DBPF_GET_KEYVAL_DBNAME(keyval_db_name, PATH_MAX, meta_path, coll_id);
+    snprintf(old_keyval_db_name, PATH_MAX, "%s.old.1.5.0", keyval_db_name);
+
+    ret = access(old_keyval_db_name, F_OK);
+    if(ret == 0)
+    {
+	gossip_err("Error: %s already exist, please make sure the migration from "
+		"1.5.0 has not been performed!\n", old_keyval_db_name);
+	return -1;
+    }
+
+    /* close keyval db */
+    coll_p = dbpf_collection_find_registered(coll_id);
+
+    if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
+    {
+        gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    if ((ret = db_close(coll_p->keyval_db)) != 0) 
+    {
+        gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
+    }
+
+    /* rename old keyval db */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Renaming old keyval db.\n ");
+
+    ret = rename(keyval_db_name, old_keyval_db_name);
+    if(ret < 0)
+    {
+	gossip_err("%s: error when renaming keyval db.\n", 
+		__func__);
+	return ret;
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Creating new keyval db.\n ");
+
+    if ((ret = db_create(&db_p, NULL, 0)) != 0)
+    {
+        gossip_err("db_create: %s\n", db_strerror(ret));
+        return -1;
+    }
+    
+    if ((ret = db_open(db_p, keyval_db_name, TROVE_DB_CREATE_FLAGS, 
+		    TROVE_DB_MODE)) != 0)
+    {
+        db_p->err(db_p, ret, "%s", keyval_db_name);
+        db_close(db_p);
+        gossip_err("fail to create new keyval db: %s\n", keyval_db_name);
+        return -1;
+    }
+
+    if ((ret = db_close(db_p)) != 0)
+    {
+        gossip_err("close db: %s\n", db_strerror(ret));
+        return -1;
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Linking new keyval db.\n ");
+
+    coll_p->keyval_db = dbpf_db_open(keyval_db_name, coll_p->coll_env,
+                                     &ret, PINT_trove_dbpf_keyval_compare, 0);
+    if(coll_p->keyval_db == NULL)
+    {
+        return ret;
+    }
+
+    /* open old keyval db and make it ready for reading */
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Opening old 1.5.0 keyval db.\n ");
+
+    db_p = NULL;
+
+    ret = db_create(&db_p, NULL, 0);
+    if(ret != 0)
+    {
+        gossip_err("Error: db_create: %s.\n", db_strerror(ret));
+        return(-1);
+    }
+     
+    ret = db_open(db_p, old_keyval_db_name, TROVE_DB_OPEN_FLAGS, 0);
+
+    if(ret != 0)
+    {
+        gossip_err("Error: db_p->open: %s.\n", db_strerror(ret));
+        return(-1);
+    }
+
+    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
+    if (ret != 0)
+    {
+        gossip_err("Error: db_p->cursor: %s.\n", db_strerror(ret));
+        db_p->close(db_p, 0);
+        return(-1);
+    }
+
+    /* setup keys */
+
+    memset(&key, 0, sizeof(key));
+    key.data = malloc(DEF_KEY_SIZE);
+    if(!key.data)
+    {
+        gossip_err("malloc failed!\n");    
+        dbc_p->c_close(dbc_p);
+        db_p->close(db_p, 0);
+        return(-1);
+    }
+    key.size = key.ulen = DEF_KEY_SIZE;
+    key.flags |= DB_DBT_USERMEM;
+
+    memset(&data, 0, sizeof(data));
+    data.data = malloc(DEF_DATA_SIZE);
+    if(!data.data)
+    {
+        gossip_err("malloc failed!\n");    
+        free(key.data);
+        dbc_p->c_close(dbc_p);
+        db_p->close(db_p, 0);
+        return(-1);
+    }
+    data.size = data.ulen = DEF_DATA_SIZE;
+    data.flags |= DB_DBT_USERMEM;
+
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Opening trove context.\n ");
+
+    /* open trove context */
+    ret = trove_open_context(coll_id, &context_id);
+    if (ret < 0)
+    {
+        gossip_err("trove_open_context failed: ret=%d coll=%d\n",
+                   ret, coll_id);
+        goto complete;
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Iterate through each record in old db!.\n ");
+
+    int count_r = 0;
+
+    do
+    {
+        /* iterate through keys in the old keyval db */
+        ret_db = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+        if (ret_db != DB_NOTFOUND && ret_db != 0)
+        {
+            gossip_err("Error: dbc_p->c_get: %s.\n", db_strerror(ret_db));
+	    ret = -1;
+	    goto complete;
+        }
+        if(ret_db == 0)
+        {
+	    PVFS_handle cur_handle;
+            PVFS_ds_flags trove_flags = TROVE_SYNC;
+
+	    count_r++;
+
+	    gossip_debug(GOSSIP_TROVE_DEBUG, 
+		    " *** start processing #%d record.\n ", count_r);
+
+	    k = key.data;
+	    cur_handle = k->handle;
+
+	    if( key.size == 8 ) 
+	    {
+		/* the count record, no insertion */
+		continue;
+	    }
+
+	    /* get attributes to determine type */
+	    ret = trove_dspace_getattr(coll_id,
+		    cur_handle,
+		    &ds_attr,
+		    0,
+		    NULL,
+		    context_id,
+		    &getattr_op_id,
+		    PVFS_HINT_NULL); 
+	    if (ret < 0)
+	    {
+		gossip_err("trove_dspace_getattr failed: \
+			ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+			ret, coll_id, llu(cur_handle), 
+			llu(context_id), llu(getattr_op_id));
+		goto complete;
+	    }
+
+	    TROVE_DSPACE_WAIT(ret, coll_id, getattr_op_id, context_id, \
+		    op_count, state, complete);
+
+	    switch(ds_attr.type)
+	    {
+		case PVFS_TYPE_DIRDATA:
+		    trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+		    trove_flags |= TROVE_NOOVERWRITE;
+		    trove_flags |= TROVE_KEYVAL_DIRECTORY_ENTRY;
+		    break;
+		case PVFS_TYPE_INTERNAL:
+		    trove_flags |= TROVE_BINARY_KEY;
+		    trove_flags |= TROVE_NOOVERWRITE;
+		    trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+		    break;
+		case PVFS_TYPE_DIRECTORY:
+		    if(strncmp(k->key, DIRECTORY_ENTRY_KEYSTR,
+			DIRECTORY_ENTRY_KEYLEN) == 0)
+		    {
+			/* directory entry record, 
+			   insert distributed directory structure instead */
+			ret = write_distdir_keyvals_0_1_5(coll_id,
+				context_id, key, data, &ds_attr);
+			if(ret < 0)
+			{
+			    goto complete;
+			}
+
+			continue;
+		    }
+		default:
+		    /* other types ? */
+		    break;
+	    }
+
+	    /* init t_key and t_val */
+            memset(&t_key, 0, sizeof(t_key));
+            memset(&t_val, 0, sizeof(t_val));
+	    t_key.buffer = k->key;
+	    t_key.buffer_sz = key.size - 8; /* excluding the handle */
+	    t_val.buffer = data.data;
+	    t_val.buffer_sz = data.size;
+
+            /* write out new keyval pair */
+            state = 0;
+            ret = trove_keyval_write(
+                coll_id, cur_handle, &t_key, &t_val, trove_flags, 0, NULL,
+                context_id, &keyval_op_id, NULL);
+	    if (ret < 0)
+	    {
+		gossip_err("trove_keyval_write failed: \
+			ret=%d coll=%d handle=%llu context=%lld op=%lld\n",
+			ret, coll_id, llu(cur_handle), 
+			llu(context_id), llu(keyval_op_id));
+		goto complete;
+	    }
+
+	    TROVE_DSPACE_WAIT(ret, coll_id, keyval_op_id, context_id, \
+		    op_count, state, complete);
+
+        }
+    }while(ret_db != DB_NOTFOUND);
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Iterate done, totally %d records.\n ", count_r);
+
+    /* success */
+
+complete:
+
+    /* close db, close trove context, cleanup */
+
+    if (context_id != PVFS_CONTEXT_NULL)
+    {
+        int rc = trove_close_context(coll_id, context_id);
+        if (rc < 0)
+        {
+            ret = rc;
+            gossip_err("trove_close_context failed: ret=%d coll=%d \
+context=%lld\n",
+                       ret, coll_id, llu(context_id));
+        }
+    }
+
+    if(dbc_p != NULL)
+    {
+	dbc_p->c_close(dbc_p);
+    }
+
+    if(db_p != NULL)
+    {
+	db_p->close(db_p, 0);
+    }
+
+    if(data.data != NULL)
+    {
+	free(data.data);
+    }
+
+    if(key.data != NULL)
+    {
+	free(key.data);
+    }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s:exit.\n ", __func__);
     return ret;
 }

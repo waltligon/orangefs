@@ -23,10 +23,8 @@
 
 /*****
 mgmt_create_root_dir.sm:
-1. enters admin mode.
-2. allocate dirdata servers for root directory.
-3. enters normal mode.
-4. create lost+found directory under the root directory.
+1. allocate dirdata handles for root directory.
+2. create lost+found directory under the root directory.
 *****/
 
 enum
@@ -56,28 +54,10 @@ machine pvfs2_mgmt_create_root_dir_sm
     state check_for_request
     {
         run mgmt_create_root_dir_check_for_request;
-/*
-        NO_REQ => change_to_admin_mode; 
-*/
         NO_REQ => create_dist_dir_struct; 
         default => cleanup_noreq;    
     }
 
-/*
-    state change_to_admin_mode
-    {
-        run mgmt_create_root_dir_change_to_admin_mode;
-        success => admin_response_release;
-        default => cleanup_noreq;
-    }
-
-    state admin_response_release
-    {
-        run mgmt_create_root_dir_response_release;
-        default => create_dist_dir_struct;
-    }
-*/
-   
     state create_dist_dir_struct
     {
         run mgmt_create_root_dir_create_dist_dir_struct;
@@ -122,29 +102,9 @@ machine pvfs2_mgmt_create_root_dir_sm
     state write_keyval_to_meta_handle
     {
         run mgmt_create_root_dir_write_keyval_to_meta_handle;
-/*
-        success => change_to_normal_mode;
-*/
         success => mkdir_lost_and_found_setup_msgpair;
         default => cleanup_noreq;
     }
-
-
-/*
-    state change_to_normal_mode
-    {
-        run mgmt_create_root_dir_change_to_normal_mode;
-        success => normal_response_release;
-        default => cleanup_noreq;
-    }
-
-    state normal_response_release
-    {
-        run mgmt_create_root_dir_response_release;
-        success => mkdir_lost_and_found_setup_msgpair;
-        default => cleanup_noreq;
-    }
-*/
 
     state mkdir_lost_and_found_setup_msgpair
     {
@@ -231,39 +191,9 @@ static PINT_sm_action mgmt_create_root_dir_check_for_request(
     return SM_ACTION_COMPLETE;
 }
 
-#if 0
-/*
- * Function: mgmt_create_root_dir_change_to_admin_mode
- * Params:   server_op *b,
- *           job_status_s *js_p
- *
- * Returns:  int
- *
- * Synopsis: Moves the server into admin mode
- */
-static PINT_sm_action mgmt_create_root_dir_change_to_admin_mode(
-    struct PINT_smcb *smcb, 
-    job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
 
-    assert(s_op);
-
-    js_p->error_code = 0;
-    ret = job_req_sched_change_mode( PVFS_SERVER_ADMIN_MODE, NULL,
-                                     0, js_p, &s_op->scheduled_id, 
-                                     server_job_context);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
-    return ret;
-}
-#endif
-
-
-
-/* init dist_dir_struct in s_op->attr.u.dir and s_op->u.mgmt_create_root_dir */
+/* init dist_dir_struct in s_op->attr.u.dir and 
+ * s_op->u.mgmt_create_root_dir */
 static PINT_sm_action mgmt_create_root_dir_create_dist_dir_struct(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -498,7 +428,7 @@ static PINT_sm_action mgmt_create_root_dir_remote_dirdata_attr_and_keyval_setup_
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "mgmt-create-root-dir state: send_remote_dir_data\n");
 
-    /* !!! set dirdata attr, set all the static component */
+    /* set dirdata attr, set all the static component */
     memset(&attr, 0, sizeof(PVFS_object_attr));
     attr.owner = getuid();
     attr.group = getgid();
@@ -626,79 +556,6 @@ static PINT_sm_action mgmt_create_root_dir_write_keyval_to_meta_handle(
 
     return ret;
 }
-
-
-
-
-
-
-#if 0
-
-/*
- * Function: mgmt_create_root_dir_change_to_normal_mode
- * Params:   server_op *b,
- *           job_status_s *js_p
- *
- * Returns:  int
- *
- * Synopsis: Moves the server into normal mode
- */
-static PINT_sm_action mgmt_create_root_dir_change_to_normal_mode(
-    struct PINT_smcb *smcb, 
-    job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
-    assert(s_op);
-
-    js_p->error_code = 0;
-    ret = job_req_sched_change_mode( PVFS_SERVER_NORMAL_MODE, NULL,
-                                     0, js_p, &s_op->scheduled_id, 
-                                     server_job_context);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
-    return ret;
-}
-
-/*
- * Function: mgmt_create_root_dir_response_release
- *
- * Params:   server_op *b,
- *           job_status_s *js_p
- *
- * Returns:  int
- *
- * Synopsis: release the operation from the request scheduler 
- *           (from final-response.sm)
- *
- */
-static PINT_sm_action mgmt_create_root_dir_response_release( struct PINT_smcb *smcb, 
-                                                      job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
-    job_id_t tmp_id;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
-
-    /* catch cases in which the operation has not been scheduled */
-    if (!s_op->scheduled_id)
-    {
-        js_p->error_code = 0;
-        return SM_ACTION_COMPLETE;
-    }
-
-    ret = job_req_sched_release( s_op->scheduled_id, smcb, 0, js_p, 
-                                 &tmp_id, server_job_context);
-
-    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: exit\n", __func__);
-    return ret;
-}
-#endif
 
 
 static PINT_sm_action mgmt_create_root_dir_mkdir_lost_and_found_setup_msgpair(
@@ -957,11 +814,6 @@ static PINT_sm_action mgmt_create_root_dir_cleanup_noreq( struct PINT_smcb *smcb
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: enter\n", __func__);
 
     assert(s_op);
-
-    /* this ensures that we succeeded in getting this mirror made. if
-     * we failed we will be in admin mode (unless we didn't get in admin
-     * mode) but the sm will still error out. */
-    //assert( PINT_req_sched_get_mode() == PVFS_SERVER_NORMAL_MODE );
 
     if(s_op->key_a)
     {

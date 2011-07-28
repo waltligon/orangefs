@@ -29,6 +29,14 @@
 /* from src/io/trove/trove-dbpf/dbpf-keyval.c and include/pvfs2-types.h */
 #define DBPF_MAX_KEY_LENGTH 256
 
+/* from src/io/trove/trove-dbpf/dbpf.h */
+enum dbpf_key_type
+{
+    DBPF_DIRECTORY_ENTRY_TYPE = 'd',
+    DBPF_ATTRIBUTE_TYPE = 'a',
+    DBPF_COUNT_TYPE = 'c'
+};
+
 /* from src/io/trove/trove-dbpf/dbpf-keyval.c */
 struct dbpf_keyval_db_entry
 {
@@ -282,7 +290,6 @@ void print_keyval( DBT key, DBT val )
     uint64_t vh, kh;
     uint32_t vi;
 
-
     k = key.data;
     printf("(%llu)", llu(k->handle));
     printf("(%c)", k->type);
@@ -290,7 +297,8 @@ void print_keyval( DBT key, DBT val )
     {
         printf("()(%d) -> ", key.size);
     }
-    else if( key.size == 17 )
+    else if( key.size == 17 && 
+        (k->type != DBPF_DIRECTORY_ENTRY_TYPE))
     {
         kh = *(uint64_t *)k->key;
         printf("(%llu)(%d) -> ", llu(kh), key.size);

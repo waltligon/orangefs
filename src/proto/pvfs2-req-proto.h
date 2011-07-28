@@ -97,11 +97,6 @@ enum PVFS_server_op
     ((x) == PVFS_SERV_MGMT_SETPARAM \
   || (x) == PVFS_SERV_MGMT_REMOVE_OBJECT \
   || (x) == PVFS_SERV_MGMT_REMOVE_DIRENT)
-/*
-  || (x) == PVFS_SERV_MGMT_CREATE_ROOT_DIR \
-  || (x) == PVFS_SERV_TREE_SETATTR \
-)
-*/
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length

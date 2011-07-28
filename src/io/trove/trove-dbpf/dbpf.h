@@ -30,7 +30,7 @@ extern "C" {
  * Major versions aren't either, but refer to architectural storage format changes.
  */
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.1.5"   
+#define TROVE_DBPF_VERSION_VALUE                                  "0.1.6"   
 
 #define LAST_HANDLE_STRING                                  "last_handle"
 

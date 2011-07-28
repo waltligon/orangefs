@@ -355,8 +355,8 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
-    /* we have to go in to admin mode to take care of creating the root
-     * directory (distdir) and making the lost+found directory if needed */
+    /* we have to take care of creating the distributed root
+     * directory and making the lost+found directory if needed */
     ret = server_check_if_root_directory_created();
     if (ret < 0)
     {
