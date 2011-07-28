@@ -21,3 +21,138 @@
 // The argument it accepts must be a handle to the Installer database.
     
 /* export prototype MyFunction(HWND); */
+
+//---------------------------------------------------------------------------
+// OnBegin
+//
+// The OnBegin event is called directly by the framework after the setup
+// initializes.
+//---------------------------------------------------------------------------
+function OnBegin()
+begin
+	// TO DO: you may change default non-UI setting, for example
+	//
+	// You may also perform your custom initialization steps, check requirements, etc.
+end;
+//---------------------------------------------------------------------------
+// OnFirstUIBefore
+//
+// The OnFirstUIBefore event is called by the framework when the setup is
+// running in first install mode. By default this event displays UI allowing
+// the end user to specify installation parameters.
+//---------------------------------------------------------------------------
+function OnFirstUIBefore()
+    NUMBER nResult, nSetupType, nvSize, nUser;
+    STRING szTitle, szMsg, szQuestion, svName, svCompany, szFile;
+    STRING szLicenseFile;
+	BOOL bCustom, bIgnore1, bIgnore2;
+begin	
+    // TO DO: if you want to enable background, window title, and caption bar title                                                                   
+    // SetTitle( @PRODUCT_NAME, 24, WHITE );                                        
+    // SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION ); 	                  
+    // Enable( FULLWINDOWMODE );						   
+    // Enable( BACKGROUND );							  
+    // SetColor(BACKGROUND,RGB (0, 128, 128));					   
+
+    // Added in InstallShield 15 - Show an appropriate error message if
+    // -removeonly is specified and the product is not installed.
+    if( REMOVEONLY ) then
+        Disable( DIALOGCACHE );
+		szMsg = SdLoadString( IDS_IFX_ERROR_PRODUCT_NOT_INSTALLED_UNINST );
+   		SdSubstituteProductInfo( szMsg );
+		MessageBox( szMsg, SEVERE );
+		abort;
+    endif;
+    
+	nSetupType = TYPICAL;	
+
+Dlg_SdWelcome:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SdWelcome(szTitle, szMsg);
+    if (nResult = BACK) goto Dlg_SdWelcome;
+	
+	szTitle   = "";
+	svName    = "";
+    svCompany = "";
+/*
+Dlg_SdRegisterUser:
+    szMsg = "";
+    szTitle = "";
+    nResult = SdRegisterUser( szTitle, szMsg, svName, svCompany );
+    if (nResult = BACK) goto Dlg_SdWelcome;
+*/
+Dlg_SetupType:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SetupType2(szTitle, szMsg, "", nSetupType, 0);
+    if (nResult = BACK) then
+        goto Dlg_SdWelcome;
+    else
+	    nSetupType = nResult;
+        if (nSetupType != CUSTOM) then
+	        nvSize = 0;
+	        FeatureCompareSizeRequired(MEDIA, INSTALLDIR, nvSize);
+	        if (nvSize != 0) then      
+            	MessageBox(szSdStr_NotEnoughSpace, WARNING);
+	            goto Dlg_SetupType;
+            endif;
+			bCustom = FALSE;
+			goto Dlg_SdStartCopy;
+		else
+			bCustom = TRUE;
+        endif;
+    endif;    
+
+Dlg_SdAskDestPath:    	
+    nResult = SdAskDestPath(szTitle, szMsg, INSTALLDIR, 0);
+    if (nResult = BACK) goto Dlg_SetupType;
+
+Dlg_SdFeatureTree: 
+    szTitle    = "";
+    szMsg      = "";
+    if (nSetupType = CUSTOM) then
+		nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+		if (nResult = BACK) goto Dlg_SdAskDestPath;  
+    endif;
+
+Dlg_SdStartCopy:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SdStartCopy2( szTitle, szMsg );			
+	
+    if (nResult = BACK) then
+       goto Dlg_SdFeatureTree;
+    endif;
+
+    // Added in IS 2009 - Set appropriate StatusEx static text.
+    SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_FIRSTUI ) );
+
+    // setup default status
+    Enable(STATUSEX);
+ 
+    return 0;
+end;
+//---------------------------------------------------------------------------
+// OnFirstUIAfter
+//
+// The OnFirstUIAfter event called by the framework after the file transfer
+// of the setup when the setup is running in first install mode. By default
+// this event displays UI that informs the end user that the setup has been
+// completed successfully.
+//---------------------------------------------------------------------------
+function OnFirstUIAfter()
+    STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2;
+    NUMBER bOpt1, bOpt2;
+begin
+	Disable(STATUSEX);
+
+	bOpt1   = FALSE;
+    bOpt2   = FALSE;    
+
+    if ( BATCH_INSTALL ) then
+    	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
+    else
+	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
+	endif;
+end;
