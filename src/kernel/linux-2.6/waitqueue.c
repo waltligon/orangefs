@@ -176,6 +176,8 @@ void pvfs2_clean_up_interrupted_operation(
     */
     if( !op )
     {
+        gossip_debug(GOSSIP_WAIT_DEBUG, "%s: op is null, ignoring\n",
+                     __func__);
         return;
     }
 
@@ -184,6 +186,8 @@ void pvfs2_clean_up_interrupted_operation(
     if( ! (op_state_waiting(op) || op_state_in_progress(op) || 
            op_state_serviced(op) || op_state_purged(op)) )
     {
+        gossip_debug(GOSSIP_WAIT_DEBUG, "%s: op %p not in a valid state (%0x), "
+                     "ignoring\n", __func__, op, op->op_state);
         return;
     }
 
