@@ -381,12 +381,10 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "cancel_op_in_progress called\n");
 
-    hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)(&tag));
+    hash_link = qhash_search( s_ops_in_progress_table, (void *)(&tag));
     if (hash_link)
     {
-        vfs_request = qhash_entry(
-            hash_link, vfs_request_t, hash_link);
+        vfs_request = qhash_entry( hash_link, vfs_request_t, hash_link);
         assert(vfs_request);
         assert(vfs_request->info.tag == tag);
 
@@ -426,12 +424,11 @@ static int is_op_in_progress(vfs_request_t *vfs_request)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "is_op_in_progress called on "
                  "tag %lld\n", lld(vfs_request->info.tag));
 
-    hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)(&vfs_request->info.tag));
+    hash_link = qhash_search( s_ops_in_progress_table, 
+                              (void *)(&vfs_request->info.tag));
     if (hash_link)
     {
-        tmp_request = qhash_entry(
-            hash_link, vfs_request_t, hash_link);
+        tmp_request = qhash_entry( hash_link, vfs_request_t, hash_link);
         assert(tmp_request);
 
         op_found = ((tmp_request->info.tag == vfs_request->info.tag) &&

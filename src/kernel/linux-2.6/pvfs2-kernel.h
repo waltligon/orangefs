@@ -758,7 +758,7 @@ int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
 int wait_for_cancellation_downcall(
     pvfs2_kernel_op_t * op);
-void clean_up_interrupted_operation(
+void pvfs2_clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op);
 void purge_waiting_ops(void);
 

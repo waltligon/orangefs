@@ -2414,7 +2414,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * htable_in_progress or from the req list
          * as the case may be.
          */
-        clean_up_interrupted_operation(op);
+        gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation aio_cancel "
+                     "(tag %lld, op %p)\n", __func__, lld(op->tag), op);
+        pvfs2_clean_up_interrupted_operation(op);
         /* 
          * However, we need to make sure that 
          * the client daemon is not transferring data

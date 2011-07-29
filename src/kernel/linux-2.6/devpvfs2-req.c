@@ -129,6 +129,7 @@ static ssize_t pvfs2_devreq_read(
              */
             else {
                 cur_op = op;
+                spin_lock(&cur_op->lock);
                 list_del(&cur_op->list);
                 cur_op->op_linger_tmp--;
                 /* if there is a trailer, re-add it to the request list */
@@ -142,6 +143,7 @@ static ssize_t pvfs2_devreq_read(
                     /* readd it to the head of the list */
                     list_add(&cur_op->list, &pvfs2_request_list);
                 }
+                spin_unlock(&cur_op->lock);
                 break;
             }
         }
