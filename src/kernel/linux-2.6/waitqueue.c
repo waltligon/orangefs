@@ -181,7 +181,7 @@ void pvfs2_clean_up_interrupted_operation(
 
     /* one more sanity check, make sure it's in one of the possible states
      * or don't try to cancel it */
-    if( ! (op_state_waiting(op) || op_state_inprogress(op) || 
+    if( ! (op_state_waiting(op) || op_state_in_progress(op) || 
            op_state_serviced(op) || op_state_purged(op)) )
     {
         return;
