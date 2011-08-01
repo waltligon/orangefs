@@ -283,7 +283,7 @@ do {                                                                         \
 #elif defined(REG_RIP)
 #  define REG_INSTRUCTION_POINTER REG_RIP
 #else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#  error Unknown instruction pointer location for your architecture, configure with --disable-segv-backtrace.
 #endif
 
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)

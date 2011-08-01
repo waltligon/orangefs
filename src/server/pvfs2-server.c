@@ -1228,7 +1228,7 @@ static int server_setup_signal_handlers(void)
 #elif defined(REG_RIP)
 #  define REG_INSTRUCTION_POINTER REG_RIP
 #else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#  error Unknown instruction pointer location for your architecture, configure with --disable-segv-backtrace.
 #endif
 
 /* bt_signalhandler()
