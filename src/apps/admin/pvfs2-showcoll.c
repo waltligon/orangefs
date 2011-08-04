@@ -19,6 +19,7 @@
 #include "trove.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
+#include <pvfs2-handle-to-str.h>
 
 /* declare the strnlen prototype */
 size_t strnlen(const char *s, size_t limit);
@@ -315,8 +316,8 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08llx/%llu (dspace_getattr output: type = %s, b_size = %lld)\n",
-	    llu(handle),llu(handle),
+	    "\t0x%08llx/%s (dspace_getattr output: type = %s, b_size = %lld)\n",
+	    llu(handle),PVFS_handle_to_str(handle),
 	    type_to_string(ds_attr.type),
 	    (ds_attr.type == PVFS_TYPE_DATAFILE) ? lld(ds_attr.u.datafile.b_size) : 0);
 
@@ -396,9 +397,9 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 
     while (count > 0) {
 	int opcount;
-        printf("%s:calling trove_keyval_iterate for %llu.\n"
+        printf("%s:calling trove_keyval_iterate for %s.\n"
               ,__func__
-              ,llu(handle));
+              ,PVFS_handle_to_str(handle));
 	ret = trove_keyval_iterate(coll_id,
 				   handle,
 				   &pos,
@@ -451,7 +452,7 @@ static void print_datafile_handles(PVFS_handle *h_p,
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t0x%08llx(%llu)", llu(h_p[i]), llu(h_p[i]));
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t0x%08llx(%s)", llu(h_p[i]), PVFS_handle_to_str(h_p[i]));
 
     if (i == 10) fprintf(stdout, "...\n");
     else fprintf(stdout, "\n");
@@ -497,13 +498,13 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx(%llu)\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx(%s)\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		val_printable ? (char *) val_p->buffer : "",
 		val_p->read_sz,
 		llu(*(TROVE_handle *) val_p->buffer),
-                llu(*(TROVE_handle *) val_p->buffer));
+                PVFS_handle_to_str(*(TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,

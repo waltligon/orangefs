@@ -540,10 +540,10 @@ static PVFS_error post_lookup_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a lookup request for %s (fsid %d | parent %llu)\n",
+        "Got a lookup request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.lookup.d_name,
         vfs_request->in_upcall.req.lookup.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.lookup.parent_refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.lookup.parent_refn.handle));
 
     /* get rank from pid */
     fill_hints(&hints, vfs_request);
@@ -575,10 +575,10 @@ static PVFS_error post_create_request(vfs_request_t *vfs_request)
     
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a create request for %s (fsid %d | parent %llu)\n",
+        "Got a create request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.create.d_name,
         vfs_request->in_upcall.req.create.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.create.parent_refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.create.parent_refn.handle));
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_create(
@@ -604,10 +604,10 @@ static PVFS_error post_symlink_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a symlink request from %s (fsid %d | parent %llu) to %s\n",
+        "Got a symlink request from %s (fsid %d | parent %s) to %s\n",
         vfs_request->in_upcall.req.sym.entry_name,
         vfs_request->in_upcall.req.sym.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.sym.parent_refn.handle),
+        PVFS_handle_to_str(vfs_request->in_upcall.req.sym.parent_refn.handle),
         vfs_request->in_upcall.req.sym.target);
 
     fill_hints(&hints, vfs_request);
@@ -635,9 +635,9 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
     
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a getattr request for fsid %d | handle %llu\n",
+        "got a getattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.getattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.getattr.refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.getattr.refn.handle));
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_getattr(
@@ -662,9 +662,9 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a setattr request for fsid %d | handle %llu [mask %d]\n",
+        "got a setattr request for fsid %d | handle %s [mask %d]\n",
         vfs_request->in_upcall.req.setattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.setattr.refn.handle),
+        PVFS_handle_to_str(vfs_request->in_upcall.req.setattr.refn.handle),
         vfs_request->in_upcall.req.setattr.attributes.mask);
 
     fill_hints(&hints, vfs_request);
@@ -690,9 +690,9 @@ static PVFS_error post_remove_request(vfs_request_t *vfs_request)
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a remove request for %s under fsid %d and "
-        "handle %llu\n", vfs_request->in_upcall.req.remove.d_name,
+        "handle %s\n", vfs_request->in_upcall.req.remove.d_name,
         vfs_request->in_upcall.req.remove.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.remove.parent_refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.remove.parent_refn.handle));
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_remove(
@@ -716,10 +716,10 @@ static PVFS_error post_mkdir_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "Got a mkdir request for %s (fsid %d | parent %llu)\n",
+        "Got a mkdir request for %s (fsid %d | parent %s)\n",
         vfs_request->in_upcall.req.mkdir.d_name,
         vfs_request->in_upcall.req.mkdir.parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.mkdir.parent_refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.mkdir.parent_refn.handle));
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_mkdir(
@@ -744,8 +744,8 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
     PVFS_hint hints;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdir request "
-                 "for %llu,%d (token %llu)\n",
-                 llu(vfs_request->in_upcall.req.readdir.refn.handle),
+                 "for %s,%d (token %llu)\n",
+                 PVFS_handle_to_str(vfs_request->in_upcall.req.readdir.refn.handle),
                  vfs_request->in_upcall.req.readdir.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdir.token));
 
@@ -772,8 +772,8 @@ static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
     PVFS_error ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
-                 "for %llu,%d (token %llu)\n",
-                 llu(vfs_request->in_upcall.req.readdirplus.refn.handle),
+                 "for %s,%d (token %llu)\n",
+                 PVFS_handle_to_str(vfs_request->in_upcall.req.readdirplus.refn.handle),
                  vfs_request->in_upcall.req.readdirplus.refn.fs_id,
                  llu(vfs_request->in_upcall.req.readdirplus.token));
 
@@ -802,13 +802,13 @@ static PVFS_error post_rename_request(vfs_request_t *vfs_request)
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got a rename request for %s under fsid %d and "
-        "handle %llu to be %s under fsid %d and handle %llu\n",
+        "handle %s to be %s under fsid %d and handle %s\n",
         vfs_request->in_upcall.req.rename.d_old_name,
         vfs_request->in_upcall.req.rename.old_parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.rename.old_parent_refn.handle),
+        PVFS_handle_to_str(vfs_request->in_upcall.req.rename.old_parent_refn.handle),
         vfs_request->in_upcall.req.rename.d_new_name,
         vfs_request->in_upcall.req.rename.new_parent_refn.fs_id,
-        llu(vfs_request->in_upcall.req.rename.new_parent_refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.rename.new_parent_refn.handle));
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_rename(
@@ -833,9 +833,9 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     PVFS_hint hints;
     
     gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %llu under "
+        GOSSIP_CLIENTCORE_DEBUG, "Got a truncate request for %s under "
         "fsid %d to be size %lld\n",
-        llu(vfs_request->in_upcall.req.truncate.refn.handle),
+        PVFS_handle_to_str(vfs_request->in_upcall.req.truncate.refn.handle),
         vfs_request->in_upcall.req.truncate.refn.fs_id,
         lld(vfs_request->in_upcall.req.truncate.size));
 
@@ -861,9 +861,9 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a getxattr request for fsid %d | handle %llu\n",
+        "got a getxattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.getxattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.getxattr.refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.getxattr.refn.handle));
 
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.getxattr.key;
@@ -925,9 +925,9 @@ static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a setxattr request for fsid %d | handle %llu\n",
+        "got a setxattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.setxattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.setxattr.refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.setxattr.refn.handle));
 
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.setxattr.keyval.key;
@@ -968,9 +968,9 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a removexattr request for fsid %d | handle %llu\n",
+        "got a removexattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.removexattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.removexattr.refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.removexattr.refn.handle));
 
     /* We need to fill in the vfs_request->key field here */
     vfs_request->key.buffer = vfs_request->in_upcall.req.removexattr.key;
@@ -1004,9 +1004,9 @@ static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
     
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
-        "got a listxattr request for fsid %d | handle %llu\n",
+        "got a listxattr request for fsid %d | handle %s\n",
         vfs_request->in_upcall.req.listxattr.refn.fs_id,
-        llu(vfs_request->in_upcall.req.listxattr.refn.handle));
+        PVFS_handle_to_str(vfs_request->in_upcall.req.listxattr.refn.handle));
 
     if (vfs_request->in_upcall.req.listxattr.requested_count < 0
             || vfs_request->in_upcall.req.listxattr.requested_count > PVFS_MAX_XATTR_LISTLEN)
@@ -1676,9 +1676,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
                 }
 
                 gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, "[%llu,%d] checking"
+                    GOSSIP_MMAP_RCACHE_DEBUG, "[%s,%d] checking"
                     " for %d bytes at offset %lu\n",
-                    llu(vfs_request->in_upcall.req.io.refn.handle),
+                    PVFS_handle_to_str(vfs_request->in_upcall.req.io.refn.handle),
                     vfs_request->in_upcall.req.io.refn.fs_id,
                     (int)vfs_request->in_upcall.req.io.count,
                     (unsigned long)vfs_request->in_upcall.req.io.offset);
@@ -1995,8 +1995,8 @@ static PVFS_error service_mmap_ra_flush_request(
     vfs_request_t *vfs_request)
 {
     gossip_debug(
-        GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %llu, %d\n",
-        llu(vfs_request->in_upcall.req.ra_cache_flush.refn.handle),
+        GOSSIP_MMAP_RCACHE_DEBUG, "Flushing mmap-racache elem %s, %d\n",
+        PVFS_handle_to_str(vfs_request->in_upcall.req.ra_cache_flush.refn.handle),
         vfs_request->in_upcall.req.ra_cache_flush.refn.fs_id);
 
     pvfs2_mmap_ra_cache_flush(
@@ -2041,8 +2041,8 @@ static PVFS_error post_fsync_request(vfs_request_t *vfs_request)
     PVFS_hint hints;
     
     gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %llu,%d\n",
-        llu(vfs_request->in_upcall.req.fsync.refn.handle),
+        GOSSIP_CLIENTCORE_DEBUG, "Got a flush request for %s,%d\n",
+        PVFS_handle_to_str(vfs_request->in_upcall.req.fsync.refn.handle),
         vfs_request->in_upcall.req.fsync.refn.fs_id);
 
     fill_hints(&hints, vfs_request);
@@ -2521,8 +2521,8 @@ static inline void package_downcall_members(
                 }
                     
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                             "FS mount got root handle %llu on fs id %d\n",
-                             llu(root_handle), vfs_request->mntent->fs_id);
+                             "FS mount got root handle %s on fs id %d\n",
+                             PVFS_handle_to_str(root_handle), vfs_request->mntent->fs_id);
 
                 vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
                 vfs_request->out_downcall.status = 0;

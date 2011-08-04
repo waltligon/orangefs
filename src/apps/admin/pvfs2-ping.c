@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
+    printf("\n   Root handle: %s\n", PVFS_handle_to_str(resp_lookup.ref.handle));
 
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     PVFS_handle_copy(param_value.u.handle_value, resp_lookup.ref.handle);

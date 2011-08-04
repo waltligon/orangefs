@@ -160,7 +160,7 @@ PVFS_error PVFS_isys_readdir(
     sm_p->readdir.dirent_limit = sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
-                 "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
+                 "%s on fs %d\n", PVFS_handle_to_str(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -247,9 +247,9 @@ static PINT_sm_action readdir_msg_setup_msgpair(
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%d | token is session(%llu), count(%llu) |"
+        GOSSIP_READDIR_DEBUG, "%s|%d | token is session(%llu), count(%llu) |"
                               "limit is %d\n",
-        llu(sm_p->object_ref.handle),
+        PVFS_handle_to_str(sm_p->object_ref.handle),
         sm_p->object_ref.fs_id,
         llu(sm_p->readdir.pos_token.session),
         llu(sm_p->readdir.pos_token.count),

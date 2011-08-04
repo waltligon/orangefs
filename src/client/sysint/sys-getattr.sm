@@ -314,8 +314,8 @@ static PINT_sm_action getattr_acache_lookup(
     assert(!PVFS_handle_is_null(object_ref.handle));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %llu fsid %d\n",
-      __func__, llu(object_ref.handle), object_ref.fs_id);
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %s fsid %d\n",
+      __func__, PVFS_handle_to_str(object_ref.handle), object_ref.fs_id);
 
    
     /* The sys attr mask request is converted to object
@@ -329,8 +329,8 @@ static PINT_sm_action getattr_acache_lookup(
     if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
-                    " [%llu]\n",
-                      llu(object_ref.handle));
+                    " [%s]\n",
+                      PVFS_handle_to_str(object_ref.handle));
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
     }
@@ -343,8 +343,8 @@ static PINT_sm_action getattr_acache_lookup(
     if(ret < 0 || attr_status < 0)
     {
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
-                    " [%llu]\n",
-                      llu(object_ref.handle));
+                    " [%s]\n",
+                      PVFS_handle_to_str(object_ref.handle));
   
         js_p->error_code = GETATTR_ACACHE_MISS;
         return SM_ACTION_COMPLETE;
@@ -422,7 +422,7 @@ static PINT_sm_action getattr_acache_lookup(
     {
         /* nothing's missing, a hit! */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                     "[%llu]\n", llu(object_ref.handle));
+                     "[%s]\n", PVFS_handle_to_str(object_ref.handle));
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -453,7 +453,7 @@ static PINT_sm_action getattr_acache_lookup(
 
             js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
-                         "[%llu]\n", llu(object_ref.handle));
+                         "[%s]\n", PVFS_handle_to_str(object_ref.handle));
             return SM_ACTION_COMPLETE;
         }
     }
@@ -464,8 +464,8 @@ static PINT_sm_action getattr_acache_lookup(
      */
     PINT_free_object_attr(&sm_p->getattr.attr);
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache miss due to mask: "
-        " [%llu]\n",
-          llu(object_ref.handle));
+        " [%s]\n",
+          PVFS_handle_to_str(object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return SM_ACTION_COMPLETE;
@@ -802,9 +802,9 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
     if (ret)
     {
-        gossip_lerr("Unable to map server address for this handle(%llu) and "
+        gossip_lerr("Unable to map server address for this handle(%s) and "
                     "filesystem(%d)\n"
-                   ,llu(msg_p->handle)
+                   ,PVFS_handle_to_str(msg_p->handle)
                    ,msg_p->fs_id);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -871,11 +871,11 @@ static int getattr_datafile_getattr_comp_fn(
            *just retrieved.
           */
           getattr->size_array[server_nr] = resp_p->u.tree_get_file_size.size[i];
-          gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: size[%d]:%lld \thandle:%llu\n"
+          gossip_debug(GOSSIP_GETATTR_DEBUG,"%s: size[%d]:%lld \thandle:%s\n"
                                          ,__func__
                                          ,i
                                          ,llu(getattr->size_array[i])
-                                         ,llu(tree->handle_array[i]));
+                                         ,PVFS_handle_to_str(tree->handle_array[i]));
        }/*end for*/
     }
     else
@@ -1091,9 +1091,9 @@ static PINT_sm_action getattr_datafile_getattr_retry(
                                           ,msg->fs_id);
     if (ret)
     {
-        gossip_lerr("Unable to determine server address for handle(%llu) and "
+        gossip_lerr("Unable to determine server address for handle(%s) and "
                     "file system(%d).\n"
-                   ,llu(msg->handle)
+                   ,PVFS_handle_to_str(msg->handle)
                    ,msg->fs_id);
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;

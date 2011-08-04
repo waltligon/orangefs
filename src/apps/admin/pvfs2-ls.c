@@ -20,6 +20,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include <pvfs2-handle-to-str.h>
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -122,8 +123,8 @@ do {                                                        \
           on base dirs, but I'm not sure it's worth it      \
         */                                                  \
         if (opts->list_inode && !opts->list_long) {         \
-            printf("%llu .\n",llu(refn.handle));              \
-            printf("%llu .. (faked)\n",llu(refn.handle));     \
+            printf("%s .\n",PVFS_handle_to_str(refn.handle));              \
+            printf("%s .. (faked)\n",PVFS_handle_to_str(refn.handle));     \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
@@ -270,7 +271,7 @@ void print_entry_attr(
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,16,"%llu ",llu(handle));
+        snprintf(scratch_inode,16,"%s ",PVFS_handle_to_str(handle));
         inode = scratch_inode;
     }
 
@@ -423,7 +424,7 @@ void print_entry(
     {
         if (opts->list_inode)
         {
-            printf("%llu %s\n", llu(handle), entry_name);
+            printf("%s %s\n", PVFS_handle_to_str(handle), entry_name);
         }
         else
         {
@@ -449,8 +450,8 @@ void print_entry(
                 &credentials, &getattr_response, NULL);
             if (ret)
             {
-                fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
-                    llu(handle),fs_id);
+                fprintf(stderr,"Failed to get attributes on handle %s,%d\n",
+                    PVFS_handle_to_str(handle),fs_id);
                 PVFS_perror("Getattr failure", ret);
                 return;
             }

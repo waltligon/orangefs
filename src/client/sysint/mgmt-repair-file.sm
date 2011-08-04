@@ -241,8 +241,8 @@ PVFS_error PVFS_imgmt_repair_file(
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
-        object_name, llu(parent_ref.handle), parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Creating file %s under %s, %d\n",
+        object_name, PVFS_handle_to_str(parent_ref.handle), parent_ref.fs_id);
           
     return PINT_client_state_machine_post(
         smcb, op_id, user_ptr);

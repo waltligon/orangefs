@@ -278,8 +278,8 @@ PVFS_error PVFS_isys_create(
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
-        object_name, llu(parent_ref.handle), parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Creating file %s under %s, %d\n",
+        object_name, PVFS_handle_to_str(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -392,8 +392,8 @@ static int create_comp_fn(void *v_p,
     sm_p->u.create.stuffed = resp_p->u.create.stuffed;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
-        llu(sm_p->u.create.metafile_handle));
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %s\n",
+        PVFS_handle_to_str(sm_p->u.create.metafile_handle));
 
     return 0;
 }
@@ -494,11 +494,11 @@ static PINT_sm_action create_crdirent_setup_msgpair(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create: %s: posting crdirent req: parent handle: %llu, "
-                 "name: %s, handle: %llu\n",
+                 "create: %s: posting crdirent req: parent handle: %s, "
+                 "name: %s, handle: %s\n",
                  __func__,
-                 llu(sm_p->object_ref.handle), sm_p->u.create.object_name,
-                 llu(sm_p->u.create.metafile_handle));
+                 PVFS_handle_to_str(sm_p->object_ref.handle), sm_p->u.create.object_name,
+                 PVFS_handle_to_str(sm_p->u.create.metafile_handle));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -1004,7 +1004,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->comp_fn = create_delete_handles_comp_fn;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                         "metafile handle %llu\n", llu(msg_p->handle));
+                         "metafile handle %s\n", PVFS_handle_to_str(msg_p->handle));
         }
         else
         {
@@ -1021,7 +1021,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
             msg_p->comp_fn = create_delete_handles_comp_fn;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                         "datafile handle %llu\n", llu(msg_p->handle));
+                         "datafile handle %s\n", PVFS_handle_to_str(msg_p->handle));
         }
     }
     ret = PINT_serv_msgpairarray_resolve_addrs(&sm_p->msgarray_op);

@@ -191,8 +191,8 @@ PVFS_error PVFS_isys_remove(
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %llu,%d\n",
-        object_name, llu(parent_ref.handle), parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %s,%d\n",
+        object_name, PVFS_handle_to_str(parent_ref.handle), parent_ref.fs_id);
 
     /* NOTE: This state machine previously multiplied the default job timeout
      * by five to allow for potentially long sync delays.  We instead now set
@@ -277,8 +277,8 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(
         sm_p->hints);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-                 "under %llu,%d\n", sm_p->u.remove.object_name,
-                 llu(sm_p->parent_ref.handle),
+                 "under %s,%d\n", sm_p->u.remove.object_name,
+                 PVFS_handle_to_str(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -325,11 +325,11 @@ static PINT_sm_action remove_crdirent_setup_msgpair(
         sm_p->parent_ref.fs_id,
         sm_p->hints);
 
-    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%llu,%d) "
-                 "under %llu,%d\n", sm_p->u.remove.object_name,
-                 llu(sm_p->object_ref.handle),
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%s,%d) "
+                 "under %s,%d\n", sm_p->u.remove.object_name,
+                 PVFS_handle_to_str(sm_p->object_ref.handle),
                  sm_p->object_ref.fs_id,
-                 llu(sm_p->parent_ref.handle),
+                 PVFS_handle_to_str(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -372,8 +372,8 @@ static int remove_rmdirent_comp_fn(
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  remove_rmdirent_comp_fn: metafile handle = %llu\n",
-            llu(sm_p->object_ref.handle));
+            "  remove_rmdirent_comp_fn: metafile handle = %s\n",
+            PVFS_handle_to_str(sm_p->object_ref.handle));
     }
     return resp_p->status;
 }
@@ -491,9 +491,9 @@ static PINT_sm_action remove_crdirent_retry_or_fail(
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
 
-    gossip_err("Error: failed to replace directory during remove recovery: entry %s for object %llu.\n",
+    gossip_err("Error: failed to replace directory during remove recovery: entry %s for object %s.\n",
         sm_p->u.remove.object_name,
-        llu(sm_p->object_ref.handle));
+        PVFS_handle_to_str(sm_p->object_ref.handle));
     PVFS_perror_gossip("crdirent", js_p->error_code);
 
     PRINT_REMOVE_WARNING();

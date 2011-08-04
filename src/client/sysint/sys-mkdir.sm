@@ -211,8 +211,8 @@ PVFS_error PVFS_isys_mkdir(
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent_ref.handle);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
-                 "under parent handle %llu on fs %d\n", object_name,
-                 llu(parent_ref.handle), parent_ref.fs_id);
+                 "under parent handle %s on fs %d\n", object_name,
+                 PVFS_handle_to_str(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -311,8 +311,8 @@ static int mkdir_msg_comp_fn(void *v_p,
     PINT_acache_update(sm_p->object_ref, &attr, NULL);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",
-        llu(sm_p->u.mkdir.metafile_handle));
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %s\n",
+        PVFS_handle_to_str(sm_p->u.mkdir.metafile_handle));
 
     return 0;
 }
@@ -410,10 +410,10 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%llu) under "
-                 "parent handle %llu\n", sm_p->u.mkdir.object_name,
-                 llu(sm_p->u.mkdir.metafile_handle),
-                 llu(sm_p->object_ref.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%s) under "
+                 "parent handle %s\n", sm_p->u.mkdir.object_name,
+                 PVFS_handle_to_str(sm_p->u.mkdir.metafile_handle),
+                 PVFS_handle_to_str(sm_p->object_ref.handle));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -499,7 +499,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
     msg_p->svr_addr = metafile_server_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "directory handle %llu\n", llu(msg_p->handle));
+                 "directory handle %s\n", PVFS_handle_to_str(msg_p->handle));
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

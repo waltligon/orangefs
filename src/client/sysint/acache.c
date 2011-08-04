@@ -318,8 +318,8 @@ int PINT_acache_get_cached_entry(
     struct static_payload* tmp_static_payload;
     int status;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%s\n",
+                 PVFS_handle_to_str(refn.handle));
   
     /* assume everything is timed out for starters */
     *attr_status = -PVFS_ETIME;
@@ -333,8 +333,8 @@ int PINT_acache_get_cached_entry(
     if(ret < 0 || status != 0)
     {
         PINT_perf_count(static_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss static: H=%llu\n",
-                     llu(refn.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss static: H=%s\n",
+                     PVFS_handle_to_str(refn.handle));
         tmp_static_payload = NULL;
     }
     else
@@ -348,8 +348,8 @@ int PINT_acache_get_cached_entry(
     if(ret < 0 || status != 0)
     {
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss non-static: H=%llu\n",
-                     llu(refn.handle));
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss non-static: H=%s\n",
+                     PVFS_handle_to_str(refn.handle));
         tmp_payload = NULL;
     }
     else
@@ -454,9 +454,9 @@ int PINT_acache_get_cached_entry(
     gen_mutex_unlock(&acache_mutex);
   
     gossip_debug(GOSSIP_ACACHE_DEBUG, 
-                 "acache: hit: H=%llu, "
+                 "acache: hit: H=%s, "
                  "size_status=%d, attr_status=%d\n",
-                 llu(refn.handle), *size_status, *attr_status);
+                 PVFS_handle_to_str(refn.handle), *size_status, *attr_status);
   
     if(*size_status == 0 || *attr_status == 0)
     {
@@ -477,8 +477,8 @@ void PINT_acache_invalidate(
     struct PINT_tcache_entry* tmp_entry;
     int tmp_status;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate(): H=%s\n",
+                 PVFS_handle_to_str(refn.handle));
   
     gen_mutex_lock(&acache_mutex);
   
@@ -528,8 +528,8 @@ void PINT_acache_invalidate_size(
     struct acache_payload* tmp_payload;
     int tmp_status;
   
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate_size(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalidate_size(): H=%s\n",
+                 PVFS_handle_to_str(refn.handle));
   
     gen_mutex_lock(&acache_mutex);
 
@@ -581,8 +581,8 @@ int PINT_acache_update(
         return(0);
     }
     
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): H=%llu\n",
-                 llu(refn.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): H=%s\n",
+                 PVFS_handle_to_str(refn.handle));
   
     if(!attr && !size)
     {

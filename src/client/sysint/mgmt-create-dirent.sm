@@ -106,8 +106,8 @@ PVFS_error PVFS_imgmt_create_dirent(
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Trying to create dirent %s under %llu,%d\n",
-        sm_p->u.mgmt_create_dirent.entry, llu(parent_ref.handle),
+        GOSSIP_CLIENT_DEBUG, "Trying to create dirent %s under %s,%d\n",
+        sm_p->u.mgmt_create_dirent.entry, PVFS_handle_to_str(parent_ref.handle),
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
@@ -175,10 +175,10 @@ static int mgmt_create_dirent_setup_msgpair(
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, " creating dirent entry %s with "
-        "handle %llu under parent %llu,%d\n",
+        "handle %s under parent %s,%d\n",
         sm_p->u.mgmt_create_dirent.entry,
-        llu(sm_p->u.mgmt_create_dirent.entry_handle),
-        llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+        PVFS_handle_to_str(sm_p->u.mgmt_create_dirent.entry_handle),
+        PVFS_handle_to_str(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -220,9 +220,9 @@ static int mgmt_create_dirent_comp_fn(
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  mgmt_create_dirent_comp_fn: dirent %s under %llu,%d "
+            "  mgmt_create_dirent_comp_fn: dirent %s under %s,%d "
             "created\n", sm_p->u.mgmt_create_dirent.entry,
-            llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+            PVFS_handle_to_str(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
     }
     return resp_p->status;
 }

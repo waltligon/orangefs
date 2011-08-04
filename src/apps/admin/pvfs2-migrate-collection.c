@@ -1161,8 +1161,8 @@ static int translate_dspace_attr_0_0_1(
             tmp_handle = ((PVFS_handle*)key.data);
             tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
 
-            if(verbose) printf("VERBOSE Migrating attributes for handle: %llu, type: %d\n", 
-                llu(*tmp_handle), (int)tmp_attr->type);
+            if(verbose) printf("VERBOSE Migrating attributes for handle: %s, type: %d\n", 
+                PVFS_handle_to_str(*tmp_handle), (int)tmp_attr->type);
 
             state = 0;
             ret = trove_dspace_create(
@@ -1357,7 +1357,7 @@ static int translate_keyval_db_0_0_1(
     TROVE_keyval_s t_val;
 
     if(verbose) 
-        printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
+        printf("VERBOSE Migrating keyvals for handle: %s\n", PVFS_handle_to_str(handle));
 
     ret = db_create(&dbp, NULL, 0);
     if(ret != 0)

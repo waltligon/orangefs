@@ -15,6 +15,7 @@
 #include "pvfs2.h"
 #include "mkspace.h"
 #include "pvfs2-internal.h"
+#include <pvfs2-handle-to-str.h>
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -208,7 +209,7 @@ static void print_options(options_t *opts)
                (opts->delete_storage ? "yes" : "no"));
         printf("\t   verbose             : %s\n",
                (opts->verbose ? "ON" : "OFF"));
-        printf("\t   root handle         : %llu\n", llu(opts->root_handle));
+        printf("\t   root handle         : %s\n", PVFS_handle_to_str(opts->root_handle));
         printf("\t   collection-only mode: %s\n",
                (opts->collection_only ? "ON" : "OFF"));
         printf("\t   collection id       : %d\n", opts->coll_id);

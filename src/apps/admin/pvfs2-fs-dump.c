@@ -475,15 +475,15 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     if (getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY)
     {
 	fprintf(stderr, "Cannot traverse object at "
-                "%llu,%d (Not a Valid Directory)\n",
-                llu(pref.handle), pref.fs_id);
+                "%s,%d (Not a Valid Directory)\n",
+                PVFS_handle_to_str(pref.handle), pref.fs_id);
         return -1;
     }
 
     if (handlelist_find_handle(pref.handle, &server_idx) < 0)
     {
-        printf("Handle %llu appears to be missing; skipping!\n",
-               llu(pref.handle));
+        printf("Handle %s appears to be missing; skipping!\n",
+               PVFS_handle_to_str(pref.handle));
         return -1;
     }
 
@@ -538,16 +538,16 @@ int descend(PVFS_fs_id cur_fs,
                              creds,
                              &getattr_resp, NULL)) != 0)
             {
-                printf("Could not get attributes of handle %llu [%d]\n",
-                        llu(cur_handle), ret);
+                printf("Could not get attributes of handle %s [%d]\n",
+                        PVFS_handle_to_str(cur_handle), ret);
                 continue;
             }
 
 
             if (handlelist_find_handle(cur_handle, &server_idx) < 0)
             {
-                printf("Handle %llu appears to be missing; skipping!\n",
-                       llu(cur_handle));
+                printf("Handle %s appears to be missing; skipping!\n",
+                       PVFS_handle_to_str(cur_handle));
                 continue;
             }
 
@@ -625,8 +625,8 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 	ret = handlelist_find_handle(df_handles[i], &server_idx);
 	if (ret != 0)
 	{
-            printf("Datafile Handle %llu appears to be missing; "
-                   "skipping!\n", llu(df_handles[i]));
+            printf("Datafile Handle %s appears to be missing; "
+                   "skipping!\n", PVFS_handle_to_str(df_handles[i]));
             continue;
 	}
 
@@ -675,28 +675,28 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
             if (dot_fmt && getattr_resp.attr.objtype != PVFS_TYPE_INTERNAL &&
                 getattr_resp.attr.objtype != PVFS_TYPE_DATAFILE)
             {
-                printf("\tH%llu [shape=record, color=red, label = \"{(unknown) "
-                       "| %llu (%d)}\"];\n",
-                       llu(handle),
-                       llu(handle),
+                printf("\tH%s [shape=record, color=red, label = \"{(unknown) "
+                       "| %s (%d)}\"];\n",
+                       PVFS_handle_to_str(handle),
+                       PVFS_handle_to_str(handle),
                        server_idx);
             }
             else if(!dot_fmt)
             {
                 if(getattr_resp.attr.objtype == PVFS_TYPE_INTERNAL)
-                    fmt_string = "\t%s: %llu (server internal use)\n";
+                    fmt_string = "\t%s: %s (server internal use)\n";
                 else if(getattr_resp.attr.objtype == PVFS_TYPE_DATAFILE)
-                    fmt_string = "\t%s: %llu (datafile, probably preallocated)\n";
+                    fmt_string = "\t%s: %s (datafile, probably preallocated)\n";
                 else if(getattr_resp.attr.objtype == PVFS_TYPE_METAFILE)
-                    fmt_string = "\t%s: %llu (metafile, probably preallocated)\n";
+                    fmt_string = "\t%s: %s (metafile, probably preallocated)\n";
                 else
-                    fmt_string = "\t%s: %llu (unknown)\n";
+                    fmt_string = "\t%s: %s (unknown)\n";
 
                 printf(fmt_string,
                        PVFS_mgmt_map_addr(cur_fs,
                                           creds,
                                           addr_array[server_idx]),
-                       llu(handle));
+                       PVFS_handle_to_str(handle));
             }
         }
     }
@@ -884,15 +884,15 @@ static void print_root_entry(PVFS_handle handle,
 {
     if (dot_fmt)
     {
-	printf("\tH%llu [shape = record, fillcolor = grey, style = filled, label = \"{/ | %llu (%d)}\"];\n",
-	       llu(handle),
-	       llu(handle),
+	printf("\tH%s [shape = record, fillcolor = grey, style = filled, label = \"{/ | %s (%d)}\"];\n",
+	       PVFS_handle_to_str(handle),
+	       PVFS_handle_to_str(handle),
 	       server_idx);
     }
     else
     {
-	printf("File: <Root>\n  handle = %llu, type = %s, server = %d\n",
-	       llu(handle),
+	printf("File: <Root>\n  handle = %s, type = %s, server = %d\n",
+	       PVFS_handle_to_str(handle),
 	       get_type_str(PVFS_TYPE_DIRECTORY),
 	       server_idx);
     }
@@ -921,21 +921,21 @@ static void print_entry(char *name,
     if (dot_fmt)
     {
 	/* always show connector */
-	printf("\tH%llu -> H%llu [style = bold];\n",
-	       llu(parent_handle),
-	       llu(handle));
+	printf("\tH%s -> H%s [style = bold];\n",
+	       PVFS_handle_to_str(parent_handle),
+	       PVFS_handle_to_str(handle));
 	switch (objtype) {
 	    case PVFS_TYPE_DIRECTORY:
-		printf("\tH%llu [shape = record, fillcolor = grey, style = filled, label = \"{%s/ | %llu (%d)}\"];\n",
-		       llu(handle), name, llu(handle), server_idx);
+		printf("\tH%s [shape = record, fillcolor = grey, style = filled, label = \"{%s/ | %s (%d)}\"];\n",
+		       PVFS_handle_to_str(handle), name, PVFS_handle_to_str(handle), server_idx);
 		break;
 	    case PVFS_TYPE_METAFILE:
-		printf("\tH%llu [shape = record, fillcolor = aquamarine, style = filled, label = \"{%s | %llu (%d)}\"];\n",
-		       llu(handle), name, llu(handle), server_idx);
+		printf("\tH%s [shape = record, fillcolor = aquamarine, style = filled, label = \"{%s | %s (%d)}\"];\n",
+		       PVFS_handle_to_str(handle), name, PVFS_handle_to_str(handle), server_idx);
 		break;
 	    case PVFS_TYPE_DATAFILE:
-		printf("\tH%llu [shape = ellipse, fillcolor = violet, style = filled, label =\"%llu (%d)\"];\n",
-		       llu(handle), llu(handle), server_idx);
+		printf("\tH%s [shape = ellipse, fillcolor = violet, style = filled, label =\"%s (%d)\"];\n",
+		       PVFS_handle_to_str(handle), PVFS_handle_to_str(handle), server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
 		break;
@@ -950,15 +950,15 @@ static void print_entry(char *name,
 	switch (objtype)
         {
 	    case PVFS_TYPE_DATAFILE:
-		printf("  handle = %llu, type = %s, server = %d\n",
-		       llu(handle),
+		printf("  handle = %s, type = %s, server = %d\n",
+		       PVFS_handle_to_str(handle),
 		       get_type_str(objtype),
 		       server_idx);
 		break;
 	    default:
-		printf("File: %s\n  handle = %llu, type = %s, server = %d\n",
+		printf("File: %s\n  handle = %s, type = %s, server = %d\n",
                        name,
-		       llu(handle),
+		       PVFS_handle_to_str(handle),
 		       get_type_str(objtype),
 		       server_idx);
 		break;

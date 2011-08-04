@@ -292,10 +292,10 @@ PVFS_error PVFS_isys_rename(
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &old_parent_ref.handle);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%llu,%d]\n\t"
-        "to %s (under [%llu,%d])\n", old_entry,
-        llu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
-        llu(new_parent_ref.handle), new_parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%s,%d]\n\t"
+        "to %s (under [%s,%d])\n", old_entry,
+        PVFS_handle_to_str(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
+        PVFS_handle_to_str(new_parent_ref.handle), new_parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -414,8 +414,8 @@ static int rename_lookups_comp_fn(
     if (index == 0)
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu\n",
-            llu(sm_p->u.rename.refns[index].handle));
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %s\n",
+            PVFS_handle_to_str(sm_p->u.rename.refns[index].handle));
     }
     else
     {
@@ -510,8 +510,8 @@ static int rename_chdirent_comp_fn(
     PVFS_handle_copy(sm_p->u.rename.old_dirent_handle, 
                      resp_p->u.chdirent.old_dirent_handle);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %llu\n",
-                 llu(sm_p->u.rename.old_dirent_handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %s\n",
+                 PVFS_handle_to_str(sm_p->u.rename.old_dirent_handle));
 
     return 0;
 }
@@ -734,7 +734,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest attr mask: %d\n", (int)attr->mask);
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename dest handle %llu\n", llu(sm_p->object_ref.handle));
+                 "rename dest handle %s\n", PVFS_handle_to_str(sm_p->object_ref.handle));
     }
 
     /* if the destination is a directory, is it empty? */
@@ -859,9 +859,9 @@ static PINT_sm_action rename_cleanup(
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
             "rename state: updating ncache with entry [%s] "
-            "ref.handle=%llu ref.fsid=%d\n",
+            "ref.handle=%s ref.fsid=%d\n",
             sm_p->u.rename.entries[1],
-            llu(sm_p->u.rename.refns[0].handle),
+            PVFS_handle_to_str(sm_p->u.rename.refns[0].handle),
             sm_p->u.rename.parent_refns[1].fs_id);
 
         PINT_ncache_update((const char*) sm_p->u.rename.entries[1],

@@ -177,7 +177,7 @@ PVFS_error PVFS_isys_readdirplus(
     sm_p->u.readdirplus.handles = NULL;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdirplus on handle "
-                 "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
+                 "%s on fs %d\n", PVFS_handle_to_str(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         smcb, op_id, user_ptr);
