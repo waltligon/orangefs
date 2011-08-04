@@ -22,6 +22,8 @@
     
 /* export prototype MyFunction(HWND); */
 
+prototype InstallServices();
+
 //---------------------------------------------------------------------------
 // OnBegin
 //
@@ -132,7 +134,42 @@ Dlg_SdStartCopy:
     Enable(STATUSEX);
  
     return 0;
+end;                    
+    
+function InstallServices()
+    NUMBER rc, line, error;
+    STRING file, errText;
+begin
+    if (!ServiceExistsService("DokanMounter")) then
+        rc = ServiceAddService("DokanMounter",
+                               "DokanMounter",
+                               "OrangeFS/Dokan driver interface service",
+                               PROGRAMFILES + "\\Dokan\\DokanLibrary\\mounter.exe",
+                               TRUE,
+                               "");
+        if (rc < ISERR_SUCCESS) then
+            GetExtendedErrInfo(file, line, error);
+            Sprintf(errText, " (%d)", error);
+            MessageBox("DokanMounter service installation failed:\n" +
+                        FormatMessage(error) + errText, SEVERE);
+        endif;
+    endif;
+    if (!ServiceExistsService("orangefs-client")) then
+        rc = ServiceAddService("orangefs-client",
+                               "OrangeFS Client",
+                               "Allows transparent access to Orange file systems.",
+                               INSTALLDIR + "\\orangefs-client -service",
+                               FALSE,
+                               "");
+        if (rc < ISERR_SUCCESS) then
+            GetExtendedErrInfo(file, line, error);
+            Sprintf(errText, " (%d)", error);
+            MessageBox("OrangeFS Client service installation failed:\n" +
+                        FormatMessage(error) + errText, SEVERE);
+        endif;
+    endif;
 end;
+                        
 //---------------------------------------------------------------------------
 // OnFirstUIAfter
 //
@@ -148,7 +185,9 @@ begin
 	Disable(STATUSEX);
 
 	bOpt1   = FALSE;
-    bOpt2   = FALSE;    
+    bOpt2   = FALSE;
+    
+    InstallServices();    
 
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
