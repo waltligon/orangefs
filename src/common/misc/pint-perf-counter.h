@@ -116,6 +116,8 @@ char* PINT_perf_generate_text(
         struct PINT_perf_counter* pc,
         int max_size);
 
+void PINT_free_pc (struct PINT_perf_counter *pc);
+
 #endif /* __PINT_PERF_COUNTER_H */
 
 /*

@@ -20,8 +20,6 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 
-/* declare the strnlen prototype */
-size_t strnlen(const char *s, size_t limit);
 
 static char data_path[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char meta_path[PATH_MAX] = "/tmp/pvfs2-test-space";
