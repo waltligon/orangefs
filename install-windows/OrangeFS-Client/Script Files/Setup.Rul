@@ -22,7 +22,15 @@
     
 /* export prototype MyFunction(HWND); */
 
-prototype InstallServices();
+prototype InstallServices(); 
+prototype InstallDriver();
+
+// global variables
+
+// 64-bit flag
+BOOL bIs64Bit;
+// Program Files and System directories for appropriate architecture
+STRING szProgramFilesDir, szSystemDir;
 
 //---------------------------------------------------------------------------
 // OnBegin
@@ -32,9 +40,15 @@ prototype InstallServices();
 //---------------------------------------------------------------------------
 function OnBegin()
 begin
-	// TO DO: you may change default non-UI setting, for example
-	//
-	// You may also perform your custom initialization steps, check requirements, etc.
+    // Set directory locations based on architecture (32/64-bit)
+    bIs64Bit = SYSINFO.bIsWow64;
+    if (bIs64Bit) then
+        szProgramFilesDir = PROGRAMFILES64;
+        szSystemDir = WINSYSDIR64;
+    else
+        szProgramFilesDir = PROGRAMFILES;
+        szSystemDir = WINSYSDIR;
+    endif;
 end;
 //---------------------------------------------------------------------------
 // OnFirstUIBefore
@@ -135,7 +149,15 @@ Dlg_SdStartCopy:
  
     return 0;
 end;                    
+
+function InstallDriver()
+    STRING svExePath;
+begin                                                 
+    svExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
     
+    LaunchAppAndWait(svExePath, "/i d", LAAW_OPTION_WAIT);
+end;    
+
 function InstallServices()
     NUMBER rc, line, error;
     STRING file, errText;
@@ -144,28 +166,30 @@ begin
         rc = ServiceAddService("DokanMounter",
                                "DokanMounter",
                                "OrangeFS/Dokan driver interface service",
-                               PROGRAMFILES + "\\Dokan\\DokanLibrary\\mounter.exe",
+                               szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\mounter.exe",
                                TRUE,
                                "");
         if (rc < ISERR_SUCCESS) then
             GetExtendedErrInfo(file, line, error);
             Sprintf(errText, " (%d)", error);
             MessageBox("DokanMounter service installation failed:\n" +
-                        FormatMessage(error) + errText, SEVERE);
+                        FormatMessage(error) + errText + " " +
+                        szProgramFilesDir + "\\Dokan\\DokanLibrary\\mounter.exe", SEVERE);
         endif;
     endif;
     if (!ServiceExistsService("orangefs-client")) then
         rc = ServiceAddService("orangefs-client",
                                "OrangeFS Client",
                                "Allows transparent access to Orange file systems.",
-                               INSTALLDIR + "\\orangefs-client -service",
+                               INSTALLDIR ^ "\\orangefs-client -service",
                                FALSE,
                                "");
         if (rc < ISERR_SUCCESS) then
             GetExtendedErrInfo(file, line, error);
             Sprintf(errText, " (%d)", error);
             MessageBox("OrangeFS Client service installation failed:\n" +
-                        FormatMessage(error) + errText, SEVERE);
+                        FormatMessage(error) + errText + " " +
+                        INSTALLDIR + "\\orangefs-client -service", SEVERE);
         endif;
     endif;
 end;
@@ -187,7 +211,9 @@ begin
 	bOpt1   = FALSE;
     bOpt2   = FALSE;
     
-    InstallServices();    
+    InstallServices();
+    
+    InstallDriver();    
 
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
