@@ -1688,7 +1688,7 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     }
     if (obj_mask & PVFS_ATTR_DATA_SIZE)
     {
-        sys_mask |= PVFS_ATTR_DATA_SIZE;
+        sys_mask |= PVFS_ATTR_SYS_SIZE;
     }
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
@@ -1713,6 +1713,11 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
+    }
+
+    if (obj_mask & PVFS_ATTR_DIR_DISTDIR_ATTR)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DISTDIR_ATTR;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed

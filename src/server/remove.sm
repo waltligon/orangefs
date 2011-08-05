@@ -58,8 +58,6 @@
  * 7) cleanup
  *
  *
- * A directory that never had entries will skip step (5), as there
- * would be no dirdata dspace.
  */
 
 #define PVFS_REMOVE_ITERATE_MAXCOUNT 100
@@ -138,9 +136,6 @@ nested machine pvfs2_remove_dirdata_handles_work_sm
     state rebuild_dirdata_handle_remote
     {
         run remove_rebuild_dirdata_handle_remote;
-/*
-        success => write_dirdata_keyval;
-*/
         success => remote_dirdata_keyval_setup_msgpair;
         default => remove_dirdata_handles_cleanup;
     }
@@ -483,7 +478,7 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "remove: no DIST_DIR_ATTR key present in directory meta handle!!\n");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "remove: no DIST_DIR_ATTR key present in directory meta handle!!\n");
         attr_p->u.dir.dist_dir_bitmap = NULL;
         attr_p->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;

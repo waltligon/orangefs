@@ -26,6 +26,12 @@ machine pvfs2_pjmp_set_attr_work_sm
     state pjmp_set_attr_work_initialize
     {
         run pjmp_initialize;
+        default => pjmp_call_prelude_sm;
+    }
+    
+    state pjmp_call_prelude_sm
+    {
+        jump pvfs2_prelude_sm;
         default => pjmp_call_set_attr_work_sm;
     }
 

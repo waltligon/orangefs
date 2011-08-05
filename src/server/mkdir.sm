@@ -62,9 +62,6 @@ nested machine pvfs2_mkdir_work_sm
     state fill_handles_to_dist_dir_struct
     {
         run mkdir_fill_handles_to_dist_dir_struct;
-/*
-        default => write_keyval_to_meta_handle;
-*/
         default => remote_dirdata_attr_and_keyval_setup_msgpair;
     }
 

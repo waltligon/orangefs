@@ -13,16 +13,62 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "pint-cached-config.h"
 #include "dist-dir-utils.h"
 
 enum
 {
     STATE_METAFILE = 7,
     STATE_SYMLINK = 8,
-    STATE_DIRDATA = 9
+    STATE_DIRDATA = 9,
+    STATE_DIRECTORY = 10
 };
 
 %%
+
+nested machine pvfs2_set_dirdata_attr_work_sm
+{
+
+    state set_dirdata_attr_init
+    {
+        run setattr_set_dirdata_attr_init;
+        default => get_dist_dir_attr;
+    }
+
+    state get_dist_dir_attr
+    {
+        run setattr_get_dist_dir_attr;
+        success => get_dirdata_handles;
+        default => return;
+    }
+
+    state get_dirdata_handles
+    {
+        run setattr_get_dirdata_handles;
+        success => remote_dirdata_attr_setup_msgpair;
+        default => set_dirdata_attr_cleanup;
+    }
+
+    state remote_dirdata_attr_setup_msgpair
+    {
+        run setattr_remote_dirdata_attr_setup_msgpair;
+        success => remote_dirdata_attr_xfer_msgpair;
+        default => set_dirdata_attr_cleanup;
+    }
+
+    state remote_dirdata_attr_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => set_dirdata_attr_cleanup;
+    }
+
+    state set_dirdata_attr_cleanup
+    {
+        run setattr_set_dirdata_attr_cleanup;
+        default => return;
+    }
+}
+
 
 nested machine pvfs2_set_attr_work_sm
 {
@@ -32,6 +78,7 @@ nested machine pvfs2_set_attr_work_sm
         STATE_METAFILE => write_metafile_datafile_handles_if_required;
         STATE_SYMLINK => write_symlink_target_if_required;
         STATE_DIRDATA => write_distr_dir_data_if_required;
+        STATE_DIRECTORY => set_dirdata_attrs;
         success => setobj_attrib;
         default => work_cleanup;
     }
@@ -60,6 +107,13 @@ nested machine pvfs2_set_attr_work_sm
     state write_distr_dir_data_if_required
     {
         run setattr_write_distr_dir_data_if_required;
+        success => setobj_attrib;
+        default => work_cleanup;
+    }
+
+    state set_dirdata_attrs
+    {
+        jump pvfs2_set_dirdata_attr_work_sm;
         success => setobj_attrib;
         default => work_cleanup;
     }
@@ -226,6 +280,16 @@ static PINT_sm_action setattr_verify_attribs(
         gossip_debug(GOSSIP_SETATTR_DEBUG,
                      "  handle %llu refers to a directory\n",
                      llu(s_op->req->u.setattr.handle));
+
+        if((req_a_p->mask & PVFS_ATTR_COMMON_UID) ||
+            (req_a_p->mask & PVFS_ATTR_COMMON_GID) ||
+            (req_a_p->mask & PVFS_ATTR_COMMON_PERM))
+        {
+            gossip_debug(GOSSIP_SETATTR_DEBUG,
+                    "  It's changing UID or GID or PERM, "
+                    "need to send to dirdata objects.\n");
+            js_p->error_code = STATE_DIRECTORY;
+        }
     }
     else if ((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
              (a_p->objtype == PVFS_TYPE_SYMLINK))
@@ -295,6 +359,8 @@ static PINT_sm_action setattr_verify_attribs(
             }
             memcpy(a_p->u.dir.dirdata_handles, req_a_p->u.dir.dirdata_handles,
                 a_p->u.dir.dist_dir_attr.num_servers * sizeof(PVFS_handle));
+
+            a_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
             js_p->error_code = STATE_DIRDATA;
         }
         else
@@ -602,6 +668,202 @@ static PINT_sm_action setattr_write_distr_dir_data_if_required(
     return ret;
 }
 
+/** functions for pvfs2_set_dirdata_attr_work_sm  **/
+
+
+static PINT_sm_action setattr_set_dirdata_attr_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action setattr_get_dist_dir_attr(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    job_id_t j_id;
+
+    /* set up key and value structures for reading the dist_dir_attr */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = &s_op->attr.u.dir.dist_dir_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
+    s_op->free_val = 0;
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+		 "  trying to read dist_dir_attr (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->req->u.setattr.fs_id, llu(s_op->req->u.setattr.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+
+static PINT_sm_action setattr_get_dirdata_handles(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+    PVFS_object_attr *attr_p;
+    job_id_t j_id;
+
+    attr_p = &s_op->attr;
+
+    if(js_p->error_code == -TROVE_ENOENT)
+    {
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "setattr: no DIST_DIR_ATTR key present in directory meta handle!!\n");
+        attr_p->u.dir.dist_dir_bitmap = NULL;
+        attr_p->u.dir.dirdata_handles = NULL;
+        return SM_ACTION_COMPLETE;
+    }
+
+    assert(attr_p->u.dir.dist_dir_attr.num_servers > 0);
+    
+    gossip_debug(GOSSIP_SETATTR_DEBUG, 
+            "setattr: get dist-dir-attr for dir meta handle %llu "
+            "with tree_height=%d, num_servers=%d, bitmap_size=%d, "
+            "split_size=%d, server_no=%d and branch_level=%d\n",
+            llu(s_op->req->u.setattr.handle),
+            attr_p->u.dir.dist_dir_attr.tree_height,
+            attr_p->u.dir.dist_dir_attr.num_servers,
+            attr_p->u.dir.dist_dir_attr.bitmap_size,
+            attr_p->u.dir.dist_dir_attr.split_size,
+            attr_p->u.dir.dist_dir_attr.server_no,
+            attr_p->u.dir.dist_dir_attr.branch_level);
+
+    /* allocate space for dirdata handles */
+    attr_p->u.dir.dist_dir_bitmap = NULL;
+    attr_p->u.dir.dirdata_handles = 
+        malloc(attr_p->u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle));
+    if(!attr_p->u.dir.dirdata_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* set up attr->mask */
+    attr_p->mask |= PVFS_ATTR_DIR_DISTDIR_ATTR;
+
+
+    /* set up key and value structures for reading dirdata handles */
+    s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
+
+    s_op->val.buffer = attr_p->u.dir.dirdata_handles;
+    s_op->val.buffer_sz = attr_p->u.dir.dist_dir_attr.num_servers *
+                sizeof(PVFS_handle);
+    s_op->free_val = 0;
+
+    js_p->error_code = 0;
+    gossip_debug(GOSSIP_SETATTR_DEBUG,
+		 "setattr: trying to read dirdata handles (coll_id = %d, "
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d)) \n",
+		 s_op->req->u.setattr.fs_id, llu(s_op->req->u.setattr.handle),
+		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
+		 s_op->val.buffer, s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_read(
+        s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
+        &s_op->key, &s_op->val,
+        0,
+        NULL, smcb, 0, js_p,
+        &j_id, server_job_context, s_op->req->hints);
+
+    return ret;
+}
+
+
+static PINT_sm_action setattr_remote_dirdata_attr_setup_msgpair(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr attr;
+    int ret;
+
+    gossip_debug(GOSSIP_MKDIR_DEBUG, "setattr state: setattr_remote_dirdata_attr_setup_msgpair\n");
+
+    /* get attr from request. */
+    memcpy(&attr, &s_op->req->u.setattr.attr, sizeof(attr));
+    attr.objtype = PVFS_TYPE_DIRDATA;
+
+    gossip_debug(
+        GOSSIP_SETATTR_DEBUG,
+        "  SENDING attrs to dirdata: [owner = %d, group = %d\n\t"
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu ]\n",
+        attr.owner, attr.group, attr.perms,
+        attr.objtype, llu(attr.atime),
+        llu(PINT_util_mkversion_time(attr.mtime)), llu(attr.ctime));
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.setattr.fs_id);
+
+    PINT_SERVREQ_TREE_SETATTR_FILL(
+        msg_p->req,
+        s_op->req->credentials,
+        s_op->req->u.setattr.fs_id,
+        PVFS_TYPE_DIRDATA,
+        attr,
+        s_op->attr.u.dir.dist_dir_attr.num_servers,
+        s_op->attr.u.dir.dirdata_handles,
+        NULL);
+
+    msg_p->fs_id = s_op->req->u.setattr.fs_id;
+    msg_p->handle = s_op->attr.u.dir.dirdata_handles[0];
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    ret = PINT_cached_config_map_to_server(
+        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+    }
+
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static PINT_sm_action setattr_set_dirdata_attr_cleanup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_msgpairarray_destroy(&s_op->msgarray_op);
+
+    return SM_ACTION_COMPLETE;
+}
+
+/**   end of functions for pvfs2_set_dirdata_attr_work_sm     */
+
 static PINT_sm_action setattr_write_symlink_target_if_required(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -662,6 +924,9 @@ static PINT_sm_action setattr_work_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_free_object_attr(&s_op->attr);
+
     if(s_op->free_val)
     {
         free(s_op->val.buffer);

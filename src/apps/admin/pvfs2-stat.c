@@ -488,6 +488,12 @@ void print_stats(const PVFS_object_ref * ref,
       fprintf(stdout, "  dir entries   : %llu\n", llu(attr->dirent_count));
    }
 
+   if( (attr->mask & PVFS_ATTR_SYS_DISTDIR_ATTR) &&
+       (attr->objtype == PVFS_TYPE_DIRECTORY))
+   {
+      fprintf(stdout, "  dirdata count : %d\n", attr->dirdata_count);
+   }
+
    if ((attr->mask & PVFS_ATTR_SYS_TYPE) && 
           (attr->objtype & PVFS_TYPE_METAFILE))
    {
