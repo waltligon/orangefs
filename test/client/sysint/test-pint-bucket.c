@@ -163,9 +163,9 @@ int main(int argc, char **argv)
                        (long)m_addr, meta_handle_extent_array.extent_count);
                 for(n = 0; n < meta_handle_extent_array.extent_count; n++)
                 {
-                    printf("Meta server %d handle range: %llu-%llu\n", j,
-                           llu(meta_handle_extent_array.extent_array[n].first),
-                           llu(meta_handle_extent_array.extent_array[n].last));
+                    printf("Meta server %d handle range: %s-%s\n", j,
+                           PVFS_handle_to_str(meta_handle_extent_array.extent_array[n].first),
+                           PVFS_handle_to_str(meta_handle_extent_array.extent_array[n].last));
                 }
             }
         }
@@ -188,9 +188,9 @@ int main(int argc, char **argv)
                        data_handle_extent_array[j].extent_count);
                 for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
-                    printf("Data server %d handle range: %llu-%llu\n", n,
-                           llu(data_handle_extent_array[j].extent_array[n].first),
-                           llu(data_handle_extent_array[j].extent_array[n].last));
+                    printf("Data server %d handle range: %s-%s\n", n,
+                           PVFS_handle_to_str(data_handle_extent_array[j].extent_array[n].first),
+                           PVFS_handle_to_str(data_handle_extent_array[j].extent_array[n].last));
                     /* get some contrived test handles */
                     if (test_handle_index < NUM_TEST_HANDLES)
                     {

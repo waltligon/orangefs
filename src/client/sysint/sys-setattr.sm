@@ -135,8 +135,8 @@ PVFS_error PVFS_isys_setattr(
         return ret;
     } 
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %llu "
-                 "on fs %d\n", llu(ref.handle),
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %s "
+                 "on fs %d\n", PVFS_handle_to_str(ref.handle),
                  ref.fs_id);
 
     return PINT_client_state_machine_post(

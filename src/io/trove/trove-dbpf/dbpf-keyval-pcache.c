@@ -178,15 +178,15 @@ int PINT_dbpf_keyval_pcache_lookup(
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
-                         "handle: %llu, pos: session(%lluu), count(%lluu)\n",
-                         llu(handle), llu(pos.session), llu(pos.count));
+                         "handle: %s, pos: session(%lluu), count(%lluu)\n",
+                         PVFS_handle_to_str(handle), llu(pos.session), llu(pos.count));
         }
         else
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
-                         "handle: %llu, pos: session(%llu), count(%llu)\n",
-                         ret, llu(handle), llu(pos.session), llu(pos.count));
+                         "handle: %s, pos: session(%llu), count(%llu)\n",
+                         ret, PVFS_handle_to_str(handle), llu(pos.session), llu(pos.count));
         }
 
         gen_mutex_unlock(&pcache->mutex);
@@ -199,8 +199,8 @@ int PINT_dbpf_keyval_pcache_lookup(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
-                 "handle: %llu, pos: session(%llu), count(%llu)\n",
-                 llu(handle), llu(pos.session), llu(pos.count));
+                 "handle: %s, pos: session(%llu), count(%llu)\n",
+                 PVFS_handle_to_str(handle), llu(pos.session), llu(pos.count));
 
     return 0;
 }
@@ -249,8 +249,8 @@ int PINT_dbpf_keyval_pcache_insert(
     {
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
-                     "handle: %llu, pos: session(%llu), count(%llu)\n",
-                     ret, llu(handle), llu(pos.session), llu(pos.count));
+                     "handle: %s, pos: session(%llu), count(%llu)\n",
+                     ret, PVFS_handle_to_str(handle), llu(pos.session), llu(pos.count));
 
         gen_mutex_unlock(&pcache->mutex);
         free(entry);
@@ -260,8 +260,8 @@ int PINT_dbpf_keyval_pcache_insert(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "
-                 "handle: %llu, pos: session(%llu), count(%llu)\n",
-                 llu(handle), llu(pos.session), llu(pos.count));
+                 "handle: %s, pos: session(%llu), count(%llu)\n",
+                 PVFS_handle_to_str(handle), llu(pos.session), llu(pos.count));
 
     return 0;
 }

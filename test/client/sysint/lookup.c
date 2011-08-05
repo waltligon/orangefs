@@ -71,7 +71,7 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("Handle     : %llu\n", llu(resp_lk.ref.handle));
+    printf("Handle     : %s\n", PVFS_handle_to_str(resp_lk.ref.handle));
     printf("FS ID      : %d\n", resp_lk.ref.fs_id);
 
     ret = PVFS_sys_finalize();

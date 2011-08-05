@@ -234,7 +234,7 @@ int main(int argc, char **argv)
     }
     for (i = 0; i < resp_getattr.attr.dfile_count; i++)
     {
-	printf("%llu\n", llu(dfile_array[i]));
+	printf("%s\n", PVFS_handle_to_str(dfile_array[i]));
     }
 
 	/**************************************************************

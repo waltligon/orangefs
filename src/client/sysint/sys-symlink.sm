@@ -204,8 +204,8 @@ PVFS_error PVFS_isys_symlink(
     PVFS_hint_copy(hints, &sm_p->hints);
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %llu "
-        "on fs %d to %s\n", entry_name, llu(parent_ref.handle),
+        GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %s "
+        "on fs %d to %s\n", entry_name, PVFS_handle_to_str(parent_ref.handle),
         parent_ref.fs_id, target);
 
     return PINT_client_state_machine_post(
@@ -310,7 +310,7 @@ static int symlink_create_comp_fn(void *v_p,
         resp_p->u.batch_create.handle_array[0]);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got newly created symlink "
-                 "handle %llu\n", llu(sm_p->u.sym.symlink_handle));
+                 "handle %s\n", PVFS_handle_to_str(sm_p->u.sym.symlink_handle));
     return 0;
 }
 
@@ -552,7 +552,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     msg_p->comp_fn = symlink_delete_handle_comp_fn;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "metafile handle %llu\n", llu(msg_p->handle));
+                 "metafile handle %s\n", PVFS_handle_to_str(msg_p->handle));
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, sm_p->u.sym.symlink_handle,

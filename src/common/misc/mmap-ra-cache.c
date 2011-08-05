@@ -90,8 +90,8 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
         gen_mutex_unlock(&s_mmap_ra_cache_mutex);
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
-                     "element %llu, %d of size %llu\n",
-                     llu(cache_elem->refn.handle),
+                     "element %s, %d of size %llu\n",
+                     PVFS_handle_to_str(cache_elem->refn.handle),
                      cache_elem->refn.fs_id,
                      llu(cache_elem->data_sz));
 
@@ -195,8 +195,8 @@ int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
             assert(cache_elem->data);
 
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
-                         "element %llu, %d of size %llu\n",
-                         llu(cache_elem->refn.handle),
+                         "element %s, %d of size %llu\n",
+                         PVFS_handle_to_str(cache_elem->refn.handle),
                          cache_elem->refn.fs_id,
                          llu(cache_elem->data_sz));
 

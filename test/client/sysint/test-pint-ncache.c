@@ -100,8 +100,8 @@ int main(int argc, char **argv)
     if (ret == -PVFS_ENOENT || test_ref.handle != first_ref.handle)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%llu != %llu)\n", llu(test_ref.handle),
-                llu(first_ref.handle));
+                "handle (%s != %s)\n", PVFS_handle_to_str(test_ref.handle),
+                PVFS_handle_to_str(first_ref.handle));
         return(-1);
     }
 
@@ -116,8 +116,8 @@ int main(int argc, char **argv)
     if (ret == -PVFS_ENOENT || test_ref.handle != second_ref.handle)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%llu != %llu)\n", llu(test_ref.handle),
-                llu(second_ref.handle));
+                "handle (%s != %s)\n", PVFS_handle_to_str(test_ref.handle),
+                PVFS_handle_to_str(second_ref.handle));
         return(-1);
     }
 
@@ -133,8 +133,8 @@ int main(int argc, char **argv)
     if ((ret == -PVFS_ENOENT) || (test_ref.handle != third_ref.handle))
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%llu != %llu)\n", llu(test_ref.handle),
-                llu(third_ref.handle));
+                "handle (%s != %s)\n", PVFS_handle_to_str(test_ref.handle),
+                PVFS_handle_to_str(third_ref.handle));
         return(-1);
     }
 
@@ -154,8 +154,8 @@ int main(int argc, char **argv)
     if (ret != -PVFS_ENOENT)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%llu != %llu)\n", llu(test_ref.handle),
-                llu(first_ref.handle));
+                "handle (%s != %s)\n", PVFS_handle_to_str(test_ref.handle),
+                PVFS_handle_to_str(first_ref.handle));
         fprintf(stderr, "Failure: lookup didn't return correct handle.\n");
         return(-1);
     }

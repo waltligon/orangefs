@@ -466,7 +466,7 @@ static int remove_one_handle(
             goto return_error;
         case 0:
             gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %llu\n", llu(ref.handle));
+                         "handle %s\n", PVFS_handle_to_str(ref.handle));
             break;
     }
 
@@ -719,8 +719,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)
+            gossip_err("failed to set cursor position at handle: %s\n",
+                       PVFS_handle_to_str(*(TROVE_handle *)
                        op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
@@ -745,8 +745,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at handle: %llu\n",
-                       llu(*(TROVE_handle *)
+            gossip_err("failed to set cursor position at handle: %s\n",
+                       PVFS_handle_to_str(*(TROVE_handle *)
                            op_p->u.d_iterate_handles.position_p));
             goto return_error;
         }
@@ -861,8 +861,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                (TROVE_handle_compare(*(TROVE_handle*)tmp_handle,  
                     op_p->u.d_iterate_handles.handle_array[i-1]) == 0 ))
             {
-                gossip_err("Warning: got duplicate handle %llu.\n", 
-                           llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: got duplicate handle %s.\n", 
+                           PVFS_handle_to_str(*(TROVE_handle*)tmp_handle));
                 gossip_err("Warning: skipping entry.\n");
                 i--;
                 continue;
@@ -905,8 +905,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                     op_p->u.d_iterate_handles.handle_array[
                         *op_p->u.d_iterate_handles.count_p]) == 0 )
             {
-                gossip_err("Warning: found duplicate handle: %llu\n", 
-                           llu(*(TROVE_handle*)tmp_handle));
+                gossip_err("Warning: found duplicate handle: %s\n", 
+                           PVFS_handle_to_str(*(TROVE_handle*)tmp_handle));
                 gossip_err("Warning: skipping entry.\n");
             }
 
@@ -955,7 +955,7 @@ get_next:
                              op_p->u.d_iterate_handles.handle_array[
                                  *op_p->u.d_iterate_handles.count_p]) == 0) )
     {
-        gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
+        gossip_err("Warning: found duplicate handle: %s\n", PVFS_handle_to_str(dummy_handle));
         gossip_err("Warning: skipping entry.\n");
         (*op_p->u.d_iterate_handles.count_p)--;
     }
@@ -1120,14 +1120,14 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 #if 0
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved "
-            "attributes from CACHE for key %llu\n  uid = %d, mode = %d, "
+            "attributes from CACHE for key %s\n  uid = %d, mode = %d, "
             "type = %d, dfile_count = %d, dist_size = %d\n",
-            llu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
+            PVFS_handle_to_str(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
             (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
             (int)ds_attr_p->dist_size);
 #endif
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
-                     "path attr cache hit on %llu\n", llu(handle));
+                     "path attr cache hit on %s\n", PVFS_handle_to_str(handle));
         if(ds_attr_p->type == PVFS_TYPE_METAFILE)
         {
             gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
@@ -1224,16 +1224,16 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
 #if 0
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved "
-                "attributes from CACHE for key %llu\n  uid = %d, mode = %d, "
+                "attributes from CACHE for key %s\n  uid = %d, mode = %d, "
                 "type = %d, dfile_count = %d, dist_size = %d\n",
-                llu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
+                PVFS_handle_to_str(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
                 (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
                 (int)ds_attr_p->dist_size);
 #endif
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "dspace_getattr_list fast "
-                "path attr cache hit on %llu, uid=%d, mode=%d, type=%d\n",
-                llu(handle_array[i]), (int)ds_attr_p[i].uid, (int)ds_attr_p[i].mode,
+                "path attr cache hit on %s, uid=%d, mode=%d, type=%d\n",
+                PVFS_handle_to_str(handle_array[i]), (int)ds_attr_p[i].uid, (int)ds_attr_p[i].mode,
                 (int)ds_attr_p[i].type);
             if(ds_attr_p[i].type == PVFS_TYPE_METAFILE)
             {
@@ -1448,8 +1448,8 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-        "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d\n",
-        llu(ref.handle), (int)attr->uid, (int)attr->mode, (int)attr->type);
+        "from DISK for key %s\n\tuid = %d, mode = %d, type = %d\n",
+        PVFS_handle_to_str(ref.handle), (int)attr->uid, (int)attr->mode, (int)attr->type);
     if(attr->type == PVFS_TYPE_METAFILE)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
@@ -2130,8 +2130,8 @@ static int dbpf_dspace_create_store_handle(
     ret = coll_p->ds_db->get(coll_p->ds_db, NULL, &key, &data, 0);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%llu) already exists.\n",
-                     llu(new_handle));
+        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%s) already exists.\n",
+                     PVFS_handle_to_str(new_handle));
         return(-TROVE_EEXIST);
     }
     else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))

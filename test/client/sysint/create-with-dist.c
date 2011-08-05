@@ -81,8 +81,8 @@ int main(int argc, char **argv)
     }
     parent_refn.fs_id = cur_fs;
 
-    printf("File to be created is %s under parent %llu\n",
-           str_buf, llu(parent_refn.handle));
+    printf("File to be created is %s under parent %s\n",
+           str_buf, PVFS_handle_to_str(parent_refn.handle));
 
     /* Lookup the distribution to use */
     dist = PVFS_sys_dist_lookup("simple_stripe");

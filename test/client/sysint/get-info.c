@@ -84,7 +84,7 @@ int main(int argc,char **argv)
     r_mtime = (time_t)resp_gattr->attr.mtime;
     r_ctime = (time_t)resp_gattr->attr.ctime;
 
-    printf("Handle      : %llu\n", llu(pinode_refn.handle));
+    printf("Handle      : %s\n", PVFS_handle_to_str(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_gattr->attr.mask);
     printf("uid         : %d\n", resp_gattr->attr.owner);

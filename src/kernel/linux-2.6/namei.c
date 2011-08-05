@@ -12,6 +12,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
+#include "../../common/misc/pvfs2-handle-to-str.h"
 
 /** Get a newly allocated inode to go with a negative dentry.
  */
@@ -112,8 +113,8 @@ static struct dentry *pvfs2_lookup(
         if (parent && parent->refn.handle != PVFS_HANDLE_NULL 
                 && parent->refn.fs_id != PVFS_FS_ID_NULL)
         {
-            gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d using parent %llu\n",
-              __FILE__, __func__, __LINE__, llu(parent->refn.handle));
+            gossip_debug(GOSSIP_NAME_DEBUG, "%s:%s:%d using parent %s\n",
+              __FILE__, __func__, __LINE__, PVFS_handle_to_str(parent->refn.handle));
             new_op->upcall.req.lookup.parent_refn = parent->refn;
         }
         else
@@ -145,9 +146,9 @@ static struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: doing lookup on %s\n  under %llu,%d "
+    gossip_debug(GOSSIP_NAME_DEBUG, "pvfs2_lookup: doing lookup on %s\n  under %s,%d "
                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
-                llu(new_op->upcall.req.lookup.parent_refn.handle),
+                PVFS_handle_to_str(new_op->upcall.req.lookup.parent_refn.handle),
                 new_op->upcall.req.lookup.parent_refn.fs_id,
                 ((new_op->upcall.req.lookup.sym_follow ==
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
@@ -156,8 +157,8 @@ static struct dentry *pvfs2_lookup(
         new_op, "pvfs2_lookup", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_NAME_DEBUG, "Lookup Got %llu, fsid %d (ret=%d)\n",
-                llu(new_op->downcall.resp.lookup.refn.handle),
+    gossip_debug(GOSSIP_NAME_DEBUG, "Lookup Got %s, fsid %d (ret=%d)\n",
+                PVFS_handle_to_str(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
     if(ret < 0)

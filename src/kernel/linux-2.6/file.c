@@ -16,6 +16,7 @@
 #include "pvfs2-internal.h"
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include "../../common/misc/pvfs2-handle-to-str.h"
 
 enum io_type {
     IO_READ = 0,
@@ -71,8 +72,8 @@ int pvfs2_file_open(
 {
     int ret = -EINVAL;
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %llu)\n",
-                file->f_dentry->d_name.name, llu(get_handle_from_ino(inode)));
+    gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_file_open: called on %s (inode is %s)\n",
+                file->f_dentry->d_name.name, PVFS_handle_to_str(get_handle_from_ino(inode)));
 
     inode->i_mapping->host = inode;
     inode->i_mapping->a_ops = &pvfs2_address_operations;
@@ -510,11 +511,11 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
           else
           {
               gossip_err(
-                    "%s: error in %s handle %llu, "
+                    "%s: error in %s handle %s, "
                     "FILE: %s, returning %ld\n",
                     rw->fnstr, 
                     rw->type == IO_READV ? "vectored read from" : "vectored write to",
-                    llu(get_handle_from_ino(rw->inode)),
+                    PVFS_handle_to_str(get_handle_from_ino(rw->inode)),
                     (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
                      (char *)rw->file->f_dentry->d_name.name : "UNKNOWN"),
                     (long) ret);
@@ -1884,11 +1885,11 @@ static ssize_t wait_for_iox(struct rw_options *rw,
           else
           {
               gossip_err(
-                "%s: error in %s handle %llu, "
+                "%s: error in %s handle %s, "
                 "FILE: %s\n  -- returning %ld\n",
                 rw->fnstr, 
                 rw->type == IO_READX ? "noncontig read from" : "noncontig write to",
-                llu(get_handle_from_ino(rw->inode)),
+                PVFS_handle_to_str(get_handle_from_ino(rw->inode)),
                 (rw->file && rw->file->f_dentry && rw->file->f_dentry->d_name.name ?
                      (char *) rw->file->f_dentry->d_name.name : "UNKNOWN"),
                     (long) ret);

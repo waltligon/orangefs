@@ -353,8 +353,8 @@ int PVFS_fsck_validate_dfile(
     {
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle list while verifying stranded objects\n",
-                    llu(*handle));
+            gossip_err("WARNING: unable to remove handle [%s] from handle list while verifying stranded objects\n",
+                    PVFS_handle_to_str(*handle));
         }
     }
 
@@ -446,8 +446,8 @@ int PVFS_fsck_validate_metafile(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from \
-                handle list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from \
+                handle list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -566,8 +566,8 @@ int PVFS_fsck_validate_symlink(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle \
-                    list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from handle \
+                    list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -681,8 +681,8 @@ int PVFS_fsck_validate_dirdata(
     {
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from handle \
-                    list while verifying stranded objects\n", llu(*handle));
+            gossip_err("WARNING: unable to remove handle [%s] from handle \
+                    list while verifying stranded objects\n", PVFS_handle_to_str(*handle));
         }
     }
 
@@ -761,8 +761,8 @@ int PVFS_fsck_validate_dir(
         if (PINT_handle_wrangler_remove_handle
             (&obj_ref->handle, &obj_ref->fs_id))
         {
-            gossip_err("WARNING: unable to remove handle [%llu] from \
-                    handle list while verifying stranded objects\n", llu(obj_ref->handle));
+            gossip_err("WARNING: unable to remove handle [%s] from \
+                    handle list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -953,7 +953,7 @@ int PVFS_fsck_get_attributes(
      * information about the attributes
      */
     gossip_debug(GOSSIP_FSCK_DEBUG, "\tFSID        : %d\n", (int) pref->fs_id);
-    gossip_debug(GOSSIP_FSCK_DEBUG, "\tHandle      : %llu\n", llu(pref->handle));
+    gossip_debug(GOSSIP_FSCK_DEBUG, "\tHandle      : %s\n", PVFS_handle_to_str(pref->handle));
 
     if (getattr_resp->attr.mask & PVFS_ATTR_SYS_COMMON_ALL)
     {
@@ -1434,8 +1434,8 @@ static int PINT_handle_wrangler_remove_handle(
     if(ret < 0)
     {
         PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);
-        gossip_err("Error: could not resolve handle [%llu] to server\n", 
-            llu(*handle));
+        gossip_err("Error: could not resolve handle [%s] to server\n", 
+            PVFS_handle_to_str(*handle));
         return(ret);
     }
 
@@ -1450,8 +1450,8 @@ static int PINT_handle_wrangler_remove_handle(
     }
     if(!found)
     {
-        gossip_err("Error: could not find matching server for handle [%llu]\n",
-            llu(*handle));
+        gossip_err("Error: could not find matching server for handle [%s]\n",
+            PVFS_handle_to_str(*handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1469,8 +1469,8 @@ static int PINT_handle_wrangler_remove_handle(
     }
     if(!found)
     {
-        gossip_err("Error: could not find handle [%llu]\n",
-            llu(*handle));
+        gossip_err("Error: could not find handle [%s]\n",
+            PVFS_handle_to_str(*handle));
         return(-PVFS_EINVAL);
     }
 
@@ -1569,8 +1569,8 @@ static int PINT_handle_wrangler_display_stranded_handles(
                 ret = PVFS_fsck_get_attributes(fsck_options, &pref, creds,
                                          &attributes);
                 
-                printf(" %llu   %d  ",
-                       llu(PINT_handle_wrangler_handlelist.list_array[i][j]),
+                printf(" %s   %d  ",
+                       PVFS_handle_to_str(PINT_handle_wrangler_handlelist.list_array[i][j]),
                        *cur_fs);
 
                 if(ret < 0)

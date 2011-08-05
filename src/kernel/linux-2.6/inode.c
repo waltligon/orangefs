@@ -14,6 +14,7 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 #include "pvfs2-internal.h"
+#include "../../common/misc/pvfs2-handle-to-str.h"
 
 static int read_one_page(struct page *page)
 {
@@ -169,8 +170,8 @@ void pvfs2_truncate(struct inode *inode)
 
     if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
         return;
-    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %llu "
-                "with size %ld\n", llu(get_handle_from_ino(inode)), (long) orig_size);
+    gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %s "
+                "with size %ld\n", PVFS_handle_to_str(get_handle_from_ino(inode)), (long) orig_size);
 
     /* successful truncate when size changes also requires mtime updates 
      * although the mtime updates are propagated lazily!
@@ -516,8 +517,8 @@ struct inode *pvfs2_iget_common(struct super_block *sb, PVFS_object_ref *ref, in
         }
 #endif
     }
-    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %llu, fsid %d hash %ld i_ino %lu\n",
-                 ref->handle, ref->fs_id, hash, inode->i_ino);
+    gossip_debug(GOSSIP_INODE_DEBUG, "iget handle %s, fsid %d hash %ld i_ino %lu\n",
+                 PVFS_handle_to_str(ref->handle), ref->fs_id, hash, inode->i_ino);
     return inode;
 }
 
@@ -636,8 +637,8 @@ struct inode *pvfs2_get_custom_inode_common(
             goto error;
 	}
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
-        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %llu\n", 
-                llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_ACL_DEBUG, "Initializing ACL's for inode %s\n", 
+                PVFS_handle_to_str(get_handle_from_ino(inode)));
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

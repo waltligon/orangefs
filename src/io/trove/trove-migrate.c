@@ -561,9 +561,9 @@ ret=%d coll=%d handles=%p attrs=%p states=%p count=%d context=%lld op=%lld\n",
             {
                 ret = -1;
                 gossip_err("trove_dspace_getattr_list failure: \
-coll=%d context=%lld handle=%llu state=%d\n",
+coll=%d context=%lld handle=%s state=%d\n",
                            coll_id, lld(context_id),
-                           llu(handles[i]), states[i]);
+                           PVFS_handle_to_str(handles[i]), states[i]);
                 goto complete;
             }
 

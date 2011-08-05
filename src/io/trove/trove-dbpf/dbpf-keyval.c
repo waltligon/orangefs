@@ -1659,8 +1659,8 @@ static int dbpf_keyval_do_remove(
     #if 0
     /* not safe to print this if it may be a binary key */
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                 "PINT_dbpf_keyval_remove: handle (%llu), key: (%d) %*s\n",
-                 llu(handle), key->buffer_sz, key->buffer_sz, (char *)key->buffer);
+                 "PINT_dbpf_keyval_remove: handle (%s), key: (%d) %*s\n",
+                 PVFS_handle_to_str(handle), key->buffer_sz, key->buffer_sz, (char *)key->buffer);
     #endif
 
     PVFS_handle_copy(key_entry.handle, handle);

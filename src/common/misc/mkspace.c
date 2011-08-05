@@ -192,7 +192,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created root directory "
-                      "with handle %llu.\n", llu(new_root_handle));
+                      "with handle %s.\n", PVFS_handle_to_str(new_root_handle));
         PVFS_handle_copy(s_used_handles[0], new_root_handle);
 
         /* set collection attribute for root handle */
@@ -261,7 +261,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose, "info: created dspace for dirents "
-                      "with handle %llu\n", llu(root_dirdata_handle));
+                      "with handle %s\n", PVFS_handle_to_str(root_dirdata_handle));
         PVFS_handle_copy(s_used_handles[1], root_dirdata_handle);
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
@@ -314,7 +314,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created lost+found directory "
-                      "with handle %llu.\n", llu(lost_and_found_handle));
+                      "with handle %s.\n", PVFS_handle_to_str(lost_and_found_handle));
         PVFS_handle_copy(s_used_handles[2], lost_and_found_handle);
 
         /* set lost+found directory dspace attributes */
@@ -364,7 +364,7 @@ int pvfs2_mkspace(
 
         mkspace_print(
             verbose, "info: created dspace for dirents "
-            "with handle %llu\n", llu(lost_and_found_dirdata_handle));
+            "with handle %s\n", PVFS_handle_to_str(lost_and_found_dirdata_handle));
         PVFS_handle_copy(s_used_handles[3], lost_and_found_dirdata_handle);
 
         key.buffer = DIRECTORY_ENTRY_KEYSTR;
@@ -436,9 +436,9 @@ int pvfs2_mkspace(
     trove_finalize(TROVE_METHOD_DBPF);
 
     mkspace_print(verbose, "collection created:\n"
-                  "\troot handle = %llu, coll id = %d, "
+                  "\troot handle = %s, coll id = %d, "
                   "root string = \"%s\"\n",
-                  llu(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
+                  PVFS_handle_to_str(root_handle), coll_id, ROOT_HANDLE_KEYSTR);
     return 0;
 }
 

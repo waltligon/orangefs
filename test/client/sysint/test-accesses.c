@@ -6,6 +6,7 @@
 #include <time.h>
 #include "pvfs2.h"
 #include "pvfs2-sysint.h"
+#include <pvfs2-handle-to-str.h>
 
 #if PVFS2_SIZEOF_VOIDP == 32 
 #  define llu(x) (x)
@@ -117,8 +118,8 @@ int main(int argc, char * argv[])
 	    size, PVFS_BYTE, &mem_req);
 	if(ret < 0) goto error;
 
-	printf("Performing Write: offset: %llu, size: %d\n",
-	       llu(offset), size);
+	printf("Performing Write: offset: %s, size: %d\n",
+	       PVFS_handle_to_str(offset), size);
 
 	ret = PVFS_sys_io(
 	    create_resp.ref, file_req, offset, membuff, mem_req,

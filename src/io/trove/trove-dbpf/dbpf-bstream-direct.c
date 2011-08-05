@@ -864,7 +864,7 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         if(sync_required == 1)
         {
             gossip_debug(GOSSIP_DIRECTIO_DEBUG, 
-                "directio updating size for handle %llu\n", llu(ref.handle));
+                "directio updating size for handle %s\n", PVFS_handle_to_str(ref.handle));
 
             dbpf_open_cache_put(&rw_op->open_ref);
 

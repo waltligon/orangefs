@@ -78,7 +78,7 @@ int main(int argc, char **argv)
     r_ctime = (time_t)resp_getattr.attr.ctime;
 
     printf("Retrieved the following attributes\n");
-    printf("Handle      : %llu\n", llu(pinode_refn.handle));
+    printf("Handle      : %s\n", PVFS_handle_to_str(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_getattr.attr.mask);
     printf("uid         : %d\n", resp_getattr.attr.owner);

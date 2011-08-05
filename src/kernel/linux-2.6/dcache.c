@@ -12,6 +12,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
+#include "../../common/misc/pvfs2-handle-to-str.h"
 
 static void __attribute__ ((unused)) print_dentry(struct dentry *entry, int ret);
 
@@ -129,8 +130,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
 
     /* now perform getattr */
     gossip_debug(GOSSIP_DCACHE_DEBUG,
-                 "%s: doing getattr: inode: %p, handle: %llu)\n",
-                 __func__, inode, llu(get_handle_from_ino(inode)));
+                 "%s: doing getattr: inode: %p, handle: %s)\n",
+                 __func__, inode, PVFS_handle_to_str(get_handle_from_ino(inode)));
     ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
     gossip_debug(GOSSIP_DCACHE_DEBUG,
                  "%s: getattr %s (ret = %d), returning %s for dentry i_count=%d\n",

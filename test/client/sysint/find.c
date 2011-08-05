@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include <pvfs2-handle-to-str.h>
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
@@ -138,8 +139,8 @@ int directory_walk(PVFS_fs_id cur_fs,
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG,"Got handle %llu\n",
-                         llu(cur_handle));
+            gossip_debug(GOSSIP_CLIENT_DEBUG,"Got handle %s\n",
+                         PVFS_handle_to_str(cur_handle));
 
             is_dir = is_directory(cur_handle,
                                   cur_fs);

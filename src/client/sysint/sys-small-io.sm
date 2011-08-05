@@ -122,7 +122,7 @@ static PINT_sm_action small_io_setup_msgpairs(
             attr->u.meta.dfile_array[sm_p->u.io.datafile_index_array[i]]);
 
         gossip_debug(GOSSIP_IO_DEBUG, "   small_io_setup_msgpairs: "
-                     "handle: %llu\n", llu(datafile_handle));
+                     "handle: %s\n", PVFS_handle_to_str(datafile_handle));
 
         if(sm_p->u.io.io_type == PVFS_IO_WRITE)
         {
@@ -377,9 +377,9 @@ static int small_io_completion_fn(void * user_args,
      * want.
     */
 
-    gossip_debug(GOSSIP_IO_DEBUG,"handle=%llu \toperation=%d \toffset=%ld "
+    gossip_debug(GOSSIP_IO_DEBUG,"handle=%s \toperation=%d \toffset=%ld "
                              "\taggregate_size=%ld\n",
-                            llu(msg_p->req.u.small_io.handle),
+                            PVFS_handle_to_str(msg_p->req.u.small_io.handle),
                             msg_p->req.u.small_io.io_type,
                             ((long int)msg_p->req.u.small_io.file_req_offset),
                             ((long int)msg_p->req.u.small_io.aggregate_size));
@@ -503,8 +503,8 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
             if (ret)
             {
                gossip_lerr("Unable to determine the server address "
-                           "for this handle (%llu)"
-                           ,llu(msg->handle));
+                           "for this handle (%s)"
+                           ,PVFS_handle_to_str(msg->handle));
                js_p->error_code = ret;
                return SM_ACTION_COMPLETE;
             }
@@ -545,8 +545,8 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
            if (ret)
            {
               gossip_lerr("Unable to determine the server address "
-                          "for this handle (%llu)"
-                          ,llu(msg->handle));
+                          "for this handle (%s)"
+                          ,PVFS_handle_to_str(msg->handle));
               js_p->error_code = ret;
               return SM_ACTION_COMPLETE;
            }
@@ -562,8 +562,8 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
         if (ret)
         {
            gossip_lerr("Unable to determine the server address "
-                       "for this handle (%llu)"
-                       ,llu(msg->handle));
+                       "for this handle (%s)"
+                       ,PVFS_handle_to_str(msg->handle));
            js_p->error_code = ret;
            return SM_ACTION_COMPLETE;
         }

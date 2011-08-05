@@ -10,6 +10,7 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
+#include "../../common/misc/pvfs2-handle-to-str.h"
 
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials)
@@ -265,8 +266,8 @@ int copy_attributes_to_inode(
         {
             /* special case: mark the root inode as sticky */
             inode->i_mode |= S_ISVTX;
-            gossip_debug(GOSSIP_UTILS_DEBUG, "Marking inode %llu as sticky\n", 
-                    llu(get_handle_from_ino(inode)));
+            gossip_debug(GOSSIP_UTILS_DEBUG, "Marking inode %s as sticky\n", 
+                    PVFS_handle_to_str(get_handle_from_ino(inode)));
         }
 
         switch (attrs->objtype)
@@ -435,8 +436,8 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_getattr: called on inode %llu\n",
-                llu(get_handle_from_ino(inode)));
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_inode_getattr: called on inode %s\n",
+                PVFS_handle_to_str(get_handle_from_ino(inode)));
 
     if (inode)
     {
@@ -528,9 +529,9 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
         }
 
       copy_attr_failure:
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Getattr on handle %llu, fsid %d\n  (inode ct = %d) "
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Getattr on handle %s, fsid %d\n  (inode ct = %d) "
                     "returned %d\n",
-                    llu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
+                    PVFS_handle_to_str(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count), ret);
         /* store error code in the inode so that we can retrieve it later if
          * needed
@@ -662,16 +663,16 @@ int pvfs2_flush_inode(struct inode *inode)
         wbattr.ia_valid |= ATTR_MODE;
     }
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %llu "
-            "(ia_valid %d)\n", llu(get_handle_from_ino(inode)), wbattr.ia_valid);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "*********** pvfs2_flush_inode: %s "
+            "(ia_valid %d)\n", PVFS_handle_to_str(get_handle_from_ino(inode)), wbattr.ia_valid);
     if (wbattr.ia_valid == 0)
     {
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode skipping setattr()\n");
         return 0;
     }
         
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode (%llu) writing mode %o\n",
-        llu(get_handle_from_ino(inode)), inode->i_mode);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_inode (%s) writing mode %o\n",
+        PVFS_handle_to_str(get_handle_from_ino(inode)), inode->i_mode);
 
     ret = pvfs2_inode_setattr(inode, &wbattr);
     return ret;
@@ -778,8 +779,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         fsgid = current->fsgid;
 #endif
 
-        gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %llu, name %s (uid %o, gid %o)\n", 
-                llu(get_handle_from_ino(inode)), name, fsuid, fsgid);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "getxattr on inode %s, name %s (uid %o, gid %o)\n", 
+                PVFS_handle_to_str(get_handle_from_ino(inode)), name, fsuid, fsgid);
         pvfs2_inode = PVFS2_I(inode);
         /* obtain the xattr semaphore */
         down_read(&pvfs2_inode->xattr_sem);
@@ -848,9 +849,9 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
                             new_length);
                     ret = new_length;
-                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s "
+                    gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %s key %s "
                             " key_sz %d, val_length %d\n", 
-                        llu(get_handle_from_ino(inode)),
+                        PVFS_handle_to_str(get_handle_from_ino(inode)),
                         (char*)new_op->upcall.req.getxattr.key, 
                         (int) new_op->upcall.req.getxattr.key_sz, (int) ret);
                 }
@@ -859,8 +860,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
         else if (ret == -ENOENT)
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
-            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %llu key %s does not exist!\n",
-                    llu(get_handle_from_ino(inode)), (char *) new_op->upcall.req.getxattr.key);
+            gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_inode_getxattr: inode %s key %s does not exist!\n",
+                    PVFS_handle_to_str(get_handle_from_ino(inode)), (char *) new_op->upcall.req.getxattr.key);
         }
 
         /* when request is serviced properly, free req op struct */
@@ -921,8 +922,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
     }
     if (inode)
     {
-        gossip_debug(GOSSIP_XATTR_DEBUG, "setxattr on inode %llu, name %s\n", 
-                llu(get_handle_from_ino(inode)), name);
+        gossip_debug(GOSSIP_XATTR_DEBUG, "setxattr on inode %s, name %s\n", 
+                PVFS_handle_to_str(get_handle_from_ino(inode)), name);
         if (IS_RDONLY(inode))
         {
             gossip_err("pvfs2_inode_setxattr: Read-only file system\n");
@@ -1230,8 +1231,8 @@ static inline struct inode *pvfs2_create_file(
         new_op, "pvfs2_create_file", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
-                llu(new_op->downcall.resp.create.refn.handle),
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Create Got PVFS2 handle %s on fsid %d (ret=%d)\n",
+                PVFS_handle_to_str(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
     if (ret > -1)
@@ -1246,8 +1247,8 @@ static inline struct inode *pvfs2_create_file(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned file inode new number of %llu\n",
-                    llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned file inode new number of %s\n",
+                    PVFS_handle_to_str(get_handle_from_ino(inode)));
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_file: Instantiating\n *negative* "
                     "dentry %p for %s\n", dentry,
@@ -1255,8 +1256,8 @@ static inline struct inode *pvfs2_create_file(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Regular File) %llu -> %s\n",
-                llu(get_handle_from_ino(inode)), dentry->d_name.name);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Regular File) %s -> %s\n",
+                PVFS_handle_to_str(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1317,8 +1318,8 @@ static inline struct inode *pvfs2_create_dir(
         new_op, "pvfs2_create_dir", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "Mkdir Got PVFS2 handle %llu on fsid %d\n",
-                llu(new_op->downcall.resp.mkdir.refn.handle),
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Mkdir Got PVFS2 handle %s on fsid %d\n",
+                PVFS_handle_to_str(new_op->downcall.resp.mkdir.refn.handle),
                 new_op->downcall.resp.mkdir.refn.fs_id);
 
     if (ret > -1)
@@ -1333,8 +1334,8 @@ static inline struct inode *pvfs2_create_dir(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned dir inode new number of %llu\n",
-                    llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned dir inode new number of %s\n",
+                    PVFS_handle_to_str(get_handle_from_ino(inode)));
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_dir: Instantiating\n  *negative* "
                     "dentry %p for %s\n", dentry,
@@ -1342,8 +1343,8 @@ static inline struct inode *pvfs2_create_dir(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Directory) %llu -> %s\n",
-                llu(get_handle_from_ino(inode)), dentry->d_name.name);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Directory) %s -> %s\n",
+                PVFS_handle_to_str(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1412,8 +1413,8 @@ static inline struct inode *pvfs2_create_symlink(
         new_op, "pvfs2_symlink_file", 
         get_interruptible_flag(dir));
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "Symlink Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
-                llu(new_op->downcall.resp.sym.refn.handle),
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Symlink Got PVFS2 handle %s on fsid %d (ret=%d)\n",
+                PVFS_handle_to_str(new_op->downcall.resp.sym.refn.handle),
                 new_op->downcall.resp.sym.refn.fs_id, ret);
 
     if (ret > -1)
@@ -1428,8 +1429,8 @@ static inline struct inode *pvfs2_create_symlink(
             return NULL;
         }
 
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned symlink inode new number of %llu\n",
-                    llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Assigned symlink inode new number of %s\n",
+                    PVFS_handle_to_str(get_handle_from_ino(inode)));
 
         /* finally, add dentry with this new inode to the dcache */
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_create_symlink: Instantiating\n  "
@@ -1438,8 +1439,8 @@ static inline struct inode *pvfs2_create_symlink(
 
         dentry->d_op = &pvfs2_dentry_operations;
         d_instantiate(dentry, inode);
-        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Symlink) %llu -> %s\n",
-                llu(get_handle_from_ino(inode)), dentry->d_name.name);
+        gossip_debug(GOSSIP_UTILS_DEBUG, "Inode (Symlink) %s -> %s\n",
+                PVFS_handle_to_str(get_handle_from_ino(inode)), dentry->d_name.name);
     }
     else
     {
@@ -1515,9 +1516,9 @@ int pvfs2_remove_entry(
 
     if (inode && parent && dentry)
     {
-        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_remove_entry: called on %s\n  (inode %llu): "
-                    "Parent is %llu | fs_id %d\n", dentry->d_name.name,
-                    llu(get_handle_from_ino(inode)), llu(parent->refn.handle),
+        gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_remove_entry: called on %s\n  (inode %s): "
+                    "Parent is %s | fs_id %d\n", dentry->d_name.name,
+                    PVFS_handle_to_str(get_handle_from_ino(inode)), PVFS_handle_to_str(parent->refn.handle),
                     parent->refn.fs_id);
 
         new_op = op_alloc(PVFS2_VFS_OP_REMOVE);
@@ -1563,9 +1564,9 @@ int pvfs2_truncate_inode(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: pvfs2_truncate_inode %llu: "
-                "Handle is %llu | fs_id %d | size is %lu\n",
-                llu(get_handle_from_ino(inode)), llu(pvfs2_inode->refn.handle),
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: pvfs2_truncate_inode %s: "
+                "Handle is %s | fs_id %d | size is %lu\n",
+                PVFS_handle_to_str(get_handle_from_ino(inode)), PVFS_handle_to_str(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc(PVFS2_VFS_OP_TRUNCATE);
@@ -1748,8 +1749,8 @@ struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
 
     ref.handle = opaque_handle.handle;
     ref.fs_id  = opaque_handle.fsid;
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_sb_find_inode_handle: obtained inode number %llu\n",
-            llu(opaque_handle.handle));
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_sb_find_inode_handle: obtained inode number %s\n",
+            PVFS_handle_to_str(opaque_handle.handle));
     /* 
      * NOTE: Locate the inode number in the icache if possible.
      * If not allocate a new inode that is returned locked and
@@ -1912,9 +1913,9 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache %llu: Handle is %llu "
-                "| fs_id %d\n", llu(get_handle_from_ino(inode)),
-                pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
+    gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_flush_mmap_racache %s: Handle is %s "
+                "| fs_id %d\n", PVFS_handle_to_str(get_handle_from_ino(inode)),
+                PVFS_handle_to_str(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id);
 
     new_op = op_alloc(PVFS2_VFS_OP_MMAP_RA_FLUSH);
     if (!new_op)
@@ -2049,11 +2050,11 @@ void pvfs2_make_bad_inode(struct inode *inode)
           can't afford to lose the inode operations and such
           associated with the root handle in any case
         */
-        gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %llu\n", llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %s\n", PVFS_handle_to_str(get_handle_from_ino(inode)));
     }
     else
     {
-        gossip_debug(GOSSIP_UTILS_DEBUG, "*** making bad inode %llu\n", llu(get_handle_from_ino(inode)));
+        gossip_debug(GOSSIP_UTILS_DEBUG, "*** making bad inode %s\n", PVFS_handle_to_str(get_handle_from_ino(inode)));
         make_bad_inode(inode);
     }
 }
