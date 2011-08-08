@@ -1,0 +1,59 @@
+#include "Ifx.h"
+
+// Constants
+#define BUTTON_NEXT      1
+#define BUTTON_BACK     12
+#define BUTTON_CANCEL2   9
+#define COMBO_MOUNT   1304
+#define RB_LIST       1307
+#define RB_CERT       1308
+#define RB_LDAP       1309
+
+#define USERMAP_LIST     1
+#define USERMAP_CERT     2
+#define USERMAP_LDAP     3
+
+prototype NUMBER MountPointUserModeDialog(BYREF STRING, BYREF NUMBER);
+
+// handler for the MountPointUserModeDialog
+function NUMBER MountPointUserModeDialog(svMountPoint, nvUserMapMode)
+    BOOL bDone;
+    NUMBER nResult, nControl;
+begin
+    EzDefineDialog("MountPointUserModeDialog",
+                   ISUSER,
+                   "MountPointUserModeDialog",
+                   0);
+    
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("MountPointUserModeDialog");
+        switch (nControl)
+            case DLG_INIT:
+                // Default values
+                CtrlSetCurSel("MountPointUserModeDialog", COMBO_MOUNT, "Auto");
+                CtrlSetState("MountPointUserModeDialog", RB_LIST, BUTTON_CHECKED);
+            case BUTTON_NEXT:
+                // Return specified values                
+                CtrlGetCurSel("MountPointUserModeDialog", COMBO_MOUNT, svMountPoint);
+                if (CtrlGetState("MountPointUserModeDialog", RB_LIST) = BUTTON_CHECKED) then
+                    nvUserMapMode = USERMAP_LIST;
+                elseif (CtrlGetState("MountPointUserModeDialog", RB_CERT) = BUTTON_CHECKED) then
+                    nvUserMapMode = USERMAP_CERT;
+                else
+                    nvUserMapMode = USERMAP_LDAP;
+                endif;  
+                nResult = BUTTON_NEXT;                
+                bDone = TRUE;                
+            case BUTTON_CANCEL2:
+                // Cancel requested
+                Do(EXIT);
+            case BUTTON_BACK:
+                // Back requested
+                nResult = BUTTON_BACK;
+                bDone = TRUE;         
+        endswitch;
+    endwhile;
+    
+    return nResult;        
+end;

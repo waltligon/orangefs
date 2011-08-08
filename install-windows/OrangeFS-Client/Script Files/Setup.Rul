@@ -11,7 +11,8 @@
 //===========================================================================
 
 // Included header files ----------------------------------------------------
-#include "ifx.h"
+#include "ifx.h" 
+#include "MountPointUserModeDialog.Rul"
 
 // Note: In order to have your InstallScript function executed as a custom
 // action by the Windows Installer, it must be prototyped as an 
@@ -204,12 +205,22 @@ end;
 //---------------------------------------------------------------------------
 function OnFirstUIAfter()
     STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2;
-    NUMBER bOpt1, bOpt2;
+    STRING szMountPoint;
+    NUMBER bOpt1, bOpt2, nUserMapMode, nRC;    
 begin
 	Disable(STATUSEX);
 
 	bOpt1   = FALSE;
     bOpt2   = FALSE;
+    
+Dlg_OrangeFSTab:
+    // TODO
+
+Dlg_MountPointUserMap:
+    nRC = MountPointUserModeDialog(szMountPoint, nUserMapMode);
+    if (nRC = BUTTON_BACK) then
+        goto Dlg_OrangeFSTab;
+    endif;
     
     InstallServices();
     
