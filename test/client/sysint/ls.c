@@ -14,6 +14,7 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pvfs2-internal.h"
+#include <pvfs2-handle-to-str.h>
 
 #define MAX_NUM_DIRENTS    32
 
@@ -114,8 +115,8 @@ void print_entry(
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          &credentials, &getattr_response, NULL))
     {
-        fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
-                "(fs_id is %d)\n",llu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle %s "
+                "(fs_id is %d)\n",PVFS_handle_to_str(handle),fs_id);
         return;
     }
     print_entry_attr(entry_name, &getattr_response.attr);

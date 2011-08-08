@@ -55,8 +55,8 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     if (PVFS_sys_getattr(pinode_refn, attrmask,
                          &credentials, &getattr_response, NULL))
     {
-        fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
-                "(fs_id is %d)\n",llu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle %s "
+                "(fs_id is %d)\n",PVFS_handle_to_str(handle),fs_id);
         return -1;
     }
     return ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 1 : 0);

@@ -273,8 +273,8 @@ int main(int argc, char ** argv)
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
-        printf("Datafile %d - %s, handle: %s (%08llx.bstream)\n", i, servers[i],
-            PVFS_handle_to_str(handles[i]), llu(handles[i]));
+        printf("Datafile %d - %s, handle: %s\n", i, servers[i],
+            PVFS_handle_to_str(handles[i]));
         free(servers[i]);
     }
 main_out:

@@ -177,12 +177,12 @@ int main(int argc, char **argv)
     else {
 	fprintf(stdout,
 		"Storage space %s and %s, collection %s (coll_id = %d, "
-                "root_handle = 0x%08llx):\n",
+                "root_handle = %s):\n",
 		data_path,
 		meta_path,
 		collection,
 		coll_id,
-		llu(root_handle));
+		PVFS_handle_to_str(root_handle));
     }
 
     if (got_dspace_handle)
@@ -316,8 +316,8 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08llx/%s (dspace_getattr output: type = %s, b_size = %lld)\n",
-	    llu(handle),PVFS_handle_to_str(handle),
+	    "\t%s (dspace_getattr output: type = %s, b_size = %lld)\n",
+	    PVFS_handle_to_str(handle),
 	    type_to_string(ds_attr.type),
 	    (ds_attr.type == PVFS_TYPE_DATAFILE) ? lld(ds_attr.u.datafile.b_size) : 0);
 
@@ -452,7 +452,7 @@ static void print_datafile_handles(PVFS_handle *h_p,
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t0x%08llx(%s)", llu(h_p[i]), PVFS_handle_to_str(h_p[i]));
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t(%s)", PVFS_handle_to_str(h_p[i]));
 
     if (i == 10) fprintf(stdout, "...\n");
     else fprintf(stdout, "\n");
@@ -498,22 +498,21 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx(%s)\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = (%s)\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		val_printable ? (char *) val_p->buffer : "",
 		val_p->read_sz,
-		llu(*(TROVE_handle *) val_p->buffer),
                 PVFS_handle_to_str(*(TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = %s\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		llu(*(TROVE_handle *) val_p->buffer));
+		PVFS_handle_to_str(*(TROVE_handle *) val_p->buffer));
     }
     else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.meta_hint",20))
     {
