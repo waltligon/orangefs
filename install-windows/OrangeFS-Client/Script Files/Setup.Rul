@@ -12,7 +12,8 @@
 
 // Included header files ----------------------------------------------------
 #include "ifx.h" 
-#include "MountPointUserModeDialog.Rul"
+#include "MountPointUserModeDialog.Rul" 
+#include "ListMapDialog.Rul"
 
 // Note: In order to have your InstallScript function executed as a custom
 // action by the Windows Installer, it must be prototyped as an 
@@ -24,9 +25,13 @@
 /* export prototype MyFunction(HWND); */
 
 prototype InstallServices(); 
-prototype InstallDriver();
+prototype InstallDriver(); 
+prototype WriteOrangeFSTab(STRING);
 
 // global variables
+#define USERMAP_LIST     1
+#define USERMAP_CERT     2
+#define USERMAP_LDAP     3
 
 // 64-bit flag
 BOOL bIs64Bit;
@@ -150,6 +155,22 @@ Dlg_SdStartCopy:
  
     return 0;
 end;                    
+            
+// Output the file "orangefstab" with the file system location URI in it
+function WriteOrangeFSTab(szFSURI)
+    NUMBER nFileHandle;
+begin
+    OpenFileMode(FILE_MODE_APPEND);
+    
+    if (CreateFile(nFileHandle, INSTALLDIR, "orangefstab") < 0) then
+        MessageBox("File " + INSTALLDIR + "\\orangefstab could not be created. " +
+                   "You must add this finally manually (see documentation).", SEVERE);
+    else
+        WriteLine(nFileHandle, szFSURI + " /mnt/pvfs2 pvfs2 defaults,noauto 0 0"); 
+        
+        CloseFile(nFileHandle);
+    endif;
+end;
 
 function InstallDriver()
     STRING svExePath;
@@ -205,7 +226,8 @@ end;
 //---------------------------------------------------------------------------
 function OnFirstUIAfter()
     STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2;
-    STRING szMountPoint;
+    STRING szFSURI, szMountPoint, szUserMapMode;
+    STRING szUserID, szUID, szGID;
     NUMBER bOpt1, bOpt2, nUserMapMode, nRC;    
 begin
 	Disable(STATUSEX);
@@ -213,14 +235,28 @@ begin
 	bOpt1   = FALSE;
     bOpt2   = FALSE;
     
-Dlg_OrangeFSTab:
-    // TODO
-
 Dlg_MountPointUserMap:
-    nRC = MountPointUserModeDialog(szMountPoint, nUserMapMode);
+    nUserMapMode = 0;
+    nRC = MountPointUserModeDialog(szFSURI, szMountPoint, nUserMapMode);
+    
+Dlg_UserMap:
+    switch(nUserMapMode)
+        case USERMAP_LIST:
+            nRC = ListMapDialog(szUserID, szUID, szGID); 
+            MessageBox(szUserID + " " + szUID + " " + szGID, INFORMATION);
+        /*
+        case USERMAP_CERT:
+            // TODO
+        case USERMAP_LDAP:
+            // TODO
+        */
+    endswitch;
+    
     if (nRC = BUTTON_BACK) then
-        goto Dlg_OrangeFSTab;
+        goto Dlg_MountPointUserMap;
     endif;
+        
+    WriteOrangeFSTab(szFSURI);
     
     InstallServices();
     
