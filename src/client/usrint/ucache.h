@@ -4,16 +4,21 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef UCACHE_H
-#define UCACHE_H 1
+#ifndef UCACHE_INTERNAL_H
+#define UCACHE_INTERNAL_H
 
-#include <sys/types.h>
+#include <stdio.h>
 #include <sys/shm.h>
 #include <stdint.h>
+#include <semaphore.h>
+
+/* The following includes may end up not being needed. 
+#include <sys/types.h>
+#include <sys/sem.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
 #include <assert.h>
+*/
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -26,13 +31,16 @@
 #define BLOCKS_IN_CACHE 512
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
-#define SVSHM_MODE   (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6) 
+#define SVSHM_MODE (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6)
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
-
 #define NIL (-1)
+
 #define DBG 0
-#define F_EVICT 1   /*  Evict files if necessary    */
-#define M_EVICT 1   /*  Evict memory entries if necessary   */
+#define INTERNAL_TESTING 0
+#define ucache_lock_t sem_t
+
+typedef uint32_t PVFS_fs_id;
+typedef uint64_t PVFS_object_ref;
 
 /** A link for one block of memory in a files hash table
  *
@@ -98,6 +106,7 @@ struct file_table_s
     uint32_t free_mtbl_blk; /* block index of next free mtbl */
     uint16_t free_mtbl_ent; /* entry index of next free mtbl */
     uint16_t free_list; /* index of next free file entry */
+    /*  pthread_spinlock_t spinlock */
     char pad[12];
     struct file_ent_s file[FILE_TABLE_ENTRY_COUNT];
 };
@@ -111,10 +120,36 @@ union user_cache_u
     union cache_block_u b[0]; /* actual size of this varies */
 };
 
-/*  Function Declarations   */
-static union user_cache_u *get_ucache();
+/* externally visible API */
+extern void ucache_initialize(void);
+extern int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+extern void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+extern void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+extern int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+extern int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+extern int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+
+/* Internal Only Function Declarations   */
+    /*  Cache Locking Functions */
+static int ucache_lock_init(ucache_lock_t * lock);
+static int ucache_lock_lock(ucache_lock_t * lock);
+static int ucache_lock_unlock(ucache_lock_t * lock);
+static int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
+static int ucache_lock_destroy(ucache_lock_t * lock);
+
+    /*  Dirty List Iterator */
+static int dirty_done(uint16_t index);
+static int dirty_next(struct mem_table_s *mtbl, uint16_t index);
+
+    /*  Memory Entry Chain Iterator */
+static int ment_done(int index);
+static int ment_next(struct mem_table_s *mtbl, int index);
+
+    /*  File Entry Chain Iterator   */
+static int file_done(int index);
+static int file_next(struct file_table_s *ftbl, int index);
+
 static void add_free_mtbls(int blk);
-void ucache_initialize(void);
 static void init_memory_table(int blk, int ent);
 static uint16_t get_free_blk(void);
 static void put_free_blk(int blk);
@@ -131,9 +166,9 @@ static struct mem_table_s *lookup_file(
     uint16_t *file_ent_prev_index   /* Can be NULL if not desired   */
 );
 static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
-void remove_all_memory_entries(struct mem_table_s *mtbl);
-void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file);
-void evict_file(unsigned int index);
+static void remove_all_memory_entries(struct mem_table_s *mtbl);
+static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file);
+static void evict_file(unsigned int index);
 static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
 static int remove_file(uint32_t fs_id, uint64_t handle);
 static void *lookup_mem(struct mem_table_s *mtbl, 
@@ -142,147 +177,20 @@ static void *lookup_mem(struct mem_table_s *mtbl,
                     uint16_t *mem_ent_index,
                     uint16_t *mem_ent_prev_index
 );
-void update_lru(struct mem_table_s *mtbl, uint16_t index);
+static void update_lru(struct mem_table_s *mtbl, uint16_t index);
 static int locate_max_mtbl(struct mem_table_s **mtbl);
-void evict_LRU(struct mem_table_s *mtbl);
+static void evict_LRU(struct mem_table_s *mtbl);
 static void *set_item(struct mem_table_s *mtbl, 
                     uint64_t offset, 
                     uint16_t index
 );
 static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset);
 static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
-
-/*  Dirty List Iterator */
-static int dirty_done(uint16_t index)
-{
-    return ((int16_t)index==NIL);
-}
-static int dirty_next(struct mem_table_s *mtbl, uint16_t index)
-{
-    return mtbl->mem[index].dirty_next;
-}
-
-/*  Memory Entry Chain Iterator */
-static int ment_done(int index)
-{
-    return ((int16_t)index==NIL);
-}
-static int ment_next(struct mem_table_s *mtbl, int index)
-{
-    return mtbl->mem[index].next;
-}
-
-/*  File Entry Chain Iterator   */
-static int file_done(int index)
-{
-    return ((int16_t)index==NIL);
-}
-static int file_next(struct file_table_s *ftbl, int index)
-{
-    return ftbl->file[index].next;
-}
-
-/*  list printing functions */
-void print_lru(struct mem_table_s *mtbl);
-void print_dirty(struct mem_table_s *mtbl);
-
-/* externally visible API */
-#if 1
-typedef uint32_t PVFS_fs_id;
-typedef uint64_t PVFS_object_ref;
-int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
-{
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if((int)mtbl==NIL)
-    {
-        insert_file((uint32_t)*fs_id, (uint64_t)*handle);
-    }
-    return 1;
-}
-
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
-{
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if((int)mtbl!=NIL)
-    {
-        return(lookup_mem(mtbl, (uint64_t)offset, NULL, NULL, NULL)); 
-    }
-    return (void *)NIL;
-}
-
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
-{
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if((int)mtbl==NIL)
-    {
-        return (void *)NIL;
-    }
-    else
-    {
-        remove_mem(mtbl, (uint64_t)offset);
-        return insert_mem(mtbl, (uint64_t)offset); 
-    }
-}
-
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
-{
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if((int)mtbl!=NIL)
-    {
-        return remove_mem(mtbl, (uint64_t)offset); 
-    }
-    return NIL;
-}
-
-int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
-{
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if((int)mtbl==NIL)
-    {
-        return NIL;
-    }
-    int i;
-    for(i=mtbl->dirty_list; !dirty_done(i); i=dirty_next(mtbl, i)){
-        struct mem_ent_s *ment = &(mtbl->mem[i]);
-        mtbl->mem[i].dirty_next = NIL;
-        if((int64_t)ment->tag==NIL || (int32_t)ment->item==NIL){
-            break;
-        }
-        //flush block to disk
-    }
-    mtbl->dirty_list = NIL;
-    return 1;
-}
-
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
-{
-    uint32_t file_mtbl_blk;
-    uint16_t file_mtbl_ent;
-    uint16_t file_ent_index;
-    uint16_t file_ent_prev_index;
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), 
-        (uint64_t)(*handle), 
-        &file_mtbl_blk, 
-        &file_mtbl_ent, 
-        &file_ent_index, 
-        &file_ent_prev_index);
-    if((int)mtbl==NIL)
-    {
-        return NIL;
-    }
-    remove_all_memory_entries(mtbl);
-    struct file_ent_s *file = &(get_ucache()->ftbl.file[file_ent_index]);
-    put_free_mtbl(mtbl, file);
-    put_free_fent(file_ent_index);
-}
+    /*  list printing functions */
+static void print_lru(struct mem_table_s *mtbl);
+static void print_dirty(struct mem_table_s *mtbl);
+/****************************************  End of Internal Only Functions    */
 #endif
-#endif 
 
 /*
  * Local variables:

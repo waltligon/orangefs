@@ -4,53 +4,46 @@
  * See COPYING in top-level directory.
  */
 
-#include "ucache.h"
+/*  Experimental cache for user data
+ *      Currently under development.
+ */
 
 /*  
-*   Note: When unsigned ints are set to NIL, their values are based on type:
-*   ex: 16      0xFFFF  
-*       32      0XFFFFFFFF
-*       64      0XFFFFFFFFFFFFFFFF 
-*   ALL EQUAL THE SIGNED REPRESENTATION OF -1, CALLED NIL.  
-*/
+ *   Note: When unsigned ints are set to NIL, their values are based on type:
+ *   ex: 16      0xFFFF  
+ *       32      0XFFFFFFFF
+ *       64      0XFFFFFFFFFFFFFFFF 
+ *   ALL EQUAL THE SIGNED REPRESENTATION OF -1, CALLED NIL.  
+ */
+
+#include "ucache.h"
 
 static union user_cache_u *ucache;
 static int ucache_blk_cnt;
-FILE *out; /*   For Logging Purposes    */
+static ucache_lock_t *ucache_lock;  /*  For maintaining concurrency */
+static FILE *out;   /*  For Logging Purposes    */
 
-static union user_cache_u *get_ucache(){
-    return ucache;
-}
+/*  Externally Visible API
+ *      The following functions are thread/processor safe regarding the cache 
+ *      tables and data.      
+ */
 
-/*  This function should only be called when the ftbl has no free mtbls */
-static void add_free_mtbls(int blk)
+/*  Initializes the cache. 
+ *  Mainly, it aquires a shared memory segment used to cache data. 
+ * 
+ *  This function also initializes the the FTBL and some MTBLs.
+ *
+ *  The whole cache is protected by a locking mechanism to maintain concurrency.
+ *  Currently using posix semaphores
+ */
+extern void ucache_initialize(void)
 {
-    int i, start_mtbl;
-    struct file_table_s *ftbl = &(ucache->ftbl);
-    union cache_block_u *b = &(ucache->b[blk]);
-
-    /* add mtbls in blk to ftbl free list */
-    if (blk == 0)
-    {
-        start_mtbl = 1; /* skip blk 0 ent 0 which is ftbl */
-    }
-    else
-    {
-        start_mtbl = 0;
-    }
-    for (i = start_mtbl; i < MTBL_PER_BLOCK - 1; i++)
-    {
-        b->mtbl[i].free_list_blk = blk;
-        b->mtbl[i].free_list = i + 1;
-    }
-    b->mtbl[i].free_list_blk = NIL;
-    b->mtbl[i].free_list = NIL;
-    ftbl->free_mtbl_blk = blk;
-    ftbl->free_mtbl_ent = start_mtbl;
-}
-
-void ucache_initialize(void)
-{
+    /*  Aquire shared memory for ucache_lock    */
+    ucache_lock = shmat(shmget(ftok(GET_KEY_FILE, 'a'), 
+        sizeof(ucache_lock_t), CACHE_FLAGS), NULL, AT_FLAGS);
+    ucache_lock_init(ucache_lock);
+    ucache_lock_lock(ucache_lock);
+    /*  Aquire shared memory for lock for ucache    */
     int key, id, i;
     char *key_file_path;
     /*  Direct output   */
@@ -95,6 +88,243 @@ void ucache_initialize(void)
         ucache->ftbl.file[i].next = i+1;
     }
     ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL;
+    ucache_lock_unlock(ucache_lock);
+}
+
+extern int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+{
+    ucache_lock_lock(ucache_lock);
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    if((int)mtbl==NIL)
+    {
+        insert_file((uint32_t)*fs_id, (uint64_t)*handle);
+    }
+    ucache_lock_unlock(ucache_lock);
+    return 1;
+}
+
+/*  Returns ptr to block in cache based on file and offset  */
+extern void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+{
+    ucache_lock_lock(ucache_lock);
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    if((int)mtbl!=NIL)
+    {
+        char *retVal = (char *)lookup_mem(mtbl, (uint64_t)offset, NULL, NULL, NULL);
+        ucache_lock_unlock(ucache_lock);
+        return((void *)retVal); 
+    }
+    ucache_lock_unlock(ucache_lock);
+    return (void *)NIL;
+}
+
+/*  Inserts block of data into cache    */
+extern void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+{
+    ucache_lock_lock(ucache_lock);
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    if((int)mtbl==NIL)
+    {
+        ucache_lock_unlock(ucache_lock);
+        return (void *)NIL;
+    }
+    else
+    {
+        remove_mem(mtbl, (uint64_t)offset);
+        char * retVal= insert_mem(mtbl, (uint64_t)offset);
+        ucache_lock_unlock(ucache_lock);
+        return ((void *)retVal); 
+    }
+}
+
+/*  Removes a cached block of data from mtbl    */
+extern int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+{
+    ucache_lock_lock(ucache_lock);
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    if((int)mtbl!=NIL)
+    {
+        int retVal = remove_mem(mtbl, (uint64_t)offset);
+        ucache_lock_unlock(ucache_lock); 
+        return retVal; 
+    }        
+    ucache_lock_unlock(ucache_lock);
+    return NIL;
+}
+
+/*  Flushes dirty blocks to the I/O Nodes   */
+extern int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+{
+    ucache_lock_lock(ucache_lock);
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    if((int)mtbl==NIL)
+    {
+        return NIL;
+    }
+    int i;
+    for(i=mtbl->dirty_list; !dirty_done(i); i=dirty_next(mtbl, i)){
+        struct mem_ent_s *ment = &(mtbl->mem[i]);
+        mtbl->mem[i].dirty_next = NIL;
+        if((int64_t)ment->tag==NIL || (int32_t)ment->item==NIL){
+            break;
+        }
+        /*  //flush block to disk   */
+    }
+    mtbl->dirty_list = NIL;
+    ucache_lock_unlock(ucache_lock);
+    return 1;
+}
+
+/*  Removes all memory entries in the mtbl corresponding to the file info 
+ *  provided as parameters. It also removes the mtbl and the file entry from 
+ *  the cache.
+ */
+extern int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+{
+    ucache_lock_lock(ucache_lock);
+    uint32_t file_mtbl_blk;
+    uint16_t file_mtbl_ent;
+    uint16_t file_ent_index;
+    uint16_t file_ent_prev_index;
+    struct mem_table_s *mtbl= lookup_file(
+        (uint32_t)(*fs_id), 
+        (uint64_t)(*handle), 
+        &file_mtbl_blk, 
+        &file_mtbl_ent, 
+        &file_ent_index, 
+        &file_ent_prev_index);
+    if((int)mtbl==NIL)
+    {
+        ucache_lock_unlock(ucache_lock);
+        return NIL;
+    }
+    remove_all_memory_entries(mtbl);
+    struct file_ent_s *file = &(ucache->ftbl.file[file_ent_index]);
+    put_free_mtbl(mtbl, file);
+    put_free_fent(file_ent_index);
+    ucache_lock_unlock(ucache_lock);
+    return 1;
+}
+
+/*  Use the following function to decrement the reference count of a particular 
+ *  mtbl. This function must be called when a user's code is done with the
+ *  pointer provided via any of the pointer returning external functions listed
+ *  above.
+ */
+extern int ucache_dec_ref_cnt(struct mem_table_s * mtbl)
+{
+    ucache_lock_lock(ucache_lock);
+    /*  decrement ref_cnt of mtbl   */
+    mtbl->ref_cnt--;
+    ucache_lock_unlock(ucache_lock);    
+}
+/*****************************************  End of Externally Visible API    */
+
+
+/*  Beginning of internal only (static) functions
+ */
+
+/*  Internally Available Locking Mechanism - using POSIX semaphores   
+ */
+static int ucache_lock_init(ucache_lock_t * lock)
+{
+    /*  Set pshared (2nd arg) to non-zero value to share semaphore b/w forked 
+     *  processes
+     */
+    return sem_init(lock, 1, 1); 
+}
+
+/*  Returns 0 when lock is locked; otherwise, return -1 and sets errno*/
+static int ucache_lock_lock(ucache_lock_t * lock)
+{
+    return sem_wait(lock);
+}
+
+/*  If successful, return zero; otherwise, return -1 and sets errno */
+static int ucache_lock_unlock(ucache_lock_t * lock)
+{
+    return sem_post(lock);
+}
+
+/*  Upon successful completion, returns zero; otherwise, returns and sets errno.
+ */
+static int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
+{
+    return sem_getvalue(lock, sval);
+}
+
+/* Upon successful completion, returns zero; otherwise returns 1 and sets errno.
+ */
+static int ucache_lock_destroy(ucache_lock_t * lock)
+{
+    return sem_destroy(lock); 
+}
+
+/*  Dirty List Iterator */
+static int dirty_done(uint16_t index)
+{
+    return ((int16_t)index==NIL);
+}
+
+static int dirty_next(struct mem_table_s *mtbl, uint16_t index)
+{
+    return mtbl->mem[index].dirty_next;
+}
+
+/*  Memory Entry Chain Iterator */
+static int ment_done(int index)
+{
+    return ((int16_t)index==NIL);
+}
+
+static int ment_next(struct mem_table_s *mtbl, int index)
+{
+    return mtbl->mem[index].next;
+}
+
+/*  File Entry Chain Iterator   */
+static int file_done(int index)
+{
+    return ((int16_t)index==NIL);
+}
+
+static int file_next(struct file_table_s *ftbl, int index)
+{
+    return ftbl->file[index].next;
+}
+
+/*  
+ *  This function should only be called when the ftbl has no free mtbls. 
+ */
+static void add_free_mtbls(int blk)
+{
+    int i, start_mtbl;
+    struct file_table_s *ftbl = &(ucache->ftbl);
+    union cache_block_u *b = &(ucache->b[blk]);
+
+    /* add mtbls in blk to ftbl free list */
+    if (blk == 0)
+    {
+        start_mtbl = 1; /* skip blk 0 ent 0 which is ftbl */
+    }
+    else
+    {
+        start_mtbl = 0;
+    }
+    for (i = start_mtbl; i < MTBL_PER_BLOCK - 1; i++)
+    {
+        b->mtbl[i].free_list_blk = blk;
+        b->mtbl[i].free_list = i + 1;
+    }
+    b->mtbl[i].free_list_blk = NIL;
+    b->mtbl[i].free_list = NIL;
+    ftbl->free_mtbl_blk = blk;
+    ftbl->free_mtbl_ent = start_mtbl;   
 }
 
 static void init_memory_table(int blk, int ent)
@@ -227,8 +457,8 @@ static struct mem_table_s *lookup_file(
     if(DBG)fprintf(out, "performing lookup...\n");
     struct file_table_s *ftbl = &(ucache->ftbl);
     struct file_ent_s *current; /* Current ptr for iteration    */
-    int index;          /* Index into file hash table   */
-    index = handle % FILE_TABLE_HASH_MAX;
+    /* Index into file hash table   */
+    int index = handle % FILE_TABLE_HASH_MAX;
     if(DBG)fprintf(out, "\thashed index: %d\n", index);
     current = &(ftbl->file[index]);
     p=NIL; c = index; n = current->next;
@@ -294,7 +524,7 @@ static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent)
         return NIL;
 }
 
-void remove_all_memory_entries(struct mem_table_s *mtbl)
+static void remove_all_memory_entries(struct mem_table_s *mtbl)
 {
     /*  remove all ments, including their associated blocks */
     int i = 0;
@@ -317,7 +547,7 @@ void remove_all_memory_entries(struct mem_table_s *mtbl)
     }
 }
 
-void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
+static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
 {
     /*  remove mtbl */
     mtbl->num_blocks = NIL; /* number of used blocks in this mtbl */
@@ -338,7 +568,7 @@ void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
 }
 
 /*  evict the file @ index, must be less than FILE_TABLE_HASH_MAX   */
-void evict_file(unsigned int index)
+static void evict_file(unsigned int index)
 {
     if(DBG)fprintf(out, "evicting data @ index %d...\n", index);
     struct file_ent_s *file = &(ucache->ftbl.file[index]);
@@ -509,7 +739,7 @@ static void *lookup_mem(struct mem_table_s *mtbl,
     }
 }
 
-void update_lru(struct mem_table_s *mtbl, uint16_t index)
+static void update_lru(struct mem_table_s *mtbl, uint16_t index)
 {
             if(DBG)fprintf(out, "updating lru...\n");
             if((int16_t)index<MEM_TABLE_HASH_MAX)
@@ -599,7 +829,7 @@ static int locate_max_mtbl(struct mem_table_s **mtbl)
     return value_of_max;
 }
 
-void evict_LRU(struct mem_table_s *mtbl)
+static void evict_LRU(struct mem_table_s *mtbl)
 {
     if(DBG)fprintf(out, "evicting LRU...\n");
     if(mtbl->num_blocks!=0)
@@ -766,7 +996,9 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
     return 1;
 }
 
-void print_lru(struct mem_table_s *mtbl)
+/*  The following two functions are provided for error checking purposes.
+ */
+static void print_lru(struct mem_table_s *mtbl)
 {
     if(DBG)fprintf(out, "\tprinting lru list:\n");
     if(DBG)fprintf(out, "\t\tlru: %d\n", (int16_t)mtbl->lru_last);
@@ -778,7 +1010,7 @@ void print_lru(struct mem_table_s *mtbl)
     }
 }
 
-void print_dirty(struct mem_table_s *mtbl)
+static void print_dirty(struct mem_table_s *mtbl)
 {
     if(DBG)fprintf(out, "\tprinting dirty list:\n");
     if(DBG)fprintf(out, "\t\tdirty_list head: %d\n",\
@@ -792,6 +1024,7 @@ void print_dirty(struct mem_table_s *mtbl)
         current = mtbl->mem[current].dirty_next;
     }
 }
+/*  End of Internal Only Functions    */
 
 /*
  * Local variables:
@@ -801,5 +1034,3 @@ void print_dirty(struct mem_table_s *mtbl)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-
