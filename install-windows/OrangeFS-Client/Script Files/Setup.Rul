@@ -13,7 +13,9 @@
 // Included header files ----------------------------------------------------
 #include "ifx.h" 
 #include "MountPointUserModeDialog.Rul" 
-#include "ListMapDialog.Rul"
+#include "ListMapDialog.Rul" 
+#include "CertMapDialog.Rul"
+#include "LDAPMapDialog.Rul"
 
 // Note: In order to have your InstallScript function executed as a custom
 // action by the Windows Installer, it must be prototyped as an 
@@ -29,9 +31,11 @@ prototype InstallDriver();
 prototype WriteOrangeFSTab(STRING);
 
 // global variables
+/*
 #define USERMAP_LIST     1
 #define USERMAP_CERT     2
 #define USERMAP_LDAP     3
+*/
 
 // 64-bit flag
 BOOL bIs64Bit;
@@ -225,10 +229,17 @@ end;
 // completed successfully.
 //---------------------------------------------------------------------------
 function OnFirstUIAfter()
-    STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2;
+    STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2, szTemp;
     STRING szFSURI, szMountPoint, szUserMapMode;
     STRING szUserID, szUID, szGID;
+    STRING szCertPrefixDir;
     NUMBER bOpt1, bOpt2, nUserMapMode, nRC;    
+    NUMBER nCertMapMode;
+    BOOL bLDAP_AD, bLDAP_eDir, bLDAP_Custom;
+    NUMBER nLDAPMapDefault;
+    STRING szHost, szUserDN, szPassword, szRoot, szClass, 
+           szNamingAttr, szUIDAttr, szGIDAttr;
+    NUMBER nScope;
 begin
 	Disable(STATUSEX);
 
@@ -236,20 +247,32 @@ begin
     bOpt2   = FALSE;
     
 Dlg_MountPointUserMap:
+    Disable(BACKBUTTON);
     nUserMapMode = 0;
     nRC = MountPointUserModeDialog(szFSURI, szMountPoint, nUserMapMode);
     
 Dlg_UserMap:
+    Enable(BACKBUTTON);
     switch(nUserMapMode)
         case USERMAP_LIST:
             nRC = ListMapDialog(szUserID, szUID, szGID); 
-            MessageBox(szUserID + " " + szUID + " " + szGID, INFORMATION);
-        /*
         case USERMAP_CERT:
-            // TODO
+            nRC = CertMapDialog(nUserMapMode, szCertPrefixDir);
         case USERMAP_LDAP:
-            // TODO
-        */
+            bLDAP_AD = TRUE;
+            bLDAP_eDir = FALSE;
+            bLDAP_Custom = FALSE;
+            AskOptions(EXCLUSIVE, "Select LDAP Default Values", "Microsoft Active Directory", bLDAP_AD, 
+                       "Novell eDirectory", bLDAP_eDir, "Custom (no defaults)", bLDAP_Custom);
+            if (bLDAP_AD) then
+                nLDAPMapDefault = LDAPMAP_AD;
+            elseif (bLDAP_eDir) then
+                nLDAPMapDefault = LDAPMAP_EDIR;
+            else
+                nLDAPMapDefault = LDAPMAP_CUSTOM;
+            endif;
+            nRC = LDAPMapDialog(nLDAPMapDefault, szHost, szUserDN, szPassword, szRoot, nScope,
+                                szClass, szNamingAttr, szUIDAttr, szGIDAttr);
     endswitch;
     
     if (nRC = BUTTON_BACK) then
