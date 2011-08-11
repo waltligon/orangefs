@@ -40,8 +40,6 @@ begin
             case DLG_INIT:
                 // select profile button
                 CtrlSetState("CertMapDialog", RB_PROFILE, BUTTON_CHECKED);
-                // set default certificate prefix
-                CtrlSetText("CertMapDialog", EDIT_PREFIX, INSTALLDIR ^ "CA");
             case RB_PROFILE:
                 // disable prefix edit
                 if (CtrlGetState("CertMapDialog", RB_PROFILE) = BUTTON_CHECKED) then

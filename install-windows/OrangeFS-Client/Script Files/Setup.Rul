@@ -29,6 +29,12 @@
 prototype InstallServices(); 
 prototype InstallDriver(); 
 prototype WriteOrangeFSTab(STRING);
+prototype InitConfigFile(BYREF NUMBER, STRING);
+prototype WriteListMapConfig(NUMBER, STRING, STRING, STRING);
+prototype WriteCertMapConfig(NUMBER, STRING);
+prototype WriteLDAPMapConfig(NUMBER, STRING, STRING, STRING, STRING,
+                             NUMBER, STRING, STRING, STRING, STRING);
+prototype CloseConfigFile(NUMBER);
 
 // global variables
 /*
@@ -133,7 +139,7 @@ Dlg_SetupType:
 Dlg_SdAskDestPath:    	
     nResult = SdAskDestPath(szTitle, szMsg, INSTALLDIR, 0);
     if (nResult = BACK) goto Dlg_SetupType;
-
+/*
 Dlg_SdFeatureTree: 
     szTitle    = "";
     szMsg      = "";
@@ -141,14 +147,18 @@ Dlg_SdFeatureTree:
 		nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
 		if (nResult = BACK) goto Dlg_SdAskDestPath;  
     endif;
-
+*/
 Dlg_SdStartCopy:
     szTitle = "";
     szMsg   = "";
     nResult = SdStartCopy2( szTitle, szMsg );			
 	
     if (nResult = BACK) then
-       goto Dlg_SdFeatureTree;
+       if (bCustom) then 
+           goto Dlg_SdAskDestPath;
+       else
+           goto Dlg_SetupType;
+       endif;
     endif;
 
     // Added in IS 2009 - Set appropriate StatusEx static text.
@@ -168,13 +178,105 @@ begin
     
     if (CreateFile(nFileHandle, INSTALLDIR, "orangefstab") < 0) then
         MessageBox("File " + INSTALLDIR + "\\orangefstab could not be created. " +
-                   "You must add this finally manually (see documentation).", SEVERE);
+                   "You must add this file manually (see documentation).", SEVERE);
     else
         WriteLine(nFileHandle, szFSURI + " /mnt/pvfs2 pvfs2 defaults,noauto 0 0"); 
         
         CloseFile(nFileHandle);
     endif;
 end;
+
+function InitConfigFile(nvFileHandle, szMountPoint)
+begin                       
+    // create the config file
+    OpenFileMode(FILE_MODE_APPEND);
+    
+    if (CreateFile(nvFileHandle, INSTALLDIR, "orangefs.cfg") < 0) then
+        MessageBox("File " + INSTALLDIR + "\\orangefs.cfg could not be created. " +
+                   "You must add this file manually (see documentation).", SEVERE);
+        return -1;
+    endif;
+    
+    // write the mount point 
+    if (szMountPoint != "Auto") then
+        WriteLine(nvFileHandle, "mount " + szMountPoint);    
+    endif;
+    
+    return 0;
+end;
+
+function WriteListMapConfig(nFileHandle, szUserID, szUID, szGID)
+begin
+    // write list map mode setting and one user
+    WriteLine(nFileHandle, "user-mode list");
+    
+    if (szUserID != "" && szUID != "" && szGID != "") then
+        WriteLine(nFileHandle, "user " + szUserID + " " + szUID + ":" + szGID);
+    endif;
+    
+end;
+
+function WriteCertMapConfig(nFileHandle, szCertDirPrefix)
+begin          
+    // write cert map mode settings
+    WriteLine(nFileHandle, "user-mode certificate");
+    
+    if (szCertDirPrefix != "") then
+       WriteLine(nFileHandle, "cert-dir-prefix " + szCertDirPrefix);
+    endif; 
+end;
+
+function WriteLDAPMapConfig(nFileHandle, szHost, szUserDN, szPassword, szRoot,
+                            nScope, szClass, szNamingAttr, szUIDAttr, szGIDAttr)
+begin
+    // write LDAP map options
+    WriteLine(nFileHandle, "user-mode ldap");
+    
+    if (szHost != "") then
+        WriteLine(nFileHandle, "ldap-host " + szHost);
+    endif;
+    
+    if (szUserDN != "") then
+        WriteLine(nFileHandle, "ldap-bind-dn " + szUserDN);
+    endif;
+    
+    if (szPassword != "") then
+        WriteLine(nFileHandle, "ldap-password " + szPassword);
+    endif;
+    
+    if (szRoot != "") then
+        WriteLine(nFileHandle, "ldap-search-root " + szRoot);
+    endif;
+    
+    if (nScope = LDAPSCOPE_SUBTREE) then
+        WriteLine(nFileHandle, "ldap-search-scope subtree");
+    else
+        WriteLine(nFileHandle, "ldap-search-scope onelevel");
+    endif;
+    
+    if (szClass != "") then
+        WriteLine(nFileHandle, "ldap-search-class " + szClass);
+    endif;
+    
+    if (szNamingAttr != "") then
+        WriteLine(nFileHandle, "ldap-naming-attr " + szNamingAttr);
+    endif;
+    
+    if (szUIDAttr != "") then
+        WriteLine(nFileHandle, "ldap-uid-attr " + szUIDAttr);
+    endif;
+    
+    if (szGIDAttr != "") then
+        WriteLine(nFileHandle, "ldap-gid-attr " + szGIDAttr);
+    endif;
+        
+end;
+
+function CloseConfigFile(nFileHandle)
+begin
+    CloseFile(nFileHandle);
+end;
+
 
 function InstallDriver()
     STRING svExePath;
@@ -240,6 +342,7 @@ function OnFirstUIAfter()
     STRING szHost, szUserDN, szPassword, szRoot, szClass, 
            szNamingAttr, szUIDAttr, szGIDAttr;
     NUMBER nScope;
+    NUMBER nFileHandle;
 begin
 	Disable(STATUSEX);
 
@@ -247,11 +350,13 @@ begin
     bOpt2   = FALSE;
     
 Dlg_MountPointUserMap:
+    // prompt for file system location, mount point and user mapping mode
     Disable(BACKBUTTON);
     nUserMapMode = 0;
     nRC = MountPointUserModeDialog(szFSURI, szMountPoint, nUserMapMode);
     
 Dlg_UserMap:
+    // prompt for user mapping settings
     Enable(BACKBUTTON);
     switch(nUserMapMode)
         case USERMAP_LIST:
@@ -281,6 +386,18 @@ Dlg_UserMap:
         
     WriteOrangeFSTab(szFSURI);
     
+    InitConfigFile(nFileHandle, szMountPoint);
+    switch (nUserMapMode)
+       case USERMAP_LIST:
+           WriteListMapConfig(nFileHandle, szUserID, szUID, szGID);
+       case USERMAP_CERT:
+           WriteCertMapConfig(nFileHandle, szCertPrefixDir);
+       case USERMAP_LDAP:
+           WriteLDAPMapConfig(nFileHandle, szHost, szUserDN, szPassword, szRoot, nScope,
+                              szClass, szNamingAttr, szUIDAttr, szGIDAttr);
+    endswitch;
+    CloseConfigFile(nFileHandle);
+        
     InstallServices();
     
     InstallDriver();    
@@ -288,6 +405,13 @@ Dlg_UserMap:
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
     else
+        szOpt1 = "Start the OrangeFS services";
+        bOpt1 = TRUE;
 	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
+	    
+        if (bOpt1) then
+            ServiceStartService("DokanMounter", "");
+            ServiceStartService("orangefs-client", "");
+        endif;
 	endif;
 end;
