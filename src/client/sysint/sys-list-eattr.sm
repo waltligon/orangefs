@@ -80,7 +80,8 @@ PVFS_error PVFS_isys_listeattr(
     /* the resp key array is used to determine how much we allocate,
      * let's enfore the max key buffer of PVFS_MAX_XATTR_NAMELEN
      */
-    if( resp_p->nkey > PVFS_REQ_LIMIT_EATTR_LIST )
+
+    if( nkey > PVFS_REQ_LIMIT_EATTR_LIST )
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: requested number of keys, %d, "
                      " is larger than the maximum of %d\n", __func__,
@@ -88,7 +89,7 @@ PVFS_error PVFS_isys_listeattr(
         return ret; 
     }
 
-    for( i=0; i < resp_p->nkey; i++ )
+    for( i=0; i < nkey; i++ )
     {
         if( resp_p->key_array[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
         {

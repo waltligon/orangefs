@@ -520,7 +520,7 @@ endecode_fields_2(
                                                   by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
-#define PVFS_MAX_XATTR_LISTLEN   8  /* Not the same as XATTR_LIST_MAX
+#define PVFS_MAX_XATTR_LISTLEN   16  /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
