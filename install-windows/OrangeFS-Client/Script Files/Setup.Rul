@@ -113,7 +113,7 @@ Dlg_SdRegisterUser:
     szTitle = "";
     nResult = SdRegisterUser( szTitle, szMsg, svName, svCompany );
     if (nResult = BACK) goto Dlg_SdWelcome;
-*/
+
 Dlg_SetupType:
     szTitle = "";
     szMsg   = "";
@@ -135,10 +135,11 @@ Dlg_SetupType:
 			bCustom = TRUE;
         endif;
     endif;    
+*/
 
 Dlg_SdAskDestPath:    	
     nResult = SdAskDestPath(szTitle, szMsg, INSTALLDIR, 0);
-    if (nResult = BACK) goto Dlg_SetupType;
+    if (nResult = BACK) goto Dlg_SdWelcome;
 /*
 Dlg_SdFeatureTree: 
     szTitle    = "";
@@ -153,13 +154,7 @@ Dlg_SdStartCopy:
     szMsg   = "";
     nResult = SdStartCopy2( szTitle, szMsg );			
 	
-    if (nResult = BACK) then
-       if (bCustom) then 
-           goto Dlg_SdAskDestPath;
-       else
-           goto Dlg_SetupType;
-       endif;
-    endif;
+    if (nResult = BACK) goto Dlg_SdAskDestPath;
 
     // Added in IS 2009 - Set appropriate StatusEx static text.
     SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_FIRSTUI ) );
