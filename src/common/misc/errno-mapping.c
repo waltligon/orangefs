@@ -46,7 +46,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     }
     else
     {
-#ifdef HAVE_GNU_STRERROR_R
+#if defined(HAVE_GNU_STRERROR_R) || defined(_GNU_SOURCE)
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
@@ -57,7 +57,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
 #elif defined(WIN32)
         ret = (int) strerror_s(buf, (size_t) limit, tmp);
 #else 
-        ret = (long int)strerror_r(tmp, buf, (size_t)limit);
+        ret = (int)strerror_r(tmp, buf, (size_t)limit);
 #endif
     }
     return ret;
