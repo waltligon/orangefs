@@ -1,16 +1,20 @@
 /* 
- * (C) 2011 Clemson University and The University of Chicago 
+ * (C) 2011 Clemson University
  *
  * See COPYING in top-level directory.
  */
 
-#ifndef UCACHE_INTERNAL_H
-#define UCACHE_INTERNAL_H
+#ifndef UCACHE_H
+#define UCACHE_H
+
+#define UCACHE_ENABLED
+#define UCACHE_LOCKING_ENABLED
 
 #include <stdio.h>
 #include <sys/shm.h>
 #include <stdint.h>
 #include <semaphore.h>
+#include <pthread.h>
 
 /* The following includes may end up not being needed. 
 #include <sys/types.h>
@@ -35,9 +39,18 @@
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
 #define NIL (-1)
 
-#define DBG 0
+#define DBG 1
 #define INTERNAL_TESTING 0
+
+
+#define LOCK_TYPE 0 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
+#if LOCK_TYPE==0
 #define ucache_lock_t sem_t
+#elif LOCK_TYPE==1
+#define ucache_lock_t pthread_mutex_t
+#elif LOCK_TYPE==2
+#define ucache_lock_t pthread_spinlock_t
+#endif
 
 typedef uint32_t PVFS_fs_id;
 typedef uint64_t PVFS_object_ref;
@@ -121,77 +134,26 @@ union user_cache_u
 };
 
 /* externally visible API */
-extern void ucache_initialize(void);
-extern int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
-extern void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-extern void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-extern int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-extern int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
-extern int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
-
-/* Internal Only Function Declarations   */
-    /*  Cache Locking Functions */
-static int ucache_lock_init(ucache_lock_t * lock);
-static int ucache_lock_lock(ucache_lock_t * lock);
-static int ucache_lock_unlock(ucache_lock_t * lock);
-static int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
-static int ucache_lock_destroy(ucache_lock_t * lock);
-
-    /*  Dirty List Iterator */
-static int dirty_done(uint16_t index);
-static int dirty_next(struct mem_table_s *mtbl, uint16_t index);
-
-    /*  Memory Entry Chain Iterator */
-static int ment_done(int index);
-static int ment_next(struct mem_table_s *mtbl, int index);
-
-    /*  File Entry Chain Iterator   */
-static int file_done(int index);
-static int file_next(struct file_table_s *ftbl, int index);
-
-static void add_free_mtbls(int blk);
-static void init_memory_table(int blk, int ent);
-static uint16_t get_free_blk(void);
-static void put_free_blk(int blk);
-static int get_free_fent(void);
-static void put_free_fent(int fent);
-static int get_free_ment(struct mem_table_s *mtbl);
-static void put_free_ment(struct mem_table_s *mtbl, int ent);
-static struct mem_table_s *lookup_file(
-    uint32_t fs_id, 
-    uint64_t handle,
-    uint32_t *file_mtbl_blk,        /* Can be NULL if not desired   */
-    uint16_t *file_mtbl_ent,        /* Can be NULL if not desired   */
-    uint16_t *file_ent_index,   /* Can be NULL if not desired   */
-    uint16_t *file_ent_prev_index   /* Can be NULL if not desired   */
+void ucache_initialize(void);
+int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
+int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+void ucache_dec_ref_cnt(struct mem_table_s * mtbl);
+void ucache_inc_ref_cnt(struct mem_table_s * mtbl);
+void ucache_info(
+    FILE * out,
+    union user_cache_u * ucache, 
+    ucache_lock_t * ucache_lock
 );
-static int get_next_free_mtbl(uint32_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
-static void remove_all_memory_entries(struct mem_table_s *mtbl);
-static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file);
-static void evict_file(unsigned int index);
-static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
-static int remove_file(uint32_t fs_id, uint64_t handle);
-static void *lookup_mem(struct mem_table_s *mtbl, 
-                    uint64_t offset, 
-                    uint32_t *item_index,
-                    uint16_t *mem_ent_index,
-                    uint16_t *mem_ent_prev_index
-);
-static void update_lru(struct mem_table_s *mtbl, uint16_t index);
-static int locate_max_mtbl(struct mem_table_s **mtbl);
-static void evict_LRU(struct mem_table_s *mtbl);
-static void *set_item(struct mem_table_s *mtbl, 
-                    uint64_t offset, 
-                    uint16_t index
-);
-static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset);
-static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
-    /*  list printing functions */
-static void print_lru(struct mem_table_s *mtbl);
-static void print_dirty(struct mem_table_s *mtbl);
+
+#if LOCK_TYPE==0
+int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
+#endif
 /****************************************  End of Internal Only Functions    */
 #endif
-
 /*
  * Local variables:
  *  c-indent-level: 4
