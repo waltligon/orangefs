@@ -12,6 +12,14 @@
 #include <malloc.h>
 #endif
 
+#ifdef WIN32
+#include "wincommon.h"
+
+/* do not declare inline on Windows (can't be exported)*/
+#undef inline
+#define inline
+#endif
+
 /* prototype definitions */
 inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment);
 inline void PINT_mem_aligned_free(void *ptr);
@@ -29,7 +37,16 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
     int ret;
     void *ptr;
 
+#ifdef WIN32    
+    ret = 0;
+    ptr = _aligned_malloc(size, alignment);
+    if (ptr == NULL)
+    {
+        ret = ENOMEM;
+    }
+#else
     ret = posix_memalign(&ptr, alignment, size);
+#endif
     if(ret != 0)
     {
         errno = ret;
@@ -48,7 +65,11 @@ inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
  */
 inline void PINT_mem_aligned_free(void *ptr)
 {
+#ifdef WIN32
+    _aligned_free(ptr);
+#else
     free(ptr);
+#endif
     return;
 }
 

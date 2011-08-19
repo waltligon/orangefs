@@ -38,8 +38,6 @@ int main(
     PVFS_object_ref pinode_refn;
     PVFS_Request file_req;
     PVFS_Request mem_req;
-    void *buffer;
-    int buffer_size;
     int32_t len_array1[17];
     int32_t len_array2[17];
     PVFS_offset off_array1[17];
@@ -160,9 +158,6 @@ int main(
 
     printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
-
-    buffer = io_buffer;
-    buffer_size = io_size * sizeof(int);
 
     off_array1[0] = 0;
     off_array1[0] += (intptr_t)io_buffer;

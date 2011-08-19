@@ -19,19 +19,6 @@
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
-#define __USE_GNU
-#include <ucontext.h>
-#endif
-
-#ifdef __PVFS2_SEGV_BACKTRACE__
-#include <execinfo.h>
-#define __USE_GNU
-#include <ucontext.h>
-#endif
-
-#ifdef __PVFS2_SEGV_BACKTRACE__
-#include <execinfo.h>
-#define __USE_GNU
 #include <ucontext.h>
 #endif
 
@@ -296,7 +283,7 @@ do {                                                                         \
 #elif defined(REG_RIP)
 #  define REG_INSTRUCTION_POINTER REG_RIP
 #else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#  error Unknown instruction pointer location for your architecture, configure with --disable-segv-backtrace.
 #endif
 
 static void client_segfault_handler(int signum, siginfo_t *info, void *secret)
@@ -394,12 +381,10 @@ static PVFS_error cancel_op_in_progress(PVFS_id_gen_t tag)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "cancel_op_in_progress called\n");
 
-    hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)(&tag));
+    hash_link = qhash_search( s_ops_in_progress_table, (void *)(&tag));
     if (hash_link)
     {
-        vfs_request = qhash_entry(
-            hash_link, vfs_request_t, hash_link);
+        vfs_request = qhash_entry( hash_link, vfs_request_t, hash_link);
         assert(vfs_request);
         assert(vfs_request->info.tag == tag);
 
@@ -439,12 +424,11 @@ static int is_op_in_progress(vfs_request_t *vfs_request)
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "is_op_in_progress called on "
                  "tag %lld\n", lld(vfs_request->info.tag));
 
-    hash_link = qhash_search(
-        s_ops_in_progress_table, (void *)(&vfs_request->info.tag));
+    hash_link = qhash_search( s_ops_in_progress_table, 
+                              (void *)(&vfs_request->info.tag));
     if (hash_link)
     {
-        tmp_request = qhash_entry(
-            hash_link, vfs_request_t, hash_link);
+        tmp_request = qhash_entry( hash_link, vfs_request_t, hash_link);
         assert(tmp_request);
 
         op_found = ((tmp_request->info.tag == vfs_request->info.tag) &&
@@ -994,7 +978,7 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
 
     fill_hints(&hints, vfs_request);
     ret = PVFS_isys_deleattr(
-        vfs_request->in_upcall.req.setxattr.refn,
+        vfs_request->in_upcall.req.removexattr.refn,
         &vfs_request->in_upcall.credentials,
         &vfs_request->key,
         &vfs_request->op_id, 
@@ -1160,7 +1144,7 @@ static inline int generate_upcall_mntent(struct PVFS_sys_mntent *mntent,
         GOSSIP_CLIENTCORE_DEBUG, "Got FS Name: %s (len=%d)\n",
         mntent->pvfs_fs_name, (int)strlen(mntent->pvfs_fs_name));
                                                               
-    mntent->encoding = ENCODING_DEFAULT;                      
+    mntent->encoding = PVFS2_ENCODING_DEFAULT;                      
     mntent->flowproto = FLOWPROTO_DEFAULT;                   
                                                            
     /* also fill in the fs_id for umount */               
@@ -3752,7 +3736,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
     };
 
     assert(opts);
-    opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
+    opts->perf_time_interval_secs = PERF_DEFAULT_UPDATE_INTERVAL / 1000;
     opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
     while((ret = getopt_long(argc, argv, "ha:n:L:",

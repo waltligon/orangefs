@@ -170,7 +170,12 @@ int main(int argc, char **argv)
     if (buf == NULL) return -1;
 
     /* pull data from file */
-    read(fd, buf, u_stat.st_size);
+    ret = read(fd, buf, u_stat.st_size);
+    if( ret == -1 )
+    {
+	fprintf(stderr, "read failed.\n");
+        return -1;
+    }
 
     f_size = (TROVE_size) u_stat.st_size;
     /* write data out to trove file */

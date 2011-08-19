@@ -70,6 +70,19 @@ int PINT_event_log_event(PINT_event_type type,
 
 #ifdef __PVFS2_ENABLE_EVENT__
 
+#ifdef WIN32
+
+#define PINT_EVENT_START(ET, PID, TID, EID, ...)  \
+   PINT_event_start_event(ET, PID, TID, EID, __VA_ARGS__)
+
+#define PINT_EVENT_END(ET, PID, TID, EID, ...) \
+   PINT_event_end_event(ET, PID, TID, EID, __VA_ARGS__)
+
+#define PINT_EVENT_LOG(ET, PID, TID, ...) \
+   PINT_event_log_event(ET, PID, TID, __VA_ARGS__)
+
+#else 
+
 #define PINT_EVENT_START(ET, PID, TID, EID, args...)  \
    PINT_event_start_event(ET, PID, TID, EID, ## args)
 
@@ -79,9 +92,24 @@ int PINT_event_log_event(PINT_event_type type,
 #define PINT_EVENT_LOG(ET, PID, TID, args...) \
    PINT_event_log_event(ET, PID, TID, ## args)
 
+#endif /* WIN32 */
+
 #define PINT_EVENT_ENABLED 1
 
 #else /* __PVFS2_ENABLE_EVENT__ */
+
+#ifdef WIN32
+
+#define PINT_EVENT_START(ET, PID, TID, EID, ...)  \
+    do { } while(0)
+
+#define PINT_EVENT_END(ET, PID, TID, EID, ...) \
+    do { } while(0)
+
+#define PINT_EVENT_LOG(ET, PID, TID, ...) \
+    do { } while(0)
+
+#else 
 
 #define PINT_EVENT_START(ET, PID, TID, EID, args...)  \
     do { } while(0)
@@ -91,6 +119,8 @@ int PINT_event_log_event(PINT_event_type type,
 
 #define PINT_EVENT_LOG(ET, PID, TID, args...) \
     do { } while(0)
+
+#endif /* WIN32 */
 
 #define PINT_EVENT_ENABLED  0
 

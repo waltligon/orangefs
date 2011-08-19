@@ -638,8 +638,13 @@ static int rename_rmdirent_comp_fn(void *v_p,
                                    int index)
 {
     PINT_smcb *smcb = v_p;
+#ifdef WIN32
+    PINT_client_sm *sm_p =
+        PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+#else
     PINT_client_sm *sm_p __attribute__((unused)) =
         PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+#endif
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_rmdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
@@ -1138,11 +1143,11 @@ static PINT_sm_action rename_cleanup(
             "ref.handle=%llu ref.fsid=%d\n",
             sm_p->u.rename.entries[1],
             llu(sm_p->u.rename.refns[0].handle),
-            sm_p->u.rename.parent_refns[0].fs_id);
+            sm_p->u.rename.parent_refns[1].fs_id);
 
         PINT_ncache_update((const char*) sm_p->u.rename.entries[1],
             (const PVFS_object_ref*) &(sm_p->u.rename.refns[0]),
-            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[0]));
+            (const PVFS_object_ref*) &(sm_p->u.rename.parent_refns[1]));
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

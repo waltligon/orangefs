@@ -7,7 +7,11 @@
 #ifndef __TCACHE_H
 #define __TCACHE_H
 
+#ifndef WIN32
 #include <sys/time.h>
+#else
+#include "wincommon.h"
+#endif
 #include "pvfs2-types.h"
 #include "quicklist.h"
 #include "quickhash.h"

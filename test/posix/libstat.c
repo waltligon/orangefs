@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include <linux/types.h>
 #include <assert.h>
-#include <linux/dirent.h>
 #include <linux/unistd.h>
 
 #define S_SLITE_SIZET     0x1

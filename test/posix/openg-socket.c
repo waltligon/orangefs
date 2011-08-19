@@ -258,7 +258,6 @@ int main(int argc, char *argv[])
 	end = Wtime();
 	if (fd < 0) {
 		fprintf(stderr, "openfh failed: %s\n", strerror(errno));
-		free(ptr);
 		exit(1);
 	}
 	printf("openfh returned %d [Time %g usec]\n", fd, usec_diff(&end, &begin));

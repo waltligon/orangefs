@@ -155,6 +155,18 @@ static int create_metafile(
     PVFS_handle_extent_array meta_handle_ext_array;
     server_configuration_s *config = get_server_config_struct();
 
+    /* first state to check in, make sure the attr mask contains the dist bit. 
+     * it's required later (not sure if we have to require it) but if we don't
+     * have it here, return an EINVAL */
+    if( ! (s_op->req->u.create.attr.mask & PVFS_ATTR_META_DIST) )
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: invalid create request, "
+                     "attribute mask did not include the distribution\n",
+                     __func__);
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
     ret = PINT_cached_config_get_server(
         s_op->req->u.create.fs_id,
         config->host_id,
@@ -247,7 +259,6 @@ static int check_stuffed(
         }
 
         s_op->resp.u.create.stuffed = 1;
-        s_op->u.create.handle_array_local[0] = 100;
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }

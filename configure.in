@@ -18,21 +18,21 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=2
-PVFS2_VERSION_RELEASE="orangefs-experimental-20101012"
+PVFS2_VERSION_SUB=4
+#PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-#PVFS2_VERSION_PRE="orangefs-experimental-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
-PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_VERSION_MAJOR, major version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_VERSION_MINOR, minor version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_SUB, $PVFS2_VERSION_SUB, sub version number)
-AC_DEFINE_UNQUOTED(PVFS2_VERSION_RELEASE, $PVFS2_VERSION_RELEASE, release version number)
+#AC_DEFINE_UNQUOTED(PVFS2_VERSION_RELEASE, $PVFS2_VERSION_RELEASE, release version number)
 AC_SUBST(PVFS2_VERSION_MAJOR)
 AC_SUBST(PVFS2_VERSION_MINOR)
 AC_SUBST(PVFS2_VERSION_SUB)
-AC_SUBST(PVFS2_VERSION_RELEASE)
+#AC_SUBST(PVFS2_VERSION_RELEASE)
 
 dnl BMI_ONLY_TAG
 
@@ -76,10 +76,24 @@ CFLAGS=$USR_CFLAGS
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
-AC_CHECK_PROG(HAVE_FIND, find, yes, no)
-AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
-AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_PERL = "no"; then
+    AC_MSG_ERROR("perl required in PATH to complete build")
+fi
 
+AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+if test $HAVE_FIND = "no"; then
+    AC_MSG_ERROR("find required in PATH complete build")
+fi
+
+AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
+if test $HAVE_BISON = "no"; then
+    AC_MSG_ERROR("bison required in PATH to complete build")
+fi
+
+AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_FLEX = "no"; then
+    AC_MSG_ERROR("flex required in PATH to complete build")
+fi
 
 AC_MSG_CHECKING([for required Math::BigInt perl module])
 perl -e "use Math::BigInt" 2>&1 > /dev/null
@@ -512,13 +526,17 @@ AC_ARG_WITH(kernel,
     if ! test -r $withval/include/linux/version.h ; then
        AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
-    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
-    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-    	# 2.6.18 moves UTS_RELEASE into its own header
-	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
-	       AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
-	fi
+
+    if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    elif test -r $withval/include/linux/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    else
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
     fi
+
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
@@ -1287,6 +1305,13 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 		    times on the fast interface.  Suggest you configure with
 		    "--without-bmi-tcp" for the best performance.])
     fi
+fi
+
+if test x$HAVE_DB_OLD = x1; then
+    AC_MSG_WARN([The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior 
+                    to 4.8.30. It is highly recommended that you update the 
+                    version of Berkeley DB you are building against.])
 fi
 
 AC_MSG_RESULT()

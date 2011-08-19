@@ -41,7 +41,11 @@
  * we grab these sizes.
  */
 
+#ifdef WIN32
+static struct profiler getattr_prof;
+#else
 static struct profiler getattr_prof __attribute__((unused));
+#endif
 
 extern job_context_id pint_client_sm_context;
 
@@ -800,7 +804,11 @@ static int getattr_object_getattr_comp_fn(
 static PINT_sm_action getattr_object_getattr_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+#ifdef WIN32
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+#else
     struct PINT_client_sm *sm_p __attribute__((unused)) = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+#endif
 
     gossip_debug(GOSSIP_CLIENT_DEBUG
                 ,"(%p) getattr state: getattr_object_getattr_failure\n"
@@ -830,6 +838,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     uint64_t mirror_retry = (sm_p->getattr.attr.mask & PVFS_ATTR_META_MIRROR_DFILES);
+    PVFS_handle *handles;
 
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing getattr_datafile_getattr_setup_msgpairarray...\n");
     gossip_debug(GOSSIP_MIRROR_DEBUG,"%s: Are we mirroring? %s\n",__func__
@@ -870,7 +879,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     }
 
     /* allocate handle array and populate */
-    PVFS_handle *handles = malloc(sizeof(PVFS_handle) * attr->u.meta.dfile_count);
+    handles = malloc(sizeof(PVFS_handle) * attr->u.meta.dfile_count);
     if (!handles)
     {
         gossip_lerr("Unable to allocation local handles array.\n");
@@ -1044,6 +1053,8 @@ static PINT_sm_action getattr_datafile_getattr_retry(
     int j   = 0;
     int k   = 0;
     int ret = 0;
+    uint32_t *tmp_server_nr;
+    PVFS_handle *tmp_handles;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, 
                  "(%p) getattr state: "
@@ -1088,7 +1099,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(
     }
 
     /*allocate temporary index-to-server array*/
-    uint32_t *tmp_server_nr = malloc(sizeof(uint32_t) * retry_msg_count);
+    tmp_server_nr = malloc(sizeof(uint32_t) * retry_msg_count);
     if (!tmp_server_nr)
     {
         gossip_lerr("Unable to allocate temporary index-to-server array.\n");
@@ -1098,7 +1109,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(
     memset(tmp_server_nr,0,sizeof(uint32_t) * retry_msg_count);
 
     /*allocate temporary handle array*/
-    PVFS_handle *tmp_handles = malloc(sizeof(PVFS_handle) * retry_msg_count);
+    tmp_handles = malloc(sizeof(PVFS_handle) * retry_msg_count);
     if (!tmp_handles)
     {
         gossip_lerr("Unable to allocate temporary handle array.\n");

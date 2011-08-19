@@ -10,7 +10,7 @@
 # you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
-export EXTRA_TESTS=${HOME}/src/benchmarks
+export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
 #export EXTRA_TESTS=/tmp/src/benchmarks
 export URL=http://devorange.clemson.edu/pvfs
 export BENCHMARKS=benchmarks-20060512.tar.gz
@@ -47,7 +47,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="devorange2 jeffrey"
+VFS_HOSTS="devorange2 devorange35 andy jeffrey"
 
 #
 # Detect basic heap corruption

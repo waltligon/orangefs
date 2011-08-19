@@ -15,7 +15,14 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty) -imacros $lk_src/include/linux/autoconf.h"
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+
+	dnl kernels > 2.6.32 now use generated/autoconf.h
+	if test -f $lk_src/include/generated/autoconf.h ; then
+		CFLAGS="$CFLAGS -imacros $lk_src/include/generated/autoconf.h"
+	else
+		CFLAGS="$CFLAGS -imacros $lk_src/include/linux/autoconf.h"
+	fi
 
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
@@ -446,6 +453,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	fi
 
+	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for dentry argument in kernel super_operations statfs)
 	dnl Rely on the fact that there is an external vfs_statfs that is
 	dnl of the same type as the .statfs in struct super_operations to
@@ -461,18 +469,28 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl If this test passes, the kernel uses a struct dentry argument.
 	dnl If this test fails, the kernel uses something else (old struct
 	dnl super_block perhaps).
+        dnl
+        dnl Need to use the second approach because vfs_statfs changes without
+        dnl a cooresponding change in statfs in super_operations. I'm not that
+        dnl concerned with reliance on Werror since we use it heavily
+        dnl throughout these checks
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-		int vfs_statfs(struct dentry *de, struct kstatfs *kfs)
+                struct super_operations sop;
+		int s(struct dentry *de, struct kstatfs *kfs)
 		{
 			return 0;
 		}
-		], [],
+		], 
+                [
+                    sop.statfs = s;
+                ],
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_DENTRY_STATFS_SOP, 1, Define if super_operations statfs has dentry argument),
 		AC_MSG_RESULT(no)
 	)
+	CFLAGS=$tmp_cflags
 
 	AC_MSG_CHECKING(for vfsmount argument in kernel file_system_type get_sb)
 	dnl Same trick as above.  A single commit changed mayn things at once:
@@ -689,6 +707,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no),
 		AC_MSG_RESULT(yes)
 		AC_DEFINE(HAVE_GENERIC_PERMISSION, 1, Define if kernel has generic_permission),
+	)
+
+        dnl generic_permission in 2.6.38 and newer has a four parameter 
+        dnl signature
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for four-param generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *f;
+	], 
+	[ 
+	        generic_permission(f, 0, 0, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FOUR_PARAM_GENERIC_PERMISSION, 1, [Define if generic_permission takes four parameters]),
+	AC_MSG_RESULT(no)
 	)
 
 	AC_MSG_CHECKING(for generic_getxattr api in kernel)
@@ -1281,6 +1317,320 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         AC_DEFINE(HAVE_BDI_INIT, 1, [Define if bdi_init function is present]),
         AC_MSG_RESULT(no)
         )
+        CFLAGS=$tmp_cflags
+
+
+	dnl 2.6.33 API change,
+	dnl Removed .ctl_name from struct ctl_table.
+        tmp_cflags=$CFLAGS
+        CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING([whether struct ctl_table has ctl_name])
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .ctl_name = 0, };
+	],[ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_CTL_NAME, 1, Define if struct ctl_table has ctl_name member),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl Removed .strategy from struct ctl_table.
+	AC_MSG_CHECKING([whether struct ctl_table has strategy])
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/sysctl.h>
+                static struct ctl_table c = { .strategy = 0, };
+	], [ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_STRATEGY_NAME, 1, Define if struct ctl_table has strategy member),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl 2.6.33 changed the parameter signature of xattr_handler get 
+	dnl member functions to have a fifth argument and changed the first
+	dnl parameter from struct inode to struct dentry. if the test fails
+	dnl assume the old 4 param with struct inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for five-param xattr_handler.get)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int get_xattr_h( struct dentry *d, const char *n, 
+					void *b, size_t s, int h)
+		{ return 0; }
+	], 
+	[ 
+	    x.get = get_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANDLER_GET_FIVE_PARAM, 1, [Define if kernel xattr_handle get function has dentry as first parameter and a fifth parameter]),
+	AC_MSG_RESULT(no)
+	)
+
+	dnl 2.6.33 changed the parameter signature of xattr_handler set 
+	dnl member functions to have a sixth argument and changed the first
+	dnl parameter from struct inode to struct dentry. if the test fails
+	dnl assume the old 5 param with struct inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for six-param xattr_handler.set)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/dcache.h>
+		#include <linux/xattr.h>
+		static struct xattr_handler x;
+		static int set_xattr_h( struct dentry *d, const char *n, 
+					const void *b, size_t s, int f, int h)
+		{ return 0; }
+	], 
+	[ 
+	    x.set = set_xattr_h;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR_HANDLER_SET_SIX_PARAM, 1, [Define if kernel xattr_handle set function has dentry as first parameter and a sixth parameter]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl xattr_handler is also a const
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for const s_xattr member in super_block struct)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/xattr.h>
+		struct super_block sb;
+                const struct xattr_handler *x[] = { NULL };
+	], 
+	[ 
+            sb.s_xattr = x;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_CONST_S_XATTR_IN_SUPERBLOCK, 1, [Define if s_xattr member of super_block struct is const]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl early 2.6 kernels do not contain true/false enum in stddef.h
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(stddef.h true/false enum)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/stddef.h>
+                int f = true;
+	], 
+	[ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TRUE_FALSE_ENUM, 1, [Define if kernel stddef has true/false enum]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+	dnl fsync no longer has a dentry second parameter
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for dentry argument in fsync)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations f;
+		static int local_fsync(struct file *f, struct dentry *d, int i)
+		{ return 0; }
+	], 
+	[ 
+	    f.fsync = local_fsync;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSYNC_DENTRY_PARAM, 1, [Define if fsync function in file_operations struct wants a dentry pointer as the second parameter]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl file_operations has unlocked_ioctl instead of ioctl as of 2.6.36
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for unlocked_ioctl in file_operations)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct file_operations f;
+	], 
+	[ 
+	    f.unlocked_ioctl = NULL;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_UNLOCKED_IOCTL_HANDLER, 1, [Define if file_operations struct has unlocked_ioctl member]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+	dnl 2.6.36 removed inode_setattr with the other BKL removal changes
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for inode_setattr)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct iattr *iattr;
+                struct inode *inode;
+                int ret;
+	], 
+	[ 
+	        ret = inode_setattr(inode, iattr);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_INODE_SETATTR, 1, [Define if inode_setattr is defined]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl dentry operations struct d_hash function has a different signature
+        dnl in 2.6.38 and newer, second param is an inode
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param dentry_operations.d_hash)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_hash_t(const struct dentry *d, 
+                                    const struct inode *i, 
+                                    struct qstr * q)
+                { return 0; }
+	], 
+	[ 
+                d.d_hash = d_hash_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_D_HASH, 1, [Define if d_hash member of dentry_operations has three params, the second inode paramsbeing the difference]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+        dnl dentry operations struct d_compare function has a different 
+        dnl signature in 2.6.38 and newer, split out dentry/inodes, string and
+        dnl qstr params
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for seven-param dentry_operations.d_compare)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_compare_t(const struct dentry *d1, 
+                                       const struct inode *i1,
+                                       const struct dentry *d2, 
+                                       const struct inode *i2, 
+                                       unsigned int len, 
+                                       const char *str, 
+                                       const struct qstr *qstr)
+                { return 0; }
+	], 
+	[ 
+                d.d_compare = d_compare_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SEVEN_PARAM_D_COMPARE, 1, [Define if d_compare member of dentry_operations has seven params]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+
+        dnl dentry operations struct d_delete argumentis constified in  
+        dnl 2.6.38 and newer
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for constified dentry_operations.d_delete)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                static struct dentry_operations d;
+                static int d_delete_t(const struct dentry *d)
+                { return 0; }
+	], 
+	[ 
+                d.d_delete = d_delete_t;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_D_DELETE_CONST, 1, [Define if d_delete member of dentry_operations has a const dentry param]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl dentry member d_count is no longer atomic and has it's own spinlock
+        dnl in 2.6.38 and newer
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for dentry.d_count atomic_t type)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                #include <linux/dcache.h>
+                struct dentry d;
+                atomic_t x;
+	], 
+	[ 
+                x = d.d_count;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_DENTRY_D_COUNT_ATOMIC, 1, [Define if d_count member of dentry is of type atomic_t]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl permission function pointer in the inode_operations struct now
+        dnl takes three params with the third being an unsigned int (circa
+        dnl 2.6.38
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param inode_operations permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode_operations i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+	], 
+	[ 
+            i.permission = p;
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_PERMISSION_WITH_FLAG, 1, [Define if permission function pointer of inode_operations struct has three parameters and the third parameter is for flags (unsigned int)]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl the acl_check parameter of the generic_permission function has a
+        dnl third parameter circa 2.6.38
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param acl_check of generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *i;
+                int p(struct inode *i, int mode, unsigned int flags)
+                { return 0; }
+	], 
+	[ 
+            generic_permission(i, 0, 0, p);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_ACL_CHECK, 1, [Define if acl_check param of generic_permission function has three parameters]),
+	AC_MSG_RESULT(no)
+	)
         CFLAGS=$tmp_cflags
 
 

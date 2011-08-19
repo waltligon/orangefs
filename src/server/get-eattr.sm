@@ -78,18 +78,32 @@ static PINT_sm_action geteattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, tsz;
+    int i;
 
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
 
     js_p->error_code = 0;
 
+    /* ensure not too many keys were requested */
+    if( s_op->req->u.geteattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* iterate through the keys and see if they fall into valid name spaces */
     for(i=0; i<s_op->req->u.geteattr.nkey; i++)
     {
         gossip_debug(GOSSIP_GETEATTR_DEBUG, "geteattr key %d : %s\n", i, 
                 (char *) s_op->req->u.geteattr.key[i].buffer);
+
+        /* ensure no buffer_sz is too larger */
+        if( s_op->req->u.geteattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
 
         js_p->error_code = PINT_eattr_check_access(
             &s_op->req->u.geteattr.key[i],
@@ -118,7 +132,7 @@ static PINT_sm_action geteattr_setup_resp(
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
-    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    for (i = 0; i < s_op->req->u.geteattr.nkey; i++)
     {
         s_op->resp.u.geteattr.val[i].buffer = malloc(
             s_op->req->u.geteattr.valsz[i]);

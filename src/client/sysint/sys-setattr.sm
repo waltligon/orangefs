@@ -105,7 +105,7 @@ PVFS_error PVFS_isys_setattr(
     /* make sure that the permission bits are acceptable */
     if ((attr.mask & PVFS_ATTR_SYS_PERM) && (attr.perms & ~PVFS_PERM_VALID) != 0)
     {
-        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported" 
+        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported " 
                     "permission bits\n");
         return(-PVFS_EINVAL);
     }

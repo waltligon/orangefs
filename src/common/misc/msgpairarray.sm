@@ -25,6 +25,20 @@
 #include "pvfs2-internal.h"
 #include "state-machine.h"
 
+#ifdef WIN32
+#define gossip_err_unless_quiet(format, ...) \
+do {\
+    if(mop->params.quiet_flag)\
+    {\
+        gossip_debug(GOSSIP_MSGPAIR_DEBUG, format, __VA_ARGS__); \
+    }\
+    else \
+    {\
+        gossip_err(format, __VA_ARGS__); \
+    }\
+} while(0)
+
+#else
 #define gossip_err_unless_quiet(format, f...) \
 do {\
     if(mop->params.quiet_flag)\
@@ -32,6 +46,7 @@ do {\
     else \
         gossip_err(format, ##f); \
 } while(0)
+#endif
 
 enum
 {
@@ -571,6 +586,17 @@ static PINT_sm_action msgpairarray_completion_fn(
             /* even if we see a failure, continue to process with the
              * completion function. -- RobR
              */
+        }
+        else if( (msg_p->op_status != 0) && (resp_p == NULL) )
+        {
+            /* before we reference resp_p we need to catch the case where 
+             * PINT_serv_decode_resp didn't give us a struct. We error out
+             * the same without referencing resp_p */
+            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
+                         "%s: error code %d from PINT_serv_decode_resp, "
+                         "from server %d\n", __func__, msg_p->op_status, i);
+            js_p->error_code = msg_p->op_status;
+            break;
         }
         else if (resp_p->status != 0)
         {

@@ -54,19 +54,12 @@ then
     exit 1
 fi
 
-#${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
-#if [ "${?}" != 0 ]
-#then
-#    echo "pvfs2-fs-dump failure." 1>&2
-#    exit 1
-#fi
-#
-#${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
-#if [ "${?}" != 0 ]
-#then
-#    echo "pvfs2-fs-dump failure." 1>&2
-#    exit 1
-#fi
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-fs-dump -m $PVFS2_MOUNTPOINT
+if [ "${?}" != 0 ]
+then
+    echo "pvfs2-fs-dump failure." 1>&2
+    exit 1
+fi
 
 ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-ls $PVFS2_MOUNTPOINT
 if [ "${?}" != 0 ]

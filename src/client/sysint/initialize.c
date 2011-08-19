@@ -11,7 +11,9 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "acache.h"
 #include "ncache.h"
@@ -78,7 +80,11 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     uint64_t debug_mask = 0;
     char *event_mask = NULL;
 
+#ifdef WIN32
+    pint_client_pid = (int) GetCurrentProcessId();
+#else
     pint_client_pid = getpid();
+#endif
 
     gossip_enable_stderr();
 

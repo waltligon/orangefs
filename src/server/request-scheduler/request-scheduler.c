@@ -25,7 +25,9 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <assert.h>
 
 #include "request-scheduler.h"
@@ -156,6 +158,7 @@ int PINT_timer_queue_finalize(void)
    qlist_for_each_safe(iterator,scratch,&timer_queue)
    {
        element = qlist_entry(iterator,struct req_sched_element,list_link);
+       qlist_del(&(element->list_link));
        if (element && element->user_ptr)
           free(element->user_ptr);
        if (element)

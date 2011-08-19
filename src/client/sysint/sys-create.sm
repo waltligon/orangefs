@@ -202,6 +202,11 @@ PVFS_error PVFS_isys_create(
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
+
+    /* save the original attribute passed in. since create does it's own
+     * retries we need the original attribute available on retries */
+    PINT_copy_object_attr(&(sm_p->u.create.store_attr), &(sm_p->u.create.attr));
+
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -292,14 +297,14 @@ PVFS_error PVFS_isys_create(
 /** Create a file with a specified distribution.
  */
 PVFS_error PVFS_sys_create(
-    char *object_name,
-    PVFS_object_ref parent_ref,
-    PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
-    PVFS_sys_dist *dist,
-    PVFS_sysresp_create *resp,
-    PVFS_sys_layout *layout,
-    PVFS_hint hints)
+    char *object_name,                 /**< name of the file to create */
+    PVFS_object_ref parent_ref,        /**< handle of the parent dir */
+    PVFS_sys_attr attr,                /**< attributes of new file */
+    const PVFS_credentials *credentials,/**< identity of the caller */
+    PVFS_sys_dist *dist,               /**< distribution of new file */
+    PVFS_sysresp_create *resp,         /**< response from the request */
+    PVFS_sys_layout *layout,           /**< selection of servers to hold file */
+    PVFS_hint hints)                   /**< user supplied PVFS hints */
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -432,6 +437,16 @@ static PINT_sm_action create_create_setup_msgpair(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
+
+    /* reset the attributes to what got passed in to the sysint call. the retry
+     * path comes through here so we'll want to reset it after each try. 
+     * force the mask to all meta attributes. */
+    if( sm_p->u.create.retry_count > 0 )
+    {
+        PINT_copy_object_attr(&(sm_p->u.create.attr), 
+                              &(sm_p->u.create.store_attr));
+        sm_p->u.create.attr.mask |= PVFS_ATTR_META_ALL;
+    }
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;

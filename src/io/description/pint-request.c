@@ -14,6 +14,10 @@
 #include <pint-distribution.h>
 #include "pvfs2-internal.h"
 
+#ifdef WIN32
+typedef uint32_t u_int32_t;
+#endif
+
 static PVFS_offset PINT_request_disp(PINT_Request *request);
 
 /* this macro is only used in this file to add a segment to the
@@ -577,14 +581,22 @@ PVFS_size PINT_distribute(PVFS_offset offset,
     if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
         !rfdata->dist->params)
     {
-        if (!rfdata)
+        if (!rfdata) 
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
+        }
         else if (!rfdata->dist)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
+        }
         else if (!rfdata->dist->methods)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
+        }
         else if (!rfdata->dist->params)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
+        }
         gossip_lerr("Bad Distribution! Bailing out!\n");
         return 0;
     }

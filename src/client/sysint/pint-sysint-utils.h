@@ -11,7 +11,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef WIN32
+#include "wincommon.h"
+#else
 #include <sys/time.h>
+#endif
 #include <errno.h>
 #include <assert.h>
 

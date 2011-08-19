@@ -17,8 +17,20 @@
 
 #include <linux/xattr.h>
 
-int pvfs2_xattr_set_trusted(struct inode *inode, 
-    const char *name, const void *buffer, size_t size, int flags)
+int pvfs2_xattr_set_trusted(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+        struct dentry *dentry,
+#else
+    struct inode *inode, 
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    const char *name, 
+    const void *buffer, 
+    size_t size,
+    int flags
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    )
 {
     int internal_flag = 0;
 
@@ -32,12 +44,29 @@ int pvfs2_xattr_set_trusted(struct inode *inode,
         return -EPERM;
     }
     internal_flag = convert_to_internal_xattr_flags(flags);
+
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    return pvfs2_inode_setxattr(dentry->d_inode, 
+        PVFS2_XATTR_NAME_TRUSTED_PREFIX, name, buffer, size, internal_flag);
+#else
     return pvfs2_inode_setxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
         name, buffer, size, internal_flag);
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
 }
 
-int pvfs2_xattr_get_trusted(struct inode *inode,
-    const char *name, void *buffer, size_t size)
+int pvfs2_xattr_get_trusted(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    struct dentry *dentry,
+#else
+    struct inode *inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    const char *name, 
+    void *buffer, 
+    size_t size
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    )
 {
     gossip_debug(GOSSIP_XATTR_DEBUG, "pvfs2_xattr_get_trusted: name %s, buffer_size %zd\n",
             name, size);
@@ -48,8 +77,13 @@ int pvfs2_xattr_get_trusted(struct inode *inode,
         gossip_err("pvfs2_xattr_get_trusted: operation not permitted\n");
         return -EPERM;
     }
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    return pvfs2_inode_getxattr(dentry->d_inode, 
+        PVFS2_XATTR_NAME_TRUSTED_PREFIX, name, buffer, size);
+#else
     return pvfs2_inode_getxattr(inode, PVFS2_XATTR_NAME_TRUSTED_PREFIX,
         name, buffer, size);
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
 }
 
 #endif

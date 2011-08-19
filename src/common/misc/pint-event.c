@@ -6,11 +6,19 @@
 
 #include <string.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 
 #include <stdio.h>
 
+#ifdef WIN32
+#include "wincommon.h"
+
+#define strdup(s)    _strdup(s)
+#else
 #include <unistd.h>
+#endif
 
 #include "pint-event.h"
 #include "pvfs2-types.h"

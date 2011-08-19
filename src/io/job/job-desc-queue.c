@@ -18,6 +18,10 @@
 #include "id-generator.h"
 #include "pint-util.h"
 
+#ifdef WIN32
+typedef enum job_type job_type_t;
+#endif
+
 /***************************************************************
  * Visible functions
  */
@@ -41,7 +45,11 @@ struct job_desc *alloc_job_desc(int type)
 
     id_gen_safe_register(&(jd->job_id), jd);
 
+#ifdef WIN32
+    jd->type = (job_type_t) type;
+#else
     jd->type = type;
+#endif
 
     return (jd);
 };

@@ -206,12 +206,11 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
       test()).  to avoid passing out the same completed op mutliple
       times, do not add the operation to the completion list until all
       cancellations on the I/O operation are accounted for
-    */
-    assert(sm_p);
-    
+    */    
     PINT_client_sm *sm_base_p = 
         PINT_sm_frame(smcb, (-(smcb->frame_count -1)));
 
+    assert(sm_p);
     assert(sm_base_p);
 
     /*

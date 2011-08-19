@@ -252,8 +252,13 @@ static int small_io_completion_fn(void * user_args,
     PINT_client_small_io_ctx *ctx = 
          &(sm_p->u.io.small_io_ctx[msg_p->req.u.small_io.server_nr]);
     uint32_t server_nr = msg_p->req.u.small_io.server_nr;
+#ifdef WIN32
+    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    PVFS_metafile_attr *meta = &(attr->u.meta);
+#else
     PVFS_object_attr *attr __attribute__((unused)) = &(sm_p->getattr.attr);
     PVFS_metafile_attr *meta __attribute__((unused)) = &(attr->u.meta);
+#endif
 
     int ret = 0;
 
@@ -377,11 +382,11 @@ static int small_io_completion_fn(void * user_args,
     */
 
     gossip_debug(GOSSIP_IO_DEBUG,"handle=%llu \toperation=%d \toffset=%ld "
-                                 "\taggregate_size=%ld\n"
-                                ,llu(msg_p->req.u.small_io.handle)
-                                ,msg_p->req.u.small_io.io_type
-                                ,msg_p->req.u.small_io.file_req_offset
-                                ,msg_p->req.u.small_io.aggregate_size);
+                             "\taggregate_size=%ld\n",
+                            llu(msg_p->req.u.small_io.handle),
+                            msg_p->req.u.small_io.io_type,
+                            ((long int)msg_p->req.u.small_io.file_req_offset),
+                            ((long int)msg_p->req.u.small_io.aggregate_size));
 
 /*
     if (   (sm_p->u.io.io_type == PVFS_IO_READ) 
@@ -401,7 +406,9 @@ static int small_io_completion_fn(void * user_args,
 static int small_io_check_for_retries( struct PINT_smcb *smcb
                                      , job_status_s *js_p)
 {
+#ifndef WIN32
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s..\n",__func__);
+#endif
 
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_object_attr *attr = &(sm_p->getattr.attr);
@@ -423,6 +430,9 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
     int k   = 0;
     int ret = 0;
 
+#ifdef WIN32
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s..\n",__func__);
+#endif
     /*if we are processing a write request, then msgpairarray handles retries.
      *if we are processing a read and the source file is mirrored, then
      *SMALL-IO handles the retries.

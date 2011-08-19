@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -61,6 +63,7 @@ PVFS_error PVFS_isys_listeattr(
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    int i = 0;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
@@ -72,6 +75,30 @@ PVFS_error PVFS_isys_listeattr(
     {
         gossip_err("invalid (NULL) required argument\n");
 	return ret;
+    }
+
+    /* the resp key array is used to determine how much we allocate,
+     * let's enfore the max key buffer of PVFS_MAX_XATTR_NAMELEN
+     */
+
+    if( nkey > PVFS_REQ_LIMIT_EATTR_LIST )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: requested number of keys, %d, "
+                     " is larger than the maximum of %d\n", __func__,
+                     resp_p->nkey, PVFS_REQ_LIMIT_EATTR_LIST );
+        return ret; 
+    }
+
+    for( i=0; i < nkey; i++ )
+    {
+        if( resp_p->key_array[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: key_array item %d "
+                         "buffer_sz of %d is too big (max value %d)\n",
+                         __func__, i, resp_p->key_array[i].buffer_sz,
+                         PVFS_MAX_XATTR_NAMELEN);
+            return ret;
+        }
     }
 
     PINT_smcb_alloc(&smcb, PVFS_SYS_LISTEATTR,

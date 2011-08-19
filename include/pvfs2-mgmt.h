@@ -49,32 +49,29 @@ struct PVFS_mgmt_server_stat
 };
 
 /* performance monitoring statistics */
-struct PVFS_mgmt_perf_stat
+
+/*
+ * defines all of the keys known to PVFS
+ * performance monitoring subsystem
+ * keys defined here must also appear
+ * in the table in src/common/misc/pint-perf-counter.c
+ * with the same index
+ */
+enum PINT_server_perf_keys
 {
-    int32_t valid_flag;	    /* is this entry valid? */
-    uint32_t id;	    /* timestep id */
-    uint64_t start_time_ms; /* start time of perf set, ms since epoch */
-    int64_t write;	    /* bytes written */
-    int64_t read;	    /* bytes read */
-    int64_t metadata_write; /* # of modifying metadata ops */
-    int64_t metadata_read;  /* # of non-modifying metadata ops */
-    int32_t dspace_queue;   /* # of metadata dspace ops in the queue */
-    int32_t keyval_queue;   /* # of metadata keyval ops in the queue */
-    int32_t reqsched;       /* # of currently scheduled request posted */
+    PINT_PERF_READ = 0,                 /* bytes read */
+    PINT_PERF_WRITE = 1,                /* bytes written */
+    PINT_PERF_METADATA_READ = 2,        /* metadata read ops */
+    PINT_PERF_METADATA_WRITE = 3,       /* metadata write ops */
+    PINT_PERF_METADATA_DSPACE_OPS = 4,  /* metadata dspace ops */
+    PINT_PERF_METADATA_KEYVAL_OPS = 5,  /* metadata keyval ops */
+    PINT_PERF_REQSCHED = 6,             /* instantaneous active requests */
+    PINT_PERF_REQUESTS = 7,             /* requests received */
+    PINT_PERF_SMALL_READ = 8,           /* bytes read by small_io */
+    PINT_PERF_SMALL_WRITE = 9,          /* bytes written by small_io */
+    PINT_PERF_FLOW_READ = 10,           /* bytes read by flow */
+    PINT_PERF_FLOW_WRITE = 11,          /* bytes written by flow */
 };
-endecode_fields_11_struct(
-    PVFS_mgmt_perf_stat,
-    int32_t, valid_flag,
-    uint32_t, id,
-    uint64_t, start_time_ms,
-    int64_t, write,
-    int64_t, read,
-    int64_t, metadata_write,
-    int64_t, metadata_read,
-    int32_t, dspace_queue,
-    int32_t, keyval_queue,
-    int32_t, reqsched,
-    skip4,);
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info
@@ -227,11 +224,12 @@ PVFS_error PVFS_mgmt_statfs_all(
 PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    struct PVFS_mgmt_perf_stat **perf_matrix,
+    int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t* next_id_array,
     int server_count,
+    int *key_count,
     int history_count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
@@ -241,11 +239,12 @@ PVFS_error PVFS_imgmt_perf_mon_list(
 PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
-    struct PVFS_mgmt_perf_stat** perf_matrix,
+    int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t *next_id_array,
     int server_count,
+    int *key_count,
     int history_count,
     PVFS_error_details *details,
     PVFS_hint hints);

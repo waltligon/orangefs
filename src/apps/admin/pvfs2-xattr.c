@@ -96,6 +96,8 @@ static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p);
 static int permit_set(PVFS_ds_keyval *key_p);
 static int eattr_is_prefixed(char* key_name);
 
+PVFS_metafile_hint current_meta_hint={0};
+
 int main(int argc, char **argv)
 {
   int ret = 0;
@@ -103,6 +105,7 @@ int main(int argc, char **argv)
   file_object src;
   PVFS_credentials credentials;
   int i;
+  PVFS_ds_keyval tmp_val={0};
 
   memset(&src, 0, sizeof(src));
   /* look at command line arguments */
@@ -144,11 +147,36 @@ int main(int argc, char **argv)
                         , (char *) user_opts->key[0].buffer);
           return -1;
       }
+      if (strncmp(user_opts->key[0].buffer
+                  ,"user.pvfs2.meta_hint"
+                  ,user_opts->key[0].buffer_sz) == 0)
+      {
+         tmp_val.buffer=&current_meta_hint.flags;
+         tmp_val.buffer_sz=sizeof(current_meta_hint.flags);
+         /*retrieve the current value of meta_hint*/
+         ret=pvfs2_eattr(1 /*get*/
+                        ,&src
+                        ,user_opts->key
+                        ,&tmp_val
+                        ,&credentials
+                        ,1 /*keycount*/);
+         if (ret != 0)
+         {
+            printf("%s does not currently have a meta_hint value (0X%08X).\n"
+                  ,user_opts->srcfile
+                  ,(unsigned int)current_meta_hint.flags
+                  );
+         }else{
+            printf("%s has a meta_hint value of (0X%08X).\n"
+                  ,user_opts->srcfile
+                  ,(unsigned int)current_meta_hint.flags
+                  );
+         }
+      }
       if (modify_val(&user_opts->key[0], &user_opts->val[0]) < 0)
       {
-          fprintf(stderr, "Invalid value for user-settable attribute %s, %s\n"
-                        , (char *) user_opts->key[0].buffer
-                        , (char *) user_opts->val[0].buffer);
+          fprintf(stderr, "Invalid value for user-settable attribute %s\n"
+                        , (char *) user_opts->key[0].buffer);
           return -1;
       }
   }
@@ -159,18 +187,24 @@ int main(int argc, char **argv)
                      ,user_opts->val
                      ,&credentials
                      ,user_opts->key_count);
-    if (ret != 0) 
+    if ( (ret != 0) && (ret == -PVFS_ENOENT) )
     {
+        printf("PVFS_sys_geteattr: no hints defined\n");
+        return ret;
+    }
+    else if (ret != 0) 
+    {
+        PVFS_perror("PVFS_sys_geteattr",ret); 
         return ret;
     }
     if (user_opts->get && user_opts->text)  
     {
         if (strncmp(user_opts->key[0].buffer
                    ,"user.pvfs2.meta_hint"
-                   ,SPECIAL_METAFILE_HINT_KEYLEN) == 0) {
+                   ,user_opts->key[0].buffer_sz) == 0) {
             PVFS_metafile_hint *hint = 
                             (PVFS_metafile_hint *) user_opts->val[0].buffer;
-            printf("Metafile hints (0x%08x)",(unsigned int)hint->flags);
+            printf("Metafile Hints (0X%08X)",(unsigned int)hint->flags);
             if (hint->flags & PVFS_IMMUTABLE_FL) {
                 printf(" :immutable file ");
             }
@@ -186,7 +220,7 @@ int main(int argc, char **argv)
             printf("\n");
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.handles"
-                           ,sizeof("user.pvfs2.mirror.handles")) == 0)
+                           ,user_opts->key[0].buffer_sz) == 0)
         {
              PVFS_handle *myHandles = (PVFS_handle *)user_opts->val[0].buffer;
              int copies = *(int *)user_opts->val[1].buffer;
@@ -197,13 +231,13 @@ int main(int argc, char **argv)
              }
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.copies"
-                           ,sizeof("user.pvfs2.mirror.copies")) == 0)
+                           ,user_opts->key[0].buffer_sz) == 0)
         {
              int *myCopies = (int *)user_opts->val[0].buffer;
              printf("Number of Mirrored Copies : %d\n",*myCopies);
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.status"
-                           ,sizeof("user.pvfs2.mirror.status")) == 0)
+                           ,user_opts->key[0].buffer_sz) == 0)
         {
              int copies = *(int *)user_opts->val[1].buffer;
              int dfile_count = src.u.pvfs2.attr.dfile_count;
@@ -215,7 +249,7 @@ int main(int argc, char **argv)
                        ,llu(status[i]));
         } else if ( strncmp(user_opts->key[0].buffer
                            ,"user.pvfs2.mirror.mode"
-                           , sizeof("user.pvfs2.mirror.mode")) == 0)
+                           ,user_opts->key[0].buffer_sz) == 0)
         {
              printf("Mirroring Mode : ");
              switch(*(MIRROR_MODE *)user_opts->val[0].buffer)
@@ -249,38 +283,85 @@ int main(int argc, char **argv)
 
 static int modify_val(PVFS_ds_keyval *key_p, PVFS_ds_keyval *val_p)
 {
+  /*We don't want these settings to interfere with the mirroring flag.  It is
+   *turned on and off with the pvfs2-setmattr and setmattr commands.
+  */
     if (strncmp(key_p->buffer,"user.pvfs2.meta_hint"
-                             , SPECIAL_METAFILE_HINT_KEYLEN) == 0)
+                             ,key_p->buffer_sz) == 0)
     {
-        PVFS_metafile_hint hint;
-        memset(&hint, 0, sizeof(hint));
-        if (strncmp(val_p->buffer, "+immutable", 10) == 0)
-            hint.flags |= PVFS_IMMUTABLE_FL;
-        else if (strncmp(val_p->buffer, "-immutable", 10) == 0)
-            hint.flags &= ~PVFS_IMMUTABLE_FL;
-        else if (strncmp(val_p->buffer, "+append", 7) == 0)
-            hint.flags |= PVFS_APPEND_FL;
-        else if (strncmp(val_p->buffer, "-append", 7) == 0)
-            hint.flags &= ~PVFS_APPEND_FL;
-        else if (strncmp(val_p->buffer, "+noatime", 8) == 0)
-            hint.flags |= PVFS_NOATIME_FL;
-        else if (strncmp(val_p->buffer, "-noatime", 8) == 0)
-            hint.flags &= ~PVFS_NOATIME_FL;
-        else 
+        if (strncmp(val_p->buffer, "+immutable", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags |= PVFS_IMMUTABLE_FL;
+            printf("Adding immutable to meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer, "-immutable", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags &= ~PVFS_IMMUTABLE_FL;
+            printf("Removing immutable from meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer,"=immutable", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags = 
+             (current_meta_hint.flags & ~ALL_FS_META_HINT_FLAGS) | PVFS_IMMUTABLE_FL;
+            printf("Setting meta_hint to immutable only (0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        } 
+        else if (strncmp(val_p->buffer, "+append", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags |= PVFS_APPEND_FL;
+            printf("Adding append to meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer, "-append", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags &= ~PVFS_APPEND_FL;
+            printf("Removing append from meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer,"=append", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags = 
+             (current_meta_hint.flags & ~ALL_FS_META_HINT_FLAGS) | PVFS_APPEND_FL;
+            printf("Setting meta_hint to append only (0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer, "+noatime", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags |= PVFS_NOATIME_FL;
+            printf("Adding noatime to meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer, "-noatime", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags &= ~PVFS_NOATIME_FL;
+            printf("Removing atime from meta_hint...(0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else if (strncmp(val_p->buffer,"=noatime", val_p->buffer_sz) == 0)
+        {
+            current_meta_hint.flags = 
+             (current_meta_hint.flags & ~ALL_FS_META_HINT_FLAGS) | PVFS_NOATIME_FL;
+            printf("Setting meta_hint to noatime only (0X%08X)\n"
+                  ,(unsigned int)current_meta_hint.flags);
+        }
+        else
+        { 
             return -1;
-        memcpy(val_p->buffer, &hint, sizeof(hint));
-        val_p->buffer_sz = sizeof(hint);
+        }
+        memcpy(val_p->buffer, &current_meta_hint.flags, sizeof(current_meta_hint.flags));
+        val_p->buffer_sz = sizeof(current_meta_hint.flags);
     } else if (strncmp(key_p->buffer,"user.pvfs2.mirror.mode"
-                                    ,sizeof("user.pvfs2.mirror.mode")) == 0)
+                                    ,key_p->buffer_sz) == 0)
     {
        printf("Setting mirror mode to %d\n",*(int *)val_p->buffer);
     } else if (strncmp(key_p->buffer,"user.pvfs2.mirror.copies"
-                                    ,sizeof("user.pvfs2.mirror.mode")) == 0)
+                                    ,key_p->buffer_sz) == 0)
     {
        printf("Setting number of mirrored copies to %d\n"
              ,*(int *)val_p->buffer);
     }
-
 
     return 0;
 }
@@ -382,11 +463,7 @@ static int pvfs2_eattr(int get
           ret = PVFS_sys_seteattr(obj->u.pvfs2.ref, creds, key_p, val_p, 0, NULL);
       }
 
-      if (ret < 0)
-      {
-          PVFS_perror("PVFS_sys_geteattr", ret);
-          return -1;
-      }
+      return ret;
   }
   return 0;
 }
@@ -438,7 +515,7 @@ static struct options* parse_args(int argc, char* argv[])
     tmp_opts->get = 1;
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    while((one_opt = getopt(argc, argv, flags)) != -1)
     {
 	switch(one_opt){
             case 't':
@@ -454,10 +531,10 @@ static struct options* parse_args(int argc, char* argv[])
             case 'v':
                 if (strncmp(tmp_opts->key[0].buffer
                            ,"user.pvfs2.mirror.mode"
-                           ,sizeof("user.pvfs2.mirror.mode")) == 0 ||
+                           ,tmp_opts->key[0].buffer_sz) == 0 ||
                     strncmp(tmp_opts->key[0].buffer
                            ,"user.pvfs2.mirror.copies"
-                           ,sizeof("user.pvfs2.mirror.copies")) == 0)
+                           ,tmp_opts->key[0].buffer_sz) == 0)
                 { /*convert string argument into numeric argument*/
                   tmp_opts->val[0].buffer = malloc(sizeof(int));
                   if (!tmp_opts->val[0].buffer)
@@ -483,10 +560,13 @@ static struct options* parse_args(int argc, char* argv[])
 
     /*ensure that the given mode is supported by PVFS*/
     if (!tmp_opts->get &&
-         strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.mode") == 0)
+         strncmp(tmp_opts->key[0].buffer
+                 ,"user.pvfs2.mirror.mode"
+                 ,tmp_opts->key[0].buffer_sz) == 0)
     {
-       if (*(int *)tmp_opts->val[0].buffer < BEGIN_MIRROR_MODE ||
-           *(int *)tmp_opts->val[0].buffer > END_MIRROR_MODE )
+       if (tmp_opts->val[0].buffer &&
+           (*(int *)tmp_opts->val[0].buffer < BEGIN_MIRROR_MODE ||
+            *(int *)tmp_opts->val[0].buffer > END_MIRROR_MODE) )
        {
           fprintf(stderr,"Invalid Mirror Mode ==> %d\n"
                          "\tValid Modes\n"
@@ -504,8 +584,12 @@ static struct options* parse_args(int argc, char* argv[])
         /*if user wants mirror.handles or mirror.status, then we must also */
         /*retrieve the number of copies, so we know how to display the     */
         /*information properly.                                            */
-        if (strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.handles") == 0 ||
-            strcmp(tmp_opts->key[0].buffer,"user.pvfs2.mirror.status") == 0 )
+        if (strncmp(tmp_opts->key[0].buffer
+                   ,"user.pvfs2.mirror.handles"
+                   ,tmp_opts->key[0].buffer_sz) == 0 ||
+            strncmp(tmp_opts->key[0].buffer
+                    ,"user.pvfs2.mirror.status"
+                    ,tmp_opts->key[0].buffer_sz) == 0 )
         {
            tmp_opts->key_count = 2;
            PVFS_ds_keyval *myKeys = malloc(tmp_opts->key_count * 
@@ -515,8 +599,7 @@ static struct options* parse_args(int argc, char* argv[])
                fprintf(stderr,"Unable to allocate myKeys.\n");
                exit(EXIT_FAILURE);
            }
-           memset(myKeys,0,sizeof(tmp_opts->key_count *
-                                  sizeof(PVFS_ds_keyval)));
+           memset(myKeys,0,tmp_opts->key_count*sizeof(PVFS_ds_keyval));
            myKeys[0] = *tmp_opts->key;
            myKeys[1].buffer = strdup("user.pvfs2.mirror.copies");
            myKeys[1].buffer_sz = sizeof("user.pvfs2.mirror.copies");
@@ -543,8 +626,7 @@ static struct options* parse_args(int argc, char* argv[])
                fprintf(stderr,"Unable to allocate myVals.\n");
                exit(EXIT_FAILURE);
            }
-           memset(myVals,0,sizeof(tmp_opts->key_count *
-                                  sizeof(PVFS_ds_keyval)));
+           memset(myVals,0,tmp_opts->key_count*sizeof(PVFS_ds_keyval));
            myVals[0] = *tmp_opts->val;
            free(tmp_opts->val);
 

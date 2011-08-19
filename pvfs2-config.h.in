@@ -1,5 +1,8 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
+/* Define if building universal (internal helper macro) */
+#undef AC_APPLE_UNIVERSAL_BUILD
+
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -46,8 +49,14 @@
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
 
+/* Define if s_xattr member of super_block struct is const */
+#undef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+
+/* Define if struct ctl_table has ctl_name member */
+#undef HAVE_CTL_NAME
 
 /* Define if cred.h contains current_fsuid */
 #undef HAVE_CURRENT_FSUID
@@ -64,6 +73,9 @@
 /* Define if DB has get_pagesize function */
 #undef HAVE_DB_GET_PAGESIZE
 
+/* Define if d_count member of dentry is of type atomic_t */
+#undef HAVE_DENTRY_D_COUNT_ATOMIC
+
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
 
@@ -72,6 +84,9 @@
 
 /* Define if dcache.h contains d_alloc_annon */
 #undef HAVE_D_ALLOC_ANON
+
+/* Define if d_delete member of dentry_operations has a const dentry param */
+#undef HAVE_D_DELETE_CONST
 
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
@@ -98,6 +113,9 @@
    */
 #undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
 
+/* Define if generic_permission takes four parameters */
+#undef HAVE_FOUR_PARAM_GENERIC_PERMISSION
+
 /* Define to 1 if you have the `fsetxattr' function. */
 #undef HAVE_FSETXATTR
 
@@ -106,6 +124,10 @@
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
+
+/* Define if fsync function in file_operations struct wants a dentry pointer
+   as the second parameter */
+#undef HAVE_FSYNC_DENTRY_PARAM
 
 /* Define if kernel has generic_file_readv */
 #undef HAVE_GENERIC_FILE_READV
@@ -154,6 +176,9 @@
 
 /* Define if kernel has iget_locked */
 #undef HAVE_IGET_LOCKED
+
+/* Define if inode_setattr is defined */
+#undef HAVE_INODE_SETATTR
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -242,6 +267,9 @@
 /* Define to 1 if you have the <mntent.h> header file. */
 #undef HAVE_MNTENT_H
 
+/* Define to 1 if you have the <mntent.h,> header file. */
+#undef HAVE_MNTENT_H_
+
 /* Define if mount.h contains MNT_NOATIME flags */
 #undef HAVE_MNT_NOATIME
 
@@ -325,6 +353,9 @@
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
 
+/* Define if d_compare member of dentry_operations has seven params */
+#undef HAVE_SEVEN_PARAM_D_COMPARE
+
 /* Define if SLAB_KERNEL is defined in kernel */
 #undef HAVE_SLAB_KERNEL
 
@@ -347,6 +378,9 @@
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
+
+/* Define if struct ctl_table has strategy member */
+#undef HAVE_STRATEGY_NAME
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -396,6 +430,21 @@
 /* Define if TAU library is used */
 #undef HAVE_TAU
 
+/* Define if acl_check param of generic_permission function has three
+   parameters */
+#undef HAVE_THREE_PARAM_ACL_CHECK
+
+/* Define if d_hash member of dentry_operations has three params, the second
+   inode paramsbeing the difference */
+#undef HAVE_THREE_PARAM_D_HASH
+
+/* Define if permission function pointer of inode_operations struct has three
+   parameters and the third parameter is for flags (unsigned int) */
+#undef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+
+/* Define if kernel stddef has true/false enum */
+#undef HAVE_TRUE_FALSE_ENUM
+
 /* Define if register_sysctl_table takes two arguments */
 #undef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
 
@@ -415,6 +464,9 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define if file_operations struct has unlocked_ioctl member */
+#undef HAVE_UNLOCKED_IOCTL_HANDLER
+
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 
@@ -430,6 +482,14 @@
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR
 
+/* Define if kernel xattr_handle get function has dentry as first parameter
+   and a fifth parameter */
+#undef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+
+/* Define if kernel xattr_handle set function has dentry as first parameter
+   and a sixth parameter */
+#undef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
@@ -442,6 +502,9 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -451,16 +514,13 @@
 /* minor version number */
 #undef PVFS2_VERSION_MINOR
 
-/* release version number */
-#undef PVFS2_VERSION_RELEASE
-
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
-/* The size of a `long int', as computed by sizeof. */
+/* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
-/* The size of a `void *', as computed by sizeof. */
+/* The size of `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
@@ -481,6 +541,14 @@
 /* Define if openssl exists */
 #undef WITH_OPENSSL
 
-/* Define to 1 if your processor stores words with the most significant byte
-   first (like Motorola and SPARC, unlike Intel and VAX). */
-#undef WORDS_BIGENDIAN
+/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
+   significant byte first (like Motorola and SPARC, unlike Intel). */
+#if defined AC_APPLE_UNIVERSAL_BUILD
+# if defined __BIG_ENDIAN__
+#  define WORDS_BIGENDIAN 1
+# endif
+#else
+# ifndef WORDS_BIGENDIAN
+#  undef WORDS_BIGENDIAN
+# endif
+#endif

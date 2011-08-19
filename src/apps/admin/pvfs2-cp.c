@@ -51,8 +51,8 @@ enum open_type {
 typedef struct pvfs2_file_object_s {
     PVFS_fs_id fs_id;
     PVFS_object_ref ref;
-    char pvfs2_path[PVFS_NAME_MAX];	
-    char user_path[PVFS_NAME_MAX];
+    char pvfs2_path[PVFS_NAME_MAX+1];	
+    char user_path[PVFS_NAME_MAX+1];
     PVFS_sys_attr attr;
     PVFS_permissions perms;
 } pvfs2_file_object;
@@ -60,7 +60,7 @@ typedef struct pvfs2_file_object_s {
 typedef struct unix_file_object_s {
     int fd;
     int mode;
-    char path[NAME_MAX];
+    char path[NAME_MAX+1];
 } unix_file_object;
 
 typedef struct file_object_s {

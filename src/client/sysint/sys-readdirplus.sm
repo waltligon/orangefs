@@ -361,6 +361,14 @@ static int create_partition_handles(PVFS_fs_id fsid, int input_handle_count,
             int ret;
             ret = PINT_cached_config_map_to_server(&tmp_svr_addr,
                 input_handle_array[i].handle, fsid);
+
+            if( ret != 0 )
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: failure mapping "
+                             "handle to server\n", __func__);
+                return ret;
+            }
+
             /* unique server address to find index */
             is_unique_server(tmp_svr_addr, *svr_count,
                 *svr_addr_array, &svr_index); 

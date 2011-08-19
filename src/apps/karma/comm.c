@@ -16,6 +16,7 @@
 #include "karma.h"
 
 #define GUI_COMM_PERF_HISTORY 5
+#define GUI_COMM_PERF_KEYCOUNT 4
 #undef FAKE_STATS
 #undef FAKE_PERF
 
@@ -32,6 +33,19 @@ static int internal_addr_ct;
 
 static int64_t meta_read_prev = 0;
 static int64_t meta_write_prev = 0;
+
+/* this struct is now only used by karma */
+/* perf numbers are returned as an array of int64_t */
+
+struct PVFS_mgmt_perf_stat
+{
+    int32_t valid_flag;
+    int64_t start_time_ms;
+    int64_t read;
+    int64_t write;
+    int64_t metadata_read;
+    int64_t metadata_write;
+};
 
 /* performance data structures */
 static struct PVFS_mgmt_perf_stat **internal_perf;
@@ -396,22 +410,57 @@ static int gui_comm_stats_collect(
 static int gui_comm_perf_collect(
     void)
 {
-    int ret;
+    int ret = 0;
     char err_msg[64];
     char msgbuf[64];
+    int key_count;
+    int64_t **perf_data;
+    int srv;
 
 #ifndef FAKE_PERF
+    key_count = GUI_COMM_PERF_KEYCOUNT;
+
+    perf_data = (int64_t **)malloc(internal_addr_ct * sizeof(int64_t *));
+    for (srv = 0; srv < internal_addr_ct; srv++)
+            perf_data[srv] = (int64_t *)malloc(sizeof(int64_t) *
+                    (GUI_COMM_PERF_KEYCOUNT + 2) *
+                    GUI_COMM_PERF_HISTORY);
+
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
                                   &creds,
-                                  internal_perf,
+                                  perf_data,
                                   internal_end_time_ms,
                                   internal_addrs,
                                   internal_perf_ids,
                                   internal_addr_ct,
+                                  &key_count,
                                   GUI_COMM_PERF_HISTORY, internal_details, 
                                   NULL);
     if (ret == 0)
-        return 0;
+    {
+        /* Note: Karma could be rewritten to deal with the */
+        /* new format from the perf subsystem, but might */
+        /* not be any great need to ... WBL */
+        for (srv = 0; srv < internal_addr_ct; srv++)
+        {
+            int i;
+            for (i = 0; i < GUI_COMM_PERF_HISTORY; i++)
+            {
+                internal_perf[srv][i].valid_flag =
+                        (perf_data[srv][(i * (key_count + 2)) + key_count] != 0.0);
+                internal_perf[srv][i].start_time_ms =
+                        perf_data[srv][(i * (key_count + 2)) + key_count];
+                internal_perf[srv][i].read =
+                        perf_data[srv][(i * (key_count + 2)) + 0];
+                internal_perf[srv][i].write =
+                        perf_data[srv][(i * (key_count + 2)) + 1];
+                internal_perf[srv][i].metadata_read =
+                        perf_data[srv][(i * (key_count + 2)) + 2];
+                internal_perf[srv][i].metadata_write =
+                        perf_data[srv][(i * (key_count + 2)) + 3];
+            }
+        }
+    }
     else if (ret == -PVFS_EDETAIL)
     {
         int i;
@@ -432,7 +481,7 @@ static int gui_comm_perf_collect(
             gui_message_new(msgbuf);
         }
 
-        return 0;
+        ret = 0;
     }
     else
     {
@@ -443,11 +492,15 @@ static int gui_comm_perf_collect(
                  err_msg);
         gui_message_new(msgbuf);
 
-        return -1;
+        ret = -1;
     }
+
+    for (srv = 0; srv < internal_addr_ct; srv++)
+        free(perf_data[srv]);
+    free(perf_data);
 #endif
 
-    return 0;
+    return ret;
 }
 
 /* gui_comm_traffic_retrieve()

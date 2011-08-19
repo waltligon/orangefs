@@ -14,7 +14,9 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <stdio.h>
 
 #include "bmi.h"
@@ -28,6 +30,13 @@
 #include "id-generator.h"
 #include "pvfs2-internal.h"
 #include "pvfs2-debug.h"
+
+#ifdef WIN32
+#include "wincommon.h"
+
+#define EREMOTE       66
+#define EHOSTDOWN    112
+#endif
 
 static int bmi_initialized_count = 0;
 static gen_mutex_t bmi_initialize_mutex = GEN_MUTEX_INITIALIZER;
@@ -552,6 +561,12 @@ int BMI_finalize(void)
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
 
+#ifdef WIN32
+    /* Windows Sockets finalize 
+       This must be done here rather than bmi_wintcp--after all addresses
+       have been destroyed */
+    WSACleanup();
+#endif
     /* shut down id generator */
     id_gen_safe_finalize();
 
@@ -990,7 +1005,13 @@ int BMI_testunexpected(int incount,
     int ret = -1;
     int position = 0;
     int tmp_outcount = 0;
+#ifdef WIN32
+    struct bmi_method_unexpected_info *sub_info = 
+        (struct bmi_method_unexpected_info *) 
+        malloc(sizeof(struct bmi_method_unexpected_info) * incount);
+#else
     struct bmi_method_unexpected_info sub_info[incount];
+#endif
     ref_st_p tmp_ref = NULL;
     int tmp_active_method_count = 0;
 
@@ -1003,7 +1024,12 @@ int BMI_testunexpected(int incount,
     gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
+    {
+#ifdef WIN32
+        free(sub_info);
+#endif
 	return (bmi_errno_to_pvfs(-EINVAL));
+    }
 
     *outcount = 0;
 
@@ -1019,6 +1045,9 @@ int BMI_testunexpected(int incount,
             if (ret < 0)
             {
                 /* can't recover from this */
+#ifdef WIN32
+                free(sub_info);
+#endif
                 gossip_lerr("Error: critical BMI_testunexpected failure.\n");
                 return (ret);
             }
@@ -1043,6 +1072,9 @@ int BMI_testunexpected(int incount,
 	if (!tmp_ref)
 	{
 	    /* yeah, right */
+#ifdef WIN32
+            free(sub_info);
+#endif
 	    gossip_lerr("Error: critical BMI_testunexpected failure.\n");
 	    gen_mutex_unlock(&ref_mutex);
 	    return (bmi_errno_to_pvfs(-EPROTO));
@@ -1054,6 +1086,9 @@ int BMI_testunexpected(int incount,
 	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
     }
+#ifdef WIN32
+    free(sub_info);
+#endif
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
@@ -1082,25 +1117,33 @@ int BMI_testcontext(int incount,
     int position = 0;
     int tmp_outcount = 0;
     int tmp_active_method_count = 0;
+#ifndef WIN32
     struct timespec ts;
+#endif
 
     gen_mutex_lock(&active_method_count_mutex);
     tmp_active_method_count = active_method_count;
     gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
+    {
 	return (bmi_errno_to_pvfs(-EINVAL));
+    }
 
     *outcount = 0;
 
-    if(tmp_active_method_count < 1)
+    if (tmp_active_method_count < 1)
     {
 	/* nothing active yet, just snooze and return */
-	if(max_idle_time_ms > 0)
+	if (max_idle_time_ms > 0)
 	{
-	    ts.tv_sec = 0;
+#ifdef WIN32
+            Sleep(2);
+#else
+            ts.tv_sec = 0;
 	    ts.tv_nsec = 2000;
 	    nanosleep(&ts, NULL);
+#endif
 	}
 	return(0);
     }
@@ -1110,7 +1153,8 @@ int BMI_testcontext(int incount,
 
     while (position < incount && i < tmp_active_method_count)
     {
-        if (expected_method_usage[i].plan) {
+        if (expected_method_usage[i].plan)
+        {
             ret = active_method_table[i]->testcontext(
                 incount - position, 
                 &out_id_array[position],
@@ -1138,7 +1182,7 @@ int BMI_testcontext(int incount,
     /* return 1 if anything completed */
     if (ret == 0 && *outcount > 0)
     {
-	for(i=0; i<*outcount; i++)
+	for (i = 0; i < *outcount; i++)
 	{
 	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, 
 		"BMI_testcontext completing: %llu\n", llu(out_id_array[i]));
@@ -2276,9 +2320,9 @@ static void bmi_check_forget_list(void)
 static void bmi_addr_drop(ref_st_p tmp_ref)
 {
     struct method_drop_addr_query query;
+    int ret = 0;
     query.response = 0;
     query.addr = tmp_ref->method_addr;
-    int ret = 0;
 
     /* reference count is zero; ask module if it wants us to discard
      * the address; TCP will tell us to drop addresses for which the
@@ -2339,7 +2383,11 @@ static void bmi_check_addr_force_drop (void)
                                 link);
         gen_mutex_unlock(&bmi_addr_force_drop_list_mutex);
         gen_mutex_lock(&ref_mutex);
+#ifdef WIN32
+        qlist_for_each_entry(ref_item, cur_ref_list, list_link, ref_st)
+#else
         qlist_for_each_entry(ref_item, cur_ref_list, list_link)
+#endif
         {
              if ((ref_item->ref_count == 0) &&
                  (ref_item->interface->method_name == drop_item->method_name))

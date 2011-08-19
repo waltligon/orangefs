@@ -367,7 +367,8 @@ int PINT_acache_get_cached_entry(
     }
  
 #if 0
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: status=%d, attr_status=%d, size_status=%d\n",
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
+                 "status=%d, attr_status=%d, size_status=%d\n",
                  status, tmp_payload->attr_status, tmp_payload->size_status);
 #endif
 

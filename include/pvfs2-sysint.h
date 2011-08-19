@@ -46,7 +46,7 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-    PVFS2_ALIGN_VAR(char *, link_target);/* NOTE: caller must free if valid */
+    PVFS2_ALIGN_VAR(char *, link_target);/**< NOTE: caller must free if valid */
     PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
     PVFS2_ALIGN_VAR(int32_t, dirdata_count); /* Changed to int32_t so that size of structure does not change */
     PVFS2_ALIGN_VAR(uint32_t, mirror_copies_count);
@@ -64,23 +64,20 @@ typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 /** Describes a PVFS2 file system. */
 struct PVFS_sys_mntent
 {
-    char **pvfs_config_servers;	/* addresses of servers with config info */
-    int32_t num_pvfs_config_servers; /* changed to int32_t so that size of structure does not change */
-    char *the_pvfs_config_server; /* first of the entries above that works */
-    char *pvfs_fs_name;		/* name of PVFS2 file system */
-    enum PVFS_flowproto_type flowproto;	/* flow protocol */
-    enum PVFS_encoding_type encoding;   /* wire data encoding */
-    /* fs id, filled in by system interface when it looks up the fs */
-    PVFS_fs_id fs_id;
-
-    /* Default number of dfiles mount option value */
-    int32_t default_num_dfiles; /* int32_t for portable, fixed size structure */
-    /* Check to determine whether the mount process must perform the integrity checks on the config files */
-    int32_t integrity_check;
+    char **pvfs_config_servers;	/**< addresses of servers with config info */
+    int32_t num_pvfs_config_servers; /**< changed to int32_t so that size of structure does not change */
+    char *the_pvfs_config_server; /**< first of the entries above that works */
+    char *pvfs_fs_name;		/**< name of PVFS2 file system */
+    enum PVFS_flowproto_type flowproto;	/**< flow protocol */
+    enum PVFS_encoding_type encoding;   /**< wire data encoding */
+    PVFS_fs_id fs_id; /**< fs id, filled in by system interface when it looks up the fs */
+    /* int32_t for portable, fixed size structure */
+    int32_t default_num_dfiles; /**< Default number of dfiles mount option value */
+    int32_t integrity_check; /**< Check to determine whether the mount process must perform the integrity checks on the config files */
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
-    char *mnt_dir;		/* local mount path */
-    char *mnt_opts;		/* full option list */
+    char *mnt_dir;		/**< local mount path */
+    char *mnt_opts;		/**< full option list */
 };
 
 /** Describes file distribution parameters. */
@@ -96,9 +93,14 @@ typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 /**********************************************************************/
 
 /** Holds results of a lookup operation (reference to object). */
+/*  if error_path is passed in NULL then nothing returned on error */
+/*  otherwise up to error_path_size chars of unresolved path */
+/*  segments are passed out in null terminated string */
 struct PVFS_sysresp_lookup_s
 {
     PVFS_object_ref ref;
+    char *error_path;       /* on error, the unresolved path segments */
+    int error_path_size;    /* size of the buffer provided by the user */
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 
@@ -173,7 +175,7 @@ struct PVFS_sysresp_readdirplus_s
 {
     PVFS_ds_position token;
     PVFS_dirent   *dirent_array;
-    uint32_t        pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint32_t        pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
     uint64_t       directory_version;
     PVFS_error    *stat_err_array; 
     PVFS_sys_attr *attr_array;
@@ -457,9 +459,11 @@ PVFS_error PVFS_isys_io(
     PVFS_hint hints,
     void *user_ptr);
 
+/** Macro for convenience read is a call to io */
 #define PVFS_isys_read(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
 PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,x7,x8,x9)
 
+/** Macro for convenience write is a call to io */
 #define PVFS_isys_write(x1,x2,x3,x4,x5,x6,y,x7,x8,x9) \
 PVFS_isys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,x7,x8,x9)
 
@@ -474,9 +478,11 @@ PVFS_error PVFS_sys_io(
     enum PVFS_io_type type,
     PVFS_hint hints);
 
+/** Macro for convenience read is a call to io */
 #define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y,z) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,z)
 
+/** Macro for convenience write is a call to io */
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y,z) \
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,z)
 

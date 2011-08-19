@@ -129,6 +129,7 @@ static ssize_t pvfs2_devreq_read(
              */
             else {
                 cur_op = op;
+                spin_lock(&cur_op->lock);
                 list_del(&cur_op->list);
                 cur_op->op_linger_tmp--;
                 /* if there is a trailer, re-add it to the request list */
@@ -142,6 +143,7 @@ static ssize_t pvfs2_devreq_read(
                     /* readd it to the head of the list */
                     list_add(&cur_op->list, &pvfs2_request_list);
                 }
+                spin_unlock(&cur_op->lock);
                 break;
             }
         }
@@ -712,6 +714,8 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     int ret;
     dev_mask_info_t mask_info = {0};
 
+    /* mtmoore: add locking here */
+
     switch(command)
     {
         case PVFS_DEV_GET_MAGIC:
@@ -818,8 +822,12 @@ static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
     return -ENOIOCTLCMD;
 }
 
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+static long pvfs2_devreq_ioctl(
+#else
 static int pvfs2_devreq_ioctl(
     struct inode *inode,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     struct file *file,
     unsigned int command,
     unsigned long arg)
@@ -1146,7 +1154,12 @@ struct file_operations pvfs2_devreq_file_operations =
 #endif
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+    .unlocked_ioctl = pvfs2_devreq_ioctl,
+#else
     .ioctl = pvfs2_devreq_ioctl,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
+
 #ifdef CONFIG_COMPAT
 #ifdef HAVE_COMPAT_IOCTL_HANDLER
     .compat_ioctl = pvfs2_devreq_compat_ioctl,

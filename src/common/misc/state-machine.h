@@ -203,7 +203,11 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *, job_status_s *);
 PINT_sm_action PINT_state_machine_start(struct PINT_smcb *, job_status_s *);
 PINT_sm_action PINT_state_machine_continue(
     struct PINT_smcb *smcb, job_status_s *r);
+#ifdef WIN32
+int PINT_state_machine_locate(struct PINT_smcb *);
+#else
 int PINT_state_machine_locate(struct PINT_smcb *) __attribute__((used));
+#endif
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
 int PINT_smcb_op(struct PINT_smcb *smcb);
 int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);

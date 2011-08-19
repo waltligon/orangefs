@@ -422,10 +422,17 @@ int PINT_context_test_all(PINT_context_id context_id,
 
     for(; i < *count; ++i)
     {
+        struct PINT_op_entry *op_entry;
         qentry = user_ptrs[i];
         ctx_entry = PINT_queue_entry_object(
             qentry, struct PINT_context_queue_entry, qentry);
         op_ids[i] = ctx_entry->op_id;
+        op_entry = id_gen_safe_lookup(ctx_entry->op_id);
+        if (op_entry)
+        {
+           id_gen_safe_unregister(op_entry->op.id);
+           free(op_entry);
+        }
         uptr = ctx_entry->user_ptr;
         errors[i] = ctx_entry->result;
         user_ptrs[i] = uptr;
@@ -519,11 +526,19 @@ int PINT_context_test(PINT_context_id context_id,
                                     &op_id, &qentry, microsecs);
     if(ret == 0)
     {
+        struct PINT_op_entry *op_entry;
         entry = PINT_queue_entry_object(
             qentry,
             struct PINT_context_queue_entry, qentry);
+        op_entry = id_gen_safe_lookup(entry->op_id);
+        if (op_entry)
+        {
+           id_gen_safe_unregister(op_entry->op.id);
+           free(op_entry);
+        }
         *user_ptr = entry->user_ptr;
         *error = entry->result;
+
         free(entry);
     }
 

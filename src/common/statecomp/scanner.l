@@ -80,7 +80,9 @@ id          [_a-zA-Z][_0-9a-zA-Z]*
 "\%"		{fprintf(out_file, "%s", yytext);}
 "\%\%"		{BEGIN(CODE);}
 
-<CODE>"\%\%"	{fprintf(out_file,"# %d \"%s\"\n", line, in_file_name);
+<CODE>"\%\%"	{fprintf(out_file,"#ifndef WIN32\n");
+                 fprintf(out_file,"# %d \"%s\"\n", line, in_file_name);
+                 fprintf(out_file,"#endif\n");
                  BEGIN(0);}
 
 <CODE>"machine"    {RETURNVAL(MACHINE);}

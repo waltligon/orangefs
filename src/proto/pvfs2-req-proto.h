@@ -158,6 +158,13 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
 #define PVFS_REQ_LIMIT_LISTATTR 60
+/* max number of bytes in an extended attribute key including null term */
+#define PVFS_REQ_LIMIT_EATTR_KEY_LEN    PVFS_MAX_XATTR_NAMELEN
+/* max number of bytes in an extended attribute value including null term */
+#define PVFS_REQ_LIMIT_EATTR_VAL_LEN    PVFS_MAX_XATTR_VALUELEN
+/* max number of keys or key/value pairs to set or get in an operation */
+#define PVFS_REQ_LIMIT_EATTR_LIST       PVFS_MAX_XATTR_LISTLEN 
+
 
 /* create *********************************************************/
 /* - used to create an object.  This creates a metadata handle,
@@ -459,20 +466,20 @@ endecode_fields_1a_struct(
 #define extra_size_PVFS_servreq_tree_remove \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
-#define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                                  \
-                                 __creds,                                \
-                                 __fsid,                                 \
-                                 __num_data_files,                       \
-                                 __handle_array,                         \
-                                 __hints)                                \
-do {                                                                     \
-    memset(&(__req), 0, sizeof(__req));                                  \
-    (__req).op = PVFS_SERV_TREE_REMOVE;                                  \
-    (__req).hints = (__hints);                                           \
-    (__req).credentials = (__creds);                                     \
-    (__req).u.tree_remove.fs_id = (__fsid);                              \
-    (__req).u.tree_remove.num_data_files = (__num_data_files);           \
-    (__req).u.tree_remove.handle_array = (__handle_array);               \
+#define PINT_SERVREQ_TREE_REMOVE_FILL(__req,                   \
+                                 __creds,                      \
+                                 __fsid,                       \
+                                 __num_data_files,             \
+                                 __handle_array,               \
+                                 __hints)                      \
+do {                                                           \
+    memset(&(__req), 0, sizeof(__req));                        \
+    (__req).op = PVFS_SERV_TREE_REMOVE;                        \
+    (__req).hints = (__hints);                                 \
+    (__req).credentials = (__creds);                           \
+    (__req).u.tree_remove.fs_id = (__fsid);                    \
+    (__req).u.tree_remove.num_data_files = (__num_data_files); \
+    (__req).u.tree_remove.handle_array = (__handle_array);     \
 } while (0)
 
 struct PVFS_servreq_tree_get_file_size
@@ -493,24 +500,26 @@ endecode_fields_3a_struct(
 #define extra_size_PVFS_servreq_tree_get_file_size \
   (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle))
 
-#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                                \
-                                 __creds,                                          \
-                                 __fsid,                                           \
-                                 __caller_handle_index,                            \
-                                 __num_data_files,                                 \
-                                 __handle_array,                                   \
-                                 __retry_msgpair_at_leaf,                          \
-                                 __hints)                                          \
-do {                                                                               \
-    memset(&(__req), 0, sizeof(__req));                                            \
-    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                                     \
-    (__req).hints = (__hints);                                                     \
-    (__req).credentials = (__creds);                                               \
-    (__req).u.tree_get_file_size.fs_id = (__fsid);                                 \
-    (__req).u.tree_get_file_size.caller_handle_index = (__caller_handle_index);    \
-    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);              \
-    (__req).u.tree_get_file_size.handle_array = (__handle_array);                  \
-    (__req).u.tree_get_file_size.retry_msgpair_at_leaf = (__retry_msgpair_at_leaf);\
+#define PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(__req,                    \
+                                 __creds,                              \
+                                 __fsid,                               \
+                                 __caller_handle_index,                \
+                                 __num_data_files,                     \
+                                 __handle_array,                       \
+                                 __retry_msgpair_at_leaf,              \
+                                 __hints)                              \
+do {                                                                   \
+    memset(&(__req), 0, sizeof(__req));                                \
+    (__req).op = PVFS_SERV_TREE_GET_FILE_SIZE;                         \
+    (__req).hints = (__hints);                                         \
+    (__req).credentials = (__creds);                                   \
+    (__req).u.tree_get_file_size.fs_id = (__fsid);                     \
+    (__req).u.tree_get_file_size.caller_handle_index =                 \
+        (__caller_handle_index);                                       \
+    (__req).u.tree_get_file_size.num_data_files = (__num_data_files);  \
+    (__req).u.tree_get_file_size.handle_array = (__handle_array);      \
+    (__req).u.tree_get_file_size.retry_msgpair_at_leaf =               \
+        (__retry_msgpair_at_leaf);\
 } while (0)
 
 struct PVFS_servresp_tree_get_file_size
@@ -1092,6 +1101,7 @@ struct PVFS_servreq_mirror
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servreq_mirror(pptr,x) do {      \
+   int i;                                            \
    encode_PVFS_handle(pptr,&(x)->src_handle);        \
    encode_PVFS_fs_id(pptr,&(x)->fs_id);              \
    encode_PINT_dist(pptr,&(x)->dist);                \
@@ -1100,7 +1110,6 @@ struct PVFS_servreq_mirror
    encode_uint32_t(pptr,&(x)->dst_count);            \
    encode_enum(pptr,&(x)->flow_type);                \
    encode_enum(pptr,&(x)->encoding);                 \
-   int i;                                            \
    for (i=0; i<(x)->dst_count; i++)                  \
    {                                                 \
        encode_PVFS_handle(pptr,&(x)->dst_handle[i]); \
@@ -1109,6 +1118,7 @@ struct PVFS_servreq_mirror
 } while (0)
 
 #define decode_PVFS_servreq_mirror(pptr,x) do {          \
+   int i;                                                \
    decode_PVFS_handle(pptr,&(x)->src_handle);            \
    decode_PVFS_fs_id(pptr,&(x)->fs_id);                  \
    decode_PINT_dist(pptr,&(x)->dist);                    \
@@ -1121,7 +1131,6 @@ struct PVFS_servreq_mirror
                                    sizeof(PVFS_handle)); \
    (x)->wcIndex = decode_malloc((x)->dst_count *         \
                                sizeof(uint32_t));        \
-   int i;                                                \
    for (i=0; i<(x)->dst_count; i++)                      \
    {                                                     \
        decode_PVFS_handle(pptr,&(x)->dst_handle[i]);     \
@@ -1148,10 +1157,10 @@ struct PVFS_servresp_mirror
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servresp_mirror(pptr,x) do {         \
+   int i;                                                \
    encode_PVFS_handle(pptr,&(x)->src_handle);            \
    encode_uint32_t(pptr,&(x)->src_server_nr);            \
    encode_uint32_t(pptr,&(x)->dst_count);                \
-   int i;                                                \
    for (i=0; i<(x)->dst_count; i++)                      \
    {                                                     \
        encode_uint32_t(pptr,&(x)->bytes_written[i]);     \
@@ -1160,6 +1169,7 @@ struct PVFS_servresp_mirror
 } while (0)
 
 #define decode_PVFS_servresp_mirror(pptr,x) do {            \
+  int i;                                                    \
   decode_PVFS_handle(pptr,&(x)->src_handle);                \
   decode_uint32_t(pptr,&(x)->src_server_nr);                \
   decode_uint32_t(pptr,&(x)->dst_count);                    \
@@ -1167,7 +1177,6 @@ struct PVFS_servresp_mirror
                                          sizeof(uint32_t)); \
   (x)->write_status_code = decode_malloc((x)->dst_count *   \
                                          sizeof(uint32_t)); \
-  int i;                                                    \
   for (i=0; i<(x)->dst_count; i++ )                         \
   {                                                         \
       decode_uint32_t(pptr,&(x)->bytes_written[i]);         \
@@ -1619,46 +1628,50 @@ do {                                               \
 
 struct PVFS_servreq_mgmt_perf_mon
 {
-    uint32_t next_id;  /* next time stamp id we want to retrieve */
-    uint32_t count;    /* how many measurements we want */
+    uint32_t next_id;      /* next time stamp id we want to retrieve */
+    uint32_t key_count;    /* how many counters per measurements we want */
+    uint32_t count;        /* how many measurements we want */
 };
-endecode_fields_2_struct(
+endecode_fields_3_struct(
     PVFS_servreq_mgmt_perf_mon,
     uint32_t, next_id,
+    uint32_t, key_count,
     uint32_t, count);
 
-#define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,    \
-                                        __creds,  \
-                                        __next_id,\
-                                        __count,  \
-                                        __hints)  \
-do {                                              \
-    memset(&(__req), 0, sizeof(__req));           \
-    (__req).op = PVFS_SERV_MGMT_PERF_MON;         \
-    (__req).credentials = (__creds);              \
-    (__req).hints = (__hints);                    \
-    (__req).u.mgmt_perf_mon.next_id = (__next_id);\
-    (__req).u.mgmt_perf_mon.count = (__count);    \
+#define PINT_SERVREQ_MGMT_PERF_MON_FILL(__req,        \
+                                        __creds,      \
+                                        __next_id,    \
+                                        __key_count,  \
+                                        __count,      \
+                                        __hints)      \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_MGMT_PERF_MON;             \
+    (__req).credentials = (__creds);                  \
+    (__req).hints = (__hints);                        \
+    (__req).u.mgmt_perf_mon.next_id = (__next_id);    \
+    (__req).u.mgmt_perf_mon.key_count = (__key_count);\
+    (__req).u.mgmt_perf_mon.count = (__count);        \
 } while (0)
 
 struct PVFS_servresp_mgmt_perf_mon
 {
-    struct PVFS_mgmt_perf_stat* perf_array; /* array of statistics */
-    uint32_t perf_array_count;              /* size of above array */
-    /* next id to pick up from this point */
-    uint32_t suggested_next_id;
-    uint64_t end_time_ms;  /* end time for final array entry */
-    uint64_t cur_time_ms;  /* current time according to svr */
+    int64_t *perf_array;            /* array of statistics */
+    uint32_t perf_array_count;      /* size of above array */
+    uint32_t key_count;             /* number of keys in each sample */
+    uint32_t suggested_next_id;     /* next id to pick up from this point */
+    uint64_t end_time_ms;           /* end time for final array entry */
+    uint64_t cur_time_ms;           /* current time according to svr */
 };
 endecode_fields_5a_struct(
     PVFS_servresp_mgmt_perf_mon,
+    uint32_t, key_count,
     uint32_t, suggested_next_id,
-    skip4,,
     uint64_t, end_time_ms,
     uint64_t, cur_time_ms,
     skip4,,
     uint32_t, perf_array_count,
-    PVFS_mgmt_perf_stat, perf_array);
+    int64_t,  perf_array);
 #define extra_size_PVFS_servresp_mgmt_perf_mon \
     (PVFS_REQ_LIMIT_IOREQ_BYTES)
 
@@ -1812,7 +1825,8 @@ endecode_fields_2aa_struct(
     PVFS_ds_keyval, key,
     PVFS_size, valsz);
 #define extra_size_PVFS_servreq_geteattr \
-    (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    ((PVFS_REQ_LIMIT_EATTR_KEY_LEN + sizeof(PVFS_size) \
+     * PVFS_REQ_LIMIT_EATTR_LIST))
 
 #define PINT_SERVREQ_GETEATTR_FILL(__req,   \
                                   __creds, \
@@ -1847,8 +1861,8 @@ endecode_fields_1aa_struct(
     PVFS_ds_keyval, val,
     PVFS_error, err);
 #define extra_size_PVFS_servresp_geteattr \
-    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST + \
-    PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_error))
+    ((PVFS_REQ_LIMIT_EATTR_VAL_LEN + sizeof(PVFS_error)) \
+     * PVFS_REQ_LIMIT_EATTR_LIST)
 
 /* seteattr ****************************************************/
 /* - sets list of extended attributes */
@@ -1872,8 +1886,8 @@ endecode_fields_4aa_struct(
     PVFS_ds_keyval, key,
     PVFS_ds_keyval, val);
 #define extra_size_PVFS_servreq_seteattr \
-    ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN) \
-        * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    ((PVFS_REQ_LIMIT_EATTR_KEY_LEN  + PVFS_REQ_LIMIT_EATTR_VAL_LEN) \
+        * PVFS_REQ_LIMIT_EATTR_LIST)
 
 #define PINT_SERVREQ_SETEATTR_FILL(__req,   \
                                   __creds,       \
@@ -1912,7 +1926,7 @@ endecode_fields_3_struct(
     PVFS_fs_id, fs_id,
     PVFS_ds_keyval, key);
 #define extra_size_PVFS_servreq_deleattr \
-    PVFS_REQ_LIMIT_KEY_LEN
+    PVFS_REQ_LIMIT_EATTR_KEY_LEN 
 
 #define PINT_SERVREQ_DELEATTR_FILL(__req,   \
                                   __creds, \
@@ -1951,7 +1965,7 @@ endecode_fields_4a_struct(
     uint32_t, nkey,
     PVFS_size, keysz);
 #define extra_size_PVFS_servreq_listeattr \
-    (PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_size))
+    (PVFS_REQ_LIMIT_EATTR_LIST * sizeof(PVFS_size))
 
 #define PINT_SERVREQ_LISTEATTR_FILL(__req,            \
                                   __creds,            \
@@ -1986,7 +2000,7 @@ endecode_fields_2a_struct(
     uint32_t, nkey,
     PVFS_ds_keyval, key);
 #define extra_size_PVFS_servresp_listeattr \
-    (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    (PVFS_REQ_LIMIT_EATTR_KEY_LEN * PVFS_REQ_LIMIT_EATTR_LIST)
 
 /* mgmt_get_dirent */
 /* - used to retrieve the handle of the specified directory entry */

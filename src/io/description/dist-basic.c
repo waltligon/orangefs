@@ -78,6 +78,10 @@ static void registration_init(void* params)
 {
 }
 
+static void unregister(void)
+{
+}
+
 static char *params_string(void *params)
 {
     return strdup("none");
@@ -98,9 +102,19 @@ static PINT_dist_methods basic_methods = {
     encode_lebf,
     decode_lebf,
     registration_init,
+    unregister,
     params_string
 };
 
+#ifdef WIN32
+PINT_dist basic_dist = {
+    PVFS_DIST_BASIC_NAME,
+    roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
+    0, /* param size */
+    &basic_params,
+    &basic_methods
+};
+#else
 PINT_dist basic_dist = {
     .dist_name = PVFS_DIST_BASIC_NAME,
     .name_size = roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
@@ -108,6 +122,7 @@ PINT_dist basic_dist = {
     .params = &basic_params,
     .methods = &basic_methods
 };
+#endif
 
 /*
  * Local variables:

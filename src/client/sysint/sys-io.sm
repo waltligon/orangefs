@@ -13,7 +13,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -1010,8 +1012,6 @@ static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
 static int io_datafile_mirror_retry(struct PINT_smcb *smcb
                                    ,job_status_s *js_p )
 {
-   gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
-   gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_mirror_retry...\n");
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = &(sm_p->getattr.attr);
     PVFS_metafile_attr *meta = &(attr->u.meta);
@@ -1022,6 +1022,9 @@ static int io_datafile_mirror_retry(struct PINT_smcb *smcb
     uint32_t copies = 0;
     int i,j,ret;
     char *enc_req_bytes = NULL;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_mirror_retry...\n");
 
     /* Have we exhausted the number of retries */
     if (io->retry_count >= sm_p->msgarray_op.params.retry_limit)
@@ -1462,16 +1465,20 @@ static PINT_sm_action io_datafile_complete_operations(
      || sm_p->u.io.flow_completion_count
      || sm_p->u.io.write_ack_completion_count) {
         if (PINT_smcb_cancelled(smcb))
+        {
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                          "%d flows and %d write acks pending\n",
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count);
+        }
         else
+        {
             gossip_debug(GOSSIP_IO_DEBUG, " %d flows pending, %d write acks "
                          "pending, %d msgpair\n", 
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count,
                          sm_p->u.io.msgpair_completion_count);
+        }
         return SM_ACTION_DEFERRED;
     }
 

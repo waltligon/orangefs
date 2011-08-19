@@ -226,9 +226,7 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     unsigned int key_count;
     unsigned int history_size;
     int ret;
-    int64_t** stat_matrix;
-    uint64_t* start_time_array_ms;
-    uint64_t* interval_array_ms;
+    int64_t* stat_matrix;
     int i,j;
 
     if(in_key_count)
@@ -255,34 +253,22 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     }
 
     /* allocate storage for results */
-    stat_matrix = malloc(key_count*sizeof(int64_t*));
-    for(i=0; i<key_count; i++)
-    {
-        stat_matrix[i] = malloc(history_size*sizeof(int64_t));
-        assert(stat_matrix[i]);
-    }
-    start_time_array_ms = malloc(history_size*sizeof(uint64_t));
-    assert(start_time_array_ms);
-    interval_array_ms = malloc(history_size*sizeof(uint64_t));
-    assert(interval_array_ms);
+    stat_matrix = malloc(history_size * (key_count + 2) * sizeof(int64_t*));
 
     /* retrieve values from perf counter api */
-    PINT_perf_retrieve(
-       pc,
-       stat_matrix,
-       start_time_array_ms,
-       interval_array_ms,
-       key_count,
-       history_size);
+    PINT_perf_retrieve(pc,
+                       stat_matrix,
+                       key_count,
+                       history_size);
 
     printf("===================\n");
 
     /* print times (column headings) */
-    printf("First start time (ms): %llu\n", llu(start_time_array_ms[0]));
+    printf("First start time (ms): %llu\n", llu(stat_matrix[key_count]));
     printf("%24.24s: ", "Interval size (ms)");
     for(i=0; i<history_size; i++)
     {
-        printf("%llu\t", llu(interval_array_ms[i]));
+        printf("%llu\t", llu(stat_matrix[(i*(key_count+2))+key_count+1]));
     }
     printf("\n");
 
@@ -293,7 +279,7 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
 
         for(j=0; j<history_size; j++)
         {
-            printf("%lld\t", lld(stat_matrix[i][j]));
+            printf("%lld\t", lld(stat_matrix[(i*(key_count+2))+j]));
         }
         printf("\n");
     }

@@ -834,8 +834,6 @@ static PINT_sm_action getattr_read_mirrored_handles_if_required(
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\tNumber of mirrored copies cannot "
                                          "be retrieved.\n");
-        gossip_lerr("Mirror handles requested, but number of mirrored copies "
-                    "cannot be retrieved.\n");
         if (resp->u.getattr.attr.mask & (PVFS_ATTR_META_DFILES |
                                          PVFS_ATTR_META_DIST) )
         {
@@ -1546,6 +1544,8 @@ static PINT_sm_action getattr_setup_op(
     s_op->u.getattr.handle = s_op->req->u.getattr.handle;
     s_op->u.getattr.fs_id = s_op->req->u.getattr.fs_id;
     s_op->u.getattr.attrmask = s_op->req->u.getattr.attrmask;
+    s_op->u.getattr.err_array = NULL;
+    s_op->u.getattr.mirror_dfile_status_array = NULL;
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

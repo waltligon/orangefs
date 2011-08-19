@@ -1997,6 +1997,9 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     return (ret);
 }
 
+/*
+  We want to clear everything except for rw_semaphore and the vfs_inode
+*/
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
 {
     if (!InitFlag(pvfs2_inode))
@@ -2006,6 +2009,8 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
         pvfs2_inode->last_failed_block_index_read = 0;
         memset(pvfs2_inode->link_target, 0, sizeof(pvfs2_inode->link_target));
         pvfs2_inode->error_code = 0;
+        pvfs2_inode->revalidate_failed = 0;
+        pvfs2_inode->pinode_flags = 0;
         SetInitFlag(pvfs2_inode);
     }
 }
@@ -2023,14 +2028,19 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
 
 void pvfs2_op_initialize(pvfs2_kernel_op_t *op)
 {
-    op->io_completed = 0;
+    if( op )
+    {
+        spin_lock( &op->lock );
+        op->io_completed = 0;
 
-    op->upcall.type = PVFS2_VFS_OP_INVALID;
-    op->downcall.type = PVFS2_VFS_OP_INVALID;
-    op->downcall.status = -1;
+        op->upcall.type = PVFS2_VFS_OP_INVALID;
+        op->downcall.type = PVFS2_VFS_OP_INVALID;
+        op->downcall.status = -1;
 
-    op->op_state = OP_VFS_STATE_UNKNOWN;
-    op->tag = 0;
+        op->op_state = OP_VFS_STATE_UNKNOWN;
+        op->tag = 0;
+        spin_unlock( &op->lock );
+    }
 }
 
 void pvfs2_make_bad_inode(struct inode *inode)

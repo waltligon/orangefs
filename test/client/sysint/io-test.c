@@ -6,8 +6,10 @@
 
 #include <time.h>
 #include "client.h"
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,6 +17,11 @@
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
+
+#ifdef WIN32
+#define snprintf    _snprintf
+#define rindex      strrchr
+#endif
 
 #define DEFAULT_IO_SIZE 8*1024*1024
 
@@ -26,7 +33,7 @@ int main(int argc, char **argv)
     char *filename = NULL;
     int ret = -1, io_size = DEFAULT_IO_SIZE;
     int *io_buffer = NULL;
-    int i, errors, buffer_size;
+    int i, errors;
     PVFS_fs_id fs_id;
     char name[512] = {0};
     char *entry_name = NULL;
@@ -138,7 +145,6 @@ int main(int argc, char **argv)
 	   (long) pinode_refn.handle, (int) pinode_refn.fs_id);
 
     buffer = io_buffer;
-    buffer_size = io_size * sizeof(int);
 
     /*
       file datatype is tiled, so we can get away with a trivial type

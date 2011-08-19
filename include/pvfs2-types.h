@@ -18,7 +18,11 @@
 #else
 #include <stdint.h>
 #include <sys/stat.h>
+#ifdef WIN32
+#include "wincommon.h"
+#else
 #include <sys/time.h>
+#endif
 #include <limits.h>
 #include <errno.h>
 #endif
@@ -43,6 +47,10 @@
   #elif INTPTR_MIN == INT64_MIN
     #define PVFS2_SIZEOF_VOIDP 64
   #endif
+#elif defined(_WIN64)
+  #define PVFS2_SIZEOF_VOIDP 64
+#elif defined(WIN32)
+  #define PVFS2_SIZEOF_VOIDP 32
 #else
   #error "Unhandled size of void pointer"
 #endif
@@ -72,9 +80,16 @@ typedef int64_t PVFS_id_gen_t;
 /** Opaque value representing a destination address. */
 typedef int64_t PVFS_BMI_addr_t;
 
+/* Windows - inline functions can't be exported */
+#ifdef WIN32
+void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
+int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
+void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+#else
 inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x);
 inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x);
 inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x);
+#endif
 
 #define encode_PVFS_error encode_int32_t
 #define decode_PVFS_error decode_int32_t
@@ -116,7 +131,7 @@ enum PVFS_encoding_type
 #define ENCODING_IS_SUPPORTED(enc_type)  \
 ((enc_type >= ENCODING_SUPPORTED_MIN) && \
  (enc_type <= ENCODING_SUPPORTED_MAX))
-#define ENCODING_DEFAULT ENCODING_LE_BFIELD
+#define PVFS2_ENCODING_DEFAULT ENCODING_LE_BFIELD
 
 /* basic types used by storage subsystem */
 
@@ -225,8 +240,13 @@ typedef struct PVFS_sys_layout_s
 } PVFS_sys_layout;
 #define extra_size_PVFS_sys_layout PVFS_REQ_LIMIT_LAYOUT
 
+#ifdef WIN32
+void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
+void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+#else
 inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x);
 inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x);
+#endif
 
 /* predefined special values for types */
 #define PVFS_CONTEXT_NULL    ((PVFS_context_id)-1)
@@ -349,6 +369,11 @@ do {                                                \
 
 #endif
 
+#define ALL_FS_META_HINT_FLAGS \
+   (PVFS_IMMUTABLE_FL |        \
+    PVFS_APPEND_FL    |        \
+    PVFS_NOATIME_FL )
+
 /* Key/Value Pairs */
 /* Extended attributes are stored on objects with */
 /* a Key/Value pair.  A key or a value is simply */
@@ -468,6 +493,9 @@ typedef struct
 /** Credentials (stubbed for future authentication methods). */
 typedef struct
 {
+#ifdef WIN32
+    /* TODO - store username string? */
+#endif
     PVFS_uid uid;
     PVFS_gid gid;
 } PVFS_credentials;
@@ -487,12 +515,16 @@ endecode_fields_2(
  * upcall request types.
  * NOTE: Please retain them as multiples of 8 even if you wish to change them
  * This is *NECESSARY* for supporting 32 bit user-space binaries on a 64-bit kernel.
+ * Due to implementation within DBPF, this really needs to be PVFS_NAME_MAX,
+ * which it was the same value as, but no reason to let it break if that
+ * changes in the future.
  */
-#define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
-                                        by <linux/xattr.h> */
+#define PVFS_MAX_XATTR_NAMELEN   PVFS_NAME_MAX /* Not the same as 
+                                                  XATTR_NAME_MAX defined
+                                                  by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  8192 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
-#define PVFS_MAX_XATTR_LISTLEN   8  /* Not the same as XATTR_LIST_MAX
+#define PVFS_MAX_XATTR_LISTLEN   16  /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
@@ -624,6 +656,8 @@ typedef struct {
 int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(const char *text, int retcode);
 void PVFS_perror_gossip(const char* text, int retcode);
+void PVFS_perror_gossip_silent(void);
+void PVFS_perror_gossip_verbose(void);
 PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 PVFS_error PVFS_errno_to_error(int err);
 
@@ -729,6 +763,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EADDRNTFD  (5|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ENOTPVFS   (8|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -849,6 +884,7 @@ const char *PINT_non_errno_strerror_mapping[] = {     \
     "No address associated with name",                \
     "Unknown server error",                           \
     "Host name lookup failure",                       \
+    "Path contains non-PVFS elements",                \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
@@ -859,6 +895,7 @@ PVFS_error PINT_non_errno_mapping[] = {               \
     PVFS_EADDRNTFD, /* 5 */                           \
     PVFS_ENORECVR,  /* 6 */                           \
     PVFS_ETRYAGAIN, /* 7 */                           \
+    PVFS_ENOTPVFS,  /* 8 */                           \
 }
 
 /*

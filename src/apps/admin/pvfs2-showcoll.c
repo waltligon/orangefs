@@ -20,8 +20,6 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
 
-/* declare the strnlen prototype */
-size_t strnlen(const char *s, size_t limit);
 
 static char data_path[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char meta_path[PATH_MAX] = "/tmp/pvfs2-test-space";
@@ -75,6 +73,7 @@ int main(int argc, char **argv)
       TROVE_METHOD_DBPF, NULL, data_path, meta_path, 0);
     if (ret < 0) 
     {
+        printf("Error from trove_initialize is %d.\n",ret);
 	fprintf(stderr,
 		"%s: error: trove initialize failed; aborting!\n",
 		argv[0]);
@@ -210,6 +209,7 @@ static int parse_args(int argc, char **argv)
 		break;
             case 'm':
 		strncpy(meta_path, optarg, PATH_MAX);
+                break;
 	    case 'c': /* collection */
 		got_collection = 1;
 		strncpy(collection, optarg, PATH_MAX);
@@ -221,6 +221,7 @@ static int parse_args(int argc, char **argv)
 		/* TODO: USE BIGGER VALUE */
 		got_dspace_handle = 1;
 		dspace_handle = strtol(optarg, NULL, 16);
+                break;
 	    case 'v':
 		verbose = 1;
 		break;
@@ -309,10 +310,10 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld)\n",
-	    llu(handle),
+	    "\t0x%08llx/%llu (dspace_getattr output: type = %s, b_size = %lld)\n",
+	    llu(handle),llu(handle),
 	    type_to_string(ds_attr.type),
-	    lld(ds_attr.u.datafile.b_size));
+	    (ds_attr.type == PVFS_TYPE_DATAFILE) ? lld(ds_attr.u.datafile.b_size) : 0);
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,
@@ -330,6 +331,7 @@ static char *type_to_string(TROVE_ds_type type)
     static char sl[] = "symlink";
     static char di[] = "directory";
     static char dd[] = "dirdata";
+    static char in[] = "internal";
     static char un[] = "unknown";
 
     switch (type) {
@@ -343,6 +345,8 @@ static char *type_to_string(TROVE_ds_type type)
 	    return sl;
 	case PVFS_TYPE_DIRECTORY:
 	    return di;
+        case PVFS_TYPE_INTERNAL:
+            return in;
 	default:
 	    return un;
     }
@@ -359,16 +363,37 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
     TROVE_op_id op_id;
     TROVE_ds_state state;
 
-    key.buffer    = malloc(65536);
-    key.buffer_sz = 65536;
+    key.buffer    = malloc(256);
+    key.buffer_sz = 256;
+    key.read_sz   = 0;
     val.buffer    = malloc(65536);
     val.buffer_sz = 65536;
+    val.read_sz   = 0;
+
+    if (key.buffer)
+        memset(key.buffer,0,256);
+    if (val.buffer)
+        memset(val.buffer,0,65536);
+
+    if ( !(key.buffer && val.buffer) )
+    {
+        if (key.buffer)
+           free(key.buffer);
+        if (val.buffer)
+           free(val.buffer);
+        printf("%s: Unable to allocate memory.\n",__func__);
+        return -1;
+    }
+
 
     pos = TROVE_ITERATE_START;
     count = 1;
 
     while (count > 0) {
 	int opcount;
+        printf("%s:calling trove_keyval_iterate for %llu.\n"
+              ,__func__
+              ,llu(handle));
 	ret = trove_keyval_iterate(coll_id,
 				   handle,
 				   &pos,
@@ -386,7 +411,17 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
             TROVE_DEFAULT_TEST_TIMEOUT);
 	if (ret != 1) return -1;
 
+        printf("%s: count=%d\n",__func__,count);
+
 	if (count > 0) print_keyval_pair(&key, &val, type, 65536);
+
+        /* re-initialize key val */
+        memset(key.buffer,0,256);
+        memset(val.buffer,0,65536);
+        key.buffer_sz = 256;
+        val.buffer_sz = 65536;
+        key.read_sz = 0;
+        val.read_sz = 0;
     }
 
     free(key.buffer);
@@ -410,7 +445,7 @@ static void print_datafile_handles(PVFS_handle *h_p,
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08llx ", llu(h_p[i]));
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "\n\t\t\t\t0x%08llx(%llu)", llu(h_p[i]), llu(h_p[i]));
 
     if (i == 10) fprintf(stdout, "...\n");
     else fprintf(stdout, "\n");
@@ -423,8 +458,18 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 {
     int key_printable = 0, val_printable = 0;
 
-    if (isprint(((char *)key_p->buffer)[0]) && (strnlen(key_p->buffer, sz) < 64)) key_printable = 1;
-    if (isprint(((char *)val_p->buffer)[0]) && (strnlen(val_p->buffer, sz) < 64)) val_printable = 1;
+    if (isprint(((char *)key_p->buffer)[0])) key_printable = 1;
+    if (isprint(((char *)val_p->buffer)[0])) val_printable = 1;
+
+    if (key_printable && key_p->buffer_sz >= 64)
+    {
+        memset(&((char *)key_p->buffer)[64],0,1);
+    }
+
+    if (val_printable && val_p->buffer_sz >= 64)
+    {
+        memset(&((char *)key_p->buffer)[64],0,1);
+    }
 
     if (!strncmp(key_p->buffer, "metadata", 9) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
 	fprintf(stdout,
@@ -440,18 +485,19 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		"\t\t'%s' (%d): '%s' (%d) as handles = ",
 		(char *) key_p->buffer,
 		key_p->read_sz,
-		(char *) val_p->buffer,
+		val_printable ? (char *) val_p->buffer : "",
 		val_p->read_sz);
 	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "de", 3)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx(%llu)\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
-		(char *) val_p->buffer,
+		val_printable ? (char *) val_p->buffer : "",
 		val_p->read_sz,
-		llu(*(TROVE_handle *) val_p->buffer));
+		llu(*(TROVE_handle *) val_p->buffer),
+                llu(*(TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
@@ -461,6 +507,42 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		(char *) val_p->buffer,
 		val_p->read_sz,
 		llu(*(TROVE_handle *) val_p->buffer));
+    }
+    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.meta_hint",20))
+    {
+        fprintf(stdout,
+                "\t\t'%s' (%d): 0x%08llX (%d)\n"
+                ,(char *)key_p->buffer
+                ,(int)strlen((char*)key_p->buffer)
+                ,*(unsigned long long *)val_p->buffer
+                ,(int)sizeof(unsigned long));
+    }
+    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.mode",22))
+    {
+        fprintf(stdout,
+                "\t\t'%s' (%d): %d (%d)\n"
+                ,(char *)key_p->buffer
+                ,(int)strlen((char*)key_p->buffer)
+                ,*(unsigned int *)val_p->buffer
+                ,(int)sizeof(unsigned int));
+    }
+    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.copies",24))
+    {
+        fprintf(stdout,
+                "\t\t'%s' (%d): %d (%d)\n"
+                ,(char *)key_p->buffer
+                ,(int)strlen((char*)key_p->buffer)
+                ,*(unsigned int *)val_p->buffer
+                ,(int)sizeof(unsigned int));
+    }
+    else if (key_printable && !strncmp((char *)key_p->buffer,"user.pvfs2.mirror.handles",25))
+    {
+        fprintf(stdout,
+                "\t\t'%s' (%d): '' (%d) as handles:"
+                ,(char *)key_p->buffer
+                ,(int)strlen((char*)key_p->buffer)
+                ,(int)val_p->read_sz);
+	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
     }
     else if (key_printable && val_printable) {
 	fprintf(stdout,
@@ -497,9 +579,11 @@ static int print_collections(void)
 
     coll_name = malloc(PATH_MAX);
     if (coll_name == NULL) return -1;
+    memset(coll_name,0,PATH_MAX);
 
     name.buffer    = coll_name;
     name.buffer_sz = PATH_MAX;
+    name.read_sz   = 0;
     count = 1;
     pos = TROVE_ITERATE_START;
 
@@ -525,6 +609,11 @@ static int print_collections(void)
 			       "\t%s (coll_id = %d)\n",
 			       coll_name,
 			       coll_id);
+        memset(coll_name,0,PATH_MAX);
+        memset(&name,0,sizeof(name));
+        name.buffer    = coll_name;
+        name.buffer_sz = PATH_MAX;
+        name.read_sz   = 0;
     }
 
     fprintf(stdout, "\n");

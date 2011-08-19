@@ -12,6 +12,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-stat.c \
 	$(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
+	$(DIR)/pvfs2-perf-mon-snmp.c \
 	$(DIR)/pvfs2-mkdir.c \
 	$(DIR)/pvfs2-chmod.c \
 	$(DIR)/pvfs2-chown.c \

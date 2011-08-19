@@ -90,6 +90,7 @@ struct PINT_client_create_sm
     int datafile_count;
     PVFS_handle *datafile_handles;
     int stuffed;
+    PVFS_object_attr store_attr;
 
     int dirent_file_count;
     PVFS_handle *dirent_handle;
@@ -271,6 +272,9 @@ struct PINT_client_io_sm
 
 struct PINT_client_flush_sm
 {
+#ifdef WIN32
+    int field;
+#endif
 };
 
 struct PINT_client_readdir_sm
@@ -306,6 +310,13 @@ struct PINT_client_readdirplus_sm
     PVFS_handle     **handles;
 };
 
+/*
+ * A segment is part of a path - namely each part of the
+ * path delimited by / characters.  as each segment is
+ * looked up we record the PVFS_object_ref for the
+ * object in the FS, and its attributes.  Other fields
+ * keep up with the segment in contect of the whole path
+ */
 typedef struct
 {
     char *seg_name;
@@ -315,6 +326,13 @@ typedef struct
     PVFS_object_ref seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
 
+/*
+ * A context is a group of segments that have been looked up
+ * on a server.  A server can resolve more than one segment
+ * in a single request, and these groupings are maintained
+ * in a context.  Again fields manage the progress as these
+ * lookups happen.
+ */
 typedef struct
 {
     int total_segments;
@@ -375,9 +393,10 @@ struct PINT_client_mgmt_statfs_list_sm
 struct PINT_client_mgmt_perf_mon_list_sm
 {
     PVFS_fs_id fs_id;
-    struct PVFS_mgmt_perf_stat **perf_matrix;
+    int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
     int server_count; 
+    int *key_count; 
     int history_count; 
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
