@@ -78,8 +78,9 @@ int fs_initialize(const char *tabfile,
     {
         _snprintf(error_msg, error_msg_len, "fs_initialize: could not initialize any "
             "file systems from %s", tab->tabfile_name);
-     
-        PVFS_sys_finalize();
+
+        PINT_release_pvfstab();
+        /* PVFS_sys_finalize(); */
         return -1;
     }
 

@@ -637,7 +637,17 @@ DWORD WINAPI main_loop(LPVOID poptions)
     if (tabfile)
     {
         service_debug("Using tabfile: %s\n", tabfile);
-        ret = fs_initialize(tabfile, error_msg, 256);
+        do {
+            ret = fs_initialize(tabfile, error_msg, 256);
+
+            if (ret != 0)
+            {
+                service_debug("Retrying fs initialization...\n");
+                report_error_event(error_msg, TRUE);
+                Sleep(30000);
+            }
+
+        } while (ret != 0);
     }
     else
     {
@@ -654,6 +664,7 @@ DWORD WINAPI main_loop(LPVOID poptions)
     }
     else 
     {
+        /* note: this will no longer occur */
         _snprintf(event_msg, sizeof(event_msg), "Fatal init error: %s",
             error_msg);        
         report_error_event(event_msg, TRUE);

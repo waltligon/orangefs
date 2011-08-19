@@ -2087,39 +2087,50 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOperations->SetFileSecurityA = PVFS_Dokan_set_file_security;
     dokanOperations->Unmount = PVFS_Dokan_unmount;
 
-    DbgPrint("Entering DokanMain\n");
+    /* Attempt to start listening for Dokan messages. Will retry indefinitely.
+       If service is stopped or CTRL-C is used, thread will terminate.
+       Retry is primarily for waiting for services to be available on system 
+       startup. */
+    do {
+        DbgPrint("Entering DokanMain\n");
 
-    /* dokan loops until termination */
-    status = DokanMain(dokanOptions, dokanOperations);
+        /* dokan loops until termination */
+        status = DokanMain(dokanOptions, dokanOperations);
 
-    DbgPrint("Exited DokanMain\n");
+        DbgPrint("Exited DokanMain\n");
 
-    switch (status) {
-        case DOKAN_SUCCESS:
-            DbgPrint("Success\n");
-            break;
-        case DOKAN_ERROR:
-            DbgPrint("Error\n");
-            break;
-        case DOKAN_DRIVE_LETTER_ERROR:
-            DbgPrint("Bad Drive letter\n");
-            break;
-        case DOKAN_DRIVER_INSTALL_ERROR:
-            DbgPrint("Can't install driver\n");
-            break;
-        case DOKAN_START_ERROR:
-            DbgPrint("Driver something wrong\n");
-            break;
-        case DOKAN_MOUNT_ERROR:
-            DbgPrint("Can't assign a drive letter\n");
-            break;
-        case DOKAN_MOUNT_POINT_ERROR:
-            DbgPrint("Can't assign mount point\n");
-            break;
-        default:
-            DbgPrint("Unknown error: %d\n", status);
-            break;
-    }
+        switch (status) {
+            case DOKAN_SUCCESS:
+                DbgPrint("Success\n");
+                break;
+            case DOKAN_ERROR:
+                DbgPrint("Error\n");
+                break;
+            case DOKAN_DRIVE_LETTER_ERROR:
+                DbgPrint("Bad Drive letter\n");
+                break;
+            case DOKAN_DRIVER_INSTALL_ERROR:
+                DbgPrint("Can't install driver\n");
+                break;
+            case DOKAN_START_ERROR:
+                DbgPrint("Driver something wrong\n");
+                break;
+            case DOKAN_MOUNT_ERROR:
+                DbgPrint("Can't assign a drive letter\n");
+                break;
+            case DOKAN_MOUNT_POINT_ERROR:
+                DbgPrint("Can't assign mount point\n");
+                break;
+            default:
+                DbgPrint("Unknown error: %d\n", status);
+                break;
+        }
+
+        DbgPrint("Retrying in 30 seconds...\n");
+        
+        Sleep(30000);
+
+    } while (TRUE);
 
     qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
     gen_mutex_destroy(&context_cache_mutex);

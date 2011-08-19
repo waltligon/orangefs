@@ -342,7 +342,11 @@ begin
 	Disable(STATUSEX);
 
 	bOpt1   = FALSE;
-    bOpt2   = FALSE;
+    bOpt2   = FALSE;  
+          
+    // in silent mode, a preconfigured orangefstab and orangefs.cfg
+    // are installed
+    if (MODE = SILENTMODE) goto Label_DlgSkip;
     
 Dlg_MountPointUserMap:
     // prompt for file system location, mount point and user mapping mode
@@ -392,6 +396,8 @@ Dlg_UserMap:
                               szClass, szNamingAttr, szUIDAttr, szGIDAttr);
     endswitch;
     CloseConfigFile(nFileHandle);
+
+Label_DlgSkip:
         
     InstallServices();
     
@@ -409,4 +415,118 @@ Dlg_UserMap:
             ServiceStartService("orangefs-client", "");
         endif;
 	endif;
+end;
+//---------------------------------------------------------------------------
+// OnMaintUIBefore
+//
+// The OnMaintUIBefore event is called by the framework when the setup is
+// running in maintenance mode. By default this event displays UI that
+// allows the end user to add or remove features, repair currently
+// installed features or uninstall the application.
+//---------------------------------------------------------------------------
+function OnMaintUIBefore()
+	NUMBER nResult, nType;
+	STRING szTitle, szMsg, svDir, svResult, szCaption, szExePath;
+begin
+	// TO DO: if you want to enable background, window title, and caption bar title   								
+	// SetTitle( @PRODUCT_NAME, 24, WHITE );					
+	// SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION );  			
+	// SetColor(BACKGROUND,RGB (0, 128, 128));					
+	// Enable( FULLWINDOWMODE );						
+	// Enable( BACKGROUND );							
+	                       
+	// prompt to remove program
+	svResult = SdLoadString(IFX_MAINTUI_MSG);
+	szCaption = SdLoadString(IFX_ONMAINTUI_CAPTION);
+	nResult = SprintfBox(MB_OKCANCEL, szCaption, "%s", svResult);
+	if (nResult = IDOK) then
+	    // Stop and remove the services
+	    ServiceStopService("orangefs-client");
+	    ServiceRemoveService("orangefs-client");
+	    ServiceStopService("DokanMounter");
+	    ServiceRemoveService("DokanMounter");
+	    
+	    // uninstall driver
+        szExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
+    
+        LaunchAppAndWait(szExePath, "/u d", LAAW_OPTION_WAIT);
+                                       
+        // remove files etc.
+        FeatureRemoveAll();
+        
+        // setup default status
+        SetStatusWindow(0, "");
+        Enable(STATUSEX);
+        StatusUpdate(ON, 100);
+    endif;                                       
+	
+/*	
+Dlg_Start:
+
+    // Added in Version 9.5 - Support for REMOVEONLY option.
+    if( !REMOVEONLY ) then
+		// In standard mode show maintenance dialog
+		Disable(BACKBUTTON);
+		nType = SdWelcomeMaint(szTitle, szMsg, MODIFY);
+		Enable(BACKBUTTON);
+	else
+        // Hide the initial progress dialog as otherwise the user can
+        // click on it, and hide the MessageBox.
+        Disable( DIALOGCACHE );
+
+        // In RemoveOnly mode, set to remove.
+        nType = REMOVEALL;
+    endif;
+	
+	// Show Uninstall Confirmation Dialog
+    if ( nType = REMOVEALL ) then
+		nResult = MessageBox( SdLoadString( IFX_MAINTUI_MSG ), MB_YESNO );
+		if (nResult != IDYES ) then
+            
+            if( REMOVEONLY ) then
+                // In REMOVEONLY mode, abort the setup.
+                abort;
+            else
+                // In non-REMOVEONLY mode, redisplay the previous dialog.
+			    goto Dlg_Start;
+            endif;
+
+		endif;
+	endif;
+
+	nResult = NEXT;
+
+Dlg_SdFeatureTree:
+	if (nType = MODIFY) then
+		szTitle = "";
+		szMsg = "";
+		nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+		if (nResult = BACK) goto Dlg_Start;
+	endif;
+
+	switch(nType)
+        case REMOVEALL: 
+        
+            ComponentRemoveAll();
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_REMOVEALL ) );
+
+        case REPAIR:
+        
+            ComponentReinstall();
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_REPAIR ) );
+
+
+        case MODIFY:
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_MODIFY ) );
+
+    endswitch;
+    
+	Enable(STATUSEX);
+*/
 end;
