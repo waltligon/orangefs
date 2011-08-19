@@ -889,6 +889,10 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         {
             gossip_err("%s: failed to perform direct locked write: "
                        "(error=%d)\n", __func__, ret);
+            if(eor > attr.u.datafile.b_size)
+            {
+                grow_bstream_handle_release_lock( ref );
+            }
             goto cache_put;
         }
         /* did this calculation above
@@ -1550,12 +1554,12 @@ static int grow_bstream_handle_acquire_lock( TROVE_object_ref ref )
                    &(grow_handle->hash_link) );
     }
 
-    gen_mutex_unlock( &grow_bstream_table_lock );
-
     /* increment the number of things using the hash member */
     gen_mutex_lock( &(grow_handle->refcount_lock) );
     grow_handle->refcount++;
     gen_mutex_unlock( &(grow_handle->refcount_lock) );
+
+    gen_mutex_unlock( &grow_bstream_table_lock );
 
     gen_mutex_lock( &(grow_handle->handle_lock));
 
@@ -1575,7 +1579,7 @@ static int grow_bstream_handle_release_lock( TROVE_object_ref ref )
         return -PVFS_EINVAL;
     } 
 
-    hash_link = qhash_search_and_remove(grow_bstream_table, &(ref.handle) );
+    hash_link = qhash_search(grow_bstream_table, &(ref.handle) );
     if( hash_link )
     {
         grow_handle = qlist_entry(hash_link, struct grow_bstream_handle, 
@@ -1591,6 +1595,7 @@ static int grow_bstream_handle_release_lock( TROVE_object_ref ref )
         if( rcount == 0 )
         {
             gen_mutex_unlock( &(grow_handle->handle_lock));
+            qhash_del(hash_link);
             gen_mutex_destroy( &(grow_handle->handle_lock) );
             gen_mutex_destroy( &(grow_handle->refcount_lock) );
             free( grow_handle );
