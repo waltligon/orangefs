@@ -9,10 +9,27 @@
  *
  *  PVFS2 user interface routines - implementation of stdio for pvfs
  */
+/* this prevents headers from using inlines for 64 bit calls */
+#ifdef _FILE_OFFSET_BITS
+#undef _FILE_OFFSET_BITS
+#endif
+
 #include <usrint.h>
 #include <dirent.h>
+#include <openfile-util.h>
+#include <stdio-ops.h>
 
-#define ISFLAGSET(s,f) ((stream->_flags & (f)) == (f))
+#define STDIO_DEBUG 0
+
+static void init_stdio(void);
+static struct stdio_ops_s stdio_ops;
+
+#define _P_IO_MAGIC     0xF0BD0000
+#define SETMAGIC(s,m)   do{(s)->_flags = (m) & _IO_MAGIC_MASK;}while(0)
+#define ISMAGICSET(s,m) (((s)->_flags & _IO_MAGIC_MASK) == (m))
+#define SETFLAG(s,f)    do{(s)->_flags |= ((f) & ~_IO_MAGIC_MASK);}while(0)
+#define CLEARFLAG(s,f)  do{(s)->_flags &= ~((f) & ~_IO_MAGIC_MASK);}while(0)
+#define ISFLAGSET(s,f)  (((s)->_flags & (f)) == (f))
 
 /* STDIO implementation - this gives users something to link to
  * that will call back to the PVFS lib - also lets us optimize
@@ -26,26 +43,104 @@
  * on the buffered IO scheme used in Linux for files.
  */
 struct __dirstream {
-    int flags;      /**< general flags field */
-    int fileno;     /**< file dscriptor of open dir */
-    char *buf_base; /**< pointer to beginning of buffer */
-    char *buf_end;  /**< pointer to end of buffer */
-    char *buf_act;  /**< pointer to end of active portion of buffer */
-    char *buf_ptr;  /**< pointer to current position in buffer */
+    int _flags;       /**< general flags field */
+    int fileno;       /**< file dscriptor of open dir */
+    struct dirent de; /**< pointer to dirent read by readdir */
+    char *buf_base;   /**< pointer to beginning of buffer */
+    char *buf_end;    /**< pointer to end of buffer */
+    char *buf_act;    /**< pointer to end of active portion of buffer */
+    char *buf_ptr;    /**< pointer to current position in buffer */
 };
 
-#define DIRSTREAM_MAGIC 0xfd100000
+#define DIRSTREAM_MAGIC 0xFD100000
 #define DIRBUFSIZE (512*1024)
 #define ASIZE 256
 #define MAXTRIES 16 /* arbitrary - how many tries to get a unique file name */
+
+/** These functions lock and unlock the stream structure
+ *
+ *  These are only called within our library, so we assume that the
+ *  stream is good, that it is our stream (and not glibc's) and we
+ *  check for the flag to see if the lock is being used.
+ */
+
+static inline void lock_init_stream(FILE *stream)
+{
+#ifdef _IO_MTSAFE_IO
+    if (ISFLAGSET(stream, _IO_USER_LOCK))
+    {
+        _IO_lock_init(stream->_lock);
+    }
+#endif
+}
+
+static inline void lock_stream(FILE *stream)
+{
+#ifdef _IO_MTSAFE_IO
+    if (ISFLAGSET(stream, _IO_USER_LOCK))
+    {
+        _IO_lock_lock(stream->_lock);
+    }
+#endif
+}
+
+static inline int trylock_stream(FILE *stream)
+{
+#ifdef _IO_MTSAFE_IO
+    if (ISFLAGSET(stream, _IO_USER_LOCK))
+    {
+        return _IO_lock_try(stream->_lock);
+    }
+#else
+    return 0;
+#endif
+}
+
+static inline void unlock_stream(FILE *stream)
+{
+#ifdef _IO_MTSAFE_IO
+    if (ISFLAGSET(stream, _IO_USER_LOCK))
+    {
+        _IO_lock_unlock(stream->_lock);
+    }
+#endif
+}
+
+static inline void lock_fini_stream(FILE *stream)
+{
+#ifdef _IO_MTSAFE_IO
+    if (ISFLAGSET(stream, _IO_USER_LOCK))
+    {
+        _IO_lock_fini(stream->_lock);
+    }
+#endif
+}
+
+/** POSIX interface for user level locking of streams *.
+ *
+ */
+void flockfile(FILE *stream)
+{
+    lock_stream(stream);
+}
+
+int ftrylockfile(FILE *stream)
+{
+    return trylock_stream(stream);
+}
+
+void funlockfile(FILE *stream)
+{
+    unlock_stream(stream);
+}
 
 /** This function coverts from stream style mode to ssycall style flags
  *
  */
 static int mode2flags(const char *mode)
 {
-    int i;
-    int flags;
+    int i = 0;
+    int flags = 0;
     int append = false, read = false, write = false, update = false;
     int exclusive = false;
 
@@ -109,29 +204,29 @@ static int mode2flags(const char *mode)
         errno = EINVAL;
         return -1;
     }
-    if (read)
-    { 
-        flags = O_RDONLY; 
-    }
-    else if(read && update)
+    if (read && update)
     { 
         flags = O_RDWR; 
     }
-    else if(write)
+    else if(read)
     { 
-        flags = O_WRONLY | O_CREAT | O_TRUNC; 
-    } 
+        flags = O_RDONLY; 
+    }
     else if(write && update)
     { 
         flags = O_RDWR | O_CREAT | O_TRUNC; 
-    }
-    else if(append)
-    { 
-        flags = O_WRONLY | O_APPEND | O_CREAT; 
     } 
-    else if (append && update)
+    else if(write)
+    { 
+        flags = O_WRONLY | O_CREAT | O_TRUNC; 
+    }
+    else if(append && update)
     { 
         flags = O_RDWR | O_APPEND | O_CREAT; 
+    } 
+    else if (append)
+    { 
+        flags = O_WRONLY | O_APPEND | O_CREAT; 
     }
     if (exclusive) /* check this regardless of the above */
     {
@@ -172,11 +267,11 @@ FILE *fopen(const char * path, const char * mode)
 static int init_stream (FILE *stream, int flags, int bufsize)
 {
     /* set up stream here */
-    stream->_flags = _IO_MAGIC;
+    SETMAGIC(stream, _P_IO_MAGIC);
     if (!(flags & O_WRONLY))
-        stream->_flags |= _IO_NO_READS;
+        SETFLAG(stream, _IO_NO_READS);
     if (!(flags & O_RDONLY))
-        stream->_flags |= _IO_NO_WRITES;
+        SETFLAG(stream, _IO_NO_WRITES);
     /* set up default buffering here */
     stream->_IO_buf_base   = (char *)malloc(bufsize);
     if (!stream->_IO_buf_base)
@@ -214,6 +309,10 @@ FILE *fdopen(int fd, const char *mode)
     }
     memset(newfile, 0, sizeof(FILE));
 
+    /* initize lock for this stream */
+    SETFLAG(newfile, _IO_USER_LOCK);
+    lock_init_stream(newfile);
+
     newfile->_fileno = fd;
     rc = init_stream(newfile, flags, PVFS_BUFSIZE);
     if(rc)
@@ -231,6 +330,17 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 {
     int fd = 0;
     int flags = 0;
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.freopen(path, mode, stream);
+        }
+        errno = EINVAL;
+        return NULL;
+    }
+    lock_stream(stream);
     /* see if stream is in use - if so close the file */
     if (stream->_fileno > -1)
     {
@@ -238,6 +348,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
         rc = close(stream->_fileno);
         if (rc == -1)
         {
+            unlock_stream(stream);
             return NULL;
         }
     }
@@ -249,6 +360,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
     fd = open(path, flags, 0666);
     if (fd == -1)
     {
+        unlock_stream(stream);
         return NULL;
     }
     stream->_fileno = fd;
@@ -258,6 +370,7 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
         free (stream->_IO_buf_base);
     init_stream(stream, flags, PVFS_BUFSIZE);
 
+    unlock_stream(stream);
     return stream;
 }
 
@@ -275,12 +388,40 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
  */
 size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fwrite(ptr, size, nmemb, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fwrite_unlocked(ptr, size, nmemb, stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
     off64_t rsz, rsz_buf, rsz_extra;
     int rc;
 
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC) ||
-            ISFLAGSET(stream, _IO_NO_WRITES) ||
-            !ptr || size <= 0 || nmemb <= 0)
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fwrite(ptr, size, nmemb, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    if (!ptr || size <= 0 || nmemb <= 0)
     {
         errno = EINVAL;
         return -1;
@@ -289,18 +430,10 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     /* Check to see if switching from read to write */
     if (!ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
-        /* write buffer back */
-        rc = write(stream->_fileno, stream->_IO_write_base,
-                stream->_IO_write_ptr - stream->_IO_write_base); 
-        if (rc == -1)
-        {
-            stream->_flags |= _IO_ERR_SEEN;
-            return -1;
-        }
         /* reset read pointer */
         stream->_IO_read_ptr = stream->_IO_read_end;
         /* set flag */
-        stream->_flags |= _IO_CURRENTLY_PUTTING;
+        SETFLAG(stream, _IO_CURRENTLY_PUTTING);
         /* indicate read buffer empty */
         stream->_IO_read_end = stream->_IO_read_base;
         stream->_IO_read_ptr = stream->_IO_read_end;
@@ -323,11 +456,16 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (rsz_extra)
     {
         /* buffer is full - write the current buffer */
+#if STDIO_DEBUG
+        fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
+                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
         rc = write(stream->_fileno, stream->_IO_write_base,
                         stream->_IO_write_ptr - stream->_IO_write_base);
         if (rc == -1)
         {
-            stream->_flags |= _IO_ERR_SEEN;
+            SETFLAG(stream, _IO_ERR_SEEN);
             return -1;
         }
         /* reset buffer */
@@ -335,11 +473,16 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         /* if there more data left in request than fits in a buffer */
         if(rsz_extra > stream->_IO_buf_end - stream->_IO_buf_base)
         {
+#if STDIO_DEBUG
+            fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
+                    (int)rsz_extra,
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
             /* write data directly */
             rc = write(stream->_fileno, ptr + rsz_buf, rsz_extra);
             if (rc == -1)
             {
-                stream->_flags |= _IO_ERR_SEEN;
+                SETFLAG(stream, _IO_ERR_SEEN);
                 return -1;
             }
         }
@@ -358,14 +501,41 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
  */
 size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
-    int fd;
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fwrite(ptr, size, nmemb, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fread_unlocked(ptr, size, nmemb, stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
     int rsz, rsz_buf, rsz_extra;
     int bytes_read;
     int rc;
 
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC) ||
-            ISFLAGSET(stream, _IO_NO_READS) ||
-            !ptr || size < 0 || nmemb < 0)
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fread(ptr, size, nmemb, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    if (!ptr || size < 0 || nmemb < 0)
     {
         errno = EINVAL;
         return -1;
@@ -375,17 +545,22 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
         /* write buffer back */
+#if STDIO_DEBUG
+        fprintf(stderr,"fread writing %d bytes to offset %d\n",
+                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
         rc = write(stream->_fileno, stream->_IO_write_base,
                 stream->_IO_write_ptr - stream->_IO_write_base); 
         if (rc == -1)
         {
-            stream->_flags |= _IO_ERR_SEEN;
+            SETFLAG(stream, _IO_ERR_SEEN);
             return -1;
         }
         /* reset write pointer */
         stream->_IO_write_ptr = stream->_IO_write_base;
         /* clear flag */
-        stream->_flags &= ~_IO_CURRENTLY_PUTTING;
+        CLEARFLAG(stream, _IO_CURRENTLY_PUTTING);
         /* indicate read buffer empty */
         stream->_IO_read_end = stream->_IO_read_base;
         stream->_IO_read_ptr = stream->_IO_read_end;
@@ -400,7 +575,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 stream->_IO_buf_end - stream->_IO_buf_base);
         if (bytes_read == -1)
         {
-            stream->_flags |= _IO_ERR_SEEN;
+            SETFLAG(stream, _IO_ERR_SEEN);
             return -1;
         }
         /* indicate end of read area */
@@ -439,7 +614,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 bytes_read = read(stream->_fileno, ptr+rsz_buf, rsz_extra);
                 if (bytes_read == -1)
                 {
-                    stream->_flags |= _IO_ERR_SEEN;
+                    SETFLAG(stream, _IO_ERR_SEEN);
                     return -1;
                 }
                 if (bytes_read == rsz_extra)
@@ -449,7 +624,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
                             stream->_IO_buf_end - stream->_IO_buf_base);
                     if (bytes_read == -1)
                     {
-                        stream->_flags |= _IO_ERR_SEEN;
+                        SETFLAG(stream, _IO_ERR_SEEN);
                         return -1;
                     }
                     stream->_IO_read_end = stream->_IO_read_base + bytes_read;
@@ -457,7 +632,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     return rsz;
                 }
                 /* have read to EOF */
-                stream->_flags |= _IO_EOF_SEEN;
+                SETFLAG(stream, _IO_EOF_SEEN);
                 return rsz_buf + bytes_read;
             }
             /* rest of request fits in a buffer - read next buffer */
@@ -465,7 +640,7 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     stream->_IO_buf_end - stream->_IO_buf_base);
             if (bytes_read == -1)
             {
-                stream->_flags |= _IO_ERR_SEEN;
+                SETFLAG(stream, _IO_ERR_SEEN);
                 return -1;
             }
             stream->_IO_read_end = stream->_IO_read_base + bytes_read;
@@ -480,14 +655,14 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
             }
             if (rsz_buf + rsz_extra < rsz)
             {
-                stream->_flags |= _IO_EOF_SEEN;
+                SETFLAG(stream, _IO_EOF_SEEN);
             }
             return rsz_buf + rsz_extra;
         }
         else
         {
             /* at EOF so return bytes read */
-            stream->_flags |= _IO_EOF_SEEN;
+            SETFLAG(stream, _IO_EOF_SEEN);
             return rsz_buf;
         }
     }
@@ -500,21 +675,33 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
  */
 int fclose(FILE *stream)
 {
-    int rc;
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    int rc = 0;
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fclose(stream);
+        }
         errno = EINVAL;
         return -1;
     }
+    lock_stream(stream);
     /* write any pending data */
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
         if (stream->_IO_write_ptr > stream->_IO_write_base)
         {
-            rc = write(stream->_fileno, stream->_IO_write_ptr,
-                    stream->_IO_write_ptr - stream->_IO_write_base);
+#if STDIO_DEBUG
+            fprintf(stderr,"fclose writing %d bytes to offset %d\n",
+                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
+            rc = write(stream->_fileno, stream->_IO_write_base,
+                        stream->_IO_write_ptr - stream->_IO_write_base);
             if (rc == -1)   
             {
+                SETFLAG(stream, _IO_ERR_SEEN);
                 return -1;
             }
         }
@@ -526,10 +713,13 @@ int fclose(FILE *stream)
     }
     if (!ISFLAGSET(stream, _IO_DELETE_DONT_CLOSE))
     {
-        return close(stream->_fileno);
+        rc = close(stream->_fileno);
     }
+    stream->_flags = 0;
+    /* can stream be locked here */
+    lock_fini_stream(stream);
     free(stream);
-    return 0;
+    return rc;
 }
 
 /**
@@ -550,17 +740,32 @@ int fseek(FILE *stream, long offset, int whence)
 int fseek64(FILE *stream, const off64_t offset, int whence)
 {
     int rc = 0;
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fseek64(stream, offset, whence);
+        }
         errno = EINVAL;
         return -1;
     }
-    /* if not just getting the position */
+    lock_stream(stream);
+    /* if actually changing the position */
     if ((offset != 0L) || (whence != SEEK_CUR))
     {
         int64_t filepos, fileend;
+        struct stat sbuf;
         filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
-        fileend = lseek64(stream->_fileno, 0, SEEK_END);
+        /* should fileend include stuff in write buffer ??? */
+        rc = fstat(stream->_fileno, &sbuf);
+        if (rc < 0)
+        {
+            SETFLAG(stream, _IO_ERR_SEEN);
+            rc = -1;
+            goto exitout;
+        }
+        fileend = sbuf.st_size;
         /* figure out if we are only seeking within the */
         /* bounds of the current buffer to minimize */
         /* unneccessary reads/writes */
@@ -569,28 +774,34 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
                 (offset > stream->_IO_write_base - stream->_IO_write_ptr))
         {
             stream->_IO_write_ptr += offset;
-            return 0;
+            /* should we zero out buffer if past eof ??? */
+            rc = 0;
+            goto exitout;
         }
         if (whence == SEEK_CUR && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 (offset < stream->_IO_read_end - stream->_IO_read_ptr) &&
                 (offset > stream->_IO_read_base - stream->_IO_read_ptr))
         {
             stream->_IO_read_ptr += offset;
-            return 0;
+            rc = 0;
+            goto exitout;
         }
         if (whence == SEEK_SET && ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 (offset > filepos) && (offset < filepos +
                 (stream->_IO_write_end - stream->_IO_write_base)))
         {
             stream->_IO_write_ptr += offset - filepos;
-            return 0;
+            /* should we zero out buffer if past eof ??? */
+            rc = 0;
+            goto exitout;
         }
         if (whence == SEEK_SET && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 (offset < filepos) && (offset > filepos -
                 (stream->_IO_read_end - stream->_IO_read_base)))
         {
             stream->_IO_read_ptr += offset - filepos;
-            return 0;
+            rc = 0;
+            goto exitout;
         }
         if (whence == SEEK_END && ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 ((fileend - offset) > filepos) &&
@@ -598,7 +809,9 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
                 (stream->_IO_write_end - stream->_IO_write_base)))
         {
             stream->_IO_write_ptr += (fileend - offset) - filepos;
-            return 0;
+            /* should we zero out buffer if past eof ??? */
+            rc = 0;
+            goto exitout;
         }
         if (whence == SEEK_END && !ISFLAGSET(stream, _IO_CURRENTLY_PUTTING) &&
                 ((fileend - offset) < filepos) &&
@@ -606,7 +819,8 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
                 (stream->_IO_read_end - stream->_IO_read_base)))
         {
             stream->_IO_read_ptr += (fileend - offset) - filepos;
-            return 0;
+            rc = 0;
+            goto exitout;
         }
         /* at this point the seek is beyond the current buffer */
         /* if we are in write mode write back the buffer */
@@ -614,11 +828,17 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             stream->_IO_write_ptr > stream->_IO_write_base)
         {
             /* write buffer back */
+#if STDIO_DEBUG
+            fprintf(stderr,"fseek writing %d bytes to offset %d\n",
+                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
             rc = write(stream->_fileno, stream->_IO_write_base,
                        stream->_IO_write_ptr - stream->_IO_write_base); 
             if (rc < 0)
             {
-                return rc;
+                SETFLAG(stream, _IO_ERR_SEEN);
+                goto exitout;
             }
             /* reset write pointer */
             stream->_IO_write_ptr = stream->_IO_write_base;
@@ -630,10 +850,22 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             stream->_IO_read_end = stream->_IO_read_base;
             stream->_IO_read_ptr = stream->_IO_read_end;
         }
-        lseek64(stream->_fileno, offset, whence);
+        rc = lseek64(stream->_fileno, offset, whence);
+#if STDIO_DEBUG
+        fprintf(stderr,"fseek seeks to offset %d\n",
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
+        if (rc < 0)
+        {
+            SETFLAG(stream, _IO_ERR_SEEN);
+            goto exitout;
+        }
     }
-    /* seek to current position, no change */
-    return 0;
+exitout:
+    /* successful call */
+    lock_stream(stream);
+    CLEARFLAG(stream, _IO_EOF_SEEN);
+    return rc;
 }
 
 /**
@@ -651,6 +883,7 @@ int fsetpos(FILE *stream, const fpos_t *pos)
 void rewind(FILE *stream)
 {
     fseek64(stream, 0L, SEEK_SET);
+    CLEARFLAG(stream, _IO_ERR_SEEN);
 }
 
 /**
@@ -664,8 +897,13 @@ long int ftell(FILE *stream)
 off64_t ftell64(FILE* stream)
 {
     int64_t filepos;
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.ftell64(stream);
+        }
         errno = EINVAL;
         return -1;
     }
@@ -697,10 +935,35 @@ int fgetpos(FILE *stream, fpos_t *pos)
  */
 int fflush(FILE *stream)
 {
-    int rc;
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
-        errno = EBADF;
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fflush(stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fflush_unlocked(stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+int fflush_unlocked(FILE *stream)
+{
+    int rc;
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fflush(stream);
+        }
+        errno = EINVAL;
         return -1;
     }
     /* if we are in write mode write back the buffer */
@@ -708,11 +971,16 @@ int fflush(FILE *stream)
         stream->_IO_write_ptr > stream->_IO_write_base)
     {
         /* write buffer back */
+#if STDIO_DEBUG
+        fprintf(stderr,"fflush writing %d bytes to offset %d\n",
+                    (int)(stream->_IO_write_ptr - stream->_IO_write_base),
+                    (int)lseek(stream->_fileno, 0, SEEK_CUR));
+#endif
         rc = write(stream->_fileno, stream->_IO_write_base,
                 stream->_IO_write_ptr - stream->_IO_write_base); 
         if (rc < 0)
         {
-            stream->_flags |= _IO_ERR_SEEN;
+            SETFLAG(stream, _IO_ERR_SEEN);
             return rc;
         }
         /* reset write pointer */
@@ -726,8 +994,28 @@ int fflush(FILE *stream)
  */
 int fputc(int c, FILE *stream)
 {
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fputc(c, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fputc_unlocked(c, stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+int fputc_unlocked(int c, FILE *stream)
+{
     int rc;
-    rc = fwrite(&c, 1, 1, stream);
+    rc = fwrite_unlocked(&c, 1, 1, stream);
     if (ferror(stream))
     {
         return EOF;
@@ -740,6 +1028,26 @@ int fputc(int c, FILE *stream)
  */
 int fputs(const char *s, FILE *stream)
 {
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fputs(s, stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = fputs_unlocked(s, stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+int fputs_unlocked(const char *s, FILE *stream)
+{
     size_t len;
     int rc;
     if (!s)
@@ -748,7 +1056,7 @@ int fputs(const char *s, FILE *stream)
         return EOF;
     }
     len = strlen(s);
-    rc = fwrite(s, len, 1, stream);
+    rc = fwrite_unlocked(s, len, 1, stream);
     if (ferror(stream))
     {
         return EOF;
@@ -764,12 +1072,22 @@ int putc(int c, FILE *stream)
     return fputc(c, stream);
 }
 
+int putc_unlocked(int c, FILE *stream)
+{
+    return fputc_unlocked(c, stream);
+}
+
 /**
  * putchar wrapper
  */
 int putchar(int c)
 {
     return fputc(c, stdout);
+}
+
+int putchar_unlocked(int c)
+{
+    return fputc_unlocked(c, stdout);
 }
 
 /**
@@ -791,6 +1109,26 @@ int puts(const char *s)
  */
 char *fgets(char *s, int size, FILE *stream)
 {
+    char *rc = NULL;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fgets(s, size, stream);
+        }
+        errno = EINVAL;
+        return NULL;
+    }
+    lock_stream(stream);
+    rc = fgets_unlocked(s, size, stream);
+    unlock_stream(stream);
+    return rc;
+}
+
+char *fgets_unlocked(char *s, int size, FILE *stream)
+{
     char c, *p;
 
     if (!s || size < 1)
@@ -806,9 +1144,10 @@ char *fgets(char *s, int size, FILE *stream)
     p = s;
     size--;
     do {
-        *p++ = c = fgetc(stream);
-    } while (--size && c != '\n' && !feof(stream) && !ferror(stream));
-    if (ferror(stream))
+        *p++ = c = fgetc_unlocked(stream);
+    } while (--size && c != '\n' && !feof_unlocked(stream)
+                    && !ferror_unlocked(stream));
+    if (ferror_unlocked(stream))
     {
         return NULL;
     }
@@ -831,12 +1170,28 @@ int fgetc(FILE *stream)
     return ch;
 }
 
+int fgetc_unlocked(FILE *stream)
+{
+    int rc, ch;
+
+    rc = fread_unlocked(&ch, 1, 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return ch;
+}
+
 /**
  * getc wrapper
  */
 int getc(FILE *stream)
 {
     return fgetc(stream);
+}
+int getc_unlocked(FILE *stream)
+{
+    return fgetc_unlocked(stream);
 }
 
 /**
@@ -845,6 +1200,11 @@ int getc(FILE *stream)
 int getchar(void)
 {
     return fgetc(stdin);
+}
+
+int getchar_unlocked(void)
+{
+    return fgetc_unlocked(stdin);
 }
 
 /**
@@ -963,12 +1323,36 @@ scanf()
  */
 void clearerr (FILE *stream)
 {
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            stdio_ops.clearerr(stream);
+            return;
+        }
         return;
     }
-    stream->_flags &= ~_IO_ERR_SEEN;
-    stream->_flags &= ~_IO_EOF_SEEN;
+    lock_stream(stream);
+    CLEARFLAG(stream, _IO_ERR_SEEN);
+    CLEARFLAG(stream, _IO_EOF_SEEN);
+    unlock_stream(stream);
+}
+
+void clearerr_unlocked (FILE *stream)
+{
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            stdio_ops.clearerr(stream);
+            return;
+        }
+        return;
+    }
+    CLEARFLAG(stream, _IO_ERR_SEEN);
+    CLEARFLAG(stream, _IO_EOF_SEEN);
 }
 
 /**
@@ -976,12 +1360,37 @@ void clearerr (FILE *stream)
  */
 int feof (FILE *stream)
 {
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.feof(stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = ISFLAGSET(stream, _IO_EOF_SEEN);
+    unlock_stream(stream);
+    return rc;
+}
+
+int feof_unlocked (FILE *stream)
+{
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.feof(stream);
+        }
         errno = EBADF;
         return -1;
     }
-    return stream->_flags & _IO_EOF_SEEN;
+    return ISFLAGSET(stream, _IO_EOF_SEEN);
 }
 
 /**
@@ -989,12 +1398,37 @@ int feof (FILE *stream)
  */
 int ferror (FILE *stream)
 {
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.ferror(stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = ISFLAGSET(stream, _IO_ERR_SEEN);
+    unlock_stream(stream);
+    return rc;
+}
+
+int ferror_unlocked (FILE *stream)
+{
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.ferror(stream);
+        }
         errno = EBADF;
         return -1;
     }
-    return stream->_flags & _IO_ERR_SEEN;
+    return ISFLAGSET(stream, _IO_ERR_SEEN);
 }
 
 /**
@@ -1002,8 +1436,33 @@ int ferror (FILE *stream)
  */
 int fileno (FILE *stream)
 {
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    int rc = 0;
+
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fileno(stream);
+        }
+        errno = EINVAL;
+        return -1;
+    }
+    lock_stream(stream);
+    rc = stream->_fileno;
+    unlock_stream(stream);
+    return rc;
+}
+
+int fileno_unlocked (FILE *stream)
+{
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
+    {
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.fileno(stream);
+        }
         errno = EBADF;
         return -1;
     }
@@ -1050,41 +1509,48 @@ void setlinebuf (FILE *stream)
 
 /**
  *
- * This should only be called on a stream that has ben opened
- * but not used so we can assume any exitinf buff is not dirty
+ * This should only be called on a stream that has been opened
+ * but not used so we can assume any exiting buff is not dirty
  */
 int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 {
-    if (!stream || !ISFLAGSET(stream, _IO_MAGIC))
+    if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
-        errno = EBADF;
+        if (stream && ISMAGICSET(stream, _IO_MAGIC))
+        {
+            init_stdio();
+            return stdio_ops.setvbuf(stream, buf, mode, size);
+        }
+        errno = EINVAL;
         return -1;
     }
     if ((stream->_IO_read_end != stream->_IO_buf_base) ||
         (stream->_IO_write_ptr != stream->_IO_buf_base))
     {
         /* fread or fwrite has been called */
-        errno - EINVAL;
+        errno = EINVAL;
         return -1;
     }
+    lock_stream(stream);
     switch (mode)
     {
     case _IOFBF : /* full buffered */
         /* this is the default */
         break;
     case _IOLBF : /* line buffered */
-        stream->_flags |= _IO_LINE_BUF; /* TODO: This is not implemented */
+        SETFLAG(stream, _IO_LINE_BUF); /* TODO: This is not implemented */
         break;
     case _IONBF : /* not buffered */
-        stream->_flags |= _IO_UNBUFFERED; /* TODO: This is not implemented */
+        SETFLAG(stream, _IO_UNBUFFERED); /* TODO: This is not implemented */
         break;
     default :
         errno = EINVAL;
+        unlock_stream(stream);
         return -1;
     }
     if (buf && size > 0)
     {
-        stream->_flags |= _IO_USER_BUF;
+        SETFLAG(stream, _IO_USER_BUF);
         free(stream->_IO_buf_base);
         stream->_IO_buf_base   = buf;
         stream->_IO_buf_end    = stream->_IO_buf_base + size;
@@ -1095,6 +1561,8 @@ int setvbuf (FILE *stream, char *buf, int mode, size_t size)
         stream->_IO_write_ptr  = stream->_IO_buf_base;
         stream->_IO_write_end  = stream->_IO_buf_end;
     }
+    unlock_stream(stream);
+    return 0;
 }
 
 /**
@@ -1200,7 +1668,7 @@ DIR *opendir (const char *name)
         return NULL;
     }
     fd = open(name, O_RDONLY|O_DIRECTORY);
-    if (fd == -1);
+    if (fd < 0)
     {
         return NULL;
     }
@@ -1218,12 +1686,13 @@ DIR *fdopendir (int fd)
     {
         return NULL;
     }
-    dstr->flags = DIRSTREAM_MAGIC;
+    SETMAGIC(dstr, DIRSTREAM_MAGIC);
     dstr->fileno = fd;
     dstr->buf_base = (char *)malloc(DIRBUFSIZE);
     dstr->buf_end = dstr->buf_base + DIRBUFSIZE;
     dstr->buf_act = dstr->buf_base;
     dstr->buf_ptr = dstr->buf_base;
+    return dstr;
 }
 
 /**
@@ -1231,7 +1700,7 @@ DIR *fdopendir (int fd)
  */
 int dirfd (DIR *dir)
 {
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return -1;
@@ -1245,44 +1714,44 @@ int dirfd (DIR *dir)
 struct dirent *readdir (DIR *dir)
 {
     struct dirent64 *de64;
-    /* this buffer is so we can return the smaller struct for
-     * single use as is the prerogative of the call.  This
-     * approach sucks, not reentrant TODO: find a better way
-     */
-    static struct dirent *de = NULL;
-
-    if (!de)
-    {
-        de = (struct dirent *)malloc(sizeof(struct dirent));
-        if (!de)
-        {
-            return NULL;
-        }
-    }
 
     de64 = readdir64(dir);
     if (de64 == NULL)
     {
         return NULL;
     }
-    memcpy(de->d_name, de64->d_name, 256);
-    de->d_ino = de64->d_ino;
-    /* these are Linux specific fields from the dirent */
-#if 1
-    de->d_off = de64->d_off;
-    de->d_reclen = de64->d_reclen;
-    de->d_type = de64->d_type;
+    memcpy(dir->de.d_name, de64->d_name, 256);
+    dir->de.d_ino = de64->d_ino;
+    /* these are wsystem specific fields from the dirent */
+#ifdef _DIRENT_HAVE_D_NAMELEN
+    dir->de.d_namelen = strnlen(de64->d_name, 256);
 #endif
-    return de;
+#ifdef _DIRENT_HAVE_D_OFF
+    dir->de.d_off = de64->d_off;
+#endif
+#ifdef _DIRENT_HAVE_D_RECLEN
+    dir->de.d_reclen = de64->d_reclen;
+#endif
+#ifdef _DIRENT_HAVE_D_TYPE
+    dir->de.d_type = de64->d_type;
+#endif
+    return &dir->de;
 }
 
 /**
  * reads a single dirent64 in buffered mode from a stream
+ *
+ * getdents is not defined in libc, though it is a linux
+ * system call and we define it in the usr lib
  */
+
+int getdents(int fd, struct dirent *buf, size_t size);
+int getdents64(int fd, struct dirent64 *buf, size_t size);
+
 struct dirent64 *readdir64 (DIR *dir)
 {
     struct dirent64 *rval;
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return NULL;
@@ -1290,8 +1759,8 @@ struct dirent64 *readdir64 (DIR *dir)
     if (dir->buf_ptr >= dir->buf_act)
     {
         int bytes_read;
-        /* read a block of dirents into the buffer */
-        bytes_read = getdents(dir->fileno, dir->buf_base,
+        /* read a block of dirent64s into the buffer */
+        bytes_read = getdents64(dir->fileno, (struct dirent64 *)dir->buf_base,
                              (dir->buf_end - dir->buf_base));
         dir->buf_act = dir->buf_base + bytes_read;
         dir->buf_ptr = dir->buf_base;
@@ -1307,7 +1776,7 @@ struct dirent64 *readdir64 (DIR *dir)
 void rewinddir (DIR *dir)
 {
     off_t filepos;
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
@@ -1326,12 +1795,12 @@ void rewinddir (DIR *dir)
 }
 
 /**
- * seeks in a direcotry stream
+ * seeks in a directory stream
  */
 void seekdir (DIR *dir, off_t offset)
 {
     off_t filepos;
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
@@ -1356,7 +1825,7 @@ void seekdir (DIR *dir, off_t offset)
 off_t telldir (DIR *dir)
 {
     off_t filepos;
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return -1;
@@ -1374,13 +1843,13 @@ off_t telldir (DIR *dir)
  */
 int closedir (DIR *dir)
 {
-    if (!dir || !(dir->flags == DIRSTREAM_MAGIC))
+    if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return -1;
     }
     free(dir->buf_base);
-    dir->flags = 0;
+    dir->_flags = 0;
     free(dir);
     return 0;
 }
@@ -1451,9 +1920,10 @@ int scandir (const char *dir,
  * and then call from two wrapper versions would be beter
  * pass in a flag to control the copy of the dirent into the array
  */
-int scandir64 (const char *dir, struct dirent64 ***namelist,
-             int(*filter)(const struct dirent64 *),
-             int(*compar)(const void *, const void *))
+int scandir64 (const char *dir,
+               struct dirent64 ***namelist,
+               int(*filter)(const struct dirent64 *),
+               int(*compar)(const void *, const void *))
 {
     struct dirent64 *de;
     DIR *dp;
@@ -1508,6 +1978,70 @@ int scandir64 (const char *dir, struct dirent64 ***namelist,
     }
     return i;
 }
+
+static void init_stdio(void)
+{
+    static int init_flag = 0;
+    if (init_flag)
+    {
+        return;
+    }
+    init_flag = 1;
+    stdio_ops.fopen = dlsym(RTLD_NEXT, "fopen" );
+    stdio_ops.fdopen = dlsym(RTLD_NEXT, "fdopen" );
+    stdio_ops.freopen = dlsym(RTLD_NEXT, "freopen" );
+    stdio_ops.fwrite = dlsym(RTLD_NEXT, "fwrite" );
+    stdio_ops.fread = dlsym(RTLD_NEXT, "fread" );
+    stdio_ops.fclose = dlsym(RTLD_NEXT, "fclose" );
+    stdio_ops.fseek = dlsym(RTLD_NEXT, "fseek" );
+    stdio_ops.fseek64 = dlsym(RTLD_NEXT, "fseek64" );
+    stdio_ops.fsetpos = dlsym(RTLD_NEXT, "fsetpos" );
+    stdio_ops.rewind = dlsym(RTLD_NEXT, "rewind" );
+    stdio_ops.ftell = dlsym(RTLD_NEXT, "ftell" );
+    stdio_ops.ftell64 = dlsym(RTLD_NEXT, "ftell64" );
+    stdio_ops.fgetpos = dlsym(RTLD_NEXT, "fgetpos" );
+    stdio_ops.fflush = dlsym(RTLD_NEXT, "fflush" );
+    stdio_ops.fputc = dlsym(RTLD_NEXT, "fputc" );
+    stdio_ops.fputs = dlsym(RTLD_NEXT, "fputs" );
+    stdio_ops.putc = dlsym(RTLD_NEXT, "putc" );
+    stdio_ops.putchar = dlsym(RTLD_NEXT, "putchar" );
+    stdio_ops.puts = dlsym(RTLD_NEXT, "puts" );
+    stdio_ops.fgets = dlsym(RTLD_NEXT, "fgets" );
+    stdio_ops.fgetc = dlsym(RTLD_NEXT, "fgetc" );
+    stdio_ops.getc = dlsym(RTLD_NEXT, "getc" );
+    stdio_ops.getchar = dlsym(RTLD_NEXT, "getchar" );
+    stdio_ops.gets = dlsym(RTLD_NEXT, "gets" );
+    stdio_ops.ungetc = dlsym(RTLD_NEXT, "ungetc" );
+    stdio_ops.vfprintf = dlsym(RTLD_NEXT, "vfprintf" );
+    stdio_ops.vprintf = dlsym(RTLD_NEXT, "vprintf" );
+    stdio_ops.fprintf = dlsym(RTLD_NEXT, "fprintf" );
+    stdio_ops.printf = dlsym(RTLD_NEXT, "printf" );
+    stdio_ops.fscanf = dlsym(RTLD_NEXT, "fscanf" );
+    stdio_ops.scanf = dlsym(RTLD_NEXT, "scanf" );
+    stdio_ops.clearerr  = dlsym(RTLD_NEXT, "clearerr" );
+    stdio_ops.feof  = dlsym(RTLD_NEXT, "feof" );
+    stdio_ops.ferror  = dlsym(RTLD_NEXT, "ferror" );
+    stdio_ops.fileno  = dlsym(RTLD_NEXT, "fileno" );
+    stdio_ops.remove  = dlsym(RTLD_NEXT, "remove" );
+    stdio_ops.setbuf  = dlsym(RTLD_NEXT, "setbuf" );
+    stdio_ops.setbuffer  = dlsym(RTLD_NEXT, "setbuffer" );
+    stdio_ops.setlinebuf  = dlsym(RTLD_NEXT, "setlinebuf" );
+    stdio_ops.setvbuf  = dlsym(RTLD_NEXT, "setvbuf" );
+    stdio_ops.mkdtemp = dlsym(RTLD_NEXT, "mkdtemp" );
+    stdio_ops.mkstemp = dlsym(RTLD_NEXT, "mkstemp" );
+    stdio_ops.tmpfile = dlsym(RTLD_NEXT, "tmpfile" );
+    stdio_ops.opendir  = dlsym(RTLD_NEXT, "opendir" );
+    stdio_ops.fdopendir  = dlsym(RTLD_NEXT, "fdopendir" );
+    stdio_ops.dirfd  = dlsym(RTLD_NEXT, "dirfd" );
+    stdio_ops.readdir  = dlsym(RTLD_NEXT, "readdir" );
+    stdio_ops.readdir64  = dlsym(RTLD_NEXT, "readdir64" );
+    stdio_ops.rewinddir  = dlsym(RTLD_NEXT, "rewinddir" );
+    stdio_ops.seekdir  = dlsym(RTLD_NEXT, "seekdir" );
+    stdio_ops.telldir  = dlsym(RTLD_NEXT, "telldir" );
+    stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
+    stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
+    stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
+};
 
 /*
  * Local variables:

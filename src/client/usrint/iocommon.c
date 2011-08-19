@@ -9,11 +9,11 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
-#include <usrint.h>
+#include "usrint.h"
 #include <linux/dirent.h>
-#include <posix-ops.h>
-#include <openfile-util.h>
-#include <iocommon.h>
+#include "posix-ops.h"
+#include "openfile-util.h"
+#include "iocommon.h"
 
 /* Functions in this file generally define a label errorout
  * for cleanup before exit and return an int rc which is -1
@@ -88,6 +88,11 @@ int iocommon_fsync(pvfs_descriptor *pd)
     PVFS_credentials *credentials;
 
     pvfs_sys_init();
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     iocommon_cred(&credentials);
     rc = PVFS_sys_flush(pd->pvfs_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
@@ -313,7 +318,7 @@ int iocommon_create_file(const char *filename,
 errorout:
     if (dist)
     {
-        PINT_dist_free(dist);
+        PVFS_sys_dist_free(dist);
     }
     return rc;
 }
@@ -337,7 +342,6 @@ pvfs_descriptor *iocommon_open(const char *path,
     char error_path[256];
     PVFS_object_ref file_ref;
     PVFS_object_ref parent_ref;
-    int fs_id = 0;
     pvfs_descriptor *pd = NULL; /* invalid pd until file is opened */
     PVFS_sysresp_getattr attributes_resp;
     PVFS_credentials *credentials;
@@ -415,7 +419,7 @@ pvfs_descriptor *iocommon_open(const char *path,
             /* try to open using glibc */
             rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
             IOCOMMON_RETURN_ERR(rc);
-            pd = pvfs_alloc_descriptor(&pvfs_ops);
+            pd = pvfs_alloc_descriptor(&pvfs_ops, -1);
             pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
             pd->true_fd = rc;
             pd->flags = flags;           /* open flags */
@@ -462,7 +466,12 @@ pvfs_descriptor *iocommon_open(const char *path,
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
-    pd = pvfs_alloc_descriptor(&pvfs_ops);
+    pd = pvfs_alloc_descriptor(&pvfs_ops, -1);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
     pd->pvfs_ref = file_ref;
     pd->flags = flags;           /* open flags */
     pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
@@ -564,6 +573,11 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
     int rc = 0;
     int orig_errno = errno;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     switch(whence)
     {
         case SEEK_SET:
@@ -837,18 +851,17 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
-    /* Initialize */
-    memset(&io_resp, 0, sizeof(io_resp));
-
-    if (!pd)
+    if (!pd || pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
         return -1;
     }
+    /* Initialize */
+    memset(&io_resp, 0, sizeof(io_resp));
 
     //Ensure descriptor is used for the correct type of access
-    if (which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE)) ||
-        which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
+    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE))) ||
+        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE))))
     {
         errno = EBADF;
         return -1;
@@ -897,9 +910,14 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
     PVFS_credentials *credentials;
     PVFS_size req_size;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     //Ensure descriptor is used for the correct type of access
-    if (which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE)) ||
-        which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE)))
+    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE))) ||
+        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE))))
     {
         errno = EBADF;
         return PVFS_FD_FAILURE;
@@ -987,6 +1005,11 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     int rc = 0;
     PVFS_sys_attr attr;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
@@ -1031,9 +1054,13 @@ errorout:
 int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
 {
     int rc = 0;
-    int orig_errno = errno;
     PVFS_sys_attr attr;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
@@ -1074,9 +1101,13 @@ errorout:
 int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 {
     int rc = 0;
-    int orig_errno = errno;
     PVFS_sys_attr attr;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
@@ -1098,9 +1129,13 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
 int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
 {
     int rc = 0;
-    int orig_errno = errno;
     PVFS_sys_attr attr;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
@@ -1111,7 +1146,7 @@ int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
     return rc;
 }
 
-iocommon_make_directory(const char *pvfs_path,
+int iocommon_make_directory(const char *pvfs_path,
                         const int mode,
                         PVFS_object_ref *pdir)
 {
@@ -1186,10 +1221,14 @@ errorout:
 
 int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
 {
-    int                  rc = 0;
-    int orig_errno = errno;
-    PVFS_sys_attr        attr;
+    int rc = 0;
+    PVFS_sys_attr attr;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize any variables */
     memset(&attr, 0, sizeof(attr));
 
@@ -1298,6 +1337,11 @@ int iocommon_getdents(pvfs_descriptor *pd,
     PVFS_ds_position token;
     int bytes = 0, i = 0;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     if (pd->token == PVFS_READDIR_END)
     {
         return -1;  /* EOF */
@@ -1356,6 +1400,11 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     PVFS_ds_position token;
     int bytes = 0, i = 0;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     if (pd->token == PVFS_READDIR_END)
     {
         return -1;  /* EOF */
@@ -1562,6 +1611,11 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
     PVFS_credentials *credentials;
     PVFS_sysresp_statfs statfs_resp;
     
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize the system interface for this process */
     pvfs_sys_init();
     iocommon_cred(&credentials);
@@ -1597,6 +1651,11 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
     PVFS_credentials *credentials;
     PVFS_sysresp_statfs statfs_resp;
     
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize the system interface for this process */
     pvfs_sys_init();
     iocommon_cred(&credentials);
@@ -1625,21 +1684,24 @@ errorout:
 }
 
 int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
-                      off64_t offset, size_t count)
+                      off64_t *offset, size_t count)
 {
-    int rc = 0, bytes_read;
-    int orig_errno = errno;
+    int rc = 0, bytes_read = 0;
     PVFS_Request mem_req, file_req;
-    PVFS_credentials *credentials;
     char *buffer;
-    int buffer_size;
+    int buffer_size = (8*1024*1024);
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     buffer = (char *)malloc(buffer_size);
 
     PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
     file_req = PVFS_BYTE;
 
-    rc = iocommon_readorwrite(PVFS_IO_READ, pd, offset + bytes_read,
+    rc = iocommon_readorwrite(PVFS_IO_READ, pd, *offset + bytes_read,
                               buffer, mem_req, file_req);
     while(rc > 0)
     {
@@ -1654,7 +1716,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
         {
             break;
         }
-        rc = iocommon_readorwrite(PVFS_IO_READ, pd, offset + bytes_read,
+        rc = iocommon_readorwrite(PVFS_IO_READ, pd, *offset + bytes_read,
                                   buffer, mem_req, file_req);
     }  
     PVFS_Request_free(&mem_req);
@@ -1665,6 +1727,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     }
     else
     {
+        *offset += bytes_read;
         return bytes_read;
     }
 }
@@ -1676,7 +1739,7 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
  *  Probably would be more efficient to do so.
  */
 int iocommon_geteattr(pvfs_descriptor *pd,
-                      char *key_p,
+                      const char *key_p,
                       void *val_p,
                       int size)
 {
@@ -1685,6 +1748,11 @@ int iocommon_geteattr(pvfs_descriptor *pd,
     PVFS_credentials *credentials;
     PVFS_ds_keyval key, val;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&key, 0, sizeof(key));
     memset(&val, 0, sizeof(val));
@@ -1692,7 +1760,7 @@ int iocommon_geteattr(pvfs_descriptor *pd,
     /* check credentials */
     iocommon_cred(&credentials);
 
-    key.buffer = key_p;
+    key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
     val.buffer = val_p;
     val.buffer_sz = size;
@@ -1720,8 +1788,8 @@ errorout:
  *  Probably would be more efficient to do so.
  */
 int iocommon_seteattr(pvfs_descriptor *pd,
-                      char *key_p,
-                      void *val_p,
+                      const char *key_p,
+                      const void *val_p,
                       int size,
                       int flag)
 {
@@ -1731,6 +1799,11 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     PVFS_credentials *credentials;
     PVFS_ds_keyval key, val;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&key, 0, sizeof(key));
     memset(&val, 0, sizeof(val));
@@ -1738,9 +1811,9 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     /* check credentials */
     iocommon_cred(&credentials);
 
-    key.buffer = key_p;
+    key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
-    val.buffer = val_p;
+    val.buffer = (void *)val_p;
     val.buffer_sz = size;
 
     if (flag & XATTR_CREATE)
@@ -1772,21 +1845,25 @@ errorout:
  *  Probably would be more efficient to do so.
  */
 int iocommon_deleattr(pvfs_descriptor *pd,
-                      char *key_p)
+                      const char *key_p)
 {
     int rc = 0;
-    int pvfs_flag = 0;
     int orig_errno = errno;
     PVFS_credentials *credentials;
     PVFS_ds_keyval key;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&key, 0, sizeof(key));
 
     /* check credentials */
     iocommon_cred(&credentials);
 
-    key.buffer = key_p;
+    key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
 
     /* now set attributes */
@@ -1823,6 +1900,11 @@ int iocommon_listeattr(pvfs_descriptor *pd,
     PVFS_credentials *credentials;
     PVFS_sysresp_listeattr listeattr_resp;
 
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
     /* Initialize */
     memset(&listeattr_resp, 0, sizeof(listeattr_resp));
     token = PVFS_ITERATE_START;

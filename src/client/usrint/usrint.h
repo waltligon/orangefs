@@ -12,8 +12,12 @@
 #ifndef USRINT_H
 #define USRINT_H 1
 
+#ifndef _LARGEFILE64_SOURCE
 #define _LARGEFILE64_SOURCE
+#endif
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #define __USE_MISC 1
 #define __USE_ATFILE 1
 #define __USE_GNU 1
@@ -33,7 +37,8 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/resource.h>
-/* #include <sys/statvfs.h> /* struct statfs on OS X */
+#include <sys/sendfile.h>
+/* #include <sys/statvfs.h> */ /* struct statfs on OS X */
 #include <sys/vfs.h> /* struct statfs on Linux */
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -88,6 +93,17 @@ int pvfs_convert_iovec(const struct iovec *vector,
 //                    int count, MPI_Datatype datatype, MPI_Status *status); 
 
 /* Macros */
+
+/* debugging */
+
+//#define USRINT_DEBUG
+#ifdef  USRINT_DEBUG
+#define debug(s,v) fprintf(stderr,s,v)
+#else
+#define debug(s,v)
+#endif
+
+/* FD sets */
 
 #ifdef FD_SET
 #undef FD_SET

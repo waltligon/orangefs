@@ -37,7 +37,7 @@ extern int pvfs_errno;
 /* prototypes */
 
 /* Perform PVFS initialization if not already finished */
-void iocommon_ensure_init();
+void iocommon_ensure_init(void);
 
 void iocommon_cred(PVFS_credentials **credentials);
 
@@ -144,6 +144,18 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask);
  */
 int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask);
 
+int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf);
+
+int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf);
+
+int iocommon_seteattr(pvfs_descriptor *pd, const char *key, const void *val, int size, int flag);
+
+int iocommon_geteattr(pvfs_descriptor *pd, const char *key, void *val, int size);
+
+int iocommon_listeattr(pvfs_descriptor *pd, char *list, int size, int *numkeys);
+
+int iocommon_deleattr(pvfs_descriptor *pd, const char * key);
+
 int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group);
 
 int iocommon_chmod(pvfs_descriptor *pd, mode_t mode);
@@ -162,11 +174,19 @@ int iocommon_getdents(pvfs_descriptor *pd,
                       struct dirent *dirp,
                       unsigned int count);
 
+int iocommon_getdents64(pvfs_descriptor *pd,
+                      struct dirent64 *dirp,
+                      unsigned int count);
+
 int iocommon_access(const char *pvfs_path,
                     int mode,
                     int flags,
                     PVFS_object_ref *pdir);
 
+int iocommon_sendfile(int sockfd,
+                      pvfs_descriptor *pd,
+                      off64_t *offset,
+                      size_t count);
 /*
  * Local variables:
  *  c-indent-level: 4

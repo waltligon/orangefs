@@ -50,8 +50,8 @@ typedef struct posix_ops_s
     int (*stat64)(const char *path, struct stat64 *buf);
     int (*fstat)(int fd, struct stat *buf);
     int (*fstat64)(int fd, struct stat64 *buf);
-    int (*fstatat)(int fd, char *path, struct stat *buf, int flag);
-    int (*fstatat64)(int fd, char *path, struct stat64 *buf, int flag);
+    int (*fstatat)(int fd, const char *path, struct stat *buf, int flag);
+    int (*fstatat64)(int fd, const char *path, struct stat64 *buf, int flag);
     int (*lstat)(const char *path, struct stat *buf);
     int (*lstat64)(const char *path, struct stat64 *buf);
     int (*dup)(int oldfd);
@@ -73,9 +73,9 @@ typedef struct posix_ops_s
     ssize_t (*link)(const char *oldpath, const char *newpath);
     int (*linkat)(int olddirfd, const char *oldpath,
                   int newdirfd, const char *newpath, int flags);
-    int (*readdir)(unsigned int fd, struct dirent *dirp, unsigned int count);
-    int (*getdents)(unsigned int fd, struct dirent *dirp, unsigned int count);
-    int (*getdents64)(unsigned int fd, struct dirent64 *dirp, unsigned int count);
+    int (*readdir)(u_int fd, struct dirent *dirp, u_int count);
+    int (*getdents)(u_int fd, struct dirent *dirp, u_int count);
+    int (*getdents64)(u_int fd, struct dirent64 *dirp, u_int count);
     int (*access)(const char *path, int mode);
     int (*faccessat)(int dirfd, const char *path, int mode, int flags);
     int (*flock)(int fd, int op);
@@ -91,8 +91,8 @@ typedef struct posix_ops_s
     int (*fstatfs64)(int fd, struct statfs64 *buf);
     int (*mknod)(const char *path, mode_t mode, dev_t dev);
     int (*mknodat)(int dirfd, const char *path, mode_t mode, dev_t dev);
-    ssize_t (*sendfile)(int outfd, int infd, off_t offset, size_t count);
-    ssize_t (*sendfile64)(int outfd, int infd, off64_t offset, size_t count);
+    ssize_t (*sendfile)(int outfd, int infd, off_t *offset, size_t count);
+    ssize_t (*sendfile64)(int outfd, int infd, off64_t *offset, size_t count);
     int (*setxattr)(const char *path, const char *name,
                     const void *value, size_t size, int flags);
     int (*lsetxattr)(const char *path, const char *name,

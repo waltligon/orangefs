@@ -11,13 +11,31 @@
  */
 #include <usrint.h>
 #include <linux/dirent.h>
+#include <sys/syscall.h>
 #include <posix-ops.h>
 #include <openfile-util.h>
+#include <posix-pvfs.h>
+
+static struct glibc_redirect_s
+{
+    int (*stat)(int ver, const char *path, struct stat *buf);
+    int (*stat64)(int ver, const char *path, struct stat64 *buf);
+    int (*fstat)(int ver, int fd, struct stat *buf);
+    int (*fstat64)(int ver, int fd, struct stat64 *buf);
+    int (*fstatat)(int ver, int fd, const char *path, struct stat *buf, int flag);
+    int (*fstatat64)(int ver, int fd, const char *path, struct stat64 *buf, int flag);
+    int (*lstat)(int ver, const char *path, struct stat *buf);
+    int (*lstat64)(int ver, const char *path, struct stat64 *buf);
+    int (*mknod)(int ver, const char *path, mode_t mode, dev_t dev);
+    int (*mknodat)(int ver, int dirfd, const char *path, mode_t mode, dev_t dev);
+} glibc_redirect;
 
 #define PREALLOC 3
+static char logfilepath[25];
+static int logfile;
+static int pvfs_initializing_flag = 0;
 static int descriptor_table_count = 0; 
 static int descriptor_table_size = 0; 
-static int next_descriptor = 0; 
 static pvfs_descriptor **descriptor_table; 
 static char rstate[256];  /* used for random number generation */
 
@@ -68,6 +86,87 @@ pvfs_descriptor pvfs_stderr =
     .is_in_use = PVFS_FS
 };
 
+static int my_glibc_stat(const char *path, struct stat *buf)
+{
+    return glibc_redirect.stat(3, path, buf);
+}
+
+static int my_glibc_stat64(const char *path, struct stat64 *buf)
+{
+    return glibc_redirect.stat64(3, path, buf);
+}
+
+static int my_glibc_fstat(int fd, struct stat *buf)
+{
+    return glibc_redirect.fstat(3, fd, buf);
+}
+
+static int my_glibc_fstat64(int fd, struct stat64 *buf)
+{
+    return glibc_redirect.fstat64(3, fd, buf);
+}
+
+static int my_glibc_fstatat(int fd, const char *path, struct stat *buf, int flag)
+{
+    return glibc_redirect.fstatat(3, fd, path, buf, flag);
+}
+
+static int my_glibc_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
+{
+    return glibc_redirect.fstatat64(3, fd, path, buf, flag);
+}
+
+static int my_glibc_lstat(const char *path, struct stat *buf)
+{
+    return glibc_redirect.lstat(3, path, buf);
+}
+
+static int my_glibc_lstat64(const char *path, struct stat64 *buf)
+{
+    return glibc_redirect.lstat64(3, path, buf);
+}
+
+static int my_glibc_mknod(const char *path, mode_t mode, dev_t dev)
+{
+    return glibc_redirect.mknod(1, path, mode, dev);
+}
+
+static int my_glibc_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
+{
+    return glibc_redirect.mknodat(1, dirfd, path, mode, dev);
+}
+
+static int my_glibc_getdents(u_int fd, struct dirent *dirp, u_int count)
+{
+    return syscall(SYS_getdents, fd, dirp, count);
+}
+
+static int my_glibc_getdents64(u_int fd, struct dirent64 *dirp, u_int count)
+{
+    return syscall(SYS_getdents64, fd, dirp, count);
+}
+
+static int my_glibc_fadvise64(int fd, off64_t offset, off64_t len, int advice)
+{
+    return syscall(SYS_fadvise64, fd, offset, len, advice);
+}
+
+static int my_glibc_fadvise(int fd, off_t offset, off_t len, int advice)
+{
+    return my_glibc_fadvise64(fd, (off64_t)offset, (off64_t)len, advice);
+}
+
+static int my_glibc_flush(int fd)
+{
+    errno = ENOSYS;
+    return -1;
+}
+ 
+static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
+{
+    return syscall(SYS_readdir, fd, dirp, count);
+}
+
 void load_glibc(void)
 { 
     glibc_ops.open = dlsym(RTLD_NEXT, "open");
@@ -96,15 +195,23 @@ void load_glibc(void)
     glibc_ops.ftruncate64 = dlsym(RTLD_NEXT, "ftruncate64");
     glibc_ops.fallocate = dlsym(RTLD_NEXT, "posix_fallocate");
     glibc_ops.close = dlsym(RTLD_NEXT, "close");
-    glibc_ops.flush = dlsym(RTLD_NEXT, "flush");
-    glibc_ops.stat = dlsym(RTLD_NEXT, "stat");
-    glibc_ops.stat64 = dlsym(RTLD_NEXT, "stat64");
-    glibc_ops.fstat = dlsym(RTLD_NEXT, "fstat");
-    glibc_ops.fstat64 = dlsym(RTLD_NEXT, "fstat64");
-    glibc_ops.fstatat = dlsym(RTLD_NEXT, "fstatat");
-    glibc_ops.fstatat64 = dlsym(RTLD_NEXT, "fstatat64");
-    glibc_ops.lstat = dlsym(RTLD_NEXT, "lstat");
-    glibc_ops.lstat64 = dlsym(RTLD_NEXT, "lstat64");
+    glibc_ops.flush = my_glibc_flush;
+    glibc_ops.stat = my_glibc_stat;
+    glibc_redirect.stat = dlsym(RTLD_NEXT, "__xstat");
+    glibc_ops.stat64 = my_glibc_stat64;
+    glibc_redirect.stat64 = dlsym(RTLD_NEXT, "__xstat64");
+    glibc_ops.fstat = my_glibc_fstat;
+    glibc_redirect.fstat = dlsym(RTLD_NEXT, "__fxstat");
+    glibc_ops.fstat64 = my_glibc_fstat64;
+    glibc_redirect.fstat64 = dlsym(RTLD_NEXT, "__fxstat64");
+    glibc_ops.fstatat = my_glibc_fstatat;
+    glibc_redirect.fstatat = dlsym(RTLD_NEXT, "__fxstatat");
+    glibc_ops.fstatat64 = my_glibc_fstatat64;
+    glibc_redirect.fstatat64 = dlsym(RTLD_NEXT, "__fxstatat64");
+    glibc_ops.lstat = my_glibc_lstat;
+    glibc_redirect.lstat = dlsym(RTLD_NEXT, "__lxstat");
+    glibc_ops.lstat64 = my_glibc_lstat64;
+    glibc_redirect.lstat64 = dlsym(RTLD_NEXT, "__lxstat64");
     glibc_ops.dup = dlsym(RTLD_NEXT, "dup");
     glibc_ops.dup2 = dlsym(RTLD_NEXT, "dup2");
     glibc_ops.chown = dlsym(RTLD_NEXT, "chown");
@@ -123,9 +230,9 @@ void load_glibc(void)
     glibc_ops.symlinkat = dlsym(RTLD_NEXT, "symlinkat");
     glibc_ops.link = dlsym(RTLD_NEXT, "link");
     glibc_ops.linkat = dlsym(RTLD_NEXT, "linkat");
-    glibc_ops.readdir = dlsym(RTLD_NEXT, "readdir");
-    glibc_ops.getdents = dlsym(RTLD_NEXT, "getdents");
-    glibc_ops.getdents64 = dlsym(RTLD_NEXT, "getdents64");
+    glibc_ops.readdir = my_glibc_readdir;
+    glibc_ops.getdents = my_glibc_getdents;
+    glibc_ops.getdents64 = my_glibc_getdents64;
     glibc_ops.access = dlsym(RTLD_NEXT, "access");
     glibc_ops.faccessat = dlsym(RTLD_NEXT, "faccessat");
     glibc_ops.flock = dlsym(RTLD_NEXT, "flock");
@@ -133,14 +240,16 @@ void load_glibc(void)
     glibc_ops.sync = dlsym(RTLD_NEXT, "sync");
     glibc_ops.fsync = dlsym(RTLD_NEXT, "fsync");
     glibc_ops.fdatasync = dlsym(RTLD_NEXT, "fdatasync");
-    glibc_ops.fadvise = dlsym(RTLD_NEXT, "fadvise");
-    glibc_ops.fadvise64 = dlsym(RTLD_NEXT, "fadvise64");
+    glibc_ops.fadvise = my_glibc_fadvise;
+    glibc_ops.fadvise64 = my_glibc_fadvise64;
     glibc_ops.statfs = dlsym(RTLD_NEXT, "statfs");
     glibc_ops.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     glibc_ops.fstatfs = dlsym(RTLD_NEXT, "fstatfs");
     glibc_ops.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
-    glibc_ops.mknod = dlsym(RTLD_NEXT, "mknod");
-    glibc_ops.mknodat = dlsym(RTLD_NEXT, "mknodat");
+    glibc_ops.mknod = my_glibc_mknod;
+    glibc_redirect.mknod = dlsym(RTLD_NEXT, "__xmknod");
+    glibc_ops.mknodat = my_glibc_mknodat;
+    glibc_redirect.mknodat = dlsym(RTLD_NEXT, "__xmknodat");
     glibc_ops.sendfile = dlsym(RTLD_NEXT, "sendfile");
     glibc_ops.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
     glibc_ops.setxattr = dlsym(RTLD_NEXT, "setxattr");
@@ -180,6 +289,9 @@ void load_glibc(void)
     glibc_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
     glibc_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
     glibc_ops.pipe = dlsym(RTLD_NEXT, "pipe");
+    glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
+    glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
+    glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
 
 /* PVFS does not implement socket ops */
     pvfs_ops.socket = dlsym(RTLD_NEXT, "socket");
@@ -207,9 +319,13 @@ void load_glibc(void)
     pvfs_ops.shutdown = dlsym(RTLD_NEXT, "shutdown");
     pvfs_ops.socketpair = dlsym(RTLD_NEXT, "socketpair");
     pvfs_ops.pipe = dlsym(RTLD_NEXT, "pipe");
-    glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
-    glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
-    glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
+}
+
+static void usrint_cleanup(void)
+{
+    /* later check for an error that might want us */
+    /* to keep this - for now it is empty */
+    glibc_ops.unlink(logfilepath);
 }
 
 /* 
@@ -226,9 +342,14 @@ void pvfs_sys_init(void) {
         return;
     }
     pvfs_lib_init_flag = 1; /* should only run this once */
+    pvfs_initializing_flag = 1;
 
     /* this allows system calls to run */
     load_glibc();
+    PINT_initrand();
+
+    /* if this fails no much we can do about it */
+    atexit(usrint_cleanup);
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
@@ -244,7 +365,14 @@ void pvfs_sys_init(void) {
     descriptor_table[1] = &pvfs_stdout;
     descriptor_table[2] = &pvfs_stderr;
     descriptor_table_count = PREALLOC;
-	next_descriptor = PREALLOC;
+
+    sprintf(logfilepath, "/tmp/pvfsuid-%05d.log", (int)(getuid()));
+    logfile = glibc_ops.open(logfilepath, O_RDWR|O_CREAT, 0600);
+    if (logfile < 0)
+    {
+        perror("failed in pvfs_sys_init");
+        exit(-1);
+    }
 
 	/* initalize PVFS */ 
 	PVFS_util_init_defaults(); 
@@ -254,8 +382,8 @@ void pvfs_sys_init(void) {
     }
 
     /* call other initialization routines */
-    PINT_initrand();
     //PVFS_perror_gossip_silent(); 
+    pvfs_initializing_flag = 0;
 }
 
 int pvfs_descriptor_table_size(void)
@@ -267,9 +395,9 @@ int pvfs_descriptor_table_size(void)
  * Allocate a new pvfs_descriptor
  * initialize fsops to the given set
  */
- pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops)
+ pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd)
  {
- 	int i; 
+ 	int newfd, rc, flags; 
     if (fsops == NULL)
     {
         errno = EINVAL;
@@ -277,48 +405,53 @@ int pvfs_descriptor_table_size(void)
     }
     pvfs_sys_init();
 
-    /* table should be initialized now - check for available slot */
-	if (descriptor_table_count == (descriptor_table_size - PREALLOC))
-	{
-        errno = ENOMEM;
-		return NULL;
-	}
-
-   /* find next empty slot in table */
-	for (i = next_descriptor; descriptor_table[i];
-			i = (i == descriptor_table_size - 1) ? PREALLOC : i + 1);
-
-   /* found a slot */
-	descriptor_table[i] = malloc(sizeof(pvfs_descriptor));
-	if (descriptor_table[i] == NULL)
-	{
-		return NULL;
-	}
-	next_descriptor = ((i == descriptor_table_size - 1) ? PREALLOC : i + 1);
+    if (fd == -1)
+    {
+        /* PVFS file allocate a real descriptor for it */
+        newfd = glibc_ops.dup(logfile);
+    }
+    else
+    {
+        /* opened by glibc, make sure this is a valid fd */
+        newfd = fd;
+        rc = fcntl(newfd, F_GETFL, flags);
+        if (rc < 0)
+        {
+            return NULL;
+        }
+    }
 	descriptor_table_count++;
+    descriptor_table[newfd] =
+                (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    if (!descriptor_table[newfd])
+    {
+        return NULL;
+    }
 
 	/* fill in descriptor */
-	descriptor_table[i]->fd = i;
-	descriptor_table[i]->dup_cnt = 1;
-	descriptor_table[i]->fsops = fsops;
-	descriptor_table[i]->true_fd = i;
-	descriptor_table[i]->pvfs_ref.fs_id = 0;
-	descriptor_table[i]->pvfs_ref.handle = 0;
-	descriptor_table[i]->flags = 0;
-	descriptor_table[i]->mode = 0;
-	descriptor_table[i]->file_pointer = 0;
-	descriptor_table[i]->token = 0;
-	descriptor_table[i]->dpath = NULL;
-	descriptor_table[i]->is_in_use = PVFS_FS;
+    /* add reference to chache objects here */
+	descriptor_table[newfd]->fd = newfd;
+	descriptor_table[newfd]->dup_cnt = 1;
+	descriptor_table[newfd]->fsops = fsops;
+	descriptor_table[newfd]->true_fd = newfd;
+	descriptor_table[newfd]->pvfs_ref.fs_id = 0;
+	descriptor_table[newfd]->pvfs_ref.handle = 0;
+	descriptor_table[newfd]->flags = flags;
+	descriptor_table[newfd]->mode = 0;
+	descriptor_table[newfd]->file_pointer = 0;
+	descriptor_table[newfd]->token = 0;
+	descriptor_table[newfd]->dpath = NULL;
+	descriptor_table[newfd]->is_in_use = PVFS_FS;
 
-    return descriptor_table[i];
+    return descriptor_table[newfd];
 }
 
 /*
- * Function for dupliating a descriptor - used in dup and dup2 calls
+ * Function for duplicating a descriptor - used in dup and dup2 calls
  */
 int pvfs_dup_descriptor(int oldfd, int newfd)
 {
+    int rc = 0;
     if (oldfd < 0 || oldfd >= descriptor_table_size)
     {
         errno = EBADF;
@@ -326,21 +459,33 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     }
     if (newfd == -1)
     {
-        /* find next empty slot in table */
-        for (newfd = next_descriptor; descriptor_table[newfd];
-            newfd = (newfd == descriptor_table_size-1) ? PREALLOC : newfd++);
+        newfd = glibc_ops.dup(logfile);
+        if (newfd < 0)
+        {
+            return newfd;
+        }
     }
     else
     {
         if (descriptor_table[newfd] != NULL)
         {
             /* close old file in new slot */
-            pvfs_close(newfd);
+            rc = pvfs_free_descriptor(newfd);
+            if (rc < 0)
+            {
+                return rc;
+            }
         }
+    }
+    rc = glibc_ops.dup2(oldfd, newfd);
+    if (rc < 0)
+    {
+        return rc;
     }
     descriptor_table[newfd] = descriptor_table[oldfd];
     descriptor_table[newfd]->dup_cnt++;
 	descriptor_table_count++;
+    return 0;
 }
 
 /*
@@ -350,27 +495,61 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
  */
 pvfs_descriptor *pvfs_find_descriptor(int fd)
 {
+    pvfs_descriptor *pd;
     if (fd < 0 || fd >= descriptor_table_size)
     {
         errno = EBADF;
         return NULL;
     }
-	return descriptor_table[fd];
+    pd = descriptor_table[fd];
+    if (!pd)
+    {
+        int rc, flags;
+        /* see if glibc opened this file without our knowing */
+        rc = glibc_ops.fcntl(fd, F_GETFL, flags);
+        if (rc < 0)
+        {
+            errno = EBADF;
+            return NULL;
+        }
+        pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+	    /* fill in descriptor */
+	    pd->fd = fd;
+	    pd->dup_cnt = 1;
+	    pd->fsops = &glibc_ops;
+	    pd->true_fd = fd;
+	    pd->pvfs_ref.fs_id = 0;
+	    pd->pvfs_ref.handle = 0;
+	    pd->flags = flags;
+	    pd->mode = 0;
+	    pd->file_pointer = 0;
+	    pd->token = 0;
+	    pd->dpath = NULL;
+	    pd->is_in_use = PVFS_FS;
+        descriptor_table[fd] = pd;
+    }
+    else if (pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return NULL;
+    }
+	return pd;
 }
 
 int pvfs_free_descriptor(int fd)
 {
     pvfs_descriptor *pd;
+    debug("pvfs_free_descriptor called with %d\n", fd);
 
-    if (fd < 0 || fd >= descriptor_table_size)
+    pd = pvfs_find_descriptor(fd);
+    if (pd == NULL)
     {
-        errno = EBADF;
         return -1;
     }
-    pd = descriptor_table[fd];
 
 	/* clear out table entry */
 	descriptor_table[fd] = NULL;
+    glibc_ops.close(fd);
 
 	/* keep up with used descriptors */
 	descriptor_table_count--;
@@ -382,11 +561,13 @@ int pvfs_free_descriptor(int fd)
         {
             free(pd->dpath);
         }
+        /* release cache opbjects here */
 	    /* free descriptor - wipe memory first */
 	    memset(pd, 0, sizeof(pvfs_descriptor));
 	    free(pd);
     }
 
+    debug("pvfs_free_descriptor returns %d\n", 0);
 	return 0;
 }
 
@@ -400,8 +581,8 @@ char *pvfs_qualify_path(const char *path)
     int i = 1;
     int cdsz;
     int psz;
-    char *curdir;
-    char *newpath;
+    char *curdir = NULL;
+    char *newpath = NULL;
 
     if(path[0] != '/')
     {
@@ -409,7 +590,7 @@ char *pvfs_qualify_path(const char *path)
         /* current directory */
         do
         {
-            if (i > 1)
+            if (i > 1 && curdir)
             {
                 free(curdir);
             }
@@ -424,7 +605,10 @@ char *pvfs_qualify_path(const char *path)
         if (rc == NULL)
         {
             /* some other error, bail out */
-            free(curdir);
+            if (curdir)
+            {
+                free(curdir);
+            }
             return NULL;
         }
         cdsz = strlen(curdir);
@@ -449,13 +633,26 @@ char *pvfs_qualify_path(const char *path)
  * returns 1 if PVFS 0 otherwise
  */
 
-#ifdef PVFS_ASSUME_MOUNT
 int is_pvfs_path(const char *path)
 {
+#ifdef PVFS_ASSUME_MOUNT
     struct statfs file_system;
+#endif
+    int rc = 0;
+    PVFS_fs_id fs_id;
+    char pvfs_path[256];
     char *newpath = NULL ;
 
+    if (pvfs_initializing_flag)
+    {
+        /* we cannot open a PVFS file while
+         * initializing PVFS
+         */
+        return 0;
+    }
+
     pvfs_sys_init();
+#ifdef PVFS_ASSUME_MOUNT
     memset(&file_system, 0, sizeof(file_system));
     
     newpath = pvfs_qualify_path(path);
@@ -483,16 +680,9 @@ int is_pvfs_path(const char *path)
     {
         return 0; /* not PVFS assume the kernel can handle it */
     }
-}
+/***************************************************************/
 #else
-int is_pvfs_path(const char *path)
-{
-    int rc = 0;
-    PVFS_fs_id fs_id;
-    char pvfs_path[256];
-    char *newpath = NULL;
-
-    pvfs_sys_init();
+/***************************************************************/
     newpath = pvfs_qualify_path(path);
     rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, 256);
     if (newpath != path)
@@ -509,16 +699,7 @@ int is_pvfs_path(const char *path)
         return -1; /* an error returned */
     }
     return 1; /* a PVFS path */
-}
 #endif
-
-void pvfs_debug(char *fmt, ...)
-{
-    va_list ap;
-
-    va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
-    va_end(ap);
 }
 
 /**

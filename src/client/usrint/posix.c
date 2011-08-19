@@ -9,6 +9,12 @@
  *
  *  PVFS2 user interface routines - wrappers for posix system calls
  */
+
+/* this prevents headers from using inlines for 64 bit calls */
+#ifdef _FILE_OFFSET_BITS
+#undef _FILE_OFFSET_BITS
+#endif
+
 #include <usrint.h>
 #include <linux/dirent.h>
 #include <posix-ops.h>
@@ -55,17 +61,21 @@ int open(const char *path, int flags, ...)
     {
         int rc;
         struct stat sbuf;
-        /* descrptor unknown to FS here so we must set it up */
-        rc = pd->fsops->open(path, flags & 01777777, mode);
+        /* path unknown to FS so open with glibc */
+        rc = glibc_ops.open(path, flags & 01777777, mode);
         if (rc < 0)
         {
             return rc;
         }
-        pd = pvfs_alloc_descriptor(&glibc_ops);
+        /* set up the descriptor manually */
+        pd = pvfs_alloc_descriptor(&glibc_ops, rc);
+        if (!pd)
+        {
+            return -1;
+        }
         pd->is_in_use = PVFS_FS;
-        pd->true_fd = rc;
         pd->flags = flags;
-        fstat(rc, &sbuf);
+        glibc_ops.fstat(rc, &sbuf);
         pd->mode = sbuf.st_mode;
         return pd->fd; 
     }
@@ -77,9 +87,14 @@ int open(const char *path, int flags, ...)
 int open64(const char *path, int flags, ...)
 { 
     int fd;
+    int mode = 0;
     va_list ap;
     va_start(ap, flags);
-    fd = open(path, flags|O_LARGEFILE, ap); 
+    if (flags & O_CREAT)
+    {
+        mode = va_arg(ap, int);
+    }
+    fd = open(path, flags|O_LARGEFILE, mode); 
     va_end(ap);
     return fd;
 }
@@ -87,6 +102,7 @@ int open64(const char *path, int flags, ...)
 int openat(int dirfd, const char *path, int flags, ...)
 {
     int fd; 
+    int mode = 0;
     pvfs_descriptor *pd; 
     va_list ap;
     
@@ -96,16 +112,20 @@ int openat(int dirfd, const char *path, int flags, ...)
         return -1;
     }
     va_start(ap, flags);
+    if (flags & O_CREAT)
+    {
+        mode = va_arg(ap, int);
+    }
     if (dirfd == AT_FDCWD || path[0] == '/')
     {
-        fd = open(path, flags, ap);
+        fd = open(path, flags, mode);
     }
     else
     {
         pd = pvfs_find_descriptor(dirfd);
         if (pd)
         {
-            fd = pd->fsops->openat(pd->true_fd, path, flags, ap);
+            fd = pd->fsops->openat(pd->true_fd, path, flags, mode);
         }
         else
         {
@@ -120,9 +140,14 @@ int openat(int dirfd, const char *path, int flags, ...)
 int openat64(int dirfd, const char *path, int flags, ...)
 {
     int fd;
+    int mode;
     va_list ap;
     va_start(ap, flags);
-    fd = openat(dirfd, path, flags|O_LARGEFILE, ap); 
+    if (flags & O_CREAT)
+    {
+        mode = va_arg(ap, int);
+    }
+    fd = openat(dirfd, path, flags|O_LARGEFILE, mode); 
     va_end(ap);
     return fd;
 }
@@ -153,17 +178,19 @@ int unlink(const char *path)
         errno = EFAULT;
         return -1;
     }
-    if (is_pvfs_path(path)) {
+    if (is_pvfs_path(path))
+    {
         return pvfs_ops.unlink(path);
     }
-    else {
+    else
+    {
         return glibc_ops.unlink(path);
     }
 }
 
 int unlinkat(int dirfd, const char *path, int flag)
 {
-    int rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path)
@@ -188,6 +215,7 @@ int unlinkat(int dirfd, const char *path, int flag)
             rc = -1;
         }
     }
+    return rc;
 }
 
 /*
@@ -251,7 +279,7 @@ int renameat (int oldfd, const char *old, int newfd, const char *new)
  */
 ssize_t read(int fd, void *buf, size_t count)
 {
-    ssize_t rc; 
+    ssize_t rc = 0; 
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd);
@@ -272,7 +300,7 @@ ssize_t read(int fd, void *buf, size_t count)
  */
 ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset)
 {
-    ssize_t rc; 
+    ssize_t rc = 0; 
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd); 
@@ -289,32 +317,11 @@ ssize_t pread(int fd, void *buf, size_t nbytes, off_t offset)
 } 
 
 /*
- * pread64 wrapper 
- */
-ssize_t pread64(int fd, void *buf, size_t nbytes, off64_t offset)
-{
-    ssize_t rc; 
-    pvfs_descriptor *pd; 
-    
-    pd = pvfs_find_descriptor(fd); 
-    if (pd)
-    {
-        rc = pd->fsops->pread64(pd->true_fd, (void *)buf, nbytes, offset); 
-    }
-    else
-    {
-        errno = EBADF;
-        rc = -1;
-    }
-    return rc;
-}
-
-/*
  * readv wrapper 
  */
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 { 
-    ssize_t rc;
+    ssize_t rc = 0;
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd); 
@@ -331,11 +338,32 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 }
 
 /*
+ * pread64 wrapper 
+ */
+ssize_t pread64(int fd, void *buf, size_t nbytes, off64_t offset)
+{
+    ssize_t rc = 0; 
+    pvfs_descriptor *pd; 
+    
+    pd = pvfs_find_descriptor(fd); 
+    if (pd)
+    {
+        rc = pd->fsops->pread64(pd->true_fd, (void *)buf, nbytes, offset); 
+    }
+    else
+    {
+        errno = EBADF;
+        rc = -1;
+    }
+    return rc;
+}
+
+/*
  * write wrapper 
  */
 ssize_t write(int fd, const void *buf, size_t count)
 {
-    ssize_t rc; 
+    ssize_t rc = 0; 
     pvfs_descriptor *pd; 
     
     pd = pvfs_find_descriptor(fd);
@@ -356,7 +384,7 @@ ssize_t write(int fd, const void *buf, size_t count)
  */
 ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
 {
-    ssize_t rc;
+    ssize_t rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -373,17 +401,19 @@ ssize_t pwrite(int fd, const void *buf, size_t nbytes, off_t offset)
 }
 
 /*
- * pwrite64 wrapper 
+ * write wrapper 
  */
-ssize_t pwrite64(int fd, const void *buf, size_t nbytes, off64_t offset)
-{
-    ssize_t rc;
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
+{ 
+    ssize_t rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->pwrite64(pd->true_fd, buf, nbytes, offset);
+        rc = pd->fsops->writev(fd, iov, iovcnt);
+        if (rc > 0)
+            pd->file_pointer += rc;
     }
     else
     {
@@ -394,19 +424,17 @@ ssize_t pwrite64(int fd, const void *buf, size_t nbytes, off64_t offset)
 }
 
 /*
- * write wrapper 
+ * pwrite64 wrapper 
  */
-ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
-{ 
-    ssize_t rc;
+ssize_t pwrite64(int fd, const void *buf, size_t nbytes, off64_t offset)
+{
+    ssize_t rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->writev(fd, iov, iovcnt);
-        if (rc > 0)
-            pd->file_pointer += rc;
+        rc = pd->fsops->pwrite64(pd->true_fd, buf, nbytes, offset);
     }
     else
     {
@@ -437,7 +465,7 @@ off_t lseek(int fd, off_t offset, int whence)
  */ 
 off64_t lseek64(int fd, off64_t offset, int whence)
 {
-    off64_t rc;
+    off64_t rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -489,7 +517,7 @@ int truncate64(const char *path, off64_t length)
 
 int ftruncate(int fd, off_t length)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -507,7 +535,7 @@ int ftruncate(int fd, off_t length)
 
 int ftruncate64(int fd, off64_t length)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -526,7 +554,7 @@ int ftruncate64(int fd, off64_t length)
 #ifdef _XOPEN_SOURCE
 int posix_fallocate(int fd, off_t offset, off_t length)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -548,26 +576,15 @@ int posix_fallocate(int fd, off_t offset, off_t length)
  */
 int close(int fd)
 {
-    pvfs_descriptor *pd;
+    int rc = 0;
     
-    pd = pvfs_find_descriptor(fd);
-    if (pd)
-    {
-        pd->fsops->flush(pd->true_fd);
-        pd->fsops->close(pd->true_fd);
-        pvfs_free_descriptor(pd);
-        return 0;
-    }
-    else
-    {
-        errno = EBADF;
-        return -1;
-    }
+    rc = pvfs_free_descriptor(fd);
+    return rc;
 }
 
 int flush(int fd)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -630,7 +647,7 @@ int __xstat64(int ver, const char *path, struct stat64 *buf)
 
 int fstat(int fd, struct stat *buf)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -653,7 +670,7 @@ int __fxstat(int ver, int fd, struct stat *buf)
 
 int fstat64(int fd, struct stat64 *buf)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -672,6 +689,80 @@ int fstat64(int fd, struct stat64 *buf)
 int __fxstat64(int ver, int fd, struct stat64 *buf)
 {
     return fstat64(fd, buf);
+}
+
+int fstatat(int fd, const char *path, struct stat *buf, int flag)
+{
+    int rc = 0; 
+    pvfs_descriptor *pd; 
+    
+    if (fd == AT_FDCWD || path[0] == '/')
+    {
+        if (flag & AT_SYMLINK_NOFOLLOW)
+        {
+            lstat(path, buf);
+        }
+        else
+        {
+            stat(path, buf);
+        }
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(fd);
+        if (pd)
+        {
+            rc = pd->fsops->fstatat(pd->true_fd, path, buf, flag);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+    return rc;
+}
+
+int __fxstatat(int ver, int fd, const char *path, struct stat *buf, int flag)
+{
+    return fstatat(fd, path, buf, flag);
+}
+
+int fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
+{
+    int rc = 0; 
+    pvfs_descriptor *pd; 
+    
+    if (fd == AT_FDCWD || path[0] == '/')
+    {
+        if (flag & AT_SYMLINK_NOFOLLOW)
+        {
+            lstat64(path, buf);
+        }
+        else
+        {
+            stat64(path, buf);
+        }
+    }
+    else
+    {
+        pd = pvfs_find_descriptor(fd);
+        if (pd)
+        {
+            rc = pd->fsops->fstatat64(pd->true_fd, path, buf, flag);
+        }
+        else
+        {
+            errno = EBADF;
+            rc = -1;
+        }
+    }
+    return rc;
+}
+
+int __fxstatat64(int ver, int fd, const char *path, struct stat64 *buf, int flag)
+{
+    return fstatat64(fd, path, buf, flag);
 }
 
 int lstat(const char *path, struct stat *buf)
@@ -720,7 +811,7 @@ int __lxstat64(int ver, const char *path, struct stat64 *buf)
 
 int dup(int oldfd)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(oldfd);
@@ -738,7 +829,7 @@ int dup(int oldfd)
 
 int dup2(int oldfd, int newfd)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(oldfd);
@@ -773,7 +864,7 @@ int chown(const char *path, uid_t owner, gid_t group)
 
 int fchown(int fd, uid_t owner, gid_t group)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -791,7 +882,7 @@ int fchown(int fd, uid_t owner, gid_t group)
 
 int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flag)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (dirfd == AT_FDCWD || path[0] == '/')
@@ -811,6 +902,7 @@ int fchownat(int dirfd, const char *path, uid_t owner, gid_t group, int flag)
             rc = -1;
         }
     }
+    return rc;
 }
 
 int lchown(const char *path, uid_t owner, gid_t group)
@@ -849,7 +941,7 @@ int chmod(const char *path, mode_t mode)
 
 int fchmod(int fd, mode_t mode)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -867,7 +959,7 @@ int fchmod(int fd, mode_t mode)
 
 int fchmodat(int dirfd, const char *path, mode_t mode, int flag)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path)
@@ -892,6 +984,7 @@ int fchmodat(int dirfd, const char *path, mode_t mode, int flag)
             rc = -1;
         }
     }
+    return rc;
 }
 
 int mkdir(const char *path, mode_t mode)
@@ -913,7 +1006,7 @@ int mkdir(const char *path, mode_t mode)
 
 int mkdirat(int dirfd, const char *path, mode_t mode)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path)
@@ -938,6 +1031,7 @@ int mkdirat(int dirfd, const char *path, mode_t mode)
             rc = -1;
         }
     }
+    return rc;
 }
 
 int rmdir(const char *path)
@@ -976,7 +1070,7 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz)
 
 int readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path || !buf)
@@ -1001,6 +1095,7 @@ int readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
             rc = -1;
         }
     }
+    return rc;
 }
 
 ssize_t symlink(const char *oldpath, const char *newpath)
@@ -1022,7 +1117,7 @@ ssize_t symlink(const char *oldpath, const char *newpath)
 
 int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!oldpath || !newpath)
@@ -1047,6 +1142,7 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
             rc = -1;
         }
     }
+    return rc;
 }
 
 ssize_t link(const char *oldpath, const char *newpath)
@@ -1064,6 +1160,7 @@ ssize_t link(const char *oldpath, const char *newpath)
     {
         return glibc_ops.link(oldpath, newpath);
     }
+    return -1;
 }
 
 int linkat(int olddirfd, const char *old,
@@ -1094,7 +1191,7 @@ int linkat(int olddirfd, const char *old,
     }
 }
 
-int readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
+int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
     int rc;
     pvfs_descriptor *pd;
@@ -1119,7 +1216,7 @@ int readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 
 int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     if (!dirp)
@@ -1142,7 +1239,7 @@ int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
 
 int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     if (!dirp)
@@ -1187,7 +1284,7 @@ int access(const char *path, int mode)
 
 int faccessat(int dirfd, const char *path, int mode, int flags)
 {
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path)
@@ -1212,11 +1309,12 @@ int faccessat(int dirfd, const char *path, int mode, int flags)
             rc = -1;
         }
     }
+    return rc;
 }
 
 int flock(int fd, int op)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1234,7 +1332,9 @@ int flock(int fd, int op)
 
 int fcntl(int fd, int cmd, ...)
 {
-    int rc;
+    int rc = 0;
+    long arg;
+    struct flock *lock;
     pvfs_descriptor *pd;
     va_list ap;
     
@@ -1242,7 +1342,19 @@ int fcntl(int fd, int cmd, ...)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fcntl(pd->true_fd, cmd, ap);
+        switch (cmd)
+        {
+        case F_GETLK:
+        case F_SETLK:
+        case F_SETLKW:
+            lock = va_arg(ap, struct flock *);
+            rc = pd->fsops->fcntl(pd->true_fd, cmd, lock);
+            break;
+        default:
+            arg = va_arg(ap, long);
+            rc = pd->fsops->fcntl(pd->true_fd, cmd, arg);
+            break;
+        }
     }
     else
     {
@@ -1261,7 +1373,7 @@ void sync(void)
 
 int fsync(int fd)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1279,7 +1391,7 @@ int fsync(int fd)
 
 int fdatasync(int fd)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1297,7 +1409,7 @@ int fdatasync(int fd)
 
 int posix_fadvise(int fd, off_t offset, off_t length, int advice)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1315,7 +1427,7 @@ int posix_fadvise(int fd, off_t offset, off_t length, int advice)
 
 int fadvise(int fd, off_t offset, off_t len, int advice)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1333,7 +1445,7 @@ int fadvise(int fd, off_t offset, off_t len, int advice)
 
 int fadvise64(int fd, off64_t offset, off64_t len, int advice)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1385,7 +1497,7 @@ int statfs64(const char *path, struct statfs64 *buf)
 
 int fstatfs(int fd, struct statfs *buf)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     if (!buf)
@@ -1408,7 +1520,7 @@ int fstatfs(int fd, struct statfs *buf)
 
 int fstatfs64(int fd, struct statfs64 *buf)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     if (!buf)
@@ -1448,7 +1560,7 @@ int mknod(const char *path, mode_t mode, dev_t dev)
 
 int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
 {            
-    ssize_t rc; 
+    int rc = 0; 
     pvfs_descriptor *pd; 
     
     if (!path)
@@ -1473,16 +1585,17 @@ int mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
             rc = -1;
         }
     }
+    return rc;
 }
 
-ssize_t sendfile(int outfd, int infd, off_t offset, size_t count)
+ssize_t sendfile(int outfd, int infd, off_t *offset, size_t count)
 {
-    return sendfile64(outfd, infd, (off64_t)offset, count);
+    return sendfile64(outfd, infd, (off64_t *)offset, count);
 }
 
-ssize_t sendfile64(int outfd, int infd, off64_t offset, size_t count)
+ssize_t sendfile64(int outfd, int infd, off64_t *offset, size_t count)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *inpd, *outpd;
     
     inpd = pvfs_find_descriptor(infd);
@@ -1539,7 +1652,7 @@ int lsetxattr(const char *path, const char *name,
 int fsetxattr(int fd, const char *name,
               const void *value, size_t size, int flags)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1594,7 +1707,7 @@ int lgetxattr(const char *path, const char *name,
 int fgetxattr(int fd, const char *name, void *value,
               size_t size)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1646,7 +1759,7 @@ int llistxattr(const char *path, char *list, size_t size)
 
 int flistxattr(int fd, char *list, size_t size)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);
@@ -1698,7 +1811,7 @@ int lremovexattr(const char *path, const char *name)
 
 int fremovexattr(int fd, const char *name)
 {
-    int rc;
+    int rc = 0;
     pvfs_descriptor *pd;
     
     pd = pvfs_find_descriptor(fd);

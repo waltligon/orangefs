@@ -87,17 +87,23 @@ int pvfs_stat(const char *path, struct stat *buf);
 
 int pvfs_stat64(const char *path, struct stat64 *buf);
 
+int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask);
+
 int pvfs_fstat(int fd, struct stat *buf);
 
 int pvfs_fstat64(int fd, struct stat64 *buf);
 
-int pvfs_fstatat(int fd, char *path, struct stat *buf, int flag);
+int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag);
 
-int pvfs_fstatat64(int fd, char *path, struct stat64 *buf, int flag);
+int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag);
+
+int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask);
 
 int pvfs_lstat(const char *path, struct stat *buf);
 
 int pvfs_lstat64(const char *path, struct stat64 *buf);
+
+int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask);
 
 int pvfs_dup(int oldfd);
 
@@ -179,9 +185,9 @@ int pvfs_mknod(const char *path, mode_t mode, dev_t dev);
 
 int pvfs_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev);
 
-ssize_t pvfs_sendfile(int outfd, int infd, off_t offset, size_t count);
+ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count);
 
-ssize_t pvfs_sendfile64(int outfd, int infd, off64_t offset, size_t count);
+ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count);
 
 int pvfs_setxattr(const char *path, const char *name,
                    const void *value, size_t size, int flags);

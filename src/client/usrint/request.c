@@ -11,6 +11,11 @@
  */
 #include <usrint.h>
 
+int pvfs_check_vector(const struct iovec *iov,
+                      int count,
+                      PVFS_Request *req,
+                      void **buf);
+
 /**
  * converts a posix iovec into a PVFS Request
  */
@@ -38,7 +43,6 @@ int pvfs_check_vector(const struct iovec *iov,
     PVFS_size *disp_array;
     PVFS_Request *req_array;
     int rblk;
-    PVFS_Request tmpreq;
 
     /* set up request arrays */
     bsz_array = (int32_t *)malloc(count * sizeof(int32_t));

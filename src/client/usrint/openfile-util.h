@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+#include "posix-ops.h"
+
 /** \file
  *  \ingroup usrint
  *
@@ -41,10 +43,15 @@ int pvfs_lookup_file(const char *filename,
                             int follow_links,
                             PVFS_object_ref *ref);
 
-pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops);
+pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd);
 
 pvfs_descriptor *pvfs_find_descriptor(int fd);
 
+int pvfs_dup_descriptor(int oldfd, int newfd);
+
+int pvfs_free_descriptor(int fd);
+
+int pvfs_descriptor_table_size(void);
 
 int pvfs_create_file(const char *filename,
                             mode_t mode,
