@@ -311,6 +311,9 @@ if [ $do_vfs -eq 1 ] ; then
 	fi
 fi
 
+echo "wait 5 seconds to let OrangeFS set distributed root directory."
+sleep 5
+
 # at this point we've got 
 # - pvfs2 servers running
 # on hosts in our whitelist
