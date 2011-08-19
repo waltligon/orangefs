@@ -894,7 +894,8 @@ int PVFS_fsck_validate_dir(
     int current_dir_entry = 0;
     PVFS_ds_position token = PVFS_READDIR_START;
     PVFS_sysresp_readdir readdir_resp;
-    PVFS_handle dirdata_handle;
+    int dirdata_count;
+    PVFS_handle *dirdata_handles;
 
     if (fsck_options->check_stranded_objects)
     {
@@ -914,23 +915,38 @@ int PVFS_fsck_validate_dir(
     }
     set_return_code(&ret, err);
 
-    /* get the dirdata handle and validate */
-    err = PVFS_mgmt_get_dirdata_handle
-        (*obj_ref, &dirdata_handle, (PVFS_credentials *) creds, NULL);
+    /* get the dirdata handles and validate */
+    dirdata_count = attributes->attr.dirdata_count;
+    dirdata_handles = (PVFS_handle *) malloc(dirdata_count * sizeof(PVFS_handle));
+    if(!dirdata_handles)
+    {
+        gossip_err("Error: no memory for dirdata array\n");
+        return -PVFS_ENOMEM;
+    }
+
+    err = PVFS_mgmt_get_dirdata_array(*obj_ref, (PVFS_credentials *) creds, 
+            dirdata_handles, dirdata_count, NULL);
     if(err < 0)
     {
-        gossip_err("Error: unable to get dirdata handle\n");
+        gossip_err("Error: unable to get dirdata array\n");
+        free(dirdata_handles);
         return(err);
     }
 
-    err = PVFS_fsck_validate_dirdata
-        (fsck_options, &dirdata_handle, &obj_ref->fs_id, creds);
-    if(err < 0)
+    for (i = 0; i < dirdata_count; i++)
     {
-        gossip_err("Error: directory dirdata is invalid\n");
-        return(err);
+        err = PVFS_fsck_validate_dirdata
+            (fsck_options, &dirdata_handles[i], &obj_ref->fs_id, creds);
+        if(err < 0)
+        {
+            gossip_err("Error: directory dirdata is invalid\n");
+            free(dirdata_handles);
+            return(err);
+        }
+        set_return_code(&ret, err);
     }
-    set_return_code(&ret, err);
+
+    free(dirdata_handles);
 
     /* get and validate all directory entries */
     do
