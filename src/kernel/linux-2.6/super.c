@@ -12,7 +12,11 @@
 LIST_HEAD(pvfs2_superblocks);
 
 /* used to protect the above superblock list */
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
+#else
+DEFINE_SPINLOCK(pvfs2_superblocks_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 #ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen);
@@ -889,7 +893,11 @@ void fsid_key_table_finalize(void)
 #endif
 
 /* Called whenever the VFS dirties the inode in response to atime updates */
-static void pvfs2_dirty_inode(struct inode *inode)
+static void pvfs2_dirty_inode(struct inode *inode
+#ifdef HAVE_DIRTY_INODE_FLAGS
+                              ,int flags
+#endif
+                             )
 {
     if (inode)
     {
@@ -1288,7 +1296,13 @@ int pvfs2_fill_sb(
     sb->s_root = root_dentry;
     return 0;
 }
-
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+struct dentry *pvfs2_mount(
+    struct file_system_type *fst,
+    int flags,
+    const char *devname,
+    void *data)
+#else
 #ifdef HAVE_VFSMOUNT_GETSB
 int pvfs2_get_sb(
     struct file_system_type *fst,
@@ -1302,12 +1316,16 @@ struct super_block *pvfs2_get_sb(
     int flags,
     const char *devname,
     void *data)
-#endif
+#endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
 {
     int ret = -EINVAL;
     struct super_block *sb = ERR_PTR(-EINVAL);
     pvfs2_kernel_op_t *new_op;
     pvfs2_mount_sb_info_t mount_sb_info;
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+    struct dentry *mnt_sb_d = ERR_PTR(-EINVAL);
+#endif
 
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: called with devname %s\n", devname);
 
@@ -1317,7 +1335,7 @@ struct super_block *pvfs2_get_sb(
         if (!new_op)
         {
             ret = -ENOMEM;
-#ifdef HAVE_VFSMOUNT_GETSB
+#if defined(HAVE_VFSMOUNT_GETSB) && !defined(HAVE_FSTYPE_MOUNT_ONLY)
             return ret;
 #else
             return ERR_PTR(ret);
@@ -1360,6 +1378,11 @@ struct super_block *pvfs2_get_sb(
           here.  so we store it temporarily and pass all of the info
           to fill_sb where it's properly copied out
         */
+        /* kernels beyond 2.6.38 no longer have get_sb_nodev in favor of
+         * mount_nodev. if the kernel still has get_sb_nodev use that in
+         * favor of mount_nodev to minimize changes for currently working
+         * kernels. */
+#ifdef HAVE_GETSB_NODEV
 #ifdef HAVE_VFSMOUNT_GETSB
         ret = get_sb_nodev(
             fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
@@ -1369,7 +1392,20 @@ struct super_block *pvfs2_get_sb(
 #else
         sb = get_sb_nodev(
             fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
-#endif
+#endif /* HAVE_VFSMOUNT_GETSB */
+#else /* !HAVE_GETSB_NODEV */
+        mnt_sb_d = mount_nodev(
+                    fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+        if( !IS_ERR(mnt_sb_d) )
+        {
+            sb = mnt_sb_d->d_sb;
+        }
+        else
+        {
+            sb = ERR_CAST(mnt_sb_d);
+            goto free_op;
+        }
+#endif /* HAVE_GETSB_NODEV */
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {
@@ -1408,17 +1444,22 @@ struct super_block *pvfs2_get_sb(
     {
         gossip_err("ERROR: device name not specified.\n");
     }
-
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+    return mnt_sb_d;
+#else
 #ifdef HAVE_VFSMOUNT_GETSB
     return ret;
 #else
     return sb;
-#endif
+#endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
 
 error_exit:
     if (ret || IS_ERR(sb))
     {
+#if !defined(HAVE_FSTYPE_MOUNT_ONLY)
         sb = ERR_PTR(ret);
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
     }
 #ifdef HAVE_VFSMOUNT_GETSB
 free_op:
@@ -1434,9 +1475,13 @@ free_op:
     {
         op_release(new_op);
     }
-#ifdef HAVE_VFSMOUNT_GETSB
+#if defined(HAVE_VFSMOUNT_GETSB) && !defined(HAVE_FSTYPE_MOUNT_ONLY)
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning %d\n", ret);
     return ret;
+#elif defined(HAVE_FSTYPE_MOUNT_ONLY)
+    gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning dentry %p\n", 
+        mnt_sb_d);
+    return mnt_sb_d;
 #else
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_get_sb: returning sb %p\n", sb);
     return sb;

@@ -15,7 +15,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
-	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+        dnl add optimizations to the flags. for some reason rcupdate.h in 
+        dnl 2.6.40 causes compilation failures when no optimzation is used. 
+        dnl no clear answer why this is.
+	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
 	dnl kernels > 2.6.32 now use generated/autoconf.h
 	if test -f $lk_src/include/generated/autoconf.h ; then
@@ -519,6 +522,63 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	AC_MSG_CHECKING(for get_sb_nodev)
+	AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+                int v_fill_sb(struct super_block *sb, void *data, int s)
+                {
+                        return 0;
+                }
+                ],
+                [
+                        int ret = 0;
+                        struct super_block *sb = NULL;
+#ifdef HAVE_VFSMOUNT_GETSB
+                        ret = get_sb_nodev(NULL, 0, NULL, v_fill_sb, NULL );
+#else
+                        sb = get_sb_nodev(NULL, 0, NULL, v_fill_sb);
+#endif
+		], 
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GETSB_NODEV, 1, Define if get_sb_nodev function exists ),
+		AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(for file_system_type get_sb)
+	AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+                ],
+                [
+                    struct file_system_type f;
+                    f.get_sb = NULL;
+		], 
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FSTYPE_GET_SB, 1, Define if only filesystem_type has get_sb),
+		AC_MSG_RESULT(no)
+	)
+
+
+
+	AC_MSG_CHECKING(for file_system_type mount exclusively)
+	AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+                ],
+                [
+#ifdef HAVE_FSTYPE_GET_SB
+                    assert(0);
+#else
+                    struct file_system_type f;
+                    f.mount = NULL;
+#endif
+		], 
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FSTYPE_MOUNT_ONLY, 1, Define if only filesystem_type has mount and HAVE_FSTYPE_GET_SB is false),
+		AC_MSG_RESULT(no)
+	)
+
 	AC_MSG_CHECKING(for xattr support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -670,6 +730,12 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <linux/exportfs.h>
 		])
+
+        dnl no bkl, no need for smp_lock.h
+        AC_CHECK_HEADER([linux/smp_lock.h], [], [],
+                [#define __KERNEL__
+                 #include <linux/smp_lock.h>
+                ])
 
 	AC_MSG_CHECKING(for generic_file_readv api in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -1633,6 +1699,58 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
         CFLAGS=$tmp_cflags
 
+        dnl SPIN_LOCK_UNLOCKED has gone away in 2.6.39 in lieu of 
+        dnl DEFINE_SPINLOCK()
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for SPIN_LOCK_UNLOCKED )
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/spinlock.h>
+                spinlock_t test_lock = SPIN_LOCK_UNLOCKED;
+                struct inode *i;
+	], [ ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SPIN_LOCK_UNLOCKED, 1, [Define if SPIN_LOCK_UNLOCKED defined]),
+	AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
+
+        dnl get_sb goes away in 2.6.39 for mount_X
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for get_sb )
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct file_system_type f;
+	], 
+        [
+                f.get_sb = NULL;
+        ],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GET_SB_MEMBER_FILE_SYSTEM_TYPE, 1, [Define if get_sb is a member of file_system_type struct]),
+	AC_MSG_RESULT(no)
+	)
+
+	AC_MSG_CHECKING(for dirty_inode flag)
+	AC_TRY_COMPILE([
+                #define __KERNEL__
+                #include <linux/fs.h>
+                void di(struct inode *i, int f)
+                {
+                        return;
+                }
+                ],
+                [
+                        struct super_operations s;
+                        s.dirty_inode = di;
+		], 
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_DIRTY_INODE_FLAGS, 1, Define if dirty_inode takes a flag argument ),
+		AC_MSG_RESULT(no)
+	)
+        CFLAGS=$tmp_cflags
 
 	CFLAGS=$oldcflags
 

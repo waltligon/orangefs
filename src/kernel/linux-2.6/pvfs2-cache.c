@@ -7,13 +7,21 @@
 #include "pvfs2-kernel.h"
 
 /* A list of all allocated pvfs2 inode objects */
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t pvfs2_inode_list_lock = SPIN_LOCK_UNLOCKED;
+#else
+static DEFINE_SPINLOCK(pvfs2_inode_list_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
+
 static LIST_HEAD(pvfs2_inode_list);
 
 /* tags assigned to kernel upcall operations */
 static uint64_t next_tag_value;
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
-
+#else
+static DEFINE_SPINLOCK(next_tag_value_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 /* the pvfs2 memory caches */
 
 #ifdef HAVE_STRUCT_KMEM_CACHE

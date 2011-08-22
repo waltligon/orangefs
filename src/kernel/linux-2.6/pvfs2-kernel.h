@@ -23,6 +23,7 @@
 #ifdef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 #include <linux/config.h>
 #endif
+#include <linux/kernel.h>
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
@@ -41,7 +42,6 @@ typedef unsigned long sector_t;
 #endif
 
 #else /* !(PVFS2_LINUX_KERNEL_2_4) */
-
 #include <linux/moduleparam.h>
 #include <linux/vermagic.h>
 #include <linux/statfs.h>
@@ -54,7 +54,6 @@ typedef unsigned long sector_t;
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -93,7 +92,9 @@ typedef unsigned long sector_t;
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <asm/atomic.h>
+#ifdef HAVE_SMP_LOCK_H
 #include <linux/smp_lock.h>
+#endif
 #include <linux/wait.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
@@ -775,6 +776,11 @@ struct super_block* pvfs2_get_sb(
     void *data,
     int silent);
 #else
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+struct dentry *pvfs2_mount(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data);
+#else
 #ifdef HAVE_VFSMOUNT_GETSB
 int pvfs2_get_sb(
     struct file_system_type *fst, int flags,
@@ -784,7 +790,8 @@ int pvfs2_get_sb(
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
-#endif
+#endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
 #endif
 
 void pvfs2_read_inode(

@@ -29,11 +29,19 @@ static struct page **bufmap_page_array = NULL;
 
 /* array to track usage of buffer descriptors */
 static int *buffer_index_array = NULL;
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
+#else
+static DEFINE_SPINLOCK(buffer_index_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 /* array to track usage of buffer descriptors for readdir/readdirplus */
 static int readdir_index_array[PVFS2_READDIR_DEFAULT_DESC_COUNT] = {0};
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t readdir_index_lock = SPIN_LOCK_UNLOCKED;
+#else
+static DEFINE_SPINLOCK(readdir_index_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 static struct pvfs_bufmap_desc *desc_array = NULL;
 

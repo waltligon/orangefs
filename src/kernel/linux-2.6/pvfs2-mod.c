@@ -83,7 +83,12 @@ MODULE_PARM(slot_timeout_secs, "i");
 struct file_system_type pvfs2_fs_type =
 {
     .name = "pvfs2",
+/* only define mount if the kernel no longer supports get_sb */
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+    .mount = pvfs2_mount,
+#else
     .get_sb = pvfs2_get_sb,
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
     .kill_sb = pvfs2_kill_sb,
     .owner = THIS_MODULE,
 /*
@@ -120,7 +125,11 @@ struct qhash_table *htable_ops_in_progress = NULL;
 LIST_HEAD(pvfs2_request_list);
 
 /* used to protect the above pvfs2_request_list */
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 spinlock_t pvfs2_request_list_lock = SPIN_LOCK_UNLOCKED;
+#else 
+DEFINE_SPINLOCK(pvfs2_request_list_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 /* used for incoming request notification */
 DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
