@@ -23,6 +23,7 @@
 
 static void init_stdio(void);
 static struct stdio_ops_s stdio_ops;
+static FILE open_files = {._chain = NULL};
 
 #define _P_IO_MAGIC     0xF0BD0000
 #define SETMAGIC(s,m)   do{(s)->_flags = (m) & _IO_MAGIC_MASK;}while(0)
@@ -285,6 +286,10 @@ static int init_stream (FILE *stream, int flags, int bufsize)
     stream->_IO_write_base = stream->_IO_buf_base;
     stream->_IO_write_ptr  = stream->_IO_buf_base;
     stream->_IO_write_end  = stream->_IO_buf_end;
+    lock_stream(&open_files);
+    stream->_chain = open_files._chain;
+    open_files._chain = stream;
+    unlock_stream(&open_files);
     return 0;
 }
 
@@ -373,6 +378,17 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
     unlock_stream(stream);
     return stream;
 }
+
+/**
+ * These functions do not need PVFS versions and thus
+ * are not implemented here
+ */
+#if 0
+FILE *fopencookie(void *cookie, const char *modes,
+                    _IO_cookie_io_function_t funcs);
+FILE *fmemopen(void *buf, size_t size, const char *mode);
+FILE *open_memstream(char **ptr, size_t *sizeloc);
+#endif
 
 /** Implements buffered write using Linux pointer model
  * 
@@ -671,11 +687,25 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 }
 
 /**
+ * fcloseall closes all open streams
+ */
+int fcloseall(void)
+{
+    int rc = 0;
+    while (open_files._chain)
+    {
+        rc = fclose(open_files._chain);
+    }
+    return rc;
+}
+
+/**
  * fclose first writes any dirty data in the buffer
  */
 int fclose(FILE *stream)
 {
     int rc = 0;
+    FILE *f;
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -715,8 +745,24 @@ int fclose(FILE *stream)
     {
         rc = close(stream->_fileno);
     }
+    /* remove from chain */
+    lock_stream(&open_files);
+    if (open_files._chain == stream)
+    {
+        open_files._chain = stream->_chain;
+    }
+    else
+    {
+        for (f = open_files._chain; f && f->_chain != stream; f = f->_chain)
+        if (f && f->_chain)
+        {
+            f->_chain = f->_chain->_chain;
+        }
+        /* was not on chain */
+    }
+    unlock_stream(&open_files);
     stream->_flags = 0;
-    /* can stream be locked here */
+    /* can stream be locked here ? */
     lock_fini_stream(stream);
     free(stream);
     return rc;
@@ -727,7 +773,16 @@ int fclose(FILE *stream)
  */
 int fseek(FILE *stream, long offset, int whence)
 {
+    return fseek64(stream, (off64_t)offset, whence);
+}
 
+int fseeko(FILE *stream, off_t offset, int whence)
+{
+    return fseek64(stream, (off64_t)offset, whence);
+}
+
+int fseeko64(FILE *stream, off64_t offset, int whence)
+{
     return fseek64(stream, (off64_t)offset, whence);
 }
 
@@ -877,6 +932,12 @@ int fsetpos(FILE *stream, const fpos_t *pos)
     return 0;
 }
 
+int fsetpos64(FILE *stream, const fpos64_t *pos)
+{
+    fseek64(stream, (off64_t)(pos->__pos), SEEK_SET);
+    return 0;
+}
+
 /**
  * rewind wrapper
  */
@@ -891,7 +952,17 @@ void rewind(FILE *stream)
  */
 long int ftell(FILE *stream)
 {
-    return (long int)ftell64(stream);
+    return (long)ftell64(stream);
+}
+
+off_t ftello(FILE *stream)
+{
+    return (off_t)ftell64(stream);
+}
+
+off64_t ftello64(FILE *stream)
+{
+    return (off64_t)ftell64(stream);
 }
 
 off64_t ftell64(FILE* stream)
@@ -922,6 +993,12 @@ off64_t ftell64(FILE* stream)
  * fgetpos wrapper
  */
 int fgetpos(FILE *stream, fpos_t *pos)
+{
+    pos->__pos = ftell64(stream);
+    return 0;
+}
+
+int fgetpos64(FILE *stream, fpos64_t *pos)
 {
     pos->__pos = ftell64(stream);
     return 0;
@@ -1105,6 +1182,20 @@ int puts(const char *s)
 }
 
 /**
+ * putw wrapper
+ */
+int putw(int wd, FILE *stream)
+{
+    int rc;
+    rc = fwrite(&wd, sizeof(int), 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return rc;
+}
+
+/**
  * fgets reads up to size or a newline
  */
 char *fgets(char *s, int size, FILE *stream)
@@ -1189,6 +1280,7 @@ int getc(FILE *stream)
 {
     return fgetc(stream);
 }
+
 int getc_unlocked(FILE *stream)
 {
     return fgetc_unlocked(stream);
@@ -1208,6 +1300,21 @@ int getchar_unlocked(void)
 }
 
 /**
+ * getw wrapper
+ */
+int getw(FILE *stream)
+{
+    int rc, wd;
+
+    rc = fread(&wd, sizeof(int), 1, stream);
+    if (ferror(stream))
+    {
+        return EOF;
+    }
+    return wd;
+}
+
+/**
  * gets
  */
 char *gets(char * s)
@@ -1223,11 +1330,64 @@ char *gets(char * s)
     do {
         *p++ = c = fgetc(stdin);
     } while (c != '\n' && !feof(stdin) && !ferror(stdin));
-    if (ferror(stdin))
+    if (ferror(stdin) || ((p = s + 1) && feof(stdin)))
     {
         return NULL;
     }
+    if (!feof(stdin))
+    {
+        *(p-1) = 0; /* replace terminating char with null */
+    }
     return s;
+}
+
+/**
+ * getline
+ */
+ssize_t getline(char **lnptr, size_t *n, FILE *stream)
+{
+    return __getdelim(lnptr, n, '\n', stream);
+}
+
+ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
+{
+    return __getdelim(lnptr, n, delim, stream);
+}
+
+ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
+{
+    int i = 0;;
+    char c, *p;
+
+    if (!*lnptr)
+    {
+        if (*n <= 0)
+        {
+            *n = 256;
+        }
+        *lnptr = (char *)malloc(*n);
+    }
+    p = *lnptr;
+    do {
+        if (i+1 >= *n) /* need space for next char and null terminator */
+        {
+            *n += 256; /* spec gives no guidance on fit of allocated space */
+            *lnptr = realloc(*lnptr, *n);
+            if (!*lnptr)
+            {
+                return -1;
+            }
+            p = *lnptr + i;
+        }
+        *p++ = c = fgetc(stream);
+        i++;
+    } while (c != delim && !feof(stream) && !ferror(stream));
+    if (ferror(stream) || feof(stream))
+    {
+        return -1;
+    }
+    *p = 0; /* null termintor */
+    return i;
 }
 
 /**
@@ -1250,7 +1410,54 @@ int ungetc(int c, FILE *stream)
 }
 
 /**
- * fprintf using a var arg list
+ * We don't need any flavor of sprintf or sscanf
+ * they don't do IO on a stream
+ */
+#if 0
+sprintf, snprintf, vsprintf, vsnprintf, asprintf, vasprintfm
+sscanf, vsscanf
+#endif
+
+/**
+ * dprintf wrapper
+ */
+int dprintf(int fd, const char *format, ...)
+{
+    size_t len;
+    va_list ap;
+
+    va_start(ap, format);
+    len = vdprintf(fd, format, ap);
+    va_end(ap);
+    return len;
+}
+
+/**
+ * vdprintf 
+ */
+int vdprintf(int fd, const char *format, va_list ap)
+{
+    char *buf;
+    int len, rc;
+
+    len = vasprintf(&buf, format, ap);
+    if (len < 0)
+    {
+        return len;
+    }
+    if (len > 0 && buf)
+    {
+        rc = write(fd, buf, len);
+    }
+    if (buf)
+    {
+        free(buf);
+    }
+    return rc;
+}
+
+/**
+ * vfprintf using a var arg list
  */
 int vfprintf(FILE *stream, const char *format, va_list ap)
 {
@@ -1273,6 +1480,9 @@ int vfprintf(FILE *stream, const char *format, va_list ap)
     return rc;
 }
 
+/**
+ * fprintf wrapper
+ */
 int vprintf(const char *format, va_list ap)
 {
     return vfprintf(stdout, format, ap);
@@ -1306,16 +1516,36 @@ int printf(const char *format, ...)
     return len;
 }
 
+/**
+ * perror
+ */
+void perror(const char *s)
+{
+    char *msg;
+    if (s && *s)
+    {
+        fwrite(s, strlen(s), 1, stderr);
+    }
+    msg = strerror(errno);
+    fwrite(msg, strlen(msg), 1, stderr);
+    fwrite("\n", 1, 1, stderr);
+}
+
 #if 0
 /* TODO: These are not implemented yet */
+
+scanf()
+{
+}
 
 fscanf()
 {
 }
 
-scanf()
+vfscanf()
 {
 }
+
 #endif
 
 /**
@@ -1987,6 +2217,9 @@ static void init_stdio(void)
         return;
     }
     init_flag = 1;
+    /* init open file chain */
+    lock_init_stream(&open_files);
+    /* init pointers to glibc stdio calls */
     stdio_ops.fopen = dlsym(RTLD_NEXT, "fopen" );
     stdio_ops.fdopen = dlsym(RTLD_NEXT, "fdopen" );
     stdio_ops.freopen = dlsym(RTLD_NEXT, "freopen" );
