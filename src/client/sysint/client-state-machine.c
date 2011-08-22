@@ -268,7 +268,8 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_remove_object_sm},
     {&pvfs2_client_mgmt_remove_dirent_sm},
     {&pvfs2_client_mgmt_create_dirent_sm},
-    {&pvfs2_client_mgmt_get_dirdata_handle_sm}
+    {&pvfs2_client_mgmt_get_dirdata_handle_sm},
+    {&pvfs2_client_mgmt_get_uid_list_sm}
 };
 
 
@@ -991,6 +992,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_MGMT_CREATE_DIRENT, "PVFS_MGMT_CREATE_DIRENT" },
         { PVFS_MGMT_GET_DIRDATA_HANDLE,
           "PVFS_MGMT_GET_DIRDATA_HANDLE" },
+        { PVFS_MGMT_GET_UID_LIST, "PVFS_MGMT_GET_UID_LIST" },
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },

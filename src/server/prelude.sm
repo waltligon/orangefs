@@ -99,6 +99,14 @@ static PINT_sm_action prelude_setup(
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
+    /* add the user to the uid mgmt system */
+    ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
+    if (ret != 0)
+    {
+        gossip_debug(GOSSIP_MIRROR_DEBUG, "Unable to add user id to uid"
+                      "management interface\n");
+    }
+
     return SM_ACTION_COMPLETE;
 }
 

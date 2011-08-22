@@ -18,6 +18,7 @@
 #include "pint-request.h"
 #include "pvfs2-mgmt.h"
 #include "pint-hint.h"
+#include "pint-uid-mgmt.h"
 
 /* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
  * compatibility (such as changing the semantics or protocol fields for an
@@ -27,7 +28,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 0
+#define PVFS2_PROTO_MINOR 1
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
@@ -83,6 +84,7 @@ enum PVFS_server_op
     PVFS_SERV_IMM_COPIES = 40,
     PVFS_SERV_TREE_REMOVE = 41,
     PVFS_SERV_TREE_GET_FILE_SIZE = 42,
+    PVFS_SERV_MGMT_GET_UID = 43,
     /* leave this entry last */
     PVFS_SERV_NUM_OPS
 };
@@ -1916,6 +1918,43 @@ endecode_fields_2a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_EATTR_KEY_LEN * PVFS_REQ_LIMIT_EATTR_LIST)
 
+/* mgmt_get_uid ****************************************************/
+/* retrieves uid managment history from server */
+
+struct PVFS_servreq_mgmt_get_uid
+{
+    uint32_t history;      /* number of seconds we want to go back
+                              when retrieving the uid history */
+};
+endecode_fields_1_struct(
+    PVFS_servreq_mgmt_get_uid,
+    uint32_t, history);
+
+#define PINT_SERVREQ_MGMT_GET_UID_FILL(__req,         \
+                                        __creds,      \
+                                        __history,    \
+                                        __hints)      \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_MGMT_GET_UID;              \
+    (__req).credentials = (__creds);                  \
+    (__req).hints = (__hints);                        \
+    (__req).u.mgmt_get_uid.history = (__history);     \
+} while (0)
+
+struct PVFS_servresp_mgmt_get_uid
+{
+    PVFS_uid_info_s *uid_info_array;    /* array of uid info */
+    uint32_t uid_info_array_count;      /* size of above array */
+};
+endecode_fields_1a_struct(
+    PVFS_servresp_mgmt_get_uid,
+    skip4,,
+    uint32_t, uid_info_array_count,
+    PVFS_uid_info_s, uid_info_array);
+
+#define extra_size_PVFS_servresp_mgmt_get_uid \
+    UID_MGMT_MAX_HISTORY * sizeof(PVFS_uid_info_s)
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1962,6 +2001,7 @@ struct PVFS_server_req
         struct PVFS_servreq_listattr listattr;
         struct PVFS_servreq_tree_remove tree_remove;
         struct PVFS_servreq_tree_get_file_size tree_get_file_size;
+        struct PVFS_servreq_mgmt_get_uid mgmt_get_uid;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -2017,6 +2057,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_small_io small_io;
         struct PVFS_servresp_listattr listattr;
         struct PVFS_servresp_tree_get_file_size tree_get_file_size;
+        struct PVFS_servresp_mgmt_get_uid mgmt_get_uid;
     } u;
 };
 endecode_fields_2_struct(

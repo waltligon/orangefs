@@ -278,6 +278,10 @@ static void lebf_initialize(void)
                 resp.u.tree_get_file_size.caller_handle_index = 0;
 		respsize = extra_size_PVFS_servresp_tree_get_file_size;
 		break;
+            case PVFS_SERV_MGMT_GET_UID:
+                resp.u.mgmt_get_uid.uid_info_array_count = 0;
+                respsize = extra_size_PVFS_servresp_mgmt_get_uid;
+                break;
             case PVFS_SERV_NUM_OPS:  /** sentinel, should not hit */
                 assert(0);
                 break;
@@ -447,6 +451,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 	CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR,  listattr);
+        CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -545,6 +550,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -659,6 +665,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_DELEATTR, deleattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
+        CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -747,6 +754,7 @@ static int lebf_decode_resp(
         CASE(PVFS_SERV_LISTEATTR, listeattr);
         CASE(PVFS_SERV_LISTATTR, listattr);
         CASE(PVFS_SERV_TREE_GET_FILE_SIZE, tree_get_file_size);
+        CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_BATCH_REMOVE:
@@ -913,6 +921,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
+            case PVFS_SERV_MGMT_GET_UID:
 
 	    case PVFS_SERV_DELEATTR:
             case PVFS_SERV_LISTEATTR:
@@ -1048,6 +1057,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                    {
                       decode_free(resp->u.tree_get_file_size.size);
                       decode_free(resp->u.tree_get_file_size.error);
+                      break;
+                   }
+
+                case PVFS_SERV_MGMT_GET_UID:
+                   {
+                      decode_free(resp->u.mgmt_get_uid.uid_info_array);
                       break;
                    }
 

@@ -209,6 +209,7 @@ typedef enum
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
     SERVER_PRECREATE_INIT  = (1 << 18),
+    SERVER_UID_MGMT_INIT = (1 << 19), 
 } PINT_server_status_flag;
 
 typedef enum

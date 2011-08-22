@@ -472,6 +472,20 @@ PVFS_time PINT_util_get_time_us(void)
     return current_time;
 }
 
+/* parses a struct timeval into a readable timestamp string*/
+/* assumes sufficient memory has been allocated for str, no checking */
+/* to be safe, make str a 64 character string atleast */
+void PINT_util_parse_timeval(struct timeval tv, char *str)
+{
+    time_t now;
+    struct tm *currentTime;
+
+    now = tv.tv_sec;
+    currentTime = localtime(&now);
+    strftime(str, 64, "%m/%d/%Y %H:%M:%S", currentTime);
+
+    return;
+}
 
 PVFS_time PINT_util_mktime_version(PVFS_time time)
 {

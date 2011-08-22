@@ -25,6 +25,7 @@
 
 #include "pvfs2-sysint.h"
 #include "pvfs2-types.h"
+#include "pint-uid-mgmt.h"
 
 /* non-blocking mgmt operation handle */
 typedef PVFS_id_gen_t PVFS_mgmt_op_id;
@@ -412,6 +413,30 @@ PVFS_error PVFS_mgmt_map_handle(
     PVFS_fs_id fs_id,
     PVFS_handle handle,
     PVFS_BMI_addr_t *addr);
+
+PVFS_error PVFS_imgmt_get_uid_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    uint32_t history,
+    PVFS_uid_info_s **uid_info_array,
+    uint32_t *uid_count,
+    PVFS_mgmt_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
+PVFS_error PVFS_mgmt_get_uid_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    int server_count,
+    PVFS_BMI_addr_t *addr_array,
+    uint32_t history,
+    PVFS_uid_info_s **uid_info_array,
+    uint32_t *uid_count,
+    PVFS_hint hints,
+    void *user_ptr);
+
 
 #endif /* __PVFS2_MGMT_H */
 

@@ -46,6 +46,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-uid-mgmt.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -1162,6 +1163,15 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
 
+    ret = PINT_uid_mgmt_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error initializing the uid management interface\n");
+        return (ret);
+    }
+
+    *server_status_flag |= SERVER_UID_MGMT_INIT;
+
     ret = precreate_pool_initialize(server_index);
     if (ret < 0)
     {
@@ -1622,6 +1632,16 @@ static int server_shutdown(
         PINT_perf_finalize(PINT_server_pc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
+    }
+
+    if (status & SERVER_UID_MGMT_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting uid management "
+                     "interface     [   ...   ]\n");
+        PINT_uid_mgmt_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         uid management "
+                     "interface     [ stopped ]\n");
+
     }
 
     if (status & SERVER_GOSSIP_INIT)

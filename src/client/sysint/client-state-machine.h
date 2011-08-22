@@ -554,6 +554,17 @@ struct PINT_sysdev_unexp_sm
     struct PINT_dev_unexp_info *info;
 };
 
+/* scratch area used for the UID management state machine */
+struct PINT_client_mgmt_get_uid_list_sm
+{
+    PVFS_fs_id fs_id;
+    uint32_t history;
+    int server_count;
+    PVFS_id_gen_t *addr_array;         /* in */
+    PVFS_uid_info_s **uid_statistics;  /* out */
+    uint32_t *uid_count;               /* out */
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -631,6 +642,7 @@ typedef struct PINT_client_sm
         struct PINT_client_perf_count_timer_sm perf_count_timer;
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
+        struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
     } u;
 } PINT_client_sm;
 
@@ -719,6 +731,7 @@ enum
     PVFS_MGMT_REMOVE_DIRENT        = 78,
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
+    PVFS_MGMT_GET_UID_LIST         = 81, 
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -727,7 +740,7 @@ enum
 
 #define PVFS_OP_SYS_MAXVALID  21
 #define PVFS_OP_SYS_MAXVAL 69
-#define PVFS_OP_MGMT_MAXVALID 81
+#define PVFS_OP_MGMT_MAXVALID 82
 #define PVFS_OP_MGMT_MAXVAL 199
 
 int PINT_client_io_cancel(job_id_t id);
@@ -830,6 +843,7 @@ extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_get_uid_list_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;

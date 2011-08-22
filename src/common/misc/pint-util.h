@@ -148,6 +148,7 @@ PVFS_time PINT_util_get_time_ms(void);
 PVFS_time PINT_util_get_time_us(void);
 void PINT_util_get_current_timeval(struct timeval *tv);
 int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end);
+void PINT_util_parse_timeval(struct timeval tv, char *str);
 
 PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
