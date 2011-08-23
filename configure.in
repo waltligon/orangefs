@@ -533,8 +533,11 @@ AC_ARG_WITH(kernel,
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/utsrelease.h`
     elif test -r  $withval/include/generated/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h; then
         vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..3\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
     else
-        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X)
+        
     fi
 
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
@@ -1224,9 +1227,9 @@ else
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      :  no])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6/3 kernel module      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      : yes])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6/3 kernel module      : yes])
 fi
 
 if test "x$LINUX24_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
