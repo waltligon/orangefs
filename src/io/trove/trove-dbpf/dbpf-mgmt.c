@@ -1543,7 +1543,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
         memset(&key, 0, sizeof(key));
         key.data = name_array[0].buffer;
         key.ulen = name_array[0].buffer_sz;
-        *(db_recno_t *)key.data = *(db_recno_t *)inout_position_p;
+        *(db_recno_t *)key.data = (db_recno_t) *inout_position_p;
         key.size = sizeof(db_recno_t);
         key.flags |= DB_DBT_USERMEM;
 
