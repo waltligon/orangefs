@@ -17,14 +17,18 @@
 #include "ucache.h"
 
 /* Global Variables */
+static FILE *out;                   /* For Logging Purposes */
+
 static union user_cache_u *ucache;
 static int ucache_blk_cnt;
-static ucache_lock_t *ucache_lock;  /* For maintaining concurrency */
-static FILE *out;                   /* For Logging Purposes */
+
+static ucache_lock_t *ucache_locks; /* will refer to the shmem of all ucache locks */
+static ucache_lock_t *ucache_lock;  /* Global Lock maintaining concurrency */
+static ucache_lock_t *ucache_block_lock;
 
 /* Internal Only Function Declarations */
 
-/* Global Cache Lock */
+/* Locking */
 static int lock_init(ucache_lock_t * lock);
 static int lock_lock(ucache_lock_t * lock);
 static int lock_unlock(ucache_lock_t * lock);
@@ -111,18 +115,29 @@ static int evict_LRU(struct mem_table_s *mtbl);
  */
 void ucache_initialize(void)
 {
-    /* Aquire shared memory for ucache_lock */
-    ucache_lock = shmat(shmget(ftok(GET_KEY_FILE, 'a'), 
-        sizeof(ucache_lock_t), CACHE_FLAGS), NULL, AT_FLAGS);
+    int i = 0;
+
+    /* Aquire shared memory for ucache_locks */
+    ucache_locks = shmat(shmget(ftok(GET_KEY_FILE, 'a'), (LOCK_SIZE 
+           * (BLOCKS_IN_CACHE + 1)), CACHE_FLAGS), NULL, AT_FLAGS);
+    /* Global Cache lock stored in first LOCK_SIZE position */
+    ucache_lock = ucache_locks; 
+
+    /* Initialize Global Cache Lock */
     lock_init(ucache_lock);
     lock_lock(ucache_lock);
-    #if LOCK_TYPE==0
-    int lockVal;
-    ucache_lock_getvalue(ucache_lock, &lockVal);
-    printf("lock value = %d\n", lockVal);
-    #endif
-    /* Aquire shared memory for lock for ucache */
-    int key, id, i;
+
+    /* The next BLOCKS_IN_CACHE number of block locks follow the global lock */
+    ucache_block_lock = ucache_locks + 1;
+    /* Initialize Block Level Locks */
+    for(i = 0; i < BLOCKS_IN_CACHE; i++)
+    {
+        lock_init(get_block_lock(i));
+    }
+
+    /* Aquire shared memory for ucache */
+    int key;
+    int id;
     char *key_file_path;
     /*  Direct output   */
     if(!out)out = stdout;
@@ -171,21 +186,38 @@ void ucache_initialize(void)
     lock_unlock(ucache_lock);
 }
 
-int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+int ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
+                                    struct mem_table_s *mtbl
+)
 {
     lock_lock(ucache_lock);
-    struct mem_table_s *mtbl= lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
+    mtbl= lookup_file((uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL,
+                                                                          NULL);
     if((int)mtbl==NIL)
     {
-        insert_file((uint32_t)*fs_id, (uint64_t)*handle);
+        mtbl = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
+        if((int)mtbl==NIL)
+        {   /* Error - Could not insert */
+            lock_unlock(ucache_lock);
+            return -1;
+        }
+        else
+        {
+            /* File Inserted*/
+            lock_unlock(ucache_lock);
+            return 1;
+        }
     }
-    lock_unlock(ucache_lock);
-    return 1;
+    else
+    {
+        /* File was previously Inserted */
+        lock_unlock(ucache_lock);
+        return 0;
+    }
 }
 
 /** Returns ptr to block in cache based on file and offset */
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset)
 {
     lock_lock(ucache_lock);
     struct mem_table_s *mtbl= lookup_file(
@@ -205,7 +237,7 @@ void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
  * On success, returns a pointer to where the block of data should be written. 
  * On failure, returns NIL.
  */
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset)
 {
     lock_lock(ucache_lock);
     struct mem_table_s *mtbl= lookup_file(
@@ -228,7 +260,7 @@ void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
 }
 
 /**  Removes a cached block of data from mtbl */
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
+int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset)
 {
     lock_lock(ucache_lock);
     struct mem_table_s *mtbl= lookup_file(
@@ -244,7 +276,7 @@ int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset)
 }
 
 /** Flushes dirty blocks to the I/O Nodes */
-int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+int ucache_flush(PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     lock_lock(ucache_lock);
     struct mem_table_s *mtbl= lookup_file(
@@ -272,7 +304,7 @@ int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
  * provided as parameters. It also removes the mtbl and the file entry from 
  * the cache.
  */
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle)
+int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle)
 {
     lock_lock(ucache_lock);
     uint32_t file_mtbl_blk;
@@ -473,6 +505,14 @@ void ucache_info(
             fprintf(out, "vacant file entry @ index = %d\n", i);
     }
 }
+
+/** Returns a pointer to the block level lock corresponding to the block_index.
+ */
+ucache_lock_t * get_block_lock(int block_index)
+{
+    return (ucache_block_lock + block_index);
+}
+
 /***************************************** End of Externally Visible API */
 
 
@@ -521,7 +561,7 @@ static int lock_unlock(ucache_lock_t * lock)
 /** Upon successful completion, returns zero; 
  * Otherwise, returns -1 and sets errno.
  */
-#if LOCK_TYPE==0
+#if (LOCK_TYPE == 0)
 int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
 {
     return sem_getvalue(lock, sval);
@@ -533,11 +573,11 @@ int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
  */
 static int lock_destroy(ucache_lock_t * lock)
 {
-    #if LOCK_TYPE==0
+    #if (LOCK_TYPE == 0)
     return sem_destroy(lock); 
-    #elif LOCK_TYPE==1
+    #elif (LOCK_TYPE == 1)
     return pthread_mutex_destroy(lock);
-    #elif LOCK_TYPE==2
+    #elif (LOCK_TYPE == 2)
     return pthread_spin_destroy(lock);
     #endif
 }

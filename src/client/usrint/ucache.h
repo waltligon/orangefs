@@ -39,21 +39,24 @@
 #define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
 #define NIL (-1)
 
-#define DBG 1
+#define DBG 0
 #define INTERNAL_TESTING 0
 
 
-#define LOCK_TYPE 0 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
-#if LOCK_TYPE==0
+#define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
+#if (LOCK_TYPE == 0)
 #define ucache_lock_t sem_t
-#elif LOCK_TYPE==1
-#define ucache_lock_t pthread_mutex_t
-#elif LOCK_TYPE==2
+#define LOCK_SIZE sizeof(sem_t)
+#elif (LOCK_TYPE == 1)
+#define ucache_lock_t pthread_mutex_t /* sizeof(pthread_mutex_t)=24 */
+#define LOCK_SIZE sizeof(pthread_mutex_t)
+#elif (LOCK_TYPE == 2)
 #define ucache_lock_t pthread_spinlock_t
+#define LOCK_SIZE sizeof(pthread_spinlock_t)
 #endif
 
 typedef uint32_t PVFS_fs_id;
-typedef uint64_t PVFS_object_ref;
+typedef uint64_t PVFS_handle;
 
 /** A link for one block of memory in a files hash table
  *
@@ -133,14 +136,21 @@ union user_cache_u
     union cache_block_u b[0]; /* actual size of this varies */
 };
 
+struct ucache_ref_s
+{
+    union user_cache_u *ucache;           /* pointer to ucache shmem */
+    ucache_lock_t *ucache_locks;    /* pointer to ucache locks */
+};
+
 /* externally visible API */
 void ucache_initialize(void);
-int ucache_open_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_object_ref *handle, uint64_t offset);
-int ucache_flush(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_object_ref *handle);
+int ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
+                                  struct mem_table_s *mtbl);
+int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
+void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+int ucache_flush(PVFS_fs_id *fs_id, PVFS_handle *handle);
 void ucache_dec_ref_cnt(struct mem_table_s * mtbl);
 void ucache_inc_ref_cnt(struct mem_table_s * mtbl);
 void ucache_info(
@@ -148,12 +158,13 @@ void ucache_info(
     union user_cache_u * ucache, 
     ucache_lock_t * ucache_lock
 );
+ucache_lock_t * get_block_lock(int block_index);
 
 #if LOCK_TYPE==0
 int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
-#endif
+#endif /* LOCK_TYPE */
 /****************************************  End of Internal Only Functions    */
-#endif
+#endif /* UCACHE_H */
 /*
  * Local variables:
  *  c-indent-level: 4

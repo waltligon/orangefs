@@ -29,7 +29,7 @@ int socket (int domain, int type, int protocol)
     {
         return sockfd;
     }
-    pd = pvfs_alloc_descriptor(&glibc_ops, sockfd);
+    pd = pvfs_alloc_descriptor(&glibc_ops, sockfd, NULL);
     pd->mode |= S_IFSOCK;
     return pd->fd;
 }
@@ -58,7 +58,7 @@ int accept (int sockfd, struct sockaddr *addr, socklen_t *alen)
         rc = -1;
         goto errorout;
     }
-    pd = pvfs_alloc_descriptor(&glibc_ops, fd);
+    pd = pvfs_alloc_descriptor(&glibc_ops, fd , NULL);
     pd->mode |= S_IFSOCK;
     rc = fd;   
 errorout:
@@ -435,12 +435,12 @@ int socketpair (int d, int type, int protocol, int sv[2])
     {
         goto errorout;
     }
-    pd0 = pvfs_alloc_descriptor(&glibc_ops, sv[0]);
+    pd0 = pvfs_alloc_descriptor(&glibc_ops, sv[0], NULL);
     if (!pd0)
     {
         goto errorout;
     }
-    pd1 = pvfs_alloc_descriptor(&glibc_ops, sv[1]);
+    pd1 = pvfs_alloc_descriptor(&glibc_ops, sv[1], NULL);
     if (!pd1)
     {
         pvfs_free_descriptor(pd0->fd);
@@ -472,12 +472,12 @@ int pipe(int filedes[2])
     {
         goto errorout;
     }
-    f0 = pvfs_alloc_descriptor(&glibc_ops, fa[0]);
+    f0 = pvfs_alloc_descriptor(&glibc_ops, fa[0], NULL);
     if (!f0)
     {
         goto errorout;
     }
-    f1 = pvfs_alloc_descriptor(&glibc_ops, fa[1]);
+    f1 = pvfs_alloc_descriptor(&glibc_ops, fa[1], NULL);
     if (!f1)
     {
         pvfs_free_descriptor(f0->fd);

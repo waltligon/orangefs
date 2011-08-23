@@ -164,6 +164,7 @@ typedef struct pvfs_descriptor_s
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
     int is_in_use;            /**< PVFS_FS if this descriptor is valid */
     char *dpath;              /**< path of an open directory for fchdir */
+    struct mem_table_s *mtbl; /**< reference to cached objects */            
 } pvfs_descriptor;
 
 typedef struct pvfs_descriptor_s PFILE; /* these are for posix interface */

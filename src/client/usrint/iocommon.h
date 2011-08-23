@@ -103,9 +103,33 @@ int iocommon_rmdir(const char *pathname, PVFS_object_ref *pdir);
 int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldname,
                     PVFS_object_ref *newpdir, const char *newname);
 
+/* R/W Wrapper Functions, possibly utilizing user cache */
+/* do a blocking read or write
+ */
+int iocommon_readorwrite(enum PVFS_io_type which,
+		         pvfs_descriptor *pd,
+                         PVFS_size offset,
+                         void *buf,
+                         PVFS_Request mem_req,
+                         PVFS_Request file_req);
+
+
+/* [Do a nonblocking read or write] */
+int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
+		          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+		          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req);
+
+
 /* do a blocking read or write
  * extra_offset = extra padding to the pd's offset, independent of the pd's offset */
-int iocommon_readorwrite(enum PVFS_io_type which,
+int iocommon_readorwrite_nocache(enum PVFS_io_type which,
 		         pvfs_descriptor *pd,
                          PVFS_size offset,
                          void *buf,
@@ -121,7 +145,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  * (which represents an etype_req*count region)
  * Note that the none of the PVFS_Requests are freed
  */
-int iocommon_ireadorwrite(enum PVFS_io_type which,
+int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
 		          pvfs_descriptor *pd,
                           PVFS_size extra_offset,
                           void *buf,

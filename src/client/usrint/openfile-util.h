@@ -43,7 +43,9 @@ int pvfs_lookup_file(const char *filename,
                             int follow_links,
                             PVFS_object_ref *ref);
 
-pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd);
+pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, 
+                                                int fd, 
+                                                PVFS_object_ref *file_ref);
 
 pvfs_descriptor *pvfs_find_descriptor(int fd);
 

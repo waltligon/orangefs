@@ -417,9 +417,9 @@ pvfs_descriptor *iocommon_open(const char *path,
         {
             struct stat sbuf;
             /* try to open using glibc */
-            rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
+            rc = (*glibc_ops.open)(error_path, fpvfs_alloc_descriptorlags & 01777777, mode);
             IOCOMMON_RETURN_ERR(rc);
-            pd = pvfs_alloc_descriptor(&pvfs_ops, -1);
+            pd = pvfs_alloc_descriptor(&pvfs_ops, -1, NULL);
             pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
             pd->true_fd = rc;
             pd->flags = flags;           /* open flags */
@@ -461,12 +461,12 @@ pvfs_descriptor *iocommon_open(const char *path,
             IOCOMMON_RETURN_ERR(rc);
         }
     }
-    /* If we get here the file was created and/or opened */
 
+    /* If we get here the file was created and/or opened */
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
-    pd = pvfs_alloc_descriptor(&pvfs_ops, -1);
+    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref);
     if (!pd)
     {
         rc = -1;
@@ -835,10 +835,39 @@ errorout:
     return rc;
 }
 
-/** do a blocking read or write
+/*The Wrapper Fuction calls to the "nocache" version of 
+ *  io_common_readorwrite (below)   
+ */
+/** do a blocking read or write, possibly utilizing the user cache.
  * 
  */
 int iocommon_readorwrite(enum PVFS_io_type which,
+                         pvfs_descriptor *pd,
+                         PVFS_size offset,
+                         void *buf,
+                         PVFS_Request mem_req,
+                         PVFS_Request file_req)
+{
+    #ifndef UCACHE_ENABLED
+    /* No cache */
+    return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
+                                                                file_req);
+    #endif /* UCACHE_ENABLED */
+
+    //read
+    //readthedata(*filePtrToData)
+    //write
+
+
+    //Cache Routines
+    //Possibly Data Transfer
+    //Possibly More Cache Routines
+}
+
+/** do a blocking read or write
+ * 
+ */
+int iocommon_readorwrite_nocache(enum PVFS_io_type which,
                          pvfs_descriptor *pd,
                          PVFS_size offset,
                          void *buf,
@@ -885,7 +914,7 @@ errorout:
     return rc;
 }
 
-/** Do a nonblocking read or write
+/** Do a nonblocking read or write, possibly utilizing the user cache.
  *
  * extra_offset = extra padding to the pd's offset,
  * independent of the pd's offset
@@ -894,6 +923,37 @@ errorout:
  * Note that the none of the PVFS_Requests are freed
  */
 int iocommon_ireadorwrite(enum PVFS_io_type which,
+                          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+                          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req)
+{
+    #ifndef UCACHE_ENABLED
+    /* No cache */
+    return iocommon_ireadorwrite_nocache(which, pd, extra_offset, buf, 
+        etype_req, file_req, count, ret_op_id, ret_resp, ret_memory_req);
+    #endif /* UCACHE_ENABLED */
+
+    //if read then check cache..if not there..then read from i/o node and store into correct location
+    //Possibly Data Transfer
+    //Possibly More Cache Routines
+}
+
+
+/** Do a nonblocking read or write
+ *
+ * extra_offset = extra padding to the pd's offset,
+ * independent of the pd's offset
+ * Returns an op_id, response, and ret_mem_request
+ * (which represents an etype_req*count region)
+ * Note that the none of the PVFS_Requests are freed
+ */
+int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
                           pvfs_descriptor *pd,
                           PVFS_size extra_offset,
                           void *buf,
@@ -1838,7 +1898,7 @@ errorout:
     return rc;
 }
 
-/** Implelments an extended attribute delete or remove
+/** Implements an extended attribute delete or remove
  *
  *  The PVFS server enforces namespaces as prefixes on the
  *  attribute keys.  Thus they are not checked here.

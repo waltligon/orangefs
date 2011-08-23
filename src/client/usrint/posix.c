@@ -68,7 +68,7 @@ int open(const char *path, int flags, ...)
             return rc;
         }
         /* set up the descriptor manually */
-        pd = pvfs_alloc_descriptor(&glibc_ops, rc);
+        pd = pvfs_alloc_descriptor(&glibc_ops, rc, NULL);
         if (!pd)
         {
             return -1;

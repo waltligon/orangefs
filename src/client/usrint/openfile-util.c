@@ -15,6 +15,7 @@
 #include <posix-ops.h>
 #include <openfile-util.h>
 #include <posix-pvfs.h>
+#include <ucache.h>
 
 static struct glibc_redirect_s
 {
@@ -395,7 +396,9 @@ int pvfs_descriptor_table_size(void)
  * Allocate a new pvfs_descriptor
  * initialize fsops to the given set
  */
- pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd)
+ pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd, 
+                                        PVFS_object_ref *file_ref
+ )
  {
  	int newfd, rc, flags; 
     if (fsops == NULL)
@@ -442,6 +445,29 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[newfd]->token = 0;
 	descriptor_table[newfd]->dpath = NULL;
 	descriptor_table[newfd]->is_in_use = PVFS_FS;
+    descriptor_table[newfd]->mtbl = NULL;
+
+    /* File reference won't always be passed in */
+    if(file_ref != NULL)
+    {
+        /* We have the file identifiers, so insert file info into ucache */
+        rc = ucache_open_file(&(file_ref->fs_id), &(file_ref->handle), 
+                                       descriptor_table[newfd]->mtbl);
+        /* Unique Entry */
+        if(rc > 0)
+        {   
+            descriptor_table[newfd]->mtbl->ref_cnt = 1;
+        }
+        /* File already in Cache */
+        else if(rc == 0){
+            descriptor_table[newfd]->mtbl->ref_cnt++;
+        }
+        /* Could not insert */
+        else
+        {
+            /* TODO: probably need modify this */  
+        }
+    }
 
     return descriptor_table[newfd];
 }
@@ -518,7 +544,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->dup_cnt = 1;
 	    pd->fsops = &glibc_ops;
 	    pd->true_fd = fd;
-	    pd->pvfs_ref.fs_id = 0;
+	    pd->.fs_id = 0;
 	    pd->pvfs_ref.handle = 0;
 	    pd->flags = flags;
 	    pd->mode = 0;
@@ -561,7 +587,16 @@ int pvfs_free_descriptor(int fd)
         {
             free(pd->dpath);
         }
-        /* release cache opbjects here */
+        /* release cache objects here */
+        pd->mtbl->ref_cnt--;
+        if(pd->mtbl->ref_cnt == 0)
+        {
+            /* Flush dirty blocks before file removal from cache */
+            ucache_flush(&(pd->pvfs_ref.fs_id), &(pd->pvfs_ref.handle));
+            /* remove all of this file's associated data from cache */
+            ucache_close_file(&(pd->pvfs_ref.fs_id), &(pd->pvfs_ref.handle));
+        }
+
 	    /* free descriptor - wipe memory first */
 	    memset(pd, 0, sizeof(pvfs_descriptor));
 	    free(pd);
