@@ -35,14 +35,18 @@ struct options
     int mnt_point_set;
     int verbose;
     int destructive;
+    int safety_check;
+    unsigned int safety_count;
 };
 struct options *fsck_opts = NULL;
 
 /* lost+found reference */
 PVFS_object_ref laf_ref;
+unsigned long int global_removals = 0;
 
 static void handlelist_remove_handle_no_idx(struct handlelist *hl,
 				     PVFS_handle handle);
+static void get_user_action_to_continue( void );
 
 int main(int argc, char **argv)
 {
@@ -1199,6 +1203,11 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 	   name,
 	   llu(entry_ref.handle),
 	   llu(dir_ref.handle));
+    if( (fsck_opts->safety_check) &&
+        (++global_removals >= fsck_opts->safety_count) )
+    {
+        get_user_action_to_continue( );
+    }
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_dirent(dir_ref,
@@ -1225,6 +1234,12 @@ int remove_object(PVFS_object_ref obj_ref,
 	   fsck_opts->destructive ? "" : "not",
 	   get_type_str(obj_type),
 	   llu(obj_ref.handle));
+
+    if( (fsck_opts->safety_check) &&
+        (++global_removals >= fsck_opts->safety_count) )
+    {
+        get_user_action_to_continue( );
+    }
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_object(obj_ref,
@@ -1543,7 +1558,7 @@ static struct options *parse_args(int argc, char *argv[])
     memset(opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, "apynvVm:")) != EOF){
+    while((one_opt = getopt(argc, argv, "apyns:vVm:")) != EOF){
 	switch(one_opt)
         {
 	    case 'a':
@@ -1554,6 +1569,10 @@ static struct options *parse_args(int argc, char *argv[])
 	    case 'n':
 		opts->destructive = 0;
 		break;
+            case 's':
+                opts->safety_count = atoi(optarg);
+                opts->safety_check = 1;
+                break;
             case 'V':
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
@@ -1601,12 +1620,14 @@ static struct options *parse_args(int argc, char *argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-vV] [-m fs_mount_point]\n",
+    fprintf(stderr, "Usage  : %s [-vV] <-ayp -s N> [-m fs_mount_point]\n",
 	argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
     fprintf(stderr, "  -V              print version and exit\n");
     fprintf(stderr, "  -v              verbose operation\n");
     fprintf(stderr, "  -n              answer \"no\" to all questions\n");
+    fprintf(stderr, "  -s N            safety check, prompt after N removals, "
+                                       "use with a, p, or y\n");
     fprintf(stderr, "  -y              answer \"yes\" to all questions\n");
     fprintf(stderr, "  -p              automatically repair with no questions\n");
     fprintf(stderr, "  -a              equivalent to \"-p\"\n");
@@ -1647,6 +1668,52 @@ static char *get_type_str(int type)
             break;
     }
     return ret;
+}
+
+void get_user_action_to_continue( )
+{
+    int count = 0;
+    int reply_idx = 0; 
+    int read_c = 0;
+    char reply[3] = { 0 };
+
+    /* only cause the prompt if destructive actions are being taken */
+    if( fsck_opts->destructive )
+    {
+        fprintf(stdout, "%lu objects have been removed, ", global_removals);
+        do
+        {
+            memset(reply, 0, 3);
+            count = 0, reply_idx = 0;
+            fprintf(stdout, "continue removal [Y|N]: ");
+            do
+            {
+                read_c = getchar();
+                count++;
+                /* discard anything beyond the two chars we want */
+                if( (read_c != EOF) && (reply_idx < 2 ) )
+                {
+                    reply[reply_idx++] = (char)read_c;
+                }
+            }
+            while((read_c != EOF) && (read_c != '\n'));
+
+            if( (count == 2) && (strncasecmp("Y\n", reply, 2) == 0) )
+            {
+                fprintf(stdout, "resetting removal count, continuing\n");
+                global_removals = 0;
+                return;
+            }
+            else if( (count == 2) && (strncasecmp("N\n", reply, 2) == 0) )
+            {
+                fprintf(stdout, "aborting\n");
+                exit(1);
+            }
+        }
+        while( 1 ) ;
+    }
+
+    return;
 }
 
 /*
