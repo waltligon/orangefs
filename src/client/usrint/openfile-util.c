@@ -383,6 +383,10 @@ void pvfs_sys_init(void) {
     }
 
     /* call other initialization routines */
+
+    /* ucache initialization - assumes shared memory previously aquired */
+    ucache_initialize();
+
     //PVFS_perror_gossip_silent(); 
     pvfs_initializing_flag = 0;
 }

@@ -117,9 +117,9 @@ void ucache_initialize(void)
 {
     int i = 0;
 
-    /* Aquire shared memory for ucache_locks */
-    ucache_locks = shmat(shmget(ftok(GET_KEY_FILE, 'a'), (LOCK_SIZE 
-           * (BLOCKS_IN_CACHE + 1)), CACHE_FLAGS), NULL, AT_FLAGS);
+    /* Aquire ptr to shared memory for ucache_locks */
+    ucache_locks = shmat(shmget(ftok(GET_KEY_FILE, 'a'), 0, CACHE_FLAGS), NULL,
+                                                                     AT_FLAGS);
     /* Global Cache lock stored in first LOCK_SIZE position */
     ucache_lock = ucache_locks; 
 
@@ -135,7 +135,7 @@ void ucache_initialize(void)
         lock_init(get_block_lock(i));
     }
 
-    /* Aquire shared memory for ucache */
+    /* Aquire ptr to shared memory for ucache */
     int key;
     int id;
     char *key_file_path;
@@ -145,7 +145,7 @@ void ucache_initialize(void)
     /* set up shared memory region */
     key_file_path = GET_KEY_FILE;
     key = ftok(key_file_path, PROJ_ID);
-    id = shmget(key, CACHE_SIZE, CACHE_FLAGS);
+    id = shmget(key, 0, CACHE_FLAGS);
     ucache = shmat(id, NULL, AT_FLAGS);
     ucache_blk_cnt = BLOCKS_IN_CACHE;
     if(DBG)
@@ -552,6 +552,7 @@ static int lock_unlock(ucache_lock_t * lock)
     #if LOCK_TYPE==0
     return sem_post(lock);
     #elif LOCK_TYPE==1
+    printf("lock size = %d\n", sizeof(*lock));
     return pthread_mutex_unlock(lock);
     #elif LOCK_TYPE==2
     return pthread_spin_unlock(lock);

@@ -36,7 +36,7 @@
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6)
-#define CACHE_FLAGS (SVSHM_MODE | IPC_CREAT)
+#define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
 
 #define DBG 0
