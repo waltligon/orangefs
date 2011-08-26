@@ -236,7 +236,7 @@
 //        e->first = (*lesser)->first;
 //        if (avlremove(n, (*lesser)->first) == 0)
 //        {
-//            gossip_err("error removing key %llu\n", llu((*lesser)->first));
+//            gossip_err("error removing key %s\n", PVFS_handle_to_str(*lesser)->first));
 //            return COALESCE_ERROR;
 //        }
 //        merge_lesser = 1;
@@ -247,7 +247,7 @@
 //        e->last = (*greater)->last;
 //        if (avlremove(n, (*greater)->first) == 0)
 //        {
-//            gossip_err("error removing key %llu\n", llu((*greater)->first));
+//            gossip_err("error removing key %s\n", PVFS_handle_to_str((*greater)->first));
 //            return COALESCE_ERROR;
 //        }
 //        merge_greater = 1;
@@ -257,7 +257,7 @@
 //    {
 //        if (avlinsert(n, e) == 0)
 //        {
-//            gossip_lerr("error inserting key %llu\n", llu(e->first));
+//            gossip_lerr("error inserting key %s\n", PVFS_handle_to_str(e->first));
 //            return COALESCE_ERROR;
 //        }
 //        else
@@ -398,7 +398,7 @@
 //    do
 //    {
 //        gossip_debug(GOSSIP_TROVE_DEBUG, "extentlist_peek_handles: "
-//                     "providing handle %llu\n", llu(handle));
+//                     "providing handle %s\n", PVFS_handle_to_str(handle));
 //
 //        PVFS_handle_copy(out_handle_array[(*returned_handle_count)++], handle);
 //
@@ -446,8 +446,8 @@
 //
 //        gossip_debug(
 //            GOSSIP_TROVE_DEBUG, "extentlist_peek_handles_from_range: "
-//            "got %llu [%llu-%llu]\n", llu(handle), 
-//            llu(tmp_extent.first), llu(tmp_extent.last));
+//            "got %s [%s-%s]\n", PVFS_handle_to_str(handle), 
+//            PVFS_handle_to_str(tmp_extent.first), PVFS_handle_to_str(tmp_extent.last));
 //
 //        out_handle_array[(*returned_handle_count)++] = handle;
 //
@@ -490,8 +490,8 @@
 //    struct TROVE_handle_extent *e __attribute__((unused)) =
 //        (struct TROVE_handle_extent *)(n->d);
 //
-//    gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %llu ub: %llu\n",
-//                 llu(e->first), llu(e->last));
+//    gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %s ub: %s\n",
+//                 PVFS_handle_to_str(e->first), PVFS_handle_to_str(e->last));
 //}
 //
 //static void extent_count(struct avlnode *n, int param, int depth)

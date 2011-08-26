@@ -613,8 +613,8 @@ coll=%d context=%lld handle=%s state=%d\n",
                 if (ret < 0)
                 {
                     gossip_err("trove_dspace_setattr failed: \
-ret=%d handle=%lld context=%lld op=%lld\n",
-                               ret, llu(handles[i]),
+ret=%d handle=%s context=%lld op=%lld\n",
+                               ret, PVFS_handle_to_str(handles[i]),
                                lld(context_id), lld(setattr_op_id));
                     goto complete;
                 }

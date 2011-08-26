@@ -21,6 +21,7 @@
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "gossip.h"
 
 #define HANDLE_BATCH 1000
 

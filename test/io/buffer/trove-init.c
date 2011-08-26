@@ -9,6 +9,7 @@
 
 #include "trove.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 #define MB 1024*1024
 enum {
@@ -102,7 +103,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
     if (ret < 0) {
         return -1;
     }
-    fprintf(stderr, "%s: handle=%lld\n", path_name, lld(parent_handle));
+    fprintf(stderr, "%s: handle=%s\n", path_name, PVFS_handle_to_str(parent_handle));
 
     
     /* find the parent directory handle */
@@ -196,7 +197,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	*context_p = trove_context;
 
     fprintf(stderr, "+++++++++++++++++++++++++++++++\n");
-    fprintf(stderr, "Trove init: coll_id=%d, handle=%lld, context=%d\n", coll_id, lld(parent_handle), (int)trove_context);
+    fprintf(stderr, "Trove init: coll_id=%d, handle=%s, context=%d\n", coll_id, PVFS_handle_to_str(parent_handle), (int)trove_context);
 
 	free(mybuffer);
     return 0;

@@ -2522,7 +2522,8 @@ static inline void package_downcall_members(
                     
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                              "FS mount got root handle %s on fs id %d\n",
-                             PVFS_handle_to_str(root_handle), vfs_request->mntent->fs_id);
+                             PVFS_handle_to_str(root_handle),
+                             vfs_request->mntent->fs_id);
 
                 vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
                 vfs_request->out_downcall.status = 0;

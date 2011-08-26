@@ -537,8 +537,8 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
     {
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "rename: posting lookup[%d] (%lld,%d)\n",
-                     i, llu(sm_p->u.rename.parent_refns[i].handle),
+                     "rename: posting lookup[%d] (%s,%d)\n",
+                     i, PVFS_handle_to_str(sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(

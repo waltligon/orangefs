@@ -633,7 +633,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_read",
-                            "%d%d%d%llu%llu%d%d",
+                            "%d%d%d%s%s%d%d",
                             "%llu",
                             &trove_dbpf_read_event_id);
 
@@ -644,7 +644,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_write",
-                            "%d%d%d%llu%llu%d%d",
+                            "%d%d%d%s%s%d%d",
                             "%llu",
                             &trove_dbpf_write_event_id);
 
@@ -654,7 +654,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_keyval_read",
-                            "%d%d%d%llu%d",
+                            "%d%d%d%s%d",
                             "",
                             &trove_dbpf_keyval_read_event_id);
 
@@ -665,7 +665,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_keyval_write",
-                            "%d%d%d%llu%d",
+                            "%d%d%d%s%d",
                             "",
                             &trove_dbpf_keyval_write_event_id);
 
@@ -677,7 +677,7 @@ static int dbpf_initialize(char *data_path,
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_create",
                             "%d%d%d%d",
-                            "%llu",
+                            "%s",
                             &trove_dbpf_dspace_create_event_id);
 
     /* Define the dspace create list event:
@@ -688,7 +688,7 @@ static int dbpf_initialize(char *data_path,
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_create_list",
                             "%d%d%d%d",
-                            "%llu",
+                            "%s",
                             &trove_dbpf_dspace_create_list_event_id);
 
     /* Define the dspace getattr event:
@@ -698,7 +698,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_getattr",
-                            "%d%d%d%llu%d",
+                            "%d%d%d%s%d",
                             "",
                             &trove_dbpf_dspace_getattr_event_id);
 
@@ -709,7 +709,7 @@ static int dbpf_initialize(char *data_path,
      */
     PINT_event_define_event(&trove_dbpf_event_group,
                             "dbpf_dspace_setattr",
-                            "%d%d%d%llu%d",
+                            "%d%d%d%s%d",
                             "",
                             &trove_dbpf_dspace_setattr_event_id);
 

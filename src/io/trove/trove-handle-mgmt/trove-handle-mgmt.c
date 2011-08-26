@@ -115,8 +115,8 @@ static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
 //                                                    handles[i]))
 //                    {
 //                        gossip_err(
-//                            "Error: handle %llu is invalid "
-//                            "(out of bounds)\n", llu(handles[i]));
+//                            "Error: handle %s is invalid "
+//                            "(out of bounds)\n", PVFS_handle_to_str(handles[i]));
 //                        return -1;
 //                    }
 //
@@ -126,7 +126,7 @@ static gen_mutex_t trove_handle_mutex = GEN_MUTEX_INITIALIZER;
 //                    {
 //			gossip_err(
 //                            "WARNING: could not remove "
-//                            "handle %llu from ledger; continuing.\n", llu(handles[i]));
+//                            "handle %s from ledger; continuing.\n", PVFS_handle_to_str(handles[i]));
 //		    }
 //                }
 //                ret = ((i == count) ? 0 : -1);

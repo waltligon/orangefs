@@ -13,6 +13,7 @@
 #include "client.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 int main(int argc,char **argv)
 {
@@ -51,8 +52,8 @@ int main(int argc,char **argv)
                resp_getparent.basename);
         printf("resp_getparent.parent_ref.fs_id: %d\n",
                resp_getparent.parent_ref.fs_id);
-        printf("resp_getparent.parent_ref.handle: %lld\n",
-               lld(resp_getparent.parent_ref.handle));
+        printf("resp_getparent.parent_ref.handle: %s\n",
+               PVFS_handle_to_str(resp_getparent.parent_ref.handle));
     }
     else
     {

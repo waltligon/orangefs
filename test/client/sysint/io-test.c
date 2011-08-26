@@ -15,6 +15,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 #define DEFAULT_IO_SIZE 8*1024*1024
 

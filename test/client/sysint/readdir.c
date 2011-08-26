@@ -13,6 +13,7 @@
 
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 int main(int argc,char **argv)
 {
@@ -63,9 +64,9 @@ int main(int argc,char **argv)
         return -1;
     }
 
-    printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %lld\n"
+    printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %s\n"
            "\tresp_look.ref.fs_id = %d\n",
-           lld(resp_look.ref.handle), resp_look.ref.fs_id);
+           PVFS_handle_to_str(resp_look.ref.handle), resp_look.ref.fs_id);
 
     pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;

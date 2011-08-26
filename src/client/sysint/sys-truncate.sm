@@ -245,9 +245,9 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
                 sm_p->u.truncate.size);
        
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "  %s: client requests %lld: resizing %lld to %lld bytes\n",
+            "  %s: client requests %lld: resizing %s to %lld bytes\n",
             __func__, lld(sm_p->u.truncate.size),
-            llu(attr->u.meta.dfile_array[i]), lld(new_dfile_size));
+            PVFS_handle_to_str(attr->u.meta.dfile_array[i]), lld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,

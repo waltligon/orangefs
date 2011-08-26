@@ -15,6 +15,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 int main(int argc, char **argv)
 {
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
 	
     // print the handle 
     printf("--create--\n"); 
-    printf("Handle: %lld\n",lld(resp_create.ref.handle));
+    printf("Handle: %s\n",PVFS_handle_to_str(resp_create.ref.handle));
 
     ret = PVFS_sys_flush(resp_create.ref, &credentials, NULL);
     if (ret < 0)

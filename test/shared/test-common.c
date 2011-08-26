@@ -18,6 +18,7 @@
 
 #include "test-common.h"
 #include "libgen.h"
+#include "gossip.h"
 
 /** \file
  * Implementation of the test-common wrapper functions.
@@ -263,7 +264,7 @@ int close_file(
     {
         if(use_pvfs2_lib) 
         {
-            printf("\tClosing [%lld]\n", lld(stFileRef->handle));
+            printf("\tClosing [%s]\n", PVFS_handle_to_str(stFileRef->handle));
         }
         else
         {

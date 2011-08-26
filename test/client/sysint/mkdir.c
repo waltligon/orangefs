@@ -15,6 +15,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 int main(int argc,char **argv)
 {

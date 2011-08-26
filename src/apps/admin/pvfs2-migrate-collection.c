@@ -35,6 +35,7 @@
 #include "pint-distribution.h"
 #include "pint-dist-utils.h"
 #include "pint-util.h"
+#include "gossip.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

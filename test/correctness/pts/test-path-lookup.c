@@ -14,7 +14,7 @@
 #include "test-path-lookup.h"
 #include "pvfs2-req-proto.h"
 #include "pvfs2-internal.h"
-#include <pvfs2-handle-to-str.h>
+#include "gossip.h"
 
 #define GENERATE_FILENAME(fname, max_len, f, i, r, slash) \
 do {                                                      \
@@ -431,8 +431,8 @@ static int build_nested_path(
             if (test_symlinks)
             {
                 fprintf(stderr,"Removing rlink %s under %s,%d \t\t... ",
-                        RELATIVE_SYMLINK_NAME, PVFS_handle_to_str(parent_refn.handle),
-                        parent_refn.fs_id);
+                        RELATIVE_SYMLINK_NAME,
+                        PVFS_handle_to_str(parent_refn.handle), parent_refn.fs_id);
                 ret = PVFS_sys_remove(RELATIVE_SYMLINK_NAME,
                                       parent_refn, &credentials);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
@@ -442,8 +442,8 @@ static int build_nested_path(
                 }
 
                 fprintf(stderr,"Removing alink %s under %s,%d \t\t... ",
-                        ABSOLUTE_SYMLINK_NAME, PVFS_handle_to_str(parent_refn.handle),
-                        parent_refn.fs_id);
+                        ABSOLUTE_SYMLINK_NAME,
+                        PVFS_handle_to_str(parent_refn.handle), parent_refn.fs_id);
                 ret = PVFS_sys_remove(ABSOLUTE_SYMLINK_NAME,
                                       parent_refn, &credentials);
                 fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));

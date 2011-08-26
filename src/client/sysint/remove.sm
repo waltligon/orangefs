@@ -261,8 +261,7 @@ static PINT_sm_action remove_datafile_remove_failure(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_err("Error: failed removing one or more datafiles associated with the meta handle %s\n", 
-               PVFS_handle_to_str(sm_p->object_ref.handle));
+    gossip_err("Error: failed removing one or more datafiles associated with the meta handle %s\n", PVFS_handle_to_str(sm_p->object_ref.handle));
     HANDLE_REMOVE_ERROR("datafile_remove_failure");
     return SM_ACTION_COMPLETE;
 }

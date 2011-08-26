@@ -531,8 +531,8 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
       copy_attr_failure:
         gossip_debug(GOSSIP_UTILS_DEBUG, "Getattr on handle %s, fsid %d\n  (inode ct = %d) "
                     "returned %d\n",
-                    PVFS_handle_to_str(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
-                    (int)atomic_read(&inode->i_count), ret);
+                    PVFS_handle_to_str(pvfs2_inode->refn.handle), 
+                    pvfs2_inode->refn.fs_id, (int)atomic_read(&inode->i_count), ret);
         /* store error code in the inode so that we can retrieve it later if
          * needed
          */
@@ -1518,8 +1518,8 @@ int pvfs2_remove_entry(
     {
         gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2_remove_entry: called on %s\n  (inode %s): "
                     "Parent is %s | fs_id %d\n", dentry->d_name.name,
-                    PVFS_handle_to_str(get_handle_from_ino(inode)), PVFS_handle_to_str(parent->refn.handle),
-                    parent->refn.fs_id);
+                    PVFS_handle_to_str(get_handle_from_ino(inode)),
+                    PVFS_handle_to_str(parent->refn.handle), parent->refn.fs_id);
 
         new_op = op_alloc(PVFS2_VFS_OP_REMOVE);
         if (!new_op)
@@ -1566,7 +1566,8 @@ int pvfs2_truncate_inode(
 
     gossip_debug(GOSSIP_UTILS_DEBUG, "pvfs2: pvfs2_truncate_inode %s: "
                 "Handle is %s | fs_id %d | size is %lu\n",
-                PVFS_handle_to_str(get_handle_from_ino(inode)), PVFS_handle_to_str(pvfs2_inode->refn.handle),
+                PVFS_handle_to_str(get_handle_from_ino(inode)),
+                PVFS_handle_to_str(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc(PVFS2_VFS_OP_TRUNCATE);
@@ -1988,8 +1989,8 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     }
     new_op->upcall.req.cancel.op_tag = tag;
 
-    gossip_debug(GOSSIP_UTILS_DEBUG, "Attempting PVFS2 operation cancellation of tag %llu\n",
-                llu(new_op->upcall.req.cancel.op_tag));
+    gossip_debug(GOSSIP_UTILS_DEBUG, "Attempting PVFS2 operation cancellation of tag %s\n",
+                PVFS_handle_to_str(new_op->upcall.req.cancel.op_tag));
 
     ret = service_operation(new_op, "pvfs2_cancel", PVFS2_OP_CANCELLATION);
 
@@ -2050,7 +2051,12 @@ void pvfs2_make_bad_inode(struct inode *inode)
           can't afford to lose the inode operations and such
           associated with the root handle in any case
         */
+<<<<<<< pvfs2-utils.c
+        gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %s\n", 
+                     PVFS_handle_to_str(get_handle_from_ino(inode)));
+=======
         gossip_debug(GOSSIP_UTILS_DEBUG, "*** NOT making bad root inode %s\n", PVFS_handle_to_str(get_handle_from_ino(inode)));
+>>>>>>> 1.156.8.4.4.2
     }
     else
     {

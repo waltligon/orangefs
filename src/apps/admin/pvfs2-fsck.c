@@ -22,6 +22,7 @@
 #include "pvfs2-fsck.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "gossip.h"
 
 #define HANDLE_BATCH 1000
 
@@ -1010,9 +1011,9 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 	switch (getattr_resp.attr.objtype)
 	{
 	    case PVFS_TYPE_METAFILE:
-		printf("# trying to salvage %s %lld.\n",
+		printf("# trying to salvage %s %s.\n",
 		       get_type_str(getattr_resp.attr.objtype),
-		       llu(handle));
+		       PVFS_handle_to_str(handle));
 		if (verify_datafiles(cur_fs,
 				     hl_all,
 				     alt_hl,

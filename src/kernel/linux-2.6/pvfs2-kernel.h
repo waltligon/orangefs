@@ -1119,8 +1119,8 @@ do {                                                      \
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \
 do {                                                      \
-  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %llu\n",\
-              llu(get_handle_from_ino(inode)));                         \
+  gossip_debug(GOSSIP_INODE_DEBUG, "calling clear_inode_mmap_ra_cache on %s\n",\
+              PVFS_handle_to_str(get_handle_from_ino(inode)));                 \
   pvfs2_flush_mmap_racache(inode);                        \
   gossip_debug(GOSSIP_INODE_DEBUG, "clear_inode_mmap_ra_cache finished\n");    \
 } while(0)

@@ -14,6 +14,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 #define MAX_NUM_FS                   67
 
@@ -220,13 +221,13 @@ int main(int argc, char **argv)
             if (m != num_file_systems)
             {
                 printf("Retrieved name of server managing handle "
-                       "%lld is %s\n",lld(test_handles[j]),server_name);
+                       "%s is %s\n",PVFS_handle_to_str(test_handles[j]),server_name);
                 test_handles_verified[j]++;
             }
             else
             {
                 printf("Error retrieving name of server managing handle "
-                       "%lld!\n",lld(test_handles[j]));
+                       "%s!\n",PVFS_handle_to_str(test_handles[j]));
             }
         }
 
@@ -267,7 +268,7 @@ int main(int argc, char **argv)
                 else
                 {
                     printf("Retrieved address of server managing handle "
-                           "%lld is %lu\n",lld(test_handles[j]),(long)addr);
+                           "%s is %lu\n",PVFS_handle_to_str(test_handles[j]),(long)addr);
                     test_handles_verified[j]++;
                 }
             }
@@ -289,8 +290,8 @@ int main(int argc, char **argv)
         else
         {
             printf("** Failed to verify ability to map servers to handles.\n");
-            printf("** Handle value %lld failed -- cannot be mapped.\n",
-                   lld(j ? test_handles[j-1] : test_handles[j]));
+            printf("** Handle value %s failed -- cannot be mapped.\n",
+                   PVFS_handle_to_str(j ? test_handles[j-1] : test_handles[j]));
             return -1;
         }
     }

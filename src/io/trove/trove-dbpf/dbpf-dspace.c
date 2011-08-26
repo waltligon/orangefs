@@ -955,7 +955,8 @@ get_next:
                              op_p->u.d_iterate_handles.handle_array[
                                  *op_p->u.d_iterate_handles.count_p]) == 0) )
     {
-        gossip_err("Warning: found duplicate handle: %s\n", PVFS_handle_to_str(dummy_handle));
+        gossip_err("Warning: found duplicate handle: %s\n",
+                   PVFS_handle_to_str(dummy_handle));
         gossip_err("Warning: skipping entry.\n");
         (*op_p->u.d_iterate_handles.count_p)--;
     }
@@ -1233,8 +1234,8 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
             gossip_debug(
                 GOSSIP_TROVE_DEBUG, "dspace_getattr_list fast "
                 "path attr cache hit on %s, uid=%d, mode=%d, type=%d\n",
-                PVFS_handle_to_str(handle_array[i]), (int)ds_attr_p[i].uid, (int)ds_attr_p[i].mode,
-                (int)ds_attr_p[i].type);
+                PVFS_handle_to_str(handle_array[i]), (int)ds_attr_p[i].uid,
+                (int)ds_attr_p[i].mode, (int)ds_attr_p[i].type);
             if(ds_attr_p[i].type == PVFS_TYPE_METAFILE)
             {
                 gossip_debug(GOSSIP_TROVE_DEBUG,

@@ -776,7 +776,8 @@ struct nameidata *nd)
                 "inode->i_uid = %d, inode->i_gid = %d "
                 "in_group_p = %d "
                 "(ret = %d)\n",
-                PVFS_handle_to_str(get_handle_from_ino(inode)), mask, inode->i_mode, fsuid, 
+                PVFS_handle_to_str(get_handle_from_ino(inode)),
+                mask, inode->i_mode, fsuid, 
                 inode->i_uid, inode->i_gid, 
                 in_group_p(inode->i_gid),
                 ret);

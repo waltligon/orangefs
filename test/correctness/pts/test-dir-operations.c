@@ -14,6 +14,7 @@
 #include "pvfs-helper.h"
 #include "test-dir-operations.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 /*
  * parent_refn:  pinode_refn of parent directory
@@ -52,8 +53,8 @@ static int read_dirs(PVFS_object_ref refn,
 
     PVFS_util_gen_credentials(&credentials);
 
-    printf("Calling readdir with handle %lld and fsid %d\n",
-           lld(refn.handle), refn.fs_id);
+    printf("Calling readdir with handle %s and fsid %d\n",
+           PVFS_handle_to_str(refn.handle), refn.fs_id);
     printf("ndirs is %d\n",ndirs);
     ret = PVFS_sys_readdir(refn, PVFS_READDIR_START, ndirs,
                            &credentials, &resp_readdir);
@@ -156,8 +157,8 @@ int test_dir_operations(MPI_Comm * comm,
     printf("rank: %d  fs_id: %d\n", rank, fs_id );
 
     get_root(fs_id, &root_refn);
-    printf("got root handle %lld in fsid %d\n",
-           lld(root_refn.handle),root_refn.fs_id);
+    printf("got root handle %s in fsid %d\n",
+           PVFS_handle_to_str(root_refn.handle),root_refn.fs_id);
 
     /* setup a dir in the root directory to do tests in (so the root dir is
      * less cluttered)
@@ -173,7 +174,7 @@ int test_dir_operations(MPI_Comm * comm,
 	}
         else
         {
-            printf("created directory %s (handle is %lld)\n",name, lld(out_refn.handle));
+            printf("created directory %s (handle is %s)\n",name, PVFS_handle_to_str(out_refn.handle));
         }
     }
     MPI_Barrier(*comm);
@@ -187,11 +188,11 @@ int test_dir_operations(MPI_Comm * comm,
 	}
         else
         {
-            printf("directory %s has handle %lld\n",name, lld(out_refn.handle));
+            printf("directory %s has handle %s\n",name, PVFS_handle_to_str(out_refn.handle));
         }
     }
 
-    printf("test dir handle is %lld\n", lld(out_refn.handle));
+    printf("test dir handle is %s\n", PVFS_handle_to_str(out_refn.handle));
     ret = create_dirs(out_refn, myparams->mode, rank);
     if (ret < 0)
     {

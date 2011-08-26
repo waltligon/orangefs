@@ -19,7 +19,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
-#include <pvfs2-handle-to-str.h>
+#include "gossip.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
@@ -386,7 +386,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  File Name     : %s\n",  pszName);
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
-   fprintf(stdout, "  Handle        : %s\n",  PVFS_handle_to_str(ref->handle));
+   fprintf(stdout, "  Handle        : %s\n", PVFS_handle_to_str(ref->handle));
    fprintf(stdout, "  Mask          : %o\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {

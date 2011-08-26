@@ -13,7 +13,7 @@
 #include <trove.h>
 #include "trove-test.h"
 #include "pvfs2-internal.h"
-#include <pvfs2-handle-to-str.h>
+#include "gossip.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";

@@ -21,6 +21,7 @@
 #include "pint-sysint-utils.h"
 #include "server-config.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

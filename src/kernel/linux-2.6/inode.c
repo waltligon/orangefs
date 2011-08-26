@@ -171,7 +171,8 @@ void pvfs2_truncate(struct inode *inode)
     if (IS_APPEND(inode) || IS_IMMUTABLE(inode))
         return;
     gossip_debug(GOSSIP_INODE_DEBUG, "pvfs2: pvfs2_truncate called on inode %s "
-                "with size %ld\n", PVFS_handle_to_str(get_handle_from_ino(inode)), (long) orig_size);
+                "with size %ld\n", PVFS_handle_to_str(get_handle_from_ino(inode)),
+                (long) orig_size);
 
     /* successful truncate when size changes also requires mtime updates 
      * although the mtime updates are propagated lazily!

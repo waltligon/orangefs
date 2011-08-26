@@ -447,7 +447,8 @@ int PVFS_fsck_validate_metafile(
             (&obj_ref->handle, &obj_ref->fs_id))
         {
             gossip_err("WARNING: unable to remove handle [%s] from \
-                handle list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
+                handle list while verifying stranded objects\n",
+                PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -567,7 +568,8 @@ int PVFS_fsck_validate_symlink(
             (&obj_ref->handle, &obj_ref->fs_id))
         {
             gossip_err("WARNING: unable to remove handle [%s] from handle \
-                    list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
+                    list while verifying stranded objects\n",
+                    PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -682,7 +684,8 @@ int PVFS_fsck_validate_dirdata(
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
             gossip_err("WARNING: unable to remove handle [%s] from handle \
-                    list while verifying stranded objects\n", PVFS_handle_to_str(*handle));
+                    list while verifying stranded objects\n", 
+                    PVFS_handle_to_str(*handle));
         }
     }
 
@@ -762,7 +765,8 @@ int PVFS_fsck_validate_dir(
             (&obj_ref->handle, &obj_ref->fs_id))
         {
             gossip_err("WARNING: unable to remove handle [%s] from \
-                    handle list while verifying stranded objects\n", PVFS_handle_to_str(obj_ref->handle));
+                    handle list while verifying stranded objects\n", 
+                    PVFS_handle_to_str(obj_ref->handle));
         }
     }
 
@@ -1451,7 +1455,7 @@ static int PINT_handle_wrangler_remove_handle(
     if(!found)
     {
         gossip_err("Error: could not find matching server for handle [%s]\n",
-            PVFS_handle_to_str(*handle));
+            PVFS_handle_to_str(*handle))
         return(-PVFS_EINVAL);
     }
 

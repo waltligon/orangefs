@@ -19,7 +19,7 @@
 #include "trove.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
-#include <pvfs2-handle-to-str.h>
+#include "gossip.h"
 
 /* declare the strnlen prototype */
 size_t strnlen(const char *s, size_t limit);

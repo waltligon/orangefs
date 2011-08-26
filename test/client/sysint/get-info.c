@@ -13,6 +13,7 @@
 #include "client.h"
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 int main(int argc,char **argv)
 {

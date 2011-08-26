@@ -234,7 +234,8 @@ void pvfs2_read_inode(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     gossip_debug(GOSSIP_SUPER_DEBUG, "pvfs2_read_inode: %p (inode = %s | ct = %d)\n",
-                pvfs2_inode, PVFS_handle_to_str(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+                pvfs2_inode, PVFS_handle_to_str(get_handle_from_ino(inode)),
+                (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -256,7 +257,9 @@ void pvfs2_read_inode(
     {
         /* assume an I/O error and mark the inode as bad */
         gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %s | ct = %d)\n",
-                __FILE__, __func__, __LINE__, pvfs2_inode, PVFS_handle_to_str(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+                __FILE__, __func__, __LINE__, pvfs2_inode, 
+               PVFS_handle_to_str(get_handle_from_ino(inode)),
+               (int)atomic_read(&inode->i_count));
         pvfs2_make_bad_inode(inode);
     }
 }
@@ -300,7 +303,9 @@ void pvfs2_read_inode(
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             gossip_debug(GOSSIP_SUPER_DEBUG, "%s:%s:%d calling make bad inode - [%p] (inode = %s | ct = %d)\n",
-                __FILE__, __func__, __LINE__, pvfs2_inode, PVFS_handle_to_str(get_handle_from_ino(inode)), (int)atomic_read(&inode->i_count));
+                __FILE__, __func__, __LINE__, pvfs2_inode,
+                PVFS_handle_to_str(get_handle_from_ino(inode)), 
+                (int)atomic_read(&inode->i_count));
             pvfs2_make_bad_inode(inode);
         }
         else {
