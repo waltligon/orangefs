@@ -15,12 +15,27 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
+        dnl SuSE and other distros that have a separate kernel obj directory 
+        dnl need to have include files from both the obj directory and the
+        dnl full source listed in the includes. Kbuild handles this when 
+        dnl compiling but the configure checks don't handle this on their own.
+        dnl The strategy here is just to set a new variable, lk_src_source,
+        dnl when the provided kernel source has a source directory. If it
+        dnl doesn't exist just set it lk_src. There may be a cleaner way to do
+        dnl this, for now, this appears to do the trick.
+        if test -d $lk_src/source; then
+            lk_src_source="$lk_src/source"
+        else
+            lk_src_source=$lk_src
+        fi
+
         dnl add optimizations to the flags. for some reason rcupdate.h in 
         dnl 2.6.40 causes compilation failures when no optimzation is used. 
         dnl no clear answer why this is.
-	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src+source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
 	dnl kernels > 2.6.32 now use generated/autoconf.h
+        dnl look in lk_src for the generated autoconf.h
 	if test -f $lk_src/include/generated/autoconf.h ; then
 		CFLAGS="$CFLAGS -imacros $lk_src/include/generated/autoconf.h"
 	else
@@ -30,7 +45,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl we probably need additional includes if this build is intended
         dnl for a different architecture
 	if test -n "${ARCH}" ; then
-		CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
+		CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include -I$lk_src_source/arch/${ARCH}/include/asm/mach-default"
         else
             SUBARCH=`uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
             -e s/arm.*/arm/ -e s/sa110/arm/ \
@@ -47,8 +62,16 @@ AC_DEFUN([AX_KERNEL_FEATURES],
                 ARCH=$SUBARCH
             fi
 
-            CFLAGS="$CFLAGS -I$lk_src/arch/${ARCH}/include -I$lk_src/arch/${ARCH}/include/asm/mach-default"
+            CFLAGS="$CFLAGS -I$lk_src_source/arch/${ARCH}/include -I$lk_src_source/arch/${ARCH}/include/asm/mach-default"
+
 	fi
+       
+        dnl if there are two different include paths (lk_src/include and 
+        dnl lk_src_source/include) add the lk_src/include path to the CFLAGS
+        dnl here.
+        if test "$lk_src" != "$lk_src_source"; then
+            CFLAGS="$CFLAGS -I$lk_src/include"
+        fi
 
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it
