@@ -5874,7 +5874,7 @@ if test -n "$lk_src" ; then
             lk_src_source=$lk_src
         fi
 
-                        	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src+source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+                        	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src_source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
 	        	if test -f $lk_src/include/generated/autoconf.h ; then
 		CFLAGS="$CFLAGS -imacros $lk_src/include/generated/autoconf.h"

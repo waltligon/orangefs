@@ -32,7 +32,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl add optimizations to the flags. for some reason rcupdate.h in 
         dnl 2.6.40 causes compilation failures when no optimzation is used. 
         dnl no clear answer why this is.
-	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src+source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+	CFLAGS="-O2 $USR_CFLAGS $NOSTDINCFLAGS -I$lk_src_source/include -I$lk_src_source/include/asm/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
 	dnl kernels > 2.6.32 now use generated/autoconf.h
         dnl look in lk_src for the generated autoconf.h
