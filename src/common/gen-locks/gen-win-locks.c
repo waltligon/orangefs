@@ -235,6 +235,9 @@ int gen_win_mutex_destroy(
     
     CloseHandle(*mut);
 
+    /* set mutex back to initializer value */
+    *mut = GEN_MUTEX_INITIALIZER;
+
     return 0;
 }
 

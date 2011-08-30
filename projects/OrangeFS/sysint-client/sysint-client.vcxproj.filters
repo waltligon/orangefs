@@ -159,6 +159,9 @@
     <ClCompile Include="..\..\..\src\client\sysint\sys-truncate.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\src\client\sysint\mgmt-get-uid-list.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\src\client\sysint\acache.h">
@@ -281,6 +284,9 @@
       <Filter>SM Files</Filter>
     </CustomBuild>
     <CustomBuild Include="..\..\..\src\client\sysint\sys-truncate.sm">
+      <Filter>SM Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\..\..\src\client\sysint\mgmt-get-uid-list.sm">
       <Filter>SM Files</Filter>
     </CustomBuild>
   </ItemGroup>

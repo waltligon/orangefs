@@ -212,6 +212,7 @@
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-get-config.c" />
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-get-dfile-array.c" />
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-get-dirdata-handle.c" />
+    <ClCompile Include="..\..\..\src\client\sysint\mgmt-get-uid-list.c" />
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-iterate-handles-list.c" />
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-misc.c" />
     <ClCompile Include="..\..\..\src\client\sysint\mgmt-noop.c" />
@@ -370,6 +371,11 @@
       <FileType>Document</FileType>
     </CustomBuild>
     <CustomBuild Include="..\..\..\src\client\sysint\sys-truncate.sm">
+      <FileType>Document</FileType>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\..\..\src\client\sysint\mgmt-get-uid-list.sm">
       <FileType>Document</FileType>
     </CustomBuild>
   </ItemGroup>

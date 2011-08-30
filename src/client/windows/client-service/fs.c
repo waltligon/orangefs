@@ -80,7 +80,7 @@ int fs_initialize(const char *tabfile,
             "file systems from %s", tab->tabfile_name);
 
         PINT_release_pvfstab();
-        /* PVFS_sys_finalize(); */
+        PVFS_sys_finalize();
         return -1;
     }
 
