@@ -13,7 +13,11 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl 'implicit function declaration' usually ends up in an undefined
 	dnl symbol somewhere.
 
-	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
+        dnl opensuse11.2 32bit only reports the correct include path when in
+        dnl specific directories, must be some search path broken-ness? 
+        dnl switching to / fixes the problem and shouldn't break others
+
+	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `cd /; $CC -print-file-name=include; cd - >/dev/null`"
 
         dnl SuSE and other distros that have a separate kernel obj directory 
         dnl need to have include files from both the obj directory and the
