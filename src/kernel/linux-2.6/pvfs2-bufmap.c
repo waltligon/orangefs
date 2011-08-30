@@ -1388,7 +1388,7 @@ size_t pvfs_bufmap_copy_to_user_task_iovec(
     struct mm_struct *mm = NULL;
     struct vm_area_struct *vma = NULL;
     struct page *page = NULL;
-    unsigned long to_addr = 0;
+    unsigned long to_addr = 0, copy_amt = 0;
     void *maddr = NULL;
     unsigned int to_offset = 0;
     unsigned int seg, from_page_offset = 0;
@@ -1490,7 +1490,12 @@ size_t pvfs_bufmap_copy_to_user_task_iovec(
         maddr = pvfs2_kmap(page);
         from_kaddr = pvfs2_kmap(from->page_array[from_page_index]);
         /* FIX */
-        copy_to_user(maddr + to_offset, from_kaddr, cur_copy_size );
+        copy_amt = copy_to_user(maddr + to_offset, from_kaddr, cur_copy_size );
+        if( copy_amt != 0 )
+        {
+            gossip_err("%s: failure in copy_to_user, %lu could not be copied\n",
+                       __func__, copy_amt);
+        }
         set_page_dirty_lock(page);
         pvfs2_kunmap(from->page_array[from_page_index]);
         pvfs2_kunmap(page);
