@@ -5909,6 +5909,36 @@ if test -n "$lk_src" ; then
             CFLAGS="$CFLAGS -I$lk_src/include"
         fi
 
+                                need_optimize_flag=0
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for sanity of linux/fs.h include" >&5
+$as_echo_n "checking for sanity of linux/fs.h include... " >&6; }
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+                need_optimize_flag=1
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        if test $need_optimize_flag -eq 1; then
+            CFLAGS="-Os $CFLAGS"
+        fi
+
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for i_size_write in kernel" >&5
 $as_echo_n "checking for i_size_write in kernel... " >&6; }
 			cat confdefs.h - <<_ACEOF >conftest.$ac_ext

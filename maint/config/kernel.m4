@@ -74,6 +74,23 @@ AC_DEFUN([AX_KERNEL_FEATURES],
             CFLAGS="$CFLAGS -I$lk_src/include"
         fi
 
+        dnl in 2.6.40 (maybe .39 too) inclusion of linux/fs.h breaks unless
+        dnl optimization flag of some sort is set. To complicate matters 
+        dnl checks in earlier versions break when optimization is turned on.
+        need_optimize_flag=0
+	AC_MSG_CHECKING(for sanity of linux/fs.h include)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+	], [],
+		AC_MSG_RESULT(yes),
+		AC_MSG_RESULT(no)
+                need_optimize_flag=1,
+	)
+        if test $need_optimize_flag -eq 1; then
+            CFLAGS="-Os $CFLAGS"
+        fi
+
 	AC_MSG_CHECKING(for i_size_write in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel already defined it
