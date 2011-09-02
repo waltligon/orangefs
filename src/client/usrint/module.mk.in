@@ -5,7 +5,7 @@ SRC := \
 	$(DIR)/request.c \
 	$(DIR)/iocommon.c \
 	$(DIR)/openfile-util.c \
-	$(DIR)/ucache.c \
+#	$(DIR)/ucache.c \
 
 USRC := \
 	$(DIR)/posix.c \
