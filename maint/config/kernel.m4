@@ -17,7 +17,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
         dnl specific directories, must be some search path broken-ness? 
         dnl switching to / fixes the problem and shouldn't break others
 
-	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `cd /; $CC -print-file-name=include; cd - >/dev/null`"
+	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
         dnl SuSE and other distros that have a separate kernel obj directory 
         dnl need to have include files from both the obj directory and the

@@ -5867,7 +5867,7 @@ if test -n "$lk_src" ; then
 
 
 
-	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `cd /; $CC -print-file-name=include; cd - >/dev/null`"
+	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
                                                                         if test -d $lk_src/source; then
             lk_src_source="$lk_src/source"
