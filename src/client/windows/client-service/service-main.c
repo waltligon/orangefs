@@ -78,7 +78,7 @@ void init_service_log()
 
         strcat(exe_path, "\\service.log");
 
-        debug_log = fopen(exe_path, "a");
+        debug_log = fopen(exe_path, "w");
     }
 }
 
@@ -402,8 +402,6 @@ void WINAPI service_main(DWORD argc, char *argv[])
     char error_msg[512];    
     char env_debug_file[MAX_PATH+16], env_debug_mask[256+16];
 
-    service_debug("Entered service_main\n");
-
     /* allocate options */
     options = (PORANGEFS_OPTIONS) calloc(1, sizeof(ORANGEFS_OPTIONS));
 
@@ -418,9 +416,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     /* point global options */
     goptions = options;    
         
-#ifndef _DEBUG
     debug = options->debug;
-#endif
 
     init_service_log();
 
@@ -435,7 +431,7 @@ void WINAPI service_main(DWORD argc, char *argv[])
     if (!check_mount_point(options->mount_point))
         return;
 
-    /* turn debug on if specified on command line */
+    /* turn on gossip debugging */
     if (debug)
     {
           /* enable win_client debugging by default */
@@ -783,7 +779,7 @@ int main(int argc, char **argv, char **envp)
       if (strlen(mount_point) > 0)
           strcpy(options->mount_point, mount_point);
 
-      /* turn debug on if specified on command line (or debug build) */
+      /* turn debug on if specified on command line */
       if (cmd_debug)
           debug = TRUE;
       if (debug)
