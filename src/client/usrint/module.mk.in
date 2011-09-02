@@ -5,13 +5,12 @@ SRC := \
 	$(DIR)/request.c \
 	$(DIR)/iocommon.c \
 	$(DIR)/openfile-util.c \
-#	$(DIR)/ucache.c \
-#	$(DIR)/ucache_test.c \
+	$(DIR)/ucache.c \
 
 USRC := \
 	$(DIR)/posix.c \
 	$(DIR)/socket.c \
-#	$(DIR)/stdio.c \
+	$(DIR)/stdio.c \
 
 # list of all .c files (generated or otherwise) that belong in library
 LIBSRC += $(SRC)
