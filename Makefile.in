@@ -144,7 +144,8 @@ INCLUDES := \
     src/common/id-generator \
     src/common/gossip \
     src/common/gen-locks \
-    src/common/events
+    src/common/events \
+    src/client/usrint
 GENINCLUDES := \
 	include
 else
@@ -157,6 +158,7 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
+    src/client/usrint \
     src/io/trove \
     src/io/bmi \
     src/io/description \
@@ -447,6 +449,8 @@ ADMINSRC_SERVER :=
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
+# ULIBSRC is source code for libpvfs2
+ULIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 ifdef BUILD_BMI_ONLY
@@ -498,18 +502,18 @@ ifeq ($(build_shared),yes)
 ifdef BUILD_BMI_ONLY
 BMILIBRARIES := lib/libbmi.so
 endif
-LIBRARIES_SHARED = lib/libpvfs2.so
+LIBRARIES_SHARED = lib/libpvfs2.so lib/libofs.so
 LIBRARIES += $(LIBRARIES_SHARED)
-LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so
+LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so lib/libofs-threaded.so
 LIBRARIES_THREADED += $(LIBRARIES_THREADED_SHARED)
 endif
 ifeq ($(build_static),yes)
 ifdef BUILD_BMI_ONLY
 BMILIBRARIES += lib/libbmi.a
 endif
-LIBRARIES_STATIC = lib/libpvfs2.a
+LIBRARIES_STATIC = lib/libpvfs2.a lib/libofs.a
 LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a
+LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a lib/libofs-threaded.a
 LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
 endif
 
@@ -551,10 +555,16 @@ endif
 
 # LIBTHREADEDOBJS is a list of objects to put in the multithreaded client lib
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
+# ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
+ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
+# ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
+ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+# ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
+ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
 # ADMINTOOLS is a list of admin program executables
@@ -775,6 +785,30 @@ lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2-threaded.so -o $@ $(LIBTHREADEDPICOBJS) $(DEPLIBS)
 
+# rule for building the ofs library
+lib/libofs.a: $(ULIBOBJS)
+	$(Q) "  RANLIB	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(ULIBOBJS)
+
+# rule for building the _multithreaded_ ofs library
+lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
+	$(Q) "  RANLIBTHREADED	$@"
+	$(E)$(INSTALL) -d lib
+	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
+
+# rule for building the ofs library
+lib/libofs.so: $(ULIBPICOBJS)
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(DEPLIBS)
+
+# rule for building the ofs _multithreaded_ library
+lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
+	$(Q) "  LDSO		$@"
+	$(E)$(INSTALL) -d lib
+	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(DEPLIBS)
+
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
 	$(Q) "  RANLIB	$@"
@@ -949,6 +983,7 @@ endif
 clean:: 
 	$(Q) "  CLEAN"
 	$(E)rm -f $(LIBOBJS) $(LIBTHREADEDOBJS) \
+	    $(ULIBOBJS) $(ULIBTHREADEDOBJS) \
 		$(SERVEROBJS) $(SERVERBINOBJS) $(MISCOBJS) \
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
