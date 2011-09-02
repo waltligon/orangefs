@@ -2114,15 +2114,15 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
 int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b)
 {
-    const struct dbpf_keyval_db_entry * db_entry_a;
-    const struct dbpf_keyval_db_entry * db_entry_b;
+    struct dbpf_keyval_db_entry db_entry_a;
+    struct dbpf_keyval_db_entry db_entry_b;
 
-    db_entry_a = (const struct dbpf_keyval_db_entry *) a->data;
-    db_entry_b = (const struct dbpf_keyval_db_entry *) b->data;
+    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
+    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
 
-    if(db_entry_a->handle != db_entry_b->handle)
+    if(db_entry_a.handle != db_entry_b.handle)
     {
-        return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
+        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
     }
 
     if(a->size > b->size)
@@ -2136,7 +2136,7 @@ int PINT_trove_dbpf_keyval_compare(
     }
 
     /* must be equal */
-    return (memcmp(db_entry_a->key, db_entry_b->key, 
+    return (memcmp(db_entry_a.key, db_entry_b.key, 
                     DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
