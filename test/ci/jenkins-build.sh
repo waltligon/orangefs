@@ -68,7 +68,8 @@ then
         flags="${flags} --enable-redhat24 --with-kernel24=${kern}"
     elif [ -f /etc/SuSE-release ]
     then
-        kern=`find /usr/src/ -maxdepth 1 -type d -name "*$(uname -r | awk -F- '{ print $1 }')*" | head -n 1` 
+        flavor="desktop"
+        kern=`find /usr/src/ -maxdepth 5 -type d -name ${flavor} | head -n 1` 
         flags="${flags} --with-kernel=${kern}"
     elif [ -f /etc/debian_version ]
     then
