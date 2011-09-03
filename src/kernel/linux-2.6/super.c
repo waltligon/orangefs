@@ -1323,7 +1323,7 @@ struct super_block *pvfs2_get_sb(
     struct super_block *sb = ERR_PTR(-EINVAL);
     pvfs2_kernel_op_t *new_op;
     pvfs2_mount_sb_info_t mount_sb_info;
-#ifdef HAVE_FSTYPE_MOUNT_ONLY
+#if defined(HAVE_FSTYPE_MOUNT_ONLY) || !defined(HAVE_GETSB_NODEV)
     struct dentry *mnt_sb_d = ERR_PTR(-EINVAL);
 #endif
 
