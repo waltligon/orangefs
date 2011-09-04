@@ -1112,6 +1112,8 @@ install_doc:
 	install -d $(mandir)/man5
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
+	gzip ${mandir}/man1/*
+	gzip ${mandir}/man5/*
 
 ifdef BUILD_BMI_ONLY
 install:: all
