@@ -12,38 +12,92 @@
 #ifndef USRINT_H
 #define USRINT_H 1
 
-#ifndef _LARGEFILE64_SOURCE
-#define _LARGEFILE64_SOURCE
-#endif
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#ifndef _LARGEFILE64_SOURCE
+#define _LARGEFILE64_SOURCE
+#endif
+
+#ifdef USRINT_SOURCE
+#ifdef _FILE_OFFSET_BITS
+#undef _FILE_OFFSET_BITS 
+#endif
+#else
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
+#endif
+#endif
+
 #define __USE_MISC 1
 #define __USE_ATFILE 1
 #define __USE_GNU 1
 
+#include <pvfs2-config.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
+#endif
 #include <assert.h>
 #include <libgen.h>
+#include <dirent.h>
 #include <string.h>
+#ifdef HAVE_STDARG_H
 #include <stdarg.h>
+#endif
 #include <memory.h>
 #include <limits.h>
+#ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
+#endif
 #include <sys/select.h>
+#ifdef HAVE_SYS_SOCKET_H
 #include <sys/socket.h>
+#endif
 #include <sys/resource.h>
 #include <sys/sendfile.h>
 /* #include <sys/statvfs.h> */ /* struct statfs on OS X */
+#ifdef HAVE_SYS_VFS_H
 #include <sys/vfs.h> /* struct statfs on Linux */
+#endif
+#ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
+#endif
 #include <sys/uio.h>
-#include <attr/xattr.h>
+
 #include <linux/types.h>
+#ifdef HAVE_ATTR_XATTR_H
+#include <attr/xattr.h>
+#else
+#ifdef HAVE_SYS_ATTR_H
+#include <sys/xattr.h>
+#else
+extern int (*setxattr)(const char *path, const char *name,
+                    const void *value, size_t size, int flags);
+extern int (*lsetxattr)(const char *path, const char *name,
+                     const void *value, size_t size, int flags);
+extern int (*fsetxattr)(int fd, const char *name,
+                     const void *value, size_t size, int flags);
+extern int (*getxattr)(const char *path, const char *name,
+                    void *value, size_t size);
+extern int (*lgetxattr)(const char *path, const char *name,
+                     void *value, size_t size);
+extern int (*fgetxattr)(int fd, const char *name, void *value, size_t size);
+extern int (*listxattr)(const char *path, char *list, size_t size);
+extern int (*llistxattr)(const char *path, char *list, size_t size);
+extern int (*flistxattr)(int fd, char *list, size_t size);
+extern int (*removexattr)(const char *path, const char *name);
+extern int (*lremovexattr)(const char *path, const char *name);
+extern int (*fremovexattr)(int fd, const char *name);
+#endif
+#endif
+
 /* #include <linux/dirent.h> diff source need diff versions */
 #include <time.h>
 #include <dlfcn.h>
@@ -53,7 +107,7 @@
 /* PVFS specific includes */
 #include <pvfs2.h>
 #include <pvfs2-hint.h>
-
+#include <pvfs2-req-proto.h>
 
 /* magic numbers for PVFS filesystem */
 #define PVFS_FS 537068840
@@ -74,7 +128,6 @@
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
 #define PVFS_BUFSIZE (1024*1024)
-#define PVFS_PATH_MAX 1024
 
 /* extra function prototypes */
 int fseek64(FILE *stream, const off64_t offset, int whence);

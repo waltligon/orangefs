@@ -9,11 +9,11 @@
  *
  *  PVFS2 user interface routines - wrappers for posix socket system calls
  */
-#include <usrint.h>
-#include <linux/dirent.h>
-#include <posix-ops.h>
-#include <posix-pvfs.h>
-#include <openfile-util.h>
+#define USRINT_SOURCE 1
+#include "usrint.h"
+#include "posix-ops.h"
+#include "posix-pvfs.h"
+#include "openfile-util.h"
 
 /*
  * SOCKET SYSTEM CALLS

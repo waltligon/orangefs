@@ -11,15 +11,12 @@
  */
 
 /* this prevents headers from using inlines for 64 bit calls */
-#ifdef _FILE_OFFSET_BITS
-#undef _FILE_OFFSET_BITS
-#endif
 
-#include <usrint.h>
-#include <linux/dirent.h>
-#include <posix-ops.h>
-#include <posix-pvfs.h>
-#include <openfile-util.h>
+#define USERINT_SOURCE 1
+#include "usrint.h"
+#include "posix-ops.h"
+#include "posix-pvfs.h"
+#include "openfile-util.h"
 
 /*
  * SYSTEM CALLS
@@ -1098,7 +1095,7 @@ int readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
     return rc;
 }
 
-ssize_t symlink(const char *oldpath, const char *newpath)
+int symlink(const char *oldpath, const char *newpath)
 {
     if (!oldpath || !newpath)
     {
@@ -1191,6 +1188,9 @@ int linkat(int olddirfd, const char *old,
     }
 }
 
+/**
+ * According to man page count is isgnored
+ */
 int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 {
     int rc;
@@ -1214,7 +1214,12 @@ int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
     return rc;
 }
 
-int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
+/**
+ * man page calls last arg count but is ambiguous if it is number
+ * of bytes or number of records to read.  The former appears to be
+ * true thus we rename the argument
+ */
+int getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     int rc = 0;
     pvfs_descriptor *pd;
@@ -1227,7 +1232,7 @@ int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->getdents(pd->true_fd, dirp, count);
+        rc = pd->fsops->getdents(pd->true_fd, dirp, size);
     }
     else
     {
@@ -1237,7 +1242,7 @@ int getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
     return rc;
 }
 
-int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
+int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     int rc = 0;
     pvfs_descriptor *pd;
@@ -1250,7 +1255,7 @@ int getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->getdents64(pd->true_fd, dirp, count);
+        rc = pd->fsops->getdents64(pd->true_fd, dirp, size);
     }
     else
     {
@@ -1627,7 +1632,15 @@ int setxattr(const char *path, const char *name,
     }
     else
     {
-        return glibc_ops.setxattr(path, name, value, size, flags);
+        if (glibc_ops.setxattr)
+        {
+            return glibc_ops.setxattr(path, name, value, size, flags);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1645,7 +1658,15 @@ int lsetxattr(const char *path, const char *name,
     }
     else
     {
-        return glibc_ops.lsetxattr(path, name, value, size, flags);
+        if (glibc_ops.lsetxattr)
+        {
+            return glibc_ops.lsetxattr(path, name, value, size, flags);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1658,7 +1679,15 @@ int fsetxattr(int fd, const char *name,
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fsetxattr(pd->true_fd, name, value, size, flags);
+        if (pd->fsops->fsetxattr)
+        {
+            rc = pd->fsops->fsetxattr(pd->true_fd, name, value, size, flags);
+        }
+        else
+        {
+            errno = ENOPKG;
+            rc = -1;
+        }
     }
     else
     {
@@ -1682,7 +1711,15 @@ int getxattr(const char *path, const char *name,
     }
     else
     {
-        return glibc_ops.getxattr(path, name, value, size);
+        if (glibc_ops.getxattr)
+        {
+            return glibc_ops.getxattr(path, name, value, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1700,7 +1737,15 @@ int lgetxattr(const char *path, const char *name,
     }
     else
     {
-        return glibc_ops.lgetxattr(path, name, value, size);
+        if (glibc_ops.lgetxattr)
+        {
+            return glibc_ops.lgetxattr(path, name, value, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1713,7 +1758,15 @@ int fgetxattr(int fd, const char *name, void *value,
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fgetxattr(pd->true_fd, name, value, size);
+        if (pd->fsops->fgetxattr)
+        {
+            rc = pd->fsops->fgetxattr(pd->true_fd, name, value, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            rc = -1;
+        }
     }
     else
     {
@@ -1736,7 +1789,15 @@ int listxattr(const char *path, char *list, size_t size)
     }
     else
     {
-        return glibc_ops.listxattr(path, list, size);
+        if (glibc_ops.listxattr)
+        {
+            return glibc_ops.listxattr(path, list, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1753,7 +1814,15 @@ int llistxattr(const char *path, char *list, size_t size)
     }
     else
     {
-        return glibc_ops.llistxattr(path, list, size);
+        if (glibc_ops.llistxattr)
+        {
+            return glibc_ops.llistxattr(path, list, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1765,7 +1834,15 @@ int flistxattr(int fd, char *list, size_t size)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->flistxattr(pd->true_fd, list, size);
+        if (pd->fsops->flistxattr)
+        {
+            rc = pd->fsops->flistxattr(pd->true_fd, list, size);
+        }
+        else
+        {
+            errno = ENOPKG;
+            rc = -1;
+        }
     }
     else
     {
@@ -1788,7 +1865,15 @@ int removexattr(const char *path, const char *name)
     }
     else
     {
-        return glibc_ops.removexattr(path, name);
+        if (glibc_ops.removexattr)
+        {
+            return glibc_ops.removexattr(path, name);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1805,7 +1890,15 @@ int lremovexattr(const char *path, const char *name)
     }
     else
     {
-        return glibc_ops.lremovexattr(path, name);
+        if (glibc_ops.lremovexattr)
+        {
+            return glibc_ops.lremovexattr(path, name);
+        }
+        else
+        {
+            errno = ENOPKG;
+            return -1;
+        }
     }
 }
 
@@ -1817,7 +1910,15 @@ int fremovexattr(int fd, const char *name)
     pd = pvfs_find_descriptor(fd);
     if (pd)
     {
-        rc = pd->fsops->fremovexattr(pd->true_fd, name);
+        if (pd->fsops->fremovexattr)
+        {
+            rc = pd->fsops->fremovexattr(pd->true_fd, name);
+        }
+        else
+        {
+            errno = ENOPKG;
+            rc = -1;
+        }
     }
     else
     {

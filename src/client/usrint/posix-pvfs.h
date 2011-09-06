@@ -133,7 +133,7 @@ ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz);
 
 int pvfs_readlinkat (int dirfd, const char *path, char *buf, size_t bufsiz);
 
-ssize_t pvfs_symlink (const char *oldpath, const char *newpath);
+int pvfs_symlink (const char *oldpath, const char *newpath);
 
 int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath);
 

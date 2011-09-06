@@ -9,8 +9,8 @@
  *
  *  PVFS2 user interface routines - low level calls to system interface
  */
+#define USRINT_SOURCE 1
 #include "usrint.h"
-#include <linux/dirent.h>
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
@@ -112,7 +112,7 @@ int iocommon_lookup_absolute(const char *abs_path,
 {
     int rc = 0;
     int orig_errno = errno;
-    char pvfs_path[256];
+    char pvfs_path[PVFS_PATH_MAX];
     PVFS_fs_id lookup_fs_id;
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
@@ -124,7 +124,7 @@ int iocommon_lookup_absolute(const char *abs_path,
     iocommon_cred(&credentials);
 
     /* Determine the fs_id and pvfs_path */
-    rc = PVFS_util_resolve(abs_path, &lookup_fs_id, pvfs_path, 256);
+    rc = PVFS_util_resolve(abs_path, &lookup_fs_id, pvfs_path, PVFS_PATH_MAX);
     IOCOMMON_CHECK_ERR(rc);
 
     /* set up buffer to return partially looked up path */
@@ -157,6 +157,11 @@ errorout:
  * Lookup a file via the PVFS system interface
  *
  * Assumes we have already looked up part of the path
+ * POSIX assumes we can handle at least 1024 char paths
+ * and potentially 4096 char paths (depending on which
+ * include file you look at).  PVFS cannot deal with more
+ * than 255 chars at a time so we must break long paths
+ * into pieces and do multiple relative lookups
  */
 int iocommon_lookup_relative(const char *rel_path,
                              PVFS_object_ref parent_ref, /* by value */
@@ -167,6 +172,9 @@ int iocommon_lookup_relative(const char *rel_path,
 {
     int rc = 0;
     int orig_errno = errno;
+    PVFS_object_ref current_seg_ref;
+    char current_seg_path[PVFS_NAME_MAX];
+    char *cur, *last, *start;
     PVFS_credentials *credentials;
     PVFS_sysresp_lookup resp_lookup;
 
@@ -190,16 +198,66 @@ int iocommon_lookup_relative(const char *rel_path,
         resp_lookup.error_path_size = 0;
     }
 
-    /* Contact server */
-    rc = PVFS_sys_ref_lookup(parent_ref.fs_id,
-                             (char*)rel_path,
-                             parent_ref,
-                             credentials,
-                             &resp_lookup,
-                             follow_links,
-                             PVFS_HINT_NULL);
-    IOCOMMON_CHECK_ERR(rc);
-    *ref = resp_lookup.ref;
+    current_seg_ref = parent_ref;
+    cur = (char *)rel_path;
+    last = (char *)rel_path;
+    start = (char *)rel_path;
+
+    /* loop over segments of the path with max PVFS_NAME_MAX chars */
+    while(*cur)
+    {
+        /* loop over chars to find a complete path segment */
+        /* that is no longer than PVFS_NAME_MAX chars */
+        while(*cur)
+        {
+            /* find next path seperator / */
+            /* cur either points to a slash */
+            /* or the first char of the path */
+            /* there must be at least one */
+            /* so n either case increment it first */
+            for(cur++; *cur && *cur != '/'; cur++);
+            if (cur - start > PVFS_NAME_MAX-1)
+            {
+                /* we over-shot the limit go back to last */
+                cur = last;
+                if (cur == start)
+                {
+                    /* single segment larger than PVFS_NAME_MAX */
+                    errno = ENAMETOOLONG;
+                    rc = -1;
+                    goto errorout;
+                }
+                break;
+            }
+            else
+            {
+                /* set up to add the next path segment */
+                last = cur;
+            }
+        }
+        memset(current_seg_path, 0, PVFS_NAME_MAX);
+        strncpy(current_seg_path, start, (cur - start) + 1);
+        start = cur;
+        last = cur;
+
+        /* Contact server */
+        rc = PVFS_sys_ref_lookup(parent_ref.fs_id,
+                                current_seg_path,
+                                current_seg_ref,
+                                credentials,
+                                &resp_lookup,
+                                follow_links,
+                                PVFS_HINT_NULL);
+        IOCOMMON_CHECK_ERR(rc);
+        if (*cur)
+        {
+            current_seg_ref = resp_lookup.ref;
+        }
+        else
+        {
+            *ref = resp_lookup.ref;
+        }
+    }
 
 errorout:
     return rc;
@@ -417,7 +475,7 @@ pvfs_descriptor *iocommon_open(const char *path,
         {
             struct stat sbuf;
             /* try to open using glibc */
-            rc = (*glibc_ops.open)(error_path, fpvfs_alloc_descriptorlags & 01777777, mode);
+            rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
             IOCOMMON_RETURN_ERR(rc);
             pd = pvfs_alloc_descriptor(&pvfs_ops, -1, NULL);
             pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
@@ -485,11 +543,11 @@ pvfs_descriptor *iocommon_open(const char *path,
     IOCOMMON_CHECK_ERR(rc);
     pd->mode = attributes_resp.attr.perms; /* this may change */
 
-    if (attributes_resp.attr.objtype & PVFS_TYPE_METAFILE)
+    if (attributes_resp.attr.objtype == PVFS_TYPE_METAFILE)
     {
         pd->mode |= S_IFREG;
     }
-    if (attributes_resp.attr.objtype & PVFS_TYPE_DIRECTORY)
+    if (attributes_resp.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         pd->mode |= S_IFDIR;
         if (pdir)
@@ -505,7 +563,7 @@ pvfs_descriptor *iocommon_open(const char *path,
             strcpy(pd->dpath, path);
         }
     }
-    if (attributes_resp.attr.objtype & PVFS_TYPE_SYMLINK)
+    if (attributes_resp.attr.objtype == PVFS_TYPE_SYMLINK)
     {
         pd->mode |= S_IFLNK;
     }
@@ -693,28 +751,26 @@ int iocommon_remove (const char *path,
     }
 
     /* need to verify this is a file or symlink */
-    /* WBL - What is going on here ??? */
     rc = iocommon_lookup_relative(file, parent_ref,
                 PVFS2_LOOKUP_LINK_NO_FOLLOW, &file_ref, NULL, 0);
-    if (rc < 0)
-    {
-        goto errorout;
-    }
+    IOCOMMON_RETURN_ERR(rc);
+
     rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_TYPE);
     IOCOMMON_RETURN_ERR(rc);
 
-    if ((attr.objtype & PVFS_TYPE_DIRECTORY) && !dirflag)
+    if ((attr.objtype == PVFS_TYPE_DIRECTORY) && !dirflag)
     {
         errno = EISDIR;
         goto errorout;
     }
-    else if (!(attr.objtype & PVFS_TYPE_DIRECTORY) && dirflag)
+    else if ((attr.objtype != PVFS_TYPE_DIRECTORY) && dirflag)
     {
         errno = ENOTDIR;
         goto errorout;
     }
 
     /* should check to see if any process has file open */
+    /* but at themoment we don't have a way to do that */
     rc = PVFS_sys_remove(file, parent_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -1080,15 +1136,15 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_dev = pd->pvfs_ref.fs_id;
     buf->st_ino = pd->pvfs_ref.handle;
     buf->st_mode = attr.perms;
-    if (attr.objtype & PVFS_TYPE_METAFILE)
+    if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
     }
-    if (attr.objtype & PVFS_TYPE_DIRECTORY)
+    if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
     }
-    if (attr.objtype & PVFS_TYPE_SYMLINK)
+    if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
     }
@@ -1131,15 +1187,15 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_dev = pd->pvfs_ref.fs_id;
     buf->st_ino = pd->pvfs_ref.handle;
     buf->st_mode = attr.perms;
-    if (attr.objtype & PVFS_TYPE_METAFILE)
+    if (attr.objtype == PVFS_TYPE_METAFILE)
     {
         buf->st_mode |= S_IFREG;
     }
-    if (attr.objtype & PVFS_TYPE_DIRECTORY)
+    if (attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         buf->st_mode |= S_IFDIR;
     }
-    if (attr.objtype & PVFS_TYPE_SYMLINK)
+    if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         buf->st_mode |= S_IFLNK;
     }
@@ -1297,7 +1353,7 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
     IOCOMMON_RETURN_ERR(rc);
 
     /* copy attributes into standard stat struct */
-    if (attr.objtype & PVFS_TYPE_SYMLINK)
+    if (attr.objtype == PVFS_TYPE_SYMLINK)
     {
         strncpy(buf, attr.link_target, size);
     }
@@ -1385,13 +1441,14 @@ errorout:
     return(rc);
 }
 
-int iocommon_getdents(pvfs_descriptor *pd,
-                      struct dirent *dirp,
-                      unsigned int count)
+int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
+                      struct dirent *dirp, /**< pointer to buffer */
+                      unsigned int size)   /**< number of bytes in buffer */
 {
     int rc = 0;
     int orig_errno = errno;
     int name_max;
+    int count;  /* number of records to read */
     PVFS_credentials *credentials;
     PVFS_sysresp_readdir readdir_resp;
     PVFS_ds_position token;
@@ -1420,6 +1477,13 @@ int iocommon_getdents(pvfs_descriptor *pd,
 
     token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
 
+    /* posix deals in bytes in buffer and bytes read */
+    /* PVFS deals in number of records to read or were read */
+    count = size / sizeof(struct dirent);
+    if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
+    {
+        count = PVFS_REQ_LIMIT_DIRENT_COUNT;
+    }
     rc = PVFS_sys_readdir(pd->pvfs_ref,
                           token,
                           count,
@@ -1430,7 +1494,7 @@ int iocommon_getdents(pvfs_descriptor *pd,
 
     pd->token = readdir_resp.token;
     name_max = PVFS_util_min(NAME_MAX, PVFS_NAME_MAX);
-    while(readdir_resp.pvfs_dirent_outcount--)
+    for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
         /* copy a PVFS_dirent to a struct dirent */
         dirp->d_ino = (long)readdir_resp.dirent_array[i].handle;
@@ -1438,8 +1502,9 @@ int iocommon_getdents(pvfs_descriptor *pd,
         dirp->d_reclen = sizeof(PVFS_dirent);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
-        pd->file_pointer += sizeof(PVFS_dirent);
-        bytes += sizeof(PVFS_dirent);
+        pd->file_pointer += sizeof(struct dirent);
+        bytes += sizeof(struct dirent);
+        dirp++;
     }
     free(readdir_resp.dirent_array);
     return bytes;
@@ -1450,11 +1515,12 @@ errorout:
 
 int iocommon_getdents64(pvfs_descriptor *pd,
                       struct dirent64 *dirp,
-                      unsigned int count)
+                      unsigned int size)
 {
     int rc = 0;
     int orig_errno = errno;
     int name_max;
+    int count;
     PVFS_credentials *credentials;
     PVFS_sysresp_readdir readdir_resp;
     PVFS_ds_position token;
@@ -1483,6 +1549,11 @@ int iocommon_getdents64(pvfs_descriptor *pd,
 
     token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
 
+    count = size / sizeof(struct dirent64);
+    if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
+    {
+        count = PVFS_REQ_LIMIT_DIRENT_COUNT;
+    }
     rc = PVFS_sys_readdir(pd->pvfs_ref,
                           token,
                           count,
@@ -1493,16 +1564,17 @@ int iocommon_getdents64(pvfs_descriptor *pd,
 
     pd->token = readdir_resp.token;
     name_max = PVFS_util_min(NAME_MAX, PVFS_NAME_MAX);
-    while(readdir_resp.pvfs_dirent_outcount--)
+    for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
-        /* copy a PVFS_dirent to a struct dirent */
+        /* copy a PVFS_dirent to a struct dirent64 */
         dirp->d_ino = (uint64_t)readdir_resp.dirent_array[i].handle;
         dirp->d_off = (off64_t)pd->file_pointer;
-        dirp->d_reclen = sizeof(PVFS_dirent);
+        dirp->d_reclen = sizeof(struct dirent64);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
-        pd->file_pointer += sizeof(PVFS_dirent);
-        bytes += sizeof(PVFS_dirent);
+        pd->file_pointer += sizeof(struct dirent64);
+        bytes += sizeof(struct dirent64);
+        dirp++;
     }
     free(readdir_resp.dirent_array);
     return bytes;

@@ -68,7 +68,7 @@ typedef struct posix_ops_s
     int (*rmdir)(const char *path);
     ssize_t (*readlink)(const char *path, char *buf, size_t bufsiz);
     int (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
-    ssize_t (*symlink)(const char *oldpath, const char *newpath);
+    int (*symlink)(const char *oldpath, const char *newpath);
     int (*symlinkat)(const char *oldpath, int newdirfd, const char *newpath);
     ssize_t (*link)(const char *oldpath, const char *newpath);
     int (*linkat)(int olddirfd, const char *oldpath,
@@ -146,6 +146,16 @@ typedef struct posix_ops_s
     int (*socketpair)(int d, int type, int prtocol, int sv[2]);
     int (*pipe)(int filedes[2]);
 } posix_ops;
+
+#ifdef BITDEFS
+#define stat stat64
+#define fstat fstat64
+#define fstatat fstatat64
+#define lstat lstat64
+#define statfs statfs64
+#define fstatfs fstatfs64
+#define sendfile sendfile64
+#endif
 
 extern posix_ops glibc_ops;
 extern posix_ops pvfs_ops;

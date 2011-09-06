@@ -9,12 +9,15 @@
  *
  *  PVFS2 user interface routines - pvfs version of posix system calls
  */
-#include <usrint.h>
-#include <linux/dirent.h>
-#include <posix-ops.h>
-#include <posix-pvfs.h>
-#include <openfile-util.h>
-#include <iocommon.h>
+#define USRINT_SOURCE 1
+#include "usrint.h"
+#include "posix-ops.h"
+#include "posix-pvfs.h"
+#include "openfile-util.h"
+#include "iocommon.h"
+
+#define PVFS_ATTR_DEFAULT_MASK \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
 
 static mode_t mask_val = 0022; /* implements umask for pvfs library */
 static char pvfs_cwd[PVFS_PATH_MAX];
@@ -62,6 +65,10 @@ int pvfs_open(const char *path, int flags, ...)
 
     /* fully qualify pathname */
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, flags, hints, mode, NULL);
     if (newpath != path)
     {
@@ -71,8 +78,10 @@ int pvfs_open(const char *path, int flags, ...)
     {
         return -1;
     }
-    debug("pvfs_open: returns %d\n", pd->fd);
-    return pd->fd;
+    else
+    {
+        return pd->fd;
+    }
 }
 
 /**
@@ -230,6 +239,10 @@ int pvfs_unlink(const char *path)
     char *newpath;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     rc = iocommon_unlink(path, NULL);
     if (newpath != path)
     {
@@ -284,7 +297,16 @@ int pvfs_rename(const char *oldpath, const char *newpath)
     char *absoldpath, *absnewpath;
 
     absoldpath = pvfs_qualify_path(oldpath);
+    if (!absoldpath)
+    {
+        return -1;
+    }
     absnewpath = pvfs_qualify_path(newpath);
+    if (!absnewpath)
+    {
+        free(absoldpath);
+        return -1;
+    }
     rc = iocommon_rename(NULL, absoldpath, NULL, absnewpath);
     if (oldpath != absoldpath)
     {
@@ -317,6 +339,10 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     {
         olddirref = NULL;
         absoldpath = pvfs_qualify_path(oldpath);
+        if (!absoldpath)
+        {
+            return -1;
+        }
     }
     else
     {
@@ -338,6 +364,10 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
     {
         newdirref = NULL;
         absnewpath = pvfs_qualify_path(newpath);
+        if (!absnewpath)
+        {
+            return -1;
+        }
     }
     else
     {
@@ -740,7 +770,7 @@ int pvfs_flush(int fd)
  */
 int pvfs_stat(const char *path, struct stat *buf)
 {
-    return pvfs_stat_mask(path, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+    return pvfs_stat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
@@ -750,13 +780,25 @@ int pvfs_stat_mask(const char *path, struct stat *buf, uint32_t mask)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    mask &= PVFS_ATTR_DEFAULT_MASK;
+    rc = iocommon_stat(pd, buf, mask);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_stat(pd, buf, mask);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -770,13 +812,24 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL_NOHINT);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -785,7 +838,7 @@ int pvfs_stat64(const char *path, struct stat64 *buf)
  */
 int pvfs_fstat(int fd, struct stat *buf)
 {
-    return pvfs_fstat_mask(fd, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+    return pvfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
@@ -803,6 +856,7 @@ int pvfs_fstat_mask(int fd, struct stat *buf, uint32_t mask)
         errno = EBADF;
         return -1;
     }
+    mask &= PVFS_ATTR_DEFAULT_MASK;
     return iocommon_stat(pd, buf, mask);
 }
 
@@ -824,7 +878,7 @@ int pvfs_fstat64(int fd, struct stat64 *buf)
         errno = EBADF;
         return -1;
     }
-    return iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+    return iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 /**
@@ -864,7 +918,11 @@ int pvfs_fstatat(int fd, const char *path, struct stat *buf, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
-        rc = iocommon_stat(pd2, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+        if (!pd2)
+        {
+            return -1;
+        }
+        rc = iocommon_stat(pd2, buf, PVFS_ATTR_DEFAULT_MASK);
         pvfs_close(pd2->fd);
     }
     return rc;
@@ -908,7 +966,11 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
-        rc = iocommon_stat64(pd2, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+        if (!pd2)
+        {
+            return -1;
+        }
+        rc = iocommon_stat64(pd2, buf, PVFS_ATTR_DEFAULT_MASK);
         pvfs_close(pd2->fd);
     }
     return rc;
@@ -919,7 +981,7 @@ int pvfs_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
  */
 int pvfs_lstat(const char *path, struct stat *buf)
 {
-    return pvfs_lstat_mask(path, buf, PVFS_ATTR_SYS_ALL_NOHINT);
+    return pvfs_lstat_mask(path, buf, PVFS_ATTR_DEFAULT_MASK);
 }
 
 int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
@@ -929,13 +991,25 @@ int pvfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    mask &= PVFS_ATTR_DEFAULT_MASK;
+    rc = iocommon_stat(pd, buf, mask);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
        free(newpath);
     }
-    rc = iocommon_stat(pd, buf, mask);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -949,13 +1023,24 @@ int pvfs_lstat64(const char *path, struct stat64 *buf)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_stat64(pd, buf, PVFS_ATTR_DEFAULT_MASK);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_stat64(pd, buf, PVFS_ATTR_SYS_ALL_NOHINT);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -985,13 +1070,24 @@ int pvfs_chown(const char *path, uid_t owner, gid_t group)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_chown(pd, owner, group);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_chown(pd, owner, group);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -1053,6 +1149,10 @@ int pvfs_fchownat(int fd, const char *path, uid_t owner, gid_t group, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
+        if (!pd)
+        {
+            return -1;
+        }
         rc = iocommon_chown(pd2, owner, group);
         pvfs_close(pd2->fd);
     }
@@ -1069,13 +1169,24 @@ int pvfs_lchown(const char *path, uid_t owner, gid_t group)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY|O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_chown(pd, owner, group);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_chown(pd, owner, group);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -1089,13 +1200,24 @@ int pvfs_chmod(const char *path, mode_t mode)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_chmod(pd, mode);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_chmod(pd, mode);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -1146,6 +1268,10 @@ int pvfs_fchmodat(int fd, const char *path, mode_t mode, int flag)
             return -1;
         }
         pd2 = iocommon_open(path, flags, PVFS_HINT_NULL, 0, pd);
+        if (!pd2)
+        {
+            return -1;
+        }
         rc = iocommon_chmod(pd2, mode);
         pvfs_close(pd2->fd);
     }
@@ -1161,6 +1287,10 @@ int pvfs_mkdir(const char *path, mode_t mode)
     char *newpath;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     rc = iocommon_make_directory(newpath, (mode & ~mask_val & 0777), NULL);
     if (newpath != path)
     {
@@ -1210,6 +1340,10 @@ int pvfs_rmdir(const char *path)
     char *newpath;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     rc = iocommon_rmdir(newpath, NULL);
     if (newpath != path)
     {
@@ -1229,15 +1363,27 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
-    pd = iocommon_open(newpath, O_RDONLY | O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
-    if (newpath != path)
+    if (!newpath)
     {
-       free(newpath);
+        return -1;
+    }
+    pd = iocommon_open(newpath, O_RDONLY | O_NOFOLLOW, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
     }
     debug("pvfs_readlink mode is %o\n", pd->mode);
     /* this checks that it is a valid symlink and sets errno if not */
     rc = iocommon_readlink(pd, buf, bufsiz);
+    /* need to close if readlink succeeds or not */
     pvfs_close(pd->fd);
+
+errorout:
+    if (newpath != path)
+    {
+       free(newpath);
+    }
     return rc;
 }
 
@@ -1279,6 +1425,10 @@ int pvfs_symlink(const char *oldpath, const char *newpath)
     int rc = 0;
     char *abspath;
     abspath = pvfs_qualify_path(newpath);
+    if (!abspath)
+    {
+        return -1;
+    }
     rc = iocommon_symlink(abspath, oldpath, NULL);
     if (abspath != newpath)
     {
@@ -1342,9 +1492,11 @@ int pvfs_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
 }
 
 /**
- * this reads multiple dirents, up to count
+ * this reads multiple dirents, man pages calls last arg count but
+ * is ambiguous if it is number of records or number of bytes.  latter
+ * appears to be true so we renmame size.  Returns bytes read.
  */
-int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
+int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
@@ -1359,10 +1511,10 @@ int pvfs_getdents(unsigned int fd, struct dirent *dirp, unsigned int count)
         errno = EBADF;
         return -1;
     }
-    return iocommon_getdents(pd, dirp, count);
+    return iocommon_getdents(pd, dirp, size);
 }
 
-int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
+int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int size)
 {
     pvfs_descriptor *pd;
 
@@ -1377,7 +1529,7 @@ int pvfs_getdents64(unsigned int fd, struct dirent64 *dirp, unsigned int count)
         errno = EBADF;
         return -1;
     }
-    return iocommon_getdents64(pd, dirp, count);
+    return iocommon_getdents64(pd, dirp, size);
 }
 
 int pvfs_access(const char *path, int mode)
@@ -1385,6 +1537,10 @@ int pvfs_access(const char *path, int mode)
     int rc = 0;
     char *newpath;
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     rc = iocommon_access(path, mode, 0, NULL);
     if (newpath != path)
     {
@@ -1537,13 +1693,24 @@ int pvfs_statfs(const char *path, struct statfs *buf)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_statfs(pd, buf);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_statfs(pd, buf);
-    pvfs_close(pd->fd);
     return rc;
 }
 
@@ -1554,13 +1721,24 @@ int pvfs_statfs64(const char *path, struct statfs64 *buf)
     pvfs_descriptor *pd;
 
     newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
     pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_statfs64(pd, buf);
+    pvfs_close(pd->fd);
+
+errorout:
     if (newpath != path)
     {
         free(newpath);
     }
-    rc = iocommon_statfs64(pd, buf);
-    pvfs_close(pd->fd);
     return rc;
 }
                  

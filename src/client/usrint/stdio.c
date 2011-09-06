@@ -10,14 +10,10 @@
  *  PVFS2 user interface routines - implementation of stdio for pvfs
  */
 /* this prevents headers from using inlines for 64 bit calls */
-#ifdef _FILE_OFFSET_BITS
-#undef _FILE_OFFSET_BITS
-#endif
-
-#include <usrint.h>
-#include <dirent.h>
-#include <openfile-util.h>
-#include <stdio-ops.h>
+#define USRINT_SOURCE 1
+#include "usrint.h"
+#include "openfile-util.h"
+#include "stdio-ops.h"
 
 #define STDIO_DEBUG 0
 
@@ -54,7 +50,10 @@ struct __dirstream {
 };
 
 #define DIRSTREAM_MAGIC 0xFD100000
-#define DIRBUFSIZE (512*1024)
+#define PVFS_RLDC PVFS_REQ_LIMIT_DIRENT_COUNT
+#define MAXDIRENT (PVFS_RLDC < 512 ? PVFS_RLDC : 512)
+#define MAXBUFSIZE (MAXDIRENT * sizeof(struct dirent64))
+#define DIRBUFSIZE ((MAXBUFSIZE / 1024) * 1024)
 #define ASIZE 256
 #define MAXTRIES 16 /* arbitrary - how many tries to get a unique file name */
 
@@ -810,10 +809,10 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
     if ((offset != 0L) || (whence != SEEK_CUR))
     {
         int64_t filepos, fileend;
-        struct stat sbuf;
+        struct stat64 sbuf;
         filepos = lseek64(stream->_fileno, 0, SEEK_CUR);
         /* should fileend include stuff in write buffer ??? */
-        rc = fstat(stream->_fileno, &sbuf);
+        rc = fstat64(stream->_fileno, &sbuf);
         if (rc < 0)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
@@ -1222,7 +1221,7 @@ char *fgets_unlocked(char *s, int size, FILE *stream)
 {
     char c, *p;
 
-    if (!s || size < 1)
+    if (!stream || !s || size < 1)
     {
         errno = EINVAL;
         return NULL;
@@ -1356,9 +1355,14 @@ ssize_t getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
 
 ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
 {
-    int i = 0;;
+    int i = 0;
     char c, *p;
 
+    if (!stream || !n)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     if (!*lnptr)
     {
         if (*n <= 0)
@@ -1369,7 +1373,7 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     }
     p = *lnptr;
     do {
-        if (i+1 >= *n) /* need space for next char and null terminator */
+        if (i + 1 >= *n) /* need space for next char and null terminator */
         {
             *n += 256; /* spec gives no guidance on fit of allocated space */
             *lnptr = realloc(*lnptr, *n);
@@ -1916,9 +1920,16 @@ DIR *fdopendir (int fd)
     {
         return NULL;
     }
+    memset(dstr, 0, sizeof(DIR));
     SETMAGIC(dstr, DIRSTREAM_MAGIC);
     dstr->fileno = fd;
     dstr->buf_base = (char *)malloc(DIRBUFSIZE);
+    if (dstr->buf_base == NULL)
+    {
+        dstr->_flags = 0;
+        free(dstr);
+        return NULL;
+    }
     dstr->buf_end = dstr->buf_base + DIRBUFSIZE;
     dstr->buf_act = dstr->buf_base;
     dstr->buf_ptr = dstr->buf_base;
@@ -1950,9 +1961,11 @@ struct dirent *readdir (DIR *dir)
     {
         return NULL;
     }
+    /* linux hard defines d_name to 256 bytes */
+    /* if others don't should replace with a define */
     memcpy(dir->de.d_name, de64->d_name, 256);
     dir->de.d_ino = de64->d_ino;
-    /* these are wsystem specific fields from the dirent */
+    /* these are system specific fields from the dirent */
 #ifdef _DIRENT_HAVE_D_NAMELEN
     dir->de.d_namelen = strnlen(de64->d_name, 256);
 #endif
@@ -1991,12 +2004,16 @@ struct dirent64 *readdir64 (DIR *dir)
         int bytes_read;
         /* read a block of dirent64s into the buffer */
         bytes_read = getdents64(dir->fileno, (struct dirent64 *)dir->buf_base,
-                             (dir->buf_end - dir->buf_base));
+                               (dir->buf_end - dir->buf_base));
         dir->buf_act = dir->buf_base + bytes_read;
         dir->buf_ptr = dir->buf_base;
     }
     rval = (struct dirent64 *)dir->buf_ptr;
+#ifdef _DIRENT_HAVE_D_RECLEN
     dir->buf_ptr += rval->d_reclen;
+#else
+    dir->buf_ptr += sizeof(struct dirent64);
+#endif
     return rval;
 }
 
@@ -2005,13 +2022,13 @@ struct dirent64 *readdir64 (DIR *dir)
  */
 void rewinddir (DIR *dir)
 {
-    off_t filepos;
+    off64_t filepos;
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
     }
-    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    filepos = lseek64(dir->fileno, 0, SEEK_CUR);
     if ((filepos - (dir->buf_act - dir->buf_base)) == 0)
     {
         dir->buf_ptr = dir->buf_base;
@@ -2020,7 +2037,7 @@ void rewinddir (DIR *dir)
     {
         dir->buf_act = dir->buf_base;
         dir->buf_ptr = dir->buf_base;
-        lseek(dir->fileno, 0, SEEK_SET);
+        lseek64(dir->fileno, 0, SEEK_SET);
     }
 }
 
@@ -2029,13 +2046,13 @@ void rewinddir (DIR *dir)
  */
 void seekdir (DIR *dir, off_t offset)
 {
-    off_t filepos;
+    off64_t filepos;
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return;
     }
-    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    filepos = lseek64(dir->fileno, 0, SEEK_CUR);
     if ((filepos - (dir->buf_act - dir->buf_base)) <= offset &&
         filepos >= offset)
     {
@@ -2045,7 +2062,7 @@ void seekdir (DIR *dir, off_t offset)
     {
         dir->buf_act = dir->buf_base;
         dir->buf_ptr = dir->buf_base;
-        lseek(dir->fileno, offset, SEEK_SET);
+        lseek64(dir->fileno, offset, SEEK_SET);
     }
 }
 
@@ -2054,13 +2071,13 @@ void seekdir (DIR *dir, off_t offset)
  */
 off_t telldir (DIR *dir)
 {
-    off_t filepos;
+    off64_t filepos;
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
         return -1;
     }
-    filepos = lseek(dir->fileno, 0, SEEK_CUR);
+    filepos = lseek64(dir->fileno, 0, SEEK_CUR);
     if (filepos == -1)
     {
         return -1;

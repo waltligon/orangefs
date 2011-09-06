@@ -9,13 +9,13 @@
  *
  *  PVFS2 user interface routines - routines to manage open files
  */
-#include <usrint.h>
-#include <linux/dirent.h>
+#define USRINT_SOURCE 1
+#include "usrint.h"
 #include <sys/syscall.h>
-#include <posix-ops.h>
-#include <openfile-util.h>
-#include <posix-pvfs.h>
-#include <ucache.h>
+#include "posix-ops.h"
+#include "openfile-util.h"
+#include "posix-pvfs.h"
+//#include "ucache.h"
 
 static struct glibc_redirect_s
 {
@@ -170,6 +170,7 @@ static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
 
 void load_glibc(void)
 { 
+    memset((void *)&glibc_ops, 0, sizeof(glibc_ops));
     glibc_ops.open = dlsym(RTLD_NEXT, "open");
     glibc_ops.open64 = dlsym(RTLD_NEXT, "open64");
     glibc_ops.openat = dlsym(RTLD_NEXT, "openat");
@@ -253,6 +254,7 @@ void load_glibc(void)
     glibc_redirect.mknodat = dlsym(RTLD_NEXT, "__xmknodat");
     glibc_ops.sendfile = dlsym(RTLD_NEXT, "sendfile");
     glibc_ops.sendfile64 = dlsym(RTLD_NEXT, "sendfile64");
+#ifdef HAVE_ATTR_XATTR_H
     glibc_ops.setxattr = dlsym(RTLD_NEXT, "setxattr");
     glibc_ops.lsetxattr = dlsym(RTLD_NEXT, "lsetxattr");
     glibc_ops.fsetxattr = dlsym(RTLD_NEXT, "fsetxattr");
@@ -265,6 +267,7 @@ void load_glibc(void)
     glibc_ops.removexattr = dlsym(RTLD_NEXT, "removexattr");
     glibc_ops.lremovexattr = dlsym(RTLD_NEXT, "lremovexattr");
     glibc_ops.fremovexattr = dlsym(RTLD_NEXT, "fremovexattr");
+#endif
     glibc_ops.socket = dlsym(RTLD_NEXT, "socket");
     glibc_ops.accept = dlsym(RTLD_NEXT, "accept");
     glibc_ops.bind = dlsym(RTLD_NEXT, "bind");
@@ -384,8 +387,10 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
 
+#if 0
     /* ucache initialization - assumes shared memory previously aquired */
     ucache_initialize();
+#endif
 
     //PVFS_perror_gossip_silent(); 
     pvfs_initializing_flag = 0;
@@ -404,7 +409,7 @@ int pvfs_descriptor_table_size(void)
                                         PVFS_object_ref *file_ref
  )
  {
- 	int newfd, rc, flags; 
+ 	int newfd, flags = 0; 
     if (fsops == NULL)
     {
         errno = EINVAL;
@@ -421,8 +426,8 @@ int pvfs_descriptor_table_size(void)
     {
         /* opened by glibc, make sure this is a valid fd */
         newfd = fd;
-        rc = fcntl(newfd, F_GETFL, flags);
-        if (rc < 0)
+        flags = glibc_ops.fcntl(newfd, F_GETFL);
+        if (flags < 0)
         {
             return NULL;
         }
@@ -451,6 +456,7 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[newfd]->is_in_use = PVFS_FS;
     descriptor_table[newfd]->mtbl = NULL;
 
+#if 0
     /* File reference won't always be passed in */
     if(file_ref != NULL)
     {
@@ -472,6 +478,7 @@ int pvfs_descriptor_table_size(void)
             /* TODO: probably need modify this */  
         }
     }
+#endif
 
     return descriptor_table[newfd];
 }
@@ -534,10 +541,10 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
     pd = descriptor_table[fd];
     if (!pd)
     {
-        int rc, flags;
+        int flags;
         /* see if glibc opened this file without our knowing */
-        rc = glibc_ops.fcntl(fd, F_GETFL, flags);
-        if (rc < 0)
+        flags = glibc_ops.fcntl(fd, F_GETFL);
+        if (flags < 0)
         {
             errno = EBADF;
             return NULL;
@@ -548,7 +555,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->dup_cnt = 1;
 	    pd->fsops = &glibc_ops;
 	    pd->true_fd = fd;
-	    pd->.fs_id = 0;
+	    pd->pvfs_ref.fs_id = 0;
 	    pd->pvfs_ref.handle = 0;
 	    pd->flags = flags;
 	    pd->mode = 0;
@@ -591,6 +598,8 @@ int pvfs_free_descriptor(int fd)
         {
             free(pd->dpath);
         }
+
+#if 0
         /* release cache objects here */
         pd->mtbl->ref_cnt--;
         if(pd->mtbl->ref_cnt == 0)
@@ -600,6 +609,7 @@ int pvfs_free_descriptor(int fd)
             /* remove all of this file's associated data from cache */
             ucache_close_file(&(pd->pvfs_ref.fs_id), &(pd->pvfs_ref.handle));
         }
+#endif
 
 	    /* free descriptor - wipe memory first */
 	    memset(pd, 0, sizeof(pvfs_descriptor));
@@ -616,8 +626,6 @@ int pvfs_free_descriptor(int fd)
  */
 char *pvfs_qualify_path(const char *path)
 {
-    char *rc = NULL;
-    int i = 1;
     int cdsz;
     int psz;
     char *curdir = NULL;
@@ -625,29 +633,10 @@ char *pvfs_qualify_path(const char *path)
 
     if(path[0] != '/')
     {
-        /* loop until our temp buffer is big enough for the */
-        /* current directory */
-        do
+        curdir = get_current_dir_name();
+        if (curdir == NULL)
         {
-            if (i > 1 && curdir)
-            {
-                free(curdir);
-            }
-            curdir = (char *)malloc(i * 256);
-            if (curdir == NULL)
-            {
-                return NULL;
-            }
-            rc = getcwd(curdir, i * 256);
-            i++;
-        } while ((rc == NULL) && (errno == ERANGE));
-        if (rc == NULL)
-        {
-            /* some other error, bail out */
-            if (curdir)
-            {
-                free(curdir);
-            }
+            /* error, bail out */
             return NULL;
         }
         cdsz = strlen(curdir);
@@ -735,7 +724,8 @@ int is_pvfs_path(const char *path)
             return 0; /* not a PVFS path */
         }
         errno = rc;
-        return -1; /* an error returned */
+        return 0; /* an error returned - let glibc deal with it */
+        // return -1; /* an error returned */
     }
     return 1; /* a PVFS path */
 #endif
@@ -769,8 +759,8 @@ int split_pathname( const char *path,
 		path = &path[length];
     }
     /* Split path into a directory and filename */
-    length = strnlen(path, PVFS_NAME_MAX);
-    if (length == PVFS_NAME_MAX)
+    length = strnlen(path, PVFS_PATH_MAX);
+    if (length == PVFS_PATH_MAX)
     {
         errno = ENAMETOOLONG;
         return -1;

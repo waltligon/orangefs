@@ -9,7 +9,8 @@
  *
  *  PVFS2 user interface routines - routines to convert requests for pvfs
  */
-#include <usrint.h>
+#define USRINT_SOURCE 1
+#include "usrint.h"
 
 int pvfs_check_vector(const struct iovec *iov,
                       int count,
