@@ -31,6 +31,12 @@
 #include "user-cache.h"
 #include "ldap-support.h"
 
+extern BOOL DOKANAPI DokanIsNameInExpression(
+    LPCWSTR	    Expression, // matching pattern
+    LPCWSTR	    Name, // file name
+    BOOL        IgnoreCase
+);
+
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
@@ -1377,8 +1383,9 @@ PVFS_Dokan_set_file_attributes(
 
 
 static int __stdcall
-PVFS_Dokan_find_files(
-    LPCWSTR          FileName,
+PVFS_Dokan_find_files_with_pattern(
+    LPCWSTR          PathName,
+    LPCWSTR          SearchPattern,
     PFillFindData    FillFindData, // function pointer
     PDOKAN_FILE_INFO DokanFileInfo)
 {
@@ -1391,15 +1398,16 @@ PVFS_Dokan_find_files(
     wchar_t *wpath, *wfilename;
     BY_HANDLE_FILE_INFORMATION hfile_info;
     
-    DbgPrint("FindFiles: %S\n", FileName);
+    DbgPrint("FindFilesWithPattern: %S\n", PathName);
     DbgPrint("   Context: %llx\n", DokanFileInfo->Context);
+    DbgPrint("   Pattern: %S\n", SearchPattern);
 
     /* load credentials */
     err = get_credentials(DokanFileInfo, &credentials);
     CRED_CHECK("FindFiles", err);
 
     /* get file system path */
-    fs_path = get_fs_path(FileName);
+    fs_path = get_fs_path(PathName);
     if (fs_path == NULL)
         return -1;
 
@@ -1411,6 +1419,14 @@ PVFS_Dokan_find_files(
     while (strlen(filename) > 0)
     {        
         DbgPrint("   File found: %s\n", filename);
+
+        /* match file against search pattern */
+        wfilename = convert_mbstring(filename);
+        if (!DokanIsNameInExpression(SearchPattern, wfilename, FALSE))
+        {
+            DbgPrint("   File doesn't match\n");
+            goto find_files_no_match;
+        }
         count++;
         /* append the filename to the dir path */
         full_path = (char *) malloc(strlen(fs_path) + strlen(filename) + 2);
@@ -1423,12 +1439,11 @@ PVFS_Dokan_find_files(
 
         /* get file information */
         memset(&find_data, 0, sizeof(WIN32_FIND_DATAW));
-        wpath = convert_mbstring(full_path);
-        wfilename = convert_mbstring(filename);
+        wpath = convert_mbstring(full_path);        
         ret = PVFS_Dokan_get_file_information(wpath, &hfile_info, DokanFileInfo);
         /* a file may have been deleted, or there is a link with an 
            invalid target -- just continue listing files */        
-        if (ret == -PVFS_ENOENT)        
+        if (ret == -ERROR_FILE_NOT_FOUND)        
             goto find_files_continue;
         else if (ret != 0) 
         {
@@ -1454,9 +1469,10 @@ PVFS_Dokan_find_files(
         FillFindData(&find_data, DokanFileInfo);
 
 find_files_continue:
-
         free(full_path);
         cleanup_string(wpath);
+
+find_files_no_match:
         cleanup_string(wfilename);
 
         /* find next file */
@@ -2070,8 +2086,7 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
     dokanOperations->WriteFile = PVFS_Dokan_write_file;
     dokanOperations->FlushFileBuffers = PVFS_Dokan_flush_file_buffers;
     dokanOperations->GetFileInformation = PVFS_Dokan_get_file_information;
-    dokanOperations->FindFiles = PVFS_Dokan_find_files;
-    dokanOperations->FindFilesWithPattern = NULL;
+    dokanOperations->FindFilesWithPattern = PVFS_Dokan_find_files_with_pattern;
     dokanOperations->SetFileAttributes = PVFS_Dokan_set_file_attributes;
     dokanOperations->SetFileTime = PVFS_Dokan_set_file_time;
     dokanOperations->DeleteFile = PVFS_Dokan_delete_file;
