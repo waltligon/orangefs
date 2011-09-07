@@ -446,8 +446,8 @@ int pvfs_descriptor_table_size(void)
 	descriptor_table[newfd]->dup_cnt = 1;
 	descriptor_table[newfd]->fsops = fsops;
 	descriptor_table[newfd]->true_fd = newfd;
-	descriptor_table[newfd]->pvfs_ref.fs_id = 0;
-	descriptor_table[newfd]->pvfs_ref.handle = 0;
+	descriptor_table[newfd]->pvfs_ref.fs_id = file_ref->fs_id;
+	descriptor_table[newfd]->pvfs_ref.handle = file_ref->handle;
 	descriptor_table[newfd]->flags = flags;
 	descriptor_table[newfd]->mode = 0;
 	descriptor_table[newfd]->file_pointer = 0;

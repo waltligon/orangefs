@@ -7,22 +7,20 @@
 #ifndef UCACHE_H
 #define UCACHE_H
 
-#define UCACHE_ENABLED
+//#define UCACHE_ENABLED
 #define UCACHE_LOCKING_ENABLED
 
-#include <stdio.h>
-#include <sys/shm.h>
 #include <stdint.h>
-#include <semaphore.h>
 #include <pthread.h>
-
-/* The following includes may end up not being needed. 
-#include <sys/types.h>
-#include <sys/sem.h>
 #include <unistd.h>
-#include <string.h>
-#include <assert.h>
-*/
+#include <usrint.h>
+#include "posix-ops.h"
+#include "iocommon.h"
+#include "posix-pvfs.h"
+#include "openfile-util.h"
+#include <sys/shm.h>
+#include <stdio.h>
+#include <pvfs2-types.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -45,6 +43,7 @@
 
 #define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
 #if (LOCK_TYPE == 0)
+#include <semaphore.h>
 #define ucache_lock_t sem_t
 #define LOCK_SIZE sizeof(sem_t)
 #elif (LOCK_TYPE == 1)
@@ -55,8 +54,8 @@
 #define LOCK_SIZE sizeof(pthread_spinlock_t)
 #endif
 
-typedef uint32_t PVFS_fs_id;
-typedef uint64_t PVFS_handle;
+//typedef uint32_t PVFS_fs_id;
+//typedef uint64_t PVFS_handle;
 
 /** A link for one block of memory in a files hash table
  *
@@ -96,8 +95,8 @@ struct mem_table_s
 union cache_block_u
 {
     struct mem_table_s mtbl[MTBL_PER_BLOCK];
-    char mblk[CACHE_BLOCK_SIZE_K*1024];
-};
+    char mblk[CACHE_BLOCK_SIZE_K * 1024];
+}; 
 
 /** A link for one file in the top level hash table
  *
@@ -147,24 +146,30 @@ void ucache_initialize(void);
 int ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
                                   struct mem_table_s *mtbl);
 int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
+void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
 int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
-int ucache_flush(PVFS_fs_id *fs_id, PVFS_handle *handle);
-void ucache_dec_ref_cnt(struct mem_table_s * mtbl);
-void ucache_inc_ref_cnt(struct mem_table_s * mtbl);
-void ucache_info(
-    FILE * out,
-    union user_cache_u * ucache, 
-    ucache_lock_t * ucache_lock
+int ucache_flush(pvfs_descriptor *pd);
+void ucache_dec_ref_cnt(struct mem_table_s *mtbl);
+void ucache_inc_ref_cnt(struct mem_table_s *mtbl);
+void ucache_info(FILE *out, union user_cache_u *ucache,
+                            ucache_lock_t *ucache_lock
 );
-ucache_lock_t * get_block_lock(int block_index);
+ucache_lock_t *get_block_lock(int block_index);
 
-#if LOCK_TYPE==0
+int lock_init(ucache_lock_t * lock);
+int lock_lock(ucache_lock_t * lock);
+int lock_unlock(ucache_lock_t * lock);
+int lock_destroy(ucache_lock_t * lock);
+#if (LOCK_TYPE == 0)
 int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
-#endif /* LOCK_TYPE */
-/****************************************  End of Internal Only Functions    */
+#endif
+
+extern ucache_lock_t *ucache_lock;
+extern ucache_lock_t *ucache_block_lock;
+
 #endif /* UCACHE_H */
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -107,11 +107,18 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldname,
 /* do a blocking read or write
  */
 int iocommon_readorwrite(enum PVFS_io_type which,
-		         pvfs_descriptor *pd,
+	                 pvfs_descriptor *pd,
                          PVFS_size offset,
                          void *buf,
                          PVFS_Request mem_req,
-                         PVFS_Request file_req);
+                         PVFS_Request file_req,
+                         size_t count,
+                         const struct iovec *vector);
+
+/* Read or write block data to/from cache */
+int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector, 
+              int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
+                                                  size_t *scratch_left);
 
 
 /* [Do a nonblocking read or write] */

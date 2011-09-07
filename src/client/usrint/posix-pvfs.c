@@ -524,7 +524,12 @@ static ssize_t pvfs_prdwr64(int fd,
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &mreq);
 
-    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq);
+    /* place contiguous buff and count into an iovec array of length 1 */
+    struct iovec vector[1];
+    vector[0].iov_base = buf;
+    vector[0].iov_len = count;
+
+    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, count, &vector[0]);
 
     PVFS_Request_free(&freq);
     PVFS_Request_free(&mreq);
@@ -560,7 +565,7 @@ static ssize_t pvfs_rdwrv(int fd,
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
     rc = pvfs_convert_iovec(vector, count, &mreq, &buf);
 
-    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq);
+    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, count, vector);
 
     if (rc >= 0)
     {

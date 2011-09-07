@@ -128,6 +128,7 @@ extern int (*fremovexattr)(int fd, const char *name);
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
 #define PVFS_BUFSIZE (1024*1024)
+#define PVFS_PATH_MAX 1024
 
 /* extra function prototypes */
 int fseek64(FILE *stream, const off64_t offset, int whence);

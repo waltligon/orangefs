@@ -14,6 +14,7 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#include "ucache.h"
 
 /* Functions in this file generally define a label errorout
  * for cleanup before exit and return an int rc which is -1
@@ -93,7 +94,8 @@ int iocommon_fsync(pvfs_descriptor *pd)
         errno = EBADF;
         return -1;
     }
-    iocommon_cred(&credentials);
+    iocommon_cred(&credentials); 
+    ucache_flush(pd);
     rc = PVFS_sys_flush(pd->pvfs_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -477,7 +479,7 @@ pvfs_descriptor *iocommon_open(const char *path,
             /* try to open using glibc */
             rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
             IOCOMMON_RETURN_ERR(rc);
-            pd = pvfs_alloc_descriptor(&pvfs_ops, -1, NULL);
+            pd = pvfs_alloc_descriptor(&glibc_ops, -1, NULL);
             pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
             pd->true_fd = rc;
             pd->flags = flags;           /* open flags */
@@ -530,7 +532,6 @@ pvfs_descriptor *iocommon_open(const char *path,
         rc = -1;
         goto errorout;
     }
-    pd->pvfs_ref = file_ref;
     pd->flags = flags;           /* open flags */
     pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
 
@@ -902,22 +903,221 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          PVFS_size offset,
                          void *buf,
                          PVFS_Request mem_req,
-                         PVFS_Request file_req)
+                         PVFS_Request file_req,
+                         size_t count,
+                         const struct iovec *vector)
 {
-    #ifndef UCACHE_ENABLED
-    /* No cache */
-    return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
-                                                                file_req);
-    #endif /* UCACHE_ENABLED */
+    int USE_CACHE = 1; /* Incorporate this elseware to enable/disable caching */
+    int CACHE_FILE = 1; /* Eventually, a per file flag */
+    int rc = 0;
+    uint32_t tag_cnt = 0;
+    uint64_t remainder = 0;
+    uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
+    uint64_t pos = 0;
+    uint64_t end = offset + count;
+    PVFS_fs_id *fs_id = &(pd->pvfs_ref.fs_id);
+    PVFS_handle *handle = &(pd->pvfs_ref.handle);
+    unsigned char scratch = 0;  /* Used to determine if we finished writing a block without filling up the current io segment */
+    void  *scratch_ptr = 0; /* The offset into the last io semgment that was partially used (so use this ptr then move on to the next io segment) */
+    size_t scratch_left = 0;
+    int iovec_ndx = 0;
+    uint32_t block_ndx = 0;
 
-    //read
-    //readthedata(*filePtrToData)
-    //write
+    if(!USE_CACHE || !CACHE_FILE)
+    {
+        /* Bypass the ucache */
+        return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
+                                                                  file_req);
+    }
 
+    /* How many tags? */
+    tag_cnt = count / (CACHE_BLOCK_SIZE_K * 1024);
 
-    //Cache Routines
-    //Possibly Data Transfer
-    //Possibly More Cache Routines
+    /* Add 2 to be sure we have enough tags (may not need them) */
+    tag_cnt += 2;
+
+    /* Array of the tags we need to read/write to */
+    uint64_t tags[tag_cnt];
+   
+    remainder = offset % blk_size;
+
+    /* Block Aligned */
+    if(remainder == 0) 
+    {
+        tags[0] = offset;        
+    }
+    else
+    {
+        tags[0] = offset - remainder;
+    }
+    
+    /* Loop over positions storing tags (ment identifiers) */
+    pos = tags[0] + blk_size;
+    int i;
+    for(i = 1; pos < end; i++)
+    {
+        tags[i] = pos;
+        pos += blk_size;
+    }
+
+    /* This should represent the number of blks */
+    tag_cnt = i - 1;
+
+    /* Now that tags are set build array of lookup responses*/
+    unsigned char hits[tag_cnt];
+    for(i = 0; i < tag_cnt; i++)
+    {
+        /* if lookup returns nil set char to 0, otherwise 1 */
+        if((int32_t)ucache_lookup(fs_id, handle, tags[i], NULL) == NIL)
+        {
+            hits[tag_cnt] = 0; /* miss */
+        }
+        else{
+            hits[tag_cnt] = 1; /* hit */
+        }
+    }
+
+    //Could do this serially or in parallel
+    uint64_t block_loc = 0;
+    //uint64_t dest = (uint32_t)buf; //TODO: fix this cast to handle 32/64 bit
+    for(i = 0; i < tag_cnt; i++)
+    {
+        if(which == 1) /* Read */
+        {
+            if(hits[i] == 1) /* Hit */
+            {
+                /* Read from Cache */
+                //instead of looking up again, save lookup somehow
+                block_loc = (uint32_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit
+                lock_lock(ucache_lock);
+                lock_lock(&ucache_block_lock[block_ndx]); 
+                rc = place_data(1, (void *)&block_loc, vector, &iovec_ndx, 
+                                   &scratch, &scratch_ptr, &scratch_left);
+                lock_unlock(&ucache_block_lock[block_ndx]);
+                lock_unlock(ucache_lock);
+            }
+            else /* Miss */
+            {
+                /* read from fs into user mem */
+                rc = iocommon_readorwrite_nocache(which, pd, offset, 
+                                                  buf, mem_req, file_req);
+                if(rc > 0)
+                {
+                    block_loc = (uint32_t)ucache_insert(fs_id, handle, tags[i], //TODO: fix this cast to handle 32/64 bit 
+                                                         &block_ndx);
+                }
+                /* Copy into cache if possible */
+                if((int64_t)block_loc != NIL)
+                {
+                    lock_lock(ucache_lock);
+                    lock_lock(&ucache_block_lock[block_ndx]); 
+                    rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx, 
+                                       &scratch, &scratch_ptr, &scratch_left);
+                    lock_unlock(&ucache_block_lock[block_ndx]);
+                    lock_unlock(ucache_lock);
+                }
+            }
+        }
+        else if(which == 2) /* Write */
+        {
+            if(hits[i] == 1) /* Hit */
+            {
+                /* Overwrite block in cache */
+                /* //or use previous return value */
+                block_loc = (uint32_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit 
+                lock_lock(ucache_lock);
+                lock_lock(&ucache_block_lock[block_ndx]);  
+                rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx, 
+                                   &scratch, &scratch_ptr, &scratch_left);
+                lock_unlock(&ucache_block_lock[block_ndx]);
+                lock_unlock(ucache_lock);
+            }
+            else /* Miss */
+            {
+                /* Attempt ucache insert, on fail, send to file system */
+                block_loc = (uint32_t)ucache_insert(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit
+                if((int64_t)block_loc != NIL)
+                {
+                    lock_lock(ucache_lock);
+                    lock_lock(&ucache_block_lock[block_ndx]); 
+                    rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx,
+                                       &scratch, &scratch_ptr, &scratch_left);
+                    lock_unlock(&ucache_block_lock[block_ndx]);
+                    lock_unlock(ucache_lock);
+                }
+                else
+                {
+                    rc = iocommon_readorwrite_nocache(which, pd, offset, 
+                                                  buf, mem_req, file_req);
+                }
+            }
+        }
+    }
+    return rc;
+}
+
+/** TODO
+ * 1: read, read from user cache and write to user mem
+ * 2: write, read from user mem and write to user cache
+ */
+int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector, 
+              int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
+                                                  size_t *scratch_left)
+{
+    const size_t block_size = CACHE_BLOCK_SIZE_K * 1024;
+    /* Bytes of block remaining to be read/written */
+    size_t left = CACHE_BLOCK_SIZE_K * 1024;    
+    void *user_mem = 0; /* Where to read/write */
+    size_t user_mem_size = 0; /* How much to read/write */
+
+    /* Continue read/writing strips of data until the whole block completed */
+    while(left != 0)
+    {
+        /* Do we need to use the scratch_ptr or a fresh segment */
+        if(*scratch)
+        {
+            /* Use a previously used buffer that wasn't quite filled by the 
+             * previous cache block.
+             */
+            user_mem = *scratch_ptr;
+            user_mem_size = *scratch_left;
+            *scratch = 0;
+        }
+        else
+        {
+            user_mem = vector[*iovec_ndx].iov_base;
+            user_mem_size = vector[*iovec_ndx].iov_len;
+        }
+
+        /* Will this transfer complete the block but not the user mem segment */
+        if(user_mem_size > left)
+        {
+            /* Save a reference to where we left off with this segment*/
+            *scratch_ptr = user_mem + left;
+            *scratch_left = user_mem_size - left; //TODO: fix this cast to handle 32/64 bit
+            *scratch = 1;
+        }
+        else
+        {
+            /* We're done with this user mem segment */
+            (*iovec_ndx)++;
+        }
+
+        /* More Data! */
+        if(which == 1)
+        {
+            /* Read */
+            memcpy(user_mem, block + (block_size - left), user_mem_size);
+        }
+        else
+        {
+            /* Write */           
+            memcpy(block + (block_size - left), user_mem, user_mem_size);
+        }
+
+        left -= user_mem_size;
+    }
+    return 1;
 }
 
 /** do a blocking read or write
@@ -977,7 +1177,7 @@ errorout:
  * Returns an op_id, response, and ret_mem_request
  * (which represents an etype_req*count region)
  * Note that the none of the PVFS_Requests are freed
- */
+ *
 int iocommon_ireadorwrite(enum PVFS_io_type which,
                           pvfs_descriptor *pd,
                           PVFS_size extra_offset,
@@ -990,16 +1190,16 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
                           PVFS_Request *ret_memory_req)
 {
     #ifndef UCACHE_ENABLED
-    /* No cache */
+    // No cache 
     return iocommon_ireadorwrite_nocache(which, pd, extra_offset, buf, 
         etype_req, file_req, count, ret_op_id, ret_resp, ret_memory_req);
-    #endif /* UCACHE_ENABLED */
+    #endif // UCACHE_ENABLED 
 
     //if read then check cache..if not there..then read from i/o node and store into correct location
     //Possibly Data Transfer
     //Possibly More Cache Routines
 }
-
+*/
 
 /** Do a nonblocking read or write
  *
@@ -1009,7 +1209,7 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
  * (which represents an etype_req*count region)
  * Note that the none of the PVFS_Requests are freed
  */
-int iocommon_ireadorwrite_nocache(enum PVFS_io_type which,
+int iocommon_ireadorwrite(enum PVFS_io_type which,
                           pvfs_descriptor *pd,
                           PVFS_size extra_offset,
                           void *buf,
@@ -1833,8 +2033,14 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
     file_req = PVFS_BYTE;
 
-    rc = iocommon_readorwrite(PVFS_IO_READ, pd, *offset + bytes_read,
-                              buffer, mem_req, file_req);
+    /* place contiguous buff and count into an iovec array of length 1 
+    struct iovec vector[1];
+    vector[0].iov_base = buffer;
+    vector[0].iov_len = buffer_size;
+    */
+
+    rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
+                               buffer, mem_req, file_req);
     while(rc > 0)
     {
         int flags = 0;
@@ -1848,8 +2054,8 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
         {
             break;
         }
-        rc = iocommon_readorwrite(PVFS_IO_READ, pd, *offset + bytes_read,
-                                  buffer, mem_req, file_req);
+        rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
+                                   buffer, mem_req, file_req);
     }  
     PVFS_Request_free(&mem_req);
     free(buffer);
@@ -1947,16 +2153,16 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     key.buffer_sz = strlen(key_p) + 1;
     val.buffer = (void *)val_p;
     val.buffer_sz = size;
-
-    if (flag & XATTR_CREATE)
+/*
+    if (flag & XATTR_CREATE)//TODO
     {
         pvfs_flag |= PVFS_XATTR_CREATE;
     }
-    if (flag & XATTR_REPLACE)
+    if (flag & XATTR_REPLACE)//TODO
     {
         pvfs_flag |= PVFS_XATTR_REPLACE;
     }
-
+*/
     /* now set attributes */
     rc = PVFS_sys_seteattr(pd->pvfs_ref,
                           credentials,
