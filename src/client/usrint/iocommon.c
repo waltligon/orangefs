@@ -907,19 +907,27 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          size_t count,
                          const struct iovec *vector)
 {
-    int USE_CACHE = 1; /* Incorporate this elseware to enable/disable caching */
-    int CACHE_FILE = 1; /* Eventually, a per file flag */
+    /* Incorporate this elsewhere to enable/disable caching */
+    int USE_CACHE = 1; 
+    /* Eventually, a per file flag */
+    int CACHE_FILE = 1; 
     int rc = 0;
-    uint32_t tag_cnt = 0;
+    int tag_cnt = 0;
     uint64_t remainder = 0;
     uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
     uint64_t pos = 0;
     uint64_t end = offset + count;
     PVFS_fs_id *fs_id = &(pd->pvfs_ref.fs_id);
     PVFS_handle *handle = &(pd->pvfs_ref.handle);
-    unsigned char scratch = 0;  /* Used to determine if we finished writing a block without filling up the current io segment */
-    void  *scratch_ptr = 0; /* The offset into the last io semgment that was partially used (so use this ptr then move on to the next io segment) */
-    size_t scratch_left = 0;
+    /* Used to determine if we finished writing a block without filling up the 
+     * current io segment 
+     */
+    unsigned char scratch = 0;  
+    /* The offset into the last io semgment that was partially used (so use 
+     * this ptr then move on to the next io segment) .
+     */
+    void  *scratch_ptr = 0; 
+    uint64_t scratch_left = 0;
     int iovec_ndx = 0;
     uint32_t block_ndx = 0;
 
@@ -968,7 +976,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     for(i = 0; i < tag_cnt; i++)
     {
         /* if lookup returns nil set char to 0, otherwise 1 */
-        if((int32_t)ucache_lookup(fs_id, handle, tags[i], NULL) == NIL)
+        if((int32_t)ucache_lookup(fs_id, handle, tags[i], NULL) == NIL) //TODO: 32 or 64 
         {
             hits[tag_cnt] = 0; /* miss */
         }
@@ -979,7 +987,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 
     //Could do this serially or in parallel
     uint64_t block_loc = 0;
-    //uint64_t dest = (uint32_t)buf; //TODO: fix this cast to handle 32/64 bit
     for(i = 0; i < tag_cnt; i++)
     {
         if(which == 1) /* Read */
@@ -1062,13 +1069,13 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  */
 int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector, 
               int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
-                                                  size_t *scratch_left)
+                                                  uint64_t *scratch_left)
 {
     const size_t block_size = CACHE_BLOCK_SIZE_K * 1024;
     /* Bytes of block remaining to be read/written */
     size_t left = CACHE_BLOCK_SIZE_K * 1024;    
     void *user_mem = 0; /* Where to read/write */
-    size_t user_mem_size = 0; /* How much to read/write */
+    uint64_t user_mem_size = 0; /* How much to read/write */
 
     /* Continue read/writing strips of data until the whole block completed */
     while(left != 0)
@@ -2033,12 +2040,6 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
     file_req = PVFS_BYTE;
 
-    /* place contiguous buff and count into an iovec array of length 1 
-    struct iovec vector[1];
-    vector[0].iov_base = buffer;
-    vector[0].iov_len = buffer_size;
-    */
-
     rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
                                buffer, mem_req, file_req);
     while(rc > 0)
@@ -2153,7 +2154,7 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     key.buffer_sz = strlen(key_p) + 1;
     val.buffer = (void *)val_p;
     val.buffer_sz = size;
-/*
+
     if (flag & XATTR_CREATE)//TODO
     {
         pvfs_flag |= PVFS_XATTR_CREATE;
@@ -2162,7 +2163,7 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     {
         pvfs_flag |= PVFS_XATTR_REPLACE;
     }
-*/
+
     /* now set attributes */
     rc = PVFS_sys_seteattr(pd->pvfs_ref,
                           credentials,

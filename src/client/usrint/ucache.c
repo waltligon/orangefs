@@ -28,13 +28,6 @@ ucache_lock_t *ucache_block_lock;
 
 /* Internal Only Function Declarations */
 
-/* Locking 
-int lock_init(ucache_lock_t * lock);
-int lock_lock(ucache_lock_t * lock);
-int lock_unlock(ucache_lock_t * lock);
-int lock_destroy(ucache_lock_t * lock);
-*/
-
 /* Initialization */
 static void add_free_mtbls(int blk);
 static void init_memory_table(int blk, int ent);

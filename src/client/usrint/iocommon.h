@@ -118,7 +118,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 /* Read or write block data to/from cache */
 int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector, 
               int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
-                                                  size_t *scratch_left);
+                                                  uint64_t *scratch_left);
 
 
 /* [Do a nonblocking read or write] */
