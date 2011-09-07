@@ -78,6 +78,8 @@
 #ifdef HAVE_SYS_ATTR_H
 #include <sys/xattr.h>
 #else
+#define XATTR_CREATE 0x1
+#define XATTR_REPLACE 0x2
 extern int (*setxattr)(const char *path, const char *name,
                     const void *value, size_t size, int flags);
 extern int (*lsetxattr)(const char *path, const char *name,
@@ -128,7 +130,6 @@ extern int (*fremovexattr)(int fd, const char *name);
 /* constants for this library */
 /* size of stdio default buffer - starting at 1Meg */
 #define PVFS_BUFSIZE (1024*1024)
-#define PVFS_PATH_MAX 1024
 
 /* extra function prototypes */
 int fseek64(FILE *stream, const off64_t offset, int whence);
