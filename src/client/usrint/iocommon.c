@@ -976,7 +976,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     for(i = 0; i < tag_cnt; i++)
     {
         /* if lookup returns nil set char to 0, otherwise 1 */
-        if((int32_t)ucache_lookup(fs_id, handle, tags[i], NULL) == NIL) //TODO: 32 or 64 
+        if(ucache_lookup(fs_id, handle, tags[i], NULL) == (void *)NIL) 
         {
             hits[tag_cnt] = 0; /* miss */
         }
@@ -995,10 +995,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             {
                 /* Read from Cache */
                 //instead of looking up again, save lookup somehow
-                block_loc = (uint32_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit
+                block_loc = (lookup_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx);
                 lock_lock(ucache_lock);
                 lock_lock(&ucache_block_lock[block_ndx]); 
-                rc = place_data(1, (void *)&block_loc, vector, &iovec_ndx, 
+                rc = place_data(1, block_loc, vector, &iovec_ndx, 
                                    &scratch, &scratch_ptr, &scratch_left);
                 lock_unlock(&ucache_block_lock[block_ndx]);
                 lock_unlock(ucache_lock);
@@ -1010,15 +1010,15 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                                   buf, mem_req, file_req);
                 if(rc > 0)
                 {
-                    block_loc = (uint32_t)ucache_insert(fs_id, handle, tags[i], //TODO: fix this cast to handle 32/64 bit 
+                    block_loc = (lookup_t)ucache_insert(fs_id, handle, tags[i], 
                                                          &block_ndx);
                 }
                 /* Copy into cache if possible */
-                if((int64_t)block_loc != NIL)
+                if(block_loc != (uint64_t)NIL)
                 {
                     lock_lock(ucache_lock);
                     lock_lock(&ucache_block_lock[block_ndx]); 
-                    rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx, 
+                    rc = place_data(2, block_loc, vector, &iovec_ndx, 
                                        &scratch, &scratch_ptr, &scratch_left);
                     lock_unlock(&ucache_block_lock[block_ndx]);
                     lock_unlock(ucache_lock);
@@ -1031,10 +1031,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             {
                 /* Overwrite block in cache */
                 /* //or use previous return value */
-                block_loc = (uint32_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit 
+                block_loc = (lookup_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); 
                 lock_lock(ucache_lock);
                 lock_lock(&ucache_block_lock[block_ndx]);  
-                rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx, 
+                rc = place_data(2, block_loc, vector, &iovec_ndx, 
                                    &scratch, &scratch_ptr, &scratch_left);
                 lock_unlock(&ucache_block_lock[block_ndx]);
                 lock_unlock(ucache_lock);
@@ -1042,12 +1042,12 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             else /* Miss */
             {
                 /* Attempt ucache insert, on fail, send to file system */
-                block_loc = (uint32_t)ucache_insert(fs_id, handle, tags[i], &block_ndx); //TODO: fix this cast to handle 32/64 bit
-                if((int64_t)block_loc != NIL)
+                block_loc = (lookup_t)ucache_insert(fs_id, handle, tags[i], &block_ndx);
+                if(block_loc != (uint64_t)NIL)
                 {
                     lock_lock(ucache_lock);
                     lock_lock(&ucache_block_lock[block_ndx]); 
-                    rc = place_data(2, (void *)&block_loc, vector, &iovec_ndx,
+                    rc = place_data(2, block_loc, vector, &iovec_ndx,
                                        &scratch, &scratch_ptr, &scratch_left);
                     lock_unlock(&ucache_block_lock[block_ndx]);
                     lock_unlock(ucache_lock);
@@ -1067,13 +1067,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  * 1: read, read from user cache and write to user mem
  * 2: write, read from user mem and write to user cache
  */
-int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector, 
-              int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
-                                                  uint64_t *scratch_left)
+int place_data(enum PVFS_io_type which, const uint64_t block, 
+                                  const struct iovec *vector, 
+                      int *iovec_ndx, unsigned char *scratch, 
+                  void **scratch_ptr, uint64_t *scratch_left)
 {
-    const size_t block_size = CACHE_BLOCK_SIZE_K * 1024;
+    const uint64_t block_size = CACHE_BLOCK_SIZE_K * 1024;
     /* Bytes of block remaining to be read/written */
-    size_t left = CACHE_BLOCK_SIZE_K * 1024;    
+    uint64_t left = CACHE_BLOCK_SIZE_K * 1024;    
     void *user_mem = 0; /* Where to read/write */
     uint64_t user_mem_size = 0; /* How much to read/write */
 
@@ -1100,8 +1101,8 @@ int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector,
         if(user_mem_size > left)
         {
             /* Save a reference to where we left off with this segment*/
-            *scratch_ptr = user_mem + left;
-            *scratch_left = user_mem_size - left; //TODO: fix this cast to handle 32/64 bit
+            *scratch_ptr = (void *)(user_mem + left);
+            *scratch_left = user_mem_size - left;
             *scratch = 1;
         }
         else
@@ -1114,12 +1115,12 @@ int place_data(enum PVFS_io_type which, void *block, const struct iovec *vector,
         if(which == 1)
         {
             /* Read */
-            memcpy(user_mem, block + (block_size - left), user_mem_size);
+            memcpy(user_mem, (void *)(block + (block_size - left)), (size_t)user_mem_size);
         }
         else
         {
             /* Write */           
-            memcpy(block + (block_size - left), user_mem, user_mem_size);
+            memcpy((void*)(block + (block_size - left)), user_mem, (size_t)user_mem_size);
         }
 
         left -= user_mem_size;

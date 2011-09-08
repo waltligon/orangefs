@@ -37,6 +37,12 @@
 #define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
 
+#if (PVFS2_SIZEOF_VOIDP == 32)
+#define lookup_t uint32_t
+#elif (PVFS2_SIZEOF_VOIDP == 64)
+#define lookup_t uint64_t
+#endif
+
 #define DBG 0
 #define INTERNAL_TESTING 0
 
