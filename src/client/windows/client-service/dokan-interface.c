@@ -31,12 +31,6 @@
 #include "user-cache.h"
 #include "ldap-support.h"
 
-extern BOOL DOKANAPI DokanIsNameInExpression(
-    LPCWSTR	    Expression, // matching pattern
-    LPCWSTR	    Name, // file name
-    BOOL        IgnoreCase
-);
-
 BOOL g_UseStdErr;
 BOOL g_DebugMode;
 
@@ -1475,6 +1469,10 @@ find_files_continue:
 find_files_no_match:
         cleanup_string(wfilename);
 
+        /* reset timeout to 30 sec. */
+        if (count % 100 == 0)
+            DokanResetTimeout(30000, DokanFileInfo);
+
         /* find next file */
         ret = fs_find_next_file(fs_path, &token, &credentials, filename, PVFS_NAME_MAX);
         
@@ -2146,6 +2144,8 @@ int __cdecl dokan_loop(PORANGEFS_OPTIONS options)
         Sleep(30000);
 
     } while (TRUE);
+
+    cleanup_string(dokanOptions->MountPoint);
 
     qhash_destroy_and_finalize(context_cache, struct context_entry, hash_link, free);
     gen_mutex_destroy(&context_cache_mutex);
