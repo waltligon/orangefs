@@ -27,8 +27,11 @@
 #define PVFS2_PROTO_MAJOR 6
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
+ * NOTE: Incrementing this will make clients unable to talk to older servers.
+ * Do not change until we have a new version policy.
  */
-#define PVFS2_PROTO_MINOR 1
+#define PVFS2_PROTO_MINOR 0
+
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 /* we set the maximum possible size of a small I/O packed message as 64K.  This
