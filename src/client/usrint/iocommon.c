@@ -995,7 +995,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             {
                 /* Read from Cache */
                 //instead of looking up again, save lookup somehow
-                block_loc = (lookup_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx);
+                block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx);
                 lock_lock(ucache_lock);
                 lock_lock(&ucache_block_lock[block_ndx]); 
                 rc = place_data(1, block_loc, vector, &iovec_ndx, 
@@ -1010,7 +1010,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                                   buf, mem_req, file_req);
                 if(rc > 0)
                 {
-                    block_loc = (lookup_t)ucache_insert(fs_id, handle, tags[i], 
+                    block_loc = (voidp_t)ucache_insert(fs_id, handle, tags[i], 
                                                          &block_ndx);
                 }
                 /* Copy into cache if possible */
@@ -1031,7 +1031,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             {
                 /* Overwrite block in cache */
                 /* //or use previous return value */
-                block_loc = (lookup_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); 
+                block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); 
                 lock_lock(ucache_lock);
                 lock_lock(&ucache_block_lock[block_ndx]);  
                 rc = place_data(2, block_loc, vector, &iovec_ndx, 
@@ -1042,7 +1042,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             else /* Miss */
             {
                 /* Attempt ucache insert, on fail, send to file system */
-                block_loc = (lookup_t)ucache_insert(fs_id, handle, tags[i], &block_ndx);
+                block_loc = (voidp_t)ucache_insert(fs_id, handle, tags[i], &block_ndx);
                 if(block_loc != (uint64_t)NIL)
                 {
                     lock_lock(ucache_lock);
@@ -1067,7 +1067,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  * 1: read, read from user cache and write to user mem
  * 2: write, read from user mem and write to user cache
  */
-int place_data(enum PVFS_io_type which, const uint64_t block, 
+uint32_t place_data(enum PVFS_io_type which, const uint64_t block, 
                                   const struct iovec *vector, 
                       int *iovec_ndx, unsigned char *scratch, 
                   void **scratch_ptr, uint64_t *scratch_left)

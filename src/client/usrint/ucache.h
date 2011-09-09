@@ -38,9 +38,9 @@
 #define NIL (-1)
 
 #if (PVFS2_SIZEOF_VOIDP == 32)
-#define lookup_t uint32_t
+#define voidp_t uint32_t
 #elif (PVFS2_SIZEOF_VOIDP == 64)
-#define lookup_t uint64_t
+#define voidp_t uint64_t
 #endif
 
 #define DBG 0
@@ -149,26 +149,26 @@ struct ucache_ref_s
 
 /* externally visible API */
 void ucache_initialize(void);
-int ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
+uint32_t ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
                                   struct mem_table_s *mtbl);
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
+uint32_t ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
 void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
 void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
-int ucache_flush(pvfs_descriptor *pd);
+uint32_t ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+uint32_t ucache_flush(pvfs_descriptor *pd);
 void ucache_dec_ref_cnt(struct mem_table_s *mtbl);
 void ucache_inc_ref_cnt(struct mem_table_s *mtbl);
 void ucache_info(FILE *out, union user_cache_u *ucache,
                             ucache_lock_t *ucache_lock
 );
-ucache_lock_t *get_block_lock(int block_index);
+ucache_lock_t *get_block_lock(uint32_t block_index);
 
-int lock_init(ucache_lock_t * lock);
-int lock_lock(ucache_lock_t * lock);
-int lock_unlock(ucache_lock_t * lock);
-int lock_destroy(ucache_lock_t * lock);
+uint32_t lock_init(ucache_lock_t * lock);
+uint32_t lock_lock(ucache_lock_t * lock);
+uint32_t lock_unlock(ucache_lock_t * lock);
+uint32_t lock_destroy(ucache_lock_t * lock);
 #if (LOCK_TYPE == 0)
-int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
+uint32_t ucache_lock_getvalue(ucache_lock_t * lock, uint32_t *sval);
 #endif
 
 extern ucache_lock_t *ucache_lock;

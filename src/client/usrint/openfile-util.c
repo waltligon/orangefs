@@ -12,6 +12,9 @@
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include <sys/syscall.h>
+#ifndef SYS_readdir
+#define SYS_readdir 89
+#endif
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "posix-pvfs.h"
