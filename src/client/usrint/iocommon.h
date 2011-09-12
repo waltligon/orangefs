@@ -116,7 +116,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          const struct iovec *vector);
 
 /* Read or write block data to/from cache */
-int place_data(enum PVFS_io_type which, const uint64_t block, const struct iovec *vector, 
+uint32_t place_data(enum PVFS_io_type which, const uint64_t block, const struct iovec *vector, 
               int *iovec_ndx, unsigned char *scratch, void **scratch_ptr, 
                                                   uint64_t *scratch_left);
 

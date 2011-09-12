@@ -1115,12 +1115,12 @@ uint32_t place_data(enum PVFS_io_type which, const uint64_t block,
         if(which == 1)
         {
             /* Read */
-            memcpy(user_mem, (void *)(block + (block_size - left)), (size_t)user_mem_size);
+            memcpy(user_mem, (void *)(voidp_t)(block + (block_size - left)), (size_t)user_mem_size);
         }
         else
         {
             /* Write */           
-            memcpy((void*)(block + (block_size - left)), user_mem, (size_t)user_mem_size);
+            memcpy((void*)(voidp_t)(block + (block_size - left)), user_mem, (size_t)user_mem_size);
         }
 
         left -= user_mem_size;
