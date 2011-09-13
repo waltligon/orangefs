@@ -18,7 +18,7 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "posix-pvfs.h"
-//#include "ucache.h"
+#include "ucache.h"
 
 static struct glibc_redirect_s
 {
@@ -390,10 +390,11 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
 
-#if 0
-    /* ucache initialization - assumes shared memory previously aquired */
-    ucache_initialize();
-#endif
+    /* Initialize User Cache */
+    if(ucache && ucache_locks)
+    {
+        ucache_initialize();
+    }
 
     //PVFS_perror_gossip_silent(); 
     pvfs_initializing_flag = 0;

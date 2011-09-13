@@ -94,8 +94,11 @@ int iocommon_fsync(pvfs_descriptor *pd)
         errno = EBADF;
         return -1;
     }
-    iocommon_cred(&credentials); 
-    ucache_flush(pd);
+    iocommon_cred(&credentials);
+    if(ucache!=0 && ucache_locks!=0)
+    {
+        ucache_flush(pd);
+    }
     rc = PVFS_sys_flush(pd->pvfs_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -908,9 +911,16 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          const struct iovec *vector)
 {
     /* Incorporate this elsewhere to enable/disable caching */
-    int USE_CACHE = 1; 
+    int USE_CACHE = (int)(ucache!=0 && ucache_locks!=0); 
     /* Eventually, a per file flag */
-    int CACHE_FILE = 1; 
+    int CACHE_FILE = 1;
+
+    if(!USE_CACHE || !CACHE_FILE)
+    {
+        /* Bypass the ucache */
+        return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
+                                                                  file_req);
+    }
     int rc = 0;
     int tag_cnt = 0;
     uint64_t remainder = 0;
@@ -931,12 +941,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     int iovec_ndx = 0;
     uint32_t block_ndx = 0;
 
-    if(!USE_CACHE || !CACHE_FILE)
-    {
-        /* Bypass the ucache */
-        return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
-                                                                  file_req);
-    }
 
     /* How many tags? */
     tag_cnt = count / (CACHE_BLOCK_SIZE_K * 1024);

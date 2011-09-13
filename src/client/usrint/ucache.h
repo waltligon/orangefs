@@ -60,8 +60,8 @@
 #define LOCK_SIZE sizeof(pthread_spinlock_t)
 #endif
 
-//typedef uint32_t PVFS_fs_id;
-//typedef uint64_t PVFS_handle;
+extern union user_cache_u *ucache;
+extern ucache_lock_t *ucache_locks;
 
 /** A link for one block of memory in a files hash table
  *

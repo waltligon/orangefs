@@ -19,12 +19,12 @@
 /* Global Variables */
 static FILE *out;                   /* For Logging Purposes */
 
-static union user_cache_u *ucache;
-static uint32_t ucache_blk_cnt;
+union user_cache_u *ucache = 0;
+static uint32_t ucache_blk_cnt = 0;
 
-ucache_lock_t *ucache_locks; /* will refer to the shmem of all ucache locks */
-ucache_lock_t *ucache_lock;  /* Global Lock maintaining concurrency */
-ucache_lock_t *ucache_block_lock;
+ucache_lock_t *ucache_locks = 0; /* will refer to the shmem of all ucache locks */
+ucache_lock_t *ucache_lock = 0;  /* Global Lock maintaining concurrency */
+ucache_lock_t *ucache_block_lock = 0;
 
 /* Internal Only Function Declarations */
 
@@ -369,7 +369,7 @@ void ucache_inc_ref_cnt(struct mem_table_s * mtbl)
 }
 
 /** Dumps all cache related information. */
-void ucache_info(
+void    ucache_info(
     FILE *out,
     union user_cache_u *ucache, 
     ucache_lock_t *ucache_lock)
