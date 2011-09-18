@@ -319,7 +319,6 @@ void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
         ptr = (void *) desc[i].ptr;
         assert(ptr);
 
-#ifdef REDHAT_RELEASE_9
         /* fixes a corruption issue on linux 2.4 kernels where the buffers are
          * not being pinned in memory properly
          */
@@ -327,7 +326,6 @@ void PINT_dev_put_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc)
         { 
            gossip_err("Error: FAILED to munlock shared buffer\n");
         }
-#endif
 
         PINT_mem_aligned_free(ptr);
     }
