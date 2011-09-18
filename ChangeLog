@@ -1,6 +1,111 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
+orangefs-2.8.5
+
+Text after "CVS: " can be prepended with "http://www.pvfs.org/fisheye/changelog/~br=Orange-Branch/PVFS/?cs=Orange-Branch:" to view related change sets in FishEye.
+
+* Enhancement: change to kernel source path to support SuSE style kernel sources
+        CVS: mtmoore:20110831005433
+
+* Enhancement: add prompt after X removals during a pvfs2-fsck when -y specified
+        CVS: mtmoore:20110824144127
+
+* Enhancement: Add sanity checks to extended attribute operations 
+        CVS: mtmoore:20110811180653
+
+* Enhancement addition of counters and application to feed SNMP counters
+        CVS: walt:20110628184842
+        CVS: walt:20110628161840
+        CVS: walt:20110617152339
+
+* Enhancement: addition of scripts used for OrangeFS CI Jenkins testing
+        CVS: mtmoore:20110623183144
+
+* Enhancement: add backtrace handler to SIGABRT
+        CVS: mtmoore:20110607235041
+
+* Enhancement: add sanity checks during trove cleanup/initialization
+        CVS: mtmoore:20110607232817
+
+* Enhancement: allow server log to be re-opened on SIGHUP to allow log rotation
+        CVS: mtmoore:20110607023901        
+        CVS: mtmoore:20110530143543
+
+* Enhancement: allow debug mask to be reset during SIGHUP
+        CVS: bligon:20110504200411
+
+* Enhancement: add Berkeley DB configure check for version 4.8.30
+        CVS: mtmoore:20110405050554
+	Additional Information: https://www.orangefs.org/trac/orangefs/wiki/DBVersionRequired
+
+* Enhancement add configure checks for binaries required during build
+        CVS: mtmoore:20110404165443
+
+* Enhancement: kernel changes to support newer kernels (up to 2.6.40 tested and 3.X compiles, not tested)
+        CVS: mtmoore:20110831005433
+        CVS: mtmoore:20110823184109
+        CVS: mtmoore:20110822232017
+        CVS: mtmoore:20110412175323
+        CVS: mtmoore:20110525205504
+        CVS: mtmoore:20110405142136
+        CVS: mtmoore:20110405141506
+
+* Bug Fix: man pages are now gzip'd during installation  
+        CVS: mtmoore:20110904010919
+
+* Bug Fix: berkeley db gives back unaligned pages (in custom compare/multi-key cases), use local variables to fix ARM failures
+        CVS: mtmoore:20110902173424
+
+* Bug Fix: pointer dereference size issue in dbpf-mgmt on non-x86 platforms, Neal Ferguson
+        CVS: mtmoore:20110823171834
+
+* Bug Fix: file corruption using direct backend when writes continuously appending to single file
+        CVS: elaine:20110819120934
+        CVS: mtmoore:20110629130442
+
+* Bug Fix: segfault in pvfs2-xattr due to mirror handle string comparison, Nick Mills
+        CVS: mtmoore:20110809180325
+
+* Bug Fix: add backtrace functionality back in for newer distributions
+        CVS: mtmoore:20110801124552
+        CVS: mtmoore:20110607215819
+
+* Bug Fix: server-side memory leak related to operation completion 
+        CVS: bligon:20110708194724
+
+* Bug Fix: slab cache fix, Bart Taylor
+        CVS: bligon:20110613200154
+
+* Bug Fix: duplicate handle fix in iterate-handles, Phil Carns
+        CVS: bligon:20110610202309
+
+* Bug Fix: correctly parse pvfs2-server alias argument
+        CVS: mtmoore:20110608010721
+
+* Bug Fix: mx_address lookup failure with multiple protocols
+        CVS: bligon:20110530173949
+
+* Bug Fix: admin apps segfault with IB
+        CVS: bligon:20110512215357
+
+* Bug Fix: allow pvfs2-server to re-read configuratio file regardless of absolute or relative path
+        CVS: mtmoore:20110506194814
+
+* Bug Fix: root squash functionality, Bart Taylor
+        CVS: bligon:20110506173620
+
+* Bug Fix: various kernel related stability and error-handling fixes
+        CVS: mtmoore:20110729151843
+        CVS: mtmoore:20110729143317
+        CVS: mtmoore:20110530154853
+        CVS: mtmoore:20110412175444
+
+* Bug Fix: pin memory passed in to the kernel to prevent swap pages and kernel panic
+        CVS: mtmoore:20110725160953
+
+-------------------------------------------------------------------------------
+
 orangefs-2.8.4
 * Change verisioning to no longer include dates, just increment the sub version for every release
 
