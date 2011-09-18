@@ -1110,6 +1110,8 @@ endif
 install_doc:
 	install -d $(mandir)/man1
 	install -d $(mandir)/man5
+	rm -f ${mandir}/man1/*.gz
+	rm -f ${mandir}/man5/*.gz
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 	gzip ${mandir}/man1/*
