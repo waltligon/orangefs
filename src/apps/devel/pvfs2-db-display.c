@@ -300,8 +300,15 @@ void print_keyval( DBT key, DBT val )
 
     if( strncmp(k->key, "dh", 3) == 0 || strncmp(k->key, "de", 3) == 0 )
     {
-        vh = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vh), val.size);
+        int s = 0;
+        while(s < val.size )
+        {
+            vh = *(uint64_t *)(val.data + s);
+            printf("(%llu)", llu(vh));
+            s += sizeof(TROVE_handle);
+        }
+        printf("(%d)\n", val.size);
+
     }
 
     else if( strncmp(k->key, "md", 3) == 0 )
