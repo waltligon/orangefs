@@ -33,14 +33,14 @@ void mywrite(int writefd, const char *src, char *buffer);
 #define LOCKS_SIZE (513 * 24)
 
 /* Choose which reponse to send to caller */
-#define CHECK_RC(rc)                            \
-    if(rc >= 0)                                 \
-    {                                           \
-       mywrite(writefd, "SUCCESS", buffer);     \
-    }                                           \
-    else                                        \
-    {                                           \
-        mywrite(writefd, "FAILURE", buffer);    \
-    }                                           \
+#define CHECK_RC(rc)                                                        \
+    if(rc >= 0)                                                             \
+    {                                                                       \
+       mywrite(writefd, "SUCCESS", buffer);                                 \
+    }                                                                       \
+    else                                                                    \
+    {                                                                       \
+        mywrite(writefd, "FAILURE: check log: /tmp/ucached.log", buffer);   \
+    }                                                                       \
 
 #endif
