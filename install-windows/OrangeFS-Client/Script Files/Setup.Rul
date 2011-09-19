@@ -103,10 +103,12 @@ Dlg_SdWelcome:
     szMsg   = "";
     nResult = SdWelcome(szTitle, szMsg);
     if (nResult = BACK) goto Dlg_SdWelcome;
-	
-	szTitle   = "";
-	svName    = "";
-    svCompany = "";
+	    
+Dlg_SdLicense:                             
+    szQuestion = "";
+    nResult = SdLicense(szTitle, szMsg, szQuestion, "license.txt");
+    if (nResult = BACK) goto Dlg_SdWelcome;
+       
 /*
 Dlg_SdRegisterUser:
     szMsg = "";
@@ -139,7 +141,7 @@ Dlg_SetupType:
 
 Dlg_SdAskDestPath:    	
     nResult = SdAskDestPath(szTitle, szMsg, INSTALLDIR, 0);
-    if (nResult = BACK) goto Dlg_SdWelcome;
+    if (nResult = BACK) goto Dlg_SdLicense;
 /*
 Dlg_SdFeatureTree: 
     szTitle    = "";
