@@ -408,6 +408,7 @@ Label_DlgSkip:
     if ( BATCH_INSTALL ) then
     	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
     else
+        szMsg2 = "Documentation is available in " + (INSTALLDIR ^ "Doc") + ".";
         szOpt1 = "Start the OrangeFS services";
         bOpt1 = TRUE;
 	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
