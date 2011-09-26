@@ -34,22 +34,25 @@ static struct glibc_redirect_s
     int (*mknodat)(int ver, int dirfd, const char *path, mode_t mode, dev_t dev);
 } glibc_redirect;
 
+#ifndef CACHE_ENABLED_DEFAULT
+#define CACHE_ENABLED_DEFAULT 1
+#endif
 #define PREALLOC 3
-static char logfilepath[25];
+static char logfilepath[30];
 static int logfile;
 static int pvfs_initializing_flag = 0;
 static int descriptor_table_count = 0; 
 static int descriptor_table_size = 0; 
 static pvfs_descriptor **descriptor_table; 
 static char rstate[256];  /* used for random number generation */
+static int cache_enabled = CACHE_ENABLED_DEFAULT;
 
 posix_ops glibc_ops;
 
-pvfs_descriptor pvfs_stdin =
+pvfs_descriptor_status pvfs_stdin_status =
 {
-    .fd = 0,
+    .dup_cnt = 1,
     .fsops = &glibc_ops,
-    .true_fd = STDIN_FILENO,
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_RDONLY,
@@ -57,14 +60,45 @@ pvfs_descriptor pvfs_stdin =
     .file_pointer = 0,
     .token = 0,
     .dpath = NULL,
-    .is_in_use = PVFS_FS
+    .mtbl = NULL
+};
+
+pvfs_descriptor pvfs_stdin =
+{
+    .is_in_use = PVFS_FS,
+    .fd = 0,
+    .true_fd = STDIN_FILENO,
+    .fdflags = 0,
+    .s = &pvfs_stdin_status
+};
+
+pvfs_descriptor_status pvfs_stdout_status =
+{
+    .dup_cnt = 1,
+    .fsops = &glibc_ops,
+    .pvfs_ref.fs_id = 0,
+    .pvfs_ref.handle = 0,
+    .flags = O_WRONLY | O_APPEND,
+    .mode = 0,
+    .file_pointer = 0,
+    .token = 0,
+    .dpath = NULL,
+    .mtbl = NULL
 };
 
 pvfs_descriptor pvfs_stdout =
 {
+    .is_in_use = PVFS_FS,
     .fd = 1,
-    .fsops = &glibc_ops,
     .true_fd = STDOUT_FILENO,
+    .fdflags = 0,
+    .s = &pvfs_stdout_status
+};
+
+pvfs_descriptor_status pvfs_stderr_status =
+{
+    .dup_cnt = 1,
+    .fsops = &glibc_ops,
     .pvfs_ref.fs_id = 0,
     .pvfs_ref.handle = 0,
     .flags = O_WRONLY | O_APPEND,
@@ -72,22 +106,16 @@ pvfs_descriptor pvfs_stdout =
     .file_pointer = 0,
     .token = 0,
     .dpath = NULL,
-    .is_in_use = PVFS_FS
+    .mtbl = NULL
 };
 
 pvfs_descriptor pvfs_stderr =
 {
+    .is_in_use = PVFS_FS,
     .fd = 2,
-    .fsops = &glibc_ops,
     .true_fd = STDERR_FILENO,
-    .pvfs_ref.fs_id = 0,
-    .pvfs_ref.handle = 0,
-    .flags = O_WRONLY | O_APPEND,
-    .mode = 0,
-    .file_pointer = 0,
-    .token = 0,
-    .dpath = NULL,
-    .is_in_use = PVFS_FS
+    .fdflags = 0,
+    .s = &pvfs_stderr_status
 };
 
 static int my_glibc_stat(const char *path, struct stat *buf)
@@ -217,6 +245,10 @@ void load_glibc(void)
     glibc_redirect.lstat = dlsym(RTLD_NEXT, "__lxstat");
     glibc_ops.lstat64 = my_glibc_lstat64;
     glibc_redirect.lstat64 = dlsym(RTLD_NEXT, "__lxstat64");
+    glibc_ops.futimesat = dlsym(RTLD_NEXT, "futimesat");
+    glibc_ops.utimes = dlsym(RTLD_NEXT, "utimes");
+    glibc_ops.utime = dlsym(RTLD_NEXT, "utime");
+    glibc_ops.futimes = dlsym(RTLD_NEXT, "futimes");
     glibc_ops.dup = dlsym(RTLD_NEXT, "dup");
     glibc_ops.dup2 = dlsym(RTLD_NEXT, "dup2");
     glibc_ops.chown = dlsym(RTLD_NEXT, "chown");
@@ -251,6 +283,8 @@ void load_glibc(void)
     glibc_ops.statfs64 = dlsym(RTLD_NEXT, "statfs64");
     glibc_ops.fstatfs = dlsym(RTLD_NEXT, "fstatfs");
     glibc_ops.fstatfs64 = dlsym(RTLD_NEXT, "fstatfs64");
+    glibc_ops.statvfs = dlsym(RTLD_NEXT, "statvfs");
+    glibc_ops.fstatvfs = dlsym(RTLD_NEXT, "fstatvfs");
     glibc_ops.mknod = my_glibc_mknod;
     glibc_redirect.mknod = dlsym(RTLD_NEXT, "__xmknod");
     glibc_ops.mknodat = my_glibc_mknodat;
@@ -299,6 +333,14 @@ void load_glibc(void)
     glibc_ops.umask = dlsym(RTLD_NEXT, "umask");
     glibc_ops.getumask = dlsym(RTLD_NEXT, "getumask");
     glibc_ops.getdtablesize = dlsym(RTLD_NEXT, "getdtablesize");
+    glibc_ops.mmap = dlsym(RTLD_NEXT, "mmap");
+    glibc_ops.munmap = dlsym(RTLD_NEXT, "munmap");
+    glibc_ops.msync = dlsym(RTLD_NEXT, "msync");
+    glibc_ops.acl_delete_def_file = dlsym(RTLD_NEXT, "acl_delete_def_file");
+    glibc_ops.acl_get_fd = dlsym(RTLD_NEXT, "acl_get_fd");
+    glibc_ops.acl_get_file = dlsym(RTLD_NEXT, "acl_get_file");
+    glibc_ops.acl_set_fd = dlsym(RTLD_NEXT, "acl_set_fd");
+    glibc_ops.acl_set_file = dlsym(RTLD_NEXT, "acl_set_file");
 
 /* PVFS does not implement socket ops */
     pvfs_ops.socket = dlsym(RTLD_NEXT, "socket");
@@ -328,21 +370,40 @@ void load_glibc(void)
     pvfs_ops.pipe = dlsym(RTLD_NEXT, "pipe");
 }
 
+/*
+ * runs on exist to do any cleanup
+ */
 static void usrint_cleanup(void)
 {
     /* later check for an error that might want us */
     /* to keep this - for now it is empty */
     glibc_ops.unlink(logfilepath);
+    /* cache cleanup? */
+#if 0
+    if (pvfs_ucache_enabled)
+    {
+        ucache_finalize();
+    }
+#endif
+}
+
+/*
+ * acces function to see if cache is currently enabled
+ */
+int pvfs_ucache_enabled(void)
+{
+    return cache_enabled;
 }
 
 /* 
  * Perform PVFS initialization tasks
  */ 
-
 void pvfs_sys_init(void) { 
 	struct rlimit rl; 
 	int rc; 
+    char *rv;
     static int pvfs_lib_init_flag = 0; 
+    char curdir[PVFS_PATH_MAX];
 
     if (pvfs_lib_init_flag)
     {
@@ -357,6 +418,15 @@ void pvfs_sys_init(void) {
 
     /* if this fails no much we can do about it */
     atexit(usrint_cleanup);
+
+    /* set up current working dir */
+    rv = getcwd(curdir, PVFS_PATH_MAX);
+    if (!rv)
+    {
+        perror("failed to get CWD");
+        exit(-1);
+    }
+    pvfs_cwd_init(curdir, PVFS_PATH_MAX);
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
@@ -373,7 +443,10 @@ void pvfs_sys_init(void) {
     descriptor_table[2] = &pvfs_stderr;
     descriptor_table_count = PREALLOC;
 
-    sprintf(logfilepath, "/tmp/pvfsuid-%05d.log", (int)(getuid()));
+    /* open log file */
+    /* we dupe this FD to get FD's for pvfs files */
+    memset(logfilepath, 0, sizeof(logfilepath));
+    snprintf(logfilepath, 25, "/tmp/pvfsuid-%05d.log", (int)(getuid()));
     logfile = glibc_ops.open(logfilepath, O_RDWR|O_CREAT, 0600);
     if (logfile < 0)
     {
@@ -382,6 +455,9 @@ void pvfs_sys_init(void) {
     }
 
 	/* initalize PVFS */ 
+    /* this is very complex so most stuff needs to work
+     * before we do this
+     */
 	PVFS_util_init_defaults(); 
     if (errno == EINPROGRESS)
     {
@@ -390,10 +466,12 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
 
-    /* Initialize User Cache */
-    if(ucache && ucache_locks)
+    /* ucache initialization - assumes shared memory previously aquired */
+    rc = ucache_initialize();
+    if (rc < 0)
     {
-        ucache_initialize();
+        /* continue without cache */
+        cache_enabled = 0;
     }
 
     //PVFS_perror_gossip_silent(); 
@@ -409,18 +487,20 @@ int pvfs_descriptor_table_size(void)
  * Allocate a new pvfs_descriptor
  * initialize fsops to the given set
  */
- pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops, int fd, 
-                                        PVFS_object_ref *file_ref
- )
+ pvfs_descriptor *pvfs_alloc_descriptor(posix_ops *fsops,
+                                        int fd, 
+                                        PVFS_object_ref *file_ref,
+                                        int use_cache)
  {
  	int newfd, flags = 0; 
+    pvfs_descriptor *pd;
+
+    pvfs_sys_init();
     if (fsops == NULL)
     {
         errno = EINVAL;
         return NULL;
     }
-    pvfs_sys_init();
-
     if (fd == -1)
     {
         /* PVFS file allocate a real descriptor for it */
@@ -435,56 +515,92 @@ int pvfs_descriptor_table_size(void)
         {
             return NULL;
         }
+        if (descriptor_table[newfd] != NULL)
+        {
+            errno = EINVAL;
+            return NULL;
+        }
     }
+
+    /* allocate new descriptor */
 	descriptor_table_count++;
-    descriptor_table[newfd] =
+    pd = descriptor_table[newfd] =
                 (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
-    if (!descriptor_table[newfd])
+    if (!pd)
     {
         return NULL;
     }
+    memset(pd, 0, sizeof(pvfs_descriptor));
+    pd->s =
+            (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
+    if (!pd->s)
+    {
+        free(pd);
+        return NULL;
+    }
+    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
 
 	/* fill in descriptor */
-    /* add reference to chache objects here */
-	descriptor_table[newfd]->fd = newfd;
-	descriptor_table[newfd]->dup_cnt = 1;
-	descriptor_table[newfd]->fsops = fsops;
-	descriptor_table[newfd]->true_fd = newfd;
-	descriptor_table[newfd]->pvfs_ref.fs_id = file_ref->fs_id;
-	descriptor_table[newfd]->pvfs_ref.handle = file_ref->handle;
-	descriptor_table[newfd]->flags = flags;
-	descriptor_table[newfd]->mode = 0;
-	descriptor_table[newfd]->file_pointer = 0;
-	descriptor_table[newfd]->token = 0;
-	descriptor_table[newfd]->dpath = NULL;
-	descriptor_table[newfd]->is_in_use = PVFS_FS;
-    descriptor_table[newfd]->mtbl = NULL;
-
-#if 0
-    /* File reference won't always be passed in */
-    if(file_ref != NULL)
+	pd->is_in_use = PVFS_FS;
+	pd->fd = newfd;
+	pd->true_fd = newfd;
+	pd->fdflags = 0;
+    if (!use_cache)
     {
-        /* We have the file identifiers, so insert file info into ucache */
-        rc = ucache_open_file(&(file_ref->fs_id), &(file_ref->handle), 
-                                       descriptor_table[newfd]->mtbl);
-        /* Unique Entry */
-        if(rc > 0)
-        {   
-            descriptor_table[newfd]->mtbl->ref_cnt = 1;
-        }
-        /* File already in Cache */
-        else if(rc == 0){
-            descriptor_table[newfd]->mtbl->ref_cnt++;
-        }
-        /* Could not insert */
-        else
+	    pd->fdflags |= PVFS_FD_NOCACHE;
+    }
+	pd->s->dup_cnt = 1;
+	pd->s->fsops = fsops;
+    if (file_ref)
+    {
+	    pd->s->pvfs_ref.fs_id = file_ref->fs_id;
+	    pd->s->pvfs_ref.handle = file_ref->handle;
+    }
+    else
+    {
+        /* if this is not a PVFS file then the file_ref will be NULL */
+	    pd->s->pvfs_ref.fs_id = 0;
+	    pd->s->pvfs_ref.handle = 0LL;
+    }
+	pd->s->flags = flags;
+	pd->s->mode = 0; /* this should be filled in by caller */
+	pd->s->file_pointer = 0;
+	pd->s->token = 0;
+	pd->s->dpath = NULL;
+    pd->s->mtbl = NULL; /* not caching if left NULL */
+
+    if (pvfs_ucache_enabled() && use_cache)
+    {
+        /* File reference won't always be passed in */
+        if(file_ref != NULL)
         {
-            /* TODO: probably need modify this */  
+            int rc = 0;
+            /* We have the file identifiers
+             * so insert file info into ucache
+             * this fills in mtbl
+             */
+            rc = ucache_open_file(&(file_ref->fs_id),
+                                  &(file_ref->handle), 
+                                  pd->s->mtbl);
+            /* Unique Entry */
+            if(rc > 0)
+            {   
+                pd->s->mtbl->ref_cnt = 1;
+            }
+            /* File already in Cache */
+            else if(rc == 0)
+            {
+                pd->s->mtbl->ref_cnt++;
+            }
+            /* Could not insert */
+            else
+            {
+                /* TODO: need error recovery here */  
+            }
         }
     }
-#endif
 
-    return descriptor_table[newfd];
+    return pd;
 }
 
 /*
@@ -493,12 +609,15 @@ int pvfs_descriptor_table_size(void)
 int pvfs_dup_descriptor(int oldfd, int newfd)
 {
     int rc = 0;
+    pvfs_descriptor *pd;
+
+    pvfs_sys_init();
     if (oldfd < 0 || oldfd >= descriptor_table_size)
     {
         errno = EBADF;
         return -1;
     }
-    if (newfd == -1)
+    if (newfd == -1) /* dup */
     {
         newfd = glibc_ops.dup(logfile);
         if (newfd < 0)
@@ -506,10 +625,16 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
             return newfd;
         }
     }
-    else
+    else /* dup2 */
     {
+        /* see if requested fd is in use */
         if (descriptor_table[newfd] != NULL)
         {
+            /* check for special case */
+            if (newfd == oldfd)
+            {
+                return oldfd;
+            }
             /* close old file in new slot */
             rc = pvfs_free_descriptor(newfd);
             if (rc < 0)
@@ -517,15 +642,29 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
                 return rc;
             }
         }
+        /* continuing with dup2 */
+        rc = glibc_ops.dup2(oldfd, newfd);
+        if (rc < 0)
+        {
+            return rc;
+        }
     }
-    rc = glibc_ops.dup2(oldfd, newfd);
-    if (rc < 0)
-    {
-        return rc;
-    }
-    descriptor_table[newfd] = descriptor_table[oldfd];
-    descriptor_table[newfd]->dup_cnt++;
+    /* new set up new pvfs_descfriptor */
 	descriptor_table_count++;
+    pd = descriptor_table[newfd] =
+                (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    if (!pd)
+    {
+        return -1;
+    }
+    memset(pd, 0, sizeof(pvfs_descriptor));
+	pd->is_in_use = PVFS_FS;
+	pd->fd = newfd;
+	pd->true_fd = newfd;
+	pd->fdflags = 0;
+    /* share the pvfs_desdriptor_status info */
+    pd->s = descriptor_table[oldfd]->s;
+    pd->s->dup_cnt++;
     return 0;
 }
 
@@ -536,7 +675,9 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
  */
 pvfs_descriptor *pvfs_find_descriptor(int fd)
 {
-    pvfs_descriptor *pd;
+    pvfs_descriptor *pd = NULL;
+
+    pvfs_sys_init();
     if (fd < 0 || fd >= descriptor_table_size)
     {
         errno = EBADF;
@@ -545,30 +686,49 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
     pd = descriptor_table[fd];
     if (!pd)
     {
-        int flags;
+        int flags = 0;
         /* see if glibc opened this file without our knowing */
         flags = glibc_ops.fcntl(fd, F_GETFL);
-        if (flags < 0)
+        if (flags == -1)
         {
-            errno = EBADF;
+            /* apparently not */
             return NULL;
         }
-        pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+        /* allocate a descriptor */
+	    descriptor_table_count++;
+        pd = descriptor_table[fd] =
+                    (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+        if (!pd)
+        {
+            return NULL;
+        }
+        memset(pd, 0, sizeof(pvfs_descriptor));
+        pd->s =
+             (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
+        if (!pd->s)
+        {
+            free(pd);
+            return NULL;
+        }
+        memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+    
 	    /* fill in descriptor */
-	    pd->fd = fd;
-	    pd->dup_cnt = 1;
-	    pd->fsops = &glibc_ops;
-	    pd->true_fd = fd;
-	    pd->pvfs_ref.fs_id = 0;
-	    pd->pvfs_ref.handle = 0;
-	    pd->flags = flags;
-	    pd->mode = 0;
-	    pd->file_pointer = 0;
-	    pd->token = 0;
-	    pd->dpath = NULL;
 	    pd->is_in_use = PVFS_FS;
-        descriptor_table[fd] = pd;
+	    pd->fd = fd;
+	    pd->true_fd = fd;
+	    pd->fdflags = 0;
+	    pd->s->dup_cnt = 1;
+	    pd->s->fsops = &glibc_ops;
+	    pd->s->pvfs_ref.fs_id = 0;
+	    pd->s->pvfs_ref.handle = 0LL;
+	    pd->s->flags = flags;
+	    pd->s->mode = 0;
+	    pd->s->file_pointer = 0;
+	    pd->s->token = 0;
+	    pd->s->dpath = NULL;
+        pd->s->mtbl = NULL; /* not caching if left NULL */
     }
+    /* not a PVFS descriptor and unix descriptor not in use */
     else if (pd->is_in_use != PVFS_FS)
     {
         errno = EBADF;
@@ -579,7 +739,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 
 int pvfs_free_descriptor(int fd)
 {
-    pvfs_descriptor *pd;
+    pvfs_descriptor *pd = NULL;
     debug("pvfs_free_descriptor called with %d\n", fd);
 
     pd = pvfs_find_descriptor(fd);
@@ -596,27 +756,40 @@ int pvfs_free_descriptor(int fd)
 	descriptor_table_count--;
 
     /* check if last copy */
-    if (--(pd->dup_cnt) <= 0)
+    if (--(pd->s->dup_cnt) <= 0)
     {
-        if (pd->dpath)
+        if (pd->s->dpath)
         {
-            free(pd->dpath);
+            free(pd->s->dpath);
         }
 
-#if 0
-        /* release cache objects here */
-        pd->mtbl->ref_cnt--;
-        if(pd->mtbl->ref_cnt == 0)
+        if (pd->s->mtbl)
         {
-            /* Flush dirty blocks before file removal from cache */
-            ucache_flush(&(pd->pvfs_ref.fs_id), &(pd->pvfs_ref.handle));
-            /* remove all of this file's associated data from cache */
-            ucache_close_file(&(pd->pvfs_ref.fs_id), &(pd->pvfs_ref.handle));
+            /* release cache objects here */
+            pd->s->mtbl->ref_cnt--;
+            if(pd->s->mtbl->ref_cnt == 0)
+            {
+                /* Flush dirty blocks before file removal from cache */
+                ucache_flush(pd);
+                /* remove all of this file's associated data from cache */
+                ucache_close_file(&(pd->s->pvfs_ref.fs_id),
+                                  &(pd->s->pvfs_ref.handle));
+            }
         }
-#endif
 
-	    /* free descriptor - wipe memory first */
-	    memset(pd, 0, sizeof(pvfs_descriptor));
+	    /* free descriptor status - wipe memory first */
+	    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+        /* first 3 descriptors not malloc'd */
+        if (fd > 2)
+        {
+	        free(pd->s);
+        }
+    }
+	/* free descriptor - wipe memory first */
+	memset(pd, 0, sizeof(pvfs_descriptor));
+    /* first 3 descriptors not malloc'd */
+    if (fd > 2)
+    {
 	    free(pd);
     }
 
@@ -630,27 +803,46 @@ int pvfs_free_descriptor(int fd)
  */
 char *pvfs_qualify_path(const char *path)
 {
-    int cdsz;
-    int psz;
-    char *curdir = NULL;
+    int cdsz, psz, msz;
+    char *rc;
     char *newpath = NULL;
+    char curdir[PVFS_PATH_MAX];
 
     if(path[0] != '/')
     {
-        curdir = get_current_dir_name();
+        memset(curdir, 0, PVFS_PATH_MAX);
+        rc = getcwd(curdir, PVFS_PATH_MAX);
         if (curdir == NULL)
         {
+            /* ERANGE if need a larger buffer */
             /* error, bail out */
             return NULL;
         }
         cdsz = strlen(curdir);
         psz = strlen(path);
+        msz = cdsz + psz + 2;
+        if (msz < 2)
+        {
+            errno = EINVAL;
+            return NULL;
+        }
         /* allocate buffer for whole path and copy */
-        newpath = (char *)malloc(cdsz + psz + 2);
-        strncpy(newpath, curdir, cdsz);
-        free(curdir);
+        newpath = (char *)malloc(msz);
+        if (!newpath)
+        {
+            return NULL;
+        }
+        memset(newpath, 0, msz);
+        if (cdsz >= 0) /* zero size copy is bad */
+        {
+            strncpy(newpath, curdir, cdsz);
+        }
+        /* free(curdir); */
         strncat(newpath, "/", 1);
-        strncat(newpath, path, psz);
+        if (psz >= 0) /* zero size copy is bad */
+        {
+            strncat(newpath, path, psz);
+        }
     }
     else
     {
@@ -667,12 +859,13 @@ char *pvfs_qualify_path(const char *path)
 
 int is_pvfs_path(const char *path)
 {
-#ifdef PVFS_ASSUME_MOUNT
-    struct statfs file_system;
+#ifdef PVFS_USRINT_KMOUNT
+    struct stat sbuf;
+    struct statfs fsbuf;
 #endif
     int rc = 0;
     PVFS_fs_id fs_id;
-    char pvfs_path[256];
+    char pvfs_path[PVFS_PATH_MAX];
     char *newpath = NULL ;
 
     if (pvfs_initializing_flag)
@@ -684,27 +877,40 @@ int is_pvfs_path(const char *path)
     }
 
     pvfs_sys_init();
-#ifdef PVFS_ASSUME_MOUNT
+#ifdef PVFS_USRINT_MOUNT
     memset(&file_system, 0, sizeof(file_system));
     
     newpath = pvfs_qualify_path(path);
-    /* lop off the last segment of the path */
-    int count;
-    for(count = strlen(newpath) -2; count > 0; count--)
+    /* first try to state the path */
+    /* this must call standard glibc stat */
+    rc = glibc_ops.stat(newpath, &sbuf);
+    if (rc < 0)
     {
-        if(newpath[count] == '/')
+        int count;
+        /* path doesn't exist, try removing last segment */
+        for(count = strlen(newpath) -2; count > 0; count--)
         {
-            newpath[count] = '\0';
-            break;
+            if(newpath[count] == '/')
+            {
+                newpath[count] = '\0';
+                break;
+            }
+        }
+        /* this must call standard glibc stat */
+        rc = glibc_ops.stat(newpath, &sbuf);
+        if (rc < 0)
+        {
+            /* can't find the path must be an error */
+            return 0; /* let glibc sort out the error */
         }
     }
     /* this must call standard glibc statfs */
-    glibc_ops.statfs(newpath, &file_system);
+    rc = glibc_ops.statfs(newpath, &fsbuf);
     if (newpath != path)
     {
         free(newpath);
     }
-    if(file_system.f_type == PVFS_FS)
+    if(fsbuf.f_type == PVFS_FS)
     {
         return 1; /* PVFS */
     }
@@ -713,10 +919,15 @@ int is_pvfs_path(const char *path)
         return 0; /* not PVFS assume the kernel can handle it */
     }
 /***************************************************************/
-#else
+#else /* PVFS_USRINT_KMOUNT */
 /***************************************************************/
+    /* we might not be able to stat the file direcly
+     * so we will use our resolver to look up the path
+     * prefix in the mount tab files
+     */
+    memset(pvfs_path, 0 , PVFS_PATH_MAX);
     newpath = pvfs_qualify_path(path);
-    rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, 256);
+    rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, PVFS_PATH_MAX);
     if (newpath != path)
     {
         free(newpath);
@@ -732,7 +943,7 @@ int is_pvfs_path(const char *path)
         // return -1; /* an error returned */
     }
     return 1; /* a PVFS path */
-#endif
+#endif /* PVFS_USRINT_KMOUNT */
 }
 
 /**

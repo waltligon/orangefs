@@ -148,9 +148,10 @@ struct ucache_ref_s
 };
 
 /* externally visible API */
-void ucache_initialize(void);
-uint32_t ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
-                                  struct mem_table_s *mtbl);
+int ucache_initialize(void);
+int ucache_open_file(PVFS_fs_id *fs_id,
+                     PVFS_handle *handle, 
+                     struct mem_table_s *mtbl);
 uint32_t ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
 void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
 void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);

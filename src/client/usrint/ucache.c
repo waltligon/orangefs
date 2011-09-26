@@ -108,19 +108,37 @@ static uint32_t evict_LRU(struct mem_table_s *mtbl);
  *  The whole cache is protected by a locking mechanism to maintain concurrency.
  *  Currently using posix semaphores
  */
-void ucache_initialize(void)
+int ucache_initialize(void)
 {
-    uint32_t i = 0;
+    int rc = 0;
+    int i = 0;
+    int id1;
 
     /* Aquire ptr to shared memory for ucache_locks */
-    ucache_locks = shmat(shmget(ftok(GET_KEY_FILE, 'a'), 0, CACHE_FLAGS), NULL,
-                                                                     AT_FLAGS);
+    id1 = shmget(ftok(GET_KEY_FILE, 'a'), 0, CACHE_FLAGS);
+    if (id1 < 0)
+    {
+        return -1;
+    }
+    ucache_locks = shmat(id1, NULL, AT_FLAGS);
+    if (!ucache_locks)
+    {
+        return -1;
+    }
     /* Global Cache lock stored in first LOCK_SIZE position */
     ucache_lock = ucache_locks; 
 
     /* Initialize Global Cache Lock */
-    lock_init(ucache_lock);
-    lock_lock(ucache_lock);
+    rc = lock_init(ucache_lock);
+    if (rc < 0)
+    {
+        return -1;
+    }
+    rc = lock_lock(ucache_lock);
+    if (rc < 0)
+    {
+        return -1;
+    }
 
     /* The next BLOCKS_IN_CACHE number of block locks follow the global lock */
     ucache_block_lock = ucache_locks + 1;
@@ -128,6 +146,11 @@ void ucache_initialize(void)
     for(i = 0; i < BLOCKS_IN_CACHE; i++)
     {
         lock_init(get_block_lock(i));
+        if (rc < 0)
+        {
+            rc = -1;
+            goto errout;
+        }
     }
 
     /* Aquire ptr to shared memory for ucache */
@@ -135,15 +158,28 @@ void ucache_initialize(void)
     uint32_t id;
     char *key_file_path;
     /*  Direct output   */
-    if(!out)out = stdout;
+    if (!out)
+    {
+        out = stdout;
+    }
     /* Note: had to set: kernel.shmmax amd kernel.shmall */
     /* set up shared memory region */
     key_file_path = GET_KEY_FILE;
     key = ftok(key_file_path, PROJ_ID);
     id = shmget(key, 0, CACHE_FLAGS);
+    if (id < 0)
+    {
+        rc = -1;
+        goto errout;
+    }
     ucache = shmat(id, NULL, AT_FLAGS);
+    if (!ucache)
+    {
+        rc = -1;
+        goto errout;
+    }
     ucache_blk_cnt = BLOCKS_IN_CACHE;
-    if(DBG)
+    if (DBG)
     {
         fprintf(out, "key:\t\t\t0X%X\n", key);
         fprintf(out, "id:\t\t\t%d\n", id);
@@ -178,12 +214,15 @@ void ucache_initialize(void)
         ucache->ftbl.file[i].next = i + 1;
     }
     ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL;
+
+errout:
     lock_unlock(ucache_lock);
+    return rc;
 }
 
-uint32_t ucache_open_file(PVFS_fs_id *fs_id, PVFS_handle *handle, 
-                                    struct mem_table_s *mtbl
-)
+int ucache_open_file(PVFS_fs_id *fs_id,
+                     PVFS_handle *handle, 
+                     struct mem_table_s *mtbl)
 {
     lock_lock(ucache_lock);
     mtbl = lookup_file((uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL,
@@ -276,8 +315,8 @@ uint32_t ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset)
 /** Flushes dirty blocks to the I/O Nodes */
 uint32_t ucache_flush(pvfs_descriptor *pd)
 {
-    PVFS_fs_id *fs_id = &(pd->pvfs_ref.fs_id);
-    PVFS_handle *handle = &(pd->pvfs_ref.handle);
+    PVFS_fs_id *fs_id = &(pd->s->pvfs_ref.fs_id);
+    PVFS_handle *handle = &(pd->s->pvfs_ref.handle);
     lock_lock(ucache_lock);
     struct mem_table_s *mtbl = lookup_file((uint32_t)(*fs_id), 
                  (uint64_t)(*handle), NULL, NULL, NULL, NULL);

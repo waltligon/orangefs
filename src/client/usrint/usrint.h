@@ -13,12 +13,22 @@
 #define USRINT_H 1
 
 #ifndef _GNU_SOURCE
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+#ifndef _ATFILE_SOURCE
+#define _ATFILE_SOURCE 1
+#endif
+#ifndef _LARGEFILE_SOURCE
+#define _LARGEFILE_SOURCE 1
 #endif
 #ifndef _LARGEFILE64_SOURCE
-#define _LARGEFILE64_SOURCE
+#define _LARGEFILE64_SOURCE 1
 #endif
 
+/*
+ * This seems to control redirect of 32-bit IO to 64-bit IO
+ * We want to avoid this in our source
+ */
 #ifdef USRINT_SOURCE
 #ifdef _FILE_OFFSET_BITS
 #undef _FILE_OFFSET_BITS 
@@ -29,15 +39,30 @@
 #endif
 #endif
 
-#define __USE_MISC 1
-#define __USE_ATFILE 1
-#define __USE_GNU 1
+/*
+ * this defines __USE_LARGEFILE, __USE_LARGEFILE64, and
+ * __USE_FILE_OFFSET64 which control many of the other includes
+ */
+#include <features.h>
+/*
+ * force this stuff off if the source requests
+ */
+#ifdef USRINT_SOURCE
+#ifdef __USE_FILE_OFFSET64
+#undef __USE_FILE_OFFSET64
+#endif
+#ifdef __OPTIMIZE__
+#undef __OPTIMIZE__
+#endif
+#endif
 
 #include <pvfs2-config.h>
+#include <gossip.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <utime.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -69,7 +94,12 @@
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
+#include <sys/statvfs.h>
 #include <sys/uio.h>
+#include <sys/acl.h>
+#include <acl/libacl.h>
+#include <sys/mman.h>
+#include <sys/time.h>
 
 #include <linux/types.h>
 #ifdef HAVE_ATTR_XATTR_H
@@ -80,23 +110,23 @@
 #else
 #define XATTR_CREATE 0x1
 #define XATTR_REPLACE 0x2
-extern int (*setxattr)(const char *path, const char *name,
+extern int setxattr(const char *path, const char *name,
                     const void *value, size_t size, int flags);
-extern int (*lsetxattr)(const char *path, const char *name,
+extern int lsetxattr(const char *path, const char *name,
                      const void *value, size_t size, int flags);
-extern int (*fsetxattr)(int fd, const char *name,
+extern int fsetxattr(int fd, const char *name,
                      const void *value, size_t size, int flags);
-extern int (*getxattr)(const char *path, const char *name,
+extern int getxattr(const char *path, const char *name,
                     void *value, size_t size);
-extern int (*lgetxattr)(const char *path, const char *name,
+extern int lgetxattr(const char *path, const char *name,
                      void *value, size_t size);
-extern int (*fgetxattr)(int fd, const char *name, void *value, size_t size);
-extern int (*listxattr)(const char *path, char *list, size_t size);
-extern int (*llistxattr)(const char *path, char *list, size_t size);
-extern int (*flistxattr)(int fd, char *list, size_t size);
-extern int (*removexattr)(const char *path, const char *name);
-extern int (*lremovexattr)(const char *path, const char *name);
-extern int (*fremovexattr)(int fd, const char *name);
+extern int fgetxattr(int fd, const char *name, void *value, size_t size);
+extern int listxattr(const char *path, char *list, size_t size);
+extern int llistxattr(const char *path, char *list, size_t size);
+extern int flistxattr(int fd, char *list, size_t size);
+extern int removexattr(const char *path, const char *name);
+extern int lremovexattr(const char *path, const char *name);
+extern int fremovexattr(int fd, const char *name);
 #endif
 #endif
 
@@ -109,6 +139,8 @@ extern int (*fremovexattr)(int fd, const char *name);
 /* PVFS specific includes */
 #include <pvfs2.h>
 #include <pvfs2-hint.h>
+#include <pvfs2-debug.h>
+#include <pvfs2-types.h>
 #include <pvfs2-req-proto.h>
 
 /* magic numbers for PVFS filesystem */
@@ -132,14 +164,18 @@ extern int (*fremovexattr)(int fd, const char *name);
 #define PVFS_BUFSIZE (1024*1024)
 
 /* extra function prototypes */
-int fseek64(FILE *stream, const off64_t offset, int whence);
 
-off64_t ftell64(FILE *stream);
+extern int posix_readdir(unsigned int fd, struct dirent *dirp,
+                         unsigned int count);
 
-int pvfs_convert_iovec(const struct iovec *vector,
-                       int count,
-                       PVFS_Request *req,
-                       void **buf);
+extern int fseek64(FILE *stream, const off64_t offset, int whence);
+
+extern off64_t ftell64(FILE *stream);
+
+extern int pvfs_convert_iovec(const struct iovec *vector,
+                              int count,
+                              PVFS_Request *req,
+                              void **buf);
 
 /* MPI functions */ 
 //int MPI_File_open(MPI_Comm comm, char *filename,

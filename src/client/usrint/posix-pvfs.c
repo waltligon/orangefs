@@ -278,11 +278,11 @@ int pvfs_unlinkat(int dirfd, const char *path, int flags)
         }
         if (flags & AT_REMOVEDIR)
         {
-            rc = iocommon_rmdir(path, &pd->pvfs_ref);
+            rc = iocommon_rmdir(path, &pd->s->pvfs_ref);
         }
         else
         {
-            rc = iocommon_unlink(path, &pd->pvfs_ref);
+            rc = iocommon_unlink(path, &pd->s->pvfs_ref);
         }
     }
     return rc;
@@ -357,7 +357,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
             errno = EBADF;
             return -1;
         }
-        olddirref = &pd->pvfs_ref;
+        olddirref = &pd->s->pvfs_ref;
         absoldpath = (char *)oldpath;
     }
     if (oldpath[0] == '/' || newdirfd == AT_FDCWD)
@@ -382,7 +382,7 @@ int pvfs_renameat(int olddirfd, const char *oldpath,
             errno = EBADF;
             return -1;
         }
-        newdirref = &pd->pvfs_ref;
+        newdirref = &pd->s->pvfs_ref;
         absnewpath = (char *)newpath;
     }
     rc = iocommon_rename(olddirref, absoldpath, newdirref, absnewpath);
@@ -414,12 +414,12 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
     {
         return -1;
     }
-    rc = pvfs_prdwr64(fd, buf, count, pd->file_pointer, PVFS_IO_READ);
+    rc = pvfs_prdwr64(fd, buf, count, pd->s->file_pointer, PVFS_IO_READ);
     if (rc < 0)
     {
         return -1;
     }
-    pd->file_pointer += rc;
+    pd->s->file_pointer += rc;
     return rc;
 }
 
@@ -453,6 +453,7 @@ ssize_t pvfs_pread64( int fd, void *buf, size_t count, off64_t offset )
 ssize_t pvfs_write(int fd, const void *buf, size_t count)
 {
     int rc;
+    off64_t offset;
 
     if (fd < 0)
     {
@@ -464,12 +465,23 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
     {
         return -1;
     }
-    rc = pvfs_prdwr64(fd, (void *)buf, count, pd->file_pointer, PVFS_IO_WRITE);
+    /* check for append mode */
+    if (pd->s->flags & O_APPEND)
+    {
+        struct stat sbuf;
+        pvfs_fstat(fd, &sbuf);
+        offset = sbuf.st_size;
+    }
+    else
+    {
+        offset = pd->s->file_pointer;
+    }
+    rc = pvfs_prdwr64(fd, (void *)buf, count, offset, PVFS_IO_WRITE);
     if (rc < 0)
     {
         return -1;
     }
-    pd->file_pointer += rc;
+    pd->s->file_pointer += rc;
     return rc;
 }
 
@@ -560,7 +572,7 @@ static ssize_t pvfs_rdwrv(int fd,
     {
         return -1;
     }
-    offset = pd->file_pointer;
+    offset = pd->s->file_pointer;
 
     rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
     rc = pvfs_convert_iovec(vector, count, &mreq, &buf);
@@ -569,7 +581,7 @@ static ssize_t pvfs_rdwrv(int fd,
 
     if (rc >= 0)
     {
-        pd->file_pointer += rc;
+        pd->s->file_pointer += rc;
     }
 
     PVFS_Request_free(&freq);
@@ -608,7 +620,7 @@ off64_t pvfs_lseek64(int fd, off64_t offset, int whence)
 
     iocommon_lseek(pd, offset, 1, whence);
 
-    return pd->file_pointer;
+    return pd->s->file_pointer;
 }
 
 /**
@@ -637,7 +649,7 @@ int pvfs_truncate64(const char *path, off64_t length)
     {
         return -1;
     }
-    rc = iocommon_truncate(pd->pvfs_ref, length);
+    rc = iocommon_truncate(pd->s->pvfs_ref, length);
     pvfs_close(pd->fd);
     return rc;
 }
@@ -691,7 +703,7 @@ int pvfs_ftruncate64(int fd, off64_t length)
     {
         return -1;
     }
-    return iocommon_truncate(pd->pvfs_ref, length);
+    return iocommon_truncate(pd->s->pvfs_ref, length);
 }
 
 /**
@@ -720,7 +732,7 @@ int pvfs_close(int fd)
     }
 
     /* flush buffers */
-    if (S_ISREG(pd->mode))
+    if (S_ISREG(pd->s->mode))
     {
         rc = iocommon_fsync(pd);
         if (rc < 0)
@@ -1050,6 +1062,111 @@ errorout:
 }
 
 /**
+ * pvfs_futimesat
+ */
+int pvfs_futimesat(int dirfd,
+                   const char *path,
+                   const struct timeval times[2])
+{
+    int rc = 0;
+    pvfs_descriptor *pd=NULL, *pd2=NULL;
+    PVFS_sys_attr attr;
+
+    if (dirfd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(dirfd);
+    if (!pd)
+    {
+        return -1;
+    }
+    if (path)
+    {
+        pd2 = iocommon_open(path, O_RDONLY, PVFS_HINT_NULL, 0, pd);
+    }
+    else
+    {
+        pd2 = pd; /* allow null path to work */
+    }
+    if (!pd2)
+    {
+        return -1;
+    }
+    memset(&attr, 0, sizeof(attr));
+    if (!times)
+    {
+        struct timeval curtime;
+        gettimeofday(&curtime, NULL);
+        attr.atime = curtime.tv_sec;
+        attr.mtime = curtime.tv_sec;
+    }
+    else
+    {
+        attr.atime = times[0].tv_sec;
+        attr.mtime = times[1].tv_sec;
+    }
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    rc = iocommon_setattr(pd2->s->pvfs_ref, &attr);
+    if (path)
+    {
+        pvfs_close(pd2->fd);
+    }
+    return rc;
+}
+
+int pvfs_utimes(const char *path, const struct timeval times[2])
+{
+    return pvfs_futimesat(AT_FDCWD, path, times);
+}
+
+int pvfs_utime(const char *path, const struct utimbuf *buf)
+{
+    struct timeval times[2];
+    times[0].tv_sec = buf->actime;
+    times[0].tv_usec = 0;
+    times[1].tv_sec = buf->modtime;
+    times[1].tv_usec = 0;
+    return pvfs_futimesat(AT_FDCWD, path, times);
+}
+
+int pvfs_futimes(int fd, const struct timeval times[2])
+{
+    int rc = 0;
+    pvfs_descriptor *pd=NULL;
+    PVFS_sys_attr attr;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        return -1;
+    }
+    memset(&attr, 0, sizeof(attr));
+    if (!times)
+    {
+        struct timeval curtime;
+        gettimeofday(&curtime, NULL);
+        attr.atime = curtime.tv_sec;
+        attr.mtime = curtime.tv_sec;
+    }
+    else
+    {
+        attr.atime = times[0].tv_sec;
+        attr.mtime = times[1].tv_sec;
+    }
+    attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
+    rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
+    pvfs_close(pd->fd);
+    return rc;
+}
+
+/**
  * pvfs_dup
  */
 int pvfs_dup(int oldfd)
@@ -1331,7 +1448,7 @@ int pvfs_mkdirat(int dirfd, const char *path, mode_t mode)
         }
         rc = iocommon_make_directory(path,
                                      (mode & ~mask_val & 0777),
-                                     &pd->pvfs_ref);
+                                     &pd->s->pvfs_ref);
     }
     return rc;
 }
@@ -1378,7 +1495,7 @@ ssize_t pvfs_readlink(const char *path, char *buf, size_t bufsiz)
         rc = -1;
         goto errorout;
     }
-    debug("pvfs_readlink mode is %o\n", pd->mode);
+    debug("pvfs_readlink mode is %o\n", pd->s->mode);
     /* this checks that it is a valid symlink and sets errno if not */
     rc = iocommon_readlink(pd, buf, bufsiz);
     /* need to close if readlink succeeds or not */
@@ -1464,7 +1581,7 @@ int pvfs_symlinkat(const char *oldpath, int newdirfd, const char *newpath)
             return -1;
         }
     }
-    return iocommon_symlink(newpath, oldpath, &pd->pvfs_ref);
+    return iocommon_symlink(newpath, oldpath, &pd->s->pvfs_ref);
 }
 
 /**
@@ -1576,7 +1693,7 @@ int pvfs_faccessat(int fd, const char *path, int mode, int flags)
             return -1;
         }
     }
-    return iocommon_access(path, mode, flags, &pd->pvfs_ref);
+    return iocommon_access(path, mode, flags, &pd->s->pvfs_ref);
 }
 
 int pvfs_flock(int fd, int op)
@@ -1606,16 +1723,16 @@ int pvfs_fcntl(int fd, int cmd, ...)
     {
     case F_DUPFD :
     case F_GETFD :
+        rc = pd->fdflags;
+        break;
     case F_SETFD :
-        errno = ENOSYS;
-        fprintf(stderr, "pvfs_fcntl not implemented\n");
-        rc = -1;
+        pd->fdflags = va_arg(ap, int);
         break;
     case F_GETFL :
-        rc = pd->flags;
+        rc = pd->s->flags;
         break;
     case F_SETFL :
-        pd->flags = va_arg(ap, int);
+        pd->s->flags = va_arg(ap, int);
         break;
     case F_GETLK :
     case F_SETLK :
@@ -1630,7 +1747,7 @@ int pvfs_fcntl(int fd, int cmd, ...)
     case F_NOTIFY :
     default :
         errno = ENOSYS;
-        fprintf(stderr, "pvfs_fcntl not implemented\n");
+        fprintf(stderr, "pvfs_fcntl command not implemented\n");
         rc = -1;
         break;
     }
@@ -1746,7 +1863,7 @@ errorout:
     }
     return rc;
 }
-                 
+
 int pvfs_fstatfs(int fd, struct statfs *buf)
 {
     pvfs_descriptor *pd;
@@ -1781,6 +1898,86 @@ int pvfs_fstatfs64(int fd, struct statfs64 *buf)
         return -1;
     }
     return iocommon_statfs64(pd, buf);
+}
+
+int pvfs_statvfs(const char *path, struct statvfs *buf)
+{
+    int rc = 0;
+    pvfs_descriptor *pd;
+    struct statfs buf2;
+    char *newpath;
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+    pd = iocommon_open(newpath, O_RDONLY, PVFS_HINT_NULL, 0, NULL);
+    if (!pd)
+    {
+        rc = -1;
+        goto errorout;
+    }
+    rc = iocommon_statfs(pd, &buf2);
+    pvfs_close(pd->fd);
+    if (rc < 0)
+    {
+        goto errorout;
+    }
+    buf->f_bsize = buf2.f_bsize;
+    /* buf->f_rsize */
+    buf->f_blocks = buf2.f_blocks;
+    buf->f_bfree = buf2.f_bfree;
+    buf->f_bavail = buf2.f_bavail;
+    buf->f_files = buf2.f_files;
+    buf->f_ffree = buf2.f_ffree;
+    /* buf->f_favail */
+    buf->f_fsid = (unsigned long)buf2.f_fsid.__val[0];
+    /* buf->f_flag */
+    buf->f_namemax = buf2.f_namelen;
+
+errorout:
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+    return rc;
+}
+
+int pvfs_fstatvfs(int fd, struct statvfs *buf)
+{
+    int rc = 0;
+    pvfs_descriptor *pd;
+    struct statfs buf2;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    rc = iocommon_statfs(pd, &buf2);
+    if (rc < 0)
+    {
+        return -1;
+    }
+    buf->f_bsize = buf2.f_bsize;
+    /* buf->f_rsize */
+    buf->f_blocks = buf2.f_blocks;
+    buf->f_bfree = buf2.f_bfree;
+    buf->f_bavail = buf2.f_bavail;
+    buf->f_files = buf2.f_files;
+    buf->f_ffree = buf2.f_ffree;
+    /* buf->f_favail */
+    buf->f_fsid = (unsigned long)buf2.f_fsid.__val[0];
+    /* buf->f_flag */
+    buf->f_namemax = buf2.f_namelen;
+    return rc;
 }
 
 int pvfs_mknod(const char *path, mode_t mode, dev_t dev)
@@ -2035,26 +2232,74 @@ int pvfs_fremovexattr(int fd,
     return iocommon_deleattr(pd, name);
 }
 
+/* These functions simulate management of the current
+ * working directory given than the kernel may not
+ * be aware of PVFS virtual mounts
+ */
+int pvfs_cwd_init(const char *buf, size_t size)
+{
+    char *rv;
+    memset(pvfs_cwd, 0, PVFS_PATH_MAX);
+    rv = strncpy(pvfs_cwd, buf, PVFS_util_min(size, PVFS_PATH_MAX));
+    if (!rv)
+    {
+        return -1;
+    }
+    return 0;
+}
+
 /**
  * pvfs chdir
  */
 int pvfs_chdir(const char *path)
 {
-    int plen;
+    int rc = 0, plen = 0;
+    struct stat sbuf;
+    char *newpath = NULL;
 
     if (!path)
     {
         errno = EINVAL;
         return -1;
     }
-    plen = strlen(path);
+    /* we really need to resolve this to a cannonical path */
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+    /* basic path length check */
+    plen = strlen(newpath);
     if (plen > PVFS_PATH_MAX)
     {
         errno = ENAMETOOLONG;
-        return -1;
+        rc = -1;
+        goto errout;
     }
-    strcpy(pvfs_cwd, path);
-    return 0;
+    /* if it is a valid path we can stat it and see what it is */
+    rc = stat(newpath, &sbuf); /* this will get most errors */
+    if (rc < 0)
+    {
+        rc = -1;
+        goto errout;
+    }
+    /* path must be a directory */
+    if (!S_ISDIR(sbuf.st_mode))
+    {
+        errno = ENOTDIR;
+        rc = -1;
+        goto errout;
+    }
+    /* we will keep a copy and keep one in the environment */
+    strncpy(pvfs_cwd, newpath, PVFS_PATH_MAX);
+    setenv("PWD", newpath, 1);
+
+errout:
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+    return rc;
 }
 
 int pvfs_fchdir(int fd)
@@ -2062,19 +2307,23 @@ int pvfs_fchdir(int fd)
     int plen;
     pvfs_descriptor *pd;
 
+    /* path is already opened, make sure it is a dir */
     pd = pvfs_find_descriptor(fd);
-    if (!pd || !pd->dpath)
+    if (!pd || !S_ISDIR(pd->s->mode) || !pd->s->dpath)
     {
         errno = EBADF;
         return -1;
     }
-    plen = strlen(pd->dpath);
+    /* basic check for overflow */
+    plen = strlen(pd->s->dpath);
     if (plen > PVFS_PATH_MAX)
     {
         errno = ENAMETOOLONG;
         return -1;
     }
-    strcpy(pvfs_cwd, pd->dpath);
+    /* we will keep a copy and keep one in the environment */
+    strncpy(pvfs_cwd, pd->s->dpath, PVFS_PATH_MAX);
+    setenv("PWD", pd->s->dpath, 1);
     return 0;
 }
 
@@ -2082,6 +2331,7 @@ char *pvfs_getcwd(char *buf, size_t size)
 {
     int plen;
     plen = strnlen(pvfs_cwd, PVFS_PATH_MAX);
+    /* implement Linux variation */
     if (!buf)
     {
         /* malloc space */
@@ -2123,7 +2373,10 @@ char *pvfs_get_current_dir_name(void)
     strcpy(buf, pvfs_cwd);
     return buf;
 }
-
+/*
+ * This is the no-frills old-fashioned version
+ * Use at own risk
+ */
 char *pvfs_getwd(char *buf)
 {
     if (!buf)
@@ -2138,6 +2391,10 @@ char *pvfs_getwd(char *buf)
 
 /**
  * pvfs_umask
+ *
+ * Manage a umask ourselves just in case we need to
+ * Probably the standard version works fine but
+ * In case we get a problem we have it
  */
 mode_t pvfs_umask(mode_t mask)
 {
@@ -2156,6 +2413,9 @@ int pvfs_getdtablesize(void)
     return pvfs_descriptor_table_size();
 }
 
+/*
+ * Table of PVFS system call versions for use by posix.c
+ */
 posix_ops pvfs_ops = 
 {
     .open = pvfs_open,
@@ -2193,6 +2453,10 @@ posix_ops pvfs_ops =
     .fstatat64 = pvfs_fstatat64,
     .lstat = pvfs_lstat,
     .lstat64 = pvfs_lstat64,
+    .futimesat = pvfs_futimesat,
+    .utimes = pvfs_utimes,
+    .utime = pvfs_utime,
+    .futimes = pvfs_futimes,
     .dup = pvfs_dup,
     .dup2 = pvfs_dup2,
     .chown = pvfs_chown,
@@ -2227,6 +2491,8 @@ posix_ops pvfs_ops =
     .statfs64 = pvfs_statfs64,
     .fstatfs = pvfs_fstatfs,
     .fstatfs64 = pvfs_fstatfs64,
+    .statvfs = statvfs,             /* this one is probably special */
+    .fstatvfs = pvfs_fstatvfs,
     .mknod = pvfs_mknod,
     .mknodat = pvfs_mknodat,
     .sendfile = pvfs_sendfile,
@@ -2243,9 +2509,17 @@ posix_ops pvfs_ops =
     .removexattr = pvfs_removexattr,
     .lremovexattr = pvfs_lremovexattr,
     .fremovexattr = pvfs_fremovexattr,
+    .getdtablesize = pvfs_getdtablesize,
     .umask = pvfs_umask,
     .getumask = pvfs_getumask,
-    .getdtablesize = pvfs_getdtablesize,
+    .mmap = pvfs_mmap,
+    .munmap = pvfs_munmap,
+    .msync = pvfs_msync,
+    .acl_delete_def_file = pvfs_acl_delete_def_file,
+    .acl_get_fd = pvfs_acl_get_fd,
+    .acl_get_file = pvfs_acl_get_file,
+    .acl_set_fd = pvfs_acl_set_fd,
+    .acl_set_file = pvfs_acl_set_file,
 };
 
 /*
