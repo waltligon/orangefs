@@ -12,8 +12,8 @@
 
 /* this prevents headers from using inlines for 64 bit calls */
 
-#ifndef PVFS_USRINT_PWD
-#define PVFS_USRINT_PWD 1
+#ifndef PVFS_USRINT_CWD
+#define PVFS_USRINT_CWD 1
 #endif
 #define USRINT_SOURCE 1
 #include "usrint.h"
@@ -582,6 +582,7 @@ int close(int fd)
     return rc;
 }
 
+#if 0
 int flush(int fd)
 {
     int rc = 0;
@@ -599,6 +600,7 @@ int flush(int fd)
     }
     return rc;
 }
+#endif
 
 /* various flavors of stat */
 int stat(const char *path, struct stat *buf)

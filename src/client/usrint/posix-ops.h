@@ -45,7 +45,6 @@ typedef struct posix_ops_s
     int (*ftruncate64)(int fd, off64_t length);
     int (*fallocate)(int fd, off_t offset, off_t length);
     int (*close)( int fd);
-    int (*flush)(int fd);
     int (*stat)(const char *path, struct stat *buf);
     int (*stat64)(const char *path, struct stat64 *buf);
     int (*fstat)(int fd, struct stat *buf);

@@ -752,35 +752,6 @@ int pvfs_close(int fd)
     return rc;
 }
 
-/**
- * pvfs_flush
- */
-int pvfs_flush(int fd)
-{
-    int rc = 0;
-    pvfs_descriptor* pd;
-
-    debug("pvfs_flush: called with %d\n", fd);
-
-    if (fd < 0)
-    {
-        errno = EBADF;
-        return -1;
-    }
-    /* Find the descriptor */
-    pd = pvfs_find_descriptor(fd);
-    if (!pd)
-    {
-        errno = EBADF;
-        return -1;
-    }
-
-    /* tell the server to flush data to disk */
-    rc = iocommon_fsync(pd);
-    debug("pvfs_flush: returns %d\n", rc);
-    return rc;
-}
-
 /* various flavors of stat */
 /**
  * pvfs_stat
@@ -1763,12 +1734,34 @@ void pvfs_sync(void )
     return;
 }
 
-/* sync file, but not dir it is in */
+/**
+ * pvfs_fsync
+ * sync file, but not dir it is in 
+ * as close as we have for now 
+ */
 int pvfs_fsync(int fd)
 {
     int rc = 0;
+    pvfs_descriptor* pd;
 
-    rc = pvfs_flush(fd); /* as close as we have for now */
+    debug("pvfs_fsync: called with %d\n", fd);
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* Find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    /* tell the server to flush data to disk */
+    rc = iocommon_fsync(pd);
+    debug("pvfs_fsync: returns %d\n", rc);
     return rc;
 }
 
@@ -1777,7 +1770,7 @@ int pvfs_fdatasync(int fd)
 {
     int rc = 0;
 
-    rc = pvfs_flush(fd); /* as close as we have for now */
+    rc = pvfs_fsync(fd); /* as close as we have for now */
     return rc;
 }
 
@@ -2334,8 +2327,14 @@ char *pvfs_getcwd(char *buf, size_t size)
     /* implement Linux variation */
     if (!buf)
     {
+        int bsize = size ? size : plen + 1;
+        if (bsize < plen + 1)
+        {
+            errno = ERANGE;
+            return NULL;
+        }
         /* malloc space */
-        buf = (char *)malloc(plen + 1);
+        buf = (char *)malloc(bsize);
         if (!buf)
         {
             errno = ENOMEM;
@@ -2444,7 +2443,6 @@ posix_ops pvfs_ops =
     .ftruncate64 = pvfs_ftruncate64,
     .fallocate = pvfs_fallocate,
     .close = pvfs_close,
-    .flush = pvfs_flush,
     .stat = pvfs_stat,
     .stat64 = pvfs_stat64,
     .fstat = pvfs_fstat,
@@ -2515,11 +2513,13 @@ posix_ops pvfs_ops =
     .mmap = pvfs_mmap,
     .munmap = pvfs_munmap,
     .msync = pvfs_msync,
+#ifdef PVFS_USRINT_ACL
     .acl_delete_def_file = pvfs_acl_delete_def_file,
     .acl_get_fd = pvfs_acl_get_fd,
     .acl_get_file = pvfs_acl_get_file,
     .acl_set_fd = pvfs_acl_set_fd,
     .acl_set_file = pvfs_acl_set_file,
+#endif
 };
 
 /*

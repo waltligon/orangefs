@@ -188,12 +188,6 @@ static int my_glibc_fadvise(int fd, off_t offset, off_t len, int advice)
     return my_glibc_fadvise64(fd, (off64_t)offset, (off64_t)len, advice);
 }
 
-static int my_glibc_flush(int fd)
-{
-    errno = ENOSYS;
-    return -1;
-}
- 
 static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
 {
     return syscall(SYS_readdir, fd, dirp, count);
@@ -228,7 +222,6 @@ void load_glibc(void)
     glibc_ops.ftruncate64 = dlsym(RTLD_NEXT, "ftruncate64");
     glibc_ops.fallocate = dlsym(RTLD_NEXT, "posix_fallocate");
     glibc_ops.close = dlsym(RTLD_NEXT, "close");
-    glibc_ops.flush = my_glibc_flush;
     glibc_ops.stat = my_glibc_stat;
     glibc_redirect.stat = dlsym(RTLD_NEXT, "__xstat");
     glibc_ops.stat64 = my_glibc_stat64;
@@ -336,11 +329,13 @@ void load_glibc(void)
     glibc_ops.mmap = dlsym(RTLD_NEXT, "mmap");
     glibc_ops.munmap = dlsym(RTLD_NEXT, "munmap");
     glibc_ops.msync = dlsym(RTLD_NEXT, "msync");
+#ifdef PVFS_USRINT_ACL
     glibc_ops.acl_delete_def_file = dlsym(RTLD_NEXT, "acl_delete_def_file");
     glibc_ops.acl_get_fd = dlsym(RTLD_NEXT, "acl_get_fd");
     glibc_ops.acl_get_file = dlsym(RTLD_NEXT, "acl_get_file");
     glibc_ops.acl_set_fd = dlsym(RTLD_NEXT, "acl_set_fd");
     glibc_ops.acl_set_file = dlsym(RTLD_NEXT, "acl_set_file");
+#endif
 
 /* PVFS does not implement socket ops */
     pvfs_ops.socket = dlsym(RTLD_NEXT, "socket");
