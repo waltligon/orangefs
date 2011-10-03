@@ -27,7 +27,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
 	$(DIR)/pvfs2-drop-caches.c \
-	$(DIR)/pvfs2-xform.c
+	$(DIR)/pvfs2-join.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

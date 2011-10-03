@@ -389,20 +389,6 @@ PVFS_error PVFS_sys_create(
     PVFS_sys_layout *layout,
     PVFS_hint hints);
 
-/* sson */
-PVFS_error PVFSXF_sys_xform(
-    int type,
-    char *srcfile,
-    char *destfile,
-    char *entry_name,
-    PVFS_object_ref ref,
-    PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
-    PVFS_sys_dist *dist,
-    PVFS_sysresp_create *resp,
-    PVFS_sys_layout *layout,
-    PVFS_hint hints);
-
 PVFS_error PVFS_isys_remove(
     char *entry_name,
     PVFS_object_ref ref,

@@ -162,6 +162,16 @@ static PINT_sm_action setattr_verify_attribs(
                          req_a_p->u.meta.dfile_count);
         }
 
+        /* TODO: set dfile_count here? */
+        if (a_p->u.meta.dfile_count != req_a_p->dfile_count)
+        {
+            gossip_debug(
+            GOSSIP_SETATTR_DEBUG, " *** dspace has dfile count %d and "
+            "req has dfile count %d\n",
+            a_p->u.meta.dfile_count, req_a_p->dfile_count);
+            a_p->u.meta.dfile_count = req_a_p->dfile_count;
+        }
+
         /* copy the dist size before writing this object */
         if (req_a_p->mask & PVFS_ATTR_META_DIST)
         {

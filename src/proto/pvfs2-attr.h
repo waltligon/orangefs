@@ -58,7 +58,8 @@
 
 /* attributes that do not change once set */
 #define PVFS_STATIC_ATTR_MASK \
-(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES|PVFS_ATTR_META_UNSTUFFED)
+(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_UNSTUFFED)
+//(PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_META_DIST|PVFS_ATTR_META_DFILES|PVFS_ATTR_META_UNSTUFFED)
 
 /* extended hint attributes for a metafile object */
 struct PVFS_metafile_hint_s
@@ -98,7 +99,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 #define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int dfiles_i; \
     encode_uint32_t(pptr, &(x)->dfile_count); \
     encode_skip4(pptr,); \
-    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)      \
 	encode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
     encode_PVFS_metafile_hint(pptr, &(x)->hint); \
 } while (0)
@@ -107,7 +108,7 @@ typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
     decode_skip4(pptr,); \
     (x)->dfile_array = decode_malloc((x)->dfile_count \
       * sizeof(*(x)->dfile_array)); \
-    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++) \
+    for (dfiles_i=0; dfiles_i<(x)->dfile_count; dfiles_i++)      \
 	decode_PVFS_handle(pptr, &(x)->dfile_array[dfiles_i]); \
     decode_PVFS_metafile_hint(pptr, &(x)->hint); \
 } while (0)
@@ -189,6 +190,7 @@ struct PVFS_object_attr
     PVFS_time ctime;
     uint32_t mask;     /* indicates which fields are currently valid */
     PVFS_ds_type objtype; /* defined in pvfs2-types.h */
+    uint32_t dfile_count; // TODO: temporary fix
     union
     {
 	PVFS_metafile_attr meta;
@@ -210,6 +212,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     encode_PVFS_time(pptr, &(x)->ctime); \
     encode_uint32_t(pptr, &(x)->mask); \
     encode_PVFS_ds_type(pptr, &(x)->objtype); \
+    encode_uint32_t(pptr, &(x)->dfile_count); \
     if ((x)->objtype == PVFS_TYPE_METAFILE && \
         (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
     { \
@@ -237,6 +240,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     decode_PVFS_time(pptr, &(x)->ctime); \
     decode_uint32_t(pptr, &(x)->mask); \
     decode_PVFS_ds_type(pptr, &(x)->objtype); \
+    decode_uint32_t(pptr, &(x)->dfile_count); \
     if ((x)->objtype == PVFS_TYPE_METAFILE && \
         (!((x)->mask & PVFS_ATTR_META_UNSTUFFED))) \
     { \
@@ -245,7 +249,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
     } \
     if ((x)->mask & PVFS_ATTR_META_DIST) \
 	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
-    if ((x)->mask & PVFS_ATTR_META_DFILES) \
+    if ((x)->mask & PVFS_ATTR_META_DFILES)                    \
 	decode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
     if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \

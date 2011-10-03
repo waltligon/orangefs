@@ -59,8 +59,10 @@ do{                                                     \
         (dest)->objtype = (src)->objtype;               \
         (dest)->mask |= PVFS_ATTR_COMMON_TYPE;          \
     }                                                   \
+    (dest)->dfile_count = (src)->dfile_count;    \
     (dest)->mask |= (extra_amask);                      \
 }while(0)
+/* TODO: just above, it adds dfile_count w/o checking mask */
 
 struct PINT_time_marker_s
 {

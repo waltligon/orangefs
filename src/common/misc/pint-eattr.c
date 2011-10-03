@@ -77,7 +77,7 @@ static int PINT_eattr_system_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v);
  */
 static struct PINT_eattr_check PINT_eattr_namespaces[] =
 {
-    {PVFS_EATTR_SYSTEM_NS, -PVFS_EINVAL, NULL},
+    {PVFS_EATTR_SYSTEM_NS, 0, PINT_eattr_strip_prefix}, //-PVFS_EINVAL, NULL}, // TODO: temporary solution; should be able to allow acces to exact field
     {"system.", 0, PINT_eattr_system_verify},
     {"user.", 0, NULL},
     {"trusted.", 0, NULL},
