@@ -1018,6 +1018,7 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             if (rc < 0)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
+                rc = -1;
                 goto exitout;
             }
             /* reset write pointer */
@@ -1038,12 +1039,15 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
         if (rc < 0)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
+            rc = -1;
             goto exitout;
         }
+        /* fseek returns 0 on success */
+        rc = 0;
     }
 exitout:
     /* successful call */
-    lock_stream(stream);
+    unlock_stream(stream);
     CLEARFLAG(stream, _IO_EOF_SEEN);
     return rc;
 }

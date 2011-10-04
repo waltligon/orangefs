@@ -380,6 +380,7 @@ static void usrint_cleanup(void)
         ucache_finalize();
     }
 #endif
+    PVFS_sys_finalize();
 }
 
 /*
