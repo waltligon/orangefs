@@ -222,7 +222,7 @@ static int generic_set_server_location(file_object *obj, PVFS_credentials *creds
     key.buffer_sz = strlen(DFILE_KEY) + 1;
     val.buffer = buffer;
     /* NOTE: sizeof(PVFS_handle) => 8 */
-    val.buffer_sz = (sizeof(PVFS_handle)*(*nservers1+*nservers2))+1;
+    val.buffer_sz = (sizeof(PVFS_handle)*(*nservers1+*nservers2));
     // TODO: replace flag doesn't work
     //       TROVE:DBPF:Berkeley DB: DB->get: DB_NOTFOUND: No matching key/data pair found
     flags |= PVFS_XATTR_REPLACE;
