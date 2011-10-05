@@ -244,8 +244,12 @@ static int check_stuffed(
         return SM_ACTION_COMPLETE;
     }
 
-    /* for now only support stuffing of ROUND_ROBIN layouts */
-    if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing && layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN)
+    /* For now only support stuffing of ROUND_ROBIN layouts.
+     * As a performance enhancement, don't create a stuffed file when the current environment only has one server.
+     * This prevents unstuffing from being called by the client sys-io machine.
+    */
+    if((server_type & PINT_SERVER_TYPE_IO) && fs_conf->file_stuffing && layout->algorithm == PVFS_SYS_LAYOUT_ROUND_ROBIN
+        && s_op->req->u.create.num_dfiles_req > 1 )
     {    
         /* we can do a stuffed create here, only one datafile */
         s_op->req->u.create.attr.u.meta.dfile_count = 1;
