@@ -1,0 +1,36 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.TH "PVFS-REMOVE-OBJECT" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-remove\-object \- Remove an object from a PVFS2 collection
+.SH "SYNOPSIS"
+pvfs2\-remove\-object [OPTIONS] [\-f, \-\-fsid]
+.SH "DESCRIPTION"
+Remove an object from a PVFS2 collection by specifing either the handle or the parent handle
+and dirent name.
+.SH "OPTIONS"
+.IP \-v,\ \-\-version
+Print the PVFS2 version and exit
+.IP \-f,\ \-\-fsid=<fs_id>
+Use
+.I fs_id
+for the specified object handle
+.IP \-o,\ \-\-object=<handle>
+Remove the specified object handle
+.IP \-p,\ \-\-parent=<handle>
+Use the specified handle as the parent handle (Requires the \-d option)
+.IP \-d,\ \-\-dirent=<entry_name>
+Use
+.I entry_name
+as the dirent name.
+.SH "ENVIRONMENT"
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.I R pvfs2tab
+file
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)
+.SH "SEE ALSO"
+pvfs2\-rm(1)

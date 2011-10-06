@@ -1,0 +1,43 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\" 
+.TH "PVFS2-MKSPACE" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-mkspace \- Create new space in a collection or add a new collection to an existing
+storage space
+.SH "SYNOPSIS"
+.B pvfs2\-mkspace
+.I [OPTIONS]
+.SH "DESCRIPTION"
+This utility will create new space inside of an existing PVFS2 collection or add a new
+collection to an existing storage space.
+.SH "OPTIONS"
+.IP \-a,\ \-\-add\-coll
+Add a collection only
+.IP \-c,\ \-\-coll\-name
+Create a collection with the specified collection name
+.IP \-d,\ \-\-defaults
+Use default options. Same as \-\-coll\-name="pvfs2\-fs" \-\-meta\-handle\-range=4\-2147483650
+\-\-data\-handle\-range=2147483651\-4294967297 \-\-root\-handle=NULL
+.IP \-D,\ \-\-delete\-storage
+Remove the storage space. It can not be recovered.
+.IP \-h,\ \-\-help
+Print a simple help message
+.IP \-i,\ \-\-coll\-id
+Create a collection with the specified id
+.IP \-r,\ \-\-root\-handle
+Create a collection with the specified root handle
+.IP \-M,\ \-\-meta\-handle\-range
+Create a collection with the specified meta handle range
+.IP \-N,\ \-\-data\-handle\-range
+Create a collection with the specified data handle range
+.IP \-s,\ \-\-storage\-space
+Create the storage space at the given location
+.IP \-v,\ \-\-verbose
+Print verbose messages
+.IP \-V,\ \-\-version
+Print the PVFS2 version and exit
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)

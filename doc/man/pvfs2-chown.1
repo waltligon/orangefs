@@ -1,0 +1,29 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\" 
+.TH "PVFS2-CHOWN" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-chown \- Chage the owner of a PVFS2 file.
+.SH "SYNOPSIS"
+pvfs2\-chown [OPTIONS] <user> <group> <filename(s)>
+.SH "DESCRIPTION"
+Change the current owner of a pvfs2 file to the supplied
+.I user
+or
+.I group
+or both. Only the user or group to change needs to be specifed.
+.SH "OPTIONS"
+.IP \-v
+Print the PVFS2 version and exit.
+.SH "ENVIRONMENT"
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.I R pvfs2tab
+file
+
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)
+.SH "SEE ALSO"
+pvfs2\-chmod(1)

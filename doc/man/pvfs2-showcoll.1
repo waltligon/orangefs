@@ -1,0 +1,35 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\" 
+.TH "PVFS2-SHOWCOLL" "1" "OCTOBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-showcoll \- Print the contents of a collection
+.SH "SYNOPSIS"
+pvfs2\-showcoll [OPTIONS]
+.SH "DESCRIPTION"
+Show the contents of a collection. If the name of the collection is not specified, then a 
+list of collections in the current storage space will be given instead. The default storage
+space is /tmp/pvfs2\-test\-space.
+.SH "OPTIONS"
+.IP \-s
+The storage space to look for the collection in. The default storage space is /tmp/pvfs2\-test\-space.
+.IP \-c
+The collection name to print the contents of. If not specified then a list of collections in the storage space will be listed.
+.IP \-d
+Prints data for a single dspace only, given a handle in hex.
+.IP \-v
+Print verbose output.
+.IP \-k
+Prints the data in keyval spaces.
+.IP \-h
+Print a simple help message and exit.
+.SH "ENVIRONMENT"
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.I R pvfs2tab
+file
+
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)

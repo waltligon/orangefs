@@ -1,0 +1,43 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\" 
+.TH "PVFS2-CHANGE-FSID" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-change\-fsid \- Utility for updating fsid in PVFS2 collections
+.SH "SYNOPSIS"
+.B pvfs2\-change\-fsid  [\-\-verbose] [\-\-oldfsid fsid]
+.I [\-\-newfsid fsid] [\-\-fsname fsname]
+.I [\-\-view]
+.I \-\-dbpath=</path/to/collections.db> \-\-fsconf=</path/to/pvfs2\-fs.conf>
+.I \-\-storage=</path/to/pvfs2\-storage\-space>
+.SH "DESCRIPTION"
+Changes the fsid of the file system in the database given as the \-\-dbpath
+.SH "OPTIONS"
+.IP \-\-dbpath
+The path to the collections.db that contains the file system ID that you want to change.
+.IP \-\-fsconf
+The path to the pvfs2 configuration file for the file system being modified.
+.IP \-\-storage
+Path to the local stroage space for the file system being modified.
+.IP \-\-oldfsid
+The current file system ID. If noy supplied then it will be looked up from the configuration
+files.
+.IP \-\-newfsid
+The ID that you would like to change to. If not supplied then it will be generated as
+in genconfig.
+.IP \-\-view
+Don't make the changes to the file system, instead just show what those changes would be.
+.IP \-\-verbose
+Print verbose messages.
+.IP \-\-help
+Show a basic help listing.
+.SH "ENVIRONMENT"
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.I R pvfs2tab
+file
+
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)

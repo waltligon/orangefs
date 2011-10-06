@@ -1,0 +1,43 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\" 
+.TH "PVFS2-MIGRATE-COLLECTION" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-migrate\-collection \- Migrate a collection made with an old version of PVFS to the
+currently running version of PVFS.
+.SH "SYNOPSIS"
+.B pvfs2\-migrate\-collection 
+.I [OPTIONS] [\-\-fs=fs_name] [\-\-all] <global_config_file>
+.SH "DESCRIPTION"
+This utility is used to migrate a collection data base that was created with an old version
+of PVFS to a PVFS2 collection. Either the
+.I \-\-fs
+option or the
+.I \-\-all
+option must be specified.
+.SH "OPTIONS"
+.IP \-\-fs=<fs_name>
+Migrate the collection for
+.I fs_name
+only.
+.IP \-\-all
+Migrate all the collections in the PVFS cluster
+.IP \-\-cleanup
+Remove the old collection upon completion
+.IP \-\-alias
+Specify the alias for this server. The migration tool will try to guess the alias based
+on the hostname if not explicitly specified.
+.IP \-\-verbose
+Print verbose messages
+.IP \-\-help
+Display a simple help message
+.IP \-\-version
+Print the PVFS2 version and exit
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)
+.SH "SEE ALSO"
+pvfs2\-statfs(1)
+pvfs2\-fsck(1)
+pvfs2\-server(1)
