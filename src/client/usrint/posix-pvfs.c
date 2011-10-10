@@ -2164,7 +2164,7 @@ int pvfs_flistxattr(int fd,
                     char *list,
                     size_t size)
 {
-    int numkeys, rc = 0;
+    int retsize, rc = 0;
     pvfs_descriptor *pd;
 
     pd = pvfs_find_descriptor(fd);
@@ -2173,12 +2173,12 @@ int pvfs_flistxattr(int fd,
         errno = EBADF;
         return -1;
     }
-    rc = iocommon_listeattr(pd, list, size, &numkeys);
+    rc = iocommon_listeattr(pd, list, size, &retsize);
     if (rc < 0)
     {
         return -1;
     }
-    return numkeys;
+    return retsize;
 }
 
 int pvfs_removexattr(const char *path,

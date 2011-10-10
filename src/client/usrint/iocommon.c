@@ -2196,12 +2196,17 @@ int iocommon_geteattr(pvfs_descriptor *pd,
                           &key,
                           &val,
                           NULL);
-    if (rc == -PVFS_ENOENT)
+    switch (rc)
     {
+    case -PVFS_ENOENT:
         /* file exists if we have a pd */
         /* either attr does not exist or */
         /* we do not have access to it */
         rc = -PVFS_ENODATA;
+        break;
+    case -PVFS_EMSGSIZE:
+        /* buffer was too small for the attribute value */
+        rc = -PVFS_ERANGE;
     }
     IOCOMMON_CHECK_ERR(rc);
     rc = val.read_sz;
@@ -2338,7 +2343,7 @@ errorout:
 int iocommon_listeattr(pvfs_descriptor *pd,
                        char *list,
                        int size,
-                       int *numkeys)
+                       int *retsize)
 {
     int rc = 0;
     int orig_errno = errno;
@@ -2383,14 +2388,8 @@ int iocommon_listeattr(pvfs_descriptor *pd,
     /* get available keys */
     nkey = listeattr_resp.nkey;
 
-    if (size == 0)
-    {
-        *numkeys = nkey;
-        goto errorout;
-    }
-
     /* allocate key_array */
-    if (nkey < PVFS_MAX_XATTR_LISTLEN)
+    if (nkey > PVFS_MAX_XATTR_LISTLEN)
     {
         max_keys = PVFS_MAX_XATTR_LISTLEN;
     }
@@ -2431,19 +2430,25 @@ int iocommon_listeattr(pvfs_descriptor *pd,
         /* copy keys out to caller */
         for (k = 0; k < listeattr_resp.nkey; k++)
         {
-            if (total_size + listeattr_resp.key_array[k].read_sz > size)
+            if (size > 0)
             {
-                total_size = size;
-                break; /* ran out of buffer space */
+                if (total_size + listeattr_resp.key_array[k].read_sz > size)
+                {
+                    total_size = size;
+                    errno = ERANGE;
+                    rc = -1;
+                    break; /* ran out of buffer space */
+                }
+                strncpy(list, listeattr_resp.key_array[k].buffer,
+                        listeattr_resp.key_array[k].read_sz);
+                list += listeattr_resp.key_array[k].read_sz;
             }
-            strncpy(list, listeattr_resp.key_array[k].buffer,
-                    listeattr_resp.key_array[k].read_sz);
-            list += listeattr_resp.key_array[k].read_sz;
             total_size += listeattr_resp.key_array[k].read_sz;
         }
         total_keys += listeattr_resp.nkey;
     } while (total_keys < nkey && listeattr_resp.nkey > 0 &&
              total_size < size);
+    *retsize = total_size;
     /* free key_array */
     for (k = 0; k < max_keys; k++)
     {
