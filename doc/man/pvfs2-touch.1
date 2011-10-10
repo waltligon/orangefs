@@ -1,17 +1,17 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
-.\" 
-.TH "PVFS2-TOUCH" "1" "OCTOBER 2011" "PVFS2" "PVFS2 MANUALS"
+.TH "PVFS2-TOUCH" "1" "SEPTEMBER 2011" "PVFS2" "PVFS2 MANUALS"
 .SH "NAME"
-pvfs2\-touch \- Change the time stamp on a PVFS2 file
+pvfs2\-touch \- Update the time stamp of a file. Create the file if it does not exist.
 .SH "SYNOPSIS"
 .B pvfs2\-touch
-.I filename(s)
+.I [OPTOINS] <pvfs2_filename(s)>
 .SH "DESCRIPTION"
-Change the timestamp for a PVFS2 file. If the file does not exist then a blank file will be created.
+Change the modified time stamp of a pvfs2 file. If the file does not exist, a blank file
+with the specified file name will be created.
 .SH "OPTIONS"
 .IP \-l
-Use list layout.
+Use list layout. Requires a comma seperated list of servers.
 .IP \-r
 Use random layout.
 .SH "ENVIRONMENT"

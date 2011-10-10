@@ -4,9 +4,12 @@
 .SH "NAME"
 pvfs2\-drop\-caches \- Request that the OS flush and drop all I/O caches on all servers.
 .SH "SYNOPSIS"
-pvfs2\-drop\-caches [OPTIONS]
+.B pvfs2\-drop\-caches
+.I [OPTIONS]
+.SH "DESCRIPTION"
+Request that the OS drop and flush all I/O caches associated with the supplied mount point.
 .SH "OPTIONS"
-.IP \-m mount_point
+.IP \-m\ mount_point
 Request that the operation be carried out on the filesystem located at the supplied mount
 point.
 .SH "ENVIRONMENT"

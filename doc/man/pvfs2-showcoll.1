@@ -5,11 +5,12 @@
 .SH "NAME"
 pvfs2\-showcoll \- Print the contents of a collection
 .SH "SYNOPSIS"
-pvfs2\-showcoll [OPTIONS]
+.B pvfs2\-showcoll 
+.I [OPTIONS]
 .SH "DESCRIPTION"
 Show the contents of a collection. If the name of the collection is not specified, then a 
-list of collections in the current storage space will be given instead. The default storage
-space is /tmp/pvfs2\-test\-space.
+list of collections in the current storage space will be given instead. If the storage space
+is not specified then the default storage space of /tmp/pvfs2\-test\-space will be used.
 .SH "OPTIONS"
 .IP \-s
 The storage space to look for the collection in. The default storage space is /tmp/pvfs2\-test\-space.

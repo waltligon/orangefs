@@ -6,7 +6,7 @@
 pvfs2\-fs\-dump \- Display lower\-level information about a pvfs2 file system
 .SH "SYNOPSIS"
 .B pvfs2\-fs\-dump
-.I [\-d] [\-v] [\-k] [\-m mount_point] [\-f font_name] [\-?]
+.I [OPTIONS] \-m mount_point
 
 .SH "DESCRIPTION"
 Display lower\-level information about the PVFS2 file system at
@@ -24,9 +24,7 @@ Also print out information about file keys along with standard header output
 Display the information about the PVFS2 volume mounted at
 .I mount_point
 .IP \-f
-Output text tags using
-.I font_name
-font
+Output text tags using the supplied font name
 .IP \-?
 Print usage information and exit
 .SH "ENVIRONMENT"
