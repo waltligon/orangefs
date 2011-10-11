@@ -15,6 +15,7 @@
 #include "openfile-util.h"
 #include "iocommon.h"
 #include "ucache.h"
+#include <errno.h>
 
 /* Functions in this file generally define a label errorout
  * for cleanup before exit and return an int rc which is -1
@@ -1047,12 +1048,13 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     void  *scratch_ptr = 0; 
     uint64_t scratch_left = 0;
     int iovec_ndx = 0;
-    uint32_t block_ndx = 0;
+    uint16_t block_ndx = 0;
 
     if(!pvfs_ucache_enabled() || !pd->s->mtbl)
     {
         /* Bypass the ucache */
         errno = 0;
+        ucache_pseudo_misses++; /* could overflow, reset periodically */
         return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
                                                                   file_req);
     }
@@ -1097,14 +1099,15 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /* if lookup returns nil set char to 0, otherwise 1 */
         if(ucache_lookup(fs_id, handle, tags[i], NULL) == (void *)NIL) 
         {
+            ucache_misses++; /* could overflow, reset periodically */
             hits[tag_cnt] = 0; /* miss */
         }
         else{
+            ucache_hits++;  /* could overflow, reset periodically */
             hits[tag_cnt] = 1; /* hit */
         }
     }
 
-    //Could do this serially or in parallel
     uint64_t block_loc = 0;
     for(i = 0; i < tag_cnt; i++)
     {

@@ -577,7 +577,7 @@ int pvfs_descriptor_table_size(void)
              */
             rc = ucache_open_file(&(file_ref->fs_id),
                                   &(file_ref->handle), 
-                                  pd->s->mtbl);
+                                  &(pd->s->mtbl));
             /* Unique Entry */
             if(rc > 0)
             {   

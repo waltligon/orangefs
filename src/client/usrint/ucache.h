@@ -13,13 +13,18 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <unistd.h>
+
+#ifndef TESTING
 #include <usrint.h>
 #include "posix-ops.h"
 #include "iocommon.h"
 #include "posix-pvfs.h"
 #include "openfile-util.h"
+#endif 
+
 #include <sys/shm.h>
 #include <stdio.h>
+#include <string.h>
 #include <pvfs2-types.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
@@ -30,7 +35,7 @@
 #define MTBL_PER_BLOCK 16
 #define GET_KEY_FILE "/etc/fstab"
 #define PROJ_ID 61
-#define BLOCKS_IN_CACHE 512
+#define BLOCKS_IN_CACHE 1024
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6)
@@ -43,9 +48,7 @@
 #define voidp_t uint64_t
 #endif
 
-#define DBG 0
-#define INTERNAL_TESTING 0
-
+#define DBG 0 
 
 #define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
 #if (LOCK_TYPE == 0)
@@ -60,8 +63,14 @@
 #define LOCK_SIZE sizeof(pthread_spinlock_t)
 #endif
 
+/* Globals */
 extern union user_cache_u *ucache;
 extern ucache_lock_t *ucache_locks;
+extern ucache_lock_t *ucache_lock;
+extern ucache_lock_t *ucache_block_lock;
+extern uint64_t ucache_hits;
+extern uint64_t ucache_misses;
+extern uint64_t ucache_pseudo_misses; /* Chose not to cache */
 
 /** A link for one block of memory in a files hash table
  *
@@ -69,12 +78,13 @@ extern ucache_lock_t *ucache_locks;
 /* 20 bytes */
 struct mem_ent_s
 {
-    uint64_t tag;       /* offset of data block in file */
-    uint32_t item;      /* index of cache block with data */
-    uint16_t next;      /* use for hash table chain */
+    uint64_t tag;           /* offset of data block in file */
+    uint16_t item;          /* index of cache block with data */
+    uint16_t next;          /* use for hash table chain */
     uint16_t dirty_next;    /* if dirty used in dirty list */
-    uint16_t lru_next;  /* used in lru list */
-    uint16_t lru_prev;  /* used in lru list */
+    uint16_t lru_next;      /* used in lru list */
+    uint16_t lru_prev;      /* used in lru list */
+    char pad[2];
 };
 
 /** A cache for a specific file
@@ -83,14 +93,14 @@ struct mem_ent_s
  */
 struct mem_table_s
 {
-    uint16_t num_blocks;    /* number of used blocks in this mtbl */
-    uint16_t free_list; /* index of next free mem entry */
-    uint16_t free_list_blk; /* only used when mtbl is on mtbl free list */
-    uint16_t lru_first; /* index of first block on lru list */
-    uint16_t lru_last;  /* index of last block on lru list */
-    uint16_t dirty_list;    /* index of first dirty block */
-    uint16_t ref_cnt;   /* number of clients using this record */
-    char pad[12];
+    uint16_t num_blocks;        /* number of used blocks in this mtbl */
+    uint16_t free_list;         /* index of next free mem entry */
+    uint16_t free_list_blk;     /* used when mtbl is on mtbl free list  and to track free blks */
+    uint16_t lru_first;         /* index of first block on lru list */
+    uint16_t lru_last;          /* index of last block on lru list */
+    uint16_t dirty_list;        /* index of first dirty block */
+    uint16_t ref_cnt;           /* number of clients using this record */
+    char pad[10];
     struct mem_ent_s mem[MEM_TABLE_ENTRY_COUNT];
 };
 
@@ -111,10 +121,11 @@ union cache_block_u
 struct file_ent_s
 {
     uint64_t tag_handle;    /* PVFS_handle */
-    uint32_t tag_id;    /* PVFS_fs_id */
-    uint32_t mtbl_blk;  /* block index of this mtbl */
-    uint16_t mtbl_ent;  /* entry index of this mtbl */
-    uint16_t next;      /* next mtbl in chain */
+    uint32_t tag_id;        /* PVFS_fs_id */
+    uint16_t mtbl_blk;      /* block index of this mtbl */
+    uint16_t mtbl_ent;      /* entry index of this mtbl */
+    uint16_t next;          /* next mtbl in chain */
+    char pad[2];
 };
 
 /** A hash table to find caches for specific files
@@ -123,12 +134,11 @@ struct file_ent_s
  */
 struct file_table_s
 {
-    uint32_t free_blk;  /* index of the next free block */
-    uint32_t free_mtbl_blk; /* block index of next free mtbl */
+    uint16_t free_blk;  /* index of the next free block */
+    uint16_t free_mtbl_blk; /* block index of next free mtbl */
     uint16_t free_mtbl_ent; /* entry index of next free mtbl */
     uint16_t free_list; /* index of next free file entry */
-    /*  pthread_spinlock_t spinlock */
-    char pad[12];
+    char pad[16];
     struct file_ent_s file[FILE_TABLE_ENTRY_COUNT];
 };
 
@@ -143,37 +153,33 @@ union user_cache_u
 
 struct ucache_ref_s
 {
-    union user_cache_u *ucache;           /* pointer to ucache shmem */
+    union user_cache_u *ucache;     /* pointer to ucache shmem */
     ucache_lock_t *ucache_locks;    /* pointer to ucache locks */
 };
 
 /* externally visible API */
+union user_cache_u *get_ucache(void);
 int ucache_initialize(void);
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
-                     struct mem_table_s *mtbl);
-uint32_t ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint32_t *block_ndx);
-uint32_t ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
-uint32_t ucache_flush(pvfs_descriptor *pd);
-void ucache_dec_ref_cnt(struct mem_table_s *mtbl);
-void ucache_inc_ref_cnt(struct mem_table_s *mtbl);
-void ucache_info(FILE *out, union user_cache_u *ucache,
-                            ucache_lock_t *ucache_lock
-);
-ucache_lock_t *get_block_lock(uint32_t block_index);
-
-uint32_t lock_init(ucache_lock_t * lock);
-uint32_t lock_lock(ucache_lock_t * lock);
-uint32_t lock_unlock(ucache_lock_t * lock);
-uint32_t lock_destroy(ucache_lock_t * lock);
-#if (LOCK_TYPE == 0)
-uint32_t ucache_lock_getvalue(ucache_lock_t * lock, uint32_t *sval);
+                     struct mem_table_s **mtbl);
+int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
+void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint16_t *block_ndx);
+void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint16_t *block_ndx);
+int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
+#ifndef TESTING
+int ucache_flush(pvfs_descriptor *pd);
 #endif
+void ucache_info(FILE *out, char *flags);
 
-extern ucache_lock_t *ucache_lock;
-extern ucache_lock_t *ucache_block_lock;
+ucache_lock_t *get_block_lock(uint16_t block_index);
+int lock_init(ucache_lock_t * lock);
+int lock_lock(ucache_lock_t * lock);
+int lock_unlock(ucache_lock_t * lock);
+int lock_destroy(ucache_lock_t * lock);
+#if (LOCK_TYPE == 0)
+int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
+#endif
 
 #endif /* UCACHE_H */
 
