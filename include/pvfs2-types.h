@@ -593,15 +593,23 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
-/* PVFS2 ACL structures */
+/* PVFS2 ACL structures - Matches Linux ACL EA structures */
 typedef struct {
-    int32_t  p_tag;
-    uint32_t p_perm;
+    int16_t  p_tag;
+    uint16_t p_perm;
     uint32_t p_id;
 } pvfs2_acl_entry;
 
+typedef struct {
+    uint32_t p_version;
+    pvfs2_acl_entry p_entries[0];
+} pvfs2_acl_header;
+
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)
+#define PVFS2_ACL_VERSION      0x0002
+#define PVFS2_ACL_ACCESS       "system.posix_acl_access"
+#define PVFS2_ACL_DEFAULT      "system.posix_acl_default"
 
 /* p_tag entry in struct posix_acl_entry */
 #define PVFS2_ACL_USER_OBJ    (0x01)
@@ -722,6 +730,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
 #define PVFS_EACCES          E(58) /* Access not allowed */
 #define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
+#define PVFS_ERANGE          E(60) /* Math out of range, or buf too small */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
@@ -740,7 +749,7 @@ PVFS_error PVFS_errno_to_error(int err);
  * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
  * src/common/misc/errno-mapping.c and the kernel module)
  */
-#define PVFS_ERRNO_MAX          60
+#define PVFS_ERRNO_MAX          61
 
 /*
  * If system headers do not define these, assign them, with arbitrary
@@ -841,6 +850,7 @@ PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     EALREADY,                                         \
     EACCES,                                           \
     ECONNRESET,   /* 59 */                            \
+    ERANGE,                                           \
     0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 const char *PINT_non_errno_strerror_mapping[] = {     \
