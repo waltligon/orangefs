@@ -35,6 +35,7 @@ uint64_t ucache_pseudo_misses; /* Chose not to cache */
 /* Initialization */
 static void add_mtbls(uint16_t blk);
 static void init_memory_table(uint16_t blk, uint16_t ent);
+static int init_memory_entry(struct mem_table_s *mtbl, int16_t index);
 
 /* Gets */
 static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_ent);
@@ -769,6 +770,21 @@ static void add_mtbls(uint16_t blk)
     ftbl->free_mtbl_ent = start_mtbl;   
 }
 
+static int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
+{
+        if(index > MEM_TABLE_ENTRY_COUNT || (int16_t)index == NIL)
+        {
+            return -1;
+        }
+        mtbl->mem[index].item = NIL;
+        mtbl->mem[index].tag = NIL;
+        mtbl->mem[index].next = NIL;
+        mtbl->mem[index].lru_prev = NIL;
+        mtbl->mem[index].lru_next = NIL;
+        mtbl->mem[index].dirty_next = NIL;
+        return 0;
+}
+
 /** Initializes a mtbl which is a hash table of memory entries.
  * The mtbl will be located at the provided entry index within 
  * the provided block.
@@ -776,7 +792,7 @@ static void add_mtbls(uint16_t blk)
 static void init_memory_table(uint16_t blk, uint16_t ent)
 {
     uint16_t i;
-    //assert((int16_t)blk != NIL);
+    int rc = -1;
     struct mem_table_s *mtbl = &(ucache->b[blk].mtbl[ent]);
     mtbl->lru_first = NIL;
     mtbl->lru_last = NIL;
@@ -787,21 +803,20 @@ static void init_memory_table(uint16_t blk, uint16_t ent)
     /* set up hash table */
     for (i = 0; i < MEM_TABLE_HASH_MAX; i++)
     {
-        mtbl->mem[i].item = NIL;
-        mtbl->mem[i].tag = NIL;
-        mtbl->mem[i].next = NIL;
-        mtbl->mem[i].lru_prev = NIL;
-        mtbl->mem[i].lru_next = NIL;
-        mtbl->mem[i].dirty_next = NIL;
+        rc = init_memory_entry(mtbl, i);
     }
     /* set up list of free hash table entries */
     mtbl->free_list = MEM_TABLE_HASH_MAX;
     for (i = MEM_TABLE_HASH_MAX; i < (MEM_TABLE_ENTRY_COUNT - 1); i++)
     {
+        rc = init_memory_entry(mtbl, i);
         mtbl->mem[i].next = i + 1;
+
     }
+    rc = init_memory_entry(mtbl, MEM_TABLE_ENTRY_COUNT - 1);
     mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL;
 }
+
 
 /** This function asks the file table if a free block is avaialable. 
  * If so, returns the block's index; otherwise, returns NIL.
@@ -1343,16 +1358,6 @@ static void *lookup_mem(struct mem_table_s *mtbl,
 static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
 {
     if(DBG)fprintf(out, "updating lru with index = %hu\n", index);
-    /* Do not place an entry with index < MEM_TABLE_HASH_MAX because 
-     * they must remain the heads of the hash table chains
-     */
-/*    if(index < MEM_TABLE_HASH_MAX)
-    {
-        if(DBG)fprintf(out, 
-            "\t%hu<MEM_TABLE_HASH_MAX, not adding to LRU\n", index);
-            return;
-    }
-*/
 
     if(DBG)print_LRU(mtbl);  
 
@@ -1380,11 +1385,11 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
             /* Must be 2nd unique memory entry */
             if(DBG)fprintf(out, "\tinserting second record in LRU\n");
             /* point tail.prev to new */
-            mtbl->mem[mtbl->lru_last].lru_prev = index;
+            mtbl->mem[mtbl->lru_first].lru_prev = index;
             /* point new.prev to NIL */  
             mtbl->mem[index].lru_prev = NIL;
             /* point the new.next to the tail */      
-            mtbl->mem[index].lru_next = mtbl->lru_last;
+            mtbl->mem[index].lru_next = mtbl->lru_first;
             /* point the head to the new */  
             mtbl->lru_first = index;                    
         }
@@ -1395,32 +1400,48 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
         if(DBG)fprintf(out, "\trepairing previous LRU links and "
                                     "inserting record in LRU\n");
         
-        /* repair links  
-        if((int16_t)mtbl->mem[index].lru_prev != NIL)
+        if((int16_t)mtbl->mem[index].lru_prev == NIL && (int16_t)mtbl->mem[index].lru_next == NIL)
         {
-            mtbl->mem[mtbl->mem[index].lru_prev].lru_next = 
-                mtbl->mem[index].lru_next;
+            /* First time on the LRU List, Add to the front */
+            mtbl->mem[index].lru_next = mtbl->lru_first;
+            mtbl->mem[mtbl->lru_first].lru_prev = index;    
         }
-        if((int16_t)mtbl->mem[index].lru_next != NIL)
+        else if((int16_t)mtbl->mem[index].lru_prev == NIL)
         {
-            mtbl->mem[mtbl->mem[index].lru_next].lru_prev =     
-                mtbl->mem[index].lru_prev;
-        }*/
+            assert(mtbl->lru_first == index);
+            /* Already the head of MRU */
+            if(DBG)fprintf(out, "\talready the MRU, no need to do anything\n");
+            return;
+        }
+        else if((int16_t)mtbl->mem[index].lru_next == NIL)
+        {
+            assert(mtbl->lru_last == index);
+            /* Relocate the LRU to become the MRU */
+            mtbl->lru_last = mtbl->mem[index].lru_prev;
+            mtbl->mem[mtbl->lru_last].lru_next = NIL;
+            mtbl->mem[mtbl->lru_first].lru_prev = index;
+            mtbl->mem[index].lru_next = mtbl->lru_first;
+            mtbl->mem[index].lru_prev = NIL;
+        }
+        else
+        {
+            /* Relocate interior LRU list item to head */
+            uint16_t current_prev = mtbl->mem[index].lru_prev;
+            uint16_t current_next = mtbl->mem[index].lru_next;
 
+            assert((int16_t)current_prev != NIL && 
+                    (int16_t)current_next != NIL);
 
-        /* update nodes own link */
-        mtbl->mem[mtbl->lru_first].lru_prev = index; 
-        mtbl->mem[index].lru_next = mtbl->lru_first;
-        mtbl->lru_first = index;
-        mtbl->mem[index].lru_prev = NIL;
+            mtbl->mem[current_prev].lru_next = current_next;
+            mtbl->mem[current_next].lru_prev = current_prev;
 
-        /* Finally, establish this entry as the first on LRU list */
+            mtbl->mem[index].lru_prev = NIL;
+            mtbl->mem[index].lru_next = mtbl->lru_first;
+        }
         mtbl->lru_first = index;
     }
-    
-    assert((int16_t) mtbl->lru_last != NIL);
-    if(DBG)print_LRU(mtbl);
-}
+    //print_LRU(mtbl);
+}    
 
 /** Searches the ftbl for the mtbl with the most entries.
  * Returns the number of memory entries the max mtbl has. The double ptr 
@@ -1605,6 +1626,7 @@ static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset,
         {   /* No free ment available, so attempt eviction, and try again */
             if(DBG)fprintf(out, "\tno ment\n");
             evict_rc = evict_LRU(mtbl);
+            //print_LRU(mtbl);
             assert(evict_rc != 0);
             mentIndex = get_free_ment(mtbl);
         }
@@ -1761,13 +1783,21 @@ void print_LRU(struct mem_table_s *mtbl)
 {
     fprintf(out, "\tprinting lru list:\n");
     fprintf(out, "\t\tmru: %hu\n", mtbl->lru_first);
+    fprintf(out, "\t\t\tmru->lru_prev = %hu\n\t\t\tmru->lru_next = %hu\n", 
+        mtbl->mem[mtbl->lru_first].lru_prev, mtbl->mem[mtbl->lru_first].lru_next);
     uint16_t current = mtbl->mem[mtbl->lru_first].lru_next; 
-    do
+    while((int16_t)current != mtbl->lru_last && (int16_t)current!=NIL)
     {
+        fprintf(out, "\t\t\tcurr->lru_prev = %hu\n", 
+                       mtbl->mem[current].lru_prev);
         fprintf(out, "\t\t%hu\n", current);
+        fprintf(out, "\t\t\tcurr->lru_next = %hu\n",
+                       mtbl->mem[current].lru_next);
         current = mtbl->mem[current].lru_next;
-    } while((int16_t)current != mtbl->lru_last && (int16_t)current!=NIL);
+    }
     fprintf(out, "\t\tlru: %hu\n", mtbl->lru_last);
+    fprintf(out, "\t\t\tlru->lru_prev = %hu\n\t\t\tlru->lru_next = %hu\n", 
+        mtbl->mem[mtbl->lru_last].lru_prev, mtbl->mem[mtbl->lru_last].lru_next);
 }
 
 /*
