@@ -1,0 +1,28 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.TH "PVFS2-CHECK-SERVER" "1" "OCTOBER 2011" "PVFS2" "PVFS2 MANUALS"
+.SH "NAME"
+pvfs2\-check\-server \- Check to see if a server is responding
+.SH "SYNOPSIS"
+pvfs2\-check\-server \-h <server> \-f <fsname> \-n <protocol> \-p <port>
+.SH "DESCRIPTION"
+Check to see if a server is running by connecting to it.
+.SH "OPTIONS"
+.IP \-h
+The host name of the server
+.IP \-f
+The name of the exported file system.
+.IP \-n
+The name of the network protocol to use
+.IP \-p
+The port number the pvfs server is listening on
+.SH "ENVIRONMENT"
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.I R pvfs2tab
+file
+
+.SH "BUGS"
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH "AUTHOR"
+The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)

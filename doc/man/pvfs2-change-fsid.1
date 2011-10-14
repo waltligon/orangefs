@@ -11,7 +11,12 @@ pvfs2\-change\-fsid \- Utility for updating fsid in PVFS2 collections
 .I \-\-dbpath=</path/to/collections.db> \-\-fsconf=</path/to/pvfs2\-fs.conf>
 .I \-\-storage=</path/to/pvfs2\-storage\-space>
 .SH "DESCRIPTION"
-Changes the fsid of the file system in the database given as the \-\-dbpath
+Changes the fsid of the file system in the database given as the \-\-dbpath. If
+the old fsid is not provided then it will be looked up in the conf file.
+Likewise, if a new fsid is not specified then the new fsid will be generated in
+the same manner as pvfs2\-genconfig. Attempting to set the new fsid to the 
+current fsid will cause the program to exit silently without making any changes.
+Changes to the fsid will automatically be updated in the conf file.
 .SH "OPTIONS"
 .IP \-\-dbpath
 The path to the collections.db that contains the file system ID that you want to change.

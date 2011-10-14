@@ -1,91 +1,21 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
 .\" 
-.TH "PVFS2-GENCONFIG" "1" "SEPTEMBER 2003" "PVFS2" "PVFS2 Manuals"
+.TH "PVFS2-GENCONFIG" "1" "OCTOBER 2011" "PVFS2" "PVFS2 Manuals"
 .SH "NAME"
 pvfs2\-genconfig \- create a basic configuration file for PVFS2 servers
 .SH "SYNOPSIS"
-.B pvfs2\-genconfig [ \-\-protocol
-.I protocol_name
-.B ] [ \-\-ioservers 
-.I server_names
-.B ] [ \-\-metaservers 
-.I meta_server_host_names
-.B ] [ \-\-iospec
-.I endpoint_of_data_server
-.B ] [ \-\-metaspec
-.I endpoint_of_meta_server
-.B ] [ \-\-tcpport
-.I port_to_use
-.B (default is 3334)] [ \-\-tcpbindspecific ] [ \-\-gmport
-.I port_to_use
-.B (default is 6)] [ \-\-mxboard 
-.I board_to_use
-.B (default is 0)] [ \-\-mxendpoint
-.I mx_endpoint_to_use
-.B (default is 3)] [ \-\-ibport
-.I ib_port_to_use
-.B (default is 3335)] [ \-\-portal
-.I portal_index
-.B (default is 5)] [ \-\-logging
-.I debug_mask
-.B ] [ \-\-tracing ] [ \-\-logstamp
-.I timestamp_for_logs
-.B ] [ \-\-storage
-.I path_to_pvfs_storage_dir
-.B ] [ \-\-logfile
-.I file_to_place_server_logging
-.B ] [ \-\-notrovesync ] [ \-\-server\-job\-timeout
-.I job_timeout_value
-.B ] [ \-\-client\-job\-timeout
-.I client_timeout_value
-.B ] [ \-\-trove\-method
-.I trove_method
-.B ] [ \-\-first\-handle
-.I first_handle_to_reserve
-.B ] [ \-\-last\-handle
-.I last_handle_to_reserve
-.B ] [ \-\-root\-handle
-.I handle_to_reserver_for_root
-.B ] [ \-\-fsid
-.I fs_id_value
-.B ] [ \-\-fsname
-.I fs_name
-.B ] [ \-\-default\-num\-dfiles
-.I number_of_datafiles
-.B ] [ \-\-flow\-buffer\-size
-.I size_in_bytes
-.B ] [ \-\-flow\-buffer\-count
-.I buffers_per_flow
-.B ] [ \-\-trusted
-.I <1|0>
-.B ] [ \-\-genkey ] [ \-\-help ] [ \-\-spec\-usage ]
-.I <global_config_file> <local_config_file>
+.B pvfs2\-genconfig 
+.I [OPTIONS] <local_config_file>
 
 .SH "DESCRIPTION"
-.B pvfs2\-genconfig
-helps create the config files used by 
-.BR pvfs2\-server (1).
-Users can pass any number of command line options, in which case 
-.B pvfs2\-genconfig
-will not prompt and use the value of the options in the generated config file.
-Without any command line options, it will prompt the user for key information only.
-
-The
-.I global_config_file
-and
-.I local_config_file
-options warrant a little explanation.  
-.B pvfs2\-genconfig
-will create one config file with settings applicable to every server in the
-system.  It will also create one smaller config file with settings applicable
-to the individual servers in the system.  Getting the many server\-specific
-config files out to the server nodes is left as an exercise for the reader.
-
+The pvfs2\-genconfig utility creates configuration files for the PVFS2 file system. 
+The <local_file_name> argument is manditory and specify the name of the configuration
+file that will be written.  This utility will create the fs.conf file.
 .SH "OPTIONS"
 .IP \-\-protocol
 The communication method the servers will use.  As of this writing, the only
-supported options are "gm" (for myrinet networks), "tcp","ib", "mx", and "portals".
+supported options are "gm" (for myrinet networks), "tcp","ib" (infiniband), "mx", and "portals".
 .IP \-\-ioservers
 The host names of data servers. Can be <prefix>{#, #\-#, ...}
 .IP \-\-metaservers
@@ -105,7 +35,7 @@ The MX board to use. Default is 0.
 .IP \-\-mxendpoint
 The MX endpoint to use. Default is 3.
 .IP \-\-ibport
-The IB port to use. Default is 3335.
+The infiniband port to use. Default is 3335.
 .IP \-\-portal
 Portals index for listening server. Default is 5.
 .IP \-\-logging
