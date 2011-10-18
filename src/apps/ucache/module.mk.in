@@ -1,0 +1,15 @@
+
+ifdef BUILD_UCACHE
+
+DIR := src/apps/ucache
+
+UCACHEDSRC := \
+	$(DIR)/ucached.c \
+	$(DIR)/ucached_common.c \
+	$(DIR)/shmem_util.c \
+
+#	$(DIR)/ucached_cmd.c \
+
+UCACHED := $(DIR)/pvfs2-ucached
+
+endif # BUILD_UCACHE

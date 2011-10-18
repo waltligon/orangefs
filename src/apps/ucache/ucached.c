@@ -15,8 +15,8 @@ static struct tm * timeinfo;
 /* Forward Function Declarations */
 static int run_as_child(char c, char *str); /* Run as child of ucached */
 static int execute_command(char command, char *str);
-static int create_ucache_shmem();
-static int destroy_ucache_shmem();
+static int create_ucache_shmem(void);
+static int destroy_ucache_shmem(void);
 static void print_to_log(char *str); /* Logs commands and warnings */
 
 /** Runs the command in a child process */
@@ -89,7 +89,7 @@ static int execute_command(char command, char *str)
     return rc;
 }
 
-static int create_ucache_shmem()
+static int create_ucache_shmem(void)
 {
     int rc = 0;
     void *ucache = 0;
@@ -115,7 +115,7 @@ static int create_ucache_shmem()
     return rc;
 }
 
-static int destroy_ucache_shmem()
+static int destroy_ucache_shmem(void)
 {
     int rc = 0;
 

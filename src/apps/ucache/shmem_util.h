@@ -1,7 +1,9 @@
 #ifndef SHMEM_UTIL_H
 #define SHMEM_UTIL_H
 
+#ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE 500
+#endif
 
 #include <stdlib.h>
 #include <unistd.h>
