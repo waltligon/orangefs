@@ -15081,6 +15081,11 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
 echo "${ECHO_T}yes" >&6
     BUILD_ACL_INTERFACE=1
 
+cat >>confdefs.h <<\_ACEOF
+#define PVFS_HAVE_ACL_INCLUDES 1
+_ACEOF
+
+
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -15091,11 +15096,6 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-
-
-cat >>confdefs.h <<_ACEOF
-#define PVFS_HAVE_ACL_INCLUDES $BUILD_ACL_INTERFACE
-_ACEOF
 
 
 

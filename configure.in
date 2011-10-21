@@ -872,13 +872,13 @@ AC_TRY_COMPILE([
 ], [],
     AC_MSG_RESULT(yes)
     BUILD_ACL_INTERFACE=1
+    AC_DEFINE(PVFS_HAVE_ACL_INCLUDES, 1,
+            [Should we build user interface acl routines.])
 ,
     AC_MSG_RESULT(no)
     BUILD_ACL_INTERFACE=0
 )
 AC_SUBST(BUILD_ACL_INTERFACE)
-AC_DEFINE_UNQUOTED(PVFS_HAVE_ACL_INCLUDES, $BUILD_ACL_INTERFACE,
-    [Should we build user interface acl routines.])
     
 
 dnl See if CC is a GNU compiler.  This may require a real test in future

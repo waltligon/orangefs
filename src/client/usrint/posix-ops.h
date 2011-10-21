@@ -122,11 +122,13 @@ typedef struct posix_ops_s
                     int flags, int fd, off_t offset);
     int (*munmap)(void *start, size_t length);
     int (*msync)(void *start, size_t length, int flags);
+#if 0
     int (*acl_delete_def_file)(const char *path_p);
     acl_t (*acl_get_fd)(int fd);
     acl_t (*acl_get_file)(const char *path_p, acl_type_t type);
     int (*acl_set_fd)(int fd, acl_t acl);
     int (*acl_set_file)(const char *path_p, acl_type_t type, acl_t acl);
+#endif
 
     /* socket operations */
     int (*socket)(int dowmain, int type, int protocol);
