@@ -23,8 +23,8 @@ int main(int argc, char **argv)
         rc = (int)fgets(ps_buff, 256, pipe);
         if(rc == 0)
         {
-            remove(FIFO1);
-            remove(FIFO2);
+            rc = remove(FIFO1);
+            rc = remove(FIFO2);
             /* Crank up the daemon since it's not running */
             rc = system("./ucached");
             puts("SUCCESS: Daemon started");
@@ -45,28 +45,33 @@ int main(int argc, char **argv)
 
     /* Open FIFOs for use */
     writefd = open(FIFO1, O_WRONLY);
-    /* Non-blocking since response could excede 4096 chars */
-    readfd = open(FIFO2, O_RDONLY | O_NONBLOCK); 
+
+    if(writefd == -1)
+    {
+        perror("cmd main opening writefd"); 
+        return -1;       
+    }
 
     /* Send Command to Daemon */
-    mywrite(writefd, &argv[1][0], buffer);
+    strcpy(buffer, &argv[1][0]);
+    rc = write(writefd, buffer, BUFF_SIZE);
+    if(rc == -1)
+    {
+        perror("writing cmd");
+    }
+
+    /* TODO: what about large responses. chunk data? */
+    readfd = open(FIFO2, O_RDONLY); 
 
     /* Collect Response */
-    int count = 0;
-    /*  */
-    while((count = myread(readfd, buffer)) == -1)
-    {
-    }
-    /* Now output the response until no more chars can be read */
-    puts(buffer);
-    memset(buffer, 0, BUFF_SIZE);
-
-    while((count = myread(readfd, buffer)) > 0)
+    int count = read(readfd, buffer, BUFF_SIZE);
+    while(count > 0 || ((count == -1) && (errno == EINTR)))
     {
         puts(buffer);
         memset(buffer, 0, BUFF_SIZE);
+        count = read(readfd, buffer, BUFF_SIZE);
     }
-
+    
     /* Close FIFO when done */
     close(readfd);
     close(writefd);
