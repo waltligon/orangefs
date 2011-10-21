@@ -334,7 +334,7 @@ void load_glibc(void)
     glibc_ops.mmap = dlsym(RTLD_NEXT, "mmap");
     glibc_ops.munmap = dlsym(RTLD_NEXT, "munmap");
     glibc_ops.msync = dlsym(RTLD_NEXT, "msync");
-#ifdef PVFS_USRINT_ACL
+#ifdef PVFS_HAVE_ACL_INCLUDES
     glibc_ops.acl_delete_def_file = dlsym(RTLD_NEXT, "acl_delete_def_file");
     glibc_ops.acl_get_fd = dlsym(RTLD_NEXT, "acl_get_fd");
     glibc_ops.acl_get_file = dlsym(RTLD_NEXT, "acl_get_file");

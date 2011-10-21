@@ -259,6 +259,9 @@ extern int pvfs_munmap(void *start, size_t length);
 
 extern int pvfs_msync(void *start, size_t length, int flags);
 
+/* these are defined in acl.c and don't really need */
+/* a PVFS implementation */
+#if 0
 extern int pvfs_acl_delete_def_file(const char *path_p);
 
 extern acl_t pvfs_acl_get_fd(int fd);
@@ -268,6 +271,7 @@ extern acl_t pvfs_acl_get_file(const char *path_p, acl_type_t type);
 extern int pvfs_acl_set_fd(int fd, acl_t acl);
 
 extern int pvfs_acl_set_file(const char *path_p, acl_type_t type, acl_t acl);
+#endif
 
 
 #endif

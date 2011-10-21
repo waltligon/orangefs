@@ -526,6 +526,9 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
+/* Should we build user interface acl routines. */
+#undef PVFS_HAVE_ACL_INCLUDES
+
 /* Should we enable user interface data cache. */
 #undef PVFS_UCACHE_ENABLE
 

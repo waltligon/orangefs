@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION PVFS2_VERSION_MAJOR PVFS2_VERSION_MINOR PVFS2_VERSION_SUB build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC BUILD_CFLAGS BUILD_LDFLAGS LIBCFLAGS THREAD_LIB BUILD_SERVER BUILD_BMI_ONLY NEED_BERKELEY_DB MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS TAU_INCS BUILD_TAU BUILD_KERNEL THREADED_KMOD_HELPER LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP FUSE_LDFLAGS FUSE_CFLAGS BUILD_FUSE ENABLE_COVERAGE STRICT_CFLAGS QUIET_COMPILE BUILD_EPOLL PVFS2_SEGV_BACKTRACE build_shared BUILD_USRINT BUILDUSRINT BUILD_UCACHE INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX BUILD_BMI_TCP BUILD_GM GM_INCDIR GM_LIBDIR BUILD_MX MX_INCDIR MX_LIBDIR BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR BUILD_PORTALS PORTALS_INCS PORTALS_LIBS BUILD_ZOID ZOID_SRCDIR SERVER_LDFLAGS GOSSIP_ENABLE_BACKTRACE BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION PVFS2_VERSION_MAJOR PVFS2_VERSION_MINOR PVFS2_VERSION_SUB build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC BUILD_CFLAGS BUILD_LDFLAGS LIBCFLAGS THREAD_LIB BUILD_SERVER BUILD_BMI_ONLY NEED_BERKELEY_DB MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS TAU_INCS BUILD_TAU BUILD_KERNEL THREADED_KMOD_HELPER LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP FUSE_LDFLAGS FUSE_CFLAGS BUILD_FUSE ENABLE_COVERAGE STRICT_CFLAGS QUIET_COMPILE BUILD_EPOLL PVFS2_SEGV_BACKTRACE build_shared BUILD_USRINT BUILDUSRINT BUILD_UCACHE BUILD_ACL_INTERFACE INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX BUILD_BMI_TCP BUILD_GM GM_INCDIR GM_LIBDIR BUILD_MX MX_INCDIR MX_LIBDIR BUILD_IB IB_INCDIR IB_LIBDIR BUILD_OPENIB OPENIB_INCDIR OPENIB_LIBDIR BUILD_PORTALS PORTALS_INCS PORTALS_LIBS BUILD_ZOID ZOID_SRCDIR SERVER_LDFLAGS GOSSIP_ENABLE_BACKTRACE BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -15034,6 +15034,70 @@ _ACEOF
 
 fi;
 
+BUILD_ACL_INTERFACE=
+echo "$as_me:$LINENO: checking for user acl includes sys/acl.h acl/libacl.h" >&5
+echo $ECHO_N "checking for user acl includes sys/acl.h acl/libacl.h... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+#include <sys/acl.h>
+#include <acl/libacl.h>
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+    BUILD_ACL_INTERFACE=1
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+    BUILD_ACL_INTERFACE=0
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+cat >>confdefs.h <<_ACEOF
+#define PVFS_HAVE_ACL_INCLUDES $BUILD_ACL_INTERFACE
+_ACEOF
+
+
 
 INTELC=
 GNUC=
@@ -22621,6 +22685,7 @@ s,@build_shared@,$build_shared,;t t
 s,@BUILD_USRINT@,$BUILD_USRINT,;t t
 s,@BUILDUSRINT@,$BUILDUSRINT,;t t
 s,@BUILD_UCACHE@,$BUILD_UCACHE,;t t
+s,@BUILD_ACL_INTERFACE@,$BUILD_ACL_INTERFACE,;t t
 s,@INTELC@,$INTELC,;t t
 s,@GNUC@,$GNUC,;t t
 s,@DB_CFLAGS@,$DB_CFLAGS,;t t

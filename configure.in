@@ -862,6 +862,23 @@ AC_SUBST(BUILD_UCACHE)],
 [AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
     [Should we enable user interface data cache.])
 AC_SUBST(BUILD_UCACHE)])
+
+dnl See if we have includes needed for acls
+BUILD_ACL_INTERFACE=
+AC_MSG_CHECKING(for user acl includes sys/acl.h acl/libacl.h)
+AC_TRY_COMPILE([
+#include <sys/acl.h>
+#include <acl/libacl.h>
+], [],
+    AC_MSG_RESULT(yes)
+    BUILD_ACL_INTERFACE=1
+,
+    AC_MSG_RESULT(no)
+    BUILD_ACL_INTERFACE=0
+)
+AC_SUBST(BUILD_ACL_INTERFACE)
+AC_DEFINE_UNQUOTED(PVFS_HAVE_ACL_INCLUDES, $BUILD_ACL_INTERFACE,
+    [Should we build user interface acl routines.])
     
 
 dnl See if CC is a GNU compiler.  This may require a real test in future

@@ -2519,7 +2519,9 @@ posix_ops pvfs_ops =
     .mmap = pvfs_mmap,
     .munmap = pvfs_munmap,
     .msync = pvfs_msync,
-#ifdef PVFS_USRINT_ACL
+/* these are defined in acl.c and do not really need */
+/* a PVFS specific implementation */
+#if 0
     .acl_delete_def_file = pvfs_acl_delete_def_file,
     .acl_get_fd = pvfs_acl_get_fd,
     .acl_get_file = pvfs_acl_get_file,

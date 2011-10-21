@@ -96,8 +96,10 @@
 #endif
 #include <sys/statvfs.h>
 #include <sys/uio.h>
+#ifdef PVFS_HAVE_ACL_INCLUDES
 #include <sys/acl.h>
 #include <acl/libacl.h>
+#endif
 #include <sys/mman.h>
 #include <sys/time.h>
 
