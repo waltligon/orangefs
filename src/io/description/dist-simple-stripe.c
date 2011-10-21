@@ -196,11 +196,11 @@ static PVFS_simple_stripe_params simple_stripe_params = {
     PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE /* strip size */
 };
 
-static PVFS_size get_blksize(void* params)
+static PVFS_size get_blksize(void* params, int dfile_count)
 {
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
     /* report the strip size as the block size */
-    return(dparam->strip_size);
+    return(dparam->strip_size * dfile_count);
 }
 
 static PINT_dist_methods simple_stripe_methods = {

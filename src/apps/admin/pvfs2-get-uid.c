@@ -9,7 +9,7 @@
 #include "pint-util.h"
 #include "pint-cached-config.h"
 
-#define UID_HISTORY_MAX_SECS 4294967295 /* max uint32_t val */
+#define UID_HISTORY_MAX_SECS 4294967295UL /* max uint32_t val */
 #define UID_SERV_LIST_SIZE 25           /* maximum servers to get stats from */
 
 struct options

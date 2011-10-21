@@ -14,6 +14,7 @@
  *   ALL EQUAL THE SIGNED REPRESENTATION OF -1, CALLED NIL IN ucache.h  
  */
 
+#if PVFS_UCACHE_ENABLE
 #include <ucache.h>
 
 /* Global Variables */
@@ -1817,6 +1818,7 @@ static void print_dirty(struct mem_table_s *mtbl)
 */
 
 /*  End of Internal Only Functions    */
+#endif /* PVFS_UCACHE_ENABLE */
 
 /*
  * Local variables:

@@ -593,7 +593,16 @@ enum PVFS_server_mode
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
 
+#ifdef PVFS_USE_OLD_ACL_FORMAT
+/* OLD PVFS ACL Format - a null terminated array of these */
+typedef struct {
+    int32_t  p_tag;
+    uint32_t p_perm;
+    uint32_t p_id;
+} pvfs2_acl_entry;
+#else
 /* PVFS2 ACL structures - Matches Linux ACL EA structures */
+/* matches POSIX ACL-XATTR format */
 typedef struct {
     int16_t  p_tag;
     uint16_t p_perm;
@@ -604,6 +613,7 @@ typedef struct {
     uint32_t p_version;
     pvfs2_acl_entry p_entries[0];
 } pvfs2_acl_header;
+#endif
 
 /* These defines match that of the POSIX defines */
 #define PVFS2_ACL_UNDEFINED_ID   (-1)

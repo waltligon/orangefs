@@ -417,7 +417,7 @@ static char *params_string(void *params)
     return strdup(dparam->strips);
 }
 
-static PVFS_size get_blksize(void* params)
+static PVFS_size get_blksize(void* params, int dfile_count)
 {
     PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
     PINT_dist_strips *strips;
@@ -430,7 +430,7 @@ static PVFS_size get_blksize(void* params)
         return -1;
     }
  
-    /* report the first trip size in the set as the block size */
+    /* report the first strip size in the set as the block size */
     blksize = strips[0].size;
 
     PINT_dist_strips_free_mem(&strips);

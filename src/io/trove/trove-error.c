@@ -76,6 +76,7 @@ static __trove_errno_mapping_t s_trove_error_map[] =
     { EALREADY, TROVE_EALREADY },
     { ECANCELED, TROVE_ECANCEL },
     { EACCES, TROVE_EACCES },
+    { ERANGE, TROVE_ERANGE },
     { 0, 0 }
 };
 

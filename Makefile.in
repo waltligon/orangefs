@@ -82,6 +82,8 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_USRINT = @BUILD_USRINT@
+BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
@@ -449,7 +451,7 @@ ADMINSRC_SERVER :=
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
-# ULIBSRC is source code for libpvfs2
+# ULIBSRC is source code for libofs
 ULIBSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
@@ -468,6 +470,8 @@ VISSRC :=
 VISMISCSRC :=
 # KARMASRC is source for the karma gui
 KARMASRC :=
+# UCACHEDSRC is source for the ucache daemon
+UCACHEDSRC :=
 # FUSESRC is source for the FUSE interface daemon
 FUSESRC :=
 # userland helper programs for kernel drivers
@@ -539,10 +543,16 @@ include $(patsubst %, %/module.mk, $(MODULES))
 
 # LIBOBJS is a list of objects to put in the client lib
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# ULIBOBJS is a list of objects to put in the ofs lib
+ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
+# ULIBPICOBJS are the same, but compiled for use in a shared library
+ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+# ULIBDEPENDS is a list of dependency files for the client lib
+ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -557,14 +567,17 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
+
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
+
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
+
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
 # ADMINTOOLS is a list of admin program executables
@@ -629,6 +642,10 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
+# UCACHEDOBJS, UCACHEDDEPENDS for the karma gui (requires gtk2.0)
+UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
+UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
+
 # FUSEOBJS
 FUSEOBJS := $(patsubst %.c,%.o, $(filter %.c,$(FUSESRC)))
 FUSEDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FUSESRC)))
@@ -663,10 +680,11 @@ DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
-    $(MISCDEPENDS) $(USERDEPENDS) \
-    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
-    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
+    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
+    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
+    $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS))
 endif
 
 ####################################################################
@@ -676,7 +694,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE) $(UCACHED)
 endif
 
 # target for building admin tools
@@ -779,7 +797,7 @@ lib/libpvfs2.so: $(LIBPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
-# rule for building the pvfs2 _multithreaded_ library
+# rule for building the shared pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
@@ -803,7 +821,7 @@ lib/libofs.so: $(ULIBPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(DEPLIBS)
 
-# rule for building the ofs _multithreaded_ library
+# rule for building the shared ofs _multithreaded_ library
 lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
@@ -819,6 +837,11 @@ lib/libpvfs2-server.a: $(SERVEROBJS)
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(KARMAOBJS) $(LIBS) $(call modldflags,$<)
+
+# rule for building ucache daemon and its objects
+$(UCACHED): $(UCACHEDOBJS) $(LIBRARIES)
+	$(Q) "  LD		$@"
+	$(E)$(LD) -o $@ $(LDFLAGS) $(UCACHEDOBJS) $(LIBS) $(call modldflags,$<)
 
 # fule for building FUSE interface and its objects
 $(FUSE): $(FUSEOBJS) $(LIBRARIES)
@@ -992,7 +1015,8 @@ clean::
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
+        $(BMILIBRARIES) $(FUSEOBJS) $(UCACHEDOBJS) \
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
 		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
@@ -1114,8 +1138,8 @@ install_doc:
 	rm -f ${mandir}/man5/*.gz
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
-	gzip ${mandir}/man1/*
-	gzip ${mandir}/man5/*
+	gzip -f ${mandir}/man1/*.1
+	gzip -f ${mandir}/man5/*.5
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1188,6 +1212,10 @@ endif
 
 ifdef BUILD_FUSE
 	install -m 755 $(FUSE) $(prefix)/bin
+endif
+
+ifdef BUILD_UCACHE
+	install -m 755 $(UCACHED) $(sbindir)
 endif
 
 	# install any development tools built

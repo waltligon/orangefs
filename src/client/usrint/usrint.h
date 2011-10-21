@@ -188,14 +188,34 @@ extern int pvfs_convert_iovec(const struct iovec *vector,
 /* debugging */
 
 //#define USRINT_DEBUG
-#ifdef  USRINT_DEBUG
+#ifdef  PVFS_USRINT_DEBUG
 #define debug(s,v) fprintf(stderr,s,v)
 #else
 #define debug(s,v)
 #endif
 
-/* FD sets */
+/* USRINT Configuration Defines - Defaults */
+/* These should be defined in pvfs2-config.h */
 
+#ifndef PVFS_USRINT_BUILD
+#define PVFS_USRINT_BUILD 1
+#endif
+
+#ifndef PVFS_USRINT_CWD
+#define PVFS_USRINT_CWD 1
+#endif
+
+#ifndef PVFS_USRINT_KMOUNT
+#define PVFS_USRINT_KMOUNT 0
+#endif
+
+#ifndef PVFS_UCACHE_ENABLE
+#define PVFS_UCACHE_ENABLE 1
+#endif
+
+
+/* FD sets */
+#if 0
 #ifdef FD_SET
 #undef FD_SET
 #endif
@@ -234,11 +254,9 @@ do {                                    \
         __FD_ISSET(pd->true_fd,(fdset));\
     }                                   \
 } while(0)
-
-
-//typedef uint64_t off64_t;
-
 #endif
+
+#endif /* USRINT_H */
 
 /*
  * Local variables:

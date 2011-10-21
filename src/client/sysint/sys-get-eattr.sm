@@ -253,7 +253,8 @@ static int get_eattr_comp_fn(
      * val struct the user passed in
      */
 
-    if (sm_p->msgarray_op.msgarray[i].op_status == 0)
+    if ((sm_p->msgarray_op.msgarray[i].op_status == 0) ||
+        (sm_p->msgarray_op.msgarray[i].op_status == -PVFS_ERANGE))
     {
         int k, mink;
         mink = sm_p->u.geteattr.nkey;
@@ -326,7 +327,7 @@ static int get_eattr_comp_fn(
     /* if this is the last response, check all of the status values
      * and return error code if any requests failed
      */
-    if (i == (sm_p->msgarray_op.count -1))
+    if (i == (sm_p->msgarray_op.count - 1))
     {
 	for (j=0; j < sm_p->msgarray_op.count; j++)
 	{

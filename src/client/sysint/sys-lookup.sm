@@ -171,7 +171,7 @@ static int initialize_context(
 
     if(lookup_sm->current_context == lookup_sm->context_count)
     {
-        /* we have usee the last available context */
+        /* we have used the last available context */
         lookup_sm->context_count++;
         if(lookup_sm->context_count == 1)
         {
@@ -184,7 +184,7 @@ static int initialize_context(
         }
         else
         {
-            /* no the first one, so realloc to get one more */
+            /* not the first one, so realloc to get one more */
             lookup_sm->contexts = realloc(lookup_sm->contexts,
                                           sizeof(PINT_client_lookup_sm_ctx) *
                                           lookup_sm->context_count);
@@ -498,7 +498,10 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p->u.lookup.follow_link = follow_link;
     sm_p->u.lookup.current_context = 0;
     PVFS_hint_copy(hints, &sm_p->hints);
-    PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &parent.handle);
+    PVFS_hint_add(&sm_p->hints,
+                    PVFS_HINT_HANDLE_NAME,
+                    sizeof(PVFS_handle),
+                    &parent.handle);
 
     ret = initialize_context(&sm_p->u.lookup,
                              relative_pathname, parent);
@@ -518,12 +521,22 @@ PVFS_error PVFS_isys_ref_lookup(
         PINT_smcb_free(smcb);
         return ret;
     }
+    /* check to see if path resolved away to nothing */
+    /* in which case return the parent as the result */
+    if
+    (sm_p->u.lookup.current_context == 0 &&
+            sm_p->u.lookup.contexts[0].total_segments == 0)
+    {
+        resp->ref.handle = parent.handle;
+        resp->ref.fs_id = fs_id;
+        *op_id = -1; /* immediate completion */
+        return 0;
+    }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
                  relative_pathname, llu(parent.handle));
 
-    return PINT_client_state_machine_post(
-        smcb,  op_id, user_ptr);
+    return PINT_client_state_machine_post(smcb, op_id, user_ptr);
 }
 
 /** Dereference a path string relative to a parent directory.
@@ -542,9 +555,15 @@ PVFS_error PVFS_sys_ref_lookup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
 
-    ret = PVFS_isys_ref_lookup(
-        fs_id, relative_pathname, parent, credentials, resp,
-        follow_link, &op_id, hints, resp);
+    ret = PVFS_isys_ref_lookup(fs_id,
+                               relative_pathname,
+                               parent,
+                               credentials,
+                               resp,
+                               follow_link,
+                               &op_id,
+                               hints,
+                               resp);
 
     if (ret)
     {
@@ -587,8 +606,8 @@ PVFS_error PVFS_sys_lookup(
         parent.handle = 0;
         parent.fs_id = fs_id;
 
-        ret = PINT_cached_config_get_root_handle(
-            parent.fs_id,&parent.handle);
+        ret = PINT_cached_config_get_root_handle(parent.fs_id,
+                                                 &parent.handle);
 
         if (ret < 0)
         {
@@ -611,8 +630,13 @@ PVFS_error PVFS_sys_lookup(
               without doing this function call.
             */
             char *path = ((name[0] == '/') ? &name[1] : name);
-            ret = PVFS_sys_ref_lookup(
-                fs_id, path, parent, credentials, resp, follow_link, hints);
+            ret = PVFS_sys_ref_lookup(fs_id,
+                                      path,
+                                      parent,
+                                      credentials,
+                                      resp,
+                                      follow_link,
+                                      hints);
         }
     }
     return ret;

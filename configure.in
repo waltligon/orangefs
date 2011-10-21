@@ -790,6 +790,80 @@ if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
     AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
 fi
 
+dnl Method to disable build of user interface libraries
+BUILD_USRINT=
+AC_ARG_ENABLE(usrint,
+[  --disable-usrint        Do not build posix and stdio user libraries],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USRINT_BUILD, 1,
+      [Should we build user interface libraries.])
+   BUILD_USRINT=1
+else
+   AC_DEFINE(PVFS_USRINT_BUILD, 0,
+      [Should we build user interface libraries.])
+fi
+AC_SUBST(BUILD_USRINT)],
+[AC_DEFINE(PVFS_USRINT_BUILD, 1,
+    [Should we build user interface libraries.])
+BUILD_USRINT=1
+AC_SUBST(BUILDUSRINT)])
+ 
+USRINT_KMOUNT=
+dnl Method to enable user interface kmod support
+AC_ARG_ENABLE(usrint-kmount,
+[  --enable-usrint-kmount  Assume FS is mounted via kernel],
+[if test "x$enableval" = "xyes" ; then
+   if test "x$BUILD_KERNEL" = "x1" -o "x$BUILD_FUSE" = "x1" ; then
+      AC_DEFINE(PVFS_USRINT_KMOUNT, 1,
+         [Should user interface assume FS is mounted.])
+      USRINT_KMOUNT=1
+   else
+      AC_MSG_ERROR([Assume FS mounted but neither kernel nor FUSE build ])
+   fi
+else
+   AC_DEFINE(PVFS_USRINT_KMOUNT, 0,
+      [Should user interface assume FS is mounted.])
+fi],
+[AC_DEFINE(PVFS_USRINT_KMOUNT, 0,
+   [Should user interface assume FS is mounted.])
+])
+
+dnl Method to disable user interface CWD support
+AC_ARG_ENABLE(usrint-cwd,
+[  --disable-usrint-cwd    Do not enable user interface CWD support],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USRINT_CWD, 1,
+      [Should we enable user interface CWD support.])
+else
+   AC_DEFINE(PVFS_USRINT_CWD, 0,
+      [Should we enable user interface CWD support.])
+fi],
+[if test "x$USRINT_KMOUNT" = "x1" ; then
+   AC_DEFINE(PVFS_USRINT_CWD, 0,
+      [Should we enable user interface CWD support.])
+else
+   AC_DEFINE(PVFS_USRINT_CWD, 1,
+      [Should we enable user interface CWD support.])
+fi])
+
+dnl Method to enable user interface data cache
+BUILD_UCACHE=
+AC_ARG_ENABLE(ucache,
+[  --enable-ucache         Do not enable user user interface data cache.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
+      [Should we enable user interface data cache.])
+   BUILD_UCACHE=1
+else
+   AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
+      [Should we enable user interface data cache.])
+fi
+AC_SUBST(BUILD_UCACHE)],
+[AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
+    [Should we enable user interface data cache.])
+AC_SUBST(BUILD_UCACHE)])
+    
+
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
 dnl check if it is an Intel compiler; those lie and claim to be gcc but are
@@ -1138,6 +1212,7 @@ src/apps/devel/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
+src/apps/ucache/module.mk
 src/apps/kernel/linux/module.mk
 src/apps/user/module.mk
 src/io/trove/module.mk
@@ -1261,6 +1336,20 @@ if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 server will be built                        : yes])
 else
    AC_MSG_RESULT([PVFS2 server will be built                        :  no])
+
+fi
+
+if test "x$BUILD_USRINT" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user interface libraries will be built      : yes])
+else
+   AC_MSG_RESULT([PVFS2 user interface libraries will be built      :  no])
+
+fi
+
+if test "x$BUILD_UCACHE" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
+else
+   AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
 
 fi
 

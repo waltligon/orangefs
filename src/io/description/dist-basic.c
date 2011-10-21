@@ -60,7 +60,7 @@ static int get_num_dfiles(void* params,
     return 1;
 }
 
-static PVFS_size get_blksize(void* params)
+static PVFS_size get_blksize(void* params, int num_servers)
 {
     /* this is arbitrary; all data is on one server */
     return CONTIGBLOCKSZ;

@@ -126,6 +126,7 @@ typedef TROVE_method_id (*TROVE_method_callback)(TROVE_coll_id);
 #define TROVE_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_TROVE)
 #define TROVE_ECANCEL         (PVFS_ECANCEL | PVFS_ERROR_TROVE)
 #define TROVE_EACCES          (PVFS_EACCES | PVFS_ERROR_TROVE)
+#define TROVE_ERANGE          (PVFS_ERANGE | PVFS_ERROR_TROVE)
 
 #endif
 

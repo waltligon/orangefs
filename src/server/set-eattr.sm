@@ -153,14 +153,19 @@ static int seteattr_verify_eattribs(
     char *valBuf = NULL;
     for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
     {
-        gossip_debug(GOSSIP_MIRROR_DEBUG
+        if (gossip_debug_on)
+        {
+            gossip_debug(GOSSIP_MIRROR_DEBUG
                     ,"\tkey:%s\n"
                     ,(char *)s_op->req->u.seteattr.key[i].buffer);
-        valBuf = (char *)s_op->req->u.seteattr.val[i].buffer;
-        for (j=0; j<s_op->req->u.seteattr.val[i].buffer_sz; j++)
-            gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
+            valBuf = (char *)s_op->req->u.seteattr.val[i].buffer;
+            for (j=0; j<s_op->req->u.seteattr.val[i].buffer_sz; j++)
+            {
+                gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
                                             ,j
                                             ,(unsigned int)valBuf[j]);
+            }
+        }
         js_p->error_code = PINT_eattr_namespace_verify(
             &s_op->req->u.seteattr.key[i],
             &s_op->req->u.seteattr.val[i]);
@@ -228,7 +233,8 @@ static int seteattr_setobj_eattribs(
         0,
         js_p,
         &j_id,
-        server_job_context, s_op->req->hints);
+        server_job_context,
+        s_op->req->hints);
 
     return ret;
 }

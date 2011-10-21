@@ -1948,7 +1948,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
      * up a job_desc structure.  */
     int ret = -1;
     struct job_desc *jd = NULL;
-    void* user_ptr_internal;
+    void *user_ptr_internal;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -1970,12 +1970,17 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     gossip_debug(GOSSIP_JOB_DEBUG, "job_trove_keyval_write_list() posting trove_keyval_write_list()\n");
-    ret = trove_keyval_write_list(coll_id, handle,
-                             key_array, val_array,
-                             count, flags,
-                             jd->u.trove.vtag, user_ptr_internal,
-                             global_trove_context,
-                             &(jd->u.trove.id), hints);
+    ret = trove_keyval_write_list(coll_id,
+                                  handle,
+                                  key_array,
+                                  val_array,
+                                  count,
+                                  flags,
+                                  jd->u.trove.vtag,
+                                  user_ptr_internal,
+                                  global_trove_context,
+                                  &(jd->u.trove.id),
+                                  hints);
 #else
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
@@ -4236,10 +4241,10 @@ int job_testcontext(job_id_t * out_id_array_p,
     gen_mutex_lock(&completion_mutex);
     pthread_ret = 0;
     while(((ret = completion_query_context(out_id_array_p,
-        inout_count_p,
-        returned_user_ptr_array,
-        out_status_array_p, context_id)) == 0) &&
-        ((pthread_ret == EINTR) || (pthread_ret == 0)))
+                             inout_count_p,
+                             returned_user_ptr_array,
+                             out_status_array_p, context_id)) == 0) &&
+                             ((pthread_ret == EINTR) || (pthread_ret == 0)))
     {
         *inout_count_p = original_count;
 

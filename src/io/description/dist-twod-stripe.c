@@ -526,11 +526,11 @@ static char *params_string(void *params)
     return strdup(param_string);
 }
 
-static PVFS_size get_blksize(void* params)
+static PVFS_size get_blksize(void* params, int dfile_count)
 {
     PVFS_twod_stripe_params* dparam = (PVFS_twod_stripe_params*)params;
     /* report the strip size as the block size */
-    return(dparam->strip_size);
+    return(dparam->strip_size * dfile_count);
 }
 
 /* default twod_stripe_params */

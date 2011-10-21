@@ -18,7 +18,10 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "posix-pvfs.h"
+
+#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#endif
 
 static struct glibc_redirect_s
 {
@@ -34,9 +37,6 @@ static struct glibc_redirect_s
     int (*mknodat)(int ver, int dirfd, const char *path, mode_t mode, dev_t dev);
 } glibc_redirect;
 
-#ifndef CACHE_ENABLED_DEFAULT
-#define CACHE_ENABLED_DEFAULT 1
-#endif
 #define PREALLOC 3
 static char logfilepath[30];
 static int logfile;
@@ -45,7 +45,7 @@ static int descriptor_table_count = 0;
 static int descriptor_table_size = 0; 
 static pvfs_descriptor **descriptor_table; 
 static char rstate[256];  /* used for random number generation */
-static int cache_enabled = CACHE_ENABLED_DEFAULT;
+static int ucache_enabled = PVFS_UCACHE_ENABLE;
 
 posix_ops glibc_ops;
 
@@ -191,6 +191,11 @@ static int my_glibc_fadvise(int fd, off_t offset, off_t len, int advice)
 static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
 {
     return syscall(SYS_readdir, fd, dirp, count);
+}
+
+static int my_glibc_getcwd(char *buf, unsigned long size)
+{
+    return syscall(SYS_getcwd, buf, size);
 }
 
 void load_glibc(void)
@@ -375,7 +380,7 @@ static void usrint_cleanup(void)
     glibc_ops.unlink(logfilepath);
     /* cache cleanup? */
 #if 0
-    if (pvfs_ucache_enabled)
+    if (ucache_enabled)
     {
         ucache_finalize();
     }
@@ -385,10 +390,11 @@ static void usrint_cleanup(void)
 
 /*
  * acces function to see if cache is currently enabled
+ * only used by code ouside of this module
  */
 int pvfs_ucache_enabled(void)
 {
-    return cache_enabled;
+    return ucache_enabled;
 }
 
 /* 
@@ -397,7 +403,6 @@ int pvfs_ucache_enabled(void)
 void pvfs_sys_init(void) { 
 	struct rlimit rl; 
 	int rc; 
-    char *rv;
     static int pvfs_lib_init_flag = 0; 
     char curdir[PVFS_PATH_MAX];
 
@@ -416,8 +421,8 @@ void pvfs_sys_init(void) {
     atexit(usrint_cleanup);
 
     /* set up current working dir */
-    rv = getcwd(curdir, PVFS_PATH_MAX);
-    if (!rv)
+    rc = my_glibc_getcwd(curdir, PVFS_PATH_MAX);
+    if (rc < 0)
     {
         perror("failed to get CWD");
         exit(-1);
@@ -462,13 +467,18 @@ void pvfs_sys_init(void) {
 
     /* call other initialization routines */
 
+#if PVFS_UCACHE_ENABLE
     /* ucache initialization - assumes shared memory previously aquired */
     rc = ucache_initialize();
     if (rc < 0)
     {
+        /* ucache failed to initialize */
         /* continue without cache */
-        cache_enabled = 0;
+        ucache_enabled = 0;
     }
+#else
+    ucache_enabled = 0;
+#endif
 
     //PVFS_perror_gossip_silent(); 
     pvfs_initializing_flag = 0;
@@ -565,7 +575,8 @@ int pvfs_descriptor_table_size(void)
 	pd->s->dpath = NULL;
     pd->s->mtbl = NULL; /* not caching if left NULL */
 
-    if (pvfs_ucache_enabled() && use_cache)
+#if PVFS_UCACHE_ENABLE
+    if (ucache_enabled && use_cache)
     {
         /* File reference won't always be passed in */
         if(file_ref != NULL)
@@ -595,6 +606,7 @@ int pvfs_descriptor_table_size(void)
             }
         }
     }
+#endif /* PVFS_UCACHE_ENABLE */
 
     return pd;
 }
@@ -759,6 +771,7 @@ int pvfs_free_descriptor(int fd)
             free(pd->s->dpath);
         }
 
+#if PVFS_UCACHE_ENABLE
         if (pd->s->mtbl)
         {
             /* release cache objects here */
@@ -771,7 +784,10 @@ int pvfs_free_descriptor(int fd)
                 ucache_close_file(&(pd->s->pvfs_ref.fs_id),
                                   &(pd->s->pvfs_ref.handle));
             }
+            /* don't leave a dangling pointer */
+            pd->s->mtbl = NULL; 
         }
+#endif /* PVFS_UCACHE_ENABLE */
 
 	    /* free descriptor status - wipe memory first */
 	    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
@@ -855,14 +871,16 @@ char *pvfs_qualify_path(const char *path)
 
 int is_pvfs_path(const char *path)
 {
-#ifdef PVFS_USRINT_KMOUNT
+    int rc = 0;
+    char *newpath = NULL ;
+#if PVFS_USRINT_KMOUNT
+    int npsize;
     struct stat sbuf;
     struct statfs fsbuf;
-#endif
-    int rc = 0;
+#else
     PVFS_fs_id fs_id;
     char pvfs_path[PVFS_PATH_MAX];
-    char *newpath = NULL ;
+#endif
 
     if (pvfs_initializing_flag)
     {
@@ -873,18 +891,30 @@ int is_pvfs_path(const char *path)
     }
 
     pvfs_sys_init();
-#ifdef PVFS_USRINT_MOUNT
-    memset(&file_system, 0, sizeof(file_system));
+    if (!path)
+    {
+        errno = EINVAL;
+        return 0; /* let glibc sort out the error */
+    }
+#if PVFS_USRINT_KMOUNT
+    memset(&sbuf, 0, sizeof(sbuf));
+    memset(&fsbuf, 0, sizeof(fsbuf));
+    npsize = strnlen(path, PVFS_PATH_MAX) + 1;
+    newpath = (char *)malloc(npsize);
+    if (!newpath)
+    {
+        return 0; /* let glibc sort out the error */
+    }
+    strncpy(newpath, path, npsize);
     
-    newpath = pvfs_qualify_path(path);
-    /* first try to state the path */
+    /* first try to stat the path */
     /* this must call standard glibc stat */
     rc = glibc_ops.stat(newpath, &sbuf);
     if (rc < 0)
     {
         int count;
         /* path doesn't exist, try removing last segment */
-        for(count = strlen(newpath) -2; count > 0; count--)
+        for(count = strlen(newpath) - 2; count > 0; count--)
         {
             if(newpath[count] == '/')
             {
@@ -897,15 +927,13 @@ int is_pvfs_path(const char *path)
         if (rc < 0)
         {
             /* can't find the path must be an error */
+            free(newpath);
             return 0; /* let glibc sort out the error */
         }
     }
     /* this must call standard glibc statfs */
     rc = glibc_ops.statfs(newpath, &fsbuf);
-    if (newpath != path)
-    {
-        free(newpath);
-    }
+    free(newpath);
     if(fsbuf.f_type == PVFS_FS)
     {
         return 1; /* PVFS */

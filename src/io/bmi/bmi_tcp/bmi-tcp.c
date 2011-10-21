@@ -2152,8 +2152,12 @@ static int tcp_sock_init(bmi_method_addr_p my_method_addr)
 	 * see if the socket is usable yet. */
 	return (0);
     }
-    
-    bmi_set_sock_buffers(tcp_addr_data->socket);
+ 
+ /* This function call makes no sense - we know the socket
+  * is not a valid value, otherwise we would have taken the
+  * above branch.  Commenting out for now WBL 9/11
+  */
+/*    bmi_set_sock_buffers(tcp_addr_data->socket); */
 
     /* at this point there is no socket.  try to build it */
     if (tcp_addr_data->port < 1)

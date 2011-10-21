@@ -281,7 +281,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
                      (char *)op_p->u.k_read.key->buffer, 
                      db_strerror(ret));
 
-        /* if data buffer is too small returns a memory error */
+        /* if data buffer is too small returns ERANGE error */
         if (data.ulen < data.size)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
@@ -1185,11 +1185,30 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
         if (ret != 0)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
-                         "keyval get %s failed with error %s\n",
+                         "keyval read list (get) %s failed with error %s\n",
                          key_entry.key, db_strerror(ret));
+            /* if data buffer is too small returns ERANGE error */
+            /* we could check fpr DB_BUFFER_SMALL rather than */
+            /* compare these, but this seems to work */
+            if (data.ulen < data.size)
+            {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "warning: Value buffer too small %d < %d\n",
+                         data.ulen, data.size);
+                /* let the user know */
+                op_p->u.k_read_list.val_array[i].read_sz = data.size;
+                /* this is still a success */
+                success_count++;
+            }
+            else
+            {
+                op_p->u.k_read_list.val_array[i].read_sz = 0;
+            }
             op_p->u.k_read_list.err_array[i] = 
                 -dbpf_db_error_to_trove_error(ret);
-            op_p->u.k_read_list.val_array[i].read_sz = 0;
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                    "Trove error set to %d\n",
+                    op_p->u.k_read_list.err_array[i]);
         }
         else
         {
@@ -1234,7 +1253,6 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
     ret = dbpf_op_init_queued_or_immediate(
         &op, &q_op_p,
         KEYVAL_WRITE_LIST,
@@ -1260,7 +1278,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
+    ret = dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
+    return ret;
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1396,9 +1415,9 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                         data.data, data.size))
                 {
                     /*
-    NOTE: this can happen if the keyword isn't registered,
-    or if there is no associated cache_elem for this key
-    */
+                     * NOTE: this can happen if the keyword isn't registered,
+                     * or if there is no associated cache_elem for this key
+                     */
                     gossip_debug(
                         GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
                         "(key is %s)\n", 
@@ -1419,7 +1438,6 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     ret = DBPF_OP_COMPLETE;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
-
 return_error:
     return ret;
 }

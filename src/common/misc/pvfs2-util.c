@@ -97,7 +97,7 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-static int PINT_util_resolve_absolute(
+int PVFS_util_resolve_absolute(
     const char* local_path,
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,
@@ -453,16 +453,22 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
             for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
+            {
                 if (*cp == ',')
+                {
                     ++me->num_pvfs_config_servers;
+                }
+            }
 
             /* allocate room for our copies of the strings */
             me->pvfs_config_servers = malloc(me->num_pvfs_config_servers
-              * sizeof(*me->pvfs_config_servers));
+                                      * sizeof(*me->pvfs_config_servers));
             if (!me->pvfs_config_servers)
+            {
                 goto error_exit;
-            memset(me->pvfs_config_servers, 0,
-              me->num_pvfs_config_servers * sizeof(*me->pvfs_config_servers));
+            }
+            memset(me->pvfs_config_servers, 0, me->num_pvfs_config_servers
+                                            * sizeof(*me->pvfs_config_servers));
             me->mnt_dir = malloc(strlen(PINT_FSTAB_PATH(tmp_ent)) + 1);
             me->mnt_opts = malloc(strlen(PINT_FSTAB_OPTS(tmp_ent)) + 1);
 
@@ -475,7 +481,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* parse server list and make sure fsname is same */
             cp = PINT_FSTAB_NAME(tmp_ent);
             cur_server = 0;
-            for (;;) {
+            for (;;)
+            {
                 char *tok;
                 int slashcount;
                 char *slash;
@@ -527,16 +534,24 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                  */
                 me->pvfs_config_servers[cur_server] = strdup(tok);
                 if (!me->pvfs_config_servers[cur_server])
+                {
                     goto error_exit;
+                }
 
                 ++last_slash;
 
-                if (cur_server == 0) {
+                if (cur_server == 0)
+                {
                     me->pvfs_fs_name = strdup(last_slash);
                     if (!me->pvfs_fs_name)
+                    {
                         goto error_exit;
-                } else {
-                    if (strcmp(last_slash, me->pvfs_fs_name) != 0) {
+                    }
+                }
+                else
+                {
+                    if (strcmp(last_slash, me->pvfs_fs_name) != 0)
+                    {
                         gossip_lerr(
                           "Error: different fs names in server addresses: %s\n",
                           PINT_FSTAB_NAME(tmp_ent));
@@ -549,17 +564,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
-                   PINT_FSTAB_PATH(tmp_ent));
+                                    PINT_FSTAB_PATH(tmp_ent));
             strcpy(current_tab->mntent_array[i].mnt_opts,
-                   PINT_FSTAB_OPTS(tmp_ent));
+                                    PINT_FSTAB_OPTS(tmp_ent));
 
             /* find out if a particular flow protocol was specified */
             if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
             {
                 ret = parse_flowproto_string(
-                    PINT_FSTAB_OPTS(tmp_ent),
-                    &(current_tab->
-                      mntent_array[i].flowproto));
+                                        PINT_FSTAB_OPTS(tmp_ent),
+                                        &(current_tab->
+                                        mntent_array[i].flowproto));
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -568,17 +583,17 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             else
             {
                 current_tab->mntent_array[i].flowproto =
-                    FLOWPROTO_DEFAULT;
+                                        FLOWPROTO_DEFAULT;
             }
 
             /* pick an encoding to use with the server */
             current_tab->mntent_array[i].encoding =
-                PVFS2_ENCODING_DEFAULT;
+                                    PVFS2_ENCODING_DEFAULT;
             cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
                 ret = parse_encoding_string(
-                    cp, &current_tab->mntent_array[i].encoding);
+                                   cp, &current_tab->mntent_array[i].encoding);
                 if (ret < 0)
                 {
                     goto error_exit;
@@ -612,7 +627,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (&s_stat_tab_array[s_stat_tab_count - 1]);
 
-  error_exit:
+error_exit:
     for (; i > -1; i--)
     {
         struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
@@ -621,8 +636,12 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         {
             int j;
             for (j=0; j<me->num_pvfs_config_servers; j++)
+            {
                 if (me->pvfs_config_servers[j])
+                {
                     free(me->pvfs_config_servers[j]);
+                }
+            }
             free(me->pvfs_config_servers);
             me->pvfs_config_servers = NULL;
             me->num_pvfs_config_servers = 0;
@@ -778,6 +797,8 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             {
                 return -PVFS_ENOMEM;
             }
+            /* should this be PVFS_PATH_MAX? - WBL */
+            /* need to find def of this field (tabfile_name) first */
             strncpy(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].tabfile_name,
                     PVFS2_DYNAMIC_TAB_NAME, PVFS_NAME_MAX);
         }
@@ -923,7 +944,7 @@ int PVFS_util_remove_internal_mntent(
                     continue;
                 }
                 PVFS_util_copy_mntent(
-                    &tmp_mnt_array[new_count++], current_mnt);
+                            &tmp_mnt_array[new_count++], current_mnt);
                 PVFS_util_free_mntent(current_mnt);
             }
 
@@ -942,7 +963,7 @@ int PVFS_util_remove_internal_mntent(
               array since we know it's now empty.
             */
             PVFS_util_free_mntent(
-                &s_stat_tab_array[found_index].mntent_array[0]);
+                        &s_stat_tab_array[found_index].mntent_array[0]);
             free(s_stat_tab_array[found_index].mntent_array);
             s_stat_tab_array[found_index].mntent_array = NULL;
             s_stat_tab_array[found_index].mntent_count = 0;
@@ -962,7 +983,7 @@ int PVFS_util_remove_internal_mntent(
  * returns 0 on success, -PVFS_error on failure
  */
 int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
-                              struct PVFS_sys_mntent* out_mntent)
+                              struct PVFS_sys_mntent *out_mntent)
 {
     int i = 0;
 
@@ -1006,7 +1027,7 @@ int PVFS_util_resolve(
     char* parent_path = NULL;
     int base_len = 0;
 
-    if(strlen(local_path) > (PVFS_NAME_MAX-1))
+    if(strlen(local_path) > (PVFS_PATH_MAX-1))
     {
         gossip_err("Error: PVFS_util_resolve() input path too long.\n");
         return(-PVFS_ENAMETOOLONG);
@@ -1015,8 +1036,8 @@ int PVFS_util_resolve(
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-    ret = PINT_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
-        out_fs_path_max);
+    ret = PVFS_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
+                                     out_fs_path_max);
     if(ret == 0)
     {
         /* done */
@@ -1027,20 +1048,20 @@ int PVFS_util_resolve(
         /* if the path wasn't found, try canonicalizing the path in case it
          * refers to a relative path on a mounted volume or contains symlinks
          */
-        tmp_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+        tmp_path = (char*)malloc(PVFS_PATH_MAX * sizeof(char));
         if(!tmp_path)
         {
             return(-PVFS_ENOMEM);
         }
-        memset(tmp_path, 0, PVFS_NAME_MAX*sizeof(char));
-        ret = PINT_realpath(local_path, tmp_path, (PVFS_NAME_MAX-1));
+        memset(tmp_path, 0, PVFS_PATH_MAX * sizeof(char));
+        ret = PINT_realpath(local_path, tmp_path, (PVFS_PATH_MAX - 1));
         if(ret == -PVFS_EINVAL)
         {
             /* one more try; canonicalize the parent in case this function
              * is called before object creation; the basename
              * doesn't yet exist but we still need to find the PVFS volume
              */
-            parent_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+            parent_path = (char *)malloc(PVFS_PATH_MAX * sizeof(char));
             if(!parent_path)
             {
                 free(tmp_path);
@@ -1052,7 +1073,7 @@ int PVFS_util_resolve(
             base_len = strlen(basename(parent_path));
             strcpy(parent_path, local_path);
             ret = PINT_realpath(dirname(parent_path), tmp_path,
-                (PVFS_NAME_MAX-base_len-2));
+                               (PVFS_PATH_MAX - base_len - 2));
             if(ret < 0)
             {
                 free(tmp_path);
@@ -1073,8 +1094,8 @@ int PVFS_util_resolve(
             return(-PVFS_ENOENT);
         }
 
-        ret = PINT_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
-            out_fs_path_max);
+        ret = PVFS_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
+                                         out_fs_path_max);
         free(tmp_path);
 
         /* fall through and preserve "ret" to be returned */
@@ -1539,7 +1560,7 @@ void PINT_release_pvfstab(void)
     int i, j;
 
     gen_mutex_lock(&s_stat_tab_mutex);
-    for(i=0; i<s_stat_tab_count; i++)
+    for(i = 0; i < s_stat_tab_count; i++)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
@@ -1766,7 +1787,7 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
     return 0;
 }
 
-/* PINT_util_resolve_absolute()
+/* PVFS_util_resolve_absolute()
  *
  * given a local path of a file that may reside on a pvfs2 volume,
  * determine what the fsid and fs relative path is. Makes no attempt
@@ -1774,25 +1795,25 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
  *
  * returns 0 on succees, -PVFS_error on failure
  */
-static int PINT_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max)
+int PVFS_util_resolve_absolute(const char *local_path,
+                               PVFS_fs_id *out_fs_id,
+                               char *out_fs_path,
+                               int out_fs_path_max)
 {
     int i = 0, j = 0;
     int ret = -PVFS_EINVAL;
 
     gen_mutex_lock(&s_stat_tab_mutex);
 
-    for(i=0; i < s_stat_tab_count; i++)
+    for(i = 0; i < s_stat_tab_count; i++)
     {
-        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
-                local_path, 
-                s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                out_fs_path, out_fs_path_max);
+                           local_path, 
+                           s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                           out_fs_path,
+                           out_fs_path_max);
             if(ret == 0)
             {
                 *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
@@ -1811,17 +1832,17 @@ static int PINT_util_resolve_absolute(
     }
 
     /* check the dynamic tab area if we haven't resolved anything yet */
-    for(j = 0; j < s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    for(j = 0; j < s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
         ret = PINT_remove_dir_prefix(
-            local_path, s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-            out_fs_path, out_fs_path_max);
+             local_path,
+             s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
+             out_fs_path,
+             out_fs_path_max);
         if (ret == 0)
         {
-            *out_fs_id = s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            *out_fs_id =
+                s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
             if(*out_fs_id == PVFS_FS_ID_NULL)
             {
                 gossip_err("Error: %s resides on a PVFS2 file system "
@@ -1842,27 +1863,27 @@ static int PINT_util_resolve_absolute(
 
 #ifdef DEFINE_MY_GET_NEXT_FSENT
 
-static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab)
+static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
 {
     char linestr[500];
     int linelen = 0;
-    char * strtok_ctx;
-    char * nexttok; 
-    PINT_fstab_entry_t * fsentry;
-    if(!fgets(linestr, 500, tab))
+    char *strtok_ctx;
+    char *nexttok; 
+    PINT_fstab_entry_t *fsentry;
+    if (!fgets(linestr, 500, tab))
     {
         return NULL;
     }
 
     fsentry = malloc(sizeof(PINT_fstab_entry_t));
-    if(!fsentry)
+    if (!fsentry)
     {
         return NULL;
     }
     memset(fsentry, 0, sizeof(PINT_fstab_entry_t));
 
     linelen = strlen(linestr);
-    if(linestr[linelen - 1] == '\n')
+    if (linestr[linelen - 1] == '\n')
     {
         linestr[linelen - 1] = 0;
     }

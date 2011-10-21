@@ -78,7 +78,7 @@ PVFS_error PVFS_isys_listeattr(
     }
 
     /* the resp key array is used to determine how much we allocate,
-     * let's enfore the max key buffer of PVFS_MAX_XATTR_NAMELEN
+     * let's enforce the max key buffer of PVFS_MAX_XATTR_NAMELEN
      */
 
     if( nkey > PVFS_REQ_LIMIT_EATTR_LIST )

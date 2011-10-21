@@ -14,7 +14,9 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#endif
 #include <errno.h>
 
 /* Functions in this file generally define a label errorout
@@ -96,10 +98,12 @@ int iocommon_fsync(pvfs_descriptor *pd)
         return -1;
     }
     iocommon_cred(&credentials); 
+#if PVFS_UCACHE_ENABLE
     if (pvfs_ucache_enabled())
     {
         ucache_flush(pd);
     }
+#endif
     errno = 0;
     rc = PVFS_sys_flush(pd->s->pvfs_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
@@ -943,6 +947,7 @@ errorout:
     return rc;
 }
 
+#if PVFS_UCACHE_ENABLE
 /** TODO
  * 1: read, read from user cache and write to user mem
  * 2: write, read from user mem and write to user cache
@@ -1014,6 +1019,7 @@ static uint32_t place_data(enum PVFS_io_type which,
     }
     return 1;
 }
+#endif /* PVFS_UCACHE_ENABLE */
 
 /*The Wrapper Fuction calls to the "nocache" version of 
  *  io_common_readorwrite (below)   
@@ -1031,18 +1037,24 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          const struct iovec *vector)
 {
     int rc = 0;
-    int tag_cnt = 0;
+#if PVFS_UCACHE_ENABLE
+    int i;
+    int tag_cnt = 0; /* how many tags/blocks to access */
+    int size; /* how many bytes request spans */
     uint64_t remainder = 0;
     uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
-    uint64_t pos = 0;
-    uint64_t end = offset + count;
+    uint64_t next_tag = 0;
+    /* Array of the tags we need to read/write to */
+    uint64_t tags[tag_cnt];
     PVFS_fs_id *fs_id = &(pd->s->pvfs_ref.fs_id);
     PVFS_handle *handle = &(pd->s->pvfs_ref.handle);
-    /* Used to determine if we finished writing a block without filling up the 
+    /* Used to determine if we finished writing a
+     * block without filling up the 
      * current io segment 
      */
     unsigned char scratch = 0;  
-    /* The offset into the last io semgment that was partially used (so use 
+    /* The offset into the last io semgment that
+     * was partially used (so use 
      * this ptr then move on to the next io segment) .
      */
     void  *scratch_ptr = 0; 
@@ -1052,45 +1064,52 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 
     if(!pvfs_ucache_enabled() || !pd->s->mtbl)
     {
+        ucache_pseudo_misses++; /* could overflow, reset periodically */
+#endif /* PVFS_UCACHE_ENABLE */
         /* Bypass the ucache */
         errno = 0;
-        ucache_pseudo_misses++; /* could overflow, reset periodically */
-        return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
-                                                                  file_req);
+        rc = iocommon_readorwrite_nocache(which,
+                                          pd,
+                                          offset,
+                                          buf,
+                                          mem_req,
+                                          file_req);
+        if (rc < 0)
+        {
+            goto errorout;
+        }
+#if PVFS_UCACHE_ENABLE
+    }
+
+    /* How many bytes does request span */
+    /* these will be contiguous in file starting at offset */
+    /* may be spread in out memory */
+    for (i = 0; i < count; i++)
+    {
+        size += vector[i].iov_len;
     }
 
     /* How many tags? */
-    tag_cnt = count / (CACHE_BLOCK_SIZE_K * 1024);
+    tag_cnt = size / (CACHE_BLOCK_SIZE_K * 1024);
 
-    /* Add 2 to be sure we have enough tags (may not need them) */
+    /* Add 2 to be sure we have enough tags (may not need them all) */
     tag_cnt += 2;
-
-    /* Array of the tags we need to read/write to */
-    uint64_t tags[tag_cnt];
    
-    remainder = offset % blk_size;
-
     /* Block Aligned */
-    if(remainder == 0) 
-    {
-        tags[0] = offset;        
-    }
-    else
-    {
-        tags[0] = offset - remainder;
-    }
-    
-    /* Loop over positions storing tags (ment identifiers) */
-    pos = tags[0] + blk_size;
-    int i;
-    for(i = 1; pos < end; i++)
-    {
-        tags[i] = pos;
-        pos += blk_size;
-    }
+    remainder = offset % blk_size;
+    tags[0] = offset - remainder;
 
+    /* Loop over positions storing tags (ment identifiers) */
+    next_tag = tags[0] + blk_size;
+    for(i = 1; i < tag_cnt; i++)
+    {
+        tags[i] = next_tag;
+        next_tag += blk_size;
+        if (next_tag > (offset + size))
+            break;
+    }
     /* This should represent the number of blks */
-    tag_cnt = i - 1;
+    tag_cnt = i + 1;
 
     /* Now that tags are set build array of lookup responses*/
     unsigned char hits[tag_cnt];
@@ -1176,12 +1195,18 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 }
                 else
                 {
-                    rc = iocommon_readorwrite_nocache(which, pd, offset, 
-                                                  buf, mem_req, file_req);
+                    rc = iocommon_readorwrite_nocache(which,
+                                                      pd,
+                                                      offset, 
+                                                      buf,
+                                                      mem_req,
+                                                      file_req);
                 }
             }
         }
     }
+#endif /* PVFS_UCACHE_ENABLE */
+errorout:
     return rc;
 }
 
@@ -1194,7 +1219,6 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
                          void *buf,
                          PVFS_Request mem_req,
                          PVFS_Request file_req)
-        //returned by nonblocking operations
 {
     int rc = 0;
     int orig_errno = errno;
@@ -1209,9 +1233,11 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     /* Initialize */
     memset(&io_resp, 0, sizeof(io_resp));
 
-    //Ensure descriptor is used for the correct type of access
-    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
-        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->s->flags & O_ACCMODE))))
+    /* Ensure descriptor is used for the correct type of access */
+    if ((which == PVFS_IO_READ &&
+            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which == PVFS_IO_WRITE &&
+            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
     {
         errno = EBADF;
         return -1;

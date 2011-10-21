@@ -514,13 +514,14 @@ ssize_t pvfs_pwrite64(int fd, const void *buf, size_t count, off64_t offset)
  */
 static ssize_t pvfs_prdwr64(int fd,
                             void *buf,
-                            size_t count,
+                            size_t size,
                             off64_t offset,
                             int which)
 {
     int rc;
     pvfs_descriptor* pd;
     PVFS_Request freq, mreq;
+    struct iovec vector[1];
 
     memset(&freq, 0, sizeof(freq));
     memset(&mreq, 0, sizeof(mreq));
@@ -533,15 +534,14 @@ static ssize_t pvfs_prdwr64(int fd,
         return -1;
     }
 
-    rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
-    rc = PVFS_Request_contiguous(count, PVFS_BYTE, &mreq);
+    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &freq);
+    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &mreq);
 
     /* place contiguous buff and count into an iovec array of length 1 */
-    struct iovec vector[1];
     vector[0].iov_base = buf;
-    vector[0].iov_len = count;
+    vector[0].iov_len = size;
 
-    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, count, &vector[0]);
+    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, 1, vector);
 
     PVFS_Request_free(&freq);
     PVFS_Request_free(&mreq);
@@ -557,7 +557,8 @@ static ssize_t pvfs_rdwrv(int fd,
                           size_t count,
                           int which)
 {
-    int rc;
+    int rc = 0;
+    int i, size = 0;
     pvfs_descriptor* pd;
     PVFS_Request freq, mreq;
     off64_t offset;
@@ -574,7 +575,12 @@ static ssize_t pvfs_rdwrv(int fd,
     }
     offset = pd->s->file_pointer;
 
-    rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
+    for (i = 0; i < count; i++)
+    {
+        size += vector[i].iov_len;
+    }
+
+    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &freq);
     rc = pvfs_convert_iovec(vector, count, &mreq, &buf);
 
     rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, count, vector);

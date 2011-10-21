@@ -153,7 +153,6 @@ PVFS_error PVFS_sys_seteattr_list(
 
     ret = PVFS_isys_seteattr_list(ref, credentials,
             nkey, key_array, val_array, flags, &op_id, hints, NULL);
-
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_seteattr call", ret);

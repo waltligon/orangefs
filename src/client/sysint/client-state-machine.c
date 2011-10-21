@@ -115,12 +115,16 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
     return found;
 }
 
+/** Moves completed jobs to the provided io_id_array from global
+ *  completion array - only checks first limit slots in comp array
+ *  scoots any beyond limit down for future calls
+ */
 static PVFS_error completion_list_retrieve_completed(
-    PVFS_sys_op_id *op_id_array,
-    void **user_ptr_array,
-    int *error_code_array,
-    int limit,
-    int *out_count)  /* what exactly is this supposed to return */
+    PVFS_sys_op_id *op_id_array, /* out */
+    void **user_ptr_array,       /* out if present */
+    int *error_code_array,       /* out */
+    int limit,                   /* in  */
+    int *out_count)              /* what exactly is this supposed to return */
 {
     int i = 0, new_list_index = 0;
     PINT_smcb *smcb = NULL;
@@ -407,9 +411,15 @@ PVFS_error PINT_client_state_machine_post(
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    PVFS_hint_add_internal(&sm_p->hints, PINT_HINT_OP_ID, sizeof(pvfs_sys_op), &pvfs_sys_op);
+    PVFS_hint_add_internal(&sm_p->hints,
+                           PINT_HINT_OP_ID,
+                           sizeof(pvfs_sys_op),
+                           &pvfs_sys_op);
 
-    PINT_EVENT_START(PINT_client_sys_event_id, pint_client_pid, NULL, &sm_p->event_id,
+    PINT_EVENT_START(PINT_client_sys_event_id,
+                     pint_client_pid,
+                     NULL,
+                     &sm_p->event_id,
                      PINT_HINT_GET_CLIENT_ID(sm_p->hints),
                      PINT_HINT_GET_RANK(sm_p->hints),
                      PINT_HINT_GET_REQUEST_ID(sm_p->hints),
@@ -459,7 +469,11 @@ PVFS_error PINT_client_state_machine_post(
     {
         assert(sm_ret == SM_ACTION_TERMINATE);
 
-        PINT_EVENT_END(PINT_client_sys_event_id, pint_client_pid, NULL, sm_p->event_id, 0);
+        PINT_EVENT_END(PINT_client_sys_event_id,
+                       pint_client_pid,
+                       NULL,
+                       sm_p->event_id,
+                       0);
 
         *op_id = -1;
 
@@ -495,8 +509,7 @@ PVFS_error PINT_client_state_machine_post(
     return js.error_code;
 }
 
-PVFS_error PINT_client_state_machine_release(
-    PINT_smcb * smcb)
+PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
@@ -756,12 +769,15 @@ PVFS_error PINT_client_state_machine_test(
  *
  *  If none of the state machines listed in op_id_array have completed,
  *  then progress is made on all posted state machines.
+ *
+ *  NOTE: checks if ANY state machine is completed and does not
+ *  look at what if anything is passed in via op_id_array
  */
 PVFS_error PINT_client_state_machine_testsome(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
+    PVFS_sys_op_id *op_id_array,  /* out */
+    int *op_count,                /* in/out */
+    void **user_ptr_array,        /* out if present */
+    int *error_code_array,        /* out */
     int timeout_ms)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -811,7 +827,11 @@ PVFS_error PINT_client_state_machine_testsome(
 			  job_status_array,
 			  timeout_ms,
 			  pint_client_sm_context);
-    assert(ret > -1);
+
+    assert(ret > -1); /* this assert is wrong
+                       * should at least test for
+                       * ETIMEDOUT
+                       */
 
     /* do as much as we can on every job that has completed */
     for(i = 0; i < job_count; i++)
@@ -846,11 +866,10 @@ PVFS_error PINT_client_state_machine_testsome(
  *
  * This is what is called when PINT_sys_wait or PINT_mgmt_wait is used.
  */
-PVFS_error PINT_client_wait_internal(
-    PVFS_sys_op_id op_id,
-    const char *in_op_str,
-    int *out_error,
-    const char *in_class_str)
+PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
+                                     const char *in_op_str,
+                                     int *out_error,
+                                     const char *in_class_str)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
@@ -1017,52 +1036,44 @@ const char *PINT_client_get_name_str(int op_type)
 }
 
 /* exposed wrapper around the client-state-machine testsome function */
-int PVFS_sys_testsome(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms)
+int PVFS_sys_testsome(PVFS_sys_op_id *op_id_array, /* out */
+                      int *op_count,               /* in/out */
+                      void **user_ptr_array,       /* out if present */
+                      int *error_code_array,       /* out */
+                      int timeout_ms)
 {
-    return PINT_client_state_machine_testsome(
-        op_id_array, op_count, user_ptr_array,
-        error_code_array, timeout_ms);
+    return PINT_client_state_machine_testsome(op_id_array,
+                                              op_count,
+                                              user_ptr_array,
+                                              error_code_array,
+                                              timeout_ms);
 }
 
-int PVFS_sys_wait(
-    PVFS_sys_op_id op_id,
-    const char *in_op_str,
-    int *out_error)
+int PVFS_sys_wait(PVFS_sys_op_id op_id,
+                  const char *in_op_str,
+                  int *out_error)
 {
-    return PINT_client_wait_internal(
-        op_id,
-        in_op_str,
-        out_error,
-        "sys");
+    return PINT_client_wait_internal(op_id, in_op_str, out_error, "sys");
 }
 
-int PVFS_mgmt_testsome(
-    PVFS_mgmt_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms)
+int PVFS_mgmt_testsome(PVFS_mgmt_op_id *op_id_array, /* out */
+                       int *op_count,                /* in/out */
+                       void **user_ptr_array,        /* out if present */
+                       int *error_code_array,        /* out */
+                       int timeout_ms)
 {
-    return PINT_client_state_machine_testsome(
-        op_id_array, op_count, user_ptr_array,
-        error_code_array, timeout_ms);
+    return PINT_client_state_machine_testsome(op_id_array,
+                                              op_count,
+                                              user_ptr_array,
+                                              error_code_array,
+                                              timeout_ms);
 }
 
-int PVFS_mgmt_wait(
-    PVFS_mgmt_op_id op_id,
-    const char *in_op_str,
-    int *out_error)
+int PVFS_mgmt_wait(PVFS_mgmt_op_id op_id,
+                   const char *in_op_str,
+                   int *out_error)
 {
-    return PINT_client_wait_internal(
-        op_id,
-        in_op_str,
-        out_error,
-        "mgmt");
+    return PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt");
 }
 
 PVFS_error PVFS_sys_set_info(

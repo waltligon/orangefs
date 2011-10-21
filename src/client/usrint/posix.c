@@ -12,9 +12,6 @@
 
 /* this prevents headers from using inlines for 64 bit calls */
 
-#ifndef PVFS_USRINT_CWD
-#define PVFS_USRINT_CWD 1
-#endif
 #define USRINT_SOURCE 1
 #include "usrint.h"
 #include "posix-ops.h"
@@ -2063,8 +2060,11 @@ int fremovexattr(int fd, const char *name)
  * all of the actual code is in the pvfs versions
  * of these functions - these are only wrappers
  * to catch calls to libc
+ *
+ * if the kernel module is used to mount the FS
+ * then there is no need for these
  */
-#ifdef PVFS_USRINT_CWD
+#if PVFS_USRINT_CWD
 
 int chdir(const char *path)
 {
@@ -2106,7 +2106,7 @@ int getdtablesize(void)
     return pvfs_getdtablesize();
 }
 
-#endif /* PVFS_USRINT_PWD */
+#endif /* PVFS_USRINT_CWD */
 
 /*
  * Local variables:
