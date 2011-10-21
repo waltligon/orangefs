@@ -140,9 +140,9 @@ extern int pvfs_mkdirat (int dirfd, const char *path, mode_t mode);
 
 extern int pvfs_rmdir (const char *path);
 
-ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz);
+extern ssize_t pvfs_readlink (const char *path, char *buf, size_t bufsiz);
 
-extern int pvfs_readlinkat (int dirfd, const char *path, char *buf, size_t bufsiz);
+extern ssize_t pvfs_readlinkat (int dirfd, const char *path, char *buf, size_t bufsiz);
 
 extern int pvfs_symlink (const char *oldpath, const char *newpath);
 

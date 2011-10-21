@@ -1144,7 +1144,7 @@ ssize_t readlink(const char *path, char *buf, size_t bufsiz)
     }
 }
 
-int readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
+ssize_t readlinkat(int dirfd, const char *path, char *buf, size_t bufsiz)
 {
     int rc = 0; 
     pvfs_descriptor *pd; 

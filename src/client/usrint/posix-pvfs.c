@@ -1486,7 +1486,7 @@ errorout:
     return rc;
 }
 
-int pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
+ssize_t pvfs_readlinkat(int fd, const char *path, char *buf, size_t bufsiz)
 {
     int rc;
     pvfs_descriptor *pd, *pd2;

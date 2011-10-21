@@ -70,7 +70,7 @@ typedef struct posix_ops_s
     int (*mkdirat)(int dirfd, const char *path, mode_t mode);
     int (*rmdir)(const char *path);
     ssize_t (*readlink)(const char *path, char *buf, size_t bufsiz);
-    int (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
+    ssize_t (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
     int (*symlink)(const char *oldpath, const char *newpath);
     int (*symlinkat)(const char *oldpath, int newdirfd, const char *newpath);
     ssize_t (*link)(const char *oldpath, const char *newpath);
