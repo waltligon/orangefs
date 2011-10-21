@@ -73,7 +73,7 @@ typedef struct posix_ops_s
     ssize_t (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
     int (*symlink)(const char *oldpath, const char *newpath);
     int (*symlinkat)(const char *oldpath, int newdirfd, const char *newpath);
-    ssize_t (*link)(const char *oldpath, const char *newpath);
+    int (*link)(const char *oldpath, const char *newpath);
     int (*linkat)(int olddirfd, const char *oldpath,
                   int newdirfd, const char *newpath, int flags);
     int (*readdir)(u_int fd, struct dirent *dirp, u_int count);

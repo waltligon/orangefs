@@ -1221,7 +1221,7 @@ int symlinkat(const char *oldpath, int newdirfd, const char *newpath)
     return rc;
 }
 
-ssize_t link(const char *oldpath, const char *newpath)
+int link(const char *oldpath, const char *newpath)
 {
     if (!oldpath || !newpath)
     {

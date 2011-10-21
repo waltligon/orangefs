@@ -149,7 +149,7 @@ extern int pvfs_symlink (const char *oldpath, const char *newpath);
 extern int pvfs_symlinkat (const char *oldpath, int newdirfd, const char *newpath);
 
 /* PVFS does not have hard links */
-extern ssize_t pvfs_link (const char *oldpath, const char *newpath);
+extern int pvfs_link (const char *oldpath, const char *newpath);
 
 /* PVFS does not have hard links */
 extern int pvfs_linkat (int olddirfd, const char *oldpath,

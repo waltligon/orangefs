@@ -1564,7 +1564,7 @@ int pvfs_symlinkat(const char *oldpath, int newdirfd, const char *newpath)
 /**
  * PVFS does not have hard links
  */
-ssize_t pvfs_link(const char *oldpath, const char *newpath)
+int pvfs_link(const char *oldpath, const char *newpath)
 {
     fprintf(stderr, "pvfs_link not implemented\n");
     errno = ENOSYS;
