@@ -1,1 +1,0 @@
-watch --interval=1 pgrep -l ucached
