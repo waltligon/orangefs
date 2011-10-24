@@ -1062,6 +1062,9 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     int iovec_ndx = 0;
     uint16_t block_ndx = 0;
 
+    /* stores hits and misses of blocks */
+    unsigned char *hits = 0;
+
     if(!pvfs_ucache_enabled() || !pd->s->mtbl)
     {
         ucache_pseudo_misses++; /* could overflow, reset periodically */
@@ -1112,7 +1115,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     tag_cnt = i + 1;
 
     /* Now that tags are set build array of lookup responses*/
-    unsigned char hits[tag_cnt];
+    hits = (unsigned char *)malloc(sizeof(unsigned char) * tag_cnt);
     for(i = 0; i < tag_cnt; i++)
     {
         /* if lookup returns nil set char to 0, otherwise 1 */
@@ -1138,10 +1141,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 //instead of looking up again, save lookup somehow
                 block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx);
                 lock_lock(ucache_lock);
-                lock_lock(&ucache_block_lock[block_ndx]); 
+                lock_lock(get_lock(block_ndx)); 
                 rc = place_data(1, block_loc, vector, &iovec_ndx, 
                                    &scratch, &scratch_ptr, &scratch_left);
-                lock_unlock(&ucache_block_lock[block_ndx]);
+                lock_unlock(get_lock(block_ndx));
                 lock_unlock(ucache_lock);
             }
             else /* Miss */
@@ -1158,10 +1161,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 if(block_loc != (uint64_t)NIL)
                 {
                     lock_lock(ucache_lock);
-                    lock_lock(&ucache_block_lock[block_ndx]); 
+                    lock_lock(get_lock(block_ndx)); 
                     rc = place_data(2, block_loc, vector, &iovec_ndx, 
                                        &scratch, &scratch_ptr, &scratch_left);
-                    lock_unlock(&ucache_block_lock[block_ndx]);
+                    lock_unlock(get_lock(block_ndx));
                     lock_unlock(ucache_lock);
                 }
             }
@@ -1174,10 +1177,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 /* //or use previous return value */
                 block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); 
                 lock_lock(ucache_lock);
-                lock_lock(&ucache_block_lock[block_ndx]);  
+                lock_lock(get_lock(block_ndx));  
                 rc = place_data(2, block_loc, vector, &iovec_ndx, 
                                    &scratch, &scratch_ptr, &scratch_left);
-                lock_unlock(&ucache_block_lock[block_ndx]);
+                lock_unlock(get_lock(block_ndx));
                 lock_unlock(ucache_lock);
             }
             else /* Miss */
@@ -1187,10 +1190,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 if(block_loc != (uint64_t)NIL)
                 {
                     lock_lock(ucache_lock);
-                    lock_lock(&ucache_block_lock[block_ndx]); 
+                    lock_lock(get_lock(block_ndx)); 
                     rc = place_data(2, block_loc, vector, &iovec_ndx,
                                        &scratch, &scratch_ptr, &scratch_left);
-                    lock_unlock(&ucache_block_lock[block_ndx]);
+                    lock_unlock(get_lock(block_ndx));
                     lock_unlock(ucache_lock);
                 }
                 else
@@ -1205,6 +1208,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             }
         }
     }
+    free(hits);
 #endif /* PVFS_UCACHE_ENABLE */
 errorout:
     return rc;

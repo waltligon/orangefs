@@ -5,33 +5,29 @@
  */
 
 /* Experimental cache for user data
- * Currently under development.
- *
- * Note: When unsigned ints are set to NIL, their values are based on type:
- *   ex: 16      0xFFFF  
- *       32      0XFFFFFFFF
- *       64      0XFFFFFFFFFFFFFFFF 
- *   ALL EQUAL THE SIGNED REPRESENTATION OF -1, CALLED NIL IN ucache.h  
+ * Currently under development...
  */
 
 #if PVFS_UCACHE_ENABLE
 #include <ucache.h>
 
 /* Global Variables */
-static FILE *out;                   /* For Logging Purposes */
+FILE *out;                   /* For Logging Purposes */
 
 union user_cache_u *ucache = 0;
 //static uint32_t ucache_blk_cnt = 0;
 
 ucache_lock_t *ucache_locks = 0; /* will refer to the shmem of all ucache locks */
 ucache_lock_t *ucache_lock = 0;  /* Global Lock maintaining concurrency */
-ucache_lock_t *ucache_block_lock = 0;
 
 uint64_t ucache_hits;
 uint64_t ucache_misses;
 uint64_t ucache_pseudo_misses; /* Chose not to cache */
 
+char ftblInitialized = 0;
+
 /* Internal Only Function Declarations */
+//void goToValue(FILE *conf);
 
 /* Initialization */
 static void add_mtbls(uint16_t blk);
@@ -106,93 +102,107 @@ void print_LRU(struct mem_table_s *mtbl);
  */
 
 /**  Initializes the cache. 
- *  Mainly, it aquires a shared memory segment used to cache data. 
+ * Mainly, it aquires a previously created shared memory segment used to 
+ * cache data. The shared mem. creation and ftbl initialization should already
+ * have been done by the daemon at this point. 
  * 
- *  This function also initializes the the FTBL and some MTBLs.
+ * The whole cache is protected globally by a locking mechanism.
  *
- *  The whole cache is protected by a locking mechanism to maintain concurrency.
+ * Locks of the same type can be used to protect block level data. 
  */
 int ucache_initialize(void)
 {
     int rc = 0;
-    int i = 0;
-    int id1;
+    /* ***** Aquire pointers to shmem segments (locks and ucache) ***** */
 
-    /* Aquire ptr to shared memory for ucache_locks */
-    id1 = shmget(ftok(GET_KEY_FILE, 'a'), 0, CACHE_FLAGS);
-    if (id1 < 0)
+    /* shmget segment containing all locks */
+    key_t key = ftok(KEY_FILE, SHM_ID1);
+    int shmflg = SVSHM_MODE;
+    int lock_shmid = shmget(key, 0, shmflg);
+    if(lock_shmid == -1)
     {
+        perror("ucach_initialize - locks shmget");
         return -1;
     }
-    ucache_locks = shmat(id1, NULL, AT_FLAGS);
-    if (!ucache_locks)
+    /* shmat locks */
+    ucache_locks = shmat(lock_shmid, NULL, 0);
+    if((int)ucache_locks == -1)
     {
+        perror("ucache_initialize - locks shmat");
         return -1;
     }
-    /* Global Cache lock stored in first LOCK_SIZE position */
-    ucache_lock = ucache_locks; 
+   
+    /* Establish and assert lock pointers */ 
+    assert(ucache_locks);
+    ucache_lock = get_lock(BLOCKS_IN_CACHE);
+    assert(ucache_lock);
 
-    /* Initialize Global Cache Lock */
-    rc = lock_init(ucache_lock);
-    if (rc < 0)
+    /* ucache */
+    key = ftok(KEY_FILE, SHM_ID2);
+    int ucache_shmid = shmget(key, 0, shmflg);
+    if(ucache_shmid == -1)
     {
+        perror("ucache_initialize - ucache shmget");
         return -1;
     }
-    rc = lock_lock(ucache_lock);
-    if (rc < 0)
+    ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
+    if((int)ucache == -1) 
     {
+        perror("ucache_initialize - ucache shmat");
         return -1;
     }
 
-    /* The next BLOCKS_IN_CACHE number of block locks follow the global lock */
-    ucache_block_lock = ucache_locks + 1;
-    /* Initialize Block Level Locks */
-    for(i = 0; i < BLOCKS_IN_CACHE; i++)
-    {
-        lock_init(get_block_lock(i));
-        if (rc < 0)
-        {
-            rc = -1;
-            goto errout;
-        }
-    }
+    return rc;
+}
 
-    /* Aquire ptr to shared memory for ucache */
-    uint32_t key;
-    uint32_t id;
-    char *key_file_path;
-    /*  Direct output   */
-    if (!out)
-    {
-        out = stdout;
-    }
+/* For testing purposes only */
+int wipe_ucache(void)
+{
+    int rc = 0;
 
-    /* set up shared memory region */
-    key_file_path = GET_KEY_FILE;
-    key = ftok(key_file_path, PROJ_ID);
-    id = shmget(key, 0, CACHE_FLAGS);
-    if (id < 0)
-    {
-        rc = -1;
-        goto errout;
-    }
-    ucache = shmat(id, NULL, AT_FLAGS);
-    if (!ucache)
-    {
-        rc = -1;
-        goto errout;
-    }
+    /* wipe the cache, locks, and reinitialize */
     memset(ucache, 0, CACHE_SIZE);
-    if (DBG)
+    memset(ucache_locks, 0, LOCKS_SIZE);
+
+    /* Force Re-creation of ftbl */
+    rc = ucache_init_file_table(1);
+    return rc;
+}
+
+/** Initializes the ucache file table if it hasn't previously been initialized.
+ * Although this function is visible, DO NOT CALL THIS FUNCTION. 
+ * It is meant to be called in the ucache daemon or during testing.
+ * see: src/apps/ucache/ucached.c for more info.
+ *
+ * Sets the char booelan ftblInitialized when ftbl has been successfully 
+ * initialized.
+ * 
+ * Returns 0 on success, -1 on failure.
+ */
+int ucache_init_file_table(char forceCreation)
+{
+    int i;
+
+    /* check if already initialized? */
+    if(ftblInitialized == 1 && !forceCreation) 
     {
-        fprintf(out, "key:\t\t\t0X%X\n", key);
-        fprintf(out, "id:\t\t\t%d\n", id);
-        fprintf(out, "ucache ptr:\t\t0X%lX\n", (long int)ucache);
+        return -1;
     }
+    if(ucache)
+    {
+        memset(ucache, 0, CACHE_SIZE);
+    }
+    else
+    {
+        return -1;
+    }
+        
+
     /* initialize mtbl free list table */
     ucache->ftbl.free_mtbl_blk = NIL;
     ucache->ftbl.free_mtbl_ent = NIL;
     add_mtbls(0);
+
     /* set up list of free blocks */
     ucache->ftbl.free_blk = 1;
     for (i = 1; i < (BLOCKS_IN_CACHE - 1); i++)
@@ -200,6 +210,7 @@ int ucache_initialize(void)
         ucache->b[i].mtbl[0].free_list_blk = i + 1;
     }
     ucache->b[BLOCKS_IN_CACHE - 1].mtbl[0].free_list_blk = NIL;
+
     /* set up file hash table */
     for (i = 0; i < FILE_TABLE_HASH_MAX; i++)
     {
@@ -209,6 +220,7 @@ int ucache_initialize(void)
         ucache->ftbl.file[i].mtbl_ent = NIL;
         ucache->ftbl.file[i].next = NIL;
     }
+
     /* set up list of free hash table entries */
     ucache->ftbl.free_list = FILE_TABLE_HASH_MAX;
     for (i = FILE_TABLE_HASH_MAX; i < FILE_TABLE_ENTRY_COUNT - 1; i++)
@@ -218,18 +230,18 @@ int ucache_initialize(void)
         ucache->ftbl.file[i].next = i + 1;
     }
     ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL;
-    rc = 0;
 
-errout:
-    lock_unlock(ucache_lock);
-    return rc;
+    /* Success */
+    ftblInitialized = 1;
+    return 0;
 }
 
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct mem_table_s **mtbl)
 {
-    lock_lock(ucache_lock);
+    int rc = -1;
+    rc = lock_lock(ucache_lock);
     *mtbl = lookup_file((uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL,
                                                                           NULL);
     if(*mtbl == (struct mem_table_s *)NIL)
@@ -237,20 +249,20 @@ int ucache_open_file(PVFS_fs_id *fs_id,
         *mtbl = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
         if(*mtbl == (struct mem_table_s *)NIL)
         {   /* Error - Could not insert */
-            lock_unlock(ucache_lock);
+            rc = lock_unlock(ucache_lock);
             return (-1);
         }
         else
         {
             /* File Inserted*/
-            lock_unlock(ucache_lock);
+            rc = lock_unlock(ucache_lock);
             return 1;
         }
     }
     else
     {
         /* File was previously Inserted */
-        lock_unlock(ucache_lock);
+        rc = lock_unlock(ucache_lock);
         return 0;
     }
 }
@@ -290,12 +302,11 @@ void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset,
     }
     else
     {
-        if(remove_mem(mtbl, offset) == NIL)
+        if(remove_mem(mtbl, offset) < 0)
         {
             lock_unlock(ucache_lock);
             return (void *)NIL;
         }
-        //print_LRU(mtbl);
         char * retVal = insert_mem(mtbl, offset, block_ndx);
         lock_unlock(ucache_lock);
         return ((void *)retVal); 
@@ -478,8 +489,9 @@ void ucache_info(FILE *out, char *flags)
     fprintf(out, "MEM_TABLE_HASH_MAX = %d\n", MEM_TABLE_HASH_MAX);
     fprintf(out, "FILE_TABLE_HASH_MAX = %d\n", FILE_TABLE_HASH_MAX);
     fprintf(out, "MTBL_PER_BLOCK  = %d\n", MTBL_PER_BLOCK );
-    fprintf(out, "GET_KEY_FILE = %s\n", GET_KEY_FILE);
-    fprintf(out, "PROJ_ID = %d\n", PROJ_ID);
+    fprintf(out, "KEY_FILE = %s\n", KEY_FILE);
+    fprintf(out, "SHM_ID1 = %d\n", SHM_ID1);
+    fprintf(out, "SHM_ID2 = %d\n", SHM_ID2);
     fprintf(out, "BLOCKS_IN_CACHE = %d\n", BLOCKS_IN_CACHE);
     fprintf(out, "CACHE_SIZE = %d(B)\t%d(MB)\n", CACHE_SIZE, 
                                     (CACHE_SIZE/(1024*1024)));
@@ -618,33 +630,48 @@ void ucache_info(FILE *out, char *flags)
     }
 }
 
-/** Returns a pointer to the block level lock corresponding to the block_index.
+/** Returns a pointer to the lock corresponding to the block_index.
     If the index is out of range, then 0 is returned.
  */
-ucache_lock_t *get_block_lock(uint16_t block_index)
+ucache_lock_t *get_lock(uint16_t block_index)
 {
-    /* TODO: check if this returns the appropriate block */
-    if(block_index >= BLOCKS_IN_CACHE)
+    if(block_index >= (BLOCKS_IN_CACHE + 1))
     {
         return (ucache_lock_t *)0;
     }
-    return (ucache_block_lock + block_index);
+    return (ucache_locks + block_index);
 }
 
 
 /* Beginning of internal only (static) functions */
 
-/** Initializes the proper lock based on the LOCK_TYPE */
+/** Initializes the proper lock based on the LOCK_TYPE 
+ * Returns 0 on success, -1 on error
+ */
 int lock_init(ucache_lock_t * lock)
 {
+    int rc = -1;
     /* TODO: ability to disable locking */
     #if LOCK_TYPE == 0
-    return sem_init(lock, 1, 1);
+    rc = sem_init(lock, 1, 1);
+    if(rc != -1)
+    {
+        rc = 0; 
+    }
     #elif LOCK_TYPE == 1
-    return pthread_mutex_init(lock, NULL);
+    rc = pthread_mutex_init(lock, NULL);
+    if(rc != 0)
+    {
+        return -1;
+    }
     #elif LOCK_TYPE == 2
-    return pthread_spin_init(lock, 1);
+    rc = pthread_spin_init(lock, 1);
+    if(rc != 0)
+    {
+        return -1;
+    }
     #endif
+    return rc;
 }
 
 /** Returns 0 when lock is locked; otherwise, return -1 and sets errno */
@@ -683,19 +710,78 @@ int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
 #endif
 
 /** Upon successful completion, returns zero.
- * Otherwise, returns 1 and sets errno.
+ * Otherwise, returns -1.
+ * The functions have the same return policy.
  */
 int lock_destroy(ucache_lock_t * lock)
 {
+    int rc = -1;
     #if (LOCK_TYPE == 0)
-    return sem_destroy(lock); 
+    rc = sem_destroy(lock);
     #elif (LOCK_TYPE == 1)
-    return pthread_mutex_destroy(lock);
+    rc = pthread_mutex_destroy(lock);
+    //printf("rc = %d\terrno = %d\n", rc, errno);
     #elif (LOCK_TYPE == 2)
-    return pthread_spin_destroy(lock);
+    rc = pthread_spin_destroy(lock);
     #endif
+    return rc;
+}
+
+/* Tries the lock to see if it's available:
+ * Returns 0 if lock has not been aquired ie: success
+ * Otherwise, returns -1
+ */
+int lock_trylock(ucache_lock_t * lock)
+{
+    int rc = -1;
+    #if (LOCK_TYPE == 0)
+    int sval = 0;
+    rc = sem_getvalue(lock, &sval);
+    if(sval <= 0 || rc == -1){
+        rc = -1;
+    }
+    else
+    {
+        rc = 0;
+    }
+    #elif (LOCK_TYPE == 1)
+    rc = pthread_mutex_trylock(lock);
+    //printf("rc = %d\n", rc);
+    if( rc != 0)
+    {
+        rc = -1;
+    }
+    #elif (LOCK_TYPE == 2)
+    rc = pthread_spin_trylock(lock);
+    if(rc != 0)
+    {
+        rc = -1;
+    }
+    #endif
+    if(rc == 0)
+    {
+        /* Unlock before leaving if lock wasn't already set */
+        rc = lock_unlock(lock);
+        //printf("OK - UNLOCKED!\n");
+    }
+    else
+    {
+        //printf("BLOCK WAS LOCKED!\n");
+    }
+    return rc;
 }
 /***************************************** End of Externally Visible API */
+
+/* Skip to integer value in config file */
+void goToValue(FILE *conf)
+{
+    int current_c = 0;
+    current_c = fgetc(conf);
+    while(current_c != '"')
+    {
+        current_c = fgetc(conf);
+    }
+}
 
 /* Dirty List Iterator */
 /** Returns true if current index is NIL, otherwise, returns 0 */
@@ -1228,7 +1314,6 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
     current->tag_id = fs_id;
     current->tag_handle = handle;
     /* Update fent with it's new mtbl: blk and ent */
-    //assert(((int16_t)free_mtbl_blk != NIL) && ((int16_t)free_mtbl_ent != NIL));
     current->mtbl_blk = free_mtbl_blk;
     current->mtbl_ent = free_mtbl_ent;
     /* Initialize Memory Table */
@@ -1494,22 +1579,29 @@ static uint16_t locate_max_mtbl(struct mem_table_s **mtbl)
     return value_of_max;
 }
 
-/** Evicts the LRU memory entry from the tail (lru_last) of the provided 
+/** Evicts the LRU memory entry from the tail (lru_last) of the provided
  * mtbl's LRU list.
- * Returns 1 on success; 0 on failure, meaning there was no lru
+ * 
+ * Returns 1 on success; 0 on failure, meaning there was no LRU
+ * or that the block's lock couldn't be aquired.
  */
 static int evict_LRU(struct mem_table_s *mtbl)
 {
-    if(DBG)fprintf(out, "evicting LRU...\n");
+    int rc = -1;
+    if(DBG)fprintf(out, "attempting evicting of LRU...\n");
     
     if(mtbl->num_blocks != 0 && (int16_t)mtbl->lru_last != NIL)
     {
-        //fprintf(out, "\tattempting to evict LRU %hu\n", mtbl->lru_last);
-        remove_mem(mtbl, mtbl->mem[mtbl->lru_last].tag);
+        rc = remove_mem(mtbl, mtbl->mem[mtbl->lru_last].tag);
+        if(rc != 1)
+        {
+            if(DBG)fprintf(out, "\tcouldn't evict: lock probably held\n");
+            return 0;
+        } 
         return 1;
     }
     else
-    {   /*  Worst Case  */
+    {
         if(DBG)fprintf(out, "\tno LRU on this mtbl\n");
         if(DBG)fprintf(out, "\tmtbl->num_blocks = %hu\n", mtbl->num_blocks);
         if(DBG)fprintf(out, "\tmtbl->lru_last = %hu\n", mtbl->lru_last);
@@ -1536,8 +1628,6 @@ static void *set_item(struct mem_table_s *mtbl,
         {
             if(DBG)fprintf(out, "\tget_free_blk returned NIL, attempting "
                                                       "removal of LRU\n");
-            //TODO this probably wont work since we cannot evict a block that is current referenced
-            //aquire lock and check before removing???
             if(DBG)print_LRU(mtbl);
             evict_LRU(mtbl); 
             free_blk = get_free_blk();
@@ -1686,12 +1776,13 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
     uint16_t mem_ent_index = NIL;
     uint16_t mem_ent_prev_index = NIL;
 
-    /* Check reference count */
+    /* Check reference count 
     if(mtbl->ref_cnt != 0)
     {
         if(DBG)fprintf(out, "removal failure: ref_cnt==%d\n", mtbl->ref_cnt);
         return 0;
     }
+    */
     void *retValue = lookup_mem(mtbl, offset, &item_index, &mem_ent_index, 
                                                      &mem_ent_prev_index);
     if(DBG)fprintf(out, "retValue = 0X%lX\n", (long unsigned int) retValue);
@@ -1702,33 +1793,44 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
                                                    "matching offset\n");
         return 0;
     }
-        /* Update First and Last...First */
-        if(mem_ent_index == mtbl->lru_first)
-        {
-            /* Is node the head? */
-            mtbl->lru_first = mtbl->mem[mem_ent_index].lru_next;
-        }
-        if(mem_ent_index == mtbl->lru_last)
-        {
-            /* Is node the tail? */
-            //print_LRU(mtbl);
-            //fprintf(out, "index.prev = %hu\n", mtbl->mem[mem_ent_index].lru_prev);
-            //assert((int16_t)mtbl->mem[mem_ent_index].lru_prev!=NIL);
-            mtbl->lru_last = mtbl->mem[mem_ent_index].lru_prev;
-        }
+
+    /* Verify the block isn't being used by trying the corresponding lock */
+    /* See if LRU can be evicted by trying its corresponding lock */
+    ucache_lock_t *block_lock = get_lock(mtbl->lru_last);
+    int rc = lock_trylock(block_lock);
+    if(rc != 0)
+    {
+        if(DBG)fprintf(out, "lock couldn't be aquired, so block cannot be removed\n");
+        return -1;
+    }
+
+    /* Update First and Last...First */
+    if(mem_ent_index == mtbl->lru_first)
+    {
+        /* Is node the head? */
+        mtbl->lru_first = mtbl->mem[mem_ent_index].lru_next;
+    }
+    if(mem_ent_index == mtbl->lru_last)
+    {
+        /* Is node the tail? */
+        //print_LRU(mtbl);
+        //fprintf(out, "index.prev = %hu\n", mtbl->mem[mem_ent_index].lru_prev);
+        //assert((int16_t)mtbl->mem[mem_ent_index].lru_prev!=NIL);
+        mtbl->lru_last = mtbl->mem[mem_ent_index].lru_prev;
+    }
     
-        /* Remove from LRU */
-        /* Update each of the adjacent nodes' link */
-        uint16_t lru_prev = mtbl->mem[mem_ent_index].lru_prev;
-        if((int16_t)lru_prev != NIL)
-        {
-            mtbl->mem[lru_prev].lru_next = mtbl->mem[mem_ent_index].lru_next;
-        }
-        uint16_t lru_next = mtbl->mem[mem_ent_index].lru_next;
-        if((int16_t)lru_next != NIL)
-        {
-            mtbl->mem[lru_next].lru_prev = mtbl->mem[mem_ent_index].lru_prev;
-        }
+    /* Remove from LRU */
+    /* Update each of the adjacent nodes' link */
+    uint16_t lru_prev = mtbl->mem[mem_ent_index].lru_prev;
+    if((int16_t)lru_prev != NIL)
+    {
+        mtbl->mem[lru_prev].lru_next = mtbl->mem[mem_ent_index].lru_next;
+    }
+    uint16_t lru_next = mtbl->mem[mem_ent_index].lru_next;
+    if((int16_t)lru_next != NIL)
+    {
+        mtbl->mem[lru_next].lru_prev = mtbl->mem[mem_ent_index].lru_prev;
+    }
 
     /* Remove from dirty list if Dirty */
     /* Previous, Current, Next */

@@ -33,14 +33,23 @@
 #define MEM_TABLE_HASH_MAX 31
 #define FILE_TABLE_HASH_MAX 31
 #define MTBL_PER_BLOCK 16
-#define GET_KEY_FILE "/etc/fstab"
-#define PROJ_ID 61
+#define KEY_FILE "/etc/fstab"
+#define SHM_ID1 'l'
+#define SHM_ID2 'm'
+#ifndef BLOCKS_IN_CACHE 
 #define BLOCKS_IN_CACHE 1024
+#endif
 #define CACHE_SIZE (CACHE_BLOCK_SIZE_K * 1024 * BLOCKS_IN_CACHE)
 #define AT_FLAGS 0
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R>>3 | SHM_R>>6)
 #define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
+
+/* Define multiple NILS to there's no need to cast for different types */
+#define NIL8  0XFF
+#define NIL16 0XFFFF
+#define NIL32 0XFFFFFFFF
+#define NIL64 0XFFFFFFFFFFFFFFFF
 
 #if (PVFS2_SIZEOF_VOIDP == 32)
 #define voidp_t uint32_t
@@ -48,7 +57,9 @@
 #define voidp_t uint64_t
 #endif
 
+#ifndef DBG
 #define DBG 0 
+#endif
 
 #define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
 #if (LOCK_TYPE == 0)
@@ -63,11 +74,13 @@
 #define LOCK_SIZE sizeof(pthread_spinlock_t)
 #endif
 
+#define LOCKS_SIZE ((LOCK_SIZE) * (BLOCKS_IN_CACHE + 1))
+
 /* Globals */
+extern FILE * out;
 extern union user_cache_u *ucache;
 extern ucache_lock_t *ucache_locks;
 extern ucache_lock_t *ucache_lock;
-extern ucache_lock_t *ucache_block_lock;
 extern uint64_t ucache_hits;
 extern uint64_t ucache_misses;
 extern uint64_t ucache_pseudo_misses; /* Chose not to cache */
@@ -172,14 +185,19 @@ int ucache_flush(pvfs_descriptor *pd);
 #endif
 void ucache_info(FILE *out, char *flags);
 
-ucache_lock_t *get_block_lock(uint16_t block_index);
+/* Don't call this except in ucache daemon */
+int ucache_init_file_table(char forceCreation);
+
+/* Used only in testing */
+int wipe_ucache(void);
+
+/* Lock Routines */
+ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
 int lock_lock(ucache_lock_t * lock);
 int lock_unlock(ucache_lock_t * lock);
 int lock_destroy(ucache_lock_t * lock);
-#if (LOCK_TYPE == 0)
-int ucache_lock_getvalue(ucache_lock_t * lock, int *sval);
-#endif
+int lock_trylock(ucache_lock_t * lock);
 
 #endif /* UCACHE_H */
 
