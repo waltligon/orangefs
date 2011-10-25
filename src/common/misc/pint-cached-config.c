@@ -296,7 +296,7 @@ int PINT_cached_config_map_servers(
     PVFS_BMI_addr_t *addr_array)
 {
     struct qhash_head *hash_link;
-    struct PINT_llist *server_list;
+    struct PINT_llist *server_list=NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
     int num_servers = 0, i = 0, ret = 0;
     int start_index = -1;
@@ -585,7 +585,7 @@ int PINT_cached_config_map_to_server(
  *
  * Returns 0 if the number of dfiles has been successfully set
  *
- * Sets the number of dfiles to a distribution approved the value.  Clients
+ * Sets the number of dfiles to a distribution approved value.  Clients
  * may pass in num_dfiles_requested as a hint, if no hint is given, the server
  * configuration is checked to find a hint there.  The distribution will
  * choose a correct number of dfiles even if no hint is set.
@@ -597,7 +597,7 @@ int PINT_cached_config_get_num_dfiles(
     int *num_dfiles)
 {
     int rc;
-    int num_servers;
+    int num_servers=0;
     
     /* If the dfile request is zero, check to see if the config has that
        setting */
@@ -635,6 +635,16 @@ int PINT_cached_config_get_num_dfiles(
         gossip_err("Error: distribution failure for %d servers and %d "
                    "requested datafiles.\n", num_servers, num_dfiles_requested);
         return(-PVFS_EINVAL);
+    }
+
+    if (*num_dfiles > num_servers)
+    {
+       gossip_err("%s: Distribution requires more datafiles(%d) than I/O servers(%d) currently defined in the system. Capping "
+                  "number of datafiles to the number of I/O servers.\n"
+                  ,__func__
+                  ,*num_dfiles
+                  ,num_servers);
+       *num_dfiles = num_servers;
     }
 
     return 0;
