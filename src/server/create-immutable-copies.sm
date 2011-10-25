@@ -1469,7 +1469,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb
        PVFS_handle_unparse(imm_p->writes_completed[index].handle,PVFS_handle_string);
        gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\t[%d][%d]:%s\n"
                              ,i,j
-                             ,PVFS_handle_to_str(imm_p->writes_completed[index]));
+                             ,PVFS_handle_string);
      }
    }
 

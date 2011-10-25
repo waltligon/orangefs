@@ -354,7 +354,7 @@ int PVFS_fsck_validate_dfile(
         if (PINT_handle_wrangler_remove_handle(handle, cur_fs))
         {
             gossip_err("WARNING: unable to remove handle [%s] from handle list while verifying stranded objects\n",
-                    PVFS_handle_to_str(*handle));
+                    PVFS_handle_to_str((unsigned char *)(*handle)));
         }
     }
 
@@ -448,7 +448,7 @@ int PVFS_fsck_validate_metafile(
         {
             gossip_err("WARNING: unable to remove handle [%s] from \
                 handle list while verifying stranded objects\n",
-                PVFS_handle_to_str(obj_ref->handle));
+                PVFS_handle_to_str((unsigned char *)(obj_ref->handle)));
         }
     }
 
@@ -569,7 +569,7 @@ int PVFS_fsck_validate_symlink(
         {
             gossip_err("WARNING: unable to remove handle [%s] from handle \
                     list while verifying stranded objects\n",
-                    PVFS_handle_to_str(obj_ref->handle));
+                    PVFS_handle_to_str((unsigned char *)(obj_ref->handle)));
         }
     }
 
@@ -685,7 +685,7 @@ int PVFS_fsck_validate_dirdata(
         {
             gossip_err("WARNING: unable to remove handle [%s] from handle \
                     list while verifying stranded objects\n", 
-                    PVFS_handle_to_str(*handle));
+                    PVFS_handle_to_str((unsigned char *)(*handle)));
         }
     }
 
@@ -766,7 +766,7 @@ int PVFS_fsck_validate_dir(
         {
             gossip_err("WARNING: unable to remove handle [%s] from \
                     handle list while verifying stranded objects\n", 
-                    PVFS_handle_to_str(obj_ref->handle));
+                    PVFS_handle_to_str((unsigned char *)(obj_ref->handle)));
         }
     }
 
@@ -957,7 +957,7 @@ int PVFS_fsck_get_attributes(
      * information about the attributes
      */
     gossip_debug(GOSSIP_FSCK_DEBUG, "\tFSID        : %d\n", (int) pref->fs_id);
-    gossip_debug(GOSSIP_FSCK_DEBUG, "\tHandle      : %s\n", PVFS_handle_to_str(pref->handle));
+    gossip_debug(GOSSIP_FSCK_DEBUG, "\tHandle      : %s\n", PVFS_handle_to_str((unsigned char *)(pref->handle)));
 
     if (getattr_resp->attr.mask & PVFS_ATTR_SYS_COMMON_ALL)
     {
@@ -1439,7 +1439,7 @@ static int PINT_handle_wrangler_remove_handle(
     {
         PVFS_perror_gossip("PINT_cached_config_map_to_server", ret);
         gossip_err("Error: could not resolve handle [%s] to server\n", 
-            PVFS_handle_to_str(*handle));
+            PVFS_handle_to_str((unsigned char *)(*handle)));
         return(ret);
     }
 
@@ -1455,7 +1455,7 @@ static int PINT_handle_wrangler_remove_handle(
     if(!found)
     {
         gossip_err("Error: could not find matching server for handle [%s]\n",
-            PVFS_handle_to_str(*handle))
+            PVFS_handle_to_str((unsigned char *)(*handle)));
         return(-PVFS_EINVAL);
     }
 
@@ -1474,7 +1474,7 @@ static int PINT_handle_wrangler_remove_handle(
     if(!found)
     {
         gossip_err("Error: could not find handle [%s]\n",
-            PVFS_handle_to_str(*handle));
+            PVFS_handle_to_str((unsigned char *)(*handle)));
         return(-PVFS_EINVAL);
     }
 
