@@ -2663,7 +2663,7 @@ int scandir64 (const char *dir,
         }
     }
     /* now sort entries */
-    qsort(*namelist, i, sizeof(struct dirent64 *), compar);
+    qsort(*namelist, i, sizeof(struct dirent64 *), (__compar_fn_t)compar);
     rc = closedir(dp);
     if (rc == -1)
     {
