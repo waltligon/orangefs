@@ -118,14 +118,14 @@ extern int lsetxattr(const char *path, const char *name,
                      const void *value, size_t size, int flags);
 extern int fsetxattr(int fd, const char *name,
                      const void *value, size_t size, int flags);
-extern int getxattr(const char *path, const char *name,
+extern ssize_t getxattr(const char *path, const char *name,
                     void *value, size_t size);
-extern int lgetxattr(const char *path, const char *name,
+extern ssize_t lgetxattr(const char *path, const char *name,
                      void *value, size_t size);
-extern int fgetxattr(int fd, const char *name, void *value, size_t size);
-extern int listxattr(const char *path, char *list, size_t size);
-extern int llistxattr(const char *path, char *list, size_t size);
-extern int flistxattr(int fd, char *list, size_t size);
+extern ssize_t fgetxattr(int fd, const char *name, void *value, size_t size);
+extern ssize_t listxattr(const char *path, char *list, size_t size);
+extern ssize_t llistxattr(const char *path, char *list, size_t size);
+extern ssize_t flistxattr(int fd, char *list, size_t size);
 extern int removexattr(const char *path, const char *name);
 extern int lremovexattr(const char *path, const char *name);
 extern int fremovexattr(int fd, const char *name);
