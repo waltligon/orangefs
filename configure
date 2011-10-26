@@ -15006,6 +15006,54 @@ _ACEOF
 fi
 fi;
 
+echo "$as_me:$LINENO: checking if dlfns needs explicit library request" >&5
+echo $ECHO_N "checking if dlfns needs explicit library request... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+
+#define _GNU_SOURCE 1
+#include <dlfcn.h>
+main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
+
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+
+    echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+
+    echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+    LIBS="$LIBS -ldl"
+
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+
 BUILD_UCACHE=
 # Check whether --enable-ucache or --disable-ucache was given.
 if test "${enable_ucache+set}" = set; then
@@ -15107,7 +15155,8 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-#define __USE_LARGEFILE64
+#define _LARGEFILE64_SOURCE 1
+#define _GNU_SOURCE 1
 #include <dirent.h>
 int scandir (const char *dir, struct dirent ***list,
              int (*sel)(const struct dirent *),
