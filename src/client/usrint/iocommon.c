@@ -1030,9 +1030,6 @@ static uint32_t place_data(enum PVFS_io_type which,
 int iocommon_readorwrite(enum PVFS_io_type which,
                          pvfs_descriptor *pd,
                          PVFS_size offset,
-                         void *buf,
-                         PVFS_Request mem_req,
-                         PVFS_Request file_req,
                          size_t count,
                          const struct iovec *vector)
 {
@@ -1071,12 +1068,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 #endif /* PVFS_UCACHE_ENABLE */
         /* Bypass the ucache */
         errno = 0;
-        rc = iocommon_readorwrite_nocache(which,
-                                          pd,
-                                          offset,
-                                          buf,
-                                          mem_req,
-                                          file_req);
+        rc = iocommon_vreadorwrite(which, pd, offset, count, vector);
         if (rc < 0)
         {
             goto errorout;
@@ -1150,8 +1142,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             else /* Miss */
             {
                 /* read from fs into user mem */
-                rc = iocommon_readorwrite_nocache(which, pd, offset, 
-                                                  buf, mem_req, file_req);
+                rc = iocommon_vreadorwrite(which, pd, offset, count, vector);
                 if(rc > 0)
                 {
                     block_loc = (voidp_t)ucache_insert(fs_id, handle, tags[i], 
@@ -1198,12 +1189,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 }
                 else
                 {
-                    rc = iocommon_readorwrite_nocache(which,
-                                                      pd,
-                                                      offset, 
-                                                      buf,
-                                                      mem_req,
-                                                      file_req);
+                    rc = iocommon_vreadorwrite(which, pd, offset,
+                                               count, vector);
                 }
             }
         }
@@ -1214,8 +1201,46 @@ errorout:
     return rc;
 }
 
+/** do a blocking read or write from an iovec
+ *  this just converts to PVFS Request notation
+ *  other interfaces can still do direct reads to
+ *  RorW_nocache below
+ */
+int iocommon_vreadorwrite(enum PVFS_io_type which,
+                         pvfs_descriptor *pd,
+                         PVFS_size offset,
+                         size_t count,
+                         const struct iovec *vector)
+{
+    int rc = 0;
+    int i, size = 0;
+    void *buf;
+    PVFS_Request mem_req;
+    PVFS_Request file_req;
+
+    for(i = 0; i < count; i++)
+    {   
+        size += vector[i].iov_len;
+    }
+
+    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
+    rc = pvfs_convert_iovec(vector, count, &mem_req, &buf);
+
+    rc = iocommon_readorwrite_nocache(which,
+                                      pd,
+                                      offset, 
+                                      buf,
+                                      mem_req,
+                                      file_req);
+
+    PVFS_Request_free(&mem_req);
+    PVFS_Request_free(&file_req);
+
+    return rc;
+}
+
 /** do a blocking read or write
- * 
+ *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
                          pvfs_descriptor *pd,

@@ -111,15 +111,16 @@ extern int iocommon_rename(PVFS_object_ref *oldpdir,
 extern int iocommon_readorwrite(enum PVFS_io_type which,
 	                 pvfs_descriptor *pd,
                          PVFS_size offset,
-                         void *buf,
-                         PVFS_Request mem_req,
-                         PVFS_Request file_req,
+                         size_t count,
+                         const struct iovec *vector);
+
+extern int iocommon_vreadorwrite(enum PVFS_io_type which,
+	                 pvfs_descriptor *pd,
+                         PVFS_size offset,
                          size_t count,
                          const struct iovec *vector);
 
 /* do a blocking read or write
- * extra_offset = extra padding to the pd's offset,
- * independent of the pd's offset
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
 		          pvfs_descriptor *pd,

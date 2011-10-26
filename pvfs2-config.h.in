@@ -529,6 +529,9 @@
 /* Should we build user interface acl routines. */
 #undef PVFS_HAVE_ACL_INCLUDES
 
+/* scandir compare arg takes void pointers. */
+#undef PVFS_SCANDIR_VOID
+
 /* Should we enable user interface data cache. */
 #undef PVFS_UCACHE_ENABLE
 

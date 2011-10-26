@@ -205,28 +205,28 @@ extern ssize_t pvfs_sendfile(int outfd, int infd, off_t *offset, size_t count);
 extern ssize_t pvfs_sendfile64(int outfd, int infd, off64_t *offset, size_t count);
 
 extern int pvfs_setxattr(const char *path, const char *name,
-                   const void *value, size_t size, int flags);
+                          const void *value, size_t size, int flags);
 
 extern int pvfs_lsetxattr(const char *path, const char *name,
-                   const void *value, size_t size, int flags);
+                          const void *value, size_t size, int flags);
 
 extern int pvfs_fsetxattr(int fd, const char *name,
-                   const void *value, size_t size, int flags);
+                          const void *value, size_t size, int flags);
 
-extern int pvfs_getxattr(const char *path, const char *name,
-                  void *value, size_t size);
+extern ssize_t pvfs_getxattr(const char *path, const char *name,
+                             void *value, size_t size);
 
-extern int pvfs_lgetxattr(const char *path, const char *name,
-                   void *value, size_t size);
+extern ssize_t pvfs_lgetxattr(const char *path, const char *name,
+                              void *value, size_t size);
 
-extern int pvfs_fgetxattr(int fd, const char *name,
-                   void *value, size_t size);
+extern ssize_t pvfs_fgetxattr(int fd, const char *name,
+                              void *value, size_t size);
 
-extern int pvfs_listxattr(const char *path, char *list, size_t size);
+extern ssize_t pvfs_listxattr(const char *path, char *list, size_t size);
 
-extern int pvfs_llistxattr(const char *path, char *list, size_t size);
+extern ssize_t pvfs_llistxattr(const char *path, char *list, size_t size);
 
-extern int pvfs_flistxattr(int fd, char *list, size_t size);
+extern ssize_t pvfs_flistxattr(int fd, char *list, size_t size);
 
 extern int pvfs_removexattr(const char *path, const char *name);
 

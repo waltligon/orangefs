@@ -520,11 +520,7 @@ static ssize_t pvfs_prdwr64(int fd,
 {
     int rc;
     pvfs_descriptor* pd;
-    PVFS_Request freq, mreq;
     struct iovec vector[1];
-
-    memset(&freq, 0, sizeof(freq));
-    memset(&mreq, 0, sizeof(mreq));
 
     /* Find the descriptor */
     pd = pvfs_find_descriptor(fd);
@@ -534,17 +530,11 @@ static ssize_t pvfs_prdwr64(int fd,
         return -1;
     }
 
-    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &freq);
-    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &mreq);
-
     /* place contiguous buff and count into an iovec array of length 1 */
     vector[0].iov_base = buf;
     vector[0].iov_len = size;
 
-    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, 1, vector);
-
-    PVFS_Request_free(&freq);
-    PVFS_Request_free(&mreq);
+    rc = iocommon_readorwrite(which, pd, offset, 1, vector);
 
     return rc;
 }
@@ -558,14 +548,8 @@ static ssize_t pvfs_rdwrv(int fd,
                           int which)
 {
     int rc = 0;
-    int i, size = 0;
     pvfs_descriptor* pd;
-    PVFS_Request freq, mreq;
     off64_t offset;
-    void *buf;
-
-    memset(&freq, 0, sizeof(freq));
-    memset(&mreq, 0, sizeof(mreq));
 
     /* Find the descriptor */
     pd = pvfs_find_descriptor(fd);
@@ -575,23 +559,12 @@ static ssize_t pvfs_rdwrv(int fd,
     }
     offset = pd->s->file_pointer;
 
-    for (i = 0; i < count; i++)
-    {
-        size += vector[i].iov_len;
-    }
-
-    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &freq);
-    rc = pvfs_convert_iovec(vector, count, &mreq, &buf);
-
-    rc = iocommon_readorwrite(which, pd, offset, buf, mreq, freq, count, vector);
+    rc = iocommon_readorwrite(which, pd, offset, count, vector);
 
     if (rc >= 0)
     {
         pd->s->file_pointer += rc;
     }
-
-    PVFS_Request_free(&freq);
-    PVFS_Request_free(&mreq);
 
     return rc;
 }
@@ -2084,10 +2057,10 @@ int pvfs_fsetxattr(int fd,
     return rc;
 }
 
-int pvfs_getxattr(const char *path,
-                  const char *name,
-                  void *value,
-                  size_t size)
+ssize_t pvfs_getxattr(const char *path,
+                      const char *name,
+                      void *value,
+                      size_t size)
 {
     int fd, rc = 0;
 
@@ -2101,10 +2074,10 @@ int pvfs_getxattr(const char *path,
     return rc;
 }
 
-int pvfs_lgetxattr(const char *path,
-                   const char *name,
-                   void *value,
-                   size_t size)
+ssize_t pvfs_lgetxattr(const char *path,
+                       const char *name,
+                       void *value,
+                       size_t size)
 {
     int fd, rc = 0;
 
@@ -2118,10 +2091,10 @@ int pvfs_lgetxattr(const char *path,
     return rc;
 }
 
-int pvfs_fgetxattr(int fd,
-                   const char *name,
-                   void *value,
-                   size_t size)
+ssize_t pvfs_fgetxattr(int fd,
+                       const char *name,
+                       void *value,
+                       size_t size)
 {
     pvfs_descriptor *pd;
 
@@ -2134,9 +2107,9 @@ int pvfs_fgetxattr(int fd,
     return iocommon_geteattr(pd, name, value, size);
 }
 
-int pvfs_listxattr(const char *path,
-                   char *list,
-                   size_t size)
+ssize_t pvfs_listxattr(const char *path,
+                       char *list,
+                       size_t size)
 {
     int fd, rc = 0;
 
@@ -2150,9 +2123,9 @@ int pvfs_listxattr(const char *path,
     return rc;
 }
 
-int pvfs_llistxattr(const char *path,
-                    char *list,
-                    size_t size)
+ssize_t pvfs_llistxattr(const char *path,
+                        char *list,
+                        size_t size)
 {
     int fd, rc = 0;
 
@@ -2166,9 +2139,9 @@ int pvfs_llistxattr(const char *path,
     return rc;
 }
 
-int pvfs_flistxattr(int fd,
-                    char *list,
-                    size_t size)
+ssize_t pvfs_flistxattr(int fd,
+                        char *list,
+                        size_t size)
 {
     int retsize, rc = 0;
     pvfs_descriptor *pd;

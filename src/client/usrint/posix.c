@@ -1824,7 +1824,7 @@ int fsetxattr(int fd, const char *name,
     return rc;
 }
 
-int getxattr(const char *path, const char *name,
+ssize_t getxattr(const char *path, const char *name,
              void *value, size_t size)
 {
     if (!path)
@@ -1850,7 +1850,7 @@ int getxattr(const char *path, const char *name,
     }
 }
 
-int lgetxattr(const char *path, const char *name,
+ssize_t lgetxattr(const char *path, const char *name,
               void *value, size_t size)
 {
     if (!path)
@@ -1876,7 +1876,7 @@ int lgetxattr(const char *path, const char *name,
     }
 }
 
-int fgetxattr(int fd, const char *name, void *value,
+ssize_t fgetxattr(int fd, const char *name, void *value,
               size_t size)
 {
     int rc = 0;
@@ -1903,7 +1903,7 @@ int fgetxattr(int fd, const char *name, void *value,
     return rc;
 }
 
-int listxattr(const char *path, char *list, size_t size)
+ssize_t listxattr(const char *path, char *list, size_t size)
 {
     if (!path)
     {
@@ -1928,7 +1928,7 @@ int listxattr(const char *path, char *list, size_t size)
     }
 }
 
-int llistxattr(const char *path, char *list, size_t size)
+ssize_t llistxattr(const char *path, char *list, size_t size)
 {
     if (!path)
     {
@@ -1953,7 +1953,7 @@ int llistxattr(const char *path, char *list, size_t size)
     }
 }
 
-int flistxattr(int fd, char *list, size_t size)
+ssize_t flistxattr(int fd, char *list, size_t size)
 {
     int rc = 0;
     pvfs_descriptor *pd;

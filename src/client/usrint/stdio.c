@@ -2527,10 +2527,19 @@ int closedir (DIR *dir)
     return 0;
 }
 
+#ifdef PVFS_SCANDIR_VOID
 int scandir (const char *dir,
              struct dirent ***namelist,
              int(*filter)(const struct dirent *),
-             int(*compar)(const void *, const void *))
+             int(*compar)(const void *,
+                          const void *))
+#else
+int scandir (const char *dir,
+             struct dirent ***namelist,
+             int(*filter)(const struct dirent *),
+             int(*compar)(const struct dirent **,
+                          const struct dirent **))
+#endif
 {
     struct dirent *de;
     DIR *dp;
