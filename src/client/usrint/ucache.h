@@ -45,20 +45,26 @@
 #define CACHE_FLAGS (SVSHM_MODE)
 #define NIL (-1)
 
+#ifndef UCACHE_MAX_REQ 
+#define UCACHE_MAX_REQ (512 * 1024 * 1024)
+#endif 
+
 /* Define multiple NILS to there's no need to cast for different types */
 #define NIL8  0XFF
 #define NIL16 0XFFFF
 #define NIL32 0XFFFFFFFF
 #define NIL64 0XFFFFFFFFFFFFFFFF
 
+/*
 #if (PVFS2_SIZEOF_VOIDP == 32)
 #define voidp_t uint32_t
 #elif (PVFS2_SIZEOF_VOIDP == 64)
 #define voidp_t uint64_t
 #endif
+*/
 
 #ifndef DBG
-#define DBG 0 
+#define DBG 0   
 #endif
 
 #define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
@@ -95,8 +101,8 @@ struct mem_ent_s
     uint16_t item;          /* index of cache block with data */
     uint16_t next;          /* use for hash table chain */
     uint16_t dirty_next;    /* if dirty used in dirty list */
-    uint16_t lru_next;      /* used in lru list */
     uint16_t lru_prev;      /* used in lru list */
+    uint16_t lru_next;      /* used in lru list */
     char pad[2];
 };
 
@@ -137,8 +143,8 @@ struct file_ent_s
     uint32_t tag_id;        /* PVFS_fs_id */
     uint16_t mtbl_blk;      /* block index of this mtbl */
     uint16_t mtbl_ent;      /* entry index of this mtbl */
-    uint16_t next;          /* next mtbl in chain */
-    char pad[2];
+    uint16_t next;          /* next fent in chain */
+    uint16_t index;         /* fent index in ftbl */
 };
 
 /** A hash table to find caches for specific files
@@ -175,15 +181,20 @@ union user_cache_u *get_ucache(void);
 int ucache_initialize(void);
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
-                     struct mem_table_s **mtbl);
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle);
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint16_t *block_ndx);
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, uint16_t *block_ndx);
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset);
-#ifndef TESTING
-int ucache_flush(pvfs_descriptor *pd);
-#endif
+                     struct file_ent_s **fent);
+int ucache_close_file(struct file_ent_s *fent);
+struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
+void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
+void *ucache_insert(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
+int ucache_remove(struct file_ent_s *fent, uint64_t offset);
 void ucache_info(FILE *out, char *flags);
+
+#ifndef TESTING
+int ucache_flush_cache(void);
+int ucache_flush_file(pvfs_descriptor *pd);
+/* Used only in testing */
+int wipe_ucache(void);
+#endif
 
 /* Don't call this except in ucache daemon */
 int ucache_init_file_table(char forceCreation);

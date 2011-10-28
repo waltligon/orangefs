@@ -60,7 +60,7 @@ pvfs_descriptor_status pvfs_stdin_status =
     .file_pointer = 0,
     .token = 0,
     .dpath = NULL,
-    .mtbl = NULL
+    .fent = NULL
 };
 
 pvfs_descriptor pvfs_stdin =
@@ -83,7 +83,7 @@ pvfs_descriptor_status pvfs_stdout_status =
     .file_pointer = 0,
     .token = 0,
     .dpath = NULL,
-    .mtbl = NULL
+    .fent = NULL
 };
 
 pvfs_descriptor pvfs_stdout =
@@ -106,7 +106,7 @@ pvfs_descriptor_status pvfs_stderr_status =
     .file_pointer = 0,
     .token = 0,
     .dpath = NULL,
-    .mtbl = NULL
+    .fent = NULL
 };
 
 pvfs_descriptor pvfs_stderr =
@@ -389,7 +389,7 @@ static void usrint_cleanup(void)
 }
 
 /*
- * acces function to see if cache is currently enabled
+ * access function to see if cache is currently enabled
  * only used by code ouside of this module
  */
 int pvfs_ucache_enabled(void)
@@ -498,7 +498,7 @@ int pvfs_descriptor_table_size(void)
                                         PVFS_object_ref *file_ref,
                                         int use_cache)
  {
- 	int newfd, flags = 0; 
+    int newfd, flags = 0; 
     pvfs_descriptor *pd;
 
     pvfs_sys_init();
@@ -568,12 +568,13 @@ int pvfs_descriptor_table_size(void)
 	    pd->s->pvfs_ref.fs_id = 0;
 	    pd->s->pvfs_ref.handle = 0LL;
     }
-	pd->s->flags = flags;
-	pd->s->mode = 0; /* this should be filled in by caller */
-	pd->s->file_pointer = 0;
-	pd->s->token = 0;
-	pd->s->dpath = NULL;
-    pd->s->mtbl = NULL; /* not caching if left NULL */
+
+    pd->s->flags = flags;
+    pd->s->mode = 0; /* this should be filled in by caller */
+    pd->s->file_pointer = 0;
+    pd->s->token = 0;
+    pd->s->dpath = NULL;
+    pd->s->fent = NULL; /* not caching if left NULL */
 
 #if PVFS_UCACHE_ENABLE
     if (ucache_enabled && use_cache)
@@ -581,29 +582,13 @@ int pvfs_descriptor_table_size(void)
         /* File reference won't always be passed in */
         if(file_ref != NULL)
         {
-            int rc = 0;
             /* We have the file identifiers
              * so insert file info into ucache
              * this fills in mtbl
              */
-            rc = ucache_open_file(&(file_ref->fs_id),
-                                  &(file_ref->handle), 
-                                  &(pd->s->mtbl));
-            /* Unique Entry */
-            if(rc > 0)
-            {   
-                pd->s->mtbl->ref_cnt = 1;
-            }
-            /* File already in Cache */
-            else if(rc == 0)
-            {
-                pd->s->mtbl->ref_cnt++;
-            }
-            /* Could not insert */
-            else
-            {
-                /* TODO: need error recovery here */  
-            }
+            ucache_open_file(&(file_ref->fs_id),
+                            &(file_ref->handle), 
+                                &(pd->s->fent));
         }
     }
 #endif /* PVFS_UCACHE_ENABLE */
@@ -734,7 +719,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->file_pointer = 0;
 	    pd->s->token = 0;
 	    pd->s->dpath = NULL;
-        pd->s->mtbl = NULL; /* not caching if left NULL */
+            pd->s->fent = NULL; /* not caching if left NULL */
     }
     /* not a PVFS descriptor and unix descriptor not in use */
     else if (pd->is_in_use != PVFS_FS)
@@ -772,20 +757,24 @@ int pvfs_free_descriptor(int fd)
         }
 
 #if PVFS_UCACHE_ENABLE
-        if (pd->s->mtbl)
+        if (pd->s->fent)
         {
+            int rc = 0;
+
+            struct mem_table_s *mtbl = get_mtbl(pd->s->fent->mtbl_blk,
+                                               pd->s->fent->mtbl_ent);
+            rc = ucache_close_file(pd->s->fent);
+
             /* release cache objects here */
-            pd->s->mtbl->ref_cnt--;
-            if(pd->s->mtbl->ref_cnt == 0)
+            mtbl->ref_cnt--;
+            if(mtbl->ref_cnt == 0)
             {
                 /* Flush dirty blocks before file removal from cache */
-                ucache_flush(pd);
-                /* remove all of this file's associated data from cache */
-                ucache_close_file(&(pd->s->pvfs_ref.fs_id),
-                                  &(pd->s->pvfs_ref.handle));
+                ucache_flush_file(pd);
+                ucache_close_file(pd->s->fent);
             }
             /* don't leave a dangling pointer */
-            pd->s->mtbl = NULL; 
+            pd->s->fent = NULL; 
         }
 #endif /* PVFS_UCACHE_ENABLE */
 

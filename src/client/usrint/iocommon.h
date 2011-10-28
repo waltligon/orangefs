@@ -29,6 +29,16 @@
 
 #define PVFS_NULL_OBJ ((PVFS_object_ref *)NULL)
 
+/** A structure used in the cache enabled version of iocommon_readorwrite.
+ */
+struct ucache_req_s
+{
+    uint64_t ublk_tag; /* ucache block tag (byte index into file) */
+    unsigned char ublk_hit; /* boolean indicating 'block found in cache' */
+    void *ublk_ptr; /* where in ucache memory to read block from or write to */
+    uint16_t ublk_index; /* index of ucache block in shared memory segment */
+};
+
 /* this global is set when a pvfs specific error is returned
  * and errno is set to EIO
  */

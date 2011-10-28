@@ -27,7 +27,6 @@ uint64_t ucache_pseudo_misses; /* Chose not to cache */
 char ftblInitialized = 0;
 
 /* Internal Only Function Declarations */
-//void goToValue(FILE *conf);
 
 /* Initialization */
 static void add_mtbls(uint16_t blk);
@@ -41,25 +40,28 @@ static uint16_t get_free_ment(struct mem_table_s *mtbl);
 static uint16_t get_free_blk(void);
 
 /* Puts */
-static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file);
-static void put_free_fent(uint16_t fent);
+static int put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file);
+static void put_free_fent(struct file_ent_s *fent);
 static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent);
 static void put_free_blk(uint16_t blk);
 
 /* File Entry Chain Iterator */
-static uint16_t file_done(uint16_t index);
+static unsigned char file_done(uint16_t index);
 static uint16_t file_next(struct file_table_s *ftbl, uint16_t index);
 
 /* Memory Entry Chain Iterator */
-static uint16_t ment_done(uint16_t index);
+static unsigned char ment_done(uint16_t index);
 static uint16_t ment_next(struct mem_table_s *mtbl, uint16_t index);
 
 /* Dirty List Iterator */
-static uint16_t dirty_done(uint16_t index);
+static unsigned char dirty_done(uint16_t index);
 static uint16_t dirty_next(struct mem_table_s *mtbl, uint16_t index);
 
 /* File and Memory Insertion */
-static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle);
+static struct file_ent_s *insert_file(
+    uint32_t fs_id,
+    uint64_t handle
+);
 static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset, 
                                              uint16_t *block_ndx);
 static void *set_item(struct mem_table_s *mtbl,uint64_t offset, uint16_t index);
@@ -81,8 +83,8 @@ static void *lookup_mem(struct mem_table_s *mtbl,
 );
 
 /* File and Memory Entry Removal */
-/* static uint32_t remove_file(uint32_t fs_id, uint64_t handle); */
-static void remove_all_memory_entries(struct mem_table_s *mtbl);
+static int remove_file(struct file_ent_s *fent);
+static int remove_all_memory_entries(struct mem_table_s *mtbl);
 static int remove_mem(struct mem_table_s *mtbl, uint64_t offset);
 
 /* Eviction Utilities */
@@ -155,18 +157,12 @@ int ucache_initialize(void)
     return rc;
 }
 
-/* For testing purposes only */
-int wipe_ucache(void)
+/** Returns a pointer to the mtbl corresponding to the blk & ent. 
+ * Input must be reliable otherwise invalid mtbl could be returned.
+ */
+struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
 {
-    int rc = 0;
-
-    /* wipe the cache, locks, and reinitialize */
-    memset(ucache, 0, CACHE_SIZE);
-    memset(ucache_locks, 0, LOCKS_SIZE);
-
-    /* Force Re-creation of ftbl */
-    rc = ucache_init_file_table(1);
-    return rc;
+    return &(ucache->b[mtbl_blk].mtbl[mtbl_ent]);
 }
 
 /** Initializes the ucache file table if it hasn't previously been initialized.
@@ -199,8 +195,8 @@ int ucache_init_file_table(char forceCreation)
         
 
     /* initialize mtbl free list table */
-    ucache->ftbl.free_mtbl_blk = NIL;
-    ucache->ftbl.free_mtbl_ent = NIL;
+    ucache->ftbl.free_mtbl_blk = NIL16;
+    ucache->ftbl.free_mtbl_ent = NIL16;
     add_mtbls(0);
 
     /* set up list of free blocks */
@@ -209,27 +205,27 @@ int ucache_init_file_table(char forceCreation)
     {
         ucache->b[i].mtbl[0].free_list_blk = i + 1;
     }
-    ucache->b[BLOCKS_IN_CACHE - 1].mtbl[0].free_list_blk = NIL;
+    ucache->b[BLOCKS_IN_CACHE - 1].mtbl[0].free_list_blk = NIL16;
 
     /* set up file hash table */
     for (i = 0; i < FILE_TABLE_HASH_MAX; i++)
     {
-        ucache->ftbl.file[i].tag_handle = NIL;
-        ucache->ftbl.file[i].tag_id = NIL;
-        ucache->ftbl.file[i].mtbl_blk = NIL;
-        ucache->ftbl.file[i].mtbl_ent = NIL;
-        ucache->ftbl.file[i].next = NIL;
+        ucache->ftbl.file[i].tag_handle = NIL64;
+        ucache->ftbl.file[i].tag_id = NIL32;
+        ucache->ftbl.file[i].mtbl_blk = NIL16;
+        ucache->ftbl.file[i].mtbl_ent = NIL16;
+        ucache->ftbl.file[i].next = NIL16;
     }
 
     /* set up list of free hash table entries */
     ucache->ftbl.free_list = FILE_TABLE_HASH_MAX;
     for (i = FILE_TABLE_HASH_MAX; i < FILE_TABLE_ENTRY_COUNT - 1; i++)
     {
-        ucache->ftbl.file[i].mtbl_blk = NIL;
-        ucache->ftbl.file[i].mtbl_ent = NIL;
+        ucache->ftbl.file[i].mtbl_blk = NIL16;
+        ucache->ftbl.file[i].mtbl_ent = NIL16;
         ucache->ftbl.file[i].next = i + 1;
     }
-    ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL;
+    ucache->ftbl.file[FILE_TABLE_ENTRY_COUNT - 1].next = NIL16;
 
     /* Success */
     ftblInitialized = 1;
@@ -238,121 +234,151 @@ int ucache_init_file_table(char forceCreation)
 
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
-                     struct mem_table_s **mtbl)
+                     struct file_ent_s **fent)
 {
     int rc = -1;
-    rc = lock_lock(ucache_lock);
-    *mtbl = lookup_file((uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL,
-                                                                          NULL);
-    if(*mtbl == (struct mem_table_s *)NIL)
+    uint16_t file_mtbl_blk;
+    uint16_t file_mtbl_ent;
+    uint16_t file_ent_index;
+    uint16_t file_ent_prev_index;
+
+    lock_lock(ucache_lock);
+
+    struct mem_table_s *mtbl = lookup_file((uint32_t)(*fs_id), 
+                                           (uint64_t)(*handle), 
+                                            &file_mtbl_blk, 
+                                            &file_mtbl_ent, 
+                                            &file_ent_index,
+                                            &file_ent_prev_index);
+
+    if(mtbl == (struct mem_table_s *)NIL)
     {
-        *mtbl = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
-        if(*mtbl == (struct mem_table_s *)NIL)
-        {   /* Error - Could not insert */
-            rc = lock_unlock(ucache_lock);
-            return (-1);
+        *fent = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
+        if(*fent != (struct file_ent_s *)NIL)
+        {
+            mtbl = get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
+        }
+
+        if(mtbl == (struct mem_table_s *)NIL)
+        {   
+            /* Error - Could not insert */
+            printf("THIS IS THE ERROR\n");
+            rc = -1;
+            goto done;
         }
         else
         {
             /* File Inserted*/
-            rc = lock_unlock(ucache_lock);
-            return 1;
+            mtbl->ref_cnt = 1;
+            rc = 0;
+            goto done;
         }
     }
     else
     {
         /* File was previously Inserted */
-        rc = lock_unlock(ucache_lock);
-        return 0;
+        mtbl->ref_cnt++;
+        *fent = &(ucache->ftbl.file[file_ent_index]);
+        rc = 1;
+        goto done;
     }
+done:
+    lock_unlock(ucache_lock);
+    return rc;
 }
 
-/** Returns ptr to block in cache based on file and offset */
-void *ucache_lookup(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, 
-                                                      uint16_t *block_ndx)
+/** Returns ptr to block in ucache based on file and offset */
+void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, 
+                                         uint16_t *block_ndx)
 {
-    lock_lock(ucache_lock);
-    struct mem_table_s *mtbl = lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if(mtbl != (struct mem_table_s *)NIL)
+    void *retVal = (void *) NIL;
+    if(fent)
     {
-        char *retVal = (char *)lookup_mem(mtbl, (uint64_t)offset, block_ndx, 
-                                                                NULL, NULL);
+        lock_lock(ucache_lock);
+        struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent); 
+        retVal = lookup_mem(mtbl, 
+                            (uint64_t)offset, 
+                            block_ndx,
+                            NULL, 
+                            NULL);
         lock_unlock(ucache_lock);
-        return((void *)retVal); 
     }
-    lock_unlock(ucache_lock);
-    return (void *)NIL;
+    return retVal;
 }
 
 /** Prepares the data structures for block storage. 
  * On success, returns a pointer to where the block of data should be written. 
  * On failure, returns NIL.
  */
-void *ucache_insert(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset, 
-                                                        uint16_t *block_ndx)
+void *ucache_insert(struct file_ent_s *fent, uint64_t offset, 
+                                         uint16_t *block_ndx)
 {
     lock_lock(ucache_lock);
-    struct mem_table_s *mtbl = lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if(mtbl == (struct mem_table_s *)NIL)
-    {
-        lock_unlock(ucache_lock);
-        return (void *)NIL;
-    }
-    else
-    {
-        if(remove_mem(mtbl, offset) < 0)
-        {
-            lock_unlock(ucache_lock);
-            return (void *)NIL;
-        }
-        char * retVal = insert_mem(mtbl, offset, block_ndx);
-        lock_unlock(ucache_lock);
-        return ((void *)retVal); 
-    }
-}
-
-/**  Removes a cached block of data from mtbl */
-int ucache_remove(PVFS_fs_id *fs_id, PVFS_handle *handle, uint64_t offset)
-{
-    lock_lock(ucache_lock);
-    struct mem_table_s *mtbl = lookup_file(
-        (uint32_t)(*fs_id), (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if(mtbl != (struct mem_table_s *)NIL)
-    {
-        int retVal = remove_mem(mtbl, (uint64_t)offset);
-        lock_unlock(ucache_lock); 
-        return retVal; 
-    }        
+    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk,
+                                       fent->mtbl_ent);
+    char * retVal = insert_mem(mtbl, offset, block_ndx);
     lock_unlock(ucache_lock);
-    return NIL;
+    return ((void *)retVal); 
 }
 
-/** Flushes dirty blocks to the I/O Nodes */
-int ucache_flush(pvfs_descriptor *pd)
+/** Removes a cached block of data from mtbl 
+ * Returns 1 on success, 0 on failure.
+ */
+int ucache_remove(struct file_ent_s *fent, uint64_t offset)
 {
-    PVFS_fs_id *fs_id = &(pd->s->pvfs_ref.fs_id);
-    PVFS_handle *handle = &(pd->s->pvfs_ref.handle);
+    int rc = 0;
     lock_lock(ucache_lock);
-    struct mem_table_s *mtbl = lookup_file((uint32_t)(*fs_id), 
-                 (uint64_t)(*handle), NULL, NULL, NULL, NULL);
-    if(mtbl == (struct mem_table_s *)NIL)
+    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
+    rc = remove_mem(mtbl, (uint64_t)offset);
+    lock_unlock(ucache_lock);
+    return rc;
+}
+
+#ifndef TESTING
+/** Flushes the entire ucache's dirty blocks (every file's dirty blocks) */
+int ucache_flush_cache(void)
+{
+    struct file_table_s *ftbl = &ucache->ftbl;
+    int i;
+    for(i = 0; i < FILE_TABLE_HASH_MAX; i++)
     {
-        return NIL;
+        if((ftbl->file[i].tag_handle != NIL64) &&
+               (ftbl->file[i].tag_handle != (uint64_t)0))
+        {
+            //iterate accross file table chain 
+            uint16_t j;
+            for(j = i; !file_done(j); j = file_next(ftbl, j))
+            {
+                //Construct pvfs_descriptor 
+                int a = 0;
+                a = 1;
+            }
+        }
     }
+    return 1;
+}
+
+
+/** Flushes dirty blocks to the I/O Nodes 
+ * Returns 1 on success and -1 on failure.
+ */
+int ucache_flush_file(pvfs_descriptor *pd)
+{
+    struct mem_table_s *mtbl = get_mtbl(pd->s->fent->mtbl_blk, 
+                                       pd->s->fent->mtbl_ent);
+
+    int rc = 0;
+    lock_lock(ucache_lock);
     uint16_t i;
     for(i = mtbl->dirty_list; !dirty_done(i); i = dirty_next(mtbl, i))
     {
         struct mem_ent_s *ment = &(mtbl->mem[i]);
-        mtbl->mem[i].dirty_next = NIL;
-        if(ment->tag == (uint64_t)NIL || ment->item == (uint16_t)NIL)
+        mtbl->mem[i].dirty_next = NIL16;
+        if(ment->tag == NIL64 || ment->item == NIL16)
         {
             break;
         }
 
-        /* Send it to the nodes */
-        int rc = 0;
         size_t count = CACHE_BLOCK_SIZE_K * 1024;
         PVFS_Request freq, mreq;
         memset(&freq, 0, sizeof(freq));
@@ -360,77 +386,81 @@ int ucache_flush(pvfs_descriptor *pd)
         rc = PVFS_Request_contiguous(count, PVFS_BYTE, &freq);
         rc = PVFS_Request_contiguous(count, PVFS_BYTE, &mreq);
 
-        /* flush block to disk. 2 means write */
-        iocommon_readorwrite_nocache(2, pd, ment->tag, 
-                     &(ucache->b[ment->item].mblk[0]),
-                                          mreq, freq);
+        rc = iocommon_readorwrite_nocache(2,
+                                    pd, 
+                                    ment->tag, 
+                                    &(ucache->b[ment->item].mblk[0]),
+                                    mreq, 
+                                    freq
+        );
+
         PVFS_Request_free(&freq);
         PVFS_Request_free(&mreq);
+
+        if(rc == -1)
+        {
+            lock_unlock(ucache_lock);
+            return -1;
+        }
     }
-    mtbl->dirty_list = NIL;
+    mtbl->dirty_list = NIL16;
     lock_unlock(ucache_lock);
     return 1;
 }
+
+/* For testing purposes only */
+int wipe_ucache(void)
+{
+    int rc = 0;
+
+    /* wipe the cache, locks, and reinitialize */
+    memset(ucache, 0, CACHE_SIZE);
+    memset(ucache_locks, 0, LOCKS_SIZE);
+
+    /* Force Re-creation of ftbl */
+    rc = ucache_init_file_table(1);
+    return rc;
+}
+#endif /* TESTING */
 
 /** Removes all memory entries in the mtbl corresponding to the file info 
  * provided as parameters. It also removes the mtbl and the file entry from 
  * the cache.
  */
-int ucache_close_file(PVFS_fs_id *fs_id, PVFS_handle *handle)
+int ucache_close_file(struct file_ent_s *fent)
 {
+    int rc = -1;
     lock_lock(ucache_lock);
-    uint16_t file_mtbl_blk;
-    uint16_t file_mtbl_ent;
-    uint16_t file_ent_index;
-    uint16_t file_ent_prev_index;
-    struct mem_table_s *mtbl = lookup_file(
-        (uint32_t)(*fs_id), 
-        (uint64_t)(*handle), 
-        &file_mtbl_blk, 
-        &file_mtbl_ent, 
-        &file_ent_index, 
-        &file_ent_prev_index);
-    if(mtbl == (struct mem_table_s *)NIL)
+
+    struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk,
+                                       fent->mtbl_ent);
+
+    rc = remove_all_memory_entries(mtbl);
+    if(rc == -1)
     {
-        lock_unlock(ucache_lock);
-        return NIL;
+        /* Couldn't remove */
+        goto done;
     }
-    remove_all_memory_entries(mtbl);
-    struct file_ent_s *file = &(ucache->ftbl.file[file_ent_index]);
-    put_free_mtbl(mtbl, file); //something broken on this line
-    put_free_fent(file_ent_index);
+
+    /* TODO: instead of removing let the LRU eviction process clean up ftbls 
+     * and mtbls */
+    rc = put_free_mtbl(mtbl, fent);
+    if(rc == -1)
+    {
+        goto done;
+    }
+    put_free_fent(fent);
+    if(rc == -1)
+    {
+        goto done;
+    }
+
+    rc =  1;
+
+done:
     lock_unlock(ucache_lock);
-    return 1;
-}
-
-/** Decrements the reference count of a particular mtbl.
-int ucache_dec_ref_cnt(struct mem_table_s * mtbl)
-{
-    int rc;
-    lock_lock(ucache_lock);
-    //decrement ref_cnt of mtbl
-    if(mtbl->ref_cnt != 0)
-    {
-        mtbl->ref_cnt--;
-    }
-    rc = mtbl->ref_cnt;
-    lock_unlock(ucache_lock); 
     return rc;
 }
-*/
-
-/** Increments the reference count of a particular mtbl.
-int ucache_inc_ref_cnt(struct mem_table_s * mtbl)
-{
-    int rc = 0;
-    lock_lock(ucache_lock);
-    //increment ref_cnt of mtbl
-    mtbl->ref_cnt++;
-    rc = mtbl->ref_cnt;
-    lock_unlock(ucache_lock); 
-    return rc;
-}
-*/
 
 /** Dumps all cache related information. */
 void ucache_info(FILE *out, char *flags)
@@ -498,7 +528,11 @@ void ucache_info(FILE *out, char *flags)
     fprintf(out, "AT_FLAGS = %d\n", AT_FLAGS);
     fprintf(out, "SVSHM_MODE = %d\n", SVSHM_MODE);
     fprintf(out, "CACHE_FLAGS = %d\n", CACHE_FLAGS);
-    fprintf(out, "NIL = %d\n\n", NIL);    
+    fprintf(out, "NIL = 0X%X\n", NIL);
+    fprintf(out, "NIL8 = 0X%X\n", NIL8);
+    fprintf(out, "NIL16 = 0X%X\n", NIL16);    
+    fprintf(out, "NIL32 = 0X%X\n", NIL32);
+    fprintf(out, "NIL64 = 0X%llx\n", NIL64);
 
     /* Lock's Shared Memory Info */
     fprintf(out, "ucache_lock ptr:\t\t0X%lX\n", (long int)ucache_lock);
@@ -517,7 +551,7 @@ void ucache_info(FILE *out, char *flags)
     /* Other Free Blocks */
     fprintf(out, "\nIterating Over Free Blocks:\n\n");
     uint16_t i;
-    for(i = (uint16_t)ftbl->free_blk; i != (uint16_t)NIL; i = ucache->b[i].mtbl[0].
+    for(i = ftbl->free_blk; i != NIL16; i = ucache->b[i].mtbl[0].
                                                               free_list_blk)
     {
         fprintf(out, "Free Block:\tCurrent: %hu\tNext: %hu\n", i, 
@@ -529,7 +563,7 @@ void ucache_info(FILE *out, char *flags)
     fprintf(out, "\nIterating Over Free Mtbls:\n");
     uint16_t current_blk = (uint16_t)ftbl->free_mtbl_blk;
     uint16_t current_ent = ftbl->free_mtbl_ent;
-    while(current_blk != (uint16_t)NIL)
+    while(current_blk != NIL16)
     {
         fprintf(out, "free mtbl: block = %hu\tentry = %hu\n", 
                 current_blk, current_ent);
@@ -543,7 +577,7 @@ void ucache_info(FILE *out, char *flags)
     /* Iterating Over Free File Entries */
     fprintf(out, "Iterating Over Free File Entries:\n");
     uint16_t current_fent; 
-    for(current_fent = ftbl->free_list; (int16_t)current_fent != NIL; 
+    for(current_fent = ftbl->free_list; current_fent != NIL16; 
                         current_fent = ftbl->file[current_fent].next)
     {
         //fprintf(out, "free file entry: index = %d\n", (int16_t)current_fent);
@@ -554,8 +588,8 @@ void ucache_info(FILE *out, char *flags)
     /* iterate over file table entries */
     for(i = 0; i < FILE_TABLE_HASH_MAX; i++)
     {
-        if((ftbl->file[i].tag_handle != (uint64_t)NIL) && 
-               (ftbl->file[i].tag_handle != (uint64_t)0))
+        if((ftbl->file[i].tag_handle != NIL64) && 
+               (ftbl->file[i].tag_handle != 0))
         {
             /* iterate accross file table chain */
             uint16_t j;
@@ -569,9 +603,10 @@ void ucache_info(FILE *out, char *flags)
                 fprintf(out, "mtbl_blk = %hu\n", fent->mtbl_blk);
                 fprintf(out, "mtbl_ent = %hu\n", fent->mtbl_ent);
                 fprintf(out, "next = %hu\n", fent->next);
+                fprintf(out, "index = %hu\n", fent->index);
 
-                struct mem_table_s * mtbl = &(ucache->b[fent->mtbl_blk].
-                                                    mtbl[fent->mtbl_ent]);
+                struct mem_table_s * mtbl = get_mtbl(fent->mtbl_blk, 
+                                                    fent->mtbl_ent);
 
                 fprintf(out, "\tMTBL LRU List ****************\n");
                 //print_LRU(mtbl);
@@ -589,7 +624,7 @@ void ucache_info(FILE *out, char *flags)
                 uint16_t k;
                 for(k = 0; k < MEM_TABLE_HASH_MAX; k++)
                 {
-                    if((int64_t)mtbl->mem[k].tag != NIL)
+                    if(mtbl->mem[k].tag != NIL64)
                     {
                         uint16_t l;
                         for(l = k; !ment_done(l); l = ment_next(mtbl, l)){
@@ -772,22 +807,11 @@ int lock_trylock(ucache_lock_t * lock)
 }
 /***************************************** End of Externally Visible API */
 
-/* Skip to integer value in config file */
-void goToValue(FILE *conf)
-{
-    int current_c = 0;
-    current_c = fgetc(conf);
-    while(current_c != '"')
-    {
-        current_c = fgetc(conf);
-    }
-}
-
 /* Dirty List Iterator */
 /** Returns true if current index is NIL, otherwise, returns 0 */
-static uint16_t dirty_done(uint16_t index)
+static unsigned char dirty_done(uint16_t index)
 {
-    return (index == NIL);
+    return (index == NIL16);
 }
 
 /** Returns the next index in the dirty list for the provided mtbl and index */
@@ -798,9 +822,9 @@ static uint16_t dirty_next(struct mem_table_s *mtbl, uint16_t index)
 
 /*  Memory Entry Chain Iterator */
 /** Returns true if current index is NIL, otherwise, returns 0 */
-static uint16_t ment_done(uint16_t index)
+static unsigned char ment_done(uint16_t index)
 {
-    return ((int16_t)index == NIL);
+    return (index == NIL16);
 }
 
 /** Returns the next index in the memory entry chain for the provided mtbl 
@@ -813,9 +837,9 @@ static uint16_t ment_next(struct mem_table_s *mtbl, uint16_t index)
 
 /*  File Entry Chain Iterator   */
 /** Returns true if current index is NIL, otherwise, returns 0 */
-static uint16_t file_done(uint16_t index)
+static unsigned char file_done(uint16_t index)
 {
-    return ((int16_t)index == NIL);
+    return (index == NIL16);
 }
 
 /** Returns the next index in the file entry chain for the provided mtbl 
@@ -851,24 +875,24 @@ static void add_mtbls(uint16_t blk)
         b->mtbl[i].free_list_blk = blk;
         b->mtbl[i].free_list = i + 1;
     }
-    b->mtbl[i].free_list_blk = NIL;
-    b->mtbl[i].free_list = NIL;
+    b->mtbl[i].free_list_blk = NIL16;
+    b->mtbl[i].free_list = NIL16;
     ftbl->free_mtbl_blk = blk;
     ftbl->free_mtbl_ent = start_mtbl;   
 }
 
 static int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
 {
-        if(index > MEM_TABLE_ENTRY_COUNT || (int16_t)index == NIL)
+        if(index > MEM_TABLE_ENTRY_COUNT || index == NIL16)
         {
             return -1;
         }
-        mtbl->mem[index].item = NIL;
-        mtbl->mem[index].tag = NIL;
-        mtbl->mem[index].next = NIL;
-        mtbl->mem[index].lru_prev = NIL;
-        mtbl->mem[index].lru_next = NIL;
-        mtbl->mem[index].dirty_next = NIL;
+        mtbl->mem[index].tag = NIL64;
+        mtbl->mem[index].item = NIL16;
+        mtbl->mem[index].next = NIL16;
+        mtbl->mem[index].dirty_next = NIL16;
+        mtbl->mem[index].lru_prev = NIL16;
+        mtbl->mem[index].lru_next = NIL16;
         return 0;
 }
 
@@ -881,12 +905,12 @@ static void init_memory_table(uint16_t blk, uint16_t ent)
     uint16_t i;
     int rc = -1;
     struct mem_table_s *mtbl = &(ucache->b[blk].mtbl[ent]);
-    mtbl->lru_first = NIL;
-    mtbl->lru_last = NIL;
-    mtbl->dirty_list = NIL;
     mtbl->num_blocks = 0;
+    mtbl->free_list_blk = NIL16;
+    mtbl->lru_first = NIL16;
+    mtbl->lru_last = NIL16;
+    mtbl->dirty_list = NIL16;
     mtbl->ref_cnt = 0;
-    mtbl->free_list_blk = NIL;
     /* set up hash table */
     for (i = 0; i < MEM_TABLE_HASH_MAX; i++)
     {
@@ -901,7 +925,7 @@ static void init_memory_table(uint16_t blk, uint16_t ent)
 
     }
     rc = init_memory_entry(mtbl, MEM_TABLE_ENTRY_COUNT - 1);
-    mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL;
+    mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL16;
 }
 
 
@@ -912,14 +936,14 @@ static uint16_t get_free_blk(void)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
     uint16_t desired_blk = ftbl->free_blk;
-    if((int16_t)desired_blk != NIL)
+    if(desired_blk != NIL16)
     {  
         /* Update the head of the free block list */ 
         /* Use mtbl index zero since free_blks have no ititialized mem tables */
         ftbl->free_blk = ucache->b[desired_blk].mtbl[0].free_list_blk; 
         return desired_blk;
     }
-    return NIL;
+    return NIL16;
 
 }
 
@@ -944,17 +968,17 @@ static uint16_t get_free_fent(void)
     if(DBG)fprintf(out, "trying to get free file entry...\n");
     struct file_table_s *ftbl = &(ucache->ftbl);
     uint16_t entry = ftbl->free_list;
-    if((int16_t)entry != NIL)
+    if(entry != NIL16)
     {
         ftbl->free_list = ftbl->file[entry].next;
-        ftbl->file[entry].next = NIL;
+        ftbl->file[entry].next = NIL16;
         if(DBG)fprintf(out, "\tfree file entry index = %hu\n", entry);
         return entry;
     }
     else
     {
         if(DBG)fprintf(out, "\tno free file entry...\n");
-        return NIL;
+        return NIL16;
     }
 }
 
@@ -964,22 +988,22 @@ static uint16_t get_free_fent(void)
  * set next to the current head of fent free list and set the free list head to
  * the provided index.
  */
-static void put_free_fent(uint16_t fent)
+static void put_free_fent(struct file_ent_s *fent)
 {
-    if(DBG)fprintf(out, "freeing file entry = %hu\n", fent);
+    if(DBG)fprintf(out, "freeing file entry = %hu\n", fent->index);
     struct file_table_s *ftbl = &(ucache->ftbl);
-    ftbl->file[fent].tag_handle = NIL;
-    ftbl->file[fent].tag_id = NIL;
-    if(fent<FILE_TABLE_HASH_MAX)
+    fent->tag_handle = NIL64;
+    fent->tag_id = NIL32;
+    if(fent->index < FILE_TABLE_HASH_MAX)
     {
-        ftbl->file[fent].next = NIL;
+        fent->next = NIL16;
     }
     else
     {
         /* Set next index to the current head of the free list */
-        ftbl->file[fent].next = ftbl->free_list;
+        fent->next = ftbl->free_list;
         /* Set fent index as the head of the free_list */
-        ftbl->free_list = fent;
+        ftbl->free_list = fent->index;
     }
 }
 
@@ -990,10 +1014,10 @@ static void put_free_fent(uint16_t fent)
 static uint16_t get_free_ment(struct mem_table_s *mtbl)
 {
     uint16_t ment = mtbl->free_list;
-    if((int16_t)ment != NIL)
+    if(ment != NIL16)
     {
         mtbl->free_list = mtbl->mem[ment].next;
-        mtbl->mem[ment].next = NIL;
+        mtbl->mem[ment].next = NIL16;
     }
     return ment;
 }
@@ -1010,11 +1034,11 @@ static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent)
 {
     if(DBG)fprintf(out, "freeing memory entry = %hu\n", ent);
     /* Reset ment values */
-    mtbl->mem[ent].tag = NIL;
-    mtbl->mem[ent].item = NIL;
-    mtbl->mem[ent].dirty_next = NIL;
-    mtbl->mem[ent].lru_next = NIL;
-    mtbl->mem[ent].lru_prev = NIL;
+    mtbl->mem[ent].tag = NIL64;
+    mtbl->mem[ent].item = NIL16;
+    mtbl->mem[ent].dirty_next = NIL16;
+    mtbl->mem[ent].lru_prev = NIL16;
+    mtbl->mem[ent].lru_next = NIL16;
     if(ent >= MEM_TABLE_HASH_MAX)
     {
         /* Set next index to the current head of the free list */
@@ -1052,7 +1076,7 @@ static struct mem_table_s *lookup_file(
     struct file_ent_s *current = &(ftbl->file[index]);
 
     /* previous, current, next fent index */
-    uint16_t p = NIL;
+    uint16_t p = NIL16;
     uint16_t c = index;
     uint16_t n = current->next;
 
@@ -1077,7 +1101,7 @@ static struct mem_table_s *lookup_file(
         /* No match yet */
         else    
         {
-            if((int16_t)current->next == NIL)
+            if(current->next == NIL16)
             {
                 if(DBG)fprintf(out, "\tlookup failure: mtbl not found\n");
                 return (struct mem_table_s *)NIL;
@@ -1112,10 +1136,10 @@ static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_
         *free_mtbl_ent = ftbl->free_mtbl_ent;
 
         /* Is free mtbl_blk available? */
-        if(((int16_t)*free_mtbl_blk == NIL) || 
-             ((int16_t)*free_mtbl_ent == NIL))
+        if((*free_mtbl_blk == NIL16) || 
+             (*free_mtbl_ent == NIL16))
         { 
-            return NIL;
+            return NIL16;
         }
 
         /* Update ftbl to contain new next free mtbl */
@@ -1125,8 +1149,8 @@ static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_
                                                                     free_list;
 
         /* Set free info to NIL */
-        ucache->b[*free_mtbl_blk].mtbl[*free_mtbl_ent].free_list = NIL;
-        ucache->b[*free_mtbl_blk].mtbl[*free_mtbl_ent].free_list_blk = NIL;
+        ucache->b[*free_mtbl_blk].mtbl[*free_mtbl_ent].free_list = NIL16;
+        ucache->b[*free_mtbl_blk].mtbl[*free_mtbl_ent].free_list_blk = NIL16;
 
         return 1;
 }
@@ -1134,14 +1158,8 @@ static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_
 /** Removes all memory entries belonging to mtbl and places corresponding blocks 
  * back on the ftbl block free list, provided the mtbl->ref_cnt is 0.  
  */
-static void remove_all_memory_entries(struct mem_table_s *mtbl)
+static int remove_all_memory_entries(struct mem_table_s *mtbl)
 {
-    /* Don't do anything if this mtbl is referenced.*/
-    if(mtbl->ref_cnt != 0)
-    {
-        return;
-    }
-
     uint16_t i;
     for(i = 0; i < MEM_TABLE_HASH_MAX; i++)
     {
@@ -1154,7 +1172,7 @@ static void remove_all_memory_entries(struct mem_table_s *mtbl)
             if(DBG)fprintf(out, "\t(tag, item)=(%lld, %hu)\n", 
                     (long long int)ment->tag, ment->item);
             /*  Account for empty head of ment chain    */
-            if(((int64_t)ment->tag == NIL) || ((int16_t)ment->item == NIL))
+            if((ment->tag == NIL64) || (ment->item == NIL16))
             {
                 break;
             }
@@ -1162,24 +1180,19 @@ static void remove_all_memory_entries(struct mem_table_s *mtbl)
             put_free_ment(mtbl, j);
         }
     }
+    return 1;
 }
 
 /** Places the provided mtbl back on the ftbl's mtbl free list provided it 
  * isn't currently referenced.
  */
-static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
+static int put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
 {
-    /* Don't do anything if this mtbl is referenced.*/
-    if(mtbl->ref_cnt != 0)
-    {
-        return;
-    }
-
     /* Remove mtbl */
     mtbl->num_blocks = 0;   /* number of used blocks in this mtbl */
-    mtbl->lru_first = NIL;  /* index of first block on lru list */
-    mtbl->lru_last = NIL;   /* index of last block on lru list */
-    mtbl->dirty_list = NIL; /* index of first dirty block */
+    mtbl->lru_first = NIL16;  /* index of first block on lru list */
+    mtbl->lru_last = NIL16;   /* index of last block on lru list */
+    mtbl->dirty_list = NIL16; /* index of first dirty block */
     mtbl->ref_cnt = 0;      /* number of clients using this record */
 
     /* Add mem_table back to free list */
@@ -1192,6 +1205,8 @@ static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
     /* Point to the next free mtbl (the former head) */
     mtbl->free_list_blk = tmp_blk;
     mtbl->free_list = tmp_ent;
+
+    return 1;
 }
 
 /** Evict the file entry at the provided index.
@@ -1201,26 +1216,35 @@ static void put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
 /*  evict the file @ index, must be less than FILE_TABLE_HASH_MAX   */
 static int evict_file( uint16_t index)
 {
+    int rc = 0;
     if(DBG)fprintf(out, "EVICTING FILE AND ITS MTBL IF NOT REFERENCED\n");
-    assert((int16_t)index != NIL);
+    assert(index != NIL16);
     if(DBG)fprintf(out, "evicting data @ index %hu...\n", index);
     struct file_ent_s *file = &(ucache->ftbl.file[index]);
-    assert(((int16_t)file->mtbl_blk != NIL) && ((int16_t)file->mtbl_ent != NIL));
-    struct mem_table_s *mtbl = 
-        &(ucache->b[file->mtbl_blk].mtbl[file->mtbl_ent]);
+    assert((file->mtbl_blk != NIL16) && (file->mtbl_ent != NIL16));
+    struct mem_table_s *mtbl = get_mtbl(file->mtbl_blk, file->mtbl_ent);
 
     if(mtbl->ref_cnt != 0){
-        return 0;
+        return -1;
     }
 
-    remove_all_memory_entries(mtbl);
-    put_free_mtbl(mtbl, file);
+    rc = remove_all_memory_entries(mtbl);
+    if(rc == -1)
+    {
+        return rc;
+    }
+    
+    rc = put_free_mtbl(mtbl, file);
+    if(rc == -1)
+    {
+        return rc;
+    }
 
     /* Prepare fent for its next occupant */
-    file->tag_handle = NIL;
-    file->tag_id = NIL;
-    file->mtbl_blk = NIL;   /* block index of this mtbl */
-    file->mtbl_ent = NIL;   /* entry index of this mtbl */
+    file->tag_handle = NIL64;
+    file->tag_id = NIL32;
+    file->mtbl_blk = NIL16;   /* block index of this mtbl */
+    file->mtbl_ent = NIL16;   /* entry index of this mtbl */
     if(DBG)fprintf(out, "EVICTION SUCCESSFUL\n");
     return 1;
 }
@@ -1231,23 +1255,27 @@ static int evict_file( uint16_t index)
  * Returns NIL if necessary data structures could not be aquired from the free
  * lists or through an eviction policy (meaning references are held).
  */
-static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
+static struct file_ent_s *insert_file(
+    uint32_t fs_id, 
+    uint64_t handle 
+)
 {
     if(DBG)fprintf(out, "trying to insert file...\n");
     struct file_table_s *ftbl = &(ucache->ftbl);
     struct file_ent_s *current;     /* Current ptr for iteration */
-    uint16_t free_fent = NIL;       /* Index of next free fent */
+    uint16_t free_fent = NIL16;       /* Index of next free fent */
     /* index into file hash table */
     uint16_t index = handle % FILE_TABLE_HASH_MAX;
     if(DBG)fprintf(out, "\thashed index: %u\n", index);
     current = &(ftbl->file[index]);
     /* Get free mtbl */
-    uint16_t free_mtbl_blk = NIL;
-    uint16_t free_mtbl_ent = NIL; 
+    uint16_t free_mtbl_blk = NIL16;
+    uint16_t free_mtbl_ent = NIL16; 
+    
     /* Create free mtbls if none are available */
     if(get_next_free_mtbl(&free_mtbl_blk, &free_mtbl_ent) != 1)
     {   
-        if((int16_t)ucache->ftbl.free_blk == NIL) 
+        if(ucache->ftbl.free_blk == NIL16) 
         {
             /* Evict a block from mtbl with most mem entries */
             struct mem_table_s *max_mtbl;
@@ -1259,7 +1287,7 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
             evict_LRU(max_mtbl);
         }
         /* Intitialize remaining blocks' memory tables */
-        if((int16_t)ucache->ftbl.free_blk != NIL)
+        if(ucache->ftbl.free_blk != NIL16)
         {
             if(DBG)fprintf(out, "\tadding memory tables to free block\n");
             int16_t free_blk = get_free_blk(); 
@@ -1269,18 +1297,21 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
     }
 
     /* Insert at index, relocating data @ index if occupied */
-    if(((int16_t)current->mtbl_blk != NIL) && 
-         ((int16_t)current->mtbl_ent != NIL)) 
+    if((current->mtbl_blk != NIL16) && 
+         (current->mtbl_ent != NIL16)) 
     {
         if(DBG)fprintf(out, "\tmust relocate head data\n");
         /* get free file entry and update ftbl */
         free_fent = get_free_fent();
-        if((int16_t)free_fent != NIL)
+        if(free_fent != NIL16)
         {
             /* copy data from 1 struct to the other */
-            ftbl->file[free_fent] = *current;   
+            ftbl->file[free_fent] = *current;
+            /* Since we just coppied structs we need to correct the index */
+            ftbl->file[free_fent].index = free_fent;   
             /* point new head's "next" to former head */
             current->next = free_fent;  
+            current->index = index; /* make sure we have correct index here */
         }
         else
         {   /* No free file entries available: policy? */
@@ -1292,17 +1323,20 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
             /* Stop when the file has been evicted or end of chain reached */
             int file_evicted = evict_file(index);
             uint16_t i;
-            for(i = index; !file_done(i) && (!file_evicted); i = 
-                                            file_next(ftbl,index))
+            for(i = index; !file_done(i); i = file_next(ftbl, i))
             {
-                i = ftbl->file[i].next;
                 current = &(ftbl->file[i]);
                 file_evicted = evict_file(i);
+                if(file_evicted)
+                {
+                    current->index = i; /* ensuring correct index in fent */
+                    break;
+                }
             }
             if(!file_evicted)
             {
                 /* Could not get file entry */
-                return (struct mem_table_s *)NIL;
+                return (struct file_ent_s *)NIL;
             }
         }
     }
@@ -1320,50 +1354,55 @@ static struct mem_table_s *insert_file(uint32_t fs_id, uint64_t handle)
     init_memory_table(free_mtbl_blk, free_mtbl_ent);
     if(DBG)fprintf(out, "\trecieved free memory table: 0X%lX\n", 
         (long int)&(ucache->b[current->mtbl_blk].mtbl[current->mtbl_ent]));
-    return (struct mem_table_s*)&(ucache->b[current->mtbl_blk].mtbl[current->mtbl_ent]);
+    return (struct file_ent_s*)&(ucache->ftbl.file[current->index]);
 }
 
 /** Remove file entry and memory table of file identified by parameters
  * Returns 1 following removal
  * Returns NIL if file is referenced or if the file could not be located.
  */
-/*
-static int remove_file(uint32_t fs_id, uint64_t handle)
+
+static int remove_file(struct file_ent_s *fent)
 {
     if(DBG)fprintf(out, "trying to remove file...\n");
-    uint16_t file_mtbl_blk = NIL;
-    uint16_t file_mtbl_ent = NIL;
-    uint16_t file_ent_index = NIL;
-    uint16_t file_ent_prev_index = NIL;
+
+
+    uint16_t file_mtbl_blk = NIL16;
+    uint16_t file_mtbl_ent = NIL16;
+    uint16_t file_ent_index = NIL16;
+    uint16_t file_ent_prev_index = NIL16;
 
     struct file_table_s *ftbl = &(ucache->ftbl);
-    struct mem_table_s *mtbl = lookup_file(fs_id, handle, &file_mtbl_blk, 
-                    &file_mtbl_ent, &file_ent_index, &file_ent_prev_index);
 
-    if(mtbl->ref_cnt != 0)
-    {
-        if(DBG)fprintf(out, "\tremoval failure: ref_cnt==%d\n", mtbl->ref_cnt);
-        return NIL;
-    }
-
-    // Verify we've recieved the necessary info
-    if((file_mtbl_blk == (uint16_t)NIL) || (file_mtbl_ent == (uint16_t)NIL))
+    /* Lookup File */
+    struct mem_table_s *mtbl = lookup_file(
+        fent->tag_id,
+        fent->tag_handle,
+        &file_mtbl_blk,    /* The rest can be NULL if not desired */
+        &file_mtbl_ent,
+        &file_ent_index,
+        &file_ent_prev_index
+    );
+ 
+    /* Remove the file completely */
+    /* Verify we've recieved the necessary info */
+    if((fent->mtbl_blk == NIL16) || (fent->mtbl_ent == NIL16))
     {
         if(DBG)fprintf(out, "\tremoval failure: no mtbl matching file\n");
         return NIL;
     }
+    /* Free the mtbl */
+    put_free_mtbl(mtbl, fent);
 
-    // Free the mtbl
-    put_free_mtbl(mtbl, &(ftbl->file[file_ent_index]));
-
-    // Free the file entry
-    ftbl->file[file_ent_prev_index].next = ftbl->file[file_ent_index].next;
-    put_free_fent(file_ent_index);
+    /* Free the file entry */
+    ftbl->file[file_ent_prev_index].next = fent->next;
+    put_free_fent(fent);
 
     if(DBG)fprintf(out, "\tremoval sucessful\n");
+
     return(1);
 }
-*/
+
 
 /** Lookup the memory location of a block of data in cache that is identified 
  * by the mtbl and offset parameters.
@@ -1390,7 +1429,7 @@ static void *lookup_mem(struct mem_table_s *mtbl,
     struct mem_ent_s *current = &(mtbl->mem[index]);
 
     /* previous, current, next memory entry index in mtbl */
-    int16_t p = NIL;
+    int16_t p = NIL16;
     int16_t c = index;
     int16_t n = current->next;  
 
@@ -1405,7 +1444,7 @@ static void *lookup_mem(struct mem_table_s *mtbl,
             if(item_index != NULL)
             {
                 *item_index = current->item;
-                assert((int16_t)*item_index != NIL);
+                assert(*item_index != NIL16);
             }
             if((mem_ent_index != NULL) && (mem_ent_prev_index != NULL))
             {
@@ -1416,7 +1455,7 @@ static void *lookup_mem(struct mem_table_s *mtbl,
         }
         else
         {
-            if((int16_t)current->next == NIL)
+            if(current->next == NIL16)
             {
                 if(DBG)fprintf(out, "\tmemory entry not found\n");
                 if(DBG)fprintf(out, "\tno more & no match: 0X%llX != 0X%llX\n", 
@@ -1448,15 +1487,15 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
     if(DBG)print_LRU(mtbl);  
 
     /* First memory entry used becomes the head and tail of the list */
-    if(((int16_t)mtbl->lru_first == NIL) && 
-        ((int16_t)mtbl->lru_last == NIL))
+    if((mtbl->lru_first == NIL16) && 
+        (mtbl->lru_last == NIL16))
     {
         if(DBG)fprintf(out, "\tsetting lru first and last\n");
         mtbl->lru_first = index;
-        assert((int16_t)index != NIL);
+        assert(index != NIL16);
         mtbl->lru_last = index;
-        mtbl->mem[index].lru_prev = NIL;
-        mtbl->mem[index].lru_next = NIL;
+        mtbl->mem[index].lru_prev = NIL16;
+        mtbl->mem[index].lru_next = NIL16;
     }
     /* 2nd Memory Entry */
     else if(mtbl->lru_first == mtbl->lru_last)
@@ -1473,7 +1512,7 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
             /* point tail.prev to new */
             mtbl->mem[mtbl->lru_first].lru_prev = index;
             /* point new.prev to NIL */  
-            mtbl->mem[index].lru_prev = NIL;
+            mtbl->mem[index].lru_prev = NIL16;
             /* point the new.next to the tail */      
             mtbl->mem[index].lru_next = mtbl->lru_first;
             /* point the head to the new */  
@@ -1486,28 +1525,29 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
         if(DBG)fprintf(out, "\trepairing previous LRU links and "
                                     "inserting record in LRU\n");
         
-        if((int16_t)mtbl->mem[index].lru_prev == NIL && (int16_t)mtbl->mem[index].lru_next == NIL)
+        if(mtbl->mem[index].lru_prev == NIL16 && 
+            mtbl->mem[index].lru_next == NIL16)
         {
             /* First time on the LRU List, Add to the front */
             mtbl->mem[index].lru_next = mtbl->lru_first;
             mtbl->mem[mtbl->lru_first].lru_prev = index;    
         }
-        else if((int16_t)mtbl->mem[index].lru_prev == NIL)
+        else if(mtbl->mem[index].lru_prev == NIL16)
         {
             assert(mtbl->lru_first == index);
             /* Already the head of MRU */
             if(DBG)fprintf(out, "\talready the MRU, no need to do anything\n");
             return;
         }
-        else if((int16_t)mtbl->mem[index].lru_next == NIL)
+        else if(mtbl->mem[index].lru_next == NIL16)
         {
             assert(mtbl->lru_last == index);
             /* Relocate the LRU to become the MRU */
             mtbl->lru_last = mtbl->mem[index].lru_prev;
-            mtbl->mem[mtbl->lru_last].lru_next = NIL;
+            mtbl->mem[mtbl->lru_last].lru_next = NIL16;
             mtbl->mem[mtbl->lru_first].lru_prev = index;
             mtbl->mem[index].lru_next = mtbl->lru_first;
-            mtbl->mem[index].lru_prev = NIL;
+            mtbl->mem[index].lru_prev = NIL16;
         }
         else
         {
@@ -1515,13 +1555,12 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index)
             uint16_t current_prev = mtbl->mem[index].lru_prev;
             uint16_t current_next = mtbl->mem[index].lru_next;
 
-            assert((int16_t)current_prev != NIL && 
-                    (int16_t)current_next != NIL);
+            assert(current_prev != NIL16 && current_next != NIL16);
 
             mtbl->mem[current_prev].lru_next = current_next;
             mtbl->mem[current_next].lru_prev = current_prev;
 
-            mtbl->mem[index].lru_prev = NIL;
+            mtbl->mem[index].lru_prev = NIL16;
             mtbl->mem[index].lru_next = mtbl->lru_first;
         }
         mtbl->lru_first = index;
@@ -1538,8 +1577,8 @@ static uint16_t locate_max_mtbl(struct mem_table_s **mtbl)
 {
     if(DBG)fprintf(out, "locating mtbl with most entries...\n");
     struct file_table_s *ftbl = &(ucache->ftbl);
-    uint16_t index_of_max_blk = NIL;
-    uint16_t index_of_max_ent = NIL;
+    uint16_t index_of_max_blk = NIL16;
+    uint16_t index_of_max_ent = NIL16;
     uint16_t value_of_max = 0;
     /* Iterate over file hash table indices */
     uint16_t i;
@@ -1554,8 +1593,8 @@ static uint16_t locate_max_mtbl(struct mem_table_s **mtbl)
 //            if(DBG)fprintf(out, "\t(blk, ent)=(%hu, %hu)\n", fent->mtbl_blk,
 //                                                            fent->mtbl_ent);
             //TODO: this might can be removed: test it
-            if(((int16_t)fent->mtbl_blk == NIL) || 
-                    ((int16_t)fent->mtbl_ent == NIL))
+            if((fent->mtbl_blk == NIL16) || 
+                    (fent->mtbl_ent == NIL16))
             {
                 break;
             }
@@ -1590,12 +1629,12 @@ static int evict_LRU(struct mem_table_s *mtbl)
     int rc = -1;
     if(DBG)fprintf(out, "attempting evicting of LRU...\n");
     
-    if(mtbl->num_blocks != 0 && (int16_t)mtbl->lru_last != NIL)
+    if(mtbl->num_blocks != 0 && mtbl->lru_last != NIL16)
     {
         rc = remove_mem(mtbl, mtbl->mem[mtbl->lru_last].tag);
         if(rc != 1)
         {
-            if(DBG)fprintf(out, "\tcouldn't evict: lock probably held\n");
+            if(DBG)fprintf(out, "\tcouldn't evict: probably bc ref_cnt > 0\n");
             return 0;
         } 
         return 1;
@@ -1624,7 +1663,7 @@ static void *set_item(struct mem_table_s *mtbl,
         if(DBG)fprintf(out, "set item index = %hu\n", index);   
         uint16_t free_blk = get_free_blk();
         /* No Free Blocks Available */
-        if((int16_t)free_blk == NIL)
+        if(free_blk == NIL16)
         {
             if(DBG)fprintf(out, "\tget_free_blk returned NIL, attempting "
                                                       "removal of LRU\n");
@@ -1636,13 +1675,13 @@ static void *set_item(struct mem_table_s *mtbl,
         /* After Eviction Routine - No Free Blocks Available, Evict from mtbl 
          * with the most memory entries 
          */
-        if((int16_t)free_blk == NIL)   
+        if(free_blk == NIL16)   
         {
             struct mem_table_s *max_mtbl;
             int ment_count = 0;
             ment_count = locate_max_mtbl(&max_mtbl);
             assert(ment_count != 0);
-            assert((int16_t)max_mtbl->lru_last != NIL);
+            assert(max_mtbl->lru_last != NIL16);
             if(DBG)fprintf(out, "ment_count = %d\n", ment_count);
             if(ment_count < 1)
             {
@@ -1657,7 +1696,7 @@ static void *set_item(struct mem_table_s *mtbl,
             free_blk = get_free_blk();
         }
         /* A Free Block is Avaiable for Use */
-        if((int16_t)free_blk != NIL)
+        if(free_blk != NIL16)
         {
             mtbl->num_blocks++;
             update_LRU(mtbl, index);
@@ -1708,12 +1747,12 @@ static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset,
     if(DBG)fprintf(out, "\tlookup returned NIL\n");
     uint16_t mentIndex = 0;
     int evict_rc = 0;
-    if((int64_t)mtbl->mem[index].tag != NIL)
+    if(mtbl->mem[index].tag != NIL64)
     {
         /* If head occupied, need to get free ment */
         if(DBG)fprintf(out, "\thead occupied\n");
         mentIndex = get_free_ment(mtbl);
-        if((int16_t)mentIndex == NIL)
+        if(mentIndex == NIL16)
         {   /* No free ment available, so attempt eviction, and try again */
             if(DBG)fprintf(out, "\tno ment\n");
             evict_rc = evict_LRU(mtbl);
@@ -1722,7 +1761,7 @@ static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset,
             mentIndex = get_free_ment(mtbl);
         }
         /* Procede with memory insertion if ment aquired */
-        if((int16_t)mentIndex != NIL)
+        if(mentIndex != NIL16)
         {   
             if(DBG)fprintf(out, "\tfound free memory entry @ index = %d\n",
                                                                 mentIndex);
@@ -1762,7 +1801,7 @@ static void *insert_mem(struct mem_table_s *mtbl, uint64_t offset,
 }
 
 /** Removes all table info regarding the block identified by the mtbl and
- * offset, provided the mtbl has a reference count of 0 and the entry exists. 
+ * offset provided the block isn't locked. 
  *
  * On success returns 1, on failure returns 0.
  *
@@ -1772,17 +1811,10 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
     if(DBG)fprintf(out, "trying to remove memory entry...\n");
 
     /* Some Indices */
-    uint16_t item_index = NIL; /* index of cached block */
-    uint16_t mem_ent_index = NIL;
-    uint16_t mem_ent_prev_index = NIL;
+    uint16_t item_index = NIL16; /* index of cached block */
+    uint16_t mem_ent_index = NIL16;
+    uint16_t mem_ent_prev_index = NIL16;
 
-    /* Check reference count 
-    if(mtbl->ref_cnt != 0)
-    {
-        if(DBG)fprintf(out, "removal failure: ref_cnt==%d\n", mtbl->ref_cnt);
-        return 0;
-    }
-    */
     void *retValue = lookup_mem(mtbl, offset, &item_index, &mem_ent_index, 
                                                      &mem_ent_prev_index);
     if(DBG)fprintf(out, "retValue = 0X%lX\n", (long unsigned int) retValue);
@@ -1795,8 +1827,7 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
     }
 
     /* Verify the block isn't being used by trying the corresponding lock */
-    /* See if LRU can be evicted by trying its corresponding lock */
-    ucache_lock_t *block_lock = get_lock(mtbl->lru_last);
+    ucache_lock_t *block_lock = get_lock(mtbl->mem[mem_ent_index].item);
     int rc = lock_trylock(block_lock);
     if(rc != 0)
     {
@@ -1815,28 +1846,28 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
         /* Is node the tail? */
         //print_LRU(mtbl);
         //fprintf(out, "index.prev = %hu\n", mtbl->mem[mem_ent_index].lru_prev);
-        //assert((int16_t)mtbl->mem[mem_ent_index].lru_prev!=NIL);
+        //assert(mtbl->mem[mem_ent_index].lru_prev != NIL16);
         mtbl->lru_last = mtbl->mem[mem_ent_index].lru_prev;
     }
     
     /* Remove from LRU */
     /* Update each of the adjacent nodes' link */
     uint16_t lru_prev = mtbl->mem[mem_ent_index].lru_prev;
-    if((int16_t)lru_prev != NIL)
+    if(lru_prev != NIL16)
     {
         mtbl->mem[lru_prev].lru_next = mtbl->mem[mem_ent_index].lru_next;
     }
     uint16_t lru_next = mtbl->mem[mem_ent_index].lru_next;
-    if((int16_t)lru_next != NIL)
+    if(lru_next != NIL16)
     {
         mtbl->mem[lru_next].lru_prev = mtbl->mem[mem_ent_index].lru_prev;
     }
 
     /* Remove from dirty list if Dirty */
     /* Previous, Current, Next */
-    uint16_t p = NIL;
-    uint16_t c = NIL;
-    uint16_t n = NIL;
+    uint16_t p = NIL16;
+    uint16_t c = NIL16;
+    uint16_t n = NIL16;
     if(DBG)fprintf(out, "\tremoving from dirty list\n");
     c = mtbl->dirty_list;
     n = mtbl->mem[c].dirty_next;
@@ -1845,15 +1876,15 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
         p = c;
         c = n;
         n = mtbl->mem[c].dirty_next;
-        if((int16_t)c == NIL)
+        if(c == NIL16)
         {
                 break;
         }
     }
-    if((int16_t)c != NIL)
+    if(c != NIL16)
     {   
         /* If memory entry was located on the dirty_list */
-        if((int16_t)p != NIL)
+        if(p != NIL16)
         {
             mtbl->mem[p].dirty_next = mtbl->mem[c].dirty_next;
         }
@@ -1861,14 +1892,14 @@ static int remove_mem(struct mem_table_s *mtbl, uint64_t offset)
         {
             mtbl->dirty_list = mtbl->mem[c].dirty_next;
         }
-        mtbl->mem[c].dirty_next = NIL;
+        mtbl->mem[c].dirty_next = NIL16;
     }
     
     /* Add memory block back to free list */
-    assert((int16_t) item_index != NIL);
+    assert(item_index != NIL16);
     put_free_blk(item_index);
     /* Repair link */
-    if((int16_t)mem_ent_prev_index != NIL)
+    if(mem_ent_prev_index != NIL16)
     {
         mtbl->mem[mem_ent_prev_index].next = mtbl->mem[mem_ent_index].next;
     }
@@ -1889,7 +1920,7 @@ void print_LRU(struct mem_table_s *mtbl)
     fprintf(out, "\t\t\tmru->lru_prev = %hu\n\t\t\tmru->lru_next = %hu\n", 
         mtbl->mem[mtbl->lru_first].lru_prev, mtbl->mem[mtbl->lru_first].lru_next);
     uint16_t current = mtbl->mem[mtbl->lru_first].lru_next; 
-    while((int16_t)current != mtbl->lru_last && (int16_t)current!=NIL)
+    while(current != mtbl->lru_last && current != NIL16)
     {
         fprintf(out, "\t\t\tcurr->lru_prev = %hu\n", 
                        mtbl->mem[current].lru_prev);
@@ -1902,22 +1933,6 @@ void print_LRU(struct mem_table_s *mtbl)
     fprintf(out, "\t\t\tlru->lru_prev = %hu\n\t\t\tlru->lru_next = %hu\n", 
         mtbl->mem[mtbl->lru_last].lru_prev, mtbl->mem[mtbl->lru_last].lru_next);
 }
-
-/*
-static void print_dirty(struct mem_table_s *mtbl)
-{
-    if(DBG)fprintf(out, "\tprinting dirty list:\n");
-    if(DBG)fprintf(out, "\t\tdirty_list head: %hu\n",\
-                                    mtbl->dirty_list);
-    uint16_t current= mtbl->dirty_list;
-    while((int16_t)current != NIL)
-    {
-        if(DBG)fprintf(out, "\t\tcurrent: %d\tnext: %hu\n", 
-                   current, mtbl->mem[current].dirty_next); 
-        current = mtbl->mem[current].dirty_next;
-    }
-}
-*/
 
 /*  End of Internal Only Functions    */
 #endif /* PVFS_UCACHE_ENABLE */
