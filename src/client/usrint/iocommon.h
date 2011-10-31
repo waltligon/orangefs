@@ -125,7 +125,7 @@ extern int iocommon_readorwrite(enum PVFS_io_type which,
                          const struct iovec *vector);
 
 extern int iocommon_vreadorwrite(enum PVFS_io_type which,
-	                 pvfs_descriptor *pd,
+	                 PVFS_object_ref *por,
                          PVFS_size offset,
                          size_t count,
                          const struct iovec *vector);
@@ -133,7 +133,7 @@ extern int iocommon_vreadorwrite(enum PVFS_io_type which,
 /* do a blocking read or write
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-		          pvfs_descriptor *pd,
+		          PVFS_object_ref *por,
                           PVFS_size offset,
                           void *buf,
                           PVFS_Request mem_req,

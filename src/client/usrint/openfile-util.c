@@ -421,6 +421,7 @@ void pvfs_sys_init(void) {
     atexit(usrint_cleanup);
 
     /* set up current working dir */
+    memset(curdir, 0, sizeof(curdir));
     rc = my_glibc_getcwd(curdir, PVFS_PATH_MAX);
     if (rc < 0)
     {
@@ -437,6 +438,11 @@ void pvfs_sys_init(void) {
 	descriptor_table =
 			(pvfs_descriptor **)malloc(sizeof(pvfs_descriptor *) *
 			descriptor_table_size);
+    if (!descriptor_table)
+    {
+        perror("failed to malloc descriptor table");
+        exit(-1);
+    }
 	memset(descriptor_table, 0,
 			(sizeof(pvfs_descriptor *) * descriptor_table_size));
     descriptor_table[0] = &pvfs_stdin;

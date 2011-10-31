@@ -1041,11 +1041,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         ucache_pseudo_misses++; /* could overflow, reset periodically */
 #endif /* PVFS_UCACHE_ENABLE */
 
-        errno = 0; //what's the purpose of this? necessary?
-
         /* Bypass the ucache */
-        rc = iocommon_vreadorwrite(which, pd, offset, count, vector);
-        return rc;
+        errno = 0;
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
+                                   count, vector);
+        if (rc < 0)
+        {
+            return -1;
+        }
 #if PVFS_UCACHE_ENABLE
     }
 
@@ -1216,7 +1219,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
  *  RorW_nocache below
  */
 int iocommon_vreadorwrite(enum PVFS_io_type which,
-                         pvfs_descriptor *pd,
+                         PVFS_object_ref *por,
                          PVFS_size offset,
                          size_t count,
                          const struct iovec *vector)
@@ -1236,7 +1239,7 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
     rc = pvfs_convert_iovec(vector, count, &mem_req, &buf);
 
     rc = iocommon_readorwrite_nocache(which,
-                                      pd,
+                                      por,
                                       offset, 
                                       buf,
                                       mem_req,
@@ -1252,7 +1255,7 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
  *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-                         pvfs_descriptor *pd,
+                         PVFS_object_ref *por,
                          PVFS_size offset,
                          void *buf,
                          PVFS_Request mem_req,
@@ -1263,7 +1266,7 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
-    if (!pd || pd->is_in_use != PVFS_FS)
+    if (!por)
     {
         errno = EBADF;
         return -1;
@@ -1271,20 +1274,10 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     /* Initialize */
     memset(&io_resp, 0, sizeof(io_resp));
 
-    /* Ensure descriptor is used for the correct type of access */
-    if ((which == PVFS_IO_READ &&
-            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
-        (which == PVFS_IO_WRITE &&
-            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
-    {
-        errno = EBADF;
-        return -1;
-    }
-
     iocommon_cred(&creds);
 
     errno = 0;
-    rc = PVFS_sys_io(pd->s->pvfs_ref,
+    rc = PVFS_sys_io(*por,
                      file_req,
                      offset,
                      buf,
@@ -2191,8 +2184,12 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     file_req = PVFS_BYTE;
 
     errno = 0;
-    rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
-                               buffer, mem_req, file_req);
+    rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
+                                      &pd->s->pvfs_ref,
+                                      *offset + bytes_read,
+                                      buffer,
+                                      mem_req,
+                                      file_req);
     while(rc > 0)
     {
         int flags = 0;
@@ -2207,8 +2204,12 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
             break;
         }
         errno = 0;
-        rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
-                                   buffer, mem_req, file_req);
+        rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
+                                          &pd->s->pvfs_ref,
+                                          *offset + bytes_read,
+                                          buffer,
+                                          mem_req,
+                                          file_req);
     }  
     PVFS_Request_free(&mem_req);
     free(buffer);

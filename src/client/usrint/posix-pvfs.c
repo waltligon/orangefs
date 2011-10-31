@@ -530,6 +530,16 @@ static ssize_t pvfs_prdwr64(int fd,
         return -1;
     }
 
+    /* Ensure descriptor is used for the correct type of access */
+    if ((which == PVFS_IO_READ &&
+            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which == PVFS_IO_WRITE &&
+            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
+    {
+        errno = EBADF;
+        return -1;
+    }
+
     /* place contiguous buff and count into an iovec array of length 1 */
     vector[0].iov_base = buf;
     vector[0].iov_len = size;
@@ -558,6 +568,16 @@ static ssize_t pvfs_rdwrv(int fd,
         return -1;
     }
     offset = pd->s->file_pointer;
+
+    /* Ensure descriptor is used for the correct type of access */
+    if ((which == PVFS_IO_READ &&
+            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which == PVFS_IO_WRITE &&
+            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
+    {
+        errno = EBADF;
+        return -1;
+    }
 
     rc = iocommon_readorwrite(which, pd, offset, count, vector);
 
