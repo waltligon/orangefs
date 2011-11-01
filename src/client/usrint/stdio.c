@@ -1655,11 +1655,12 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     }
     if (!*lnptr)
     {
-        if (*n <= 0)
-        {
-            *n = 256;
-        }
+        *n = 256;
         *lnptr = (char *)malloc(*n);
+        if (!*lnptr)
+        {
+            return -1;
+        }
     }
     p = *lnptr;
     do {

@@ -197,6 +197,7 @@ LIBS += -lpvfs2 @LIBS@
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
+ULIBDEPLIBS := -lpvfs2
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -791,7 +792,7 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(LIBTHREADEDOBJS)
 
-# rule for building the pvfs2 library
+# rule for building the shared pvfs2 library
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
@@ -815,17 +816,17 @@ lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
 
-# rule for building the ofs library
+# rule for building the shared ofs library
 lib/libofs.so: $(ULIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the shared ofs _multithreaded_ library
 lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)

@@ -120,52 +120,54 @@ pvfs_descriptor pvfs_stderr =
 
 static int my_glibc_stat(const char *path, struct stat *buf)
 {
-    return glibc_redirect.stat(3, path, buf);
+    int rc = glibc_redirect.stat(_STAT_VER, path, buf);
+    return rc;
 }
 
 static int my_glibc_stat64(const char *path, struct stat64 *buf)
 {
-    return glibc_redirect.stat64(3, path, buf);
+    int rc = glibc_redirect.stat64(_STAT_VER, path, buf);
+    return rc;
 }
 
 static int my_glibc_fstat(int fd, struct stat *buf)
 {
-    return glibc_redirect.fstat(3, fd, buf);
+    return glibc_redirect.fstat(_STAT_VER, fd, buf);
 }
 
 static int my_glibc_fstat64(int fd, struct stat64 *buf)
 {
-    return glibc_redirect.fstat64(3, fd, buf);
+    return glibc_redirect.fstat64(_STAT_VER, fd, buf);
 }
 
 static int my_glibc_fstatat(int fd, const char *path, struct stat *buf, int flag)
 {
-    return glibc_redirect.fstatat(3, fd, path, buf, flag);
+    return glibc_redirect.fstatat(_STAT_VER, fd, path, buf, flag);
 }
 
 static int my_glibc_fstatat64(int fd, const char *path, struct stat64 *buf, int flag)
 {
-    return glibc_redirect.fstatat64(3, fd, path, buf, flag);
+    return glibc_redirect.fstatat64(_STAT_VER, fd, path, buf, flag);
 }
 
 static int my_glibc_lstat(const char *path, struct stat *buf)
 {
-    return glibc_redirect.lstat(3, path, buf);
+    return glibc_redirect.lstat(_STAT_VER, path, buf);
 }
 
 static int my_glibc_lstat64(const char *path, struct stat64 *buf)
 {
-    return glibc_redirect.lstat64(3, path, buf);
+    return glibc_redirect.lstat64(_STAT_VER, path, buf);
 }
 
 static int my_glibc_mknod(const char *path, mode_t mode, dev_t dev)
 {
-    return glibc_redirect.mknod(1, path, mode, dev);
+    return glibc_redirect.mknod(_MKNOD_VER, path, mode, dev);
 }
 
 static int my_glibc_mknodat(int dirfd, const char *path, mode_t mode, dev_t dev)
 {
-    return glibc_redirect.mknodat(1, dirfd, path, mode, dev);
+    return glibc_redirect.mknodat(_MKNOD_VER, dirfd, path, mode, dev);
 }
 
 static int my_glibc_getdents(u_int fd, struct dirent *dirp, u_int count)

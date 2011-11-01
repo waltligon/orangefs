@@ -4033,7 +4033,6 @@ static int cache_config_files(
     my_global_fn = ((global_config_filename != NULL) ?
                     global_config_filename : "fs.conf");
 
-open_global_config:
     memset(&statbuf, 0, sizeof(struct stat));
     if (stat(my_global_fn, &statbuf) == 0)
     {
@@ -4048,12 +4047,22 @@ open_global_config:
     }
     else if (errno == ENOENT)
     {
+        /* Not sure why we don't try the add working dir to
+         * path trick in this case as is done below but for
+         * now we'll leave the code this way in cases there
+         * is some corner case we don't know about.
+         */
 	gossip_err("Failed to find global config file %s.  This "
                    "file does not exist!\n", my_global_fn);
         goto error_exit;
     }
     else
     {
+        /* It is unclear what errors to stat we are responding to here
+         * but the addition of more than one copy of the working dir
+         * is clearly a bad idea.  If one copy helps, great, otherwise
+         * we are calling an error.
+         */
         assert(working_dir);
 #ifdef WIN32
         _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
@@ -4061,7 +4070,23 @@ open_global_config:
         snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
 #endif
         my_global_fn = buf;
-        goto open_global_config;
+        memset(&statbuf, 0, sizeof(struct stat));
+        if (stat(my_global_fn, &statbuf) == 0)
+        {
+            if (statbuf.st_size == 0)
+            {
+                gossip_err("Invalid config file %s.  This "
+                        "file is 0 bytes in length!\n", my_global_fn);
+                goto error_exit;
+            }
+            config_s->fs_config_filename = strdup(my_global_fn);
+            config_s->fs_config_buflen = statbuf.st_size + 1;
+        }
+        else
+        {
+	    gossip_err("Failed to stat global config file %s.", my_global_fn);
+            goto error_exit;
+        }
     }
 
     if (!config_s->fs_config_filename ||
