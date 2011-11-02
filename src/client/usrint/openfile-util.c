@@ -595,8 +595,8 @@ int pvfs_descriptor_table_size(void)
              * this fills in mtbl
              */
             ucache_open_file(&(file_ref->fs_id),
-                            &(file_ref->handle), 
-                                &(pd->s->fent));
+                             &(file_ref->handle), 
+                             &(pd->s->fent));
         }
     }
 #endif /* PVFS_UCACHE_ENABLE */
@@ -768,26 +768,17 @@ int pvfs_free_descriptor(int fd)
         if (pd->s->fent)
         {
             int rc = 0;
-
-            struct mem_table_s *mtbl = get_mtbl(pd->s->fent->mtbl_blk,
-                                               pd->s->fent->mtbl_ent);
             rc = ucache_close_file(pd->s->fent);
-
-            /* release cache objects here */
-            mtbl->ref_cnt--;
-            if(mtbl->ref_cnt == 0)
+            if(rc == -1)
             {
-                /* Flush dirty blocks before file removal from cache */
-                ucache_flush_file(pd);
-                ucache_close_file(pd->s->fent);
+                return rc;
             }
-            /* don't leave a dangling pointer */
-            pd->s->fent = NULL; 
         }
 #endif /* PVFS_UCACHE_ENABLE */
 
-	    /* free descriptor status - wipe memory first */
-	    memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+	/* free descriptor status - wipe memory first */
+	memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+
         /* first 3 descriptors not malloc'd */
         if (fd > 2)
         {

@@ -101,7 +101,11 @@ int iocommon_fsync(pvfs_descriptor *pd)
 #if PVFS_UCACHE_ENABLE
     if (pvfs_ucache_enabled())
     {
-        ucache_flush_file(pd);
+        rc = ucache_flush_file(pd->s->fent);
+        if(rc != 0)
+        {
+            goto errorout;
+        }
     }
 #endif
     errno = 0;
@@ -1073,17 +1077,21 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     if(req_size > UCACHE_MAX_REQ)
     {
         /* Flush dirty blocks */
-        ucache_flush_file(pd);
+        rc = ucache_flush_file(pd->s->fent);
+        if(rc != 0)
+        {
+            rc = -1;
+        }
 
         /*TODO Possibly remove the file - bad idea? What if it's referenced? */
 
         /* Bypass the ucache */
-        rc = iocommon_vreadorwrite(which, pd, offset, count, vector);
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset, count, vector);
         return rc;
     }
 
     /* How many tags? */
-    req_blk_cnt = req_size / (CACHE_BLOCK_SIZE_K * 1024);
+    req_blk_cnt = req_size / blk_size;
 
     /* Add 2 to be sure we have enough tags (may not need them all) */
     req_blk_cnt += 2;
@@ -1168,11 +1176,13 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         {
             if(which == 1) /* Read */
             {
-                /* read single block from fs into user mem */
-                //TODO:
-                //rc = iocommon_readorwrite_nocache(which, pd, offset,
-                //                            buf, mem_req, file_req);
-                //cant use this b/c it uses all the blocks
+                /* read single block from fs into cache */
+                struct iovec vector = { ureq[i].ublk_ptr, blk_size };
+                rc = iocommon_vreadorwrite(which, 
+                                           &pd->s->pvfs_ref, 
+                                           ureq[i].ublk_tag, 
+                                           1, 
+                                           &vector);
             }
             if(which == 2) /* Write */
             {
@@ -1181,14 +1191,23 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 if((i == 0) && (offset != ureq[i].ublk_tag))
                 {
                     /* Read first block from fs into ucache */
-                    //TODO:
-                    
+                    struct iovec vector = {ureq[0].ublk_ptr, blk_size};
+                    rc = iocommon_vreadorwrite(which,
+                                               &pd->s->pvfs_ref,
+                                               ureq[0].ublk_tag,
+                                               1,
+                                               &vector);
                 }
                 if((i == (req_blk_cnt - 1)) &&  
-                    (((offset + req_size) % (CACHE_BLOCK_SIZE_K * 1024)) != 0))
+                    (((offset + req_size) % blk_size) != 0))
                 {
                     /* Read last block from fs into ucache */
-                    //TODO:
+                    struct iovec vector = {ureq[i].ublk_ptr, blk_size};
+                    rc = iocommon_vreadorwrite(which,
+                                               &pd->s->pvfs_ref,
+                                               ureq[i].ublk_tag,
+                                               1,
+                                               &vector);
                 }
             }
 

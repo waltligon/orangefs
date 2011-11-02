@@ -10,22 +10,12 @@
 //#define UCACHE_ENABLED
 #define UCACHE_LOCKING_ENABLED
 
-#include <stdint.h>
-#include <pthread.h>
-#include <unistd.h>
-
-#ifndef TESTING
-#include <usrint.h>
-#include "posix-ops.h"
-#include "iocommon.h"
-#include "posix-pvfs.h"
-#include "openfile-util.h"
-#endif 
-
-#include <sys/shm.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
-#include <pvfs2-types.h>
+#include <pthread.h>
+#include <sys/shm.h>
+#include <usrint.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -54,14 +44,6 @@
 #define NIL16 0XFFFF
 #define NIL32 0XFFFFFFFF
 #define NIL64 0XFFFFFFFFFFFFFFFF
-
-/*
-#if (PVFS2_SIZEOF_VOIDP == 32)
-#define voidp_t uint32_t
-#elif (PVFS2_SIZEOF_VOIDP == 64)
-#define voidp_t uint64_t
-#endif
-*/
 
 #ifndef DBG
 #define DBG 0   
@@ -185,16 +167,14 @@ int ucache_open_file(PVFS_fs_id *fs_id,
 int ucache_close_file(struct file_ent_s *fent);
 struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
 void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
-void *ucache_insert(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
+void *ucache_insert(struct file_ent_s *fent, 
+                    uint64_t offset, 
+                    uint16_t *block_ndx);
 int ucache_remove(struct file_ent_s *fent, uint64_t offset);
 void ucache_info(FILE *out, char *flags);
 
-#ifndef TESTING
-int ucache_flush_cache(void);
-int ucache_flush_file(pvfs_descriptor *pd);
-/* Used only in testing */
-int wipe_ucache(void);
-#endif
+int ucache_flush_cache(void); 
+int ucache_flush_file(struct file_ent_s *fent);
 
 /* Don't call this except in ucache daemon */
 int ucache_init_file_table(char forceCreation);
