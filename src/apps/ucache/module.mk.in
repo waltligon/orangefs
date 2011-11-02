@@ -5,12 +5,6 @@ DIR := src/apps/ucache
 
 UCACHEDSRC := \
 	$(DIR)/ucached.c \
-
-#	$(DIR)/ucached_common.c \
-#	$(DIR)/shmem_util.c \
-
-#	$(DIR)/ucached_cmd.c \
-
-UCACHED := $(DIR)/pvfs2-ucached
+        $(DIR)/ucached_cmd.c
 
 endif # BUILD_UCACHE
