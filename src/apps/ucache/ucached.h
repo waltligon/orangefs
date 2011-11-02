@@ -14,7 +14,7 @@
 #include <time.h>
 #include <string.h>
 #include <poll.h>
-#include "ucache.h"
+#include <ucache.h>
  
 /* Daemon Log */
 #define LOG "/tmp/ucached.log"
@@ -59,8 +59,6 @@
 #ifndef SVSHM_MODE
 #define SVSHM_MODE (SHM_R | SHM_W | SHM_R >> 3 | SHM_W >> 3 | SHM_R >> 6 | SHM_W >> 6)
 #endif
-
-#define LOCKS_SIZE ((BLOCKS_IN_CACHE + 1) * 24)
 
 #ifndef BLOCK_LOCK_TIMEOUT
 #define BLOCK_LOCK_TIMEOUT 100

@@ -1,3 +1,9 @@
+
+/* TODO: fix this! */
+#ifndef off64_t
+#define off64_t uint64_t
+#endif
+
 #include "ucached.h"
 
 /*

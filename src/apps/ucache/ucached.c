@@ -1,3 +1,9 @@
+
+/* TODO: fix this! */
+#ifndef off64_t
+#define off64_t uint64_t
+#endif
+
 #include "ucached.h"
 
 /* FIFO  */
@@ -607,18 +613,22 @@ int main(int argc, char **argv)
         {
             fprintf(ucached_log, "ERROR: poll: errno = %d\n", errno);
         }
+        /*
         if(rc == 0)
         {
-            /* Timeout occured, no descriptors ready */
+            //Timeout occured, no descriptors ready
             fprintf(ucached_log, "nothing to read/write after %d seconds\n", 
                                                           FIFO_TIMEOUT);            
         }
-/*
+        */
+
+        /*
         if(rc > 0)
         {
             fprintf(ucached_log, "poll found descriptors to work on\n");
         }
-*/
+        */
+
         if(fds[0].revents & POLLIN)
         {
             /* Data to be read */
