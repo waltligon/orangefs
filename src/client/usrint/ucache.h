@@ -5,17 +5,13 @@
  */
 
 #ifndef UCACHE_H
-#define UCACHE_H
-
-//#define UCACHE_ENABLED
-#define UCACHE_LOCKING_ENABLED
+#define UCACHE_H 1
 
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/shm.h>
-#include <usrint.h>
 
 #define MEM_TABLE_ENTRY_COUNT 818
 #define FILE_TABLE_ENTRY_COUNT 818
@@ -44,6 +40,12 @@
 #define NIL16 0XFFFF
 #define NIL32 0XFFFFFFFF
 #define NIL64 0XFFFFFFFFFFFFFFFF
+#if (PVFS2_SIZEOF_VOIDP == 32)
+#define NILP NIL32
+#elif (PVFS2_SIZEOF_VOIDP == 64)
+#define NILP NIL64
+#endif
+
 
 #ifndef DBG
 #define DBG 0   

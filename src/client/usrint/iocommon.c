@@ -1059,7 +1059,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     /* define all the values we'll need to fill the ucache_req_s struct */
     int i; /* index used for 'for loops' */
     int req_blk_cnt = 0; /* how many blocks request encompasses */
-    int req_size; /* how many bytes request spans */
+    int req_size = 0; /* how many bytes request spans */
     uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
     uint64_t remainder = 0; /* used to determine if offset is byte alligned */
     uint64_t next_tag = 0; /* used in the for loop that fills in the tags */
