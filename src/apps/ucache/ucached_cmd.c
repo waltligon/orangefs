@@ -1,9 +1,5 @@
 
-/* TODO: fix this! */
-#ifndef off64_t
-#define off64_t uint64_t
-#endif
-
+#include <usrint.h>
 #include "ucached.h"
 
 /*
@@ -21,13 +17,14 @@ int main(int argc, char **argv)
     }
 
     int rc = 0;
+    void *rp;
 
     if(argv[1][0] == 's')
     {
         char ps_buff[256];
         FILE *pipe = popen("ps -e | grep -w ucached", "r");
-        rc = (int)fgets(ps_buff, 256, pipe);
-        if(rc == 0)
+        rp = fgets(ps_buff, 256, pipe);
+        if(rp == NULL)
         {
             rc = remove(FIFO1);
             rc = remove(FIFO2);

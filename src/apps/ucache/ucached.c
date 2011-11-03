@@ -1,9 +1,5 @@
 
-/* TODO: fix this! */
-#ifndef off64_t
-#define off64_t uint64_t
-#endif
-
+#include <usrint.h>
 #include "ucached.h"
 
 /* FIFO  */
@@ -39,11 +35,11 @@ time_t locked_time[BLOCKS_IN_CACHE+1];
 /* Forward Function Declarations */
 static int run_as_child(char c); /* Run as child of ucached */
 static int execute_cmd(char command);
-static int create_ucache_shmem();
+static int create_ucache_shmem(void);
 static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
 //static void print_to_log(char *str); /* Logs commands and warnings */
 static void clean_up(void);
-static int ucached_lockchk();
+static int ucached_lockchk(void);
 
 void check_rc(int rc)
 {
@@ -88,7 +84,7 @@ static void clean_up(void)
  * Returns -1 when 1 or more  hung locks are detected and couldn't
  * be handled properly. (error) 
  */
-static int ucached_lockchk()
+static int ucached_lockchk(void)
 {
     int rc = 0;
     int i;
@@ -205,7 +201,7 @@ static int execute_cmd(char cmd)
 }
 
 /* Returns -1 on failure, 1 on success */
-static int create_ucache_shmem()
+static int create_ucache_shmem(void)
 {
     int rc = 0;
 
@@ -536,6 +532,7 @@ static void print_to_log(char *str)
 int main(int argc, char **argv)
 {
     int rc = 0; 
+    void *rp;
     memset(locked_time, 0, (sizeof(time_t) * (BLOCKS_IN_CACHE + 1)));
 
     /* Direct output of ucache library, TODO: change this later */
@@ -550,9 +547,9 @@ int main(int argc, char **argv)
     FILE *pipe = popen("ps -e | grep -w ucached", "r");
 
     /* Should catch 1 line result, but not 2 */
-    rc = (int)fgets(ps_buff1, 256, pipe);
-    rc = (int)fgets(ps_buff2, 256, pipe); /* Should be zero if only 1 ucached */
-    if(rc == 0)
+    rp = fgets(ps_buff1, 256, pipe);
+    rp = fgets(ps_buff2, 256, pipe); /* Should be zero if only 1 ucached */
+    if(rp == NULL)
     {
         /* Remove old FIFOs in case daemon was killed last time */
         remove(FIFO1);
