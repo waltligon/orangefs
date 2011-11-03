@@ -11,7 +11,8 @@
 # docsclean      cleans up documentation files
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
-# usertools	 builds user tools
+# usertools	     builds user tools
+# ucachedtools	 builds ucached tools
 # kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
@@ -124,7 +125,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools
 
 ################################################################
 # Find project subdirectories
@@ -454,6 +455,8 @@ USERSRC :=
 LIBSRC :=
 # ULIBSRC is source code for libofs
 ULIBSRC :=
+# UCACHEDSRC is source code for ucached programs
+UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 ifdef BUILD_BMI_ONLY
@@ -471,8 +474,6 @@ VISSRC :=
 VISMISCSRC :=
 # KARMASRC is source for the karma gui
 KARMASRC :=
-# UCACHEDSRC is source for the ucache daemon
-UCACHEDSRC :=
 # FUSESRC is source for the FUSE interface daemon
 FUSESRC :=
 # userland helper programs for kernel drivers
@@ -593,6 +594,13 @@ USERTOOLS := $(patsubst %.c,%, $(filter %.c, $(USERSRC)))
 # USERDEPENDS is a list of dependency files for user programs
 USERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(USERSRC)))
 
+# UCACHEDOBJS is a list of ucached program objects
+UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
+# UCACHEDTOOLS is a list of ucached program executables
+UCACHEDTOOLS := $(patsubst %.c,%, $(filter %.c, $(UCACHEDSRC)))
+# UCACHEDDEPENDS is a list of dependency files for ucached programs
+UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
+
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
     ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
@@ -643,10 +651,6 @@ VISMISCDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VISMISCSRC)))
 KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
-# UCACHEDOBJS, UCACHEDDEPENDS for the karma gui (requires gtk2.0)
-UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
-UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
-
 # FUSEOBJS
 FUSEOBJS := $(patsubst %.c,%.o, $(filter %.c,$(FUSESRC)))
 FUSEDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(FUSESRC)))
@@ -685,7 +689,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
     $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
     $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
-    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS))
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) )
 endif
 
 ####################################################################
@@ -695,7 +699,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE) $(UCACHED)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -703,6 +707,9 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 #target for building user tools
 usertools: $(USERTOOLS)
+
+# target for building ucached tools
+ucachedtools: $(UCACHEDTOOLS)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
@@ -839,11 +846,6 @@ $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 	$(Q) "  LD		$@"
 	$(E)$(LD) -o $@ $(LDFLAGS) $(KARMAOBJS) $(LIBS) $(call modldflags,$<)
 
-# rule for building ucache daemon and its objects
-$(UCACHED): $(UCACHEDOBJS) $(LIBRARIES)
-	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(UCACHEDOBJS) $(LIBS) $(call modldflags,$<)
-
 # fule for building FUSE interface and its objects
 $(FUSE): $(FUSEOBJS) $(LIBRARIES)
 	$(Q) " LD 		$@"
@@ -948,6 +950,8 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
 
+$(UCACHEDTOOLS): %: %.o $(LIBRARIES)
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
@@ -1012,12 +1016,13 @@ clean::
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+        $(USERTOOLS) $(USEROBJS) \
+        $(UCACHEDTOOLS) $(UCACHEDOBJS) \
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
-        $(BMILIBRARIES) $(FUSEOBJS) $(UCACHEDOBJS) \
+        $(BMILIBRARIES) $(FUSEOBJS) \
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
 		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
@@ -1199,6 +1204,9 @@ endif
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
 	install -m 755 $(USERTOOLS) $(bindir)
+ifdef BUILD_UCACHE
+	install -m 755 $(UCACHEDTOOLS) $(sbindir)
+endif
 	# for compatibility in case anyone really wants "lsplus"
 	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
@@ -1213,10 +1221,6 @@ endif
 
 ifdef BUILD_FUSE
 	install -m 755 $(FUSE) $(prefix)/bin
-endif
-
-ifdef BUILD_UCACHE
-	install -m 755 $(UCACHED) $(sbindir)
 endif
 
 	# install any development tools built
