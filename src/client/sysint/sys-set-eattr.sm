@@ -34,6 +34,13 @@ static int set_eattr_comp_fn(
 
 machine pvfs2_client_set_eattr_sm
 {
+    state getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setup_msgpair;
+        default => cleanup;
+    }
+
     state setup_msgpair
     {
         run set_eattr_setup_msgpair;
@@ -58,7 +65,7 @@ machine pvfs2_client_set_eattr_sm
 
 PVFS_error PVFS_isys_seteattr_list(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_ds_keyval *val_array,
@@ -110,7 +117,7 @@ PVFS_error PVFS_isys_seteattr_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.seteattr.nkey = nkey;
     sm_p->u.seteattr.key_array = key_array;
     sm_p->u.seteattr.val_array = val_array;
@@ -119,13 +126,20 @@ PVFS_error PVFS_isys_seteattr_list(
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
 
+    PINT_SM_GETATTR_STATE_FILL(
+                               sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_NONE,
+                               0);
+
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
 }
 
 PVFS_error PVFS_isys_seteattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
         int32_t flags,
@@ -133,13 +147,13 @@ PVFS_error PVFS_isys_seteattr(
         PVFS_hint hints,
         void *user_ptr)
 {
-    return PVFS_isys_seteattr_list(ref, credentials, 1, key_p, val_p, flags,
+    return PVFS_isys_seteattr_list(ref, credential, 1, key_p, val_p, flags,
                                 op_id, hints, user_ptr);
 }
 
 PVFS_error PVFS_sys_seteattr_list(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_ds_keyval *val_array,
@@ -151,7 +165,7 @@ PVFS_error PVFS_sys_seteattr_list(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_seteattr entered\n");
 
-    ret = PVFS_isys_seteattr_list(ref, credentials,
+    ret = PVFS_isys_seteattr_list(ref, credential,
             nkey, key_array, val_array, flags, &op_id, hints, NULL);
     if (ret)
     {
@@ -174,13 +188,13 @@ PVFS_error PVFS_sys_seteattr_list(
 
 PVFS_error PVFS_sys_seteattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
         int32_t flags,
         PVFS_hint hints)
 {
-    return PVFS_sys_seteattr_list(ref, credentials, 1, key_p, val_p, flags, hints);
+    return PVFS_sys_seteattr_list(ref, credential, 1, key_p, val_p, flags, hints);
 }
 
 
@@ -191,12 +205,14 @@ static PINT_sm_action set_eattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p;
 
+    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
+   
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_SETEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             sm_p->u.seteattr.flags,
@@ -229,6 +245,8 @@ static PINT_sm_action set_eattr_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     sm_p->error_code  = js_p->error_code;
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

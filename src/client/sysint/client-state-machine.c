@@ -27,6 +27,7 @@
 #include "acache.h"
 #include "pint-event.h"
 #include "pint-hint.h"
+#include "security-util.h"
 
 #define MAX_RETURNED_JOBS   256
 
@@ -207,7 +208,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
       NOTE: if the I/O cancellation has properly completed, the
       cancelled contextual jobs within that I/O operation will be
       popping out of the testcontext calls (in our testsome() or
-      test()).  to avoid passing out the same completed op mutliple
+      test()).  to avoid passing out the same completed op multiple
       times, do not add the operation to the completion list until all
       cancellations on the I/O operation are accounted for
     */    
@@ -930,7 +931,7 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
 static void PINT_sys_release_smcb(PINT_smcb *smcb)
 {
     PINT_client_sm *sm_p; 
-    PVFS_credentials *cred_p; 
+    PVFS_credential *cred_p; 
 
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (sm_p == NULL) 
@@ -947,7 +948,8 @@ static void PINT_sys_release_smcb(PINT_smcb *smcb)
 
     if (PINT_smcb_op(smcb) && cred_p)
     {
-        PVFS_util_release_credentials(cred_p);
+        PINT_cleanup_credential(cred_p);
+        free(cred_p);
         if (sm_p) sm_p->cred_p = NULL;
     }
 

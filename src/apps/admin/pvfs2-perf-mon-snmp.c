@@ -90,7 +90,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     int io_server_count;
     int64_t **perf_matrix;
     uint64_t* end_time_ms_array;
@@ -115,7 +115,13 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
+
     if (user_opts->server_addr_set)
     {
         if (PVFS_util_get_default_fsid(&cur_fs) < 0)
@@ -154,7 +160,7 @@ int main(int argc, char **argv)
         }
 
         /* count how many I/O servers we have */
-        ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
+        ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
                                     &io_server_count);
         if (ret < 0)
         {
@@ -171,8 +177,7 @@ int main(int argc, char **argv)
 	        return -1;
         }
         ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
-				     PVFS_MGMT_IO_SERVER,
+                     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
         if (ret < 0)

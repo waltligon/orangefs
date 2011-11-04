@@ -1,5 +1,5 @@
 /* 
- * (C) 2001 The University of Chicago 
+ * (C) 2001 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -14,6 +14,7 @@
 #include "pvfs2-internal.h"
 #include "pint-util.h"
 #include "pint-cached-config.h"
+#include "pint-security.h"
 
 #define REPLACE_DONE 100
 
@@ -776,17 +777,20 @@ static PINT_sm_action setattr_setobj_attribs(
 static int setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    /* TODO: orange-security
+       PINT_ACCESS_DEBUG below is currently a no-op 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
     if (js_p->error_code == 0)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG,
                           "create: new metadata handle: %llu.\n",
                           llu(s_op->resp.u.create.metafile_handle));
     }
+    */
 
     return SM_ACTION_COMPLETE;
 }
-
 
 /*
  * Function: create_cleanup
@@ -862,11 +866,57 @@ static inline int PINT_get_object_ref_create(
     return 0;
 };
 
+PINT_GET_CREDENTIAL_DEFINE(create);
+
+static int perm_create(PINT_server_op *s_op)
+{
+    PVFS_object_attr *attr = &s_op->req->u.create.attr;
+
+    if (!(s_op->req->capability.op_mask & PINT_CAP_CREATE))
+    {
+        return -PVFS_EACCES;
+    }
+
+    if (attr->mask & PVFS_ATTR_COMMON_UID)
+    {
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN) &&
+            (s_op->req->u.create.credential.userid != attr->owner))
+        {
+            return -PVFS_EPERM;
+        }
+    }
+
+    if (attr->mask & PVFS_ATTR_COMMON_GID)
+    {
+        PVFS_credential *cred = &s_op->req->u.create.credential;
+        int i;
+
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        {
+            for (i = 0; i < cred->num_groups; i++)
+            {
+                if (cred->group_array[i] == attr->group)
+                {
+                    break;
+                }
+            }
+            /* no group matches */
+            if (i >= cred->num_groups)
+            {
+                return -PVFS_EPERM;
+            }
+        }
+    }
+
+    return 0;
+}
+
 struct PINT_server_req_params pvfs2_create_params =
 {
     .string_name = "create",
     .get_object_ref = PINT_get_object_ref_create,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .get_credential = PINT_get_credential_create,
+    .perm = perm_create,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_create_sm
 };

@@ -26,7 +26,7 @@
 
 static int test_meta_fields(int testcase){
     int fs_id, ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sys_attr attr;
@@ -43,7 +43,7 @@ static int test_meta_fields(int testcase){
     }
     fs_id = pvfs_helper.fs_id;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -54,8 +54,8 @@ static int test_meta_fields(int testcase){
 
     pinode_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
     attr.objtype = PVFS_TYPE_METAFILE;
@@ -95,7 +95,7 @@ static int test_meta_fields(int testcase){
 }
 
 static int test_permissions(int testcase){
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -113,7 +113,7 @@ static int test_permissions(int testcase){
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -134,10 +134,10 @@ static int test_permissions(int testcase){
     switch (testcase)
     {
     case 0:
-	credentials.uid = 555;
+	credentials.userid = 555;
         break;
     case 1:
-	credentials.gid = 555;
+	credentials.group_array[0] = 555;
         break;
     case 2:
 	ret = PVFS_sys_lookup(
@@ -157,7 +157,7 @@ static int test_permissions(int testcase){
 
 }
 static int test_size_after_write(void){
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -179,7 +179,7 @@ static int test_size_after_write(void){
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -225,7 +225,7 @@ static int test_size_after_write(void){
 }
 
 static int test_sparse_files(void){
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -247,7 +247,7 @@ static int test_sparse_files(void){
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -310,7 +310,7 @@ static int test_sparse_files(void){
 }
 
 static int test_read_sparse_files(void){
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -331,7 +331,7 @@ static int test_read_sparse_files(void){
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -398,7 +398,7 @@ static int test_read_sparse_files(void){
 static int test_allcat(int testcase)
 {
     int ret, fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_size size = 0, oldsize = 0;
     PVFS_sysresp_getattr resp;
@@ -410,7 +410,7 @@ static int test_allcat(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "altrun");
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -468,7 +468,7 @@ static int test_allcat(int testcase)
 static int test_truncat(int testcase)
 {
     int ret, fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_size size = 0, oldsize = 0;
     PVFS_sysresp_getattr resp;
@@ -480,7 +480,7 @@ static int test_truncat(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "altrun");
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -541,7 +541,7 @@ static int test_read_beyond(void){
     PVFS_Request req_io;
     PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_offset file_req_offset = 0;
     char *filename;
     char *io_buffer;
@@ -560,7 +560,7 @@ static int test_read_beyond(void){
 
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -594,7 +594,7 @@ static int test_write_beyond(void){
     PVFS_Request req_io;
     PVFS_Request req_mem;
     PVFS_sysresp_io resp_io;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *filename;
     char *io_buffer;
     int fs_id, ret, i;
@@ -614,7 +614,7 @@ static int test_write_beyond(void){
 
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -654,7 +654,7 @@ static int test_files_as_dirs(int testcase)
 {
     int ret = 1, fs_id;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
     char *filename;
@@ -662,11 +662,11 @@ static int test_files_as_dirs(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 
@@ -714,7 +714,7 @@ static int test_files_as_dirs(int testcase)
 static int test_get_set_attr_empty(int testcase)
 {
     int fs_id, ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sys_attr attr;
@@ -733,7 +733,7 @@ static int test_get_set_attr_empty(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, &credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -745,8 +745,8 @@ static int test_get_set_attr_empty(int testcase)
 
     pinode_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
     attr.objtype = PVFS_TYPE_METAFILE;
@@ -768,7 +768,7 @@ static int test_get_set_attr_empty(int testcase)
 static int test_lookup_empty(void)
 {
     int fs_id, ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
     char *name;
 
@@ -783,7 +783,7 @@ static int test_lookup_empty(void)
     }
     fs_id = pvfs_helper.fs_id;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
 
@@ -793,7 +793,7 @@ static int test_lookup_empty(void)
 static int test_io_on_dir(int testcase)
 {
     int fs_id, ret,i;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -813,7 +813,7 @@ static int test_io_on_dir(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if((ret = PVFS_sys_lookup(
             fs_id, name, &credentials,
             &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -846,7 +846,7 @@ static int test_io_on_dir(int testcase)
 
 static int test_remove_nonempty_dir(int testcase)
 {
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     char *filename;
     int ret; 
@@ -856,7 +856,7 @@ static int test_remove_nonempty_dir(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "/");
     
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -888,7 +888,7 @@ static int init_files(void)
 {
     int ret, fs_id;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_create resp_create;
     char *filename;
@@ -896,10 +896,10 @@ static int init_files(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 
@@ -937,8 +937,8 @@ static int init_files(void)
 
     filename = strcpy(filename, "invalid_perms");
 
-    credentials.uid = 444;
-    credentials.gid = 444;
+    credentials.userid = 444;
+    credentials.group_array[0] = 444;
 
     if (initialize_sysint() < 0)
     {

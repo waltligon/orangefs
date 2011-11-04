@@ -162,7 +162,7 @@ int main(int argc, char **argv)
     int ret = -1;
     options_t *user_opts = NULL;
     PVFS_object_ref ref;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -209,7 +209,12 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     if (user_opts->remove_object_only)
     {

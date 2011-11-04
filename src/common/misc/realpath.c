@@ -160,8 +160,12 @@ int PINT_realpath(
         *npath = '\0';
 
         /* see if this part of the path has a PVFS mount point */
+        /* TODO: orange-security 
         ret = PVFS_util_resolve_absolute(resolved_path, &fs_id,
                                         link_path, PATH_MAX);
+        */
+        ret = PVFS_util_resolve(resolved_path, &fs_id,
+                               link_path, PATH_MAX);
         /* we don't care about the output of resolve */
         /* link_path was just a placeholder */
         memset(link_path, 0, PATH_MAX);

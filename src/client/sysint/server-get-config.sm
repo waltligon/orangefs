@@ -18,6 +18,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -87,13 +88,13 @@ machine pvfs2_server_get_config_sm
 int PINT_server_get_config(
     struct server_configuration_s *config,
     struct PVFS_sys_mntent* mntent_p,
+    const PVFS_credential *credential,
     PVFS_hint hints)
 {
     int ret = -PVFS_EINVAL;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     PVFS_error error = 0;
-    PVFS_credentials creds;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -103,8 +104,6 @@ int PINT_server_get_config(
     {
 	return ret;
     }
-
-    PVFS_util_gen_credentials(&creds);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "asked for fs name = %s\n",
                  mntent_p->pvfs_fs_name);
@@ -130,7 +129,7 @@ int PINT_server_get_config(
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
     PINT_msgpair_init(&sm_p->msgarray_op);
-    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.get_config.mntent = mntent_p;
     sm_p->u.get_config.config = config;
     
@@ -291,9 +290,12 @@ static PINT_sm_action server_get_config_setup_msgpair(
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "get_config state: server_get_config_setup_msgpair\n");
+    
+    PINT_null_capability(&capability);
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -313,7 +315,7 @@ static PINT_sm_action server_get_config_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
+    PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, capability, sm_p->hints);
 
     msg_p->fs_id = PVFS_FS_ID_NULL;
     msg_p->handle = PVFS_HANDLE_NULL;

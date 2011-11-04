@@ -99,7 +99,7 @@ PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_readdir *resp,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -138,7 +138,7 @@ PVFS_error PVFS_isys_readdir(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -171,7 +171,7 @@ PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
     int32_t pvfs_dirent_incount,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_readdir *resp,
     PVFS_hint hints)
 {
@@ -181,7 +181,7 @@ PVFS_error PVFS_sys_readdir(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_readdir entered\n");
 
     ret = PVFS_isys_readdir(ref, token, pvfs_dirent_incount,
-                            credentials, resp, &op_id, hints, NULL);
+                            credential, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_readdir call", ret);
@@ -212,7 +212,7 @@ static PINT_sm_action readdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL,
+        PVFS_ATTR_DIR_ALL|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_DIRECTORY,
         0);
     
@@ -251,7 +251,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
 
     PINT_SERVREQ_READDIR_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         sm_p->u.readdir.pos_token,

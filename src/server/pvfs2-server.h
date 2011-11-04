@@ -82,78 +82,6 @@ enum PINT_server_req_permissions
                                       needs write and execute */
 };
 
-#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
-static inline int PINT_get_object_ref_##req_name(                        \
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
-{                                                                        \
-    *fs_id = req->u.req_name.fs_id;                                      \
-    *handle = req->u.req_name.handle;                                    \
-    return 0;                                                            \
-}
-
-enum PINT_server_req_access_type PINT_server_req_readonly(
-                                    struct PVFS_server_req *req);
-enum PINT_server_req_access_type PINT_server_req_modify(
-                                    struct PVFS_server_req *req);
-
-struct PINT_server_req_params
-{
-    const char* string_name;
-
-    /* For each request that specifies an object ref (fsid,handle) we
-     * get the common attributes on that object and check the permissions.
-     * For the request to proceed the permissions required by this flag
-     * must be met.
-     */
-    enum PINT_server_req_permissions perm;
-
-    /* Specifies the type of access on the object (readonly, modify).  This
-     * is used by the request scheduler to determine 
-     * which requests to queue (block), and which to schedule (proceed).
-     * This is a callback implemented by the request.  For example, sometimes
-     * the io request writes, sometimes it reads.
-     * Default functions PINT_server_req_readonly and PINT_server_req_modify
-     * are used for requests that always require the same access type.
-     */
-    enum PINT_server_req_access_type (*access_type)(
-                                        struct PVFS_server_req *req);
-
-    /* Specifies the scheduling policy for the request.  In some cases,
-     * we can bypass the request scheduler and proceed directly with the
-     * request.
-     */
-    enum PINT_server_sched_policy sched_policy;
-
-    /* A callback implemented by the request to return the object reference
-     * from the server request structure.
-     */
-    int (*get_object_ref)(
-        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-    /* The state machine that performs the request */
-    struct PINT_state_machine_s *state_machine;
-};
-
-struct PINT_server_req_entry
-{
-    enum PVFS_server_op op_type;
-    struct PINT_server_req_params *params;
-};
-
-extern struct PINT_server_req_entry PINT_server_req_table[];
-
-int PINT_server_req_get_object_ref(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req);
-enum PINT_server_req_access_type
-PINT_server_req_get_access_type(struct PVFS_server_req *req);
-enum PINT_server_sched_policy
-PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
-
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
-
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
@@ -208,8 +136,9 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
-    SERVER_PRECREATE_INIT  = (1 << 18),
-    SERVER_UID_MGMT_INIT = (1 << 19), 
+    SERVER_PRECREATE_INIT      = (1 << 18),
+    SERVER_UID_MGMT_INIT       = (1 << 19), 
+    SERVER_SECURITY_INIT       = (1 << 20)
 } PINT_server_status_flag;
 
 typedef enum
@@ -394,20 +323,12 @@ do {                                                                           \
  */
 struct PINT_server_lookup_op
 {
-    /* current segment (0..N), number of segments in the path */
-    int seg_ct, seg_nr; 
-
-    /* number of attrs read succesfully */
-    int attr_ct;
-
-    /* number of handles read successfully */
-    int handle_ct;
-
-    char *segp;
-    void *segstate;
-
+    /* handle used to read directory entries */
     PVFS_handle dirent_handle;
-    PVFS_ds_attributes *ds_attr_array;
+    /* handle of the directory entry */
+    PVFS_handle handle;
+    /* directory entry attributes */
+    PVFS_ds_attributes ds_attr;
 };
 
 struct PINT_server_readdir_op
@@ -477,6 +398,7 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_BMI_addr_t host_addr;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_ds_type type;
+    PVFS_capability capability;
 };
 
 struct PINT_server_batch_create_op
@@ -538,13 +460,13 @@ struct PINT_server_getattr_op
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
     int num_dfiles_req;
     PVFS_handle *mirror_dfile_status_array;
+    PVFS_credential credential;
 };
 
 struct PINT_server_listattr_op
@@ -703,19 +625,113 @@ typedef struct PINT_server_op
       } \
     } while (0)
 
+/* nlmills: TODO: consider passing request only */
+/* nlmills: in that case we can move this whole block back to the file's top */
+typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
+#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
+static inline int PINT_get_object_ref_##req_name(                        \
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
+{                                                                        \
+    *fs_id = req->u.req_name.fs_id;                                      \
+    *handle = req->u.req_name.handle;                                    \
+    return 0;                                                            \
+}
+
+#define PINT_GET_CREDENTIAL_DEFINE(req_name)             \
+static inline int PINT_get_credential_##req_name(        \
+    struct PVFS_server_req *req, PVFS_credential **cred) \
+{                                                        \
+    *cred = &req->u.req_name.credential;                  \
+    return 0;                                            \
+}
+
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
+
+struct PINT_server_req_params
+{
+    const char* string_name;
+
+    /* For each request that specifies an object ref we
+     * call the permission function set by the op state machine
+     * to authorize access.
+     */
+    PINT_server_req_perm_fun perm;
+
+    /* Specifies the type of access on the object (readonly, modify).  This
+     * is used by the request scheduler to determine 
+     * which requests to queue (block), and which to schedule (proceed).
+     * This is a callback implemented by the request.  For example, sometimes
+     * the io request writes, sometimes it reads.
+     * Default functions PINT_server_req_readonly and PINT_server_req_modify
+     * are used for requests that always require the same access type.
+     */
+    enum PINT_server_req_access_type (*access_type)(
+                                        struct PVFS_server_req *req);
+
+    /* Specifies the scheduling policy for the request.  In some cases,
+     * we can bypass the request scheduler and proceed directly with the
+     * request.
+     */
+    enum PINT_server_sched_policy sched_policy;
+
+    /* A callback implemented by the request to return the object reference
+     * from the server request structure.
+     */
+    int (*get_object_ref)(
+        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+
+    /* A callback implemented by the request to return the credential from
+     * the server request structure. If the server request does not contain
+     * a credential this field should be set to NULL.
+     */
+    int (*get_credential)(
+        struct PVFS_server_req *req, PVFS_credential **cred);
+
+    /* The state machine that performs the request */
+    struct PINT_state_machine_s *state_machine;
+};
+
+struct PINT_server_req_entry
+{
+    enum PVFS_server_op op_type;
+    struct PINT_server_req_params *params;
+};
+
+extern struct PINT_server_req_entry PINT_server_req_table[];
+
+int PINT_server_req_get_object_ref(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred);
+
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req);
+enum PINT_server_req_access_type
+PINT_server_req_get_access_type(struct PVFS_server_req *req);
+enum PINT_server_sched_policy
+PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
+
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
+
+
+/* nlmills: TODO: fix this to work with capabilities */
 /* PINT_ACCESS_DEBUG()
  *
  * macro for consistent printing of access records
  *
  * no return value
  */
-#ifdef GOSSIP_DISABLE_DEBUG
+/*#ifdef GOSSIP_DISABLE_DEBUG*/
 #ifdef WIN32
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
 #endif
+/*
 #else
 #ifdef WIN32
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
@@ -737,6 +753,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
 #endif
+*/
 
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;

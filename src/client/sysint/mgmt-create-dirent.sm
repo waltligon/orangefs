@@ -36,7 +36,14 @@ machine pvfs2_client_mgmt_create_dirent_sm
     state init
     {
         run mgmt_create_dirent_init;
-        default => create_dirent_setup_msgpair;
+        default => create_dirent_get_capability;
+    }
+    
+    state create_dirent_get_capability
+    {
+        jump pvfs2_client_getattr_sm;
+        success => create_dirent_setup_msgpair;
+        default => cleanup;
     }
 
     state create_dirent_setup_msgpair
@@ -67,7 +74,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_mgmt_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr)
@@ -99,7 +106,7 @@ PVFS_error PVFS_imgmt_create_dirent(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->parent_ref = parent_ref;
     sm_p->u.mgmt_create_dirent.entry = entry;
     sm_p->u.mgmt_create_dirent.entry_handle = entry_handle;
@@ -120,7 +127,7 @@ PVFS_error PVFS_mgmt_create_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_handle entry_handle,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -130,7 +137,7 @@ PVFS_error PVFS_mgmt_create_dirent(
                  "PVFS_mgmt_create_dirent entered\n");
 
     ret = PVFS_imgmt_create_dirent(
-        parent_ref, entry, entry_handle, credentials, &op_id, hints, NULL);
+        parent_ref, entry, entry_handle, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_imgmt_create_dirent call", ret);
@@ -155,7 +162,20 @@ PVFS_error PVFS_mgmt_create_dirent(
 static int mgmt_create_dirent_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    struct PINT_client_sm *sm_p;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_create_dirent_init called\n");
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->parent_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
 
     assert(js_p->error_code == 0);
     return SM_ACTION_COMPLETE;
@@ -182,7 +202,7 @@ static int mgmt_create_dirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->u.mgmt_create_dirent.entry,
         sm_p->u.mgmt_create_dirent.entry_handle,
         sm_p->parent_ref.handle,

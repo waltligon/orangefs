@@ -10,6 +10,8 @@
  *  PVFS2 system interface routines for dereferencing path strings.
  */
 
+/* TODO: orange-security (whole lookup process) */
+
 #include <string.h>
 #include <assert.h>
 
@@ -23,6 +25,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -72,7 +75,20 @@ machine pvfs2_client_lookup_sm
     {
         run lookup_segment_query_ncache;
         success => lookup_segment_verify_attr_present;
-        default => lookup_segment_setup_msgpair;
+        default => lookup_segment_setup_parent_getattr;
+    }
+
+    state lookup_segment_setup_parent_getattr
+    {
+        run lookup_segment_setup_parent_getattr;
+        default => lookup_segment_parent_getattr;
+    }
+
+    state lookup_segment_parent_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => lookup_segment_setup_msgpair;
+        default => lookup_segment_lookup_failure;
     }
 
     state lookup_segment_setup_msgpair
@@ -175,7 +191,6 @@ static int initialize_context(
         lookup_sm->context_count++;
         if(lookup_sm->context_count == 1)
         {
-            /* first context, so allocate one */
             lookup_sm->contexts = malloc(sizeof(PINT_client_lookup_sm_ctx));
             if(!lookup_sm->contexts)
             {
@@ -195,211 +210,203 @@ static int initialize_context(
         }
     }
 
-    if (!pathname)
+    if (pathname && (lookup_sm->current_context > -1))
     {
-        return ret;
-    }
-    pathlen = strlen(pathname);
-    num_segments = PINT_string_count_segments(pathname);
+        ctx = &lookup_sm->contexts[lookup_sm->current_context];
+        assert(ctx);
 
-    if ((pathlen == 0) || (num_segments == 0))
-    {
-        return ret;
-    }
+        prev_ctx_index = (lookup_sm->current_context - 1);
 
-    if ((pathlen > (PVFS_REQ_LIMIT_PATH_NAME_BYTES - 1)) ||
-        (num_segments > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
-    {
-        gossip_err("Filename %s is too long\n", pathname);
-        return -PVFS_ENAMETOOLONG;
-    }
+        pathlen = strlen(pathname);
+        num_segments = PINT_string_count_segments(pathname);
 
-    /* initialize new context */
-    if (lookup_sm->current_context < 0)
-    {
-        return ret;
-    }
-    ctx = &lookup_sm->contexts[lookup_sm->current_context];
-    assert(ctx);
-
-    prev_ctx_index = (lookup_sm->current_context - 1);
-
-    memset(ctx, 0, sizeof(PINT_client_lookup_sm_ctx));
-
-    ctx->current_segment = 0;
-    ctx->total_segments = 0;
-    ctx->ctx_starting_refn = ctx_starting_refn;
-
-    /* initialize all segments within the context */
-    orig_pathname = strdup(pathname);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, " original pathname is: %s\n",
-                     orig_pathname);
-    while(!PINT_string_next_segment(pathname, &cur_seg_name, &state))
-    {
-        /* grab the next segment in the context to fill in */
-        cur_seg = &(ctx->segments[cur_seg_index]);
-        assert(cur_seg);
-        memset(cur_seg, 0, sizeof(PINT_client_lookup_sm_segment));
-
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, " cur_seg_name[%d]: %s\n",
-                     cur_seg_index, cur_seg_name);
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, " pathname is: %s\n",
-                     pathname);
-
-        if (strcmp(cur_seg_name,".") == 0)
+        if ((pathlen == 0) || (num_segments == 0))
         {
-            /* reset the count of consecutive dot dot segments */
-            num_consecutive_prev_ctx_dot_dots = 0;
-
-            gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                             " ignoring useless segment\n");
-            continue;
+            return ret;
         }
-        else if (strcmp(cur_seg_name,"..") == 0)
+
+        if ((pathlen > (PVFS_REQ_LIMIT_PATH_NAME_BYTES - 1)) ||
+            (num_segments > MAX_LOOKUP_SEGMENTS))
         {
-            /*
-               if this isn't true, we need to
-               grab the previous context's previous segment
+            gossip_err("Filename %s is too long\n", pathname);
+            return -PVFS_ENAMETOOLONG;
+        }
 
-               if this weren't true, we'd normally:
-               assert(cur_seg_index > 0);
-            */
-            if ((cur_seg_index < 1) ||
-                (num_consecutive_prev_ctx_dot_dots > 0))
+        memset(ctx, 0, sizeof(PINT_client_lookup_sm_ctx));
+
+        ctx->current_segment = 0;
+        ctx->total_segments = 0;
+        ctx->ctx_starting_refn = ctx_starting_refn;
+
+        /* initialize all segments within the context */
+        orig_pathname = strdup(pathname);
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, " original pathname is: %s\n",
+                     orig_pathname);
+        while(!PINT_string_next_segment(pathname,&cur_seg_name,&state))
+        {
+            /* grab the next segment in the context to fill in */
+            cur_seg = &(ctx->segments[cur_seg_index]);
+            assert(cur_seg);
+            memset(cur_seg, 0, sizeof(PINT_client_lookup_sm_segment));
+
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, " cur_seg_name[%d]: %s\n",
+                         cur_seg_index, cur_seg_name);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, " pathname is: %s\n",
+                         pathname);
+
+            if (strcmp(cur_seg_name,".") == 0)
             {
-                PINT_client_lookup_sm_segment *prev_ctx_prev_seg;
+                /* reset the count of consecutive dot dot segments */
+                num_consecutive_prev_ctx_dot_dots = 0;
 
-                gossip_debug(
-                    GOSSIP_LOOKUP_DEBUG, "  got a '..' segment that "
-                    "requires attention of the previous context\n");
-
-             init_next_prev_segment:
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             " ignoring useless segment\n");
+                continue;
+            }
+            else if (strcmp(cur_seg_name,"..") == 0)
+            {
                 /*
-                  grab the previous context to access the segments
-                  within it, assuming a previous context is available
+                   if this isn't true, we need to
+                   grab the previous context's previous segment
+
+                   if this weren't true, we'd normally:
+                   assert(cur_seg_index > 0);
                 */
-                if (prev_ctx_index < 0)
+                if ((cur_seg_index < 1) ||
+                    (num_consecutive_prev_ctx_dot_dots > 0))
                 {
-                    gossip_debug(GOSSIP_LOOKUP_DEBUG, "there are no "
-                                 "more previous contexts available: "
-                                 "failing lookup\n");
-                    free(orig_pathname);
-                    return -PVFS_ENOENT;
-                }
+                    PINT_client_lookup_sm_segment *prev_ctx_prev_seg;
 
-                prev_ctx = &lookup_sm->contexts[prev_ctx_index];
-                assert(prev_ctx);
-                assert(prev_ctx->current_segment > 0);
-
-                num_consecutive_prev_ctx_dot_dots++;
-                gossip_debug(
-                    GOSSIP_LOOKUP_DEBUG, "num consecutive '..' "
-                    "segments requiring the previous segment "
-                    "is now %d\n", num_consecutive_prev_ctx_dot_dots);
-
-                /*
-                  further, if we have a number of consecutive '..'
-                  segments, we may need to keep backing up into
-                  the previous contexts' space
-                */
-                if (prev_ctx->current_segment -
-                    num_consecutive_prev_ctx_dot_dots < 0)
-                {
-                    /* skip to next previous context, if any */
-                    if (prev_ctx_index > -1)
-                    {
-                        /*
-                          bump down dot dot count since it wasn't
-                          used yet if we got here
-                        */
-                        num_consecutive_prev_ctx_dot_dots--;
-                        prev_ctx_index--;
-                        goto init_next_prev_segment;
-                    }
                     gossip_debug(
-                        GOSSIP_LOOKUP_DEBUG, "there are no more segments "
-                        "in the previous context: failing lookup\n");
-                    free(orig_pathname);
-                    return -PVFS_ENOENT;
+                        GOSSIP_LOOKUP_DEBUG, "  got a '..' segment that "
+                        "requires attention of the previous context\n");
+
+                  init_next_prev_segment:
+                    /*
+                      grab the previous context to access the segments
+                      within it, assuming a previous context is
+                      available
+                    */
+                    if (prev_ctx_index < 0)
+                    {
+                        gossip_debug(GOSSIP_LOOKUP_DEBUG, "there are no "
+                                     "more previous contexts available: "
+                                     "failing lookup\n");
+                        free(orig_pathname);
+                        return -PVFS_ENOENT;
+                    }
+
+                    prev_ctx = &lookup_sm->contexts[prev_ctx_index];
+                    assert(prev_ctx);
+                    assert(prev_ctx->current_segment > 0);
+
+                    num_consecutive_prev_ctx_dot_dots++;
+                    gossip_debug(
+                        GOSSIP_LOOKUP_DEBUG, "num consecutive '..' "
+                        "segments requiring the previous segment "
+                        "is now %d\n", num_consecutive_prev_ctx_dot_dots);
+
+                    /*
+                      further, if we have a number of consecutive '..'
+                      segments, we may need to keep backing up into
+                      the previous contexts' space
+                    */
+                    if (prev_ctx->current_segment -
+                        num_consecutive_prev_ctx_dot_dots < 0)
+                    {
+                        /* skip to next previous context, if any */
+                        if (prev_ctx_index > -1)
+                        {
+                            /*
+                              bump down dot dot count since it wasn't
+                              used yet if we got here
+                            */
+                            num_consecutive_prev_ctx_dot_dots--;
+                            prev_ctx_index--;
+                            goto init_next_prev_segment;
+                        }
+                        gossip_debug(
+                            GOSSIP_LOOKUP_DEBUG, "there are no more segments "
+                            "in the previous context: failing lookup\n");
+                        free(orig_pathname);
+                        return -PVFS_ENOENT;
+                    }
+
+                    prev_ctx_prev_seg = &prev_ctx->segments[
+                        prev_ctx->current_segment -
+                        num_consecutive_prev_ctx_dot_dots];
+                    assert(prev_ctx_prev_seg);
+
+                    /*
+                      instead of decrementing the seg index and
+                      continuing, we need to replace the last segment
+                      copied from the last context in this case.  (so
+                      we drop through to segment init)
+                    */
+                    ctx_starting_refn =
+                        prev_ctx_prev_seg->seg_starting_refn;
+                    cur_seg_name = prev_ctx_prev_seg->seg_name;
+                    gossip_debug(
+                        GOSSIP_LOOKUP_DEBUG,
+                        "using previous segment: %s\n", cur_seg_name);
+
+                    cur_seg_index--;
                 }
-
-                prev_ctx_prev_seg = &prev_ctx->segments[
-                    prev_ctx->current_segment -
-                    num_consecutive_prev_ctx_dot_dots];
-                assert(prev_ctx_prev_seg);
-
-                /*
-                  instead of decrementing the seg index and
-                  continuing, we need to replace the last segment
-                  copied from the last context in this case.  (so
-                  we drop through to segment init)
-                */
-                ctx_starting_refn =
-                    prev_ctx_prev_seg->seg_starting_refn;
-                cur_seg_name = prev_ctx_prev_seg->seg_name;
-                gossip_debug(
-                    GOSSIP_LOOKUP_DEBUG,
-                    "using previous segment: %s\n", cur_seg_name);
-
-                cur_seg_index--;
+                else
+                {
+                    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                                 "  got a '..' segment\n");
+                    cur_seg_index--;
+                    continue;
+                }
             }
             else
             {
-                gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                             "  got a '..' segment\n");
-                cur_seg_index--;
-                continue;
+                /* reset the count of consecutive dot dot segments */
+                num_consecutive_prev_ctx_dot_dots = 0;
             }
-        }
-        else
-        {
-            /* reset the count of consecutive dot dot segments */
-            num_consecutive_prev_ctx_dot_dots = 0;
-        }
 
-        /*
-          fill in the current segment now.  the first segment
-          MUST have the same starting refn as the context
-        */
-        if (cur_seg_index == 0)
-        {
-            cur_seg->seg_starting_refn = ctx_starting_refn;
-        }
-        if (cur_seg->seg_name)
-        {
-            free(cur_seg->seg_name);
-        }
-        cur_seg->seg_name = strdup(cur_seg_name);
-        assert(cur_seg->seg_name);
-
-        slash_str = orig_pathname;
-        for (i = 0; i < cur_seg_index; i++)
-        {
-            slash_str = strchr(slash_str, '/');
-            if (slash_str == NULL)
+            /*
+              fill in the current segment now.  the first segment
+              MUST have the same starting refn as the context
+            */
+            if (cur_seg_index == 0)
             {
-                break;
+                cur_seg->seg_starting_refn = ctx_starting_refn;
             }
-            slash_str++;
-        }
-        /* seg_remaining = strstr(orig_pathname, cur_seg_name); */
-        seg_remaining = slash_str;
-        if (seg_remaining)
-        {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                         " *seg_remaining is: %s\n", seg_remaining);
+            if (cur_seg->seg_name)
+            {
+                free(cur_seg->seg_name);
+            }
+            cur_seg->seg_name = strdup(cur_seg_name);
+            assert(cur_seg->seg_name);
 
-            cur_seg->seg_remaining = strdup(seg_remaining);
-            assert(cur_seg->seg_remaining);
-        }
-        else
-        {
-            cur_seg->seg_remaining = NULL;
-        }
+            slash_str = orig_pathname;
+            for (i = 0; i < cur_seg_index; i++) {
+                slash_str = strchr(slash_str, '/');
+                if (slash_str == NULL) {
+                    break;
+                }
+                slash_str++;
+            }
+            /* seg_remaining = strstr(orig_pathname, cur_seg_name); */
+            seg_remaining = slash_str;
+            if (seg_remaining)
+            {
+                gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                             " *seg_remaining is: %s\n", seg_remaining);
 
-        cur_seg_index++;
-    }
-    free(orig_pathname);
+                cur_seg->seg_remaining = strdup(seg_remaining);
+                assert(cur_seg->seg_remaining);
+            }
+            else
+            {
+                cur_seg->seg_remaining = NULL;
+            }
+
+            cur_seg_index++;
+        }
+        free(orig_pathname);
 
 #if 0
     /* DEBUGGING ONLY */
@@ -416,9 +423,10 @@ static int initialize_context(
     }
 #endif
 
-    ctx->total_segments = cur_seg_index;
-    assert(ctx->current_segment == 0);
-    ret = 0;
+        ctx->total_segments = cur_seg_index;
+        assert(ctx->current_segment == 0);
+        ret = 0;
+    }
     return ret;
 }
 
@@ -461,7 +469,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_sys_op_id *op_id,
@@ -491,7 +499,7 @@ PVFS_error PVFS_isys_ref_lookup(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.lookup.orig_pathname = relative_pathname;
     sm_p->u.lookup.starting_refn = parent;
     sm_p->u.lookup.lookup_resp = resp;
@@ -510,14 +518,7 @@ PVFS_error PVFS_isys_ref_lookup(
         gossip_err("%s: failed to init context (path = %s)\n",
                    __func__, relative_pathname);
 
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
-        {
-            /* copy out error path */
-            strncpy(sm_p->u.lookup.lookup_resp->error_path,
-                    relative_pathname,
-                    sm_p->u.lookup.lookup_resp->error_path_size);
-        }
-        PVFS_util_release_credentials(sm_p->cred_p);
+        PINT_cleanup_credential(sm_p->cred_p);
         PINT_smcb_free(smcb);
         return ret;
     }
@@ -545,7 +546,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints)
@@ -555,15 +556,15 @@ PVFS_error PVFS_sys_ref_lookup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
 
-    ret = PVFS_isys_ref_lookup(fs_id,
-                               relative_pathname,
-                               parent,
-                               credentials,
-                               resp,
-                               follow_link,
-                               &op_id,
-                               hints,
-                               resp);
+    ret = PVFS_isys_ref_lookup(fs_id, 
+                               relative_pathname, 
+			       parent, 
+			       credential, 
+			       resp,
+                               follow_link, 
+			       &op_id, 
+			       hints, 
+			       resp);
 
     if (ret)
     {
@@ -593,7 +594,7 @@ PVFS_error PVFS_sys_ref_lookup(
  */
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_lookup *resp,
     int32_t follow_link,
     PVFS_hint hints)
@@ -630,13 +631,13 @@ PVFS_error PVFS_sys_lookup(
               without doing this function call.
             */
             char *path = ((name[0] == '/') ? &name[1] : name);
-            ret = PVFS_sys_ref_lookup(fs_id,
-                                      path,
-                                      parent,
-                                      credentials,
-                                      resp,
-                                      follow_link,
-                                      hints);
+            ret = PVFS_sys_ref_lookup(fs_id, 
+	                              path,
+				      parent,
+				      credential,
+				      resp,
+				      follow_link,
+				      hints);
         }
     }
     return ret;
@@ -693,6 +694,28 @@ static int lookup_segment_query_ncache(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action lookup_segment_setup_parent_getattr(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_client_lookup_sm_segment *cur_seg = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: "
+                 "lookup_segment_setup_parent_getattr\n");
+
+    cur_seg = GET_CURRENT_SEGMENT(sm_p);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        cur_seg->seg_starting_refn,
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY),
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+    js_p->error_code = 0;
+    return SM_ACTION_COMPLETE;
+}
+
 /*
  * This is called if the ncache lookup failed.  It builds the msgpair
  * so that the next state can jump into xfer msgpair.
@@ -713,27 +736,17 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
-    /*
-      the pvfs2 lookup_path server operation has an optimization that
-      allows several path components to be resolved at once.  this
-      code here resolves on a segment-by-segment basis, but we can
-      handle the multi-segment resolution by advancing through all
-      handles/attrs returned and populating the segments on
-      completion.  the lookup_comp_fn does just this.
-
-      one way to disable use of this optimization is to make sure
-      seg_to_lookup is set to seg_name, and never seg_remaining.  that
-      guarantees we're issuing a lookup on a single path segment
-    */
-    seg_to_lookup = cur_seg->seg_remaining ? cur_seg->seg_remaining :
-                    cur_seg->seg_name;
+    seg_to_lookup = cur_seg->seg_name;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    PINT_SERVREQ_LOOKUP_PATH_FILL(
+    /* ensure a capability exists for the parent directory */
+    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
+
+    PINT_SERVREQ_LOOKUP_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         seg_to_lookup,
         cur_seg->seg_starting_refn.fs_id,
         cur_seg->seg_starting_refn.handle,
@@ -809,6 +822,8 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
+        /* nlmills: TODO: get capability too? */
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
         PINT_SM_GETATTR_STATE_FILL(
             sm_p->getattr,  
             cur_seg->seg_resolved_refn,
@@ -947,13 +962,6 @@ static PINT_sm_action lookup_segment_handle_relative_link(
                              cur_seg->seg_starting_refn);
     if (ret)
     {
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
-        {
-            /* copy out error path */
-            strncpy(sm_p->u.lookup.lookup_resp->error_path,
-                    relative_symlink_target,
-                    sm_p->u.lookup.lookup_resp->error_path_size);
-        }
         js_p->error_code = ret;
     }
     return SM_ACTION_COMPLETE;
@@ -993,17 +1001,7 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "PVFS_util_resolve returned %d on %s\n",
                      ret, cur_seg->seg_attr.u.sym.target_path);
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
-        {
-            /* copy out error path */
-            strncpy(sm_p->u.lookup.lookup_resp->error_path,
-                    cur_seg->seg_attr.u.sym.target_path,
-                    /*absolute_symlink_target,*/
-                    sm_p->u.lookup.lookup_resp->error_path_size);
-            /* set special error code */
-            ret = -PVFS_ENOTPVFS;
-        }
-        js_p->error_code = ret;
+        js_p->error_code = 1;
         return SM_ACTION_COMPLETE;
     }
 
@@ -1022,17 +1020,10 @@ static PINT_sm_action lookup_segment_handle_absolute_link(
     assert(ret == 0);
 
     ret = initialize_context(&sm_p->u.lookup,
-                             absolute_symlink_target + 1,
+                             absolute_symlink_target+1,
                              root_refn);
     if (ret)
     {
-        if (ret == -PVFS_ENOENT && sm_p->u.lookup.lookup_resp->error_path)
-        {
-            /* copy out error path */
-            strncpy(sm_p->u.lookup.lookup_resp->error_path,
-                    absolute_symlink_target + 1,
-                    sm_p->u.lookup.lookup_resp->error_path_size);
-        }
         js_p->error_code = ret;
     }
     return SM_ACTION_COMPLETE;
@@ -1182,90 +1173,53 @@ static int lookup_segment_lookup_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
-    int i = 0;
     PINT_smcb *smcb = v_p;
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-    int current_seg_index = sm_p->u.lookup.contexts[
-        sm_p->u.lookup.current_context].current_segment;
     PVFS_object_ref last_resolved_refn;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 
-    assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
+    assert(resp_p->op == PVFS_SERV_LOOKUP);
 
     if (resp_p->status != 0)
     {
         return resp_p->status;
     }
 
-    assert(resp_p->u.lookup_path.handle_count);
-
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
-                 resp_p->u.lookup_path.handle_count);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved 1 segment\n");
 
     memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
     /*
-      at this point we have 1 or more resolved handles so we're going
-      to advance through all of them and populate the segments with
-      those resolved handles.  in addition, we fill in the attribute
-      information for each segment if the attrs are available here
+      at this point we have 1 resolved handle so we're going to
+      populate the current segment with that handle.  in addition, we
+      fill in the attribute information if available
     */
-    for(i = 0; i < resp_p->u.lookup_path.handle_count; i++)
-    {
-        cur_seg = GET_SEGMENT_AT(sm_p, current_seg_index + i);
-        assert(cur_seg);
+    cur_seg = GET_CURRENT_SEGMENT(sm_p);
+    
+    last_resolved_refn.handle = resp_p->u.lookup.handle;
+    last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
 
-        if (i > 0)
-        {
-            /*
-              if we got more than one resolved segment, fill the
-              current segment with the previously resolved
-              handle/fs_id
-            */
-            cur_seg->seg_starting_refn = last_resolved_refn;
-        }
+    cur_seg->seg_resolved_refn = last_resolved_refn;
 
-        last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
-        last_resolved_refn.fs_id = cur_seg->seg_starting_refn.fs_id;
+    PINT_free_object_attr(&cur_seg->seg_attr);
+    PINT_copy_object_attr(&cur_seg->seg_attr, &resp_p->u.lookup.attr);
 
-        cur_seg->seg_resolved_refn = last_resolved_refn;
+    gossip_debug(
+        GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
+        "target (%llu|%d) "
+        "parent (%llu|%d)\n",
+        cur_seg->seg_name,
+        llu(last_resolved_refn.handle),
+        last_resolved_refn.fs_id,
+        llu(cur_seg->seg_starting_refn.handle),
+        cur_seg->seg_starting_refn.fs_id);
 
-        /*
-          and store the retrieved attr in the current
-          segment (if one was returned)
-        */
-        if (i < resp_p->u.lookup_path.attr_count)
-        {
-            PINT_free_object_attr(&(cur_seg->seg_attr));
-            PINT_copy_object_attr(
-                &(cur_seg->seg_attr),
-                &(resp_p->u.lookup_path.attr_array[i]));
-        }
-        
-        gossip_debug(
-            GOSSIP_NCACHE_DEBUG, "*** ncache update on %s "
-                                 "target (%llu|%d) "
-                                 "parent (%llu|%d)\n",
-            cur_seg->seg_name,
-            llu(last_resolved_refn.handle),
-            last_resolved_refn.fs_id,
-            llu(cur_seg->seg_starting_refn.handle),
-            cur_seg->seg_starting_refn.fs_id);
-
-        PINT_ncache_update(
-                (const char*) cur_seg->seg_name,
-                (const PVFS_object_ref*) &(last_resolved_refn),
-                (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
-    }
-    assert(i == resp_p->u.lookup_path.handle_count);
-
-    /*
-      if we've updated all of the segments that we could, advance
-      the context's current segment position
-    */
-    GET_CURRENT_CONTEXT(sm_p)->current_segment = current_seg_index + (i - 1);
+    PINT_ncache_update(
+        (const char*) cur_seg->seg_name,
+        (const PVFS_object_ref*) &(last_resolved_refn),
+        (const PVFS_object_ref*) &(cur_seg->seg_starting_refn));
 
     return 0;
 }

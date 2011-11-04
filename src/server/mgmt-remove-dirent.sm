@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 %%
 
@@ -127,10 +128,19 @@ static PINT_sm_action mgmt_remove_dirent_cleanup(
 
 PINT_GET_OBJECT_REF_DEFINE(mgmt_remove_dirent);
 
+static int perm_mgmt_remove_dirent(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_mgmt_remove_dirent_params =
 {
     .string_name = "mgmt-remove-dirent",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_mgmt_remove_dirent,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_mgmt_remove_dirent,

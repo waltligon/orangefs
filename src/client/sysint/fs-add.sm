@@ -38,6 +38,7 @@
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
 #include "pint-util.h"
+#include "security-util.h"
 
 enum {
     SKIP_INTEGRITY_CHECK = 1
@@ -133,9 +134,6 @@ PVFS_error PVFS_isys_fs_add(
     PVFS_BMI_addr_t test_addr;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
-    PVFS_credentials creds;
-
-    PVFS_util_gen_credentials(&creds);
 
     gen_mutex_lock(&mt_config);
 
@@ -211,7 +209,6 @@ PVFS_error PVFS_isys_fs_add(
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
 
     PINT_msgpair_init(&sm_p->msgarray_op);
-    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
 
     return PINT_client_state_machine_post(
         smcb,  op_id, user_ptr);
@@ -288,7 +285,8 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
     assert(js_p->error_code == 0);
     fsid = sm_p->u.get_config.mntent->fs_id;
     ret = PVFS_mgmt_count_servers(
-        fsid, sm_p->cred_p, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, &count);
+        fsid, PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, 
+        &count);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_mgmt_count_servers()", ret);
@@ -309,7 +307,7 @@ static PINT_sm_action pvfs2_server_prepare_fetch_config(
         return SM_ACTION_COMPLETE;
     }
 
-    ret = PVFS_mgmt_get_server_array(fsid, sm_p->cred_p, 
+    ret = PVFS_mgmt_get_server_array(fsid,
             PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER, sm_p->fetch_config.addr_array, &count);
     if (ret < 0)
     {
@@ -427,7 +425,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
         for (i = 0; i < count; i++)
         {
             gossip_err("     FS config file on %s -> (size) %d\n", 
-                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
+                   PVFS_mgmt_map_addr(fsid,
                    sm_p->fetch_config.addr_array[indexes[i]], &tmp),
                    sm_p->fetch_config.fs_config_buf_size[indexes[i]] - 1);
             ret = -PVFS_EINVAL;
@@ -459,7 +457,7 @@ static int compare_hashes(PINT_client_sm *sm_p, job_status_s *js_p)
             unsigned char str[256];
             hash2str((unsigned char *) sha1_fs_digests[i], digest_len, str);
             gossip_err("     FS config file on %s -> (SHA1) %s\n", 
-                   PVFS_mgmt_map_addr(fsid, sm_p->cred_p,
+                   PVFS_mgmt_map_addr(fsid,
                    sm_p->fetch_config.addr_array[indexes[i]], &tmp), str);
         }
         ret = -PVFS_EINVAL;
@@ -625,14 +623,17 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
     int i;
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"fetch_config state: server_fetch_config_setup_msgpair\n");
 
+    PINT_null_capability(&capability);
+
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         sm_p->msgarray_op.msgarray[i].enc_type = sm_p->msgarray_op.msgpair.enc_type;
-        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, *sm_p->cred_p, sm_p->hints);
+        PINT_SERVREQ_GETCONFIG_FILL(msg_p->req, capability, sm_p->hints);
 
         msg_p->fs_id = PVFS_FS_ID_NULL;
         msg_p->handle = PVFS_HANDLE_NULL;
@@ -712,6 +713,7 @@ static int server_fetch_config_comp_fn(
 
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

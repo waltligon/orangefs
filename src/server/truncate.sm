@@ -13,6 +13,7 @@
 
 #include "server-config.h"
 #include "pvfs2-server.h"
+#include "pint-security.h"
 
 %%
 
@@ -80,12 +81,28 @@ static PINT_sm_action truncate_cleanup(
     return (server_state_machine_complete(smcb));
 }
 
+static int perm_truncate(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_WRITE)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(truncate);
 
 struct PINT_server_req_params pvfs2_truncate_params =
 {
     .string_name = "truncate",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_truncate,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_truncate,

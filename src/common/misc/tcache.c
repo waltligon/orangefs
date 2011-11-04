@@ -1,9 +1,11 @@
 /*
- * Copyright © Acxiom Corporation, 2005
+ * Copyright Acxiom Corporation, 2005
+ * (C) 2008 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
 
+#include <string.h>
 #include <assert.h>
 
 #include "tcache.h"
@@ -261,7 +263,8 @@ int PINT_tcache_set_info(
 
 /**
  * Adds an entry to the tcache.  Caller must not retain a pointer to the 
- * payload; it could be destroyed at any time.
+ * payload; it could be destroyed at any time. The default timeout value
+ * is used.
  * \return 0 on success, -PVFS_error on failure
  */
 int PINT_tcache_insert_entry(
@@ -269,6 +272,23 @@ int PINT_tcache_insert_entry(
     void* key,                  /**< that uniquely identifies the payload */
     void* payload,              /**< data to store in the cache */
     int* purged)                /**< number of entries purged to make room */
+{
+    return PINT_tcache_insert_entry_ex(tcache, key, payload, NULL, purged);
+}
+
+/**
+ * Adds an entry to the tcache with the given expiration date. The caller
+ * must not retain a pointer to the payload; it could be destroyed
+ * upon subsequent calls to PINT_tcache_*.
+ * \return 0 on success, -PVFS_error on failure
+ */
+int PINT_tcache_insert_entry_ex(
+    struct PINT_tcache* tcache, /**< pointer to tcache instance */
+    void* key,                  /**< that uniquely identifies the payload */
+    void* payload,              /**< data to store in the cache */
+    struct timeval* expiration, /**< when the entry will expire */
+    int* purged)                /**< number of entries purged to make room */
+
 {
     struct PINT_tcache_entry* tmp_entry = NULL;
     int tmp_status = 0;
@@ -332,11 +352,19 @@ int PINT_tcache_insert_entry(
     tmp_entry->payload = payload;
 
     /* set expiration date */
-    ret = PINT_tcache_refresh_entry(tcache, tmp_entry);
-    if(ret < 0)
+    if (expiration)
     {
-        free(tmp_entry);
-        return(ret);
+        memcpy(&tmp_entry->expiration_date, expiration,
+               sizeof(struct timeval));
+    }
+    else
+    {
+        ret = PINT_tcache_refresh_entry(tcache, tmp_entry);
+        if(ret < 0)
+        {
+            free(tmp_entry);
+            return(ret);
+        }
     }
 
     /* add to hash table */

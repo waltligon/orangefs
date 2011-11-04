@@ -55,7 +55,7 @@ static int parse_args(int argc, char **argv, options_t *opts)
         {"verbose",0,0,0},
         {"defaults",0,0,0},
         {"data-space",1,0,0},
-	{"meta-space",1,0,0},
+        {"meta-space",1,0,0},
         {"coll-id",1,0,0},
         {"coll-name",1,0,0},
         {"root-handle",1,0,0},
@@ -97,11 +97,11 @@ static int parse_args(int argc, char **argv, options_t *opts)
                     strncpy(opts->data_space, optarg, PATH_MAX);
                     break;
                 }
-		else if (strcmp("meta-space", cur_option) == 0)
+                else if (strcmp("meta-space", cur_option) == 0)
 		{
-		   strncpy(opts->meta_space, optarg, PATH_MAX);
-                   break;
-		}
+                    strncpy(opts->meta_space, optarg, PATH_MAX);
+                    break;
+                }
                 else if (strcmp("coll-id", cur_option) == 0)
                 {
                     goto do_collection_id;
@@ -230,7 +230,7 @@ static void print_options(options_t *opts)
         printf("\t   data storage space  : %s\n",
                (strlen(opts->data_space) ?
                 opts->data_space : "None specified"));
-	printf("\tmetadata storage space : %s\n",
+        printf("\tmetadata storage space : %s\n",
 	       	(strlen(opts->meta_space) ?
 		opts->meta_space : "None specified"));
     }

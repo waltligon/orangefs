@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     int io_server_count;
     int64_t** perf_matrix;
     uint64_t* end_time_ms_array;
@@ -91,10 +91,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential(NULL, NULL, 1*60*60, NULL, &creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential", ret);
+        return(-1);
+    }
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
+    ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
 	&io_server_count);
     if(ret < 0)
     {
@@ -147,7 +152,6 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -160,6 +164,7 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats at regular intervals */
     while (1)
     {
+        PVFS_util_refresh_credential(&creds);
         key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &creds,
@@ -182,7 +187,7 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
@@ -210,7 +215,7 @@ int main(int argc, char **argv)
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
@@ -241,7 +246,7 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
@@ -253,7 +258,7 @@ int main(int argc, char **argv)
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {

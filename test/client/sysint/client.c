@@ -42,7 +42,7 @@ int main(
     int ret = -1, i = 0;
     PVFS_fs_id fs_id;
     char *name = "/";
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -73,6 +73,8 @@ int main(
 
     printf("SYSTEM INTERFACE INITIALIZED\n");
 
+    PVFS_util_gen_credential_defaults(&credentials);
+
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
@@ -102,11 +104,10 @@ int main(
 	return (-1);
     }
     memcpy(entry_name, filename, strlen(filename) + 1);
-    PVFS_util_gen_credentials(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 

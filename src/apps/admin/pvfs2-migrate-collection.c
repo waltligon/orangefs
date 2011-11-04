@@ -173,6 +173,7 @@ int main(int argc, char **argv)
         server_alias = PINT_util_guess_alias();
     }
 
+    memset(&server_config, 0, sizeof(server_config));
     ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias);
     if(ret < 0)
     {
@@ -297,8 +298,8 @@ int migrate_collection(void * config, void * sconfig)
 
         ret = translate_0_0_1(
             server_config->data_path, 
-	    server_config->meta_path,
-	    old_coll_path, 
+            server_config->meta_path,
+            old_coll_path, 
             fs_config->file_system_name, 
             fs_config->coll_id);
         if(ret < 0)
@@ -334,7 +335,7 @@ int migrate_collection(void * config, void * sconfig)
              * is anymore
              */
             DIR * data_storage_dir;
-	    DIR * meta_storage_dir;
+            DIR * meta_storage_dir;
             struct dirent * next_dirent;
             char collname[PATH_MAX];
             int collname_length;
@@ -380,11 +381,11 @@ int migrate_collection(void * config, void * sconfig)
             }
 
 	    /* if the meta and data paths are the same, don't try to remove twice */
-	    if (strcmp(server_config->data_path, server_config->meta_path))
-	    {
-	    	meta_storage_dir = opendir(server_config->meta_path);
-	    	if(!meta_storage_dir)
-            	{
+        if (strcmp(server_config->data_path, server_config->meta_path))
+        {
+            meta_storage_dir = opendir(server_config->meta_path);
+            if(!meta_storage_dir)
+            {
                     fprintf(stderr, "Error: failed to open meta directory: %s\n",
                         server_config->meta_path);
                     return -1;
@@ -729,7 +730,7 @@ static int translate_0_0_1(
         printf("VERBOSE Creating temporary collection to migrate to.\n");
     ret = pvfs2_mkspace(
         data_storage_space,
-	meta_storage_space,
+        meta_storage_space,
         coll_name,
         coll_id, 
         TROVE_HANDLE_NULL,

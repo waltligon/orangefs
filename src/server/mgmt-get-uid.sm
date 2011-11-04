@@ -122,7 +122,8 @@ static PINT_sm_action uid_mgmt_do_work(
 struct PINT_server_req_params pvfs2_uid_mgmt_params =
 {
     .string_name = "mgmt_get_uid",
-    .perm = PINT_SERVER_CHECK_NONE,
+/* TODO: orange-security */
+    .perm = (PINT_server_req_perm_fun) PINT_SERVER_CHECK_NONE,
     .state_machine = &pvfs2_uid_mgmt_sm
 };
 

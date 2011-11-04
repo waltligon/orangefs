@@ -206,10 +206,32 @@ static int cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_batch_remove(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_BATCH_REMOVE)
+    {
+        ret = 0;
+    }
+    else if ((s_op->req->capability.op_mask & PINT_CAP_REMOVE) &&
+             (s_op->req->u.batch_remove.handle_count == 1))
+    {
+        /* remove capability allows you to remove only one object */
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_batch_remove_params =
 {
     .string_name = "batch_remove",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_batch_remove,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_batch_remove_sm
 };

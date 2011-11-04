@@ -76,7 +76,7 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => mkdir_seteattr_setup_msgpair;
+        success => mkdir_getattr_setup;
         default => mkdir_msg_failure;
     }
 
@@ -84,6 +84,19 @@ machine pvfs2_client_mkdir_sm
     {
         run mkdir_msg_failure;
         default => cleanup;
+    }
+    
+    state mkdir_getattr_setup
+    {
+        run mkdir_getattr_setup;
+        default => mkdir_getattr;
+    }
+
+    state mkdir_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => mkdir_seteattr_setup_msgpair;
+        default => delete_handle_setup_msgpair;
     }
 
     state mkdir_seteattr_setup_msgpair
@@ -156,7 +169,7 @@ PVFS_error PVFS_isys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_mkdir *resp,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -201,7 +214,7 @@ PVFS_error PVFS_isys_mkdir(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.mkdir.object_name = object_name;
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -224,7 +237,7 @@ PVFS_error PVFS_sys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_mkdir *resp,
     PVFS_hint hints)
 {
@@ -234,7 +247,7 @@ PVFS_error PVFS_sys_mkdir(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
 
     ret = PVFS_isys_mkdir(object_name, parent_ref, attr,
-                          credentials, resp, &op_id, hints, NULL);
+                          credential, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_mkdir call", ret);
@@ -270,7 +283,7 @@ static PINT_sm_action mkdir_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT),
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY), 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -368,6 +381,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(
 
     PINT_SERVREQ_MKDIR_FILL(
         msg_p->req,
+        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         meta_handle_extent_array,
@@ -417,7 +431,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->u.mkdir.object_name,
         sm_p->u.mkdir.metafile_handle,
         sm_p->object_ref.handle,
@@ -484,7 +498,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->u.mkdir.metafile_getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->u.mkdir.metafile_handle,
         sm_p->hints);
@@ -524,6 +538,9 @@ static PINT_sm_action mkdir_cleanup(
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
+    /* nlmills: TODO: ensure this is always safe to call */
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->u.mkdir.metafile_getattr);
+    
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?
@@ -596,6 +613,26 @@ static PINT_sm_action mkdir_parent_getattr_inspect(
 
     return SM_ACTION_COMPLETE;
 }
+
+static PINT_sm_action mkdir_getattr_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref ref;
+
+    ref.fs_id = sm_p->object_ref.fs_id;
+    ref.handle = sm_p->u.mkdir.metafile_handle;
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->u.mkdir.metafile_getattr,
+        ref,
+        PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+    
+    return SM_ACTION_COMPLETE;
+}
+
 
 static PINT_sm_action mkdir_seteattr_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
@@ -707,7 +744,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(
 
     PINT_SERVREQ_SETEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            sm_p->u.mkdir.metafile_getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->u.mkdir.metafile_handle,
             0,

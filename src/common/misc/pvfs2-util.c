@@ -14,13 +14,15 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
-#include <sys/types.h>
-#ifndef WIN32
 #include <unistd.h>
+#include <sys/types.h>
 #include <sys/time.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <signal.h>
 #include <libgen.h>
-#endif
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
@@ -34,6 +36,7 @@
 #include "pint-sysint-utils.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "security-util.h"
 
 #ifdef HAVE_MNTENT_H
 
@@ -157,6 +160,148 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
+int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
+{
+    return PVFS_util_gen_credential(NULL, NULL, 
+                                    PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
+                                    NULL, cred);
+}
+
+
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+{
+    struct sigaction newsa, oldsa;
+    pid_t pid;
+    int filedes[2];
+    int ret;
+
+    if (!keypath && getenv("PVFS2KEY_FILE"))
+    {
+        keypath = getenv("PVFS2KEY_FILE");
+    }
+
+    memset(&newsa, 0, sizeof(newsa));
+    newsa.sa_handler = SIG_DFL;
+    sigaction(SIGCHLD, &newsa, &oldsa);
+
+    ret = pipe(filedes);
+    if (ret == -1)
+    {
+        return -PVFS_errno_to_error(errno);
+    }
+
+    pid = fork();
+    if (pid == 0)
+    {
+        char *args[7];
+        char **ptr = args;
+        char timearg[16];
+        char *envp[] = { NULL };
+
+        close(STDERR_FILENO);
+        close(STDOUT_FILENO);
+        dup(filedes[1]);
+        close(STDIN_FILENO);
+
+        *ptr++ = BINDIR"/pvfs2-gencred";
+
+        if (user)
+        {
+            *ptr++ = "-u";
+            *ptr++ = (char*)user;
+        }
+        if (group)
+        {
+            *ptr++ = "-g";
+            *ptr++ = (char*)group;
+        }
+        if (timeout != PVFS_DEFAULT_CREDENTIAL_TIMEOUT)
+        {
+           snprintf(timearg, sizeof(timearg), "%u", timeout);
+           *ptr++ = "-t";
+           *ptr++ = timearg;
+        }
+        if (keypath)
+        {
+            *ptr++ = "-k";
+            *ptr++ = (char*)keypath;
+        }
+        *ptr++ = NULL;
+        execve(BINDIR"/pvfs2-gencred", args, envp);
+
+        _exit(100);
+    }
+    else if (pid == -1)
+    {
+        close(filedes[1]);
+        ret = -PVFS_errno_to_error(errno);
+    }
+    else
+    {
+        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
+        ssize_t total = 0;
+        ssize_t cnt;
+
+        /* close write end so we get EOF when child exits */
+        close(filedes[1]);
+
+        do
+        {
+            do cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
+            while (cnt == -1 && errno == EINTR);
+            total += cnt;
+        } while (cnt > 0);
+        
+        if (cnt == -1)
+        {
+            ret = -PVFS_errno_to_error(errno);
+        }
+        else
+        {
+            int rc;
+
+            waitpid(pid, &rc, 0);
+            if (WIFEXITED(rc) && !WEXITSTATUS(rc))
+            {
+                char *ptr = buf;
+                PVFS_credential tmp;
+
+                decode_PVFS_credential(&ptr, &tmp);
+                ret = PINT_copy_credential(&tmp, cred);
+            }
+            else
+            {
+                /* nlmills: TODO: find a more appropriate error code */
+                ret = -PVFS_EINVAL;
+            }
+        }
+    }
+
+    close(filedes[0]);
+    sigaction(SIGCLD, &oldsa, NULL);
+
+    return ret;
+}
+
+int PVFS_util_refresh_credential(PVFS_credential *cred)
+{
+    int ret;
+
+    /* =if the credential is valid for at least an hour */
+    if (PINT_util_get_current_time() <= cred->timeout - 3600)
+    {
+        ret = 0;
+    }
+    else
+    {
+        PINT_cleanup_credential(cred);
+        ret = PVFS_util_gen_credential_defaults(cred);
+    }
+
+    return ret;
+}
+
 int PVFS_util_get_umask(void)
 {
     static int mask = 0, set = 0;
@@ -168,31 +313,6 @@ int PVFS_util_get_umask(void)
         set = 1;
     }
     return mask;
-}
-
-PVFS_credentials *PVFS_util_dup_credentials(
-    const PVFS_credentials *credentials)
-{
-    PVFS_credentials *ret = NULL;
-
-    if (credentials)
-    {
-        ret = malloc(sizeof(PVFS_credentials));
-        if (ret)
-        {
-            memcpy(ret, credentials, sizeof(PVFS_credentials));
-        }
-    }
-    return ret;
-}
-
-void PVFS_util_release_credentials(
-    PVFS_credentials *credentials)
-{
-    if (credentials)
-    {
-        free(credentials);
-    }
 }
 
 int PVFS_util_copy_sys_attr(
@@ -1005,6 +1125,23 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
             }
         }
     }
+
+    /* check the dynamic region if we haven't found a match yet */
+    for (i = 0; i < s_stat_tab_array[
+             PVFS2_DYNAMIC_TAB_INDEX].mntent_count; i++)
+    {
+        struct PVFS_sys_mntent *mnt_iter;
+        mnt_iter = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
+                     mntent_array[i]);
+
+        if (mnt_iter->fs_id == fs_id)
+        {
+            PVFS_util_copy_mntent(out_mntent, mnt_iter);
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return 0;
+        }
+    }
+
     gen_mutex_unlock(&s_stat_tab_mutex);
     return -PVFS_EINVAL;
 }
@@ -1418,6 +1555,15 @@ int PVFS_util_copy_mntent(
             }
         }
 
+        /* nlmills: TODO: this copy will leak memory. fix that */
+        dest_mntent->the_pvfs_config_server = 
+            strdup(src_mntent->the_pvfs_config_server);
+        if (!dest_mntent->the_pvfs_config_server)
+        {
+            ret = -PVFS_ENOMEM;
+            goto error_exit;
+        }
+
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
         if (!dest_mntent->pvfs_fs_name)
         {
@@ -1644,6 +1790,11 @@ uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_META_DIST;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_CAPABILITY)
+    {
+        attrmask |= PVFS_ATTR_CAPABILITY;
+    }
+
     if(sys_attrmask & PVFS_ATTR_SYS_UID)
         attrmask |= PVFS_ATTR_COMMON_UID;
     if(sys_attrmask & PVFS_ATTR_SYS_GID)
@@ -1730,6 +1881,10 @@ uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_DIR_HINT)
     {
         sys_mask |= PVFS_ATTR_SYS_DIR_HINT;
+    }
+    if (obj_mask & PVFS_ATTR_CAPABILITY)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CAPABILITY;
     }
 
     /* NOTE: the PVFS_ATTR_META_UNSTUFFED is intentionally not exposed
@@ -1994,14 +2149,9 @@ int32_t PVFS_util_translate_mode(int mode, int suid)
 #undef NUM_MODES
 }
 
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    return(PINT_util_gen_credentials(credentials));
-}
-
 /*
  * Local variables:
+ *  mode: c
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:

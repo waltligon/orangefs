@@ -60,6 +60,18 @@ typedef uint64_t u_int64_t;
     *(pptr) += 4; \
 } while (0)
 
+#define encode_PVFS_signature(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_signature(pptr,x) decode_char(pptr,x)
+
+#define encode_char(pptr,x) do { \
+    *(char *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_char(pptr,x) do { \
+    *(x) = *(char *) *(pptr); \
+    *(pptr) += 1; \
+} while (0)
+
 #define encode_int32_t(pptr,x) do { \
     *(int32_t*) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
@@ -851,9 +863,52 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         default: assert(0);                                                   \
     }                                                                         \
 };
-
-#ifdef WIN32
-#endif
+/* 3 fields, then an array, then 2 fields, then an array */
+#define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+        for (i=0; i<x->n1; i++) \
+            encode_##ta1(pptr, &(x)->a1[i]); \
+    align8(pptr); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
+    align8(pptr); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+    { \
+        x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+        for (i=0; i<x->n1; i++) \
+            decode_##ta1(pptr, &(x)->a1[i]); \
+    } \
+    else \
+        x->a1 = NULL; \
+    align8(pptr); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+}
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 

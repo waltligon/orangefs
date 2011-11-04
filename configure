@@ -666,6 +666,10 @@ TRUSTED_CONNECTIONS
 MMAP_RA_CACHE
 NEED_BERKELEY_DB
 BUILD_BMI_ONLY
+ENABLE_SECURITY
+OPENSSL_LIB
+OPENSSL_LDFLAGS
+OPENSSL_CPPFLAGS
 BUILD_SERVER
 THREAD_LIB
 LIBCFLAGS
@@ -744,7 +748,8 @@ ac_user_opts='
 enable_option_checking
 enable_thread_safety
 enable_server
-with_openssl
+with_ssl
+enable_security
 enable_karma_mem_usage_stats
 enable_bmi_only
 enable_perf_counters
@@ -1420,6 +1425,7 @@ Optional Features:
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --disable-thread-safety Disables thread safety in the client library
   --disable-server        Disables building of PVFS2 server
+  --enable-security       Enables robust security features
   --disable-karma-mem-usage-stats
                           Disables memory usage stats in karma
   --enable-bmi-only       Build only the BMI library
@@ -1463,8 +1469,8 @@ Optional Features:
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
-  --with-openssl=<dir>    Build with openssl (default=/usr)
-  --without-openssl       Don't build with openssl.
+  --with-ssl=DIR          use ssl (default is yes) specify the root directory
+                          for ssl library (optional)
   --with-mtrace           Use mtrace (must set MALLOC_TRACE to output file)
   --with-berkdb-debug     Use berkeley db error reporting (if detected).
   --with-tau=path         Use TAU trace library installed in "path"
@@ -5006,158 +5012,235 @@ fi
 
 
 
-# Check whether --with-openssl was given.
-if test "${with_openssl+set}" = set; then :
-  withval=$with_openssl;
-    opensslpath=${withval}
 
-    if test "x${withval}" != "xno"; then
-
-        { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl library" >&5
-$as_echo_n "checking for openssl library... " >&6; }
-
-        if test "x${opensslpath}" != "x"; then
-            CFLAGS="${CFLAGS} -I${opensslpath}/include"
-            LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
-            SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
-        fi
-        LIBS="$LIBS -lcrypto -lssl"
-
-        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include "openssl/bio.h"
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
+# Check whether --with-ssl was given.
+if test "${with_ssl+set}" = set; then :
+  withval=$with_ssl;
+				if test "$withval" = "no"; then
+					want_ssl="no"
+				elif test "$withval" = "yes"; then
+					want_ssl="yes"
+					ac_ssl_path=""
+				else
+					want_ssl="yes"
+					ac_ssl_path="$withval"
+				fi
 
 else
-  as_fn_error $? "Invalid openssl path specified.  No openssl/bio.h found." "$LINENO" 5
+  want_ssl="yes"
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-        cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+
+	if test "x$want_ssl" = "xyes"; then
+
+		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl/md5.h" >&5
+$as_echo_n "checking for openssl/md5.h... " >&6; }
+
+		if test "$ac_ssl_path" != ""; then
+			OPENSSL_CPPFLAGS="-I$ac_ssl_path/include"
+			OPENSSL_LDFLAGS="-L$ac_ssl_path/lib64 -L$ac_ssl_path/lib"
+		else
+			for ac_ssl_path_tmp in /usr /usr/local /opt ; do
+				if test -d "$ac_ssl_path_tmp" && test -r "$ac_ssl_path_tmp/include/openssl/md5.h"; then
+					OPENSSL_CPPFLAGS="-I$ac_ssl_path_tmp/include"
+					OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib64 -L$ac_ssl_path_tmp/lib"
+					break;
+				fi
+			done
+		fi
+
+		if test "$OPENSSL_CPPFLAGS" = "";then
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: '*** openssl/md5.h does not exist'" >&5
+$as_echo "$as_me: WARNING: '*** openssl/md5.h does not exist'" >&2;}
+		else
+			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+
+			CPPFLAGS="$CPPFLAGS $OPENSSL_CPPFLAGS"
+			export CPPFLAGS
+			LDFLAGS="$LDFLAGS $OPENSSL_LDFLAGS"
+			export LDFLAGS
+
+
+
+
+			ax_lib=ssl
+			as_ac_Lib=`$as_echo "ac_cv_lib_$ax_lib''_SSLv2_method" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for SSLv2_method in -l$ax_lib" >&5
+$as_echo_n "checking for SSLv2_method in -l$ax_lib... " >&6; }
+if eval \${$as_ac_Lib+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-l$ax_lib  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-#include "openssl/bio.h"
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char SSLv2_method ();
 int
 main ()
 {
-BIO * b;
+return SSLv2_method ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
+  eval "$as_ac_Lib=yes"
 else
-  as_fn_error $? "could not find openssl libs" "$LINENO" 5
+  eval "$as_ac_Lib=no"
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
-
-
-$as_echo "#define WITH_OPENSSL 1" >>confdefs.h
-
-
-	for ac_header in openssl/evp.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/evp.h" "ac_cv_header_openssl_evp_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_evp_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_OPENSSL_EVP_H 1
-_ACEOF
-
+LIBS=$ac_check_lib_save_LIBS
 fi
-
-done
-
-	for ac_header in openssl/crypto.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/crypto.h" "ac_cv_header_openssl_crypto_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_crypto_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_OPENSSL_CRYPTO_H 1
-_ACEOF
-
-fi
-
-done
-
-    fi
-
+eval ac_res=\$$as_ac_Lib
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
+  link_ssl="yes";break
 else
-
-    { $as_echo "$as_me:${as_lineno-$LINENO}: checking for openssl library" >&5
-$as_echo_n "checking for openssl library... " >&6; }
-    TMPLIBS=${LIBS}
-    LIBS="$LIBS -lcrypto -lssl"
-
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include "openssl/bio.h"
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-
-else
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No openssl headers found." >&5
-$as_echo "$as_me: WARNING: No openssl headers found." >&2;}
+  link_ssl="no"
 fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 
-    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+			if test "x$link_ssl" = "xno"; then
+				{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Could not link against lib$ax_lib !" >&5
+$as_echo "$as_me: WARNING: Could not link against lib$ax_lib !" >&2;}
+			else
+
+$as_echo "#define HAVE_OPENSSL /**/" >>confdefs.h
+
+			fi
+
+			ax_lib=crypto
+			as_ac_Lib=`$as_echo "ac_cv_lib_$ax_lib''_MD5_Init" | $as_tr_sh`
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for MD5_Init in -l$ax_lib" >&5
+$as_echo_n "checking for MD5_Init in -l$ax_lib... " >&6; }
+if eval \${$as_ac_Lib+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-l$ax_lib  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
-#include "openssl/bio.h"
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char MD5_Init ();
 int
 main ()
 {
-BIO * b;
+return MD5_Init ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-$as_echo "yes" >&6; }
-
-$as_echo "#define WITH_OPENSSL 1" >>confdefs.h
-
-
+  eval "$as_ac_Lib=yes"
 else
-
-      	{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: No openssl headers found." >&5
-$as_echo "$as_me: WARNING: No openssl headers found." >&2;}
-	LIBS=${TMPLIBS}
-
+  eval "$as_ac_Lib=no"
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+eval ac_res=\$$as_ac_Lib
+	       { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_res" >&5
+$as_echo "$ac_res" >&6; }
+if eval test \"x\$"$as_ac_Lib"\" = x"yes"; then :
+  link_crypto="yes";break
+else
+  link_crypto="no"
+fi
 
-    for ac_header in openssl/evp.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/evp.h" "ac_cv_header_openssl_evp_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_evp_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_OPENSSL_EVP_H 1
+			if test "x$link_crypto" = "xno"; then
+				{ $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Could not link against lib$ax_lib !" >&5
+$as_echo "$as_me: WARNING: Could not link against lib$ax_lib !" >&2;}
+			fi
+
+			if test "x$link_ssl" = "xyes"; then
+				OPENSSL_LIB="$OPENSSL_LIB -lssl"
+			fi
+			if test "x$link_crypto" = "xyes"; then
+				OPENSSL_LIB="$OPENSSL_LIB -lcrypto"
+			fi
+
+
+			if test -d "/usr/kerberos/include" ; then
+			    OPENSSL_CPPFLAGS="$OPENSSL_CPPFLAGS -I/usr/kerberos/include"
+
+			fi
+		fi
+	fi
+
+
+
+	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for getgrouplist in distro" >&5
+$as_echo_n "checking for getgrouplist in distro... " >&6; }
+
+	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <grp.h>
+
 _ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "getgrouplist" >/dev/null 2>&1; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+$as_echo "#define HAVE_GETGROUPLIST 1" >>confdefs.h
 
-fi
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <unistd.h>
 
-done
-
-    for ac_header in openssl/crypto.h
-do :
-  ac_fn_c_check_header_mongrel "$LINENO" "openssl/crypto.h" "ac_cv_header_openssl_crypto_h" "$ac_includes_default"
-if test "x$ac_cv_header_openssl_crypto_h" = xyes; then :
-  cat >>confdefs.h <<_ACEOF
-#define HAVE_OPENSSL_CRYPTO_H 1
 _ACEOF
+if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
+  $EGREP "getgrouplist" >/dev/null 2>&1; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+$as_echo "yes" >&6; }
+$as_echo "#define HAVE_GETGROUPLIST 1" >>confdefs.h
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
+$as_echo "no" >&6; }
+fi
+rm -f conftest*
+
+
+fi
+rm -f conftest*
+
+
+
+
+# Check whether --enable-security was given.
+if test "${enable_security+set}" = set; then :
+  enableval=$enable_security; if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY=1
+
+$as_echo "#define ENABLE_SECURITY 1" >>confdefs.h
+
+else
+    ENABLE_SECURITY=
+fi
+else
+  ENABLE_SECURITY=
 
 fi
 
-done
-
-
-
-fi
 
 
 # Check whether --enable-karma-mem-usage-stats was given.
@@ -12004,7 +12087,7 @@ for d in src/apps src/io src/common src/client src/kernel \
        install -d $d;
 done
 
-ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/devel/module.mk src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/ucache/module.mk src/apps/kernel/linux/module.mk src/apps/user/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/bmi/bmi_zoid/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/client/usrint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
+ac_config_files="$ac_config_files include/pvfs2.h Makefile module.mk src/apps/admin/module.mk src/apps/admin/pvfs2-config src/apps/devel/module.mk src/apps/karma/module.mk src/apps/vis/module.mk src/apps/fuse/module.mk src/apps/ucache/module.mk src/apps/kernel/linux/module.mk src/apps/user/module.mk src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/misc/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/common/statecomp/module.mk src/common/events/module.mk src/common/mgmt/module.mk src/common/security/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/bmi/bmi_gm/module.mk src/io/bmi/bmi_mx/module.mk src/io/bmi/bmi_ib/module.mk src/io/bmi/bmi_portals/module.mk src/io/bmi/bmi_zoid/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/flow/flowproto-dump-offsets/module.mk src/io/flow/flowproto-bmi-cache/module.mk src/io/buffer/module.mk src/io/job/module.mk src/io/dev/module.mk src/proto/module.mk src/server/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk src/client/usrint/module.mk src/kernel/linux-2.6/Makefile src/kernel/linux-2.4/Makefile doc/module.mk doc/coding/module.mk doc/design/module.mk doc/random/module.mk examples/pvfs2-server.rc doc/doxygen/pvfs2-doxygen.conf"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -12736,6 +12819,7 @@ do
     "src/common/statecomp/module.mk") CONFIG_FILES="$CONFIG_FILES src/common/statecomp/module.mk" ;;
     "src/common/events/module.mk") CONFIG_FILES="$CONFIG_FILES src/common/events/module.mk" ;;
     "src/common/mgmt/module.mk") CONFIG_FILES="$CONFIG_FILES src/common/mgmt/module.mk" ;;
+    "src/common/security/module.mk") CONFIG_FILES="$CONFIG_FILES src/common/security/module.mk" ;;
     "src/io/bmi/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/module.mk" ;;
     "src/io/bmi/bmi_tcp/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_tcp/module.mk" ;;
     "src/io/bmi/bmi_gm/module.mk") CONFIG_FILES="$CONFIG_FILES src/io/bmi/bmi_gm/module.mk" ;;
@@ -13446,6 +13530,14 @@ $as_echo "PVFS2 will use workaround for buggy NPTL          :  no" >&6; }
 else
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: PVFS2 will use workaround for buggy NPTL          : yes" >&5
 $as_echo "PVFS2 will use workaround for buggy NPTL          : yes" >&6; }
+fi
+
+if test "x$ENABLE_SECURITY" = "x1"; then
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: PVFS2 configured with robust security             : yes" >&5
+$as_echo "PVFS2 configured with robust security             : yes" >&6; }
+else
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: PVFS2 configured with robust security             :  no" >&5
+$as_echo "PVFS2 configured with robust security             :  no" >&6; }
 fi
 
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then

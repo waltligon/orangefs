@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     struct options *user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential creds;
     struct PVFS_mgmt_setparam_value param_value;
 
     /* look at command line arguments */
@@ -70,7 +70,12 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     if (user_opts->single_server)
     {

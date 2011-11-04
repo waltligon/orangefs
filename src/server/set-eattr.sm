@@ -15,6 +15,7 @@
 #include "pint-util.h"
 #include "pint-eattr.h"
 #include "pvfs2-mirror.h"
+#include "pint-security.h"
 
 /*helper functions' prototypes*/
 static void init_keyval_structs(PINT_server_op *s_op, int free_val);
@@ -676,14 +677,28 @@ static void init_keyval_structs(PINT_server_op *s_op, int free_val)
    return;
 }/*end init_keyval_structs*/
 
+static int perm_seteattr(PINT_server_op *s_op)
+{
+    int ret;
 
+    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
 
 PINT_GET_OBJECT_REF_DEFINE(seteattr);
 
 struct PINT_server_req_params pvfs2_set_eattr_params =
 {
     .string_name = "set_eattr",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_seteattr,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_seteattr,

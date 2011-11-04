@@ -33,19 +33,8 @@ struct PVFS_util_tab_s
 };
 typedef struct PVFS_util_tab_s PVFS_util_tab;
 
-/* client side default credential generation */
-void PVFS_util_gen_credentials(
-    PVFS_credentials *credentials);
-
 /* returns the currently set umask */
 int PVFS_util_get_umask(void);
-
-/*
-  shallow copies the credentials into a newly allocated returned
-  credential object.  returns NULL on failure.
-*/
-PVFS_credentials *PVFS_util_dup_credentials(
-    const PVFS_credentials *credentials);
 
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     char* config_server,
@@ -53,8 +42,11 @@ struct PVFS_sys_mntent* PVFS_util_gen_mntent(
 
 void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent);
 
-void PVFS_util_release_credentials(
-    PVFS_credentials *credentials);
+enum { PVFS_DEFAULT_CREDENTIAL_TIMEOUT=0 };
+int PVFS_util_gen_credential_defaults(PVFS_credential *cred);
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred);
+int PVFS_util_refresh_credential(PVFS_credential *cred);
 
 int PVFS_util_copy_sys_attr(
     PVFS_sys_attr *dest_attr,
@@ -73,11 +65,13 @@ int PVFS_util_resolve(
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,
     int out_fs_path_max);
+/* TODO: orange-security
 int PVFS_util_resolve_absolute(
     const char* local_path,
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,
     int out_fs_path_max);
+*/
 int PVFS_util_get_default_fsid(
     PVFS_fs_id* out_fs_id);
 

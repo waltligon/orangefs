@@ -31,6 +31,7 @@
 #include "ncache.h"
 #include "pvfs2-internal.h"
 #include "extent-utils.h"
+#include "security-util.h"
 
 #define	MAX_PARTITIONS	2
 
@@ -144,6 +145,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
     struct server_configuration_s *server_config = get_server_config_struct();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
+    PVFS_capability capability;
 
     s_op->u.tree_communicate.handle_array_local = calloc(
         num_data_files, sizeof(*s_op->u.tree_communicate.handle_array_local));
@@ -162,6 +164,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+
+    /* nlmills: TODO: replace with real capability */
+    PINT_null_capability(&capability);
 
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
@@ -209,7 +214,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             {
                 PINT_SERVREQ_REMOVE_FILL(
                     *req,
-                    s_op->req->credentials,
+                    capability,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[i],
                     s_op->req->hints);
@@ -221,7 +226,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             {
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
-                    s_op->req->credentials,
+                    capability,
+                    this_req->u.tree_get_file_size.credential,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[i],
                     PVFS_ATTR_DATA_SIZE,
@@ -321,7 +327,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                 {
                     PINT_SERVREQ_TREE_REMOVE_FILL(
                         msg_p->req,
-                        s_op->req->credentials,
+                        capability,
                         fs_id,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
@@ -336,7 +342,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
 /* TODO: Need to pass along hints. */
                   PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                       msg_p->req,
-                      s_op->req->credentials,
+                      capability,
+                      this_req->u.tree_get_file_size.credential,
                       fs_id,
                       (i * num_files_per_server),
                       num_data_files_for_this_server,
@@ -727,11 +734,21 @@ static inline int PINT_get_object_ref_tree_remove(
     return 0;
 };
 
+static int perm_tree_remove(struct PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: add real security checks */
+    ret = 0;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_tree_remove_params =
 {
     .string_name = "tree_remove",
     .get_object_ref = PINT_get_object_ref_tree_remove,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_tree_remove,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_tree_remove_sm
 };
@@ -744,11 +761,21 @@ static inline int PINT_get_object_ref_tree_get_file_size(
     return 0;
 };
 
+static int perm_tree_get_file_size(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: add real security checks */
+    ret = 0;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_tree_get_file_size_params =
 {
     .string_name = "tree_get_file_size",
     .get_object_ref = PINT_get_object_ref_tree_get_file_size,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_tree_get_file_size,
     .access_type = PINT_server_req_readonly,
     .state_machine = &pvfs2_tree_get_file_size_sm
 };

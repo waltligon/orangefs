@@ -32,6 +32,10 @@
 #define INT32_MAX (2147483647)
 #endif
 
+#ifndef UINT32_MAX
+#define UINT32_MAX (4294967295U)
+#endif
+
 #ifndef NAME_MAX
 #define NAME_MAX 255
 #endif
@@ -159,7 +163,9 @@ typedef int32_t PVFS_ds_flags;
 
 /* Basic types used within metadata. */
 typedef uint32_t PVFS_uid;
+#define PVFS_UID_MAX UINT32_MAX
 typedef uint32_t PVFS_gid;
+#define PVFS_GID_MAX UINT32_MAX
 typedef uint64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 typedef uint64_t PVFS_flags;
@@ -410,6 +416,7 @@ typedef struct
 #define PVFS_ATTR_SYS_DIR_HINT              (1 << 27)
 #define PVFS_ATTR_SYS_BLKSIZE               (1 << 28)
 #define PVFS_ATTR_SYS_MIRROR_COPIES_COUNT   (1 << 29)
+#define PVFS_ATTR_SYS_CAPABILITY            (1 << 30)
 #define PVFS_ATTR_SYS_UID                   (1 << 0)
 #define PVFS_ATTR_SYS_GID                   (1 << 1)
 #define PVFS_ATTR_SYS_PERM                  (1 << 2)
@@ -488,20 +495,6 @@ typedef struct
     PVFS_fs_id fs_id;
     int32_t    __pad1;
 } PVFS_object_ref;
-
-/** Credentials (stubbed for future authentication methods). */
-typedef struct
-{
-#ifdef WIN32
-    /* TODO - store username string? */
-#endif
-    PVFS_uid uid;
-    PVFS_gid gid;
-} PVFS_credentials;
-endecode_fields_2(
-    PVFS_credentials,
-    PVFS_uid, uid,
-    PVFS_gid, gid);
 
 /* max length of BMI style URI's for identifying servers */
 #define PVFS_MAX_SERVER_ADDR_LEN 256
@@ -1007,6 +1000,65 @@ struct profiler
 #define PRINT_PROFILER(label, prof_struct) \
       gossip_err("PROFILING %s: %f\n", label, prof_struct.save_timing / 1000000.0);
 
+/*
+ * New types for robust security implementation.
+ */
+typedef unsigned char *PVFS_signature;
+
+typedef struct PVFS_capability PVFS_capability;
+struct PVFS_capability
+{
+    char *issuer;              /* alias of the issuing server */
+    PVFS_fs_id fsid;           /* fsid for which this capability is valid */
+    uint32_t sig_size;         /* length of the signature in bytes */
+    PVFS_signature signature;  /* digital signature */
+    PVFS_time timeout;         /* seconds after epoch to time out */
+    uint32_t op_mask;          /* allowed operations mask */
+    uint32_t num_handles;      /* number of elements in the handle array */
+    PVFS_handle *handle_array; /* handles in this capability */
+};
+endecode_fields_3a2a_struct (
+    PVFS_capability,
+    string, issuer,
+    PVFS_fs_id, fsid,
+    skip4,,
+    uint32_t, sig_size,
+    PVFS_signature, signature,
+    PVFS_time, timeout,
+    uint32_t, op_mask,
+    uint32_t, num_handles,
+    PVFS_handle, handle_array);
+#define extra_size_PVFS_capability (PVFS_REQ_LIMIT_HANDLES_COUNT * \
+                                    sizeof(PVFS_handle)          + \
+                                    PVFS_REQ_LIMIT_ISSUER        + \
+                                    PVFS_REQ_LIMIT_SIGNATURE)
+
+typedef struct PVFS_credential PVFS_credential;
+struct PVFS_credential 
+{
+    PVFS_uid userid;           /* user id */
+    uint32_t num_groups;       /* length of group_array */
+    PVFS_gid *group_array;     /* groups for which the user is a member */
+    char *issuer;              /* alias of the issuing server */
+    PVFS_time timeout;         /* seconds after epoch to time out */
+    uint32_t sig_size;         /* length of the signature in bytes */
+    PVFS_signature signature;  /* digital signature */
+};
+endecode_fields_3a2a_struct (
+    PVFS_credential,
+    skip4,,
+    skip4,,
+    PVFS_uid, userid,
+    uint32_t, num_groups,
+    PVFS_gid, group_array,
+    string, issuer,
+    PVFS_time, timeout,
+    uint32_t, sig_size,
+    PVFS_signature, signature);
+#define extra_size_PVFS_credential (PVFS_REQ_LIMIT_GROUPS    * \
+                                    sizeof(PVFS_gid)         + \
+                                    PVFS_REQ_LIMIT_ISSUER    + \
+                                    PVFS_REQ_LIMIT_SIGNATURE)
 
 #endif /* __PVFS2_TYPES_H */
 

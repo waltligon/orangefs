@@ -27,7 +27,7 @@ static void cleanup(struct options *ptr, PVFS_BMI_addr_t *addr_array,
 
 int main(int argc, char *argv[])
 {
-    PVFS_credentials creds;
+    PVFS_credential creds;
     PVFS_fs_id cur_fs;
     PVFS_BMI_addr_t *addr_array, server_addr;
     PVFS_uid_info_s **uid_info_array;
@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
         return (-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    PVFS_util_gen_credential_defaults(&creds);
 
     /* get a default fsid or use the one given by the user */
     if (prog_opts->fs_id == -1)
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     else
     {
         /* else, user specified no servers, so a list will be built */
-        ret = PVFS_mgmt_count_servers(cur_fs, &creds, PINT_SERVER_TYPE_ALL,
+        ret = PVFS_mgmt_count_servers(cur_fs, PINT_SERVER_TYPE_ALL,
                                       &(prog_opts->server_count));
         if (ret < 0)
         {
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
         }
 
         /* retrieve the list of BMI addrs for the list of servers */
-        ret = PVFS_mgmt_get_server_array(cur_fs, &creds, PINT_SERVER_TYPE_ALL, 
+        ret = PVFS_mgmt_get_server_array(cur_fs, PINT_SERVER_TYPE_ALL, 
                                             addr_array,
                                             &(prog_opts->server_count));
         if (ret < 0)

@@ -4,7 +4,7 @@
  * Changes by Acxiom Corporation to add PINT_check_mode() helper function
  * as a replacement for check_mode() in permission checking, also added
  * PINT_check_group() for supplimental group support 
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
@@ -14,302 +14,328 @@
  */
 #include <string.h>
 #include <assert.h>
-#include <pwd.h>
-#include <grp.h>
 
 #include "pvfs2-debug.h"
-#include "gen-locks.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "server-config.h"
+#include "trove.h"
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
 #include "gossip.h"
 #include "bmi-byteswap.h"
 #include "check.h"
+#include "security-util.h"
 
-static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
-static int pw_buf_size = 1024;      // 1 KB
-static int gr_buf_size = 1024*1024; // 1 MB
-static char* check_group_pw_buffer = NULL;
-static char* check_group_gr_buffer = NULL;
-static int PINT_check_group(uid_t uid, gid_t gid);
-
-/* PINT_check_mode()
- *
- * checks to see if the type of access described by "access_type" is permitted 
- * for user "uid" of group "gid" on the object with attributes "attr"
- *
- * returns 0 on success, -PVFS_EACCES if permission is not granted
- */
-int PINT_check_mode(
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid,
-    enum PINT_access_type access_type)
+enum access_type
 {
-    int in_group_flag = 0;
-    int ret = 0;
+    READ_ACCESS,
+    WRITE_ACCESS,
+    EXEC_ACCESS
+};
 
-    /* if we don't have masks for the permission information that we
-     * need, then the system is broken
-     */
+static int check_mode(enum access_type access, PVFS_uid userid,
+    PVFS_gid group, const PVFS_object_attr *attr);
+static int check_acls(void *acl_buf, size_t acl_size, 
+    const PVFS_object_attr *attr, PVFS_uid uid, PVFS_gid *group_array, 
+    uint32_t num_groups, int want);
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
+    PVFS_BMI_addr_t client_addr);
+static int permit_operation(PVFS_fs_id fsid,
+    enum PINT_server_req_access_type access_type, PVFS_BMI_addr_t client_addr);
+
+
+/* PINT_get_capabilities
+ *
+ * Sets all of the capability bits in the op_mask that apply to
+ * the combination of the given user and permissions. UID 0 is
+ * given all possible capabilities.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
+ */
+int PINT_get_capabilities(void *acl_buf, 
+                          size_t acl_size, 
+                          PVFS_uid userid,
+                          PVFS_gid *group_array, 
+                          uint32_t num_groups,
+                          const PVFS_object_attr *attr, 
+                          uint32_t *op_mask)
+{
+    PVFS_gid active_group;
+    int ret;
+    int i;
+
+    *op_mask = 0;
+    
+    /* root has every possible capability */
+    if (userid == 0)
+    {
+        *op_mask = ~((uint32_t)0);
+        return 0;
+    }
+
+    /* if acls are present then use them */
+    if (acl_size < 0)
+    {
+        assert(acl_buf);
+
+        /* nlmills: errors are ignored on purpose. we don't want to
+           give anyone free access.
+        */
+
+        ret = check_acls(acl_buf, acl_size, attr, userid, 
+                         group_array, num_groups, PVFS2_ACL_READ);
+        if (!ret)
+        {
+            *op_mask |= PINT_CAP_READ;
+        }
+
+        ret = check_acls(acl_buf, acl_size, attr, userid,
+                         group_array, num_groups, PVFS2_ACL_WRITE);
+        if (!ret)
+        {
+            *op_mask |= PINT_CAP_WRITE;
+        }
+
+        ret = check_acls(acl_buf, acl_size, attr, userid,
+                         group_array, num_groups, PVFS2_ACL_EXECUTE);
+        if (!ret)
+        {
+            *op_mask |= PINT_CAP_EXEC;
+        }
+    }
+    /* otherwise fall back to standard UNIX permissions */
+    else
+    {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                     "PINT_get_capabilities: ACL unavailable, "
+                     "using UNIX permissions\n");
+        
+        assert(num_groups > 0);
+        assert(attr->mask & PVFS_ATTR_COMMON_GID);
+        
+        /* see if the user is a member of the object's group */
+        active_group = group_array[0];
+        for (i = 0; i < num_groups; i++)
+        {
+            if (group_array[i] == attr->group)
+            {
+                active_group = group_array[i];
+                break;
+            }
+        }
+
+        if (check_mode(READ_ACCESS, userid, active_group, attr))
+        {
+            *op_mask |= PINT_CAP_READ;
+        }
+
+        if (check_mode(WRITE_ACCESS, userid, active_group, attr))
+        {
+            *op_mask |= PINT_CAP_WRITE;
+        }
+
+        if (check_mode(EXEC_ACCESS, userid, active_group, attr))
+        {
+            *op_mask |= PINT_CAP_EXEC;
+        }
+    }
+
+    /* only the owner can set attributes */
+    if (userid == attr->owner)
+    {
+        *op_mask |= PINT_CAP_SETATTR;
+    }
+
+    /* write and exec access to directories allows create and remove */
+    if (attr->objtype == PVFS_TYPE_DIRECTORY &&
+        *op_mask & PINT_CAP_WRITE &&
+        *op_mask & PINT_CAP_EXEC)
+    {
+        *op_mask |= PINT_CAP_CREATE | PINT_CAP_REMOVE;
+    }
+
+    /* nlmills: TODO: replace this hack */
+    /* if metafile is not initialized allow setattr to complete */
+    if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == 0 
+        && attr->owner == 0)
+    {
+        *op_mask |= PINT_CAP_SETATTR;
+    }
+
+    return 0;
+}
+
+/* PINT_perm_check
+ *
+ * Performs a permission check for the given server operation. Calls
+ * the permission function given in the server state machine.
+ *
+ * returns 0 on success
+ * returns negative PVFS error on failure
+ */
+int PINT_perm_check(struct PINT_server_op *s_op)
+{
+    PVFS_capability *cap = &s_op->req->capability;
+    PINT_server_req_perm_fun perm_fun;
+    int ret = -PVFS_EINVAL;
+
+    if (s_op->target_fs_id != PVFS_FS_ID_NULL)
+    {
+        /*
+         * if we are exporting a volume readonly, disallow any operation 
+         * that modifies the state of the file-system.
+         */
+        ret = permit_operation(s_op->target_fs_id, s_op->access_type,
+                               s_op->addr);
+        if (ret < 0)
+        {
+            return ret;
+        }
+    }
+
+    if (s_op->target_handle != PVFS_HANDLE_NULL && 
+        !PINT_capability_is_null(cap))
+    {
+        int index;
+
+        /* ensure we have a capability for the target handle */
+        for (index = 0; index < cap->num_handles; index++)
+        {
+            if (cap->handle_array[index] == s_op->target_handle)
+            {
+                break;
+            }
+        }
+        if (index == cap->num_handles)
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
+                         "an operation on target handle %llu that was "
+                         "not in the capability\n", llu(s_op->target_handle));
+            return -PVFS_EACCES;
+        }
+    }
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
+                 "attr mask %d\n\t(capability mask = %d)\n",
+                 PINT_map_server_op_to_string(s_op->req->op),
+                 s_op->attr.mask, cap->op_mask);
+
+    perm_fun = PINT_server_req_get_perm_fun(s_op->req);
+    if (perm_fun)
+    {
+        ret = perm_fun(s_op);
+    }
+    else
+    {
+        ret = -PVFS_EINVAL;
+    }
+
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+                 "Final permission check for \"%s\" set error code to %d\n", 
+                 PINT_map_server_op_to_string(s_op->req->op),
+                 ret);
+
+    return ret;
+}
+
+static int check_mode(enum access_type access, 
+               PVFS_uid userid, 
+               PVFS_gid group,
+               const PVFS_object_attr *attr)
+{
+    int user_other_access = 0;
+    int group_access = 0;
+    int mask;
+    
     assert(attr->mask & PVFS_ATTR_COMMON_UID &&
            attr->mask & PVFS_ATTR_COMMON_GID &&
            attr->mask & PVFS_ATTR_COMMON_PERM);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - check_mode called --- "
-                 "(uid=%d,gid=%d,access_type=%d)\n", uid, gid, access_type);
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - object attributes --- "
-                 "(uid=%d,gid=%d,mode=%d)\n", attr->owner, attr->group,
-                 attr->perms);
-
-    /* give root permission, no matter what */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                 " - checking if uid (%d) is root ...\n", uid);
-    if (uid == 0)
+    mask = 0;
+    if (attr->owner == userid)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return 0;
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-
-    /* see if uid matches object owner */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if owner (%d) "
-        "matches uid (%d)...\n", attr->owner, uid);
-    if(attr->owner == uid)
-    {
-        /* see if object user permissions match access type */
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-            "(%d) allows access type (%d) for user...\n", attr->perms, access_type);
-        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-            PVFS_U_READ))
+        if (access == READ_ACCESS)
         {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
+            mask = PVFS_U_READ;
         }
-        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-            PVFS_U_WRITE))
+        else if (access == WRITE_ACCESS)
         {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
+            mask = PVFS_U_WRITE;
         }
-        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-            PVFS_U_EXECUTE))
+        else if (access == EXEC_ACCESS)
         {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
+            mask = PVFS_U_EXECUTE;
         }
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
     else
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-    }
-
-    /* see if other bits allow access */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-        "(%d) allows access type (%d) by others...\n", attr->perms, access_type);
-    if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-        PVFS_O_READ))
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return(0);
-    }
-    if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-        PVFS_O_WRITE))
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return(0);
-    }
-    if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-        PVFS_O_EXECUTE))
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        return(0);
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-
-    /* see if gid matches object group */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
-        "matches gid (%d)...\n", attr->group, gid);
-    if(attr->group == gid)
-    {
-        /* default group match */
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        in_group_flag = 1;
-    }
-    else
-    {
-        /* no default group match, check supplementary groups */
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking for"
-            " supplementary group match...\n");
-        ret = PINT_check_group(uid, attr->group);
-        if(ret == 0)
+        if (access == READ_ACCESS)
         {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            in_group_flag = 1;
+            mask = PVFS_O_READ;
         }
-        else
+        else if (access == WRITE_ACCESS)
         {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-            if(ret != -PVFS_ENOENT)
-            {
-                /* system error; not just failed match */
-                return(ret);
-            }
+            mask = PVFS_O_WRITE;
+        }
+        else if (access == EXEC_ACCESS)
+        {
+            mask = PVFS_O_EXECUTE;
+        }
+    }
+    
+    user_other_access = attr->perms & mask;
+
+    mask = 0;
+    if (attr->group == group)
+    {
+        if (access == READ_ACCESS)
+        {
+            mask = PVFS_G_READ;
+        }
+        else if (access == WRITE_ACCESS)
+        {
+            mask = PVFS_G_WRITE;
+        }
+        else if (access == EXEC_ACCESS)
+        {
+            mask = PVFS_G_EXECUTE;
         }
     }
 
-    if(in_group_flag)
-    {
-        /* see if object group permissions match access type */
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-            "(%d) allows access type (%d) for group...\n", attr->perms, access_type);
-        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-            PVFS_G_READ))
-        {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
-        }
-        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-            PVFS_G_WRITE))
-        {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
-        }
-        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
-            PVFS_G_EXECUTE))
-        {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
-        }
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-    }
-  
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "******PINT_check_mode: denying access\n");
-    /* default case: access denied */
-    return -PVFS_EACCES;
-}
-
-/* PINT_check_group()
- *
- * checks to see if uid is a member of gid
- * 
- * returns 0 on success, -PVFS_ENOENT if not a member, other PVFS error codes
- * on system failure
- */
-static int PINT_check_group(uid_t uid, gid_t gid)
-{
-    struct passwd pwd;
-    struct passwd* pwd_p = NULL;
-    struct group grp;
-    struct group* grp_p = NULL;
-    int i = 0;
-    int ret = -1;
-
-    /* Explanation: 
-     *
-     * We use the _r variants of getpwuid and getgrgid in order to insure
-     * thread safety; particularly if this function ever gets called in a
-     * client side situation in which we can't prevent the application from
-     * making conflicting calls.
-     *
-     * These _r functions require that a buffer be supplied for the user and
-     * group information, however.  These buffers may be unconfortably large
-     * for the stack, so we malloc them on a static pointer and then mutex
-     * lock this function so that it can still be reentrant.
-     */
-
-    gen_mutex_lock(&check_group_mutex);
-
-    if(!check_group_pw_buffer)
-    {
-        check_group_pw_buffer = (char*)malloc(pw_buf_size);
-        check_group_gr_buffer = (char*)malloc(gr_buf_size);
-        if(!check_group_pw_buffer || !check_group_gr_buffer)
-        {
-            if(check_group_pw_buffer)
-            {
-                free(check_group_pw_buffer);
-                check_group_pw_buffer = NULL;
-            }
-            if(check_group_gr_buffer)
-            {
-                free(check_group_gr_buffer);
-                check_group_gr_buffer = NULL;
-            }
-            gen_mutex_unlock(&check_group_mutex);
-            return(-PVFS_ENOMEM);
-        }
-    }
-
-    /* get user information */
-    ret = getpwuid_r(uid, &pwd, check_group_pw_buffer, pw_buf_size, &pwd_p);
-    if(ret != 0 || pwd_p == NULL)
-    {
-        gen_mutex_unlock(&check_group_mutex);
-        gossip_err("Get user info for (uid=%d) failed."
-                   "errno [%d] error_msg [%s]\n",
-                   uid, ret, strerror(ret));
-        return(-PVFS_EINVAL);
-    }
-
-    /* check primary group */
-    if(pwd.pw_gid == gid)
-    {
-        gen_mutex_unlock(&check_group_mutex);
-        return 0;
-    }
-
-    /* get the members of the group */
-    ret = getgrgid_r(gid, &grp, check_group_gr_buffer, gr_buf_size, &grp_p);
-    if(ret != 0 || grp_p == NULL)
-    {
-      gen_mutex_unlock(&check_group_mutex);
-      gossip_err("Get members for group (gid=%d) failed."
-                 "errno [%d] error_msg [%s]\n",
-                 gid, ret, strerror(ret));
-      return(-PVFS_EINVAL);
-    }
-
-    for(i = 0; grp.gr_mem[i] != NULL; i++)
-    {
-        if(0 == strcmp(pwd.pw_name, grp.gr_mem[i]))
-        {
-            gen_mutex_unlock(&check_group_mutex);
-            return 0;
-        } 
-    }
-
-    gen_mutex_unlock(&check_group_mutex);
-    return(-PVFS_ENOENT);
-}
-
-/* Checks if a given user is part of any groups that matches the file gid */
-static int in_group_p(PVFS_uid uid, PVFS_gid gid, PVFS_gid attr_group)
-{
-    if (attr_group == gid)
-        return 1;
-    if (PINT_check_group(uid, attr_group) == 0)
-        return 1;
-    return 0;
+    group_access = attr->perms & mask;
+    
+    return (user_other_access || group_access);
 }
 
 /*
  * Return 0 if requesting clients is granted want access to the object
- * by the acl. Returns -PVFS_E... otherwise.
+ * by the acl. Returns -PVFS_EIO if ACL is invalid or not found,
+ * returns -PVFS_EACCESS if access is denied
  */
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid, int want)
+static int check_acls(void *acl_buf, 
+                      size_t acl_size, 
+                      const PVFS_object_attr *attr,
+                      PVFS_uid uid,
+                      PVFS_gid *group_array, 
+                      uint32_t num_groups, 
+                      int want)
 {
     pvfs2_acl_entry pe, *pa;
     int i = 0, found = 0, count = 0;
+    int j;
     assert(attr->mask & PVFS_ATTR_COMMON_UID &&
            attr->mask & PVFS_ATTR_COMMON_GID &&
            attr->mask & PVFS_ATTR_COMMON_PERM);
+    assert(num_groups > 0);
 
     if (acl_size == 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
-        return -PVFS_EACCES;
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, 
+            "no acl's present..check metadata instead!\n");
+        return -PVFS_EIO;
     }
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
@@ -319,7 +345,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
         (int) acl_size, 
         (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
-        uid, gid, want);
+        uid, group_array[0], want);
 
     assert(acl_buf);
     /* if the acl format doesn't look valid, then return an error rather than
@@ -328,7 +354,7 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
     if((acl_size % sizeof(pvfs2_acl_entry)) != 0)
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "invalid acls on object\n");
-        return(-PVFS_EACCES);
+        return(-PVFS_EIO);
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
 
@@ -358,18 +384,27 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
                     goto mask;
                 break;
             case PVFS2_ACL_GROUP_OBJ:
-                if (in_group_p(uid, gid, attr->group)) 
+                for (j = 0; j < num_groups; j++)
                 {
-                    found = 1;
-                    if ((pa->p_perm & want) == want)
-                        goto mask;
+                    if (group_array[j] == attr->group)
+                    {
+                        found = 1;
+                        if ((pa->p_perm & want) == want)
+                            goto mask;
+                        break;
+                    }
                 }
                 break;
             case PVFS2_ACL_GROUP:
-                if (in_group_p(uid, gid, pa->p_id)) {
-                    found = 1;
-                    if ((pa->p_perm & want) == want)
-                        goto mask;
+                for (j = 0; j < num_groups; j++)
+                {
+                    if (group_array[j] == pa->p_id)
+                    {
+                        found = 1;
+                        if ((pa->p_perm & want) == want)
+                            goto mask;
+                        break;
+                    }
                 }
                 break;
             case PVFS2_ACL_MASK:
@@ -378,8 +413,8 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
                 if (found)
                 {
                     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "(1) PINT_check_acls:"
-                        "returning access denied\n");
-                    return -PVFS_EACCES;
+                        "returning EIO\n");
+                    return -PVFS_EIO;
                 }
                 else
                     goto check_perm;
@@ -427,3 +462,76 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+/*
+ * Return zero if this operation should be allowed.
+ */
+static int permit_operation(PVFS_fs_id fsid,
+                            enum PINT_server_req_access_type access_type,
+                            PVFS_BMI_addr_t client_addr)
+{ 
+    int exp_flags = 0; 
+    struct server_configuration_s *serv_config = NULL;
+    struct filesystem_configuration_s * fsconfig = NULL;
+
+    if (access_type == PINT_SERVER_REQ_READONLY)
+    {
+        return 0;  /* anything that doesn't modify state is okay */
+    }
+    serv_config = PINT_get_server_config();
+    fsconfig = PINT_config_find_fs_id(serv_config, fsid);
+
+    if (fsconfig == NULL)
+    {
+        return 0;
+    }
+    exp_flags = fsconfig->exp_flags;
+
+    /* cheap test to see if ReadOnly was even specified in the exportoptions */
+    if (!(exp_flags & TROVE_EXP_READ_ONLY))
+    {
+        return 0;
+    }
+    /* Drat. Iterate thru the list of wildcards specified in 
+     * server_configuration and see if the client address matches. 
+     * If yes, then we deny permission.
+     */
+    if (iterate_ro_wildcards(fsconfig, client_addr) == 1)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, 
+                     "Disallowing read-write operation on a read-only" 
+                     "exported file-system\n");
+        return -EROFS;
+    }
+
+    return 0;
+}
+
+static int iterate_ro_wildcards(struct filesystem_configuration_s *fsconfig, 
+                                PVFS_BMI_addr_t client_addr)
+{
+    int i;
+
+    for (i = 0; i < fsconfig->ro_count; i++)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "BMI_query_addr_range %lld, %s\n",
+                     lld(client_addr), fsconfig->ro_hosts[i]);
+        /* Does the client address match the wildcard specification and/or 
+           the netmask specification? */
+        if (BMI_query_addr_range(client_addr, fsconfig->ro_hosts[i],
+                fsconfig->ro_netmasks[i]) == 1)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

@@ -25,24 +25,24 @@ void reset_buff(void);
 void print_buff(int padding, int len);
 
 int do_smallmem_noncontig_read(
-    PVFS_object_ref ref, PVFS_credentials * creds,
+    PVFS_object_ref ref, PVFS_credential * creds,
     int memsize,
     int chunks,
     ...);
 
 int do_noncontig_read(
-    PVFS_object_ref ref, PVFS_credentials * creds, 
+    PVFS_object_ref ref, PVFS_credential * creds, 
     int chunks, 
     ...);
 
 int do_contig_read(
     PVFS_object_ref ref, 
-    PVFS_credentials * creds, 
+    PVFS_credential * creds, 
     PVFS_offset offset, 
     int length,
     PVFS_Request freq);
 
-int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
+int do_write(PVFS_object_ref ref, PVFS_credential * creds,
 	     PVFS_offset offset, PVFS_size size, char * buff);
 
 int check_results(
@@ -156,7 +156,7 @@ int check_results(
 	    
 
 int do_smallmem_noncontig_read(
-    PVFS_object_ref ref, PVFS_credentials * creds,
+    PVFS_object_ref ref, PVFS_credential * creds,
     int memsize,
     int chunks,
     ...)
@@ -231,7 +231,7 @@ int do_smallmem_noncontig_read(
 } 
 
 int do_noncontig_read(
-    PVFS_object_ref ref, PVFS_credentials * creds, 
+    PVFS_object_ref ref, PVFS_credential * creds, 
     int chunks, 
     ...)
 {
@@ -306,7 +306,7 @@ int do_noncontig_read(
 
 int do_contig_read(
     PVFS_object_ref ref, 
-    PVFS_credentials * creds, 
+    PVFS_credential * creds, 
     PVFS_offset offset, 
     int length,
     PVFS_Request freq)
@@ -366,7 +366,7 @@ int do_contig_read(
     return res;
 }
 
-int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
+int do_write(PVFS_object_ref ref, PVFS_credential * creds,
 	     PVFS_offset offset, PVFS_size size, char * buff)
 {
     PVFS_Request filereq;
@@ -432,7 +432,7 @@ int main(int argc, char * argv[])
     PVFS_sysresp_lookup lookup_resp;
     PVFS_fs_id curfs;
     PVFS_sys_attr attr;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     PVFS_sys_dist * dist;
     int strip_size = 9;
     int half_strip;
@@ -502,6 +502,8 @@ int main(int argc, char * argv[])
 		before_len, dashes, after_len, dashes);
     }
 
+    PVFS_util_gen_credential_defaults(&creds);
+
     res = PVFS_sys_lookup(curfs, "/", &creds, &lookup_resp, 0, NULL);
     if(res < 0)
     {
@@ -517,11 +519,9 @@ int main(int argc, char * argv[])
 	PVFS_perror("dist setparam failed with errcode", res);
     }
 
-    PVFS_util_gen_credentials(&creds);
-
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = creds.uid;
-    attr.group = creds.gid;
+    attr.owner = creds.userid;
+    attr.group = creds.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 

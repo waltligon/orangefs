@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     int ret = -1, in_admin_mode = 0;
     PVFS_fs_id cur_fs;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array = NULL;
     struct handlelist *hl_all, *hl_unrefd, *hl_notree;
@@ -85,12 +85,17 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     printf("# Current FSID is %u.\n", cur_fs);
 
     /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
+    ret = PVFS_mgmt_count_servers(cur_fs, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	&server_count);
     if (ret != 0)
@@ -108,7 +113,6 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds, 
 				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 				     addr_array,
 				     &server_count);
@@ -187,6 +191,8 @@ int main(int argc, char **argv)
 
     handlelist_finalize(&hl_all);
 
+    PVFS_util_refresh_credential(&creds);
+
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 
@@ -223,6 +229,8 @@ int main(int argc, char **argv)
     handlelist_finalize(&hl_unrefd);
 
  exit_now:
+    PVFS_util_refresh_credential(&creds);
+
     if (in_admin_mode) {
 
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -249,7 +257,7 @@ int main(int argc, char **argv)
 struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 				    PVFS_BMI_addr_t *addr_array,
 				    int server_count,
-				    PVFS_credentials *creds)
+				    PVFS_credential *creds)
 {
     int ret, i, more_flag;
     unsigned long j;
@@ -261,6 +269,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     struct PVFS_mgmt_server_stat *stat_array;
     struct handlelist *hl;
     struct PVFS_mgmt_setparam_value param_value;
+
+    PVFS_util_refresh_credential(creds);
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
@@ -366,6 +376,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -450,6 +462,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -526,12 +540,14 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    struct handlelist *hl,
 			    PVFS_BMI_addr_t *addr_array,
 			    int server_count,
-			    PVFS_credentials *creds)
+			    PVFS_credential *creds)
 {
     int ret, server_idx = 0;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
+
+    PVFS_util_refresh_credential(creds);
 
     ret = PVFS_sys_lookup(cur_fs,
 			  "/",
@@ -570,7 +586,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 int match_dirdata(struct handlelist *hl,
 		  struct handlelist *alt_hl,
 		  PVFS_object_ref dir_ref,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret, idx;
     PVFS_handle dirdata_handle;
@@ -607,7 +623,7 @@ int descend(PVFS_fs_id cur_fs,
 	    struct handlelist *hl,
 	    struct handlelist *alt_hl,
 	    PVFS_object_ref dir_ref,
-	    PVFS_credentials *creds)
+	    PVFS_credential *creds)
 {
     int i, count;
     PVFS_ds_position token; 
@@ -790,7 +806,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 		     struct handlelist *alt_hl,
 		     PVFS_object_ref mf_ref,
 		     int df_count,
-		     PVFS_credentials *creds)
+		     PVFS_credential *creds)
 {
     int ret, i, server_idx = 0, error = 0;
     PVFS_handle *df_handles;
@@ -865,7 +881,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 				  struct handlelist *hl_all,
 				  PVFS_BMI_addr_t *addr_array,
-				  PVFS_credentials *creds)
+				  PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -886,6 +902,8 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -947,7 +965,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 				       struct handlelist *hl_all,
 				       PVFS_BMI_addr_t *addr_array,
-				       PVFS_credentials *creds)
+				       PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -967,6 +985,8 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1065,7 +1085,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 void cull_leftovers(PVFS_fs_id cur_fs,
 		    struct handlelist *hl_all,
 		    PVFS_BMI_addr_t *addr_array,
-		    PVFS_credentials *creds)
+		    PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -1078,6 +1098,8 @@ void cull_leftovers(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1108,7 +1130,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 /********************************************/
 
 int create_lost_and_found(PVFS_fs_id cur_fs,
-			  PVFS_credentials *creds)
+			  PVFS_credential *creds)
 {
     int ret;
     PVFS_object_ref root_ref;
@@ -1127,9 +1149,8 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 	return 0;
     }
 
-    attr.owner = creds->uid;
-    attr.owner = creds->uid;
-    attr.group = creds->gid;
+    attr.owner = creds->userid;
+    attr.group = creds->group_array[0];
     attr.perms = PVFS_util_translate_mode(0755, 0);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
@@ -1165,7 +1186,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 int create_dirent(PVFS_object_ref dir_ref,
 		  char *name,
 		  PVFS_handle handle,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret;
 
@@ -1194,7 +1215,7 @@ int create_dirent(PVFS_object_ref dir_ref,
 int remove_directory_entry(PVFS_object_ref dir_ref,
 			   PVFS_object_ref entry_ref,
 			   char *name,
-			   PVFS_credentials *creds)
+			   PVFS_credential *creds)
 {
     int ret;
 
@@ -1226,7 +1247,7 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 
 int remove_object(PVFS_object_ref obj_ref,
 		  PVFS_ds_type obj_type,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret;
 

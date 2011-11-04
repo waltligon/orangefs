@@ -51,7 +51,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm
  */
 PVFS_error PVFS_imgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_handle *dfile_array,
     int dfile_count,
     PVFS_mgmt_op_id *op_id,
@@ -82,7 +82,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     sm_p->u.get_dfile_array.dfile_array = dfile_array;
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
@@ -103,7 +103,7 @@ PVFS_error PVFS_imgmt_get_dfile_array(
  */
 PVFS_error PVFS_mgmt_get_dfile_array(
     PVFS_object_ref ref,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_handle *dfile_array,
     int dfile_count,
     PVFS_hint hints)
@@ -115,7 +115,7 @@ PVFS_error PVFS_mgmt_get_dfile_array(
                  "PVFS_mgmt_get_dfile_array entered\n");
 
     ret = PVFS_imgmt_get_dfile_array(
-        ref, credentials, dfile_array, dfile_count, &op_id, hints, NULL);
+        ref, credential, dfile_array, dfile_count, &op_id, hints, NULL);
 
     if (ret)
     {

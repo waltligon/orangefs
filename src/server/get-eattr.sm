@@ -24,6 +24,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-eattr.h"
+#include "pint-security.h"
 
 %%
 
@@ -255,12 +256,21 @@ static PINT_sm_action geteattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_geteattr(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(geteattr);
 
 struct PINT_server_req_params pvfs2_get_eattr_params =
 {
     .string_name = "get_eattr",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_geteattr,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_geteattr,
     .state_machine = &pvfs2_get_eattr_sm

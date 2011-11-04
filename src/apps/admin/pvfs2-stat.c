@@ -44,7 +44,7 @@ static void enable_dereference(struct options * opts);
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
-                   const PVFS_credentials * credentials,
+                   const PVFS_credential  * credentials,
                    const struct options   * opts);
 void print_stats(const PVFS_object_ref * ref,
                  const char            * pszName,
@@ -58,7 +58,7 @@ int main(int argc, char **argv)
                      i            =  0;
    char           ** ppszPvfsPath = NULL;
    PVFS_fs_id     *  pfs_id       = NULL;
-   PVFS_credentials  credentials;
+   PVFS_credential   credentials;
    struct options    user_opts;
 
    /* Initialize any memory */
@@ -133,7 +133,12 @@ int main(int argc, char **argv)
    }
 
    /* We will re-use the same credentials for each call */
-   PVFS_util_gen_credentials(&credentials);
+   ret = PVFS_util_gen_credential_defaults(&credentials);
+   if (ret < 0)
+   {
+       PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+       return(-1);
+   }
 
    for(i = 0; i < user_opts.nNumFiles; i++)
    {
@@ -181,7 +186,7 @@ int main(int argc, char **argv)
 static int do_stat(const char             * pszFile,
                    const char             * pszRelativeFile, 
                    const PVFS_fs_id         fs_id, 
-                   const PVFS_credentials * credentials,
+                   const PVFS_credential  * credentials,
                    const struct options   * opts)
 {
    int                  ret = 0;
@@ -200,7 +205,7 @@ static int do_stat(const char             * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credentials *) credentials, 
+                            (PVFS_credential *) credentials, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_FOLLOW, NULL);
    }
@@ -208,7 +213,7 @@ static int do_stat(const char             * pszFile,
    {
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
-                            (PVFS_credentials *) credentials, 
+                            (PVFS_credential *) credentials, 
                             &lk_response, 
                             PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
    }
@@ -228,7 +233,7 @@ static int do_stat(const char             * pszFile,
    
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          (PVFS_credentials *) credentials, 
+                          (PVFS_credential *) credentials, 
                           &getattr_response, NULL);
 
    if(ret < 0)

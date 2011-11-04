@@ -95,6 +95,8 @@ static PINT_sm_action small_io_setup_msgpairs(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
+    assert(attr->mask & PVFS_ATTR_CAPABILITY);
+
     /* initialize msgarray. one msgpair for each handle with data. */
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op, sm_p->u.io.datafile_count);
     if(ret < 0)
@@ -183,7 +185,7 @@ static PINT_sm_action small_io_setup_msgpairs(
          */ 
         PINT_SERVREQ_SMALL_IO_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            attr->capability,
             sm_p->object_ref.fs_id,
             datafile_handle,
             sm_p->u.io.io_type,

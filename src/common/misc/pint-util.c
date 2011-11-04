@@ -16,18 +16,10 @@
 #ifdef WIN32
 #include <io.h>
 #include "wincommon.h"
-
-/* uid and gid types */
-typedef unsigned int uid_t, gid_t;
-
 #else
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
-
-#include <grp.h>
-#include <pwd.h>
-#include <sys/types.h>
 #endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -35,19 +27,11 @@ typedef unsigned int uid_t, gid_t;
 #include "pint-util.h"
 #include "bmi.h"
 #include "gossip.h"
+#include "security-util.h"
 #include "pvfs2-req-proto.h"
 
 #include "pvfs2-debug.h"
 #include "bmi-byteswap.h"
-
-#ifdef HAVE_GETPWUID
-static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
-static int pw_buf_size = 1024;      // 1 KB
-static int gr_buf_size = 1024*1024; // 1 MB
-static char* check_group_pw_buffer = NULL;
-static char* check_group_gr_buffer = NULL;
-#endif
-static int PINT_check_group(uid_t uid, gid_t gid);
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -325,6 +309,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
+        if (src->mask & PVFS_ATTR_CAPABILITY)
+        {
+            ret = PINT_copy_capability(&src->capability, &dest->capability);
+            if (ret < 0)
+            {
+                return ret;
+            }
+        }
+
 	dest->mask = src->mask;
         ret = 0;
     }
@@ -335,6 +328,16 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
+        if (attr->mask & PVFS_ATTR_CAPABILITY)
+        {
+            free(attr->capability.signature);
+            attr->capability.signature = NULL;
+            free(attr->capability.handle_array);
+            attr->capability.handle_array = NULL;
+            free(attr->capability.issuer);
+            attr->capability.issuer = NULL;
+        }
+
         if (attr->objtype == PVFS_TYPE_METAFILE)
         {
             if (attr->mask & PVFS_ATTR_META_DFILES)
@@ -526,21 +529,6 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     return tv;
 }
 
-void PINT_util_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    assert(credentials);
-
-    memset(credentials, 0, sizeof(PVFS_credentials));
-#ifndef WIN32
-    /* TODO */
-    credentials->uid = geteuid();
-    credentials->gid = getegid();
-#endif
-}
-
-/* Windows - inline functions can't be exported to other libraries */
-
 #ifndef WIN32
 inline
 #endif
@@ -657,6 +645,11 @@ char *PINT_util_guess_alias(void)
     }
     return strdup(tmp_alias);
 }
+
+/* TODO: orange security 
+   These functions aren't used with the new security code. 
+   However they may be repurposed later. */
+#if 0
 
 /* PINT_check_mode()
  *
@@ -1091,6 +1084,8 @@ check_perm:
             "access denied\n");
     return -PVFS_EACCES;
 }
+
+#endif /* #if 0 */
 
 #ifdef WIN32
 int PINT_statfs_lookup(const char *path, struct statfs *buf)

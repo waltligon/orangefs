@@ -75,6 +75,8 @@ int main(int argc, char **argv)
         cur = PINT_llist_next(cur);
     }
 
+    /* nlmills: TODO: orange-security - print security configuration */
+
     fprintf(stderr,"\n");
     cur = serverconfig.file_systems;
     while(cur)

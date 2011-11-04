@@ -196,11 +196,22 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
-AC_ARG_WITH(openssl,
-	[  --with-openssl=<dir>    Build with openssl (default=/usr)
-  --without-openssl       Don't build with openssl.],
-	[AX_OPENSSL(${withval})],
-	[AX_OPENSSL_OPTIONAL])
+AX_OPENSSL
+
+dnl check to see if the "fast" getgrouplist function is available
+AX_GETGROUPLIST
+
+AC_ARG_ENABLE(security,
+[  --enable-security       Enables robust security features],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY=1
+    AC_DEFINE(ENABLE_SECURITY, 1, Define if robust security is enabled)
+else
+    ENABLE_SECURITY=
+fi],
+[ENABLE_SECURITY=]
+)
+AC_SUBST(ENABLE_SECURITY)
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -1282,6 +1293,7 @@ src/common/llist/module.mk
 src/common/statecomp/module.mk
 src/common/events/module.mk
 src/common/mgmt/module.mk
+src/common/security/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -1383,6 +1395,12 @@ if test "x$NPTL_WORKAROUND" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
+fi
+
+if test "x$ENABLE_SECURITY" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with robust security             : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with robust security             :  no])
 fi
 
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then

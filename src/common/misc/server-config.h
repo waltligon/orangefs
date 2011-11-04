@@ -184,7 +184,7 @@ typedef struct server_configuration_s
     int   *allowed_masks;            /* Netmasks for each of the specified trusted network */
     void  *security;                /* BMI module specific information */
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
-#endif
+#endif /* USE_TRUSTED */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
@@ -201,6 +201,12 @@ typedef struct server_configuration_s
                                      * be configurable.
                                      */
     int trove_method;
+	
+    char *keystore_path;             /* location of trusted server public keys */
+    char *serverkey_path;            /* location of server private key */
+
+    int security_timeout;
+
     void *private_data;
 } server_configuration_s;
 

@@ -68,7 +68,7 @@ typedef struct file_object_s {
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials);
+static int generic_open(file_object *obj, PVFS_credential *credentials);
 
 static file_object src;
 static char buf[2097152];
@@ -84,7 +84,7 @@ typedef struct {
     char  *buffer;
     int64_t offset;
     int64_t count;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     struct aiocb acb;
     struct qlist_head hash_link;
 } io_request;
@@ -197,7 +197,7 @@ static void post_op(io_request *req)
     req->src = &src;
     req->buffer = buf;
     req->count = 2097152;
-    PVFS_util_gen_credentials(&req->credentials);
+    PVFS_util_gen_credential_defaults(&req->credentials);
     if (rd_wr == 0) 
         post_generic_read(req);
     else
@@ -337,7 +337,7 @@ int main(int argc, char ** argv)
 {
     struct options* user_opts = NULL;
     int64_t ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     initialize_ops_in_progress_table();
     user_opts = parse_args(argc, argv);
@@ -357,7 +357,7 @@ int main(int argc, char ** argv)
 
     resolve_filename(&src,  user_opts->srcfile);
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     ret = generic_open(&src, &credentials);
     if (ret < 0)
@@ -452,7 +452,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credentials *credentials)
+static int generic_open(file_object *obj, PVFS_credential *credentials)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;

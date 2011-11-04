@@ -400,6 +400,33 @@ static PINT_sm_action io_send_completion_ack(
     return err;
 }
 
+static int perm_io(PINT_server_op *s_op)
+{
+    int ret = -PVFS_EINVAL;
+    int mask = 0;
+    enum PVFS_io_type type = s_op->req->u.io.io_type;
+
+    if (type == PVFS_IO_READ)
+    {
+        mask = PINT_CAP_READ;
+    }
+    else if (type == PVFS_IO_WRITE)
+    {
+        mask = PINT_CAP_WRITE;
+    }
+
+    if (s_op->req->capability.op_mask & mask)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 static enum PINT_server_req_access_type PINT_server_req_access_io(
     struct PVFS_server_req *req)
 {
@@ -415,7 +442,7 @@ PINT_GET_OBJECT_REF_DEFINE(io);
 struct PINT_server_req_params pvfs2_io_params =
 {
     .string_name = "io",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_io,
     .access_type = PINT_server_req_access_io,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_io,

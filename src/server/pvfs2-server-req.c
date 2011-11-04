@@ -5,7 +5,7 @@
  */
 
 #include "pvfs2-server.h"
-#include "assert.h"
+#include <assert.h>
 
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;
@@ -62,7 +62,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 3 */ {PVFS_SERV_IO, &pvfs2_io_params},
     /* 4 */ {PVFS_SERV_GETATTR, &pvfs2_get_attr_params},
     /* 5 */ {PVFS_SERV_SETATTR, &pvfs2_set_attr_params},
-    /* 6 */ {PVFS_SERV_LOOKUP_PATH, &pvfs2_lookup_params},
+    /* TODO: orange-security */
+    /* 6 */ {PVFS_SERV_LOOKUP, &pvfs2_lookup_params}, 
     /* 7 */ {PVFS_SERV_CRDIRENT, &pvfs2_crdirent_params},
     /* 8 */ {PVFS_SERV_RMDIRENT, &pvfs2_rmdirent_params},
     /* 9 */ {PVFS_SERV_CHDIRENT, &pvfs2_chdirent_params},
@@ -116,8 +117,8 @@ enum PINT_server_req_access_type PINT_server_req_modify(
     return PINT_SERVER_REQ_MODIFY;
 }
 
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req)
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req)
 {
     CHECK_OP(req->op);
     return PINT_server_req_table[req->op].params->perm;
@@ -158,6 +159,26 @@ int PINT_server_req_get_object_ref(
         return PINT_server_req_table[req->op].params->get_object_ref(
             req, fs_id, handle);
     }
+}
+
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred)
+{
+    int ret;
+    CHECK_OP(req->op);
+
+    if (!PINT_server_req_table[req->op].params->get_credential)
+    {
+        *cred = NULL;
+        ret = 0;
+    }
+    else
+    {
+        ret = PINT_server_req_table[req->op].params->get_credential(
+            req, cred);
+    }
+
+    return ret;
 }
 
 /*

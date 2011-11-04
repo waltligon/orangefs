@@ -81,13 +81,13 @@ typedef struct file_object_s {
 } file_object;
 
 static struct options* parse_args(int argc, char* argv[]);
-static int generic_open(file_object *obj, PVFS_credentials *credentials);
+static int generic_open(file_object *obj, PVFS_credential *credentials);
 
 static int pvfs2_eattr(int get
                       ,file_object      *obj
                       ,PVFS_ds_keyval   *key_p
                       ,PVFS_ds_keyval   *val_p
-                      ,PVFS_credentials *creds
+                      ,PVFS_credential  *creds
                       ,int key_count); 
 
 static void usage(int argc, char** argv);
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
   int ret = 0;
   struct options* user_opts = NULL;
   file_object src;
-  PVFS_credentials credentials;
+  PVFS_credential credentials;
   int i;
   PVFS_ds_keyval tmp_val={0};
 
@@ -125,7 +125,13 @@ int main(int argc, char **argv)
   }
   resolve_filename(&src, user_opts->srcfile);
 
-  PVFS_util_gen_credentials(&credentials);
+  ret = PVFS_util_gen_credential_defaults(&credentials);
+  if (ret < 0)
+  {
+      PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+      return(-1);
+  }
+
   ret = generic_open(&src, &credentials);
   if (ret < 0)
   {
@@ -385,7 +391,7 @@ static int pvfs2_eattr(int get
                       ,file_object      *obj
                       ,PVFS_ds_keyval   *key_p
                       ,PVFS_ds_keyval   *val_p
-                      ,PVFS_credentials *creds
+                      ,PVFS_credential  *creds
                       ,int key_count) 
 {
   int ret = -1;
@@ -689,7 +695,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credentials *credentials)
+static int generic_open(file_object *obj, PVFS_credential *credentials)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;

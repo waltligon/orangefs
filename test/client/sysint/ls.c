@@ -105,12 +105,12 @@ void print_entry(
     PVFS_fs_id fs_id)
 {
     PVFS_object_ref pinode_refn;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
@@ -136,7 +136,7 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
 
@@ -145,7 +145,7 @@ int do_list(
 
     name = start_dir;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (PVFS_sys_lookup(fs_id, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL))
@@ -158,7 +158,7 @@ int do_list(
     pinode_refn.handle = lk_response.ref.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          &credentials, &getattr_response, NULL) == 0)

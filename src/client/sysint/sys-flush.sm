@@ -22,6 +22,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -69,7 +70,7 @@ machine pvfs2_client_flush_sm
  */
 PVFS_error PVFS_isys_flush(
     PVFS_object_ref ref,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr)
@@ -99,7 +100,7 @@ PVFS_error PVFS_isys_flush(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
@@ -125,7 +126,7 @@ PVFS_error PVFS_isys_flush(
  */
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -133,7 +134,7 @@ PVFS_error PVFS_sys_flush(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush entered\n");
 
-    ret = PVFS_isys_flush(ref, credentials, &op_id, hints, NULL);
+    ret = PVFS_isys_flush(ref, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_flush call", ret);
@@ -160,11 +161,14 @@ static int flush_datafile_setup_msgpairarray(
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) flush state: "
                  "datafile_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
+
+    PINT_null_capability(&capability);
 
     attr = &sm_p->getattr.attr;
     assert(attr);
@@ -195,7 +199,7 @@ static int flush_datafile_setup_msgpairarray(
                          llu(attr->u.meta.dfile_array[i]));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
-                                    *sm_p->cred_p,
+                                    capability,
                                     sm_p->object_ref.fs_id,
                                     attr->u.meta.dfile_array[i],
                                     sm_p->hints);
@@ -214,7 +218,7 @@ static int flush_datafile_setup_msgpairarray(
                          llu(sm_p->object_ref.handle));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
-                                    *sm_p->cred_p,
+                                    capability,
                                     sm_p->object_ref.fs_id,
                                     sm_p->object_ref.handle,
                                     sm_p->hints);

@@ -54,6 +54,9 @@ ifdef BUILD_SERVER
 	SERVERSRC += \
 		$(SERVER_SMCGEN)
 
+	# server only file
+	SERVERSRC += $(DIR)/check.c
+
 	# track generate .c files to remove during dist clean, etc. 
 		SMCGEN += $(SERVER_SMCGEN)
 

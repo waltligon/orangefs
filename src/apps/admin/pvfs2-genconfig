@@ -63,6 +63,9 @@ my $bmi_module = undef;
 
 my $opt_gen_key = 0;
 
+my $opt_key_store = undef;
+my $opt_server_key = undef;
+
 my $META_ENDPOINT = 0x1;
 my $IO_ENDPOINT   = 0x2;
 
@@ -388,6 +391,20 @@ sub emit_serveropts
         print $target "\tDataStorageSpace $endpoint->{STORAGE}\n";
         print $target "\tMetadataStorageSpace $endpoint->{METASTORAGE}\n";
         print $target "\tLogFile $endpoint->{LOGFILE}\n";
+        
+        my $alias_key = get_server_key($alias);
+        my $alias_store = get_key_store($alias);
+
+        if( defined($alias_store) ) 
+        {
+            print $target "\tKeyStore $alias_store\n";
+        }
+
+        if( defined($alias_key) )
+        {
+            print $target "\tServerKey $alias_key\n";
+        }
+
         print $target "</ServerOptions>\n";
     }
 }
@@ -565,7 +582,10 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf>
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
      --genkey                          optionally generates a secret key for the 
                                        filesystem(s).
-
+     --keystore                        keystore for each server. Magic value _ALIAS_ will be replaced 
+                                       with each defined alias' value.
+     --serverkey                       private key for each server. Magic value _ALIAS_ will be 
+                                       replaced in the path with each defined alias' value
      --help                            This message
      --spec-usage                      Show the usage info for --iospec 
                                        and --metaspec options
@@ -1368,6 +1388,32 @@ sub get_all_protocols
     return keys %protos;
 }
 
+sub get_server_key
+{
+    my $keypath = $opt_server_key;
+    my $alias = shift;
+
+    if( defined($opt_server_key) )
+    {
+        $keypath =~ s/_ALIAS_/$alias/g;
+        return $keypath;
+    }
+    return undef;
+}
+
+sub get_key_store
+{
+    my $keystore = $opt_key_store;
+    my $alias = shift;
+
+    if( defined($opt_key_store) )
+    {
+        $keystore =~ s/_ALIAS_/$alias/g;
+        return $keystore;
+    }
+    return undef;
+}
+
 sub needs_default_value
 {
     my $paramname = shift;
@@ -1439,6 +1485,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
     'metaspec=s'   => \$opt_metaspec, 
     'spec-usage!'  => \$show_specusage,
     'genkey!'       => \$opt_gen_key,
+    'keystore=s'    => \$opt_key_store,
+    'serverkey=s'    => \$opt_server_key,
     '-'           => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 

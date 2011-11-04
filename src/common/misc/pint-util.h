@@ -166,25 +166,6 @@ int PINT_util_digest_md5(const void *input_message, size_t input_length,
 
 char *PINT_util_guess_alias(void);
 
-void PINT_util_gen_credentials(
-    PVFS_credentials *credentials);
-
-enum PINT_access_type
-{
-    PINT_ACCESS_EXECUTABLE = 1,
-    PINT_ACCESS_WRITABLE = 2,
-    PINT_ACCESS_READABLE = 4,
-};
-
-int PINT_check_mode(
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid,
-    enum PINT_access_type access_type);
-
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid, int want);
-
 #endif /* __PINT_UTIL_H */
 
 /*

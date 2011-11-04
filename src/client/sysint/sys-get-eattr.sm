@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-eattr.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -59,7 +60,7 @@ machine pvfs2_client_get_eattr_sm
 
 PVFS_error PVFS_isys_geteattr_list(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_sysresp_geteattr *resp_p,
@@ -93,7 +94,7 @@ PVFS_error PVFS_isys_geteattr_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.geteattr.nkey = nkey;
     sm_p->u.geteattr.key_array = key_array;
     sm_p->u.geteattr.resp_p = resp_p;
@@ -107,7 +108,7 @@ PVFS_error PVFS_isys_geteattr_list(
 
 PVFS_error PVFS_sys_geteattr_list(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         int32_t nkey,
         PVFS_ds_keyval *key_array,
         PVFS_sysresp_geteattr *resp_p,
@@ -118,7 +119,7 @@ PVFS_error PVFS_sys_geteattr_list(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_geteattr entered\n");
 
-    ret = PVFS_isys_geteattr_list(ref, credentials,
+    ret = PVFS_isys_geteattr_list(ref, credential,
             nkey, key_array, resp_p, &op_id, hints, NULL);
 
     if (ret)
@@ -142,7 +143,7 @@ PVFS_error PVFS_sys_geteattr_list(
 
 PVFS_error PVFS_sys_geteattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_ds_keyval *val_p,
         PVFS_hint hints)
@@ -151,7 +152,7 @@ PVFS_error PVFS_sys_geteattr(
     PVFS_error tmp_err;
     resp_p.val_array = val_p;
     resp_p.err_array = &tmp_err;
-    return PVFS_sys_geteattr_list(ref, credentials, 1, key_p, &resp_p, hints);
+    return PVFS_sys_geteattr_list(ref, credential, 1, key_p, &resp_p, hints);
 }
 
 static PINT_sm_action get_eattr_setup_msgpair(
@@ -161,9 +162,12 @@ static PINT_sm_action get_eattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     int i;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_setup_msgpair\n");
+
+    PINT_null_capability(&capability);
 
     /* this will be the array of value buffer sizes */
     sm_p->u.geteattr.size_array =
@@ -181,7 +185,7 @@ static PINT_sm_action get_eattr_setup_msgpair(
 
     PINT_SERVREQ_GETEATTR_FILL(
         msg_p->req,
-        (*sm_p->cred_p),
+        capability,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
         sm_p->u.geteattr.nkey,

@@ -47,7 +47,7 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_sysresp_statfs resp_statfs;
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     struct PVFS_mgmt_server_stat *stat_array = NULL;
     int outcount;
     int server_type;
@@ -81,7 +81,12 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     /* gather normal statfs statistics from system interface */
     ret = PVFS_sys_statfs(cur_fs, &creds, &resp_statfs, NULL);

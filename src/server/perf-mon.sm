@@ -15,6 +15,7 @@
 #include "pvfs2-server.h"
 #include "pint-util.h"
 #include "pint-perf-counter.h"
+#include "pint-security.h"
 
 /* there had better not be but one of these requests at a time */
 static int64_t *static_value_array = NULL;
@@ -314,10 +315,19 @@ static int reallocate_static_arrays_if_needed(void)
     return(0);
 }
 
+static int perm_perf_mon(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+    
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_perf_mon_params =
 {
     .string_name = "mgmt_perf_mon",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_perf_mon,
     .state_machine = &pvfs2_perf_mon_sm
 };
 

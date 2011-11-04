@@ -65,6 +65,7 @@ mandir = $(DESTDIR)@mandir@
 sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
+sysconfdir = $(DESTDIR)@sysconfdir@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -89,6 +90,7 @@ BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
+ENABLE_SECURITY = @ENABLE_SECURITY@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -161,6 +163,7 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
+    src/common/security \
     src/client/usrint \
     src/io/trove \
     src/io/bmi \
@@ -190,7 +193,7 @@ CFLAGS = -I$(srcdir)/include @CFLAGS@ @CPPFLAGS@
 LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
-SERVER_LDFLAGS += @SERVER_LDFLAGS@
+SERVER_LDFLAGS += @SERVER_LDFLAGS@ @OPENSSL_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
@@ -229,6 +232,12 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
 
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
+
+  # make bindir and sysconfdir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+
+  # OpenSSL support
+CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
@@ -322,7 +331,10 @@ SERVERCFLAGS = @CFLAGS@ -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
+# OpenSSL support
+SERVERCFLAGS += @OPENSSL_CPPFLAGS@
+
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@ -lpthread 
 
 ifdef NEEDS_LIBRT 
 	SERVERLIBS += -lrt
@@ -332,11 +344,11 @@ endif
 # though it's not recommended unless *required*.
 #
 # run ./configure --help for information on how to do this cleanly.
-LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
+LIBCFLAGS=@LIBCFLAGS@ @OPENSSL_CPPFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ -D__PVFS2_CLIENT__
-LIBS += @THREAD_LIB@
-DEPLIBS += @THREAD_LIB@
-LIBS_THREADED += @THREAD_LIB@
+LIBS += @THREAD_LIB@ @OPENSSL_LIB@
+DEPLIBS += @THREAD_LIB@ @OPENSSL_LIB@
+LIBS_THREADED += @THREAD_LIB@ @OPENSSL_LIB@
 
 ################################################################
 # build BMI TCP?

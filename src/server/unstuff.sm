@@ -19,8 +19,14 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 #include "pint-cached-config.h"
+#include "pint-security.h"
+#include "security-util.h"
+#include "check.h"
 
-#define STATE_UNSTUFF 33
+enum {
+    STATE_UNSTUFF = 33,
+    STATE_CAPABILITY
+};
 
 %%
 
@@ -90,9 +96,29 @@ machine pvfs2_unstuff_sm
     state remove_layout
     {
         run remove_layout;
+        success => get_capability_setup;
         default => final_response;
     }
 
+    state get_capability_setup
+    {
+        run get_capability_setup;
+        STATE_CAPABILITY => get_capability;
+        default => final_response;
+    }
+
+    state get_capability
+    {
+        jump pvfs2_get_attr_work_sm;
+        default => get_capability_cleanup;
+    }
+
+    state get_capability_cleanup
+    {
+        run get_capability_cleanup;
+        default => final_response;
+    }
+ 
     state final_response
     {
         jump pvfs2_final_response_sm;
@@ -364,6 +390,83 @@ static PINT_sm_action remove_layout(
         s_op->req->hints);
 }
 
+/* get_capability_setup
+ *
+ * Sets up a getattr nested op if a capability is requested.
+ */
+static PINT_sm_action get_capability_setup(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret;
+
+    if (s_op->req->u.unstuff.attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        struct PINT_server_op *getattr_op;
+
+        getattr_op = malloc(sizeof(*getattr_op));
+        if (getattr_op == NULL)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        memset(getattr_op, 0, sizeof(*getattr_op));
+
+        getattr_op->req = s_op->req;
+        getattr_op->attr = s_op->resp.u.unstuff.attr;
+        getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
+        getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
+        getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+        getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
+
+        ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+        if (ret < 0)
+        {
+            js_p->error_code = ret;
+        }
+        else
+        {
+            js_p->error_code = STATE_CAPABILITY;
+        }
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
+/* get_capability_cleanup 
+ *
+ * Cleans up after the call to getattr nested state machine.
+ */
+static PINT_sm_action get_capability_cleanup(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *getattr_op;
+    struct PINT_server_op *s_op;
+    int task_id, remaining;
+
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code,
+                                   &remaining);
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* free outdated attrs set in getattr_interpret */
+    PINT_free_object_attr(&s_op->resp.u.unstuff.attr);
+    s_op->resp.u.unstuff.attr = getattr_op->resp.u.getattr.attr;
+
+    free(getattr_op);
+
+    if(js_p->error_code)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+            "unstuff failed to retrieve new attrs.\n");
+    }
+
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -425,6 +528,7 @@ static PINT_sm_action getattr_setup(
     getattr_op->u.getattr.fs_id = s_op->req->u.unstuff.fs_id;
     getattr_op->u.getattr.handle = s_op->req->u.unstuff.handle;
     getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
+    getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if(ret < 0)
@@ -475,16 +579,37 @@ static PINT_sm_action getattr_interpret(
     return SM_ACTION_COMPLETE;
 }
 
+static int perm_unstuff(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: current functionality in Orange-Branch is described
+     * in the log entry for changeset Orange-Branch:bligon:20100920181650.
+     * probably need to replicate this.
+     */
+    if (s_op->req->capability.op_mask & PINT_CAP_WRITE)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
 
 PINT_GET_OBJECT_REF_DEFINE(unstuff);
+PINT_GET_CREDENTIAL_DEFINE(unstuff);
 
 struct PINT_server_req_params pvfs2_unstuff_params =
 {
     .string_name = "unstuff",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_unstuff,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_unstuff,
+    .get_credential = PINT_get_credential_unstuff,
     .state_machine = &pvfs2_unstuff_sm
 };
 

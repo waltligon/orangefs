@@ -69,11 +69,17 @@ int main(int argc, char **argv)
         char pvfs_path[PVFS_NAME_MAX] = {0};
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
-        PVFS_credentials credentials;
+        PVFS_credential credentials;
         PVFS_object_ref parent_ref;
         int tmp_len = 0;
 
-        PVFS_util_gen_credentials(&credentials);
+        rc = PVFS_util_gen_credential_defaults(&credentials);
+        if (rc < 0)
+        {
+            PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+            ret = -1;
+            break;
+        }
 
         /* Translate path into pvfs2 relative path */
         rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path,

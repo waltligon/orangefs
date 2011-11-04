@@ -77,8 +77,8 @@ typedef struct file_object_s {
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials);
-static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+static int generic_open(file_object *obj, PVFS_credential *credentials);
+static int generic_server_location(file_object *obj, PVFS_credential *creds,
         char **servers, PVFS_handle *handles, int *nservers);
 
 /* metafile distribution */
@@ -86,7 +86,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
 /* datafile handles */
 #define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
 
-static int generic_dist(file_object *obj, PVFS_credentials *creds,
+static int generic_dist(file_object *obj, PVFS_credential *creds,
         char **dist, int *size)
 {
     char *buffer = (char *) malloc(4096);
@@ -131,7 +131,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
  * is allocated internally in this function.
  * callers job is to free up all the memory
  */
-static int generic_server_location(file_object *obj, PVFS_credentials *creds,
+static int generic_server_location(file_object *obj, PVFS_credential *creds,
         char **servers, PVFS_handle *handles, int *nservers)
 {
     char *buffer = (char *) malloc(4096);
@@ -209,7 +209,7 @@ int main(int argc, char ** argv)
     char *dist_buf = NULL;
     int dist_size;
     int64_t ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *servers[256];
     PVFS_handle handles[256];
     char metadataserver[256];
@@ -233,7 +233,12 @@ int main(int argc, char ** argv)
 
     resolve_filename(&src,  user_opts->srcfile);
 
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     ret = generic_open(&src, &credentials);
     if (ret < 0)
@@ -360,7 +365,7 @@ static int resolve_filename(file_object *obj, char *filename)
 /* generic_open:
  *  given a file_object, perform the apropriate open calls.  
  */
-static int generic_open(file_object *obj, PVFS_credentials *credentials)
+static int generic_open(file_object *obj, PVFS_credential *credentials)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;

@@ -106,7 +106,7 @@ machine pvfs2_client_truncate_sm
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr)
@@ -143,7 +143,7 @@ PVFS_error PVFS_isys_truncate(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.truncate.size = size;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
@@ -151,7 +151,7 @@ PVFS_error PVFS_isys_truncate(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_METAFILE,
         PINT_SM_GETATTR_BYPASS_CACHE);
 
@@ -162,7 +162,7 @@ PVFS_error PVFS_isys_truncate(
 PVFS_error PVFS_sys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -171,7 +171,7 @@ PVFS_error PVFS_sys_truncate(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_sys_truncate entered with %lld\n", lld(size));
 
-    ret = PVFS_isys_truncate(ref, size, credentials, &op_id, hints, NULL);
+    ret = PVFS_isys_truncate(ref, size, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_truncate call", ret);
@@ -208,6 +208,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
     attr = &sm_p->getattr.attr;
     assert(attr);
 
+    assert(attr->mask & PVFS_ATTR_CAPABILITY);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
@@ -251,7 +252,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            attr->capability,
             sm_p->object_ref.fs_id,
             new_dfile_size,
             attr->u.meta.dfile_array[i],
@@ -313,13 +314,7 @@ static PINT_sm_action truncate_inspect_attr(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    /* check for write access */
-    js_p->error_code = PINT_check_mode(
-        &sm_p->getattr.attr, sm_p->cred_p->uid, sm_p->cred_p->gid, PINT_ACCESS_WRITABLE);
-    if(js_p->error_code)
-    {
-        return 1;
-    }
+    /* TODO: orange-security: check write access? */
 
     /* determine if we need to unstuff or not to service this request */
     if(unstuff_needed(
@@ -411,7 +406,8 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(
      */
     PINT_SERVREQ_UNSTUFF_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            sm_p->getattr.attr.capability,
+            *sm_p->cred_p,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE);

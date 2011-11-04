@@ -6,6 +6,9 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if robust security is enabled */
+#undef ENABLE_SECURITY
+
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
@@ -149,6 +152,9 @@
 
 /* Define if struct inode_operations in kernel has getattr_lite callback */
 #undef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
+/* Define if distro has getgrouplist */
+#undef HAVE_GETGROUPLIST
 
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
@@ -303,11 +309,8 @@
 /* Define if struct page defines a count member without leading underscore */
 #undef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
 
-/* Define to 1 if you have the <openssl/crypto.h> header file. */
-#undef HAVE_OPENSSL_CRYPTO_H
-
-/* Define to 1 if you have the <openssl/evp.h> header file. */
-#undef HAVE_OPENSSL_EVP_H
+/* Define to 1 if the libssl is available */
+#undef HAVE_OPENSSL
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_FILE_ARG
@@ -573,9 +576,6 @@
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
-
-/* Define if openssl exists */
-#undef WITH_OPENSSL
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

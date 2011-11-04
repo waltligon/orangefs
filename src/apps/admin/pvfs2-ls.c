@@ -454,7 +454,7 @@ void print_entry(
 {
     int ret = -1;
     PVFS_object_ref ref;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_getattr getattr_response;
 
     if (!opts->list_long)
@@ -481,7 +481,12 @@ void print_entry(
             ref.fs_id = fs_id;
 
             memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-            PVFS_util_gen_credentials(&credentials);
+            ret = PVFS_util_gen_credential_defaults(&credentials);
+            if (ret < 0)
+            {
+                PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+                return;
+            }
 
             ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                 &credentials, &getattr_response, NULL);
@@ -523,7 +528,7 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdirplus rdplus_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
@@ -533,7 +538,12 @@ int do_list(
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     if (opts->list_recursive || opts->num_starts > 1)
     {

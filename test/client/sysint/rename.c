@@ -27,7 +27,7 @@ int main(int argc,char **argv)
     PVFS_object_ref old_parent_refn;
     char* new_entry;
     PVFS_object_ref new_parent_refn;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     if (argc != 3)
     {
@@ -74,7 +74,7 @@ int main(int argc,char **argv)
     }
     printf("New filename is %s\n",new_buf);
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     old_entry = old_buf;
     ret = PINT_lookup_parent(old_filename, cur_fs, &credentials,

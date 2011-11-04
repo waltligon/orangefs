@@ -91,7 +91,7 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
   PVFS_object_ref parent_ref;
-  PVFS_credentials credentials;
+  PVFS_credential credentials;
   PVFS_sysresp_getattr resp_getattr;
   PVFS_sys_attr old_attr;
   PVFS_sys_attr new_attr;
@@ -104,7 +104,12 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
     return -1;
   }
 
-  PVFS_util_gen_credentials(&credentials);
+  ret = PVFS_util_gen_credential_defaults(&credentials);
+  if (ret < 0)
+  {
+    PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+    return -1;
+  }
 
   /* this if-else statement just pulls apart the pathname into its
    * parts....I think...this should be a function somewhere

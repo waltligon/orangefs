@@ -50,7 +50,7 @@ int finalize_sysint(void)
 int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
 {
     int ret = -1;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_look;
     char *root = "/";
 
@@ -58,7 +58,7 @@ int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
     {
         memset(&resp_look, 0, sizeof(resp_look));
 
-        PVFS_util_gen_credentials(&credentials);
+        PVFS_util_gen_credential_defaults(&credentials);
 
         printf("looking up the root handle for fsid = %d\n", fs_id);
         ret = PVFS_sys_lookup(fs_id, root, &credentials,
@@ -78,16 +78,16 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
 {
     int ret = -1;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_mkdir resp_mkdir;
 
     memset(&attr, 0, sizeof(PVFS_sys_attr));
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.atime = attr.mtime = attr.ctime = 
 	time(NULL);
     attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
@@ -118,9 +118,9 @@ int create_dir(PVFS_object_ref parent_refn, char *name,
 int remove_file(PVFS_object_ref parent_refn, char *name)
 {
     int ret = -1;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     ret = PVFS_sys_remove(name, parent_refn, &credentials);
     if (ret < 0)
@@ -152,12 +152,12 @@ int lookup_name(PVFS_object_ref pinode_refn, char *name,
                 PVFS_object_ref *out_refn)
 {
     int ret = -1;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lookup;
 
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     ret = PVFS_sys_lookup(pinode_refn.fs_id, name,
                           &credentials, &resp_lookup,

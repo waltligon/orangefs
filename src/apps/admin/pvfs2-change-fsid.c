@@ -554,7 +554,7 @@ int process_args(int argc, char ** argv)
         {"dbpath",1,0,0},
         {"fsconf",1,0,0},
         {"datastorage",1,0,0},
-	{"metastorage",1,0,0},
+        {"metastorage",1,0,0},
         {"view",0,0,0},
         {0,0,0,0}
     };

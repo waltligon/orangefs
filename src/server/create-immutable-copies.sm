@@ -19,6 +19,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-dist-basic.h"
 #include "pvfs2-mirror.h"
+#include "security-util.h"
 
 /*Global Variables*/
 
@@ -1057,6 +1058,8 @@ static PINT_sm_action setup_datahandle_copies (struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+   /* nlmills: XXX: this is technically incorrect. see memset(3) */
+   /* nlmills: TODO: set the values in a loop */
     memset(imm_p->writes_completed, UINT64_HIGH, sizeof(PVFS_handle) *
            imm_p->dfile_count * imm_p->copies);
 
@@ -1078,6 +1081,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
         imm_p->fs_id);
     int ret = 0;
     int src, row, cols, i, index, wc;
+   PVFS_capability capability;
 
     /* this variable helps to understand the logic better.  it is a 
      * redeclaration of the one dimensional imm_p->handle_array_copies and can 
@@ -1100,6 +1104,9 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
     }
 
     js_p->error_code = 0;
+
+   /* nlmills: TODO: replace with real capability */
+   PINT_null_capability(&capability);
 
     /* for each source handle[src], create a MIRROR request containing a set 
      * of destination handles. */
@@ -1162,7 +1169,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
         memset(req->u.mirror.wcIndex,0,sizeof(uint32_t) * imm_p->copies);
  
         req->op = PVFS_SERV_MIRROR;
-        req->credentials = sm_p->req->credentials;
+        req->capability = capability;
 
         req->u.mirror.src_handle    = imm_p->handle_array_base[src];
 
@@ -2108,11 +2115,21 @@ static inline int PINT_get_object_ref_copies( struct PVFS_server_req *req,
     return 0;
 };
 
+static int perm_copies(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: add real security checks */
+    ret = 0;
+
+    return ret;
+}
+
 /* request parameters */
 struct PINT_server_req_params pvfs2_create_immutable_copies_params =
 {
 	.string_name = "create_immutable_copies",
-	.perm = PINT_SERVER_CHECK_NONE,
+	.perm = perm_copies,
 	.access_type = PINT_server_req_modify,
 	.sched_policy = PINT_SERVER_REQ_SCHEDULE,
 	.get_object_ref = PINT_get_object_ref_copies,

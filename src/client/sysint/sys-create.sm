@@ -133,7 +133,7 @@ PVFS_error PVFS_isys_create(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_dist *dist,
     PVFS_sys_layout *layout,
     PVFS_sysresp_create *resp,
@@ -177,6 +177,20 @@ PVFS_error PVFS_isys_create(
         return -PVFS_ENAMETOOLONG;
     }
 
+    if (attr.owner != credential->userid)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing owner uid %d with %d "
+                     "on create\n", attr.owner, credential->userid);
+        attr.owner = credential->userid;
+    }
+
+    if (attr.group != credential->group_array[0])
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Replacing group uid %d with %d "
+                     "on create\n", attr.group, credential->group_array[0]);
+        attr.group = credential->group_array[0];
+    }
+
     PINT_smcb_alloc(&smcb, PVFS_SYS_CREATE,
              sizeof(struct PINT_client_sm),
              client_op_state_get_machine,
@@ -189,7 +203,7 @@ PVFS_error PVFS_isys_create(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
@@ -292,7 +306,7 @@ PVFS_error PVFS_sys_create(
     char *object_name,                 /**< name of the file to create */
     PVFS_object_ref parent_ref,        /**< handle of the parent dir */
     PVFS_sys_attr attr,                /**< attributes of new file */
-    const PVFS_credentials *credentials,/**< identity of the caller */
+    const PVFS_credential *credential, /**< identity of the caller */
     PVFS_sys_dist *dist,               /**< distribution of new file */
     PVFS_sysresp_create *resp,         /**< response from the request */
     PVFS_sys_layout *layout,           /**< selection of servers to hold file */
@@ -303,7 +317,7 @@ PVFS_error PVFS_sys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
-    ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
+    ret = PVFS_isys_create(object_name, parent_ref, attr, credential,
                            dist, layout, resp, &op_id, hints, NULL);
     if (ret)
     {
@@ -339,7 +353,7 @@ static PINT_sm_action create_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT, 
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -347,19 +361,10 @@ static PINT_sm_action create_init(
     {
         js_p->error_code = 0;
 
-        /* call for getattr_acache_lookup (next state) */
-        PINT_SM_GETATTR_STATE_FILL(
-            sm_p->getattr,
-            sm_p->object_ref,
-            PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT, 
-            PVFS_TYPE_DIRECTORY,
-            0);
-
         return job_req_sched_post_timer(
             sm_p->msgarray_op.params.retry_delay, smcb, 0, js_p, &tmp_id,
             pint_client_sm_context);
-    }
-
+    }    
 
    return SM_ACTION_COMPLETE;
 }
@@ -464,6 +469,7 @@ static PINT_sm_action create_create_setup_msgpair(
 
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
+        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.create.attr,
@@ -509,7 +515,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
         sm_p->object_ref.handle,
@@ -982,6 +988,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         return(SM_ACTION_COMPLETE);
     }
 
+    /* nlmills: TODO: ensure the capability is valid before using */
     /*
       for the metafile and each datafile, prepare to post a remove
       send/recv pair
@@ -996,7 +1003,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                *sm_p->cred_p,
+                sm_p->getattr.attr.capability,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.metafile_handle,
                 sm_p->hints);
@@ -1013,7 +1020,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         {
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
-                *sm_p->cred_p,
+                sm_p->getattr.attr.capability,
                 sm_p->object_ref.fs_id,
                 sm_p->u.create.datafile_handles[i],
                 sm_p->hints);

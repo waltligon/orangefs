@@ -32,8 +32,8 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
-#ifdef WITH_OPENSSL
-#include "openssl/evp.h"
+#ifdef HAVE_OPENSSL
+#include <openssl/evp.h>
 #endif
 
 static const char * replace_old_keystring(const char * oldkey);
@@ -125,6 +125,9 @@ static DOTCONF_CB(get_small_file_size);
 static DOTCONF_CB(directio_thread_num);
 static DOTCONF_CB(directio_ops_per_queue);
 static DOTCONF_CB(directio_timeout);
+static DOTCONF_CB(get_key_store);
+static DOTCONF_CB(get_server_key);
+static DOTCONF_CB(get_security_timeout);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -685,7 +688,7 @@ static const configoption_t options[] =
       */
      {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
- 
+
      /* Precreate pools will be "topped off" if they fall below this value. 
       * One value is specified for each DS handle type. This parameter operates
       * the same as the PrecreateBatchSize in that each count coorespends to 
@@ -1018,6 +1021,15 @@ static const configoption_t options[] =
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
 
+    {"KeyStore", ARG_STR, get_key_store, NULL, 
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+	
+    {"ServerKey", ARG_STR, get_server_key, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+
+    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
+        CTX_DEFAULTS, "3600"},
+
     LAST_OPTION
 };
 
@@ -1051,7 +1063,10 @@ int PINT_parse_config(
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
-    config_s->server_alias = server_alias_name;
+    if (server_alias_name)
+    {
+        config_s->server_alias = strdup(server_alias_name);
+    }
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
@@ -1141,7 +1156,22 @@ int PINT_parse_config(
                    "No PerfUpdateInterval specified.\n");
         return 1;
     }
-    
+
+#ifdef ENABLE_SECURITY
+    if (server_alias_name && !config_s->keystore_path)
+    {
+        gossip_err("Configuration file error. No keystore path specified.\n");
+        return 1;
+    }
+
+    if (server_alias_name && !config_s->serverkey_path)
+    {
+        gossip_err("Configuration file error. No server key path "
+                   "specified.\n");
+        return 1;
+    }
+#endif /* ENABLE_SECURITY */
+
     return 0;
 }
 
@@ -3012,6 +3042,44 @@ DOTCONF_CB(directio_timeout)
     return NULL;
 }
 
+DOTCONF_CB(get_key_store)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->keystore_path);
+    config_s->keystore_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_server_key)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->serverkey_path);
+    config_s->serverkey_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_security_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
+
 /*
  * Function: PINT_config_release
  *
@@ -3140,6 +3208,11 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
         }
+
+        free(config_s->keystore_path);
+        config_s->keystore_path = NULL;
+        free(config_s->serverkey_path);
+        config_s->serverkey_path = NULL;
     }
 }
 
@@ -4400,7 +4473,7 @@ int PINT_config_get_fs_key(
     char ** key,
     int * length)
 {
-#ifndef WITH_OPENSSL
+#ifndef HAVE_OPENSSL
     *key = NULL;
     *length = 0;
     return -PVFS_ENOSYS;
@@ -4459,7 +4532,7 @@ int PINT_config_get_fs_key(
     
     BIO_free_all(bio);
     return 0;
-#endif /* WITH_OPENSSL */
+#endif /* HAVE_OPENSSL */
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__

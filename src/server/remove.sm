@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 /* Implementation notes
  *
@@ -377,13 +378,23 @@ static PINT_sm_action remove_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_remove(PINT_server_op *s_op)
+{
+    int ret;
+
+    /* nlmills: TODO: find a way to check permissions on the parent directory */
+    ret = 0;
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(remove);
 
 struct PINT_server_req_params pvfs2_remove_params =
 {
     .string_name = "remove",
     .get_object_ref = PINT_get_object_ref_remove,
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_remove,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .state_machine = &pvfs2_remove_sm
