@@ -43,7 +43,7 @@ copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure
 	${PVFS2_DEST}/config3 -n 1
 
 copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure4\
-	${PVFS2_DEST}/config4 -n 10
+	${PVFS2_DEST}/config4 -n 4
 
 copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure5\
 	${PVFS2_DEST}/config5 -b 128
