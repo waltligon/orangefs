@@ -977,6 +977,7 @@ static uint32_t place_data(enum PVFS_io_type which,
     uint64_t left = CACHE_BLOCK_SIZE_K * 1024;    
     void *user_mem = 0; /* Where to read/write */
     uint64_t user_mem_size = 0; /* How much to read/write */
+    uint32_t written = 0;
 
     /* Continue read/writing strips of data until the whole block completed */
     while(left != 0)
@@ -1028,8 +1029,9 @@ static uint32_t place_data(enum PVFS_io_type which,
         }
 
         left -= user_mem_size;
+        written += user_mem_size;
     }
-    return 1;
+    return written;
 }
 #endif /* PVFS_UCACHE_ENABLE */
 
@@ -1069,6 +1071,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     int req_blk_cnt = 0; /* how many blocks request encompasses */
     int req_size = 0; /* how many bytes request spans */
     uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
+    int written = 0;
 
     /* How many bytes does request span? */
     /* These will be contiguous in file starting at offset. */
@@ -1164,6 +1167,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                 &scratch,
                                 &scratch_ptr, 
                                 &scratch_left);
+                written += rc;
         }
         else /* Miss */
         {
@@ -1176,6 +1180,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                            ureq[i].ublk_tag, 
                                            1, 
                                            &vector);
+                written += rc;
             }
             if(which == 2) /* Write */
             {
@@ -1216,13 +1221,15 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                 &scratch, 
                                 &scratch_ptr, 
                                 &scratch_left);
+                written += rc;
             }
         }
         /* Finally, unlock the block */
         lock_unlock(get_lock(ureq[i].ublk_index));
     }
+    rc = written;
 #endif /* PVFS_UCACHE_ENABLE */
-    return req_size;
+    return rc;
 }
 
 /** do a blocking read or write from an iovec
