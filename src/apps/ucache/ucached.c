@@ -21,7 +21,7 @@ static unsigned char ucache_avail = 0;
 /* Set this to one if the ucache doesn't get created, and the 
  * create_ucache_shmem function should be run again. 
  */
-static unsigned char tryAgain = 0;
+//static unsigned char tryAgain = 0;
 
 /* Use this global to determine if the atexit registered function (clean_up)
  * needs to run. A child process is created to create shmem. This facilitates
@@ -564,7 +564,13 @@ int main(int argc, char **argv)
     }
 
     /* Daemonize! */
-    daemon(1, 1);
+    rc = daemon(1, 1);
+
+    if(rc != 0)
+    {
+        perror("daemon-izing failed");
+        exit(EXIT_FAILURE);
+    }
 
     ucached_log = fopen(LOG, "w");
 
