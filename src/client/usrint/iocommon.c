@@ -1069,8 +1069,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     int req_blk_cnt = 0; /* how many blocks request encompasses */
     int req_size = 0; /* how many bytes request spans */
     uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
-    uint64_t remainder = 0; /* used to determine if offset is byte alligned */
-    uint64_t next_tag = 0; /* used in the for loop that fills in the tags */
 
     /* How many bytes does request span? */
     /* These will be contiguous in file starting at offset. */
@@ -1099,33 +1097,20 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     }
 
     /* How many tags? */
-    req_blk_cnt = req_size / blk_size;
-
-    /* Add 2 to be sure we have enough tags (may not need them all) */
-    req_blk_cnt += 2;
+    uint64_t start_tag = offset - (offset % blk_size);
+    uint64_t end_tag = (offset + req_size) - ((offset + req_size) % blk_size);
+    req_blk_cnt = (end_tag - start_tag) / blk_size;
    
-    /* Now that we know the approximate req_blk_cnt, allocate the required 
+    /* Now that we know the req_blk_cnt, allocate the required 
      * space for tags, hits boolean, and ptr to block in ucache shared memory.
      */
     struct ucache_req_s ureq[req_blk_cnt];
-
-    /* Determine if offset is block aligned and what the first tag will be. */
-    remainder = offset % blk_size;
-    ureq[0].ublk_tag = offset - remainder;
-
+    ureq[0].ublk_tag = start_tag;
     /* Loop over positions storing tags (ment identifiers) */
-    next_tag = ureq[0].ublk_tag + blk_size;
     for(i = 1; i < req_blk_cnt; i++)
     {
-
-        ureq[i].ublk_tag = next_tag;
-        next_tag += blk_size;
-        if(next_tag > (offset + req_size))
-            break;
+        ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + blk_size;
     }
-
-    /* This should now accurately represent the number of blks */
-    req_blk_cnt = i + 1;
 
     /* Now that tags are set fill in array of lookup responses */
     for(i = 0; i < req_blk_cnt; i++)
@@ -1237,7 +1222,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         lock_unlock(get_lock(ureq[i].ublk_index));
     }
 #endif /* PVFS_UCACHE_ENABLE */
-    return 1;
+    return req_size;
 }
 
 /** do a blocking read or write from an iovec

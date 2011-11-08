@@ -8,10 +8,13 @@
  * Currently under development...
  */
 #include <usrint.h> /* to get PVFS_UCACHE_ENABLE */
+#include "usrint.h"
+#include "posix-ops.h"
+#include "openfile-util.h"
 #if PVFS_UCACHE_ENABLE
 #include <ucache.h>
-
-//#define FILE_SYSTEM_ENABLED 
+#include <iocommon.h>
+#define FILE_SYSTEM_ENABLED 
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
@@ -60,7 +63,7 @@ static unsigned char dirty_done(uint16_t index);
 static uint16_t dirty_next(struct mem_table_s *mtbl, uint16_t index);
 
 /* File and Memory Insertion */
-static struct file_ent_s *insert_file(uint32_t fs_id, uint64_t handle);
+uint16_t insert_file(uint32_t fs_id, uint64_t handle);
 
 static void *insert_mem(struct file_ent_s *fent, 
                         uint64_t offset, 
@@ -271,13 +274,24 @@ int ucache_open_file(PVFS_fs_id *fs_id,
 
     if(mtbl == (struct mem_table_s *)NIL)
     {
-        *fent = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
-        if(*fent != (struct file_ent_s *)NIL)
+        uint16_t fentIndex  = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
+        if(fentIndex < 0 || fentIndex > FILE_TABLE_ENTRY_COUNT)
         {
-            mtbl = get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
+            rc = -1;
+            goto done;
+        }
+        *fent = &(ucache->ftbl.file[fentIndex]);
+        if((*fent)->mtbl_blk == NIL16 || (*fent)->mtbl_ent == NIL16)
+        {
+            rc = -1;
+            goto done;
         }
 
-        if(mtbl == (struct mem_table_s *)NIL)
+        printf("%hu\t%hu\n", (*fent)->mtbl_blk, (*fent)->mtbl_ent);
+        fflush(stdout);
+
+        mtbl = get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
+        if(mtbl == (struct mem_table_s *)NILP)
         {   
             /* Error - Could not insert */
             rc = -1;
@@ -487,14 +501,14 @@ int wipe_ucache(void)
 int ucache_close_file(struct file_ent_s *fent)
 {
     int rc = 0;
-    lock_lock(ucache_lock);
+    rc = lock_lock(ucache_lock);
     rc = remove_file(fent);
     lock_unlock(ucache_lock);
     return rc;
 }
 
 /** Dumps all cache related information. */
-void ucache_info(FILE *out, char *flags)
+int ucache_info(FILE *out, char *flags)
 {
     /* Decide what to show */
     char show_all=0;
@@ -564,6 +578,8 @@ void ucache_info(FILE *out, char *flags)
     fprintf(out, "NIL16 = 0X%X\n", NIL16);    
     fprintf(out, "NIL32 = 0X%X\n", NIL32);
     fprintf(out, "NIL64 = 0X%llx\n", NIL64);
+
+    fflush(out);
 
     /* Lock's Shared Memory Info */
     fprintf(out, "ucache_lock ptr:\t\t0X%lX\n", (long int)ucache_lock);
@@ -695,6 +711,7 @@ void ucache_info(FILE *out, char *flags)
         }
     }
     }
+    return 1;
 }
 
 /** Returns a pointer to the lock corresponding to the block_index.
@@ -744,10 +761,13 @@ int lock_init(ucache_lock_t * lock)
 /** Returns 0 when lock is locked; otherwise, return -1 and sets errno */
 int lock_lock(ucache_lock_t * lock)
 {
+    int rc = 0;
     #if LOCK_TYPE == 0
     return sem_wait(lock);
     #elif LOCK_TYPE == 1
-    return pthread_mutex_lock(lock);
+    rc = pthread_mutex_lock(lock);
+    assert(rc == 0);
+    return rc;
     #elif LOCK_TYPE == 2
     return pthread_spin_lock(lock);
     #endif   
@@ -756,11 +776,13 @@ int lock_lock(ucache_lock_t * lock)
 /** If successful, return zero; otherwise, return -1 and sets errno */
 int lock_unlock(ucache_lock_t * lock)
 {
+    int rc = 0;
     #if LOCK_TYPE == 0
     return sem_post(lock);
     #elif LOCK_TYPE == 1
-    /* printf("lock size = %d\n", sizeof(*lock)); */
-    return pthread_mutex_unlock(lock);
+    rc = pthread_mutex_unlock(lock); 
+    assert(rc == 0);
+    return rc;
     #elif LOCK_TYPE == 2
     return pthread_spin_unlock(lock);
     #endif
@@ -1241,19 +1263,22 @@ static int put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
  * Returns NIL if necessary data structures could not be aquired from the free
  * lists or through an eviction policy (meaning references are held).
  */
-static struct file_ent_s *insert_file(
+uint16_t insert_file(
     uint32_t fs_id,
     uint64_t handle 
 )
 {
     if(DBG)fprintf(out, "trying to insert file...\n");
+
     struct file_table_s *ftbl = &(ucache->ftbl);
     struct file_ent_s *current;     /* Current ptr for iteration */
     uint16_t free_fent = NIL16;       /* Index of next free fent */
+
     /* index into file hash table */
     uint16_t index = handle % FILE_TABLE_HASH_MAX;
     if(DBG)fprintf(out, "\thashed index: %u\n", index);
     current = &(ftbl->file[index]);
+
     /* Get free mtbl */
     uint16_t free_mtbl_blk = NIL16;
     uint16_t free_mtbl_ent = NIL16; 
@@ -1278,7 +1303,7 @@ static struct file_ent_s *insert_file(
         {
 
         }
-        /* Intitialize remaining blocks' memory tables */
+        /* Intitialize memory tables */
         if(ucache->ftbl.free_blk != NIL16)
         {
             if(DBG)fprintf(out, "\tadding memory tables to free block\n");
@@ -1289,39 +1314,50 @@ static struct file_ent_s *insert_file(
         else
         {
             /* Couldn't get free mtbl - unlikely */
-            return (struct file_ent_s *) NIL;
+            return NIL16;
         }
     }
 
-    /* Insert at index, relocating data @ index if occupied */
-    if((current->mtbl_blk != NIL16) && 
-         (current->mtbl_ent != NIL16)) 
+    /* Now, we know which hashed chain we are trying to insert into and have a 
+     * mtbl ready to be filled.
+     */
+
+    /* Insert at index if empty, otherwise append to the end of chain */
+    uint16_t lastInChain = index;
+    while(current->next != NIL16) 
     {
-        if(DBG)fprintf(out, "\tmust relocate head data\n");
+        lastInChain = current->next;
+        current = &(ftbl->file[current->next]);
+    }
+
+    /* Insert after last occupied link */
+    if(lastInChain >= FILE_TABLE_HASH_MAX)
+    {
+        /* Certain a file entry is required */
+        if(DBG)fprintf(out, "\thashed index was occupied, inserting after:"
+                                                      " %hu\n", lastInChain);
         /* get free file entry and update ftbl */
         free_fent = get_free_fent();
         if(free_fent != NIL16)
         {
-            /* copy data from 1 struct to the other */
-            ftbl->file[free_fent] = *current;
-            /* Since we just coppied structs we need to correct the index */
-            ftbl->file[free_fent].index = free_fent;   
-            /* point new head's "next" to former head */
-            current->next = free_fent;  
-            current->index = index; /* make sure we have correct index here */
+            current->next = free_fent;
+            current = &(ftbl->file[free_fent]);
+            current->index = free_fent;
         }
         else
         {
             /* Return an error indicating the ucache is full and file couldn't 
              * be cached 
              */
-            return (struct file_ent_s *) NIL;
+            return NIL16;
         }
     }
     else
     {
         if(DBG)fprintf(out, "\tno head data @ index\n");
+        current->index = index;
     }
+
     /* Insert file data @ index */
     current->tag_id = fs_id;
     current->tag_handle = handle;
@@ -1332,7 +1368,7 @@ static struct file_ent_s *insert_file(
     init_memory_table(get_mtbl(free_mtbl_blk, free_mtbl_ent));
     if(DBG)fprintf(out, "\trecieved free memory table: 0X%lX\n", 
         (long int)&(ucache->b[current->mtbl_blk].mtbl[current->mtbl_ent]));
-    return (struct file_ent_s*)&(ucache->ftbl.file[current->index]);
+    return current->index;
 }
 
 /** Remove file entry and memory table of file identified by parameters
@@ -1414,6 +1450,8 @@ static void *lookup_mem(struct mem_table_s *mtbl,
                                                               index);
 
     struct mem_ent_s *current = &(mtbl->mem[index]);
+
+
 
     /* previous, current, next memory entry index in mtbl */
     int16_t p = NIL16;

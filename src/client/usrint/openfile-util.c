@@ -559,10 +559,13 @@ int pvfs_descriptor_table_size(void)
 	pd->fd = newfd;
 	pd->true_fd = newfd;
 	pd->fdflags = 0;
+
+    /*
     if (!use_cache)
     {
 	    pd->fdflags |= PVFS_FD_NOCACHE;
     }
+    */
 	pd->s->dup_cnt = 1;
 	pd->s->fsops = fsops;
     if (file_ref)
@@ -585,7 +588,7 @@ int pvfs_descriptor_table_size(void)
     pd->s->fent = NULL; /* not caching if left NULL */
 
 #if PVFS_UCACHE_ENABLE
-    if (ucache_enabled && use_cache)
+    if (ucache_enabled /* && use_cache*/ )
     {
         /* File reference won't always be passed in */
         if(file_ref != NULL)

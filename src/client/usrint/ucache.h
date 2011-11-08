@@ -173,7 +173,7 @@ void *ucache_insert(struct file_ent_s *fent,
                     uint64_t offset, 
                     uint16_t *block_ndx);
 int ucache_remove(struct file_ent_s *fent, uint64_t offset);
-void ucache_info(FILE *out, char *flags);
+int ucache_info(FILE *out, char *flags);
 
 int ucache_flush_cache(void); 
 int ucache_flush_file(struct file_ent_s *fent);
