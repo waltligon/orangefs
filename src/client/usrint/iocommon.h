@@ -39,6 +39,16 @@ struct ucache_req_s
     uint16_t ublk_index; /* index of ucache block in shared memory segment */
 };
 
+struct ucache_copy_s
+{
+    void * cache_pos;
+    void * buff_pos;
+    size_t size;
+    unsigned char hit;
+    uint16_t blk_index;
+};
+
+
 /* this global is set when a pvfs specific error is returned
  * and errno is set to EIO
  */
@@ -121,7 +131,7 @@ extern int iocommon_rename(PVFS_object_ref *oldpdir,
 extern int iocommon_readorwrite(enum PVFS_io_type which,
 	                 pvfs_descriptor *pd,
                          PVFS_size offset,
-                         size_t count,
+                         size_t iovec_count,
                          const struct iovec *vector);
 
 extern int iocommon_vreadorwrite(enum PVFS_io_type which,

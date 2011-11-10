@@ -441,7 +441,7 @@ int flush_file(struct file_ent_s *fent)
         mtbl->mem[i].dirty_next = NIL16; 
 
         #ifdef FILE_SYSTEM_ENABLED
-        PVFS_object_ref ref = {fent->mtbl_blk, fent->mtbl_ent, 0};
+        PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
         struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
         rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector); 
         #endif
@@ -469,7 +469,7 @@ int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment)
 {
     int rc = 0;
     #ifdef FILE_SYSTEM_ENABLED
-    PVFS_object_ref ref = {fent->mtbl_blk, fent->mtbl_ent, 0};
+    PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
     struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
     rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector);
     #endif
@@ -1769,7 +1769,6 @@ static void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     if(DBG)fprintf(out, "\toffset: 0X%llX hashes to index: %u\n",
                                    (long long int)offset, index);
 
-    struct mem_ent_s *current = &(mtbl->mem[index]);
     /* Lookup first */
     void *returnValue = lookup_mem(mtbl, offset, block_ndx, NULL, NULL);
     if(returnValue != (void *)NIL)
@@ -1782,6 +1781,7 @@ static void *insert_mem(struct file_ent_s *fent, uint64_t offset,
 
     /* Entry doesn't exist, insertion required */
     if(DBG)fprintf(out, "\tlookup returned NIL\n");
+    struct mem_ent_s *current = &(mtbl->mem[index]);
     uint16_t mentIndex = 0;
     int evict_rc = 0;
     if(mtbl->mem[index].tag != NIL64)
@@ -1807,7 +1807,6 @@ static void *insert_mem(struct file_ent_s *fent, uint64_t offset,
             current->next = mentIndex;
             mtbl->mem[mentIndex].next = next_ment;
             rc = set_item(fent, offset, mentIndex); 
-            mtbl->mem[index].next = mentIndex; /* link head to new ment, containing previous head */
             if(rc != (void *)NIL)
             {
                 *block_ndx = mtbl->mem[mentIndex].item;
@@ -1828,7 +1827,8 @@ static void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     rc = set_item(fent, offset, index);
     if(rc != (void *)NIL)
     {
-        *block_ndx = mtbl->mem[mentIndex].item;
+        *block_ndx = mtbl->mem[index].item;
+        assert(*block_ndx == mtbl->mem[index].item);
         return rc;      
     }
     else

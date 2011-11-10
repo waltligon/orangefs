@@ -960,78 +960,109 @@ errorout:
 }
 
 #if PVFS_UCACHE_ENABLE
-/** TODO
- * 1: read, read from user cache and write to user mem
- * 2: write, read from user mem and write to user cache
+/* Returns how many copy operations to/from the ucache will need to be 
+ * completed.
  */
-static uint32_t place_data(enum PVFS_io_type which,
-                           void *block, 
-                           const struct iovec *vector, 
-                           int *iovec_ndx,
-                           unsigned char *scratch, 
-                           void **scratch_ptr,
-                           uint64_t *scratch_left)
+static int calc_copy_op_cnt(size_t req_size, const struct iovec *vector)
 {
-    const uint64_t block_size = CACHE_BLOCK_SIZE_K * 1024;
-    /* Bytes of block remaining to be read/written */
-    uint64_t left = CACHE_BLOCK_SIZE_K * 1024;    
-    void *user_mem = 0; /* Where to read/write */
-    uint64_t user_mem_size = 0; /* How much to read/write */
-    uint32_t written = 0;
-
-    /* Continue read/writing strips of data until the whole block completed */
-    while(left != 0)
+    int copy_count = 0;
+    int vec_ndx = 0;
+    size_t size_left = req_size;
+    size_t blk_left = CACHE_BLOCK_SIZE;
+    size_t iovec_left = vector[0].iov_len;
+    while(size_left != 0)
     {
-        /* Do we need to use the scratch_ptr or a fresh segment */
-        if(*scratch)
+        if(iovec_left > blk_left)
         {
-            /* Use a previously used buffer that wasn't quite filled by the 
-             * previous cache block.
-             */
-            user_mem = *scratch_ptr;
-            user_mem_size = *scratch_left;
-            *scratch = 0;
+            size_left -= blk_left;
+            iovec_left -= blk_left;
+            blk_left = CACHE_BLOCK_SIZE;
         }
-        else
+        else if(iovec_left < blk_left)
         {
-            user_mem = vector[*iovec_ndx].iov_base;
-            user_mem_size = vector[*iovec_ndx].iov_len;
+            size_left -= iovec_left;
+            blk_left -= iovec_left;
+            vec_ndx++;
+            iovec_left = vector[vec_ndx].iov_len;
         }
-
-        /* Will this transfer complete the block but not the user mem segment */
-        if(user_mem_size > left)
+        else /* They must be equal */
         {
-            /* Save a reference to where we left off with this segment*/
-            *scratch_ptr = (void *)(user_mem + left);
-            *scratch_left = user_mem_size - left;
-            *scratch = 1;
-        }
-        else
-        {
-            /* We're done with this user mem segment */
-            (*iovec_ndx)++;
+            size_left -= iovec_left;
+            blk_left = CACHE_BLOCK_SIZE;
+            vec_ndx++;
+            iovec_left = vector[vec_ndx].iov_len;
         }
 
-        /* More Data! */
-        if(which == 1)
-        {
-            /* Read */
-            memcpy(user_mem,
-                    block + (block_size - left),
-                    (size_t)user_mem_size);
-        }
-        else
-        {
-            /* Write */           
-            memcpy(block + (block_size - left),
-                     user_mem,
-                     (size_t)user_mem_size);
-        }
-
-        left -= user_mem_size;
-        written += user_mem_size;
+        copy_count++;
     }
-    return written;
+    return copy_count;
+}
+
+
+void calc_copy_ops(struct ucache_req_s *ureq, 
+                  struct ucache_copy_s *ucop, 
+                  const struct iovec *vector, 
+                  int copy_count
+)
+{
+    int ureq_ndx = 0;
+    int vec_ndx = 0;
+    size_t blk_left = CACHE_BLOCK_SIZE;
+    size_t vec_left = vector[0].iov_len;
+    int i;
+    for(i = 0; i < copy_count; i++)
+    {
+        ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr +
+                       (CACHE_BLOCK_SIZE - blk_left);
+        ucop[i].buff_pos = vector[vec_ndx].iov_base +
+                (vector[vec_ndx].iov_len - vec_left);
+        ucop[i].hit = ureq[ureq_ndx].ublk_hit;
+        ucop[i].blk_index = ureq[ureq_ndx].ublk_index;
+
+        if(vec_left > blk_left) /* Finish block */
+        {
+            ucop[i].size = blk_left;
+            vec_left -= blk_left;
+            blk_left = CACHE_BLOCK_SIZE;
+            ureq_ndx++;
+        }
+        else if(vec_left < blk_left) /* Finish iovec */
+        {
+            ucop[i].size = vec_left;
+            blk_left -= vec_left;
+            vec_ndx++;
+            vec_left = vector[vec_ndx].iov_len;
+        }
+        else /* They must be equal - finish both */
+        {
+            ucop[i].size = blk_left;
+            blk_left = CACHE_BLOCK_SIZE;
+            vec_ndx++;
+            ureq_ndx++;
+            vec_left = vector[vec_ndx].iov_len;
+        }
+    }
+}
+
+static int cache_readorwrite(
+    enum PVFS_io_type which, 
+    struct ucache_copy_s * ucop
+)
+{
+    int rc = 0;
+    if(which == PVFS_IO_READ)
+    {
+        /* Copy from cache to user mem */
+        memcpy(ucop->buff_pos, ucop->cache_pos, ucop->size);
+        rc = (int)ucop->size;
+    }
+    else
+    {
+        /* Copy from user mem to cache */
+        memcpy(ucop->cache_pos, ucop->buff_pos, ucop->size);
+        rc = (int)ucop->size;
+    }
+    return rc; 
 }
 #endif /* PVFS_UCACHE_ENABLE */
 
@@ -1044,7 +1075,7 @@ static uint32_t place_data(enum PVFS_io_type which,
 int iocommon_readorwrite(enum PVFS_io_type which,
                          pvfs_descriptor *pd,
                          PVFS_size offset,
-                         size_t count,
+                         size_t iovec_count,
                          const struct iovec *vector)
 {
     int rc = 0;
@@ -1058,7 +1089,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /* Bypass the ucache */
         errno = 0;
         rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                   count, vector);
+                                   iovec_count, vector);
         if (rc < 0)
         {
             return -1;
@@ -1070,13 +1101,12 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     int i; /* index used for 'for loops' */
     int req_blk_cnt = 0; /* how many blocks request encompasses */
     int req_size = 0; /* how many bytes request spans */
-    uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
-    int written = 0;
+    int transfered = 0;
 
     /* How many bytes does request span? */
     /* These will be contiguous in file starting at offset. */
     /* Also, they may be spread in out memory */
-    for (i = 0; i < count; i++)
+    for (i = 0; i < iovec_count; i++)
     {
         req_size += vector[i].iov_len;
     }
@@ -1095,15 +1125,19 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /*TODO Possibly remove the file - bad idea? What if it's referenced? */
 
         /* Bypass the ucache */
-        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset, count, vector);
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset, 
+                                              iovec_count, vector);
         return rc;
     }
 
     /* How many tags? */
-    uint64_t start_tag = offset - (offset % blk_size);
-    uint64_t end_tag = (offset + req_size) - ((offset + req_size) % blk_size);
-    req_blk_cnt = (end_tag - start_tag) / blk_size;
-   
+    uint64_t start_tag = offset - (offset % CACHE_BLOCK_SIZE);
+    /* End_tag isn't really the last tag if the blk is alligned. 
+     * This value is used to determine the req_blk_cnt only.
+     */
+    uint64_t end_tag = (offset + req_size) - ((offset + req_size) % CACHE_BLOCK_SIZE);
+    req_blk_cnt = (end_tag - start_tag) / CACHE_BLOCK_SIZE;
+
     /* Now that we know the req_blk_cnt, allocate the required 
      * space for tags, hits boolean, and ptr to block in ucache shared memory.
      */
@@ -1112,7 +1146,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     /* Loop over positions storing tags (ment identifiers) */
     for(i = 1; i < req_blk_cnt; i++)
     {
-        ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + blk_size;
+        ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + CACHE_BLOCK_SIZE;
     }
 
     /* Now that tags are set fill in array of lookup responses */
@@ -1120,14 +1154,15 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     {
         /* if lookup returns nil set char to 0, otherwise 1 */
         ureq[i].ublk_ptr = ucache_lookup(pd->s->fent, ureq[i].ublk_tag, 
-                                                  &ureq[i].ublk_index);
+                                                  &(ureq[i].ublk_index));
         if(ureq[i].ublk_ptr == (void *)NIL) 
         {
             ucache_misses++; /* could overflow, reset periodically */
             ureq[i].ublk_hit = 0; /* miss */
             /* Find a place for the block */
             ureq[i].ublk_ptr = ucache_insert(pd->s->fent, ureq[i].ublk_tag,
-                                                      &ureq[i].ublk_index);            
+                                                      &(ureq[i].ublk_index));
+            assert(ureq[i].ublk_ptr != (void *)NILP);            
         }
         else{
             ucache_hits++;  /* could overflow, reset periodically */
@@ -1135,99 +1170,93 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         }
     }
 
+    if(which == PVFS_IO_READ)
+    {
+        /* Loop over ureq structure and perform reads on misses */
+        for(i = 0; i < req_blk_cnt; i++)
+        {
+            if(ureq[i].ublk_hit == 0)
+            {
+                /* Perform read */
+                /* read single block from fs into cache */
+                struct iovec cache_vec = {ureq[i].ublk_ptr, CACHE_BLOCK_SIZE};
+                rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                                           &pd->s->pvfs_ref,
+                                           ureq[i].ublk_tag,
+                                           1,
+                                           &cache_vec);     
+            }   
+        }
+    }
+
+    /* Read beginning and end blks into cache before writing if 
+     * either end of the request are unalligned.
+     */
+    if(which == PVFS_IO_WRITE) /* Write */
+    {
+        /* Consult ureq to see if block was hit or missed */
+        /* Also see if block was alligned or not */
+        if((ureq[0].ublk_hit == 0) && (offset != ureq[0].ublk_tag))
+        {
+            /* Read first block from fs into ucache */
+            struct iovec vector = {ureq[0].ublk_ptr, CACHE_BLOCK_SIZE};
+            rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                            &pd->s->pvfs_ref,
+                            ureq[0].ublk_tag,
+                                           1,
+                                    &vector);
+        }
+        if((ureq[req_blk_cnt].ublk_hit == 0) &&
+           (((offset + req_size) % CACHE_BLOCK_SIZE) != 0))
+        {
+            /* Read last block from fs into ucache */
+            struct iovec vector = {ureq[req_blk_cnt].ublk_ptr,
+                                            CACHE_BLOCK_SIZE};
+            rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                            &pd->s->pvfs_ref,
+                            ureq[req_blk_cnt].ublk_tag,
+                                           1,
+                                    &vector);
+        }
+    }
+
     /* At this point we know how many blocks the request will cover, the tags
      * (indexes into file) of the blocks, whether the corresponding block was
      * hit, and the ptr to the corresponding blk in memory. The blocks are also
      * locked at this point. They will be unlocked as reads/writes happen.
-     *
-     * Now, define some more values used with the place_data function.
      */
 
-    /* Used to determine if we finished writing a
-     * block without filling up the 
-     * current io segment 
+    /* If only one iovec then we can assume there will be req_blk_cnt 
+     * memcpy operations, otherwise we need to determine how many 
+     * memcpy operations will be required so we can create the ucache_copy_s
+     * struct array of proper length.
      */
-    unsigned char scratch = 0;
-    /* The offset into the last io semgment that
-     * was partially used (so use 
-     * this ptr then move on to the next io segment) .
-     */ 
-    void  *scratch_ptr = 0; 
-    uint64_t scratch_left = 0;
-    int iovec_ndx = 0;
-
-    for(i = 0; i < req_blk_cnt; i++)
+    int copy_count = 0;
+    if(iovec_count == 1)
     {
-        if(ureq[i].ublk_hit) /* Hit */
-        {
-                rc = place_data(which, 
-                                ureq[i].ublk_ptr, 
-                                vector, 
-                                &iovec_ndx,
-                                &scratch,
-                                &scratch_ptr, 
-                                &scratch_left);
-                written += rc;
-        }
-        else /* Miss */
-        {
-            if(which == 1) /* Read */
-            {
-                /* read single block from fs into cache */
-                struct iovec vector = { ureq[i].ublk_ptr, blk_size };
-                rc = iocommon_vreadorwrite(which, 
-                                           &pd->s->pvfs_ref, 
-                                           ureq[i].ublk_tag, 
-                                           1, 
-                                           &vector);
-                written += rc;
-            }
-            if(which == 2) /* Write */
-            {
-                /* Read beginning and end blks into cache before writing if 
-                 * either end of the request are unalligned. */
-                if((i == 0) && (offset != ureq[i].ublk_tag))
-                {
-                    /* Read first block from fs into ucache */
-                    struct iovec vector = {ureq[0].ublk_ptr, blk_size};
-                    rc = iocommon_vreadorwrite(which,
-                                               &pd->s->pvfs_ref,
-                                               ureq[0].ublk_tag,
-                                               1,
-                                               &vector);
-                }
-                if((i == (req_blk_cnt - 1)) &&  
-                    (((offset + req_size) % blk_size) != 0))
-                {
-                    /* Read last block from fs into ucache */
-                    struct iovec vector = {ureq[i].ublk_ptr, blk_size};
-                    rc = iocommon_vreadorwrite(which,
-                                               &pd->s->pvfs_ref,
-                                               ureq[i].ublk_tag,
-                                               1,
-                                               &vector);
-                }
-            }
+        copy_count = req_blk_cnt;
+    }
+    else
+    {
+        copy_count = calc_copy_op_cnt(req_size, vector);    
+    }
 
-            /* Copy into cache if possible */
-            if(ureq[i].ublk_ptr != (void *) NIL64)
-            {
-                /* As long as the eviction routines are functional
-                 * we should always call place_data here */
-                rc = place_data(which, 
-                                ureq[i].ublk_ptr, 
-                                vector, 
-                                &iovec_ndx,
-                                &scratch, 
-                                &scratch_ptr, 
-                                &scratch_left);
-                written += rc;
-            }
-        }
-        /* Finally, unlock the block */
+    /* Create copy structure and fill with appropriate values */
+    struct ucache_copy_s ucop[copy_count];
+    calc_copy_ops(&ureq[0], &ucop[0], vector, copy_count);
+
+    /* The ucache copy structure should now be filled and we can procede with 
+     * the necessary memcpy operations.
+     */
+    for(i = 0; i < copy_count; i++)
+    {
+        /* perform copy operation */
+        transfered += cache_readorwrite(which, &ucop[i]);
+
+        /* Unlock the block */
         lock_unlock(get_lock(ureq[i].ublk_index));
     }
-    rc = written;
+    rc = transfered;
 #endif /* PVFS_UCACHE_ENABLE */
     return rc;
 }
