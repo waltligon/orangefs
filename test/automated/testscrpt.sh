@@ -7,6 +7,9 @@
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
+# set ENABLE_SECURITY to build with security
+# set SECURITY_FAIL to test that security will fail - SSS
+
 # you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
@@ -23,6 +26,10 @@ fi
 
 # need to make this a command line arugment:
 export CVS_TAG="${CVS_TAG:-HEAD}"
+
+if [ $ENABLE_SECURITY ] ; then
+	sec_dir=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc
+fi
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
@@ -65,11 +72,15 @@ pull_and_build_pvfs2 () {
 	if  [ $do_vfs -eq 1 ] ; then
 		with_kernel="-k /lib/modules/`uname -r`/build"
 	fi
+   with_security=""
+   if [ $ENABLE_SECURITY ] ; then
+      with_security="-s"
+   fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
 	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -t -v $1 \
-		$with_kernel -r $PVFS2_DEST
+		$with_kernel $with_security -r $PVFS2_DEST
 	
 }
 
@@ -95,11 +106,11 @@ pull_and_build_mpich2 () {
 
 
 teardown_vfs() {
-	sudo umount $PVFS2_MOUNTPOINT
-	sudo killall pvfs2-client
+	mount | grep -q $PVFS2_MOUNTPOINT && sudo umount $PVFS2_MOUNTPOINT
+	ps -e | grep -q pvfs2-client && sudo killall pvfs2-client
 	sleep 1
-	sudo /sbin/rmmod  pvfs2
-	# let teardown alway ssucceed.  pvfs2-client might already be killed
+	/sbin/lsmod | grep -q pvfs2 && sudo /sbin/rmmod pvfs2
+	# let teardown always succeed.  pvfs2-client might already be killed
 	# and pvfs2 kernel module might not be loaded yet 
 	return 0
 }
@@ -112,20 +123,88 @@ setup_vfs() {
 #		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
-        sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client  -p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+	keypath=""
+	if [ $ENABLE_SECURITY ] ; then
+		keypath="--keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/clientkey.pem"
+	fi
+	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
+		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+}
+
+check_openssl() {
+	if [ $? -ne 0 ] ; then
+		echo "OpenSSL error:" 1>&2
+		cat ${sec_dir}/error.tmp 1>&2
+	fi
+}
+
+setup_security() {
+	echo "....initializing security"
+	which openssl > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		echo "openssl must be installed for security mode"
+		return 1
+	fi
+	mkdir -p $sec_dir
+	# remove existing files
+	rm -f ${sec_dir}/*
+	# generate client private key
+	openssl genrsa -out ${sec_dir}/clientkey.pem 1024 > /dev/null \
+		2> ${sec_dir}/error.tmp
+	check_openssl
+	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
+		# output client public key to keystore, unless security 
+		# is intended to fail
+		if [ ! $SECURITY_FAIL ] ; then
+			echo "C:`hostname -s`" >> ${sec_dir}/keystore-${alias}
+			openssl rsa -in ${sec_dir}/clientkey.pem -pubout >> \
+				${sec_dir}/keystore-${alias} 2> ${sec_dir}/error.tmp
+			check_openssl
+		fi
+		# generate server private key
+		openssl genrsa -out ${sec_dir}/serverkey-${alias}.pem 2048 \
+			> /dev/null 2> ${sec_dir}/error.tmp
+		check_openssl
+		# output server public key to keystore files
+		for keystore_alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
+			echo "S:${alias}" >> ${sec_dir}/keystore-${keystore_alias}
+			openssl rsa -in ${sec_dir}/serverkey-${alias}.pem \
+				-pubout >> ${sec_dir}/keystore-${keystore_alias} \
+				2> ${sec_dir}/error.tmp
+			check_openssl
+		done
+	done
+	# set client key location
+	export PVFS2KEY_FILE=${sec_dir}/clientkey.pem
+	rm -f ${sec_dir}/error.tmp
 }
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
 	rm -f fs.conf 
+	sec_args=""
+	if [ $ENABLE_SECURITY ] ; then
+		sec_args="--keystore=${sec_dir}/keystore-_ALIAS_ "
+		sec_args+="--serverkey=${sec_dir}/serverkey-_ALIAS_.pem"
+	fi
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
+		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
+	# generate security keys
+	if [ $ENABLE_SECURITY ] ; then
+		setup_security
+		if [ $? -ne 0 ] ; then
+			return 1
+		fi
+	fi
 	# clean up any artifacts from earlier runs
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
@@ -146,9 +225,9 @@ setup_pvfs2() {
 	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi
-	#turn on degging on each server
+	#turn on debugging on each server
 	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-        echo "....setting server-side debug mask"
+	echo "....setting server-side debug mask"
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
@@ -298,7 +377,7 @@ teardown_pvfs2 && setup_pvfs2
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
-        setupfail
+	setupfail
 fi
 
 if [ $do_vfs -eq 1 ] ; then 
@@ -362,5 +441,5 @@ else
 	tinder_report success
 fi
 
-#[ $do_vfs -eq 1 ] && teardown_vfs
-#teardown_pvfs2
+[ $do_vfs -eq 1 ] && teardown_vfs
+teardown_pvfs2

@@ -94,7 +94,7 @@ if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
 fi
 
-if [ "$enablesecurity" = "true " ]
+if [ "$enablesecurity" = "true" ]
 then
     configureopts="${configureopts} --enable-security"
 fi
