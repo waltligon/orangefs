@@ -155,6 +155,8 @@ PVFS_time PINT_util_mkversion_time(PVFS_time version);
 
 struct timespec PINT_util_get_abs_timespec(int microsecs);
 
+char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count);
+
 void PINT_util_digest_init(void);
 void PINT_util_digest_finalize(void);
 

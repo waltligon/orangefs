@@ -6,11 +6,63 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <assert.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-types.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-internal.h"
+#include "gossip.h"
+#include "pint-util.h"
 #include "security-util.h"
 
+/* PINT_print_op_mask
+ *
+ * Writes capability operation mask into string buffer.
+ * Each operation has a code:
+ *    m - BATCH_REMOVE
+ *    e - BATCH_CREATE
+ *    v - REMOVE
+ *    a - ADMIN
+ *    c - CREATE
+ *    s - SETATTR
+ *    r - READ
+ *    w - WRITE
+ *    x - EXECUTE
+ *
+ * A - is printed in place of a code if it is not set.
+ * The buffer must be at least 10 bytes.
+ * Returns pointer to the buffer.
+ */
+char *PINT_print_op_mask(uint32_t op_mask, char *out_buf)
+{
+    const char codes[] = "mevacsrwx";
+    uint32_t bit, i;
+    char *p;
+
+    if (!out_buf)
+    {
+        return NULL;
+    }
+
+    /* start from "left" */
+    for (bit = (1 << 8), i = 0, p = out_buf;
+         bit; 
+         bit >>= 1, i++, p++)
+    {
+        if (op_mask & bit)
+        {
+            snprintf(p, 2, "%c", codes[i]);
+        }
+        else
+        {
+            snprintf(p, 2, "-");
+        }
+    }
+
+    return out_buf;
+}
 
 /* PINT_null_capability
  *
@@ -125,6 +177,40 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
     return 0;
 }
 
+/* PINT_debug_capability                                                             
+ * 
+ * Outputs the fields of a capability.
+ * prefix should typically be "Received" or "Created".      
+ */
+void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
+{
+    char sig_buf[10], mask_buf[10]; 
+
+    assert(cap);
+
+    if (strlen(cap->issuer) == 0)
+    {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s null capability\n", prefix);
+        return;
+    }
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s capability:\n", prefix);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cap->issuer);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfsid: %u\n", cap->fsid);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cap->sig_size);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
+                 PINT_util_bytes2str(cap->signature, sig_buf, 4));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n",
+                 (int) cap->timeout);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\top_mask: %s\n",
+                 PINT_print_op_mask(cap->op_mask, mask_buf));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tnum_handles: %u\n", 
+                 cap->num_handles);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %llu\n",
+                 cap->num_handles > 0 ? llu(cap->handle_array[0]) : 0LL);
+
+}
+
 /* PINT_cleanup_capability
  *
  * Destructs a capability object by freeing its internal structures.
@@ -233,6 +319,42 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     return 0;
 }
 
+/* PINT_debug_credential
+ * 
+ * Outputs the fields of a credential.
+ * Set prefix to descriptive text.
+ */
+void PINT_debug_credential(const PVFS_credential *cred, const char *prefix)
+{
+    char sig_buf[10], group_buf[512], temp_buf[16];
+    unsigned int i, buf_left, count;
+
+    assert(cred);
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s:\n", prefix);
+
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cred->issuer);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tuserid: %u\n", cred->userid);
+    /* output groups */
+    for (i = 0, group_buf[0] = '\0', buf_left = 512; i < cred->num_groups; i++)
+    {
+        count = sprintf(temp_buf, "%u ", cred->group_array[i]);
+        if (count > buf_left)
+        {
+            break;
+        }
+        strcat(group_buf, temp_buf);
+        buf_left -= count;
+    }
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tgroups: %s\n", group_buf);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cred->sig_size);
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
+                 PINT_util_bytes2str(cred->signature, sig_buf, 4));
+    gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n", 
+                 (int) cred->timeout);
+
+}
+
 /* PINT_cleanup_credential
  *
  * Destructs a credential object by freeing its internal structures.
@@ -253,7 +375,6 @@ void PINT_cleanup_credential(PVFS_credential *cred)
         cred->sig_size = 0;
     }
 }
-
 
 /*
  * Local variables:

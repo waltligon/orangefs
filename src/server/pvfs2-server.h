@@ -717,21 +717,18 @@ PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
 
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 
-
-/* nlmills: TODO: fix this to work with capabilities */
 /* PINT_ACCESS_DEBUG()
  *
  * macro for consistent printing of access records
  *
  * no return value
  */
-/*#ifdef GOSSIP_DISABLE_DEBUG*/
+#ifdef GOSSIP_DISABLE_DEBUG
 #ifdef WIN32
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
 #endif
-/*
 #else
 #ifdef WIN32
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
@@ -742,6 +739,7 @@ const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 #endif
 #endif
 
+#ifndef GOSSIP_DISABLE_DEBUG
 #ifdef WIN32
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
@@ -753,7 +751,7 @@ void PINT_server_access_debug(PINT_server_op * s_op,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
 #endif
-*/
+#endif 
 
 /* server side state machines */
 extern struct PINT_state_machine_s pvfs2_mirror_sm;

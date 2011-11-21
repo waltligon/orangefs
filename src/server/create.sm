@@ -776,9 +776,7 @@ static PINT_sm_action setattr_setobj_attribs(
 
 static int setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    /* TODO: orange-security
-       PINT_ACCESS_DEBUG below is currently a no-op 
+{    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     if (js_p->error_code == 0)
@@ -787,8 +785,7 @@ static int setup_resp(
                           "create: new metadata handle: %llu.\n",
                           llu(s_op->resp.u.create.metafile_handle));
     }
-    */
-
+ 
     return SM_ACTION_COMPLETE;
 }
 

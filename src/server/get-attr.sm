@@ -1420,7 +1420,7 @@ static PINT_sm_action getattr_create_capability(
     ret = PINT_init_capability(&resp_attr->capability);
     if (ret < 0)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
                      "getattr: capability init failed\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -1471,7 +1471,7 @@ static PINT_sm_action getattr_create_capability(
     ret = PINT_sign_capability(&resp_attr->capability);
     if (ret < 0)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_debug((GOSSIP_GETATTR_DEBUG|GOSSIP_SECURITY_DEBUG),
                      "getattr: failed to sign capability\n");
         PINT_cleanup_capability(&resp_attr->capability);
         js_p->error_code = -PVFS_EINVAL;
@@ -1480,25 +1480,10 @@ static PINT_sm_action getattr_create_capability(
                                  
     resp_attr->mask |= PVFS_ATTR_CAPABILITY;
 
-    /* TODO: orange-security */
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "Created capability with: \n"
-                 "issuer: %s\n"
-                 "fsid: %u\n"
-                 "sig_size: %u\n"
-                 "signature: %p\n"
-                 "timeout: %d\n"
-                 "op_mask: %x\n"
-                 "num_handles: %u\n"
-                 "handle_array: %p\n",
-                 resp_attr->capability.issuer,
-                 resp_attr->capability.fsid,
-                 resp_attr->capability.sig_size,
-                 resp_attr->capability.signature,
-                 (int) resp_attr->capability.timeout,
-                 resp_attr->capability.op_mask,
-                 resp_attr->capability.num_handles,
-                 resp_attr->capability.handle_array
-                 );
+    PINT_debug_credential(&s_op->u.getattr.credential, 
+                          "getattr: using credential");
+
+    PINT_debug_capability(&resp_attr->capability, "Created");
 
     return SM_ACTION_COMPLETE;
 }

@@ -154,6 +154,7 @@ static int seteattr_verify_eattribs(
     char *valBuf = NULL;
     for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
     {
+#ifndef GOSSIP_DISABLE_DEBUG
         if (gossip_debug_on)
         {
             gossip_debug(GOSSIP_MIRROR_DEBUG
@@ -167,6 +168,7 @@ static int seteattr_verify_eattribs(
                                             ,(unsigned int)valBuf[j]);
             }
         }
+#endif
         js_p->error_code = PINT_eattr_namespace_verify(
             &s_op->req->u.seteattr.key[i],
             &s_op->req->u.seteattr.val[i]);

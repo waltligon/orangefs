@@ -529,6 +529,32 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     return tv;
 }
 
+/*                                                              
+ * Output hex representation of arbitrary data.
+ * The output buffer must have size for count * 2 bytes + 1 (zero-byte).
+ */
+char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
+{
+    unsigned char *in_p;
+    char *out_p;
+    size_t i, num;
+
+    if (!bytes || !output || !count)
+    {
+        return NULL;
+    }
+
+    for (in_p = bytes, out_p = output, i = 0;
+         i < count;
+         in_p++, out_p += num, i++)
+    {
+        num = sprintf(out_p, "%02x", *in_p);
+    }
+
+    return output;    
+
+}
+
 #ifndef WIN32
 inline
 #endif

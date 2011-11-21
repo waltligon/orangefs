@@ -234,7 +234,7 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
             &remaining);
         gossip_debug(GOSSIP_SERVER_DEBUG, "getattr_op is %s.\n",(getattr_op ? "okay" : "NULL"));
         gossip_debug(GOSSIP_SERVER_DEBUG, "listattr: nested sm returned error code: %d\n", tmp_err);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "s_op is %p \t getattr_op is %p",s_op,getattr_op );
+        gossip_debug(GOSSIP_SERVER_DEBUG, "s_op is %p \t getattr_op is %p\n",s_op,getattr_op );
         /* match it up with the correct array entry */
         for(j=0; j<s_op->req->u.listattr.nhandles; j++)
         {
