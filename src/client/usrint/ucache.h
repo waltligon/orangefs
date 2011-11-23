@@ -13,8 +13,8 @@
 #include <pthread.h>
 #include <sys/shm.h>
 
-#define MEM_TABLE_ENTRY_COUNT 818
-#define FILE_TABLE_ENTRY_COUNT 818
+#define MEM_TABLE_ENTRY_COUNT 682
+#define FILE_TABLE_ENTRY_COUNT 682
 #define CACHE_BLOCK_SIZE_K 256
 #define CACHE_BLOCK_SIZE (CACHE_BLOCK_SIZE_K * 1024)
 #define MEM_TABLE_HASH_MAX 31
@@ -33,7 +33,7 @@
 #define NIL (-1)
 
 #ifndef UCACHE_MAX_REQ 
-#define UCACHE_MAX_REQ (512 * 1024 * 1024)
+#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * BLOCKS_IN_CACHE)
 #endif 
 
 /* Define multiple NILS to there's no need to cast for different types */
@@ -79,7 +79,7 @@ extern uint64_t ucache_pseudo_misses; /* Chose not to cache */
 /** A link for one block of memory in a files hash table
  *
  */
-/* 20 bytes */
+/* 24 bytes */
 struct mem_ent_s
 {
     uint64_t tag;           /* offset of data block in file */
@@ -88,7 +88,7 @@ struct mem_ent_s
     uint16_t dirty_next;    /* if dirty used in dirty list */
     uint16_t lru_prev;      /* used in lru list */
     uint16_t lru_next;      /* used in lru list */
-    char pad[2];
+    char pad[6];
 };
 
 /** A cache for a specific file
@@ -104,7 +104,7 @@ struct mem_table_s
     uint16_t lru_last;          /* index of last block on lru list */
     uint16_t dirty_list;        /* index of first dirty block */
     uint16_t ref_cnt;           /* number of clients using this record */
-    char pad[10];
+    char pad[2];
     struct mem_ent_s mem[MEM_TABLE_ENTRY_COUNT];
 };
 
@@ -121,7 +121,7 @@ union cache_block_u
 /** A link for one file in the top level hash table
  *
  */
-/* 20 bytes */
+/* 24 bytes */
 struct file_ent_s
 {
     uint64_t tag_handle;    /* PVFS_handle */
@@ -130,6 +130,7 @@ struct file_ent_s
     uint16_t mtbl_ent;      /* entry index of this mtbl */
     uint16_t next;          /* next fent in chain */
     uint16_t index;         /* fent index in ftbl */
+    char pad[4];
 };
 
 /** A hash table to find caches for specific files
@@ -142,7 +143,7 @@ struct file_table_s
     uint16_t free_mtbl_blk; /* block index of next free mtbl */
     uint16_t free_mtbl_ent; /* entry index of next free mtbl */
     uint16_t free_list; /* index of next free file entry */
-    char pad[16];
+    char pad[8];
     struct file_ent_s file[FILE_TABLE_ENTRY_COUNT];
 };
 
@@ -168,9 +169,9 @@ int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct file_ent_s **fent);
 int ucache_close_file(struct file_ent_s *fent);
-struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
-void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
-void *ucache_insert(struct file_ent_s *fent, 
+inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent);
+inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *block_ndx);
+inline void *ucache_insert(struct file_ent_s *fent, 
                     uint64_t offset, 
                     uint16_t *block_ndx);
 int ucache_remove(struct file_ent_s *fent, uint64_t offset);
@@ -188,10 +189,10 @@ int wipe_ucache(void);
 /* Lock Routines */
 ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
-int lock_lock(ucache_lock_t * lock);
-int lock_unlock(ucache_lock_t * lock);
+inline int lock_lock(ucache_lock_t * lock);
+inline int lock_unlock(ucache_lock_t * lock);
 int lock_destroy(ucache_lock_t * lock);
-int lock_trylock(ucache_lock_t * lock);
+inline int lock_trylock(ucache_lock_t * lock);
 
 #endif /* UCACHE_H */
 

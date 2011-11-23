@@ -23,7 +23,7 @@ extern int split_pathname(const char *path,
 		   char **directory,
 		   char **filename);
 
-extern int pvfs_ucache_enabled(void);
+int pvfs_ucache_enabled(void);
 
 extern void pvfs_sys_init(void); 
 

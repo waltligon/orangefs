@@ -1113,7 +1113,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 
     /* If the ucache request threshold is exceeded, flush and evict file, then
      * peform nocache version of readorwrite */
-    if(req_size > UCACHE_MAX_REQ)
+    if(req_size > UCACHE_MAX_REQ || (req_size > (FILE_TABLE_ENTRY_COUNT * CACHE_BLOCK_SIZE)))
     {
         /* Flush dirty blocks */
         rc = ucache_flush_file(pd->s->fent);
