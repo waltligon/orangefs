@@ -187,7 +187,7 @@ int ucache_init_file_table(char forceCreation);
 int wipe_ucache(void);
 
 /* Lock Routines */
-ucache_lock_t *get_lock(uint16_t block_index);
+inline ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
 inline int lock_lock(ucache_lock_t * lock);
 inline int lock_unlock(ucache_lock_t * lock);

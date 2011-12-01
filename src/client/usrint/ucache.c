@@ -180,9 +180,7 @@ int ucache_initialize(void)
  */
 inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
 {
-    if( mtbl_blk >= 0 && 
-        mtbl_blk < BLOCKS_IN_CACHE &&
-        mtbl_ent >= 0 && 
+    if( mtbl_blk < BLOCKS_IN_CACHE &&
         mtbl_ent < MEM_TABLE_ENTRY_COUNT)
     {
         return &(ucache->b[mtbl_blk].mtbl[mtbl_ent]);
@@ -205,7 +203,6 @@ inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
  */
 int ucache_init_file_table(char forceCreation)
 {
-    printf("file table initialized!\n");
     int i;
 
     /* check if already initialized? */
@@ -284,7 +281,7 @@ int ucache_open_file(PVFS_fs_id *fs_id,
     if(mtbl == (struct mem_table_s *)NIL)
     {
         uint16_t fentIndex  = insert_file((uint32_t)*fs_id, (uint64_t)*handle);
-        if(fentIndex < 0 || fentIndex > FILE_TABLE_ENTRY_COUNT)
+        if(fentIndex > FILE_TABLE_ENTRY_COUNT)
         {
             rc = -1;
             goto done;
@@ -296,8 +293,10 @@ int ucache_open_file(PVFS_fs_id *fs_id,
             goto done;
         }
 
+        /*
         printf("%hu\t%hu\n", (*fent)->mtbl_blk, (*fent)->mtbl_ent);
         fflush(stdout);
+        */
 
         mtbl = get_mtbl((*fent)->mtbl_blk, (*fent)->mtbl_ent);
         if(mtbl == (struct mem_table_s *)NILP)
@@ -761,7 +760,6 @@ int lock_init(ucache_lock_t * lock)
     }
     #elif LOCK_TYPE == 1
     rc = pthread_mutex_init(lock, NULL);
-    rc = pthread_mutex_unlock(lock);
     if(rc != 0)
     {
         return -1;
@@ -948,7 +946,7 @@ static void add_mtbls(uint16_t blk)
 
 static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
 {
-        if(index > MEM_TABLE_ENTRY_COUNT || index == NIL16)
+        if(index > MEM_TABLE_ENTRY_COUNT)
         {
             return -1;
         }
@@ -1297,7 +1295,7 @@ uint16_t insert_file(
     if(DBG)fprintf(out, "\thashed index: %u\n", index);
     current = &(ftbl->file[index]);
 
-    unsigned char indexOccupied = (current->tag_handle == 0 && current->tag_id == 0);
+    unsigned char indexOccupied = (current->tag_handle != NIL64 && current->tag_id != NIL32);
     //printf("indexOccupied? %c\n", indexOccupied);
 
     /* Get free mtbl */
