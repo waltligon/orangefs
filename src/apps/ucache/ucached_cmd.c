@@ -12,7 +12,7 @@ int main(int argc, char **argv)
 {
     if(argc!=2)
     {
-        printf("usage: ./ucache_cmd <command char>\n");
+        printf("usage: ucache_cmd <command char>\n");
         return 0; 
     }
 
@@ -29,7 +29,7 @@ int main(int argc, char **argv)
             rc = remove(FIFO1);
             rc = remove(FIFO2);
             /* Crank up the daemon since it's not running */
-            rc = system("./ucached");
+            rc = system("ucached");
             puts("SUCCESS: Daemon started");
         }
         else
