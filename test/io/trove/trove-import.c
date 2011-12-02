@@ -57,7 +57,7 @@ int main(int argc, char **argv)
     strcpy(path_to_file, argv[optind+1]);
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
@@ -170,7 +170,12 @@ int main(int argc, char **argv)
     if (buf == NULL) return -1;
 
     /* pull data from file */
-    read(fd, buf, u_stat.st_size);
+    ret = read(fd, buf, u_stat.st_size);
+    if( ret == -1 )
+    {
+	fprintf(stderr, "read failed.\n");
+        return -1;
+    }
 
     f_size = (TROVE_size) u_stat.st_size;
     /* write data out to trove file */
@@ -233,3 +238,4 @@ int parse_args(int argc, char **argv)
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
+

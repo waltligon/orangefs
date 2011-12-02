@@ -14,6 +14,13 @@
 
 #include "src/io/bmi/bmi-byteswap.h"
 #include <stdint.h>
+#ifdef WIN32
+typedef uint32_t u_int32_t;
+typedef uint64_t u_int64_t;
+
+/* typeof not available on Windows */
+#define typeof(t)   t
+#endif
 #include <assert.h>
 
 /*
@@ -53,6 +60,18 @@
     *(pptr) += 4; \
 } while (0)
 
+#define encode_PVFS_signature(pptr,x) encode_char(pptr,x)
+#define decode_PVFS_signature(pptr,x) decode_char(pptr,x)
+
+#define encode_char(pptr,x) do { \
+    *(char *) *(pptr) = *(x); \
+    *(pptr) += 1; \
+} while (0)
+#define decode_char(pptr,x) do { \
+    *(x) = *(char *) *(pptr); \
+    *(pptr) += 1; \
+} while (0)
+
 #define encode_int32_t(pptr,x) do { \
     *(int32_t*) *(pptr) = htobmi32(*(x)); \
     *(pptr) += 4; \
@@ -87,30 +106,30 @@
 #define encode_string(pptr,pbuf) do { \
     u_int32_t len = 0; \
     if (*pbuf) \
-	len = strlen(*pbuf); \
+	    len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
-	memcpy(*(pptr)+4, *pbuf, len+1); \
-	int pad = roundup8(4 + len + 1) - (4 + len + 1); \
-	*(pptr) += roundup8(4 + len + 1); \
-	memset(*(pptr)-pad, 0, pad); \
+	    memcpy(*(pptr)+4, *pbuf, len+1); \
+	    int pad = roundup8(4 + len + 1) - (4 + len + 1); \
+	    *(pptr) += roundup8(4 + len + 1); \
+	    memset(*(pptr)-pad, 0, pad); \
     } else { \
-	*(u_int32_t *) (*(pptr)+4) = 0; \
-	*(pptr) += 8; \
+	    *(u_int32_t *) (*(pptr)+4) = 0; \
+	    *(pptr) += 8; \
     } \
 } while (0)
 #else
 #define encode_string(pptr,pbuf) do { \
     u_int32_t len = 0; \
     if (*pbuf) \
-	len = strlen(*pbuf); \
+	    len = strlen(*pbuf); \
     *(u_int32_t *) *(pptr) = htobmi32(len); \
     if (len) { \
-	memcpy(*(pptr)+4, *pbuf, len+1); \
-	*(pptr) += roundup8(4 + len + 1); \
+	    memcpy(*(pptr)+4, *pbuf, len+1); \
+	    *(pptr) += roundup8(4 + len + 1); \
     } else { \
-        *(u_int32_t *) (*(pptr)+4) = 0; \
-	*(pptr) += 8; \
+	    *(u_int32_t *) *(pptr) = 0; \
+	    *(pptr) += 8; \
     } \
 } while (0)
 #endif
@@ -799,6 +818,17 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
+#ifdef WIN32
+#define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
+static void encode_func_##__name__(char **pptr, void *x) \
+{ \
+    encode_##__name__(pptr, (__type__ *)x); \
+}; \
+static void decode_func_##__name__(char **pptr, void *x) \
+{ \
+    decode_##__name__(pptr, (__type__ *)x); \
+}
+#else
 #define DEFINE_STATIC_ENDECODE_FUNCS(__name__, __type__) \
 __attribute__((unused)) \
 static void encode_func_##__name__(char **pptr, void *x) \
@@ -810,6 +840,7 @@ static void decode_func_##__name__(char **pptr, void *x) \
 { \
     decode_##__name__(pptr, (__type__ *)x); \
 }
+#endif
 
 #define encode_enum_union_2_struct(name, ename, uname, ut1, un1, en1, ut2, un2, en2)                         \
 static inline void encode_##name(char **pptr, const struct name *x)           \
@@ -832,6 +863,52 @@ static inline void decode_##name(char **pptr, struct name *x)                 \
         default: assert(0);                                                   \
     }                                                                         \
 };
+/* 3 fields, then an array, then 2 fields, then an array */
+#define endecode_fields_3a2a_struct(name, t1, x1, t2, x2, t3, x3, tn1, n1, ta1, a1, t4, x4, t5, x5, tn2, n2, ta2, a2) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##t2(pptr, &x->x2); \
+    encode_##t3(pptr, &x->x3); \
+    encode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+        for (i=0; i<x->n1; i++) \
+            encode_##ta1(pptr, &(x)->a1[i]); \
+    align8(pptr); \
+    encode_##t4(pptr, &x->x4); \
+    encode_##t5(pptr, &x->x5); \
+    encode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+        for (i=0; i<x->n2; i++) \
+            encode_##ta2(pptr, &(x)->a2[i]); \
+    align8(pptr); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##t2(pptr, &x->x2); \
+    decode_##t3(pptr, &x->x3); \
+    decode_##tn1(pptr, &x->n1); \
+    if (x->n1 > 0) \
+    { \
+        x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+        for (i=0; i<x->n1; i++) \
+            decode_##ta1(pptr, &(x)->a1[i]); \
+    } \
+    else \
+        x->a1 = NULL; \
+    align8(pptr); \
+    decode_##t4(pptr, &x->x4); \
+    decode_##t5(pptr, &x->x5); \
+    decode_##tn2(pptr, &x->n2); \
+    if (x->n2 > 0) \
+    { \
+        x->a2 = decode_malloc(x->n2 * sizeof(*x->a2)); \
+        for (i=0; i<x->n2; i++) \
+            decode_##ta2(pptr, &(x)->a2[i]); \
+    } \
+    else \
+        x->a2 = NULL; \
+    align8(pptr); \
+}
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
 

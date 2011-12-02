@@ -110,6 +110,31 @@ void PINT_time_diff(PINT_time_marker mark1,
 #define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
 #define PINT_statfs_fsid(_statfs) (_statfs)->f_fsid
 
+#elif defined(WIN32)
+/* the statfs type must be defined on Windows */
+typedef unsigned long fsid_t;
+struct statfs {
+    uint64_t f_type;
+    uint64_t f_bsize;
+    uint64_t f_blocks;
+    uint64_t f_bfree;
+    uint64_t f_bavail;
+    uint64_t f_files;
+    uint64_t f_ffree;
+    fsid_t   f_fsid;
+    uint64_t f_namelen;
+};
+
+#define PINT_statfs_t struct statfs
+/* Use functions with Windows API calls--defined in pint-util.c */
+int PINT_statfs_lookup(const char *path, struct statfs *buf);
+int PINT_statfs_fd_lookup(int fd, struct statfs *buf);
+#define PINT_statfs_bsize(_statfs) (_statfs)->f_bsize
+#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
+#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
+#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
+#define PINT_statfs_fsid(_statfs) (_statfs)->f_fsid
+
 #else
 
 #error OS does not have sys/vfs.h or sys/mount.h.  
@@ -119,13 +144,18 @@ void PINT_time_diff(PINT_time_marker mark1,
 
 char *PINT_util_get_object_type(int objtype);
 PVFS_time PINT_util_get_current_time(void);
+PVFS_time PINT_util_get_time_ms(void);
+PVFS_time PINT_util_get_time_us(void);
 void PINT_util_get_current_timeval(struct timeval *tv);
 int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end);
+void PINT_util_parse_timeval(struct timeval tv, char *str);
 
 PVFS_time PINT_util_mktime_version(PVFS_time time);
 PVFS_time PINT_util_mkversion_time(PVFS_time version);
 
 struct timespec PINT_util_get_abs_timespec(int microsecs);
+
+char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count);
 
 void PINT_util_digest_init(void);
 void PINT_util_digest_finalize(void);
@@ -137,25 +167,6 @@ int PINT_util_digest_md5(const void *input_message, size_t input_length,
 		char **output, size_t *output_length);
 
 char *PINT_util_guess_alias(void);
-
-void PINT_util_gen_credentials(
-    PVFS_credentials *credentials);
-
-enum PINT_access_type
-{
-    PINT_ACCESS_EXECUTABLE = 1,
-    PINT_ACCESS_WRITABLE = 2,
-    PINT_ACCESS_READABLE = 4,
-};
-
-int PINT_check_mode(
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid,
-    enum PINT_access_type access_type);
-
-int PINT_check_acls(void *acl_buf, size_t acl_size, 
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid, int want);
 
 #endif /* __PINT_UTIL_H */
 

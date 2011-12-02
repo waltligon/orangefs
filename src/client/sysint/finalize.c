@@ -38,7 +38,6 @@ int PVFS_sys_finalize()
 {
     id_gen_safe_finalize();
 
-    PINT_util_digest_finalize();
     PINT_ncache_finalize();
     PINT_acache_finalize();
     PINT_cached_config_finalize();
@@ -55,9 +54,14 @@ int PVFS_sys_finalize()
 
     PINT_req_sched_finalize();
 
+    /* release timer_queue resources, if there are any */
+    PINT_timer_queue_finalize();
+
     BMI_finalize();
 
     PINT_encode_finalize();
+
+    PINT_client_security_finalize();
 
     PINT_dist_finalize();
 

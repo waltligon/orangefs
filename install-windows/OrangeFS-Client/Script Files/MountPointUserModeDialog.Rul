@@ -1,0 +1,104 @@
+#include "Ifx.h"
+
+// Constants
+#define BUTTON_NEXT      1
+#define BUTTON_BACK     12
+#define BUTTON_CANCEL2   9
+#define COMBO_MOUNT   1304
+#define RB_LIST       1327
+#define RB_CERT       1328
+#define RB_LDAP       1329
+#define EDIT_FS       1331
+
+#define USERMAP_LIST     1
+#define USERMAP_CERT     2
+#define USERMAP_LDAP     3
+
+prototype NUMBER MountPointUserModeDialog(BYREF STRING, BYREF STRING, BYREF NUMBER); 
+prototype LIST CreateMountList();
+
+function LIST CreateMountList()
+    LIST listMount;
+begin
+    // We must create a list of mount points programatically, since there
+    // seems to be a bug saving our mount points in the dialog
+    listMount = ListCreate(STRINGLIST);
+    ListAddString(listMount, "Auto", AFTER);
+    ListAddString(listMount, "E:", AFTER);
+    ListAddString(listMount, "F:", AFTER);
+    ListAddString(listMount, "G:", AFTER);
+    ListAddString(listMount, "H:", AFTER);
+    ListAddString(listMount, "I:", AFTER);
+    ListAddString(listMount, "J:", AFTER);
+    ListAddString(listMount, "K:", AFTER);
+    ListAddString(listMount, "L:", AFTER);
+    ListAddString(listMount, "M:", AFTER);
+    ListAddString(listMount, "N:", AFTER);
+    ListAddString(listMount, "O:", AFTER);
+    ListAddString(listMount, "P:", AFTER);
+    ListAddString(listMount, "Q:", AFTER);
+    ListAddString(listMount, "R:", AFTER);
+    ListAddString(listMount, "S:", AFTER);
+    ListAddString(listMount, "T:", AFTER);
+    ListAddString(listMount, "U:", AFTER);
+    ListAddString(listMount, "V:", AFTER);
+    ListAddString(listMount, "W:", AFTER);
+    ListAddString(listMount, "X:", AFTER);
+    ListAddString(listMount, "Y:", AFTER);
+    ListAddString(listMount, "Z:", AFTER);
+                               
+    return listMount;
+end;
+
+// handler for the MountPointUserModeDialog
+function NUMBER MountPointUserModeDialog(svFSURI, svMountPoint, nvUserMapMode)
+    BOOL bDone;
+    NUMBER nResult, nControl;
+    LIST listMount;
+begin
+    EzDefineDialog("MountPointUserModeDialog",
+                   ISUSER,
+                   "MountPointUserModeDialog",
+                   0);
+    
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("MountPointUserModeDialog");
+        switch (nControl)
+            case DLG_INIT:       
+                // Init combo
+                listMount = CreateMountList();
+                CtrlSetList("MountPointUserModeDialog", COMBO_MOUNT, listMount);
+                ListDestroy(listMount);
+                // Default values
+                CtrlSetCurSel("MountPointUserModeDialog", COMBO_MOUNT, "Auto");
+                CtrlSetState("MountPointUserModeDialog", RB_LIST, BUTTON_CHECKED);                    
+            case BUTTON_NEXT:
+                // Return specified values       
+                CtrlGetText("MountPointUserModeDialog", EDIT_FS, svFSURI);         
+                CtrlGetCurSel("MountPointUserModeDialog", COMBO_MOUNT, svMountPoint);
+                if (CtrlGetState("MountPointUserModeDialog", RB_LIST) = BUTTON_CHECKED) then
+                    nvUserMapMode = USERMAP_LIST;
+                elseif (CtrlGetState("MountPointUserModeDialog", RB_CERT) = BUTTON_CHECKED) then
+                    nvUserMapMode = USERMAP_CERT;
+                else
+                    nvUserMapMode = USERMAP_LDAP;
+                endif;  
+                nResult = BUTTON_NEXT;                
+                bDone = TRUE;                
+            case BUTTON_CANCEL2:
+                // Cancel requested
+                Do(EXIT);
+            case BUTTON_BACK:
+                // Back requested
+                nResult = BUTTON_BACK;
+                bDone = TRUE;         
+        endswitch;
+    endwhile;  
+    
+    EndDialog("MountPointUserModeDialog");
+    
+    ReleaseDialog("MountPointUserModeDialog");
+    
+    return nResult;        
+end;

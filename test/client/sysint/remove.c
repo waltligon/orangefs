@@ -5,7 +5,9 @@
  */
 
 #include <stdio.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 #include "client.h"
@@ -21,7 +23,7 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     char* entry_name;
     PVFS_object_ref parent_refn;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     if (argc != 2)
     {
@@ -57,7 +59,7 @@ int main(int argc,char **argv)
 
     entry_name = str_buf;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PINT_lookup_parent(filename, cur_fs, &credentials,
                              &parent_refn.handle);
     if(ret < 0)

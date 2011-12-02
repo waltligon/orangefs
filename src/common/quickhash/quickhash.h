@@ -219,14 +219,14 @@ static inline struct qhash_head *qhash_search_and_remove(
     void *key)
 {
     int index = 0;
-    struct qhash_head *tmp_link = NULL;
+    struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
 
     /* find the hash value */
     index = table->hash(key, table->table_size);
 
     /* linear search at index to find match */
     qhash_lock(&table->lock);
-    qhash_for_each(tmp_link, &(table->array[index]))
+    qhash_for_each_safe(tmp_link, tmp_link_safe, &(table->array[index]))
     {
 	if (table->compare(key, tmp_link))
 	{
@@ -251,7 +251,7 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
     struct qhash_table *table,
     int index)
 {
-    struct qhash_head *tmp_link = NULL;
+    struct qhash_head *tmp_link = NULL, *tmp_link_safe = NULL;
 
     if(index >= table->table_size)
     {
@@ -259,7 +259,7 @@ static inline struct qhash_head *qhash_search_and_remove_at_index(
     }
 
     qhash_lock(&table->lock);
-    qhash_for_each(tmp_link, &(table->array[index]))
+    qhash_for_each_safe(tmp_link, tmp_link_safe, &(table->array[index]))
     {
         qhash_del(tmp_link);
         qhash_unlock(&table->lock);
@@ -339,13 +339,6 @@ static inline int quickhash_string_hash(void *k, int table_size)
     }
 
     return (int)(h & ((uint64_t)(table_size - 1)));
-}
-
-/* used for cases where we the key is already in good shape for hashing */ 
-static inline int quickhash_null32_hash(void *k, int table_size)
-{
-    uint32_t *tmp = k;
-    return(int)(*tmp & (table_size - 1));
 }
 
 #endif /* QUICKHASH_H */

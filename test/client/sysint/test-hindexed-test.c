@@ -119,8 +119,8 @@ static int fillup_buffer(cm_frame_t *frame)
 int main(int argc, char **argv)
 {
     int ret = -1;
-    char str_buf[PVFS_NAME_MAX] = {0}, *fname = NULL;
-    char pvfs_path[PVFS_NAME_MAX] = {0};
+    char str_buf[PVFS_NAME_MAX+1] = {0}, *fname = NULL;
+    char pvfs_path[PVFS_NAME_MAX+1] = {0};
     PVFS_fs_id cur_fs;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_create resp_create;
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     char* entry_name;
     PVFS_object_ref parent_ref;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_Request file_req;
     PVFS_Request mem_req;
@@ -191,11 +191,11 @@ int main(int argc, char **argv)
 	ret = -1;
 	goto main_out;
     }
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     entry_name = str_buf;
-    attr.owner = credentials.uid; 
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid; 
+    attr.group = credentials.group_array[0];
     attr.perms = PVFS_U_WRITE|PVFS_U_READ;
     attr.atime = time(NULL);
     attr.mtime = attr.atime;

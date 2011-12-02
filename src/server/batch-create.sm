@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-security.h"
 
 %%
 
@@ -142,10 +143,32 @@ static int batch_create_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_batch_create(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_BATCH_CREATE)
+    {
+        ret = 0;
+    }
+    else if ((s_op->req->capability.op_mask & PINT_CAP_CREATE) &&
+             (s_op->req->u.batch_create.object_count == 1))
+    {
+        /* create capability allows you to create only one object */
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_batch_create_params =
 {
     .string_name = "batch_create",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_batch_create,
     .access_type = PINT_server_req_modify,
     .state_machine = &pvfs2_batch_create_sm
 };

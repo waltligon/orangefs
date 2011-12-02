@@ -45,6 +45,97 @@ very large numbers of clients and servers.  The architecture is very modular,
 allowing for easy inclusion of new hardware support and new algorithms.  This
 makes PVFS a perfect research testbed as well.
 
+\subsection{What is the history of PVFS?}
+
+PVFS was first developed at Clemson University in 1993
+by Walt Ligon and Eric Blumer as a parallel file system for
+Parallel Virtual Machine (PVM).  It was developed as part of a
+NASA grant to study the I/O patterns of parallel programs. PVFS version
+0 was based on Vesta, a parallel file system developed at IBM T. J.
+Watson Research Center.  Starting in 1994 Rob Ross re-wrote PVFS to
+use TCP/IP and departed from many of the original Vesta design points.
+PVFS version 1 was targeted to a cluster of DEC Alpha workstations
+networked using switched FDDI. Like Vesta, PVFS striped data across
+multiple servers and allowed I/O requests based on a file view that
+described a strided access pattern. Unlike Vesta, the striping and view
+were not dependent on a common record size. Ross' research focused on
+scheduling of disk I/O when multiple clients were accessing the same
+file. Previous results had show than scheduling according the best
+possible disk access pattern was preferable. Ross showed that this
+depended on a number of factors including the relative speed of the
+network and the details of the file view. In some cases a scheduling
+that based on network traffic was preferable, thus a dynamically
+adaptable schedule provided the best overall performance.
+
+In late 1994 Ligon met with Thomas Sterling and John Dorband at Goddard
+Space Flight Center (GSFC) and discussed their plans to build the first
+Beowulf computer. It was agreed that PVFS would be ported to Linux
+and be featured on the new machine. Over the next several years Ligon
+and Ross worked with the GSFC group including Donald Becker, Dan Ridge,
+and Eric Hendricks. In 1997 at a cluster meeting in Pasadena, CA
+Sterling asked that PVFS be released as an open source package.
+
+In 1999 Ligon proposed the development of a new version of PVFS
+initially dubbed PVFS2000 and later PVFS2. The design was initially
+developed by Ligon, Ross, and Phil Carns. Ross completed his PhD in 2000
+and moved to Argonne National Laboratory and the design and
+implementation was carried out by Ligon, Carns, Dale Witchurch, and
+Harish Ramachandran at Clemson University, Ross, Neil Miller, and Rob
+Lathrum at Argonne National Laboratory, and Pete Wyckoff at Ohio
+Supercomputer Center. The new file system was released in 2003. The
+new design featured object servers, distributed metadata, views based on
+MPI, support for multiple network types, and a software architecture for
+easy experimentation and extensibility.
+
+PVFS version 1 was retired in 2005. PVFS version 2 is still supported by
+Clemson and Argonne. Carns completed his PhD in 2006 and joined Axicom,
+Inc. where PVFS was deployed on several thousand nodes for data mining.
+In 2008 Carns moved to Argonne and continues to work on PVFS along with
+Ross, Latham, and Sam Lang. Brad Settlemyer developed a mirroring
+subsystem at Clemson, and later a detailed simulation of PVFS used for
+researching new developments. Settlemyer is now at Oak Ridge National
+Laboratory. in 2007 Argonne began porting PVFS for use on an IBM Blue
+Gene/P. In 2008 Clemson began developing extensions for supporting
+large directories of small files, security enhancements, and redundancy
+capabilities. As many of these goals conflicted with development for
+Blue Gene, a second branch of the CVS source tree was created and dubbed
+"Orange" and the original branch was dubbed "Blue." PVFS and OrangeFS
+tracked each other very closely, but represent two different groups of
+user requirements.
+
+\subsection{What is OrangeFS?}
+
+Simply put, OrangeFS is PVFS.  OrangeFS is a branch of PVFS created by
+the Clemson team PVFS developers to investigate new features and
+implementations of PVFS.  As of fall 2010 OrangeFS has become the main
+branch of PVFS.  So why the name change?  PVFS was originally conceived
+as a research parallel file system and later developed for production on
+large high performance machines such as the BG/P at Argonne National
+Lab.  OrangeFS is taking a slightly different approach to support a
+broader range of large and medium systems and a number of issues PVFS
+was not concerned with including security, redundancy, and a broader
+range of applications.  The new name reflects this new focus, but for
+now at least, OrangeFS is PVFS.
+
+The PVFS web site is still maintained.  The PVFS mailing lists for
+users and developers have not changed and will be used for OrangeFS.
+At some point in the future
+another group may decide to branch from the main but the PVFS site will
+remain the home for the community.
+
+\subsection{What is Omnibond?}
+
+Omnibond is a software company that for years has worked with Clemson
+University to market software developed at the university.  As of fall
+2010 Omnibond is offering commercial support for OrangeFS/PVFS.
+OrangeFS is open source and will always be free; and the code, as
+always, is developed and maintained by the PVFS community.  Omnibond is
+offering profesional services to those who are intersted in it, and
+directly supports the PVFS community.  Omnibond offers its customers the
+option of dedicated support services and the opportunity to support the
+development of new features that they feel are critical.  Omnibond gives
+back to the community through their support and development.
+
 \subsection{What does the ``V'' in PVFS stand for?}
 
 The ``V'' in PVFS stands for virtual.  This is a holdover from the original

@@ -27,6 +27,19 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define MAX_KEY_CNT 4;
+/* macros for accessing data returned from server */
+#define VALID_FLAG(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt] != 0.0)
+#define ID(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
+#define START_TIME(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + key_cnt])
+#define READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 0])
+#define WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 1])
+#define METADATA_READ(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 2])
+#define METADATA_WRITE(s,h) (perf_matrix[(s)][((h) * (key_cnt + 2)) + 3])
+
+int key_cnt; /* holds the Number of keys */
+
+
 struct options
 {
     char* mnt_point;
@@ -43,9 +56,9 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_credentials creds;
+    PVFS_credential creds;
     int io_server_count;
-    struct PVFS_mgmt_perf_stat** perf_matrix;
+    int64_t** perf_matrix;
     uint64_t* end_time_ms_array;
     uint32_t* next_id_array;
     PVFS_BMI_addr_t *addr_array;
@@ -78,10 +91,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential(NULL, NULL, 1*60*60, NULL, &creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential", ret);
+        return(-1);
+    }
 
     /* count how many I/O servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, PVFS_MGMT_IO_SERVER,
+    ret = PVFS_mgmt_count_servers(cur_fs, PVFS_MGMT_IO_SERVER,
 	&io_server_count);
     if(ret < 0)
     {
@@ -90,8 +108,7 @@ int main(int argc, char **argv)
     }
 
     /* allocate a 2 dimensional array for statistics */
-    perf_matrix = (struct PVFS_mgmt_perf_stat**)malloc(
-	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
+    perf_matrix = (int64_t **)malloc(io_server_count*sizeof(int64_t *));
     if(!perf_matrix)
     {
 	perror("malloc");
@@ -99,8 +116,7 @@ int main(int argc, char **argv)
     }
     for(i=0; i<io_server_count; i++)
     {
-	perf_matrix[i] = (struct PVFS_mgmt_perf_stat *)
-	    malloc(HISTORY * sizeof(struct PVFS_mgmt_perf_stat));
+	perf_matrix[i] = (int64_t *)malloc(HISTORY * sizeof(int64_t));
 	if (perf_matrix[i] == NULL)
 	{
 	    perror("malloc");
@@ -136,7 +152,6 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds,
 				     PVFS_MGMT_IO_SERVER,
 				     addr_array,
 				     &io_server_count);
@@ -149,6 +164,8 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats at regular intervals */
     while (1)
     {
+        PVFS_util_refresh_credential(&creds);
+        key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
 				      &creds,
 				      perf_matrix, 
@@ -156,6 +173,7 @@ int main(int argc, char **argv)
 				      addr_array,
 				      next_id_array,
 				      io_server_count, 
+                                      &key_cnt,
 				      HISTORY,
 				      NULL, NULL);
 	if (ret < 0)
@@ -169,58 +187,58 @@ int main(int argc, char **argv)
 	for (i=0; i < io_server_count; i++)
 	{
 	    printf("\nread:  %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
-		if(!perf_matrix[i][j].valid_flag)
+		if(!VALID_FLAG(i,j))
 		    break;
 
 		/* shortcut if measurement is zero */
-		if(perf_matrix[i][j].read == 0)
+		if(READ(i,j) == 0)
 		{
 		    printf("\t0.0");
 		    continue;
 		}
 
 		/* figure out what time interval to use */
-		if (j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		if (j == (HISTORY-1) || !VALID_FLAG(i,j+1))
 		    next_time = end_time_ms_array[i];
 		else
-		    next_time = perf_matrix[i][j+1].start_time_ms;
+		    next_time = START_TIME(i,j+1);
 
 		/* bw calculation */
-		bw = ((float)perf_matrix[i][j].read * 1000.0)/ 
-		    (float)(next_time - perf_matrix[i][j].start_time_ms);
+		bw = ((float)READ(i,j) * 1000.0)/ 
+		    (float)(next_time - START_TIME(i,j));
 		bw = bw / (float)(1024.0*1024.0);
 		printf("\t%10f", bw);
 	    }
 
 	    printf("\nwrite: %-30s ",
-		   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+		   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for (j=0; j < HISTORY; j++)
 	    {
 		/* only print valid measurements */
-		if (!perf_matrix[i][j].valid_flag)
+		if (!VALID_FLAG(i,j))
 		    break;
 
 		/* shortcut if measurement is zero */
-		if (perf_matrix[i][j].write == 0)
+		if (WRITE(i,j) == 0)
 		{
 		    printf("\t0.0");
 		    continue;
 		}
 
 		/* figure out what time interval to use */
-		if (j == (HISTORY-1) || !perf_matrix[i][j+1].valid_flag)
+		if (j == (HISTORY-1) || !VALID_FLAG(i,j+1))
 		    next_time = end_time_ms_array[i];
 		else
-		    next_time = perf_matrix[i][j+1].start_time_ms;
+		    next_time = START_TIME(i,j+1);
 
 		/* bw calculation */
-		bw = ((float)perf_matrix[i][j].write * 1000.0)/ 
-		    (float)(next_time - perf_matrix[i][j].start_time_ms);
+		bw = ((float)WRITE(i,j) * 1000.0)/ 
+		    (float)(next_time - START_TIME(i,j));
 		bw = bw / (float)(1024.0*1024.0);
 		printf("\t%10f", bw);
 	    }
@@ -228,36 +246,36 @@ int main(int argc, char **argv)
             printf("\n\nPVFS2 metadata op statistics (# of operations):\n");
             printf("==================================================");
             printf("\nread:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
-		if (!perf_matrix[i][j].valid_flag)
+		if (!VALID_FLAG(i,j))
                 {
 		    break;
                 }
-		printf("\t%llu", llu(perf_matrix[i][j].metadata_read));
+		printf("\t%llu", llu(METADATA_READ(i,j)));
 	    }
 
             printf("\nwrite:  %-30s ",
-                   PVFS_mgmt_map_addr(cur_fs, &creds,addr_array[i], &tmp_type));
+                   PVFS_mgmt_map_addr(cur_fs, addr_array[i], &tmp_type));
 
 	    for(j = 0; j < HISTORY; j++)
 	    {
-		if (!perf_matrix[i][j].valid_flag)
+		if (!VALID_FLAG(i,j))
                 {
 		    break;
                 }
-		printf("\t%llu", llu(perf_matrix[i][j].metadata_write));
+		printf("\t%llu", llu(METADATA_WRITE(i,j)));
 	    }
 
 	    printf("\ntimestep:\t\t\t");
 	    for(j=0; j<HISTORY; j++)
 	    {
-		if(!perf_matrix[i][j].valid_flag)
+		if(!VALID_FLAG(i,j))
 		    break;
 
-		printf("\t%u", (unsigned)perf_matrix[i][j].id);
+		printf("\t%u", (unsigned)ID(i,j));
 	    }
 	    printf("\n");
 	}

@@ -102,7 +102,7 @@ int main(
     }
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0)
     {
 	fprintf(stderr, "initialize failed: run trove-mkfs first.\n");
@@ -318,7 +318,7 @@ static int block_on_flow(
     int ret = -1;
     struct timespec req = {0, 1000};
 
-    flow_d->callback = callback_fn;
+    flow_d->callback = (void*)callback_fn;
     ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {

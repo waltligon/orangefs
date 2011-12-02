@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     strcpy(path_to_unix, argv[optind+1]);
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
@@ -156,8 +156,12 @@ int main(int argc, char **argv)
     }
 
     /* write data to file */
-    write(fd, buf, f_size);
-
+    ret = write(fd, buf, f_size);
+    if( ret == -1 )
+    {
+	fprintf(stderr, "write failed.\n");
+        return -1;
+    }
     close(fd);
 
     trove_close_context(coll_id, trove_context);

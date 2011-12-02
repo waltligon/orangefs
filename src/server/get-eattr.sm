@@ -24,6 +24,7 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 #include "pint-eattr.h"
+#include "pint-security.h"
 
 %%
 
@@ -78,18 +79,32 @@ static PINT_sm_action geteattr_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int i, tsz;
+    int i;
 
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
 
     js_p->error_code = 0;
 
+    /* ensure not too many keys were requested */
+    if( s_op->req->u.geteattr.nkey > PVFS_MAX_XATTR_LISTLEN )
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return SM_ACTION_COMPLETE;
+    }
+
     /* iterate through the keys and see if they fall into valid name spaces */
     for(i=0; i<s_op->req->u.geteattr.nkey; i++)
     {
         gossip_debug(GOSSIP_GETEATTR_DEBUG, "geteattr key %d : %s\n", i, 
                 (char *) s_op->req->u.geteattr.key[i].buffer);
+
+        /* ensure no buffer_sz is too large */
+        if( s_op->req->u.geteattr.key[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            js_p->error_code = -PVFS_EINVAL;
+            return SM_ACTION_COMPLETE;
+        }
 
         js_p->error_code = PINT_eattr_check_access(
             &s_op->req->u.geteattr.key[i],
@@ -118,7 +133,7 @@ static PINT_sm_action geteattr_setup_resp(
         return SM_ACTION_COMPLETE;
     }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
-    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    for (i = 0; i < s_op->req->u.geteattr.nkey; i++)
     {
         s_op->resp.u.geteattr.val[i].buffer = malloc(
             s_op->req->u.geteattr.valsz[i]);
@@ -183,14 +198,19 @@ static PINT_sm_action geteattr_check_resp(
     int k;
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
-    /* put the returned read buffer size in buffer_sz */
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"status %d error_code %d nkeys %d\n",
             s_op->resp.status, js_p->error_code, s_op->resp.u.geteattr.nkey);
     /* it is the only thing returned across the wire */
     for (k = 0; k < s_op->resp.u.geteattr.nkey; k++)
     {
+        /* this is all or nothing */
+        /* why not use s_op->resp.u.geteattr.err */
+        /* which seems to be filled in by Trove? */
         if (js_p->error_code == 0)
         {
+            /* this checks to see if the attr is a */
+            /* PVFS specific attr and if so encodes */
+            /* it because it is binary */
             ret = PINT_eattr_encode(
                 &s_op->req->u.geteattr.key[k],
                 &s_op->resp.u.geteattr.val[k]);
@@ -201,6 +221,7 @@ static PINT_sm_action geteattr_check_resp(
                 s_op->resp.u.geteattr.err[k] = ret;
             }
 
+            /* put the returned read buffer size in buffer_sz */
             s_op->resp.u.geteattr.val[k].buffer_sz =
                 s_op->resp.u.geteattr.val[k].read_sz;
             gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
@@ -208,7 +229,8 @@ static PINT_sm_action geteattr_check_resp(
                 s_op->resp.u.geteattr.val[k].buffer_sz);
         }
         /* in case of any errors, we initialize it to 0 */
-        else {
+        else
+        {
             s_op->resp.u.geteattr.val[k].buffer_sz = 0;
         }
     }
@@ -234,12 +256,21 @@ static PINT_sm_action geteattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_geteattr(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(geteattr);
 
 struct PINT_server_req_params pvfs2_get_eattr_params =
 {
     .string_name = "get_eattr",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_geteattr,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_geteattr,
     .state_machine = &pvfs2_get_eattr_sm

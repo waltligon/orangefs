@@ -20,17 +20,15 @@ typedef struct PVFS_hint_s *PVFS_hint;
 
 #define PVFS_HINT_NULL NULL
 
-int PVFS_hint_add(
-    PVFS_hint *hint,
-    const char *type,
-    int length,
-    void *value);
+int PVFS_hint_add(PVFS_hint *hint,
+                  const char *type,
+                  int length,
+                  void *value);
 
-int PVFS_hint_replace(
-    PVFS_hint *hint,
-    const char *type,
-    int length,
-    void *value);
+int PVFS_hint_replace(PVFS_hint *hint,
+                      const char *type,
+                      int length,
+                      void *value);
 
 int PVFS_hint_copy(PVFS_hint old_hint, PVFS_hint *new_hint);
 

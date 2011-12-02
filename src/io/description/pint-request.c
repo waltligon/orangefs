@@ -14,6 +14,10 @@
 #include <pint-distribution.h>
 #include "pvfs2-internal.h"
 
+#ifdef WIN32
+typedef uint32_t u_int32_t;
+#endif
+
 static PVFS_offset PINT_request_disp(PINT_Request *request);
 
 /* this macro is only used in this file to add a segment to the
@@ -110,10 +114,10 @@ int PINT_process_request(PINT_Request_state *req,
 				req->cur->rqbase->depth);
 		temp_space = (void *)malloc(sizeof(PINT_Request_state)+
 				(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
-        if(!temp_space)
-        {
-            return -PVFS_ENOMEM;
-        }
+                if(!temp_space)
+                {
+                   return -PVFS_ENOMEM;
+                }
 
 		memcpy(temp_space,req,sizeof(PINT_Request_state));
 		req = (PINT_Request_state *)temp_space;
@@ -164,7 +168,7 @@ int PINT_process_request(PINT_Request_state *req,
 	{
 		/* do we allow external setting of LOGICAL_SKIP */
 		/* what about backwards skipping, as in seeking? */
-    }
+        }
 	
 	/* we should be ready to begin */
 	/* zero retval indicates everything flowing successfully */
@@ -173,7 +177,7 @@ int PINT_process_request(PINT_Request_state *req,
 	while(!retval)
 	{
 		if (req->cur[req->lvl].rq)
-		{
+	    {
 		/* print the current state of the decoding process */
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"\tDo seq of %lld ne %d st %lld nb %d "
 		"ub %lld lb %lld as %lld co %llu\n",
@@ -188,13 +192,13 @@ int PINT_process_request(PINT_Request_state *req,
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tto %lld ta %lld fi %lld\n",
 				lld(req->type_offset), lld(req->target_offset),
 				lld(req->final_offset));
-            if (mem) /* if a mem type is specified print its state */
-            {
+               if (mem) /* if a mem type is specified print its state */
+               {
                 gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tmto %lld mta %lld mfi %lld\n",
                        lld(mem->type_offset), lld(mem->target_offset),
                        lld(mem->final_offset));
-            }
-		}
+               }
+	     }
 		/* NULL type indicates packed data - handle directly */
 		if (req->cur[req->lvl].rq == NULL)
 		{
@@ -577,14 +581,22 @@ PVFS_size PINT_distribute(PVFS_offset offset,
     if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
         !rfdata->dist->params)
     {
-        if (!rfdata)
+        if (!rfdata) 
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
+        }
         else if (!rfdata->dist)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
+        }
         else if (!rfdata->dist->methods)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
+        }
         else if (!rfdata->dist->params)
+        {
             gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
+        }
         gossip_lerr("Bad Distribution! Bailing out!\n");
         return 0;
     }

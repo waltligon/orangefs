@@ -43,11 +43,8 @@
 struct bmi_method_addr
 {
     int method_type;
-    int ref_count;
     void *method_data;		/* area to be used by specific methods */
     void *parent;               /* pointer back to generic BMI address info */  
-    struct bmi_method_addr* primary;
-    struct bmi_method_addr* secondary;
 };
 typedef struct bmi_method_addr *bmi_method_addr_p;
 
@@ -80,6 +77,34 @@ struct bmi_method_ops
 
     int (*unexpected_free) (void *);
 
+    int (*post_send) (bmi_op_id_t *,
+                      bmi_method_addr_p,
+                      const void *,
+                      bmi_size_t,
+                      enum bmi_buffer_type,
+                      bmi_msg_tag_t,
+                      void *,
+                      bmi_context_id,
+                      PVFS_hint hints);
+    int (*post_sendunexpected) (bmi_op_id_t *,
+                                bmi_method_addr_p,
+                                const void *,
+                                bmi_size_t,
+                                enum bmi_buffer_type,
+                                bmi_msg_tag_t,
+                                void *,
+                                bmi_context_id,
+                                PVFS_hint hints);
+    int (*post_recv) (bmi_op_id_t *,
+                      bmi_method_addr_p,
+                      void *,
+                      bmi_size_t,
+                      bmi_size_t *,
+                      enum bmi_buffer_type,
+                      bmi_msg_tag_t,
+                      void *,
+                      bmi_context_id,
+                      PVFS_hint hints);
     int (*test) (bmi_op_id_t,
                  int *,
                  bmi_error_code_t *,
@@ -107,7 +132,6 @@ struct bmi_method_ops
     int (*testunexpected) (int,
                            int *,
                            struct bmi_method_unexpected_info *,
-                           uint8_t,
                            int);
     bmi_method_addr_p (*method_addr_lookup) (const char *);
     int (*post_send_list) (bmi_op_id_t *,
@@ -141,7 +165,6 @@ struct bmi_method_ops
                                      bmi_size_t,
                                      enum bmi_buffer_type,
                                      bmi_msg_tag_t,
-                                     uint8_t,
                                      void *,
                                      bmi_context_id,
                                      PVFS_hint hints);
@@ -166,7 +189,6 @@ struct method_op
     enum bmi_op_type send_recv;	/* type of operation */
     void *user_ptr;		/* user_ptr associated with this op */
     bmi_msg_tag_t msg_tag;	/* message tag */
-    uint8_t class;              /* message class (if unexpected) */
     bmi_error_code_t error_code;	/* final status of operation */
     bmi_size_t amt_complete;	/* how much is completed */
     bmi_size_t env_amt_complete;	/* amount of the envelope that is completed */

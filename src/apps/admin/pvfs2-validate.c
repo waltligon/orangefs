@@ -68,7 +68,7 @@ static void usage(
 int validate_pvfs_object(
     const struct PINT_fsck_options *fsck_options,
     const PVFS_object_ref * pref,
-    const PVFS_credentials * creds,
+    const PVFS_credential * creds,
     int *cur_fs,
     char *current_path);
 
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
     int ret = 0;
     int cur_fs = 0;
     char pvfs_path[PVFS_NAME_MAX] = { 0 };
-    PVFS_credentials creds;
+    PVFS_credential creds;
     PVFS_sysresp_lookup lookup_resp;
     struct PINT_fsck_options *fsck_options = NULL;
 
@@ -135,7 +135,14 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        PVFS_sys_finalize();
+        free(fsck_options);
+        return -1;
+    }
 
     ret = PVFS_sys_lookup(
             cur_fs, pvfs_path, 
@@ -219,7 +226,7 @@ int main(int argc, char **argv)
 int validate_pvfs_object(
     const struct PINT_fsck_options *fsck_options, /**< fsck options */
     const PVFS_object_ref * pref,                 /**< object to validate */
-    const PVFS_credentials * creds,               /**< caller's credentials */
+    const PVFS_credential * creds,                /**< caller's credentials */
     int *cur_fs,                                  /**< file system */
     char *current_path)                           /**< path to object */
 {

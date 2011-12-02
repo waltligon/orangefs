@@ -12,6 +12,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-stat.c \
 	$(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
+	$(DIR)/pvfs2-perf-mon-snmp.c \
 	$(DIR)/pvfs2-mkdir.c \
 	$(DIR)/pvfs2-chmod.c \
 	$(DIR)/pvfs2-chown.c \
@@ -26,7 +27,9 @@ ADMINSRC := \
 	$(DIR)/pvfs2-ln.c \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
-	$(DIR)/pvfs2-drop-caches.c
+	$(DIR)/pvfs2-drop-caches.c \
+        $(DIR)/pvfs2-get-uid.c \
+	$(DIR)/pvfs2-gencred.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

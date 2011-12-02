@@ -1,2 +1,3 @@
-
-# echo "******* tinder script called ********"
+#!/bin/sh
+echo "do nothing"
+exit

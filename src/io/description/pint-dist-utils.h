@@ -54,6 +54,14 @@ int PINT_dist_register_param_offset(const char* dist_name,
                              size_t field_size);
 
 /**
+ * Unregister the parameter offset.
+ *
+ * Just helper to make register/unregister look complete
+ */
+int PINT_dist_unregister_param_offset(const char* dist_name,
+                            const char* param_name);
+
+/**
  * Wrapper macro to make adding parameter fields easy.
  *
  * Uses the offsetof trick to locate the offset for the struct field
@@ -65,6 +73,8 @@ int PINT_dist_register_param_offset(const char* dist_name,
                                     (size_t)&((param_type*)0)->param_member, \
                                     sizeof(((param_type*)0)->param_member))
 
+#define PINT_dist_unregister_param(dname, pname) \
+    PINT_dist_unregister_param_offset(dname, pname)
 
 #endif
 

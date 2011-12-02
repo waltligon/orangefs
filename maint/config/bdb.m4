@@ -231,5 +231,24 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_DEFINE(HAVE_DB_GET_PAGESIZE, 1, [Define if DB has get_pagesize function]),
     AC_MSG_RESULT(no))
     
+    dnl Check BDB version here since it's just a warning
+    AC_MSG_CHECKING([Berkeley DB version])
+    AC_TRY_COMPILE(
+        [
+            #include <db.h>
+        ], 
+        [
+             #if DB_VERSION_MAJOR < 4 || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 8) || \
+                (DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR == 8 && \
+                 DB_VERSION_PATCH < 30)
+                 #error "Recommend version of Berkeley DB at least 4.8.30"
+             #endif
+        ], 
+        AC_MSG_RESULT(yes)
+        HAVE_DB_OLD=0,
+        AC_MSG_RESULT(no)
+        HAVE_DB_OLD=1
+    )
     CFLAGS="$oldcflags"    
 ])

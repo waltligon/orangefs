@@ -15,7 +15,9 @@
 #ifdef __KERNEL__
 #include <linux/ioctl.h>
 #else
+#ifndef WIN32
 #include <sys/ioctl.h>  /* needed for constructing the _IO macros */
+#endif
 #endif
 
 /* version number for use in communicating between kernel space and user

@@ -21,6 +21,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -56,7 +57,7 @@ machine pvfs2_client_mgmt_event_mon_list_sm
 
 PVFS_error PVFS_imgmt_event_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
@@ -91,7 +92,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.event_mon_list.fs_id = fs_id;
     sm_p->u.event_mon_list.event_matrix = event_matrix;
     sm_p->u.event_mon_list.server_count = server_count;
@@ -113,7 +114,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
 
 PVFS_error PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_event** event_matrix,
     PVFS_BMI_addr_t *addr_array,
     int server_count,
@@ -128,7 +129,7 @@ PVFS_error PVFS_mgmt_event_mon_list(
                  "PVFS_mgmt_event_mon_list entered\n");
 
     ret = PVFS_imgmt_event_mon_list(
-        fs_id, credentials, event_matrix, addr_array, server_count,
+        fs_id, credential, event_matrix, addr_array, server_count,
         event_count, details, &op_id, hints, NULL);
 
     if (ret)
@@ -159,17 +160,20 @@ static PINT_sm_action mgmt_event_mon_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "event_mon_list state: "
                  "mgmt_event_mon_list_setup_msgpair\n");
 
     js_p->error_code = 0;
 
+    PINT_null_capability(&capability);
+
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
         PINT_SERVREQ_MGMT_EVENT_MON_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            capability,
             sm_p->u.event_mon_list.event_count,
             sm_p->hints);
 

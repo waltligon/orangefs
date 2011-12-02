@@ -18,6 +18,23 @@
 
 #define PVFS_EATTR_SYSTEM_NS "system.pvfs2."
 
+/** \file
+ *  \ingroup common
+ *
+ *  Code for checking attribute keys for known prefixes (namespaces)
+ *
+ *  The code in this file defines several arrays that list attribute
+ *  key prefixes (known as namespaces).  There is a driver routine to
+ *  take the key, scan the list to find its prefix and then either
+ *  return an error code or call a function to futher process the item.
+ *  Several such lists are defined and functions provided to check a
+ *  attribute against that list with the driver.  Two such lists call
+ *  routines to encode and decode datafile handle arrays (which are
+ *  stored as attributes).  The list of namespaces is the same as defined
+ *  by Posix, plus a special namespace system.pvfs. for pvfs specific
+ *  attributes.
+ */
+
 /* This is used to encode/decode the datafile handles array when its retrieved
  * as an extended attribute (viewdist does this)
  */
@@ -92,7 +109,8 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val
  */
 static struct PINT_eattr_check PINT_eattr_system[] =
 {
-    {"system.posix_acl_access", 0, PINT_eattr_verify_acl_access},
+    {PVFS2_ACL_ACCESS, 0, PINT_eattr_verify_acl_access},
+    {PVFS2_ACL_DEFAULT, 0, PINT_eattr_verify_acl_access},
     {NULL, 0, NULL}};
 
 static int PINT_eattr_add_pvfs_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val);
@@ -142,6 +160,11 @@ static inline int PINT_eattr_verify(
     struct PINT_eattr_check * eattr_array,
     PVFS_ds_keyval *key, PVFS_ds_keyval *val);
 
+/** Checks for any known name space including system.pvfs.
+ *
+ *  Accepts an attribute from any known namespace - strips
+ *  namespace from system.pvfs. namespace but leaves others alone.
+ */
 int PINT_eattr_check_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {
     return PINT_eattr_verify(PINT_eattr_access, key, val);
@@ -273,11 +296,21 @@ static inline int PINT_eattr_verify(
     return(0);
 }
 
+/** Checks an attribute key against a system list
+ *
+ *  Accepts a system. attribute with a posix acl list
+ *  Rejects all other namespaces
+ */
 int PINT_eattr_system_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v)
 {
     return PINT_eattr_verify(PINT_eattr_system, k, v);
 }
 
+/** Checks an attribute key against a non-system list
+ *
+ *  Accepts attribute in any known namespace other than syste.pvfs.
+ *  Rejects all unknown namespaces
+ */
 int PINT_eattr_namespace_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v)
 {
     return PINT_eattr_verify(PINT_eattr_namespaces, k, v);
@@ -293,15 +326,31 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val
      * number of pvfs acl entries.  The remainder should be 1
      * because the keyvals are padded with a null terminator
      */
+#ifdef PVFS_USE_OLD_ACL_FORMAT
+    /* Old PVFS2 ACL format */
     if(val->buffer_sz == 0 || 
        val->buffer_sz % sizeof(pvfs2_acl_entry) != 1)
     {
         return -PVFS_EINVAL;
     }
+#else
+    /* New Posix compliant PVFS2 ACL format */
+    if(val->buffer_sz == 0 || 
+            (val->buffer_sz - sizeof(pvfs2_acl_header)) %
+                sizeof(pvfs2_acl_entry) != 0)
+    {
+        return -PVFS_EINVAL;
+    }
+#endif
 
     return 0;
 }
 
+/** checks an attribute key against the standard list of namespace
+ *
+ *  Accpets attributes for any namespace other than system.pvfs.
+ *  and rejects that and all unknown namespaces
+ */
 int PINT_eattr_list_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {
     return PINT_eattr_verify(PINT_eattr_list, key, val);
@@ -338,11 +387,23 @@ static int PINT_eattr_add_pvfs_prefix(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
     return 0;
 }
 
+/** Encodes a datafile handle array
+ *
+ *  This uses the same mechanism for verifying namespaces to
+ *  recognize and then encode a datafile handle array, which
+ *  is a PVFS attribute
+ */
 int PINT_eattr_encode(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {
     return PINT_eattr_verify(PINT_eattr_encode_keyvals, key, val);
 }
 
+/** Decodes a datafile handle array
+ *
+ *  This uses the same mechanism for verifying namespaces to
+ *  recognize and then decode a datafile handle array, which
+ *  is a PVFS attribute
+ */
 int PINT_eattr_decode(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {
     return PINT_eattr_verify(PINT_eattr_decode_keyvals, key, val);

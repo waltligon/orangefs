@@ -67,6 +67,8 @@ struct static_payload
     uint32_t dist_size;
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
+    PVFS_handle *mirror_dfile_array;
+    uint32_t mirror_copies_count;
 };
   
 static struct PINT_tcache* acache = NULL;
@@ -364,7 +366,8 @@ int PINT_acache_get_cached_entry(
     }
  
 #if 0
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: status=%d, attr_status=%d, size_status=%d\n",
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
+                 "status=%d, attr_status=%d, size_status=%d\n",
                  status, tmp_payload->attr_status, tmp_payload->size_status);
 #endif
 
@@ -411,6 +414,25 @@ int PINT_acache_get_cached_entry(
             memcpy(attr->u.meta.dfile_array, tmp_static_payload->dfile_array,
                 tmp_static_payload->dfile_count*sizeof(PVFS_handle));
             attr->u.meta.dfile_count = tmp_static_payload->dfile_count;
+        }
+        if(tmp_static_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        {
+            if(attr->u.meta.mirror_dfile_array)
+                free(attr->u.meta.mirror_dfile_array);
+            attr->u.meta.mirror_dfile_array = 
+                malloc(tmp_static_payload->dfile_count*sizeof(PVFS_handle)*
+                       tmp_static_payload->mirror_copies_count);
+            if(!attr->u.meta.mirror_dfile_array)
+            {
+                gen_mutex_unlock(&acache_mutex);
+                return(-PVFS_ENOMEM);
+            }
+            memcpy(attr->u.meta.mirror_dfile_array
+                  ,tmp_static_payload->mirror_dfile_array
+                  ,tmp_static_payload->dfile_count*sizeof(PVFS_handle)*
+                   tmp_static_payload->mirror_copies_count);
+            attr->u.meta.mirror_copies_count = 
+                     tmp_static_payload->mirror_copies_count;
         }
         if(tmp_static_payload->mask & PVFS_ATTR_META_DIST)
         {
@@ -596,6 +618,23 @@ int PINT_acache_update(
                 attr->u.meta.dfile_count*sizeof(PVFS_handle));
             tmp_static_payload->dfile_count = attr->u.meta.dfile_count;
         }
+        if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        {
+           tmp_static_payload->mirror_dfile_array =
+                malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle) *
+                       attr->u.meta.mirror_copies_count);
+           if (!tmp_static_payload->mirror_dfile_array)
+           {
+                ret = -PVFS_ENOMEM;
+                goto err;
+           }
+           memcpy(tmp_static_payload->mirror_dfile_array
+                 ,attr->u.meta.mirror_dfile_array
+                 ,attr->u.meta.dfile_count * sizeof(PVFS_handle) *
+                  attr->u.meta.mirror_copies_count);
+           tmp_static_payload->mirror_copies_count =
+                attr->u.meta.mirror_copies_count;
+        }
         if(attr->mask & PVFS_ATTR_META_DIST)
         {
             tmp_static_payload->dist = PINT_dist_copy(attr->u.meta.dist);
@@ -672,6 +711,8 @@ err:
     {
         if(tmp_static_payload->dfile_array)
             free(tmp_static_payload->dfile_array);
+        if(tmp_static_payload->mirror_dfile_array)
+            free(tmp_static_payload->mirror_dfile_array);
         if(tmp_static_payload->dist)
             PINT_dist_free(tmp_static_payload->dist);
         free(tmp_static_payload);
@@ -766,6 +807,10 @@ static int static_free_payload(void* payload)
     if(tmp_static_payload->dfile_array)
     {
         free(tmp_static_payload->dfile_array);
+    }
+    if(tmp_static_payload->mirror_dfile_array)
+    {
+        free(tmp_static_payload->mirror_dfile_array);
     }
     if(tmp_static_payload->dist)
     {

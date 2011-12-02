@@ -1,0 +1,27 @@
+Signing the Dokan.sys Driver
+----------------------------
+
+Windows x64 systems since Vista require device drivers to be signed by a certificate.
+
+These steps are derived from: http://www.globalsign.com/support/code-signing/codesign_vista64.php. 
+
+1. Use a 32-bit Windows XP system (VM). All steps are done on this system.
+   * Install the Windows Driver Kit (WDK) from Microsoft's website.
+2. Import the Omnibond Systems LLC certificate and private key.
+   * Obtain the file globalsign-code.p12 file from Sam Sampson. This file cannot be placed in CVS or made public since it contains the private key.
+   * Double-click the file and follow the steps. The password is the one Omnibond typically uses for testing. Store the certificates in the Personal store.
+3. Disable Windows root-certificate updating--see the link above.
+4. View certificates by opening a Command Prompt and running: mmc certmgr.msc.
+5. Remove the "GlobalSign Root CA" certificates.
+   * One will be under Trusted Root Certification Authorities | Certificates.
+   * Another may be under Personal | Certificates.
+   * Do not remove the GlobalSign Code Signing CA - G2 certificate.
+6. Copy {CVS Root}\dokan\bin64\unsigned\dokan-unsigned.sys to dokan.sys in the same folder.
+7. Run the signtool.exe application from the WDK. Open a Command Prompt and cd to the unsigned folder (see above). Here is the command line using WDK 7.1 from the default location:
+   c:\WinDDK\7600.16385.1\bin\x86\signtool sign /ac ..\mscv-globalsign.cer [cont. next line]
+      /sha1 054326a1248434f54c7a6163a90603201e02db1f /v dokan.sys
+8. Verify the dokan.sys. This must be done on another system, since the GlobalSign Root CA has been removed from the current system. Command:
+   c:\WinDDK\7600.16385.1\bin\x86\signtool verify /kp dokan.sys.
+8. Copy the new dokan.sys to the bin64 folder (parent of the unsigned folder).
+9. The installer can then be built with InstallShield 2010.
+

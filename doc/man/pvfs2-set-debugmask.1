@@ -1,31 +1,22 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
-.\" 
-.TH "PVFS2-SET-DEBUGMASK" "1" "SEPTEMBER 2003" "PVFS2" "PVFS2 Manuals"
-.SH "NAME"
-pvfs2\-set\-debugmask \- Change logging level of a pvfs2\-server
-.SH "SYNOPSIS"
-.B pvfs2\-set\-debugmask
-.I \-m mount_point [\-h] [\-v] [\-s server]
-.B <MASK_LIST>
+.\"
+.TH PVFS2-SET-DEBUGMASK 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-set-debugmask \- Change logging level of a pvfs2-server
+.SH SYNOPSIS
+.B pvfs2-set-debugmask
+.I -m mount_point <MASK_LIST>
 
-.SH "DESCRIPTION"
+.SH DESCRIPTION
 Change the type of debugging information a 
-.B pvfs2\-server
+.B pvfs2-server
 (1) will log.
 
-.SH "OPTIONS"
-.IP \-h
-Print usage information and exit.
-.IP \-v
-Print pvfs2 version information and exit.
-.IP \-m
+.SH OPTIONS
+.IP -m
 Change the logging level of the servers associated with 
 .I mount_point
-.IP \-s
-Set the debug mask for a single server called
-.I server.
-Otherwise the debug mask for all servers in the cluster will be set.
 
 .IP mask_list
 can be one of 
@@ -34,19 +25,19 @@ can be one of
 or 
 .I none  
 
-.SH "ENVIRONMENT"
+.SH ENVIRONMENT
 .IP PVFS2TAB_FILE
 If set, the full pathname for an alternate 
-.I R pvfs2tab
+.IR pvfs2tab
 file
 
-.SH "BUGS"
+.SH BUGS
 Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
-.SH "AUTHOR"
-The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
 .SH "SEE ALSO"
-.BR pvfs2\-server (1),
-.BR pvfs2\-statfs (1)
-.BR pvfs2\-ping (1)
-.BR pvfs2\-cp (1)
-.BR pvfs2\-genconfig (1)
+.BR pvfs2-server (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

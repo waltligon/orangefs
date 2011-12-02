@@ -201,7 +201,7 @@ static int pvfs2_readdir(
 	    new_op->upcall.req.readdir.refn.fs_id =
 		PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
 	}
-	new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
+	new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT_READDIR;
 
 	/* NOTE:
 	   the position we send to the readdir upcall is out of
@@ -307,10 +307,12 @@ static int pvfs2_readdir(
                         file->f_pos = rhandle.readdir_response.token - 
                             (rhandle.readdir_response.pvfs_dirent_outcount - i + 1);
                     }
-                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  Setting f_pos to: %ld\n", (unsigned long) file->f_pos);
+                    gossip_debug(GOSSIP_DIR_DEBUG, "at least one filldir call failed.  "
+                                                   "Setting f_pos to: %ld\n"
+                                                  , (unsigned long) file->f_pos);
                 }
             }
-
+            
             /* did we hit the end of the directory? */
             if(rhandle.readdir_response.token == PVFS_READDIR_END && !buffer_full)
             {
@@ -643,7 +645,8 @@ static int pvfs2_readdirplus_common(
             else
             {
 #if defined(HAVE_IGET5_LOCKED) || defined(HAVE_IGET4_LOCKED)
-                gossip_lerr("Critical error: i_ino cannot be relied on when using iget4/5\n");
+                gossip_lerr("Critical error: i_ino cannot be relied on "
+                            "when using iget4/5\n");
                 op_release(new_op);
                 return -EINVAL;
 #endif
@@ -653,7 +656,8 @@ static int pvfs2_readdirplus_common(
                     PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
             }
             new_op->upcall.req.readdirplus.mask = pvfs2_mask;
-            new_op->upcall.req.readdirplus.max_dirent_count = MAX_DIRENT_COUNT;
+            new_op->upcall.req.readdirplus.max_dirent_count 
+                    = MAX_DIRENT_COUNT_READDIRPLUS;
 
             /* NOTE:
                the position we send to the readdirplus upcall is out of
@@ -666,7 +670,8 @@ static int pvfs2_readdirplus_common(
             ret = readdir_index_get(&buffer_index);
             if (ret < 0)
             {
-                gossip_err("pvfs2_readdirplus: readdir_index_get() failure (%d)\n", ret);
+                gossip_err("pvfs2_readdirplus: readdir_index_get() "
+                           "failure (%d)\n", ret);
                 goto err;
             }
             new_op->upcall.req.readdirplus.buf_index = buffer_index;

@@ -7,10 +7,16 @@
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
+# set ENABLE_SECURITY to build with security
+# set SECURITY_FAIL to test that security will fail - SSS
+
 # you can override these settings in nightly-tests.cfg 
 export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
-export EXTRA_TESTS=${HOME}/src/benchmarks
+export EXTRA_TESTS=/tmp/${USER}/src/benchmarks
+#export EXTRA_TESTS=/tmp/src/benchmarks
+export URL=http://devorange.clemson.edu/pvfs
+export BENCHMARKS=benchmarks-20060512.tar.gz
 
 # look for a 'nightly-test.cfg' in the same directory as this script
 if [ -f /tmp/$USER/nightly-tests.cfg ] ; then 
@@ -21,13 +27,19 @@ fi
 # need to make this a command line arugment:
 export CVS_TAG="${CVS_TAG:-HEAD}"
 
+if [ $ENABLE_SECURITY ] ; then
+	sec_dir=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc
+fi
+
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
-VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
+SYSINT_SCRIPTS=~+/sysint-tests.d
+VFS_SCRIPTS=~+/vfs-tests.d
+VFS_SCRIPT="dbench"
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests-${CVS_TAG}.log
+BENCHMARKS=benchmarks-20060512.tar.gz
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -42,7 +54,7 @@ TESTNAME="`hostname -s`-nightly"
 export LD_LIBRARY_PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib:${LD_LIBRARY_PATH}
 
 # we only have a few hosts that meet all the earlier stated prereqs
-VFS_HOSTS="gil lain stan"
+VFS_HOSTS="devorange2 devorange35 andy jeffrey"
 
 #
 # Detect basic heap corruption
@@ -60,11 +72,15 @@ pull_and_build_pvfs2 () {
 	if  [ $do_vfs -eq 1 ] ; then
 		with_kernel="-k /lib/modules/`uname -r`/build"
 	fi
+   with_security=""
+   if [ $ENABLE_SECURITY ] ; then
+      with_security="-s"
+   fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
 	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -t -v $1 \
-		$with_kernel -r $PVFS2_DEST
+		$with_kernel $with_security -r $PVFS2_DEST
 	
 }
 
@@ -90,11 +106,11 @@ pull_and_build_mpich2 () {
 
 
 teardown_vfs() {
-	sudo umount $PVFS2_MOUNTPOINT
-	sudo killall pvfs2-client
+	mount | grep -q $PVFS2_MOUNTPOINT && sudo umount $PVFS2_MOUNTPOINT
+	ps -e | grep -q pvfs2-client && sudo killall pvfs2-client
 	sleep 1
-	sudo /sbin/rmmod  pvfs2
-	# let teardown alway ssucceed.  pvfs2-client might already be killed
+	/sbin/lsmod | grep -q pvfs2 && sudo /sbin/rmmod pvfs2
+	# let teardown always succeed.  pvfs2-client might already be killed
 	# and pvfs2 kernel module might not be loaded yet 
 	return 0
 }
@@ -102,24 +118,93 @@ teardown_vfs() {
 setup_vfs() {
 	sudo dmesg -c >/dev/null
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
-	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
-		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
-		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
+#	sudo LD_LIBRARY_PATH=${LD_LIBRARY_PATH} ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+#		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+#		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	# sudo screen -d -m cgdb -x ${PVFS2_DEST}/.gdbinit --args ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	#sudo valgrind --log-file=${PVFS2_DEST}/pvfs2-client.vg ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core -L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log &
+	keypath=""
+	if [ $ENABLE_SECURITY ] ; then
+		keypath="--keypath ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/etc/clientkey.pem"
+	fi
+	sudo ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client \
+		-p ${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-client-core \
+		-L ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log \
+		$keypath
 	sudo chmod 644 ${PVFS2_DEST}/pvfs2-client-${CVS_TAG}.log
 	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
+}
+
+check_openssl() {
+	if [ $? -ne 0 ] ; then
+		echo "OpenSSL error:" 1>&2
+		cat ${sec_dir}/error.tmp 1>&2
+	fi
+}
+
+setup_security() {
+	echo "....initializing security"
+	which openssl > /dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		echo "openssl must be installed for security mode"
+		return 1
+	fi
+	mkdir -p $sec_dir
+	# remove existing files
+	rm -f ${sec_dir}/*
+	# generate client private key
+	openssl genrsa -out ${sec_dir}/clientkey.pem 1024 > /dev/null \
+		2> ${sec_dir}/error.tmp
+	check_openssl
+	for alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
+		# output client public key to keystore, unless security 
+		# is intended to fail
+		if [ ! $SECURITY_FAIL ] ; then
+			echo "C:`hostname -s`" >> ${sec_dir}/keystore-${alias}
+			openssl rsa -in ${sec_dir}/clientkey.pem -pubout >> \
+				${sec_dir}/keystore-${alias} 2> ${sec_dir}/error.tmp
+			check_openssl
+		fi
+		# generate server private key
+		openssl genrsa -out ${sec_dir}/serverkey-${alias}.pem 2048 \
+			> /dev/null 2> ${sec_dir}/error.tmp
+		check_openssl
+		# output server public key to keystore files
+		for keystore_alias in `grep 'Alias ' fs.conf | cut -d ' ' -f 2`; do
+			echo "S:${alias}" >> ${sec_dir}/keystore-${keystore_alias}
+			openssl rsa -in ${sec_dir}/serverkey-${alias}.pem \
+				-pubout >> ${sec_dir}/keystore-${keystore_alias} \
+				2> ${sec_dir}/error.tmp
+			check_openssl
+		done
+	done
+	# set client key location
+	export PVFS2KEY_FILE=${sec_dir}/clientkey.pem
+	rm -f ${sec_dir}/error.tmp
 }
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
 	rm -f fs.conf 
+	sec_args=""
+	if [ $ENABLE_SECURITY ] ; then
+		sec_args="--keystore=${sec_dir}/keystore-_ALIAS_ "
+		sec_args+="--serverkey=${sec_dir}/serverkey-_ALIAS_.pem"
+	fi
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf \
 		--protocol tcp \
 		--iospec="`hostname -s`:{3396-3399}" \
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
+		$sec_args \
 		--logfile=${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log --quiet
+	# generate security keys
+	if [ $ENABLE_SECURITY ] ; then
+		setup_security
+		if [ $? -ne 0 ] ; then
+			return 1
+		fi
+	fi
 	# clean up any artifacts from earlier runs
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG}*
 	rm -f ${PVFS2_DEST}/pvfs2-server-${CVS_TAG}.log* 
@@ -139,7 +224,11 @@ setup_pvfs2() {
 	grep -q 'pvfs2-nightly' /etc/fstab
 	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
-	fi	
+	fi
+	#turn on debugging on each server
+	export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+	echo "....setting server-side debug mask"
+	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-set-debugmask -m ${PVFS2_MOUNTPOINT} "all"	
 }
 
 teardown_pvfs2() {
@@ -198,7 +287,7 @@ run_parts() {
 		# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
-			echo -n "====== running $f ..."
+			echo -n "====== `date` == running $f ..."
 			./$f > ${PVFS2_DEST}/${f}-${CVS_TAG}.log
 			if [ $? -eq 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
@@ -212,6 +301,20 @@ run_parts() {
 	done
 }
 
+#run only one script
+run_one() {
+   cd $1
+   echo -n "===== `date` == running ${1}/${2} ..."
+   ${1}/${2} > ${PVFS2_DEST}/${2}-${CVS_TAG}.log
+   if [ $? -eq 0 ] ; then 
+      nr_passed=$((nr_passed + 1))
+      echo "OK"
+   else
+      nr_failed=$((nr_failed + 1))
+      failure_logs="$failure_logs ${PVFS2_DEST}/${2}-${CVS_TAG}.log"
+      echo "FAILED"
+   fi
+}
 ###
 ### entry point for script
 ###
@@ -228,10 +331,48 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
-failure_logs=""   # a space-delimited list of logs that failed
-# compile and install
+# "install" benchmark software, if EXTRA_TESTS is not null
+if [ $EXTRA_TESTS ] 
+then
+   echo "Installing benchmark software...."
+   my_cwd=`pwd`
+
+   #create directory, if not already there
+   mkdir -p $EXTRA_TESTS
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: mkdir failed"
+      setupfail
+   fi
+
+   #remove existing tar file and/or subdirectories
+   cd $EXTRA_TESTS/..
+   sudo /bin/rm -rf *
+
+   #get new tar file
+   wget ${URL}/${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: wget failed"
+      setupfail
+   fi
+
+   #untar the file
+   tar -xzf ${BENCHMARKS}
+   if [ $? != 0 ]
+   then
+      echo "benchmarks: tar failed"
+      setupfail
+   fi
+
+   #go back to original working directory
+   cd $my_cwd
+fi
+
+echo "pull_and_build_pvfs2"
 pull_and_build_pvfs2  $CVS_TAG || buildfail
 
+echo "setup_pvfs2"
 teardown_pvfs2 && setup_pvfs2 
 
 if [ $? != 0 ] ; then
@@ -240,6 +381,7 @@ if [ $? != 0 ] ; then
 fi
 
 if [ $do_vfs -eq 1 ] ; then 
+	echo "setup_vfs"
 	teardown_vfs && setup_vfs
 
 	if [ $? != 0 ] ; then
@@ -263,11 +405,14 @@ exec 7<&2
 
 exec 1> ${REPORT_LOG}
 exec 2>&1
+echo "running sysint scripts"
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	echo "running vfs scripts"
 	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
+#        run_one ${VFS_SCRIPTS} ${VFS_SCRIPT}
 fi
 
 # down the road (as we get our hands on more clusters) we'll need a more

@@ -43,11 +43,12 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
     {
         return (-1);
     }
+    memset(tids,0,sizeof(pthread_t) * nent);
 
     for(i = 0; i < nent; ++i)
     {
 	int spawnmode= PTHREAD_CREATE_JOINABLE;
-        tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item)*nent);
+        tmp_item = (struct alt_aio_item*)malloc(sizeof(struct alt_aio_item));
         if(!tmp_item)
         {
             return (-1);
@@ -126,10 +127,13 @@ int alt_lio_listio(int mode, struct aiocb * const list[],
             errno = ret;
             return(-1);
         }
-        gossip_debug(GOSSIP_BSTREAM_DEBUG, 
-                     "[alt-aio]: pthread_create completed:"
-                     " id: %d, thread_id: %p\n",
-                     i, (void *)tids[i]);
+        if (tids)
+        {
+           gossip_debug(GOSSIP_BSTREAM_DEBUG, 
+                        "[alt-aio]: pthread_create completed:"
+                        " id: %d, thread_id: %p\n",
+                        i, (void *)tids[i]);
+        }
     }
 
     ret = 0;

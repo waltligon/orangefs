@@ -8,11 +8,16 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <ctype.h>
+#ifdef WIN32
+#include <io.h>
+#endif
 
 #include "src/common/dotconf/dotconf.h"
 #include "server-config.h"
@@ -27,14 +32,16 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
-#ifdef WITH_OPENSSL
-#include "openssl/evp.h"
+#ifdef HAVE_OPENSSL
+#include <openssl/evp.h>
 #endif
 
 static const char * replace_old_keystring(const char * oldkey);
 
 static DOTCONF_CB(get_logstamp);
-static DOTCONF_CB(get_storage_space);
+static DOTCONF_CB(get_storage_path);
+static DOTCONF_CB(get_data_path);
+static DOTCONF_CB(get_meta_path);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
 #ifdef USE_TRUSTED
@@ -118,6 +125,9 @@ static DOTCONF_CB(get_small_file_size);
 static DOTCONF_CB(directio_thread_num);
 static DOTCONF_CB(directio_ops_per_queue);
 static DOTCONF_CB(directio_timeout);
+static DOTCONF_CB(get_key_store);
+static DOTCONF_CB(get_server_key);
+static DOTCONF_CB(get_security_timeout);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -550,17 +560,51 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_SERVER_OPTIONS,"50"},
 
-    /* Specifies the local path for the pvfs2 server to use as storage space.
-     * This option specifies the default path for all servers and will appear
+    /* DEPRECATED 
+     * Specifies the local path for the pvfs2 server to use as 
+     * storage space for data files and metadata files. This option should not
+     * be used in conjuction with DataStorageSpace or MetadataStorageSpace. 
+     * This option is only meant as a migration path for configurations where i
+     * users do not want (or don't expect to need to) modify their configuration
+     * to run this version.
+     *
+     * This option specifies the default path for all servers and will appear 
      * in the Defaults context.
      *
      * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
      * basis. Look at the "Option" tag for more details
      * Example:
      *
-     * StorageSpace /tmp/pvfs.storage
+     * StorageSpace /tmp/pvfs-data.storage
+     * DEPRECATED.
      */
-    {"StorageSpace",ARG_STR, get_storage_space,NULL,
+    {"StorageSpace",ARG_STR, get_storage_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for data files. This option specifies the default path for all servers 
+     * and will appear in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * DataStorageSpace /tmp/pvfs-data.storage
+     */
+    {"DataStorageSpace",ARG_STR, get_data_path,NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
+
+    /* Specifies the local path for the pvfs2 server to use as storage space 
+     * for metadata files. This option specifies the default path for all 
+     * servers and will appear in the Defaults context.
+     *
+     * NOTE: This can be overridden in the <ServerOptions> tag on a per-server
+     * basis. Look at the "Option" tag for more details
+     * Example:
+     *
+     * MetadataStorageSpace /tmp/pvfs-meta.storage
+     */
+    {"MetadataStorageSpace",ARG_STR, get_meta_path,NULL,
         CTX_DEFAULTS|CTX_SERVER_OPTIONS,NULL},
 
      /* Current implementations of TCP on most systems use a window
@@ -627,14 +671,31 @@ static const configoption_t options[] =
          CTX_DEFAULTS, "2000"},
 
      /* Specifies the number of handles to be preceated at a time from each
-      * server using the batch create request.
+      * server using the batch create request. One value is specified for each
+      * type of DS handle. Order is important, it matches the order the types 
+      * are defined in the PVFS_ds_type enum, which lives in 
+      * include/pvfs2-types.h. If that enum changes, it must be changed here 
+      * to match. Currently, this parameter follows the order:
+      *  
+      *  PVFS_TYPE_NONE
+      *  PVFS_TYPE_METAFILE
+      *  PVFS_TYPE_DATAFILE
+      *  PVFS_TYPE_DIRECTORY
+      *  PVFS_TYPE_SYMLINK
+      *  PVFS_TYPE_DIRDATA
+      *  PVFS_TYPE_INTERNAL
+      *
       */
-     {"PrecreateBatchSize",ARG_INT, get_precreate_batch_size,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "512"},
- 
-     /* Precreate pools will be "topped off" if they fall below this value */
-     {"PrecreateLowThreshold",ARG_INT, get_precreate_low_threshold,NULL,
-         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "256"},
+     {"PrecreateBatchSize",ARG_LIST, get_precreate_batch_size,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 32, 512, 32, 32, 32, 0" },
+
+     /* Precreate pools will be "topped off" if they fall below this value. 
+      * One value is specified for each DS handle type. This parameter operates
+      * the same as the PrecreateBatchSize in that each count coorespends to 
+      * one DS handle type. The order of types is identical to the 
+      * PrecreateBatchSize defined above.  */
+     {"PrecreateLowThreshold",ARG_LIST, get_precreate_low_threshold,NULL,
+         CTX_DEFAULTS|CTX_SERVER_OPTIONS, "0, 16, 256, 16, 16, 16, 0"},
 
     /* Specifies if file stuffing should be enabled or not.  Default is
      * enabled; this option is only provided for benchmarking purposes 
@@ -960,6 +1021,15 @@ static const configoption_t options[] =
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
 
+    {"KeyStore", ARG_STR, get_key_store, NULL, 
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+	
+    {"ServerKey", ARG_STR, get_server_key, NULL,
+        CTX_DEFAULTS|CTX_SERVER_OPTIONS, NULL},
+
+    {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
+        CTX_DEFAULTS, "3600"},
+
     LAST_OPTION
 };
 
@@ -993,7 +1063,10 @@ int PINT_parse_config(
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
-    config_s->server_alias = server_alias_name;
+    if (server_alias_name)
+    {
+        config_s->server_alias = strdup(server_alias_name);
+    }
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
@@ -1003,8 +1076,6 @@ int PINT_parse_config(
     config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
     config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
     config_s->trove_max_concurrent_io = 16;
-    config_s->precreate_batch_size = PVFS2_PRECREATE_BATCH_SIZE_DEFAULT;
-    config_s->precreate_low_threshold = PVFS2_PRECREATE_LOW_THRESHOLD_DEFAULT;
 
     if (cache_config_files(config_s, global_config_filename))
     {
@@ -1048,10 +1119,17 @@ int PINT_parse_config(
         config_s->host_id = strdup(halias->bmi_address);
     }
 
-    if (server_alias_name && !config_s->storage_path)
+    if (server_alias_name && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
-                   "No storage path specified for alias %s.\n", server_alias_name);
+                   "No data storage path specified for alias %s.\n", server_alias_name);
+        return 1;
+    }
+
+    if (server_alias_name && !config_s->meta_path)
+    {
+        gossip_err("Configuration file error. "
+                   "No metadata storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
@@ -1078,7 +1156,22 @@ int PINT_parse_config(
                    "No PerfUpdateInterval specified.\n");
         return 1;
     }
-    
+
+#ifdef ENABLE_SECURITY
+    if (server_alias_name && !config_s->keystore_path)
+    {
+        gossip_err("Configuration file error. No keystore path specified.\n");
+        return 1;
+    }
+
+    if (server_alias_name && !config_s->serverkey_path)
+    {
+        gossip_err("Configuration file error. No server key path "
+                   "specified.\n");
+        return 1;
+    }
+#endif /* ENABLE_SECURITY */
+
     return 0;
 }
 
@@ -1135,7 +1228,7 @@ DOTCONF_CB(get_logstamp)
 }
 
 
-DOTCONF_CB(get_storage_space)
+DOTCONF_CB(get_storage_path)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
@@ -1144,11 +1237,58 @@ DOTCONF_CB(get_storage_space)
     {
         return NULL;
     }
-    if (config_s->storage_path)
+
+    if( config_s->data_path )
     {
-        free(config_s->storage_path);
+        free(config_s->data_path);
     }
-    config_s->storage_path =
+
+    if( config_s->meta_path )
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    config_s->meta_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_data_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->data_path)
+    {
+        free(config_s->data_path);
+    }
+
+    config_s->data_path =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_meta_path)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
+       config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    if (config_s->meta_path)
+    {
+        free(config_s->meta_path);
+    }
+
+    config_s->meta_path =
         (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
@@ -1224,7 +1364,7 @@ DOTCONF_CB(enter_filesystem_context)
 
     /* fill any fs defaults here */
     fs_conf->flowproto = FLOWPROTO_DEFAULT;
-    fs_conf->encoding = ENCODING_DEFAULT;
+    fs_conf->encoding = PVFS2_ENCODING_DEFAULT;
     fs_conf->trove_sync_meta = TROVE_SYNC;
     fs_conf->trove_sync_data = TROVE_SYNC;
     fs_conf->fp_buffer_size = -1;
@@ -1444,6 +1584,9 @@ DOTCONF_CB(get_tcp_buffer_send)
     return NULL;
 }
 
+#ifdef WIN32
+#define strcasecmp   stricmp
+#endif
 DOTCONF_CB(get_tcp_bind_specific)
 {
     struct server_configuration_s *config_s =
@@ -1487,12 +1630,55 @@ DOTCONF_CB(get_precreate_batch_size)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
+    char **tokens;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
         return NULL;
     }
-    config_s->precreate_batch_size = cmd->data.value;
+
+    if (config_s->precreate_batch_size != NULL) 
+    {
+        free(config_s->precreate_batch_size);
+        config_s->precreate_batch_size = NULL;
+    }
+
+    /* so this seems silly but a config option of type ARG_LIST doesn't
+     * split on commas (which is claimed to be the delimiter) but on white 
+     * space. That could possibly be fixed. So, until it is we have to handle 
+     * the possibility of multiple arguments with some number of values per 
+     * argument. */
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
+        for(j = 0; j < token_count; ++j)
+        {
+            counts[count_count++] = atoi(tokens[j]);
+        }
+        PINT_free_string_list(tokens, token_count);
+    }
+
+    /* make sure we scrounged up the right number of values */
+    if( count_count != PVFS_DS_TYPE_COUNT ) 
+    {
+        return "PrecreateBatchSize must contain counts for each DS "
+               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
+               "SYMLINK, DIRDATA, INTERNAL\n";
+    }
+
+    config_s->precreate_batch_size = calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
+    if( config_s->precreate_batch_size == NULL )
+    {
+        return "PrecreateBatchSize malloc failure";
+    }
+
+    for( i = 0; i < count_count; i++ )
+    {
+        config_s->precreate_batch_size[i] = counts[i];
+    }
+
     return NULL;
 }
 
@@ -1500,12 +1686,52 @@ DOTCONF_CB(get_precreate_low_threshold)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
+    int i = 0, j = 0, token_count = 0, counts[7], count_count=0;
+    char **tokens;
+
     if(config_s->configuration_context == CTX_SERVER_OPTIONS &&
        config_s->my_server_options == 0)
     {
         return NULL;
     }
-    config_s->precreate_low_threshold = cmd->data.value;
+
+    if (config_s->precreate_low_threshold != NULL) 
+    {
+        free(config_s->precreate_low_threshold);
+        config_s->precreate_low_threshold = NULL;
+    }
+
+    /* handle multiple values per arguments, gross */
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        token_count = PINT_split_string_list( &tokens, cmd->data.list[i]);
+        for(j = 0; j < token_count; ++j)
+        {
+            counts[count_count++] = atoi(tokens[j]);
+        }
+        PINT_free_string_list(tokens, token_count);
+    }
+
+    /* make sure we scrounged up the right number of values */
+    if( count_count != PVFS_DS_TYPE_COUNT ) 
+    {
+        return "PrecreateLowThreshold must contain counts for each DS "
+               "type in the order NONE, METAFILE, DATAFILE, DIRECTORY, "
+               "SYMLINK, DIRDATA, INTERNAL\n";
+    }
+
+    config_s->precreate_low_threshold = 
+        calloc( PVFS_DS_TYPE_COUNT, sizeof(int));
+    if( config_s->precreate_low_threshold == NULL )
+    {
+        return "PrecreateLowThreshold malloc failure";
+    }
+
+    for( i = 0; i < count_count; i++ )
+    {
+        config_s->precreate_low_threshold[i] = counts[i];
+    }
+
     return NULL;
 }
 
@@ -2816,6 +3042,44 @@ DOTCONF_CB(directio_timeout)
     return NULL;
 }
 
+DOTCONF_CB(get_key_store)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->keystore_path);
+    config_s->keystore_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_server_key)
+{
+    struct server_configuration_s *config_s =
+            (struct server_configuration_s*)cmd->context;	
+    if (config_s->configuration_context == CTX_SERVER_OPTIONS &&
+            config_s->my_server_options == 0)
+    {
+        return NULL;
+    }
+    free(config_s->serverkey_path);
+    config_s->serverkey_path =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    return NULL;
+}
+
+DOTCONF_CB(get_security_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
+
 /*
  * Function: PINT_config_release
  *
@@ -2837,10 +3101,16 @@ void PINT_config_release(struct server_configuration_s *config_s)
             config_s->host_id = NULL;
         }
 
-        if (config_s->storage_path)
+	if (config_s->data_path)
         {
-            free(config_s->storage_path);
-            config_s->storage_path = NULL;
+            free(config_s->data_path);
+            config_s->data_path = NULL;
+        }
+
+        if (config_s->meta_path)
+        {
+            free(config_s->meta_path);
+            config_s->meta_path = NULL;
         }
 
         if (config_s->fs_config_filename)
@@ -2853,6 +3123,18 @@ void PINT_config_release(struct server_configuration_s *config_s)
         {
             free(config_s->fs_config_buf);
             config_s->fs_config_buf = NULL;
+        }
+
+        if(config_s->precreate_batch_size)
+        {
+            free(config_s->precreate_batch_size);
+            config_s->precreate_batch_size = NULL;
+        }
+
+        if(config_s->precreate_low_threshold)
+        {
+            free(config_s->precreate_low_threshold);
+            config_s->precreate_low_threshold = NULL;
         }
 
         if (config_s->logfile)
@@ -2926,6 +3208,11 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->db_cache_type);
             config_s->db_cache_type = NULL;
         }
+
+        free(config_s->keystore_path);
+        config_s->keystore_path = NULL;
+        free(config_s->serverkey_path);
+        config_s->serverkey_path = NULL;
     }
 }
 
@@ -3799,19 +4086,26 @@ static int cache_config_files(
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
+#ifdef WIN32
+    char working_dir[MAX_PATH+1];
+#else
     char *working_dir = NULL;
+#endif
     char *my_global_fn = NULL;
     char buf[512] = {0};
 
     assert(config_s);
 
+#ifdef WIN32
+    GetCurrentDirectory(MAX_PATH+1, working_dir);
+#else
     working_dir = getenv("PWD");
+#endif
 
     /* pick some filenames if not provided */
     my_global_fn = ((global_config_filename != NULL) ?
                     global_config_filename : "fs.conf");
 
-open_global_config:
     memset(&statbuf, 0, sizeof(struct stat));
     if (stat(my_global_fn, &statbuf) == 0)
     {
@@ -3826,16 +4120,46 @@ open_global_config:
     }
     else if (errno == ENOENT)
     {
+        /* Not sure why we don't try the add working dir to
+         * path trick in this case as is done below but for
+         * now we'll leave the code this way in cases there
+         * is some corner case we don't know about.
+         */
 	gossip_err("Failed to find global config file %s.  This "
                    "file does not exist!\n", my_global_fn);
         goto error_exit;
     }
     else
     {
+        /* It is unclear what errors to stat we are responding to here
+         * but the addition of more than one copy of the working dir
+         * is clearly a bad idea.  If one copy helps, great, otherwise
+         * we are calling an error.
+         */
         assert(working_dir);
+#ifdef WIN32
+        _snprintf(buf, 512, "%s\\%s",working_dir, my_global_fn);
+#else
         snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
+#endif
         my_global_fn = buf;
-        goto open_global_config;
+        memset(&statbuf, 0, sizeof(struct stat));
+        if (stat(my_global_fn, &statbuf) == 0)
+        {
+            if (statbuf.st_size == 0)
+            {
+                gossip_err("Invalid config file %s.  This "
+                        "file is 0 bytes in length!\n", my_global_fn);
+                goto error_exit;
+            }
+            config_s->fs_config_filename = strdup(my_global_fn);
+            config_s->fs_config_buflen = statbuf.st_size + 1;
+        }
+        else
+        {
+	    gossip_err("Failed to stat global config file %s.", my_global_fn);
+            goto error_exit;
+        }
     }
 
     if (!config_s->fs_config_filename ||
@@ -4149,7 +4473,7 @@ int PINT_config_get_fs_key(
     char ** key,
     int * length)
 {
-#ifndef WITH_OPENSSL
+#ifndef HAVE_OPENSSL
     *key = NULL;
     *length = 0;
     return -PVFS_ENOSYS;
@@ -4208,7 +4532,7 @@ int PINT_config_get_fs_key(
     
     BIO_free_all(bio);
     return 0;
-#endif /* WITH_OPENSSL */
+#endif /* HAVE_OPENSSL */
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -4340,7 +4664,7 @@ int PINT_config_pvfs2_mkspace(
                  "storage space"));
 
             ret = pvfs2_mkspace(
-                config->storage_path, cur_fs->file_system_name,
+                config->data_path, config->meta_path, cur_fs->file_system_name,
                 cur_fs->coll_id, root_handle, cur_meta_handle_range,
                 cur_data_handle_range, create_collection_only, 1);
 
@@ -4395,7 +4719,8 @@ int PINT_config_pvfs2_rmspace(
                 GOSSIP_SERVER_DEBUG,"Removing existing PVFS2 %s\n",
                 (remove_collection_only ? "collection" :
                  "storage space"));
-            ret = pvfs2_rmspace(config->storage_path,
+            ret = pvfs2_rmspace(config->data_path,
+				config->meta_path,
                                 cur_fs->file_system_name,
                                 cur_fs->coll_id,
                                 remove_collection_only,

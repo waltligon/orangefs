@@ -145,7 +145,8 @@ typedef struct server_configuration_s
     int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
-    char *storage_path;
+    char *data_path;                /* path to data storage directory */
+    char *meta_path;                /* path to metadata storage directory */
     char *fs_config_filename;       /* the fs.conf file name            */
     size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */
@@ -158,8 +159,8 @@ typedef struct server_configuration_s
     int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
-    int  precreate_batch_size;
-    int  precreate_low_threshold;
+    uint32_t  *precreate_batch_size;    /* batch size for each ds type */
+    uint32_t  *precreate_low_threshold; /* threshold for each ds type */
     char *logfile;                  /* what log file to write to */
     char *logtype;                  /* "file" or "syslog" destination */
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
@@ -183,7 +184,7 @@ typedef struct server_configuration_s
     int   *allowed_masks;            /* Netmasks for each of the specified trusted network */
     void  *security;                /* BMI module specific information */
     void  (*security_dtor)(void *); /* Destructor to free BMI module specific information */
-#endif
+#endif /* USE_TRUSTED */
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
@@ -200,6 +201,12 @@ typedef struct server_configuration_s
                                      * be configurable.
                                      */
     int trove_method;
+	
+    char *keystore_path;             /* location of trusted server public keys */
+    char *serverkey_path;            /* location of server private key */
+
+    int security_timeout;
+
     void *private_data;
 } server_configuration_s;
 

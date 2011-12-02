@@ -708,6 +708,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     void * multiples_buffer = NULL;
     TROVE_handle dummy_handle;
+    TROVE_handle aligned_handle;
     size_t sizeof_handle = 0, sizeof_attr = 0;
     int start_size;
     void *tmp_ptr;
@@ -874,6 +875,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
              * pointer value of tmp_buffer actually changes, and it
              * must be derefenced to get the handle value.
              */
+
             DB_MULTIPLE_KEY_NEXT(tmp_ptr, &data,
                                  tmp_handle, sizeof_handle,
                                  tmp_attr, sizeof_attr);
@@ -892,8 +894,17 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                 continue;
             }
 
-            op_p->u.d_iterate_handles.handle_array[i] =
-                *(TROVE_handle *)tmp_handle;
+            /* check for duplicates */
+            memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
+            if(i > 0 && aligned_handle == op_p->u.d_iterate_handles.handle_array[i-1])
+            {
+                gossip_err("Warning: got duplicate handle %llu.\n", llu(aligned_handle));
+                gossip_err("Warning: skipping entry.\n");
+                i--;
+                continue;
+            }
+
+            op_p->u.d_iterate_handles.handle_array[i] = aligned_handle;
         }
     }
 
@@ -923,10 +934,19 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
             {
                 goto get_next;
             }
-        } while (sizeof_handle != sizeof(TROVE_handle) ||
-           sizeof_attr != sizeof(attr));
 
-        *op_p->u.d_iterate_handles.position_p = *(TROVE_handle *)tmp_handle;
+            memcpy(&aligned_handle, tmp_handle, sizeof(TROVE_handle));
+            if(aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+            {
+                gossip_err("Warning: found duplicate handle: %llu\n", llu(aligned_handle));
+                gossip_err("Warning: skipping entry.\n");
+            }
+
+        } while (sizeof_handle != sizeof(TROVE_handle) ||
+           sizeof_attr != sizeof(attr) ||
+           aligned_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p]);
+
+        *op_p->u.d_iterate_handles.position_p = aligned_handle;
         goto return_ok;
     }
 
@@ -955,6 +975,13 @@ get_next:
         gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- some other "
                      "failure @ recno\n");
         ret = -dbpf_db_error_to_trove_error(ret);
+    }
+    if(*op_p->u.d_iterate_handles.count_p > 0 && 
+        dummy_handle == op_p->u.d_iterate_handles.handle_array[*op_p->u.d_iterate_handles.count_p])
+    {
+        gossip_err("Warning: found duplicate handle: %llu\n", llu(dummy_handle));
+        gossip_err("Warning: skipping entry.\n");
+        (*op_p->u.d_iterate_handles.count_p)--;
     }
     *op_p->u.d_iterate_handles.position_p = dummy_handle;
 
@@ -2044,35 +2071,35 @@ static int dbpf_dspace_testsome(
 int PINT_trove_dbpf_ds_attr_compare_reversed(
     DB * dbp, const DBT * a, const DBT * b)
 {
-    const TROVE_handle * handle_a;
-    const TROVE_handle * handle_b;
+    TROVE_handle handle_a = 0;
+    TROVE_handle handle_b = 0;
 
-    handle_a = (const TROVE_handle *) a->data;
-    handle_b = (const TROVE_handle *) b->data;
+    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
+    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
 
-    if(*handle_a == *handle_b)
+    if(handle_a == handle_b)
     {
         return 0;
     }
 
-    return (*handle_a < *handle_b) ? -1 : 1;
+    return (handle_a < handle_b) ? -1 : 1;
 }
 
 int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b)
 {
-    const TROVE_handle * handle_a;
-    const TROVE_handle * handle_b;
+    TROVE_handle handle_a = 0;
+    TROVE_handle handle_b = 0;
 
-    handle_a = (const TROVE_handle *) a->data;
-    handle_b = (const TROVE_handle *) b->data;
+    memcpy(&handle_a, a->data, sizeof(TROVE_handle));
+    memcpy(&handle_b, b->data, sizeof(TROVE_handle));
 
-    if(*handle_a == *handle_b)
+    if(handle_a == handle_b)
     {
         return 0;
     }
 
-    return (*handle_a > *handle_b) ? -1 : 1;
+    return (handle_a > handle_b) ? -1 : 1;
 }
 
 /* dbpf_dspace_create_store_handle()
@@ -2124,7 +2151,7 @@ static int dbpf_dspace_create_store_handle(
      * possible if the db gets out of sync with the rest of the collection
      * somehow
      */
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->data_path,
                               coll_p->coll_id, llu(new_handle));
     ret = access(filename, F_OK);
     if(ret == 0)
@@ -2137,7 +2164,7 @@ static int dbpf_dspace_create_store_handle(
                    filename);
         
         DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
-                                           my_storage_p->name, 
+                                           my_storage_p->data_path, 
                                            coll_p->coll_id,
                                            llu(new_handle));
         /* an old file exists.  Move it to the stranded subdirectory */

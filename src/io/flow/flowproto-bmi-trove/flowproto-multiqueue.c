@@ -9,8 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef WIN32
 #include <sys/time.h>
 #include <unistd.h>
+#endif
 
 #include "gossip.h"
 #include "quicklist.h"
@@ -1066,6 +1068,10 @@ static int bmi_send_callback_fn(void *user_ptr,
                     PINT_PERF_READ, 
                     actual_size, 
                     PINT_PERF_ADD);
+    PINT_perf_count(PINT_server_pc,
+                    PINT_PERF_FLOW_READ, 
+                    actual_size, 
+                    PINT_PERF_ADD);
 
     flow_data->parent->total_transferred += actual_size;
 
@@ -1351,11 +1357,14 @@ static void trove_write_callback_fn(void *user_ptr,
     result_tmp = &q_item->result_chain;
     do{
         q_item->parent->total_transferred += result_tmp->result.bytes;
-        PINT_perf_count(
-            PINT_server_pc,
-            PINT_PERF_WRITE, 
-            result_tmp->result.bytes,
-            PINT_PERF_ADD);
+        PINT_perf_count( PINT_server_pc,
+                         PINT_PERF_WRITE, 
+                         result_tmp->result.bytes,
+                         PINT_PERF_ADD);
+        PINT_perf_count( PINT_server_pc,
+                         PINT_PERF_FLOW_WRITE, 
+                         result_tmp->result.bytes,
+                         PINT_PERF_ADD);
         old_result_tmp = result_tmp;
         result_tmp = result_tmp->next;
         if(old_result_tmp != &q_item->result_chain)

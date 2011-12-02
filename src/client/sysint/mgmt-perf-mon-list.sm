@@ -22,6 +22,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -58,12 +59,13 @@ machine pvfs2_client_mgmt_perf_mon_list_sm
  */
 PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    struct PVFS_mgmt_perf_stat **perf_matrix,
+    const PVFS_credential *credential,
+    int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t* next_id_array,
     int server_count,
+    int *key_count,
     int history_count,
     PVFS_error_details *details,
     PVFS_mgmt_op_id *op_id,
@@ -77,8 +79,9 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_perf_mon_list entered\n");
 
-    if ((server_count < 1) || (history_count < 1) || !perf_matrix ||
-        !addr_array || !end_time_ms_array)
+    if ((server_count < 1) || (history_count < 1) || !key_count
+             || (*key_count < 1) || !perf_matrix || !addr_array
+             || !end_time_ms_array)
     {
 	return -PVFS_EINVAL;
     }
@@ -96,10 +99,11 @@ PVFS_error PVFS_imgmt_perf_mon_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.perf_mon_list.fs_id = fs_id;
     sm_p->u.perf_mon_list.perf_matrix = perf_matrix;
     sm_p->u.perf_mon_list.server_count = server_count;
+    sm_p->u.perf_mon_list.key_count = key_count;
     sm_p->u.perf_mon_list.history_count = history_count;
     sm_p->u.perf_mon_list.addr_array = addr_array;
     sm_p->u.perf_mon_list.next_id_array = next_id_array;
@@ -122,12 +126,13 @@ PVFS_error PVFS_imgmt_perf_mon_list(
  */
 PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    struct PVFS_mgmt_perf_stat **perf_matrix,
+    const PVFS_credential *credential,
+    int64_t **perf_matrix,
     uint64_t *end_time_ms_array,
     PVFS_BMI_addr_t *addr_array,
     uint32_t* next_id_array,
     int server_count,
+    int *key_count,
     int history_count,
     PVFS_error_details *details,
     PVFS_hint hints)
@@ -139,9 +144,9 @@ PVFS_error PVFS_mgmt_perf_mon_list(
                  "PVFS_mgmt_perf_mon_list entered\n");
 
     ret = PVFS_imgmt_perf_mon_list(
-        fs_id, credentials, perf_matrix, end_time_ms_array,
-        addr_array, next_id_array, server_count, history_count,
-        details, &op_id, hints, NULL);
+        fs_id, credential, perf_matrix, end_time_ms_array,
+        addr_array, next_id_array, server_count, key_count,
+        history_count, details, &op_id, hints, NULL);
 
     if (ret)
     {
@@ -171,17 +176,21 @@ static PINT_sm_action mgmt_perf_mon_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "perf_mon_list state: "
                  "mgmt_perf_mon_list_setup_msgpair\n");
+
+    PINT_null_capability(&capability);
 
     /* setup msgpair array */
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
 	PINT_SERVREQ_MGMT_PERF_MON_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            capability,
             sm_p->u.perf_mon_list.next_id_array[i],
+            *sm_p->u.perf_mon_list.key_count,
             sm_p->u.perf_mon_list.history_count,
             sm_p->hints);
 
@@ -259,10 +268,12 @@ static int perf_mon_list_comp_fn(void* v_p,
 	    resp_p->u.mgmt_perf_mon.suggested_next_id;
 	sm_p->u.perf_mon_list.end_time_ms_array[i] =
 	    resp_p->u.mgmt_perf_mon.end_time_ms;
+	*sm_p->u.perf_mon_list.key_count =
+	    resp_p->u.mgmt_perf_mon.key_count;
 	memcpy(sm_p->u.perf_mon_list.perf_matrix[i],
 	       resp_p->u.mgmt_perf_mon.perf_array,
 	       resp_p->u.mgmt_perf_mon.perf_array_count
-	       * sizeof(struct PVFS_mgmt_perf_stat));
+	       * sizeof(int64_t));
     }
  
     /* if this is the last response, check all of the status values and 

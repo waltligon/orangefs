@@ -1,5 +1,5 @@
-/*
- * (C) 2003 Clemson University and The University of Chicago
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -67,7 +67,7 @@ machine pvfs2_client_symlink_sm
     state dspace_create_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => symlink_setattr_setup_msgpair;
+        success => new_metafile_init;
         default => dspace_create_failure;
     }
 
@@ -75,6 +75,20 @@ machine pvfs2_client_symlink_sm
     {
         run symlink_dspace_create_failure;
         default => cleanup;
+    }
+    
+    state new_metafile_init
+    {
+        run getattr_new_metafile_init;
+        success => getattr_new_metafile;
+        default => symlink_setattr_failure;
+    }
+    
+    state getattr_new_metafile
+    {
+        jump pvfs2_client_getattr_sm;
+        success => symlink_setattr_setup_msgpair;
+        default => symlink_setattr_failure;
     }
 
     state symlink_setattr_setup_msgpair
@@ -87,7 +101,7 @@ machine pvfs2_client_symlink_sm
     state symlink_setattr_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => crdirent_setup_msgpair;
+        success => crdirent_init;
         default => symlink_setattr_failure;
     }
 
@@ -96,6 +110,21 @@ machine pvfs2_client_symlink_sm
         run symlink_setattr_failure;
         default => delete_handle_setup_msgpair;
     }
+    
+    state crdirent_init
+    {
+        run getattr_crdirent_init;
+        success => getattr_crdirent;
+        default => crdirent_failure;
+    }
+    
+    state getattr_crdirent
+    {
+        jump pvfs2_client_getattr_sm;
+        success => crdirent_setup_msgpair;
+        default => crdirent_failure;
+    }
+
 
     state crdirent_setup_msgpair
     {
@@ -147,7 +176,7 @@ PVFS_error PVFS_isys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_symlink *resp,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
@@ -193,7 +222,7 @@ PVFS_error PVFS_isys_symlink(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
     sm_p->u.sym.sym_resp = resp;
@@ -219,7 +248,7 @@ PVFS_error PVFS_sys_symlink(
     PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_symlink *resp,
     PVFS_hint hints)
 {
@@ -229,7 +258,7 @@ PVFS_error PVFS_sys_symlink(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_symlink entered\n");
 
     ret = PVFS_isys_symlink(entry_name, parent_ref, target, attr,
-                            credentials, resp, &op_id, hints, NULL);
+                            credential, resp, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_symlink call", ret);
@@ -273,7 +302,7 @@ static PINT_sm_action symlink_init(
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL,
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_CAPABILITY,
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -385,7 +414,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
 
     PINT_SERVREQ_BATCH_CREATE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
         1,
@@ -410,6 +439,24 @@ static PINT_sm_action symlink_dspace_create_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_crdirent_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap crdirent\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_DIRECTORY,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action symlink_crdirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -426,7 +473,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(
 
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        sm_p->getattr.attr.capability,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->object_ref.handle,
@@ -462,6 +509,28 @@ static PINT_sm_action symlink_crdirent_failure(
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action getattr_new_metafile_init(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_ref temp;
+    
+    temp.handle = sm_p->u.sym.symlink_handle;
+    temp.fs_id = sm_p->object_ref.fs_id;
+    
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: grabbing cap for meta\n");
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        temp,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_SYMLINK,
+        0);
+
+   return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action symlink_setattr_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -481,6 +550,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
+        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
@@ -530,6 +600,9 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
+
+    PINT_null_capability(&capability);
 
     js_p->error_code = 0;
 
@@ -538,7 +611,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        *sm_p->cred_p,
+        capability,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         sm_p->hints);

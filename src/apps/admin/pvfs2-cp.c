@@ -51,8 +51,8 @@ enum open_type {
 typedef struct pvfs2_file_object_s {
     PVFS_fs_id fs_id;
     PVFS_object_ref ref;
-    char pvfs2_path[PVFS_NAME_MAX];	
-    char user_path[PVFS_NAME_MAX];
+    char pvfs2_path[PVFS_NAME_MAX+1];	
+    char user_path[PVFS_NAME_MAX+1];
     PVFS_sys_attr attr;
     PVFS_permissions perms;
 } pvfs2_file_object;
@@ -60,7 +60,7 @@ typedef struct pvfs2_file_object_s {
 typedef struct unix_file_object_s {
     int fd;
     int mode;
-    char path[NAME_MAX];
+    char path[NAME_MAX+1];
 } unix_file_object;
 
 typedef struct file_object_s {
@@ -78,16 +78,16 @@ static void usage(int argc, char** argv);
 static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
-static int generic_open(file_object *obj, PVFS_credentials *credentials, 
+static int generic_open(file_object *obj, PVFS_credential *credentials, 
 	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
 static size_t generic_read(file_object *src, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
+	int64_t offset, size_t count, PVFS_credential *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials);
+	int64_t offset, size_t count, PVFS_credential *credentials);
 static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials);
+                           PVFS_credential *credentials);
 static void make_attribs(PVFS_sys_attr *attr,
-                         PVFS_credentials *credentials, 
+                         PVFS_credential *credentials, 
                          int nr_datafiles, int mode);
 
 static int convert_pvfs2_perms_to_mode(PVFS_permissions perms)
@@ -125,7 +125,7 @@ int main (int argc, char ** argv)
     file_object src, dest;
     void* buffer = NULL;
     int64_t ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)
@@ -148,7 +148,12 @@ int main (int argc, char ** argv)
     resolve_filename(&src,  user_opts->srcfile );
     resolve_filename(&dest, user_opts->destfile);
 
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);    
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential", ret);
+        goto main_out;
+    }
 
     ret = generic_open(&src, &credentials, 0, 0, NULL, OPEN_SRC);
     if (ret < 0)
@@ -320,7 +325,7 @@ static void print_timings( double time, int64_t total)
 /* read 'count' bytes from a (unix or pvfs2) file 'src', placing the result in
  * 'buffer' */
 static size_t generic_read(file_object *src, char *buffer, 
-	int64_t offset, size_t count, PVFS_credentials *credentials)
+	int64_t offset, size_t count, PVFS_credential *credentials)
 {
     PVFS_Request mem_req, file_req;
     PVFS_sysresp_io resp_io;
@@ -337,6 +342,7 @@ static size_t generic_read(file_object *src, char *buffer,
 	    fprintf(stderr, "Error: PVFS_Request_contiguous failure\n");
 	    return (ret);
 	}
+	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_read(src->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0)
@@ -352,7 +358,7 @@ static size_t generic_read(file_object *src, char *buffer,
 
 /* write 'count' bytes from 'buffer' into (unix or pvfs2) file 'dest' */
 static size_t generic_write(file_object *dest, char *buffer, 
-    int64_t offset, size_t count, PVFS_credentials *credentials)
+    int64_t offset, size_t count, PVFS_credential *credentials)
 {
     PVFS_Request mem_req, file_req;
     PVFS_sysresp_io resp_io;
@@ -369,6 +375,7 @@ static size_t generic_write(file_object *dest, char *buffer,
 	    PVFS_perror("PVFS_Request_contiguous", ret);
 	    return(ret);
 	}
+	PVFS_util_refresh_credential(credentials);
 	ret = PVFS_sys_write(dest->u.pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io, hints);
 	if (ret == 0) 
@@ -415,7 +422,7 @@ static int resolve_filename(file_object *obj, char *filename)
  *    new file with the basename of srcname in the specified directory 
  */
 
-static int generic_open(file_object *obj, PVFS_credentials *credentials,
+static int generic_open(file_object *obj, PVFS_credential *credentials,
                         int nr_datafiles, PVFS_size strip_size, 
                         char *srcname, int open_type)
 {
@@ -649,7 +656,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 }
 
 static int generic_cleanup(file_object *src, file_object *dest,
-                           PVFS_credentials *credentials)
+                           PVFS_credential *credentials)
 {
     /* preserve permissions doing a pvfs2 => unix copy */
     if ((src->fs_type == PVFS2_FILE) &&
@@ -684,11 +691,11 @@ static int generic_cleanup(file_object *src, file_object *dest,
     return 0;
 }
 
-void make_attribs(PVFS_sys_attr *attr, PVFS_credentials *credentials,
+void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
                   int nr_datafiles, int mode)
 {
-    attr->owner = credentials->uid; 
-    attr->group = credentials->gid;
+    attr->owner = credentials->userid; 
+    attr->group = credentials->group_array[0];
     attr->perms = PVFS_util_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     attr->dfile_count = nr_datafiles;

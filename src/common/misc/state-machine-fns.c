@@ -66,7 +66,13 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
          my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
          /* this will loop from TOS down to the base frame */
          /* base frame will not be processed */
+
+         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"[SM Terminating Child]: my_frame:%p\n",my_frame);
+#ifdef WIN32
+         qlist_for_each_entry(f, &smcb->parent_smcb->frames, link, struct PINT_frame_s)
+#else
          qlist_for_each_entry(f, &smcb->parent_smcb->frames, link)
+#endif
          {
              if(my_frame == f->frame)
              {
@@ -75,6 +81,8 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
              }
          }
 
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"[SM Terminating Child]: children_running:%d\n"
+                                               ,smcb->parent_smcb->children_running);
         if (--smcb->parent_smcb->children_running <= 0)
         {
             /* no more child state machines running, so we can
@@ -82,11 +90,15 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
              */
             job_null(0, smcb->parent_smcb, 0, r, &id, smcb->context);
         }
-        return SM_ACTION_DEFERRED;
     }
+
     /* call state machine completion function */
     if (smcb->terminate_fn)
     {
+        if (smcb->parent_smcb)
+        {
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"[SM Terminating Child]: calling terminate function.\n");
+        }   
         (*smcb->terminate_fn)(smcb, r);
     }
     return 0;
@@ -544,13 +556,31 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 {
     struct PINT_frame_s *frame_entry, *tmp;
     assert(smcb);
+
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"PINT_smcb_free: smcb:%p\n",smcb);
+
+#ifdef WIN32
+    qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link, struct PINT_frame_s, struct PINT_frame_s)
+#else
     qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link)
+#endif
     {
+        if (frame_entry->frame)
+        {
+           gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"PINT_smcb_free: frame:%p \ttask-id:%d\n"
+                                                  ,frame_entry->frame
+                                                  ,frame_entry->task_id);
+        }
+        else
+        {
+           gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"PINT_smcb_free: NO FRAME ENTRIES.\n");
+        }
+
         if (frame_entry->frame && frame_entry->task_id == 0)
         {
             /* only free if task_id is 0 */
             free(frame_entry->frame);
-        }
+        } 
         qlist_del(&frame_entry->link);
         free(frame_entry);
     }
@@ -738,6 +768,8 @@ static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb, int task_id
 
 static int child_sm_frame_terminate(struct PINT_smcb * smcb, job_status_s * js_p)
 {
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"CHILD TERMINATE: smcb:%p.\n",smcb);
+
     PINT_smcb_free(smcb);
     return 0;
 }
@@ -771,7 +803,11 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      * the first one immediately completes it will mistakenly believe it is
      * the last one and signal the parent.
      */
+#ifdef WIN32
+    qlist_for_each_entry(f, &smcb->frames, link, struct PINT_frame_s)
+#else
     qlist_for_each_entry(f, &smcb->frames, link)
+#endif
     {
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)
@@ -787,8 +823,11 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
      * complete before we leave this function.
      */
     *children_started = smcb->children_running;
-
+#ifdef WIN32
+    qlist_for_each_entry(f, &smcb->frames, link, struct PINT_frame_s)
+#else
     qlist_for_each_entry(f, &smcb->frames, link)
+#endif
     {
         /* run from TOS until the parent frame */
         if(f->frame == my_frame)
@@ -802,8 +841,21 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb, int* children_sta
         new_sm->parent_smcb = smcb;
         /* assign frame */
         PINT_sm_push_frame(new_sm, f->task_id, f->frame);
+
         /* locate SM to run */
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"START CHILD FRAMES: calling smcb is %p.\n",smcb);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"START CHILD FRAMES: with frame: %p.\n",f->frame);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"START CHILD FRAMES: and task id: %d.\n",f->task_id);
         new_sm->current_state = PINT_sm_task_map(smcb, f->task_id);
+
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"START CHILD FRAMES: new_sm->current_state is %s\n:"
+                                    ,(new_sm->current_state)?"VALID":"INVALID");
+        if (new_sm->current_state)
+        {
+            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,"START CHILD FRAMES: new_sm->current_state->flag is %d\n"
+                                        ,new_sm->current_state->flag);
+        }
+
         /* invoke SM */
         retval = PINT_state_machine_start(new_sm, &r);
         if(retval < 0)

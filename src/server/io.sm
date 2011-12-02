@@ -92,6 +92,7 @@ machine pvfs2_io_sm
 static int io_send_ack(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_send_ack (io.sm)....\n");
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int err = -PVFS_EIO;
     job_id_t tmp_id;
@@ -103,6 +104,9 @@ static int io_send_ack(
      */
     s_op->resp.status = js_p->error_code;
     s_op->resp.u.io.bstream_size = s_op->ds_attr.u.datafile.b_size;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbstream_size:%d\n"
+                                    ,(int)s_op->resp.u.io.bstream_size);
 
     err = PINT_encode(&s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
                       s_op->addr, s_op->decoded.enc_type);
@@ -235,9 +239,14 @@ static PINT_sm_action io_start_flow(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG,"\tabout to issue job_flow...\n");
     err = job_flow(s_op->u.io.flow_d, smcb, 0, js_p, &tmp_id,
                    server_job_context, user_opts->server_job_flow_timeout
                    , s_op->req->hints);
+
+    gossip_debug(GOSSIP_IO_DEBUG,"\treturn code from job_flow "
+                                 "submission:%d\n"
+                                ,err);
 
     return err;
 }
@@ -338,7 +347,9 @@ static PINT_sm_action io_send_completion_ack(
     int err = -PVFS_EIO;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-        
+    
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_send_completion_ack.\n");
+    
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */
@@ -374,6 +385,8 @@ static PINT_sm_action io_send_completion_ack(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_debug(GOSSIP_IO_DEBUG,"\ts_op->tag:%d\n",s_op->tag);
+
     err = job_bmi_send_list(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
@@ -381,7 +394,37 @@ static PINT_sm_action io_send_completion_ack(
         server_job_context, user_opts->server_job_bmi_timeout,
         s_op->req->hints);
 
+    gossip_debug(GOSSIP_IO_DEBUG,"return code from sending ack:%d\n"
+                                ,err);
+
     return err;
+}
+
+static int perm_io(PINT_server_op *s_op)
+{
+    int ret = -PVFS_EINVAL;
+    int mask = 0;
+    enum PVFS_io_type type = s_op->req->u.io.io_type;
+
+    if (type == PVFS_IO_READ)
+    {
+        mask = PINT_CAP_READ;
+    }
+    else if (type == PVFS_IO_WRITE)
+    {
+        mask = PINT_CAP_WRITE;
+    }
+
+    if (s_op->req->capability.op_mask & mask)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
 }
 
 static enum PINT_server_req_access_type PINT_server_req_access_io(
@@ -399,7 +442,7 @@ PINT_GET_OBJECT_REF_DEFINE(io);
 struct PINT_server_req_params pvfs2_io_params =
 {
     .string_name = "io",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_io,
     .access_type = PINT_server_req_access_io,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_io,

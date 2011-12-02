@@ -11,7 +11,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef WIN32
+#include "wincommon.h"
+#else
 #include <sys/time.h>
+#endif
 #include <errno.h>
 #include <assert.h>
 
@@ -31,6 +35,7 @@
 int PINT_server_get_config(
     struct server_configuration_s *config,
     struct PVFS_sys_mntent* mntent_p,
+    const PVFS_credential *credential,
     PVFS_hint hints);
 
 struct server_configuration_s *PINT_get_server_config_struct(
@@ -41,8 +46,11 @@ void PINT_put_server_config_struct(
 int PINT_lookup_parent(
     char *filename,
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle * handle);
+
+int PINT_client_security_initialize(void);
+int PINT_client_security_finalize(void);
 
 /*
  * Local variables:

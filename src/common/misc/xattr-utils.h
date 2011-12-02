@@ -17,6 +17,10 @@
 #include <attr/xattr.h>
 #endif
 
+#ifdef WIN32
+typedef size_t ssize_t;
+#endif
+
 #ifndef HAVE_FGETXATTR_PROTOTYPE
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
 /* prototype taken from fgetxattr(2) on Fedora FC4 */

@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     if (argc != 2)
     {
@@ -61,12 +61,12 @@ int main(int argc, char **argv)
     printf("File to be created is %s\n",str_buf);
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 

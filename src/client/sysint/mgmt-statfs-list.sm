@@ -2,7 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * Changes by Acxiom Corporation to add support for nonblocking statfs
- * Copyright © Acxiom Corporation, 2006.
+ * Copyright Acxiom Corporation, 2006.
  *
  * See COPYING in top-level directory.
  */
@@ -25,6 +25,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -76,7 +77,7 @@ machine pvfs2_client_mgmt_statfs_list_sm
  */
 PVFS_error PVFS_imgmt_statfs_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_server_stat *stat_array,
     PVFS_BMI_addr_t *addr_array,
     int count,
@@ -109,7 +110,7 @@ PVFS_error PVFS_imgmt_statfs_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.statfs_list.fs_id = fs_id;
     sm_p->u.statfs_list.stat_array = stat_array;
     sm_p->u.statfs_list.count = count;
@@ -135,7 +136,7 @@ PVFS_error PVFS_imgmt_statfs_list(
  */
 PVFS_error PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     struct PVFS_mgmt_server_stat *stat_array,
     PVFS_BMI_addr_t *addr_array,
     int count,
@@ -148,7 +149,7 @@ PVFS_error PVFS_mgmt_statfs_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_statfs_list entered\n");
 
     ret = PVFS_imgmt_statfs_list(
-        fs_id, credentials, stat_array, addr_array, count,
+        fs_id, credential, stat_array, addr_array, count,
         details, &op_id, hints, NULL);
 
     if (ret)
@@ -179,17 +180,20 @@ static PINT_sm_action mgmt_statfs_list_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
 
     js_p->error_code = 0;
 
+    PINT_null_capability(&capability);
+
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
 	PINT_SERVREQ_STATFS_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            capability,
             sm_p->u.statfs_list.fs_id,
             sm_p->hints);
 
@@ -276,7 +280,7 @@ static int statfs_list_comp_fn(void *v_p,
             resp_stat->handles_total_count;
 
 	sm_stat->bmi_address = PVFS_mgmt_map_addr(
-            sm_p->u.statfs_list.fs_id, sm_p->cred_p,
+            sm_p->u.statfs_list.fs_id,
             sm_p->msgarray_op.msgarray[i].svr_addr, &sm_stat->server_type);
 	assert(sm_stat->bmi_address);
 

@@ -405,6 +405,11 @@ static void registration_init(void* params)
             PVFS_varstrip_params, strips);
 }
 
+static void unregister(void)
+{
+    PINT_dist_unregister_param(PVFS_DIST_VARSTRIP_NAME, "strips");
+}
+
 static char *params_string(void *params)
 {
     PVFS_varstrip_params* dparam = (PVFS_varstrip_params*)params;
@@ -412,7 +417,7 @@ static char *params_string(void *params)
     return strdup(dparam->strips);
 }
 
-static PVFS_size get_blksize(void* params)
+static PVFS_size get_blksize(void* params, int dfile_count)
 {
     PVFS_varstrip_params* varstrip_params = (PVFS_varstrip_params*)params;
     PINT_dist_strips *strips;
@@ -425,7 +430,7 @@ static PVFS_size get_blksize(void* params)
         return -1;
     }
  
-    /* report the first trip size in the set as the block size */
+    /* report the first strip size in the set as the block size */
     blksize = strips[0].size;
 
     PINT_dist_strips_free_mem(&strips);
@@ -447,9 +452,19 @@ static PINT_dist_methods varstrip_methods = {
     encode_params,
     decode_params,
     registration_init,
+    unregister,
     params_string
 };
 
+#ifdef WIN32
+PINT_dist varstrip_dist = {
+    PVFS_DIST_VARSTRIP_NAME,
+    roundup8(PVFS_DIST_VARSTRIP_NAME_SIZE), /* name size */
+    roundup8(sizeof(PVFS_varstrip_params)), /* param size */
+    &varstrip_params,
+    &varstrip_methods
+};
+#else
 PINT_dist varstrip_dist = {
     .dist_name = PVFS_DIST_VARSTRIP_NAME,
     .name_size = roundup8(PVFS_DIST_VARSTRIP_NAME_SIZE), /* name size */
@@ -457,6 +472,7 @@ PINT_dist varstrip_dist = {
     .params = &varstrip_params,
     .methods = &varstrip_methods
 };
+#endif
 
 /*
  * Local variables:

@@ -29,7 +29,12 @@
  * null-terminated array of struct xattr_handler (one for each prefix) and
  * hang a pointer to it off of the s_xattr field of the superblock.
  */
-struct xattr_handler *pvfs2_xattr_handlers[] = {
+#ifdef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+const struct xattr_handler *pvfs2_xattr_handlers[] = 
+#else
+struct xattr_handler *pvfs2_xattr_handlers[] = 
+#endif
+{
     /*
      * ACL xattrs have special prefixes that I am handling separately
      * so that we get control when the acl's are set or listed or queried!

@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 #include "pint-util.h"
+#include "pint-security.h"
 
 enum
 {
@@ -229,6 +230,40 @@ static PINT_sm_action setattr_verify_attribs(
 
         js_p->error_code = -PVFS_EACCES;
     }
+
+    /* verify that the user has permission to change the file's owner */
+    if (req_a_p->mask & PVFS_ATTR_COMMON_UID)
+    {
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN) &&
+            (s_op->req->u.setattr.credential.userid != req_a_p->owner))
+        {
+            js_p->error_code = -PVFS_EPERM;
+        }
+    }
+
+    /* verify that the user has permission to change the file's group */
+    if (req_a_p->mask & PVFS_ATTR_COMMON_GID)
+    {
+        PVFS_credential *cred = &s_op->req->u.setattr.credential;
+        int i;
+
+        if (!(s_op->req->capability.op_mask & PINT_CAP_ADMIN))
+        {
+            for (i = 0; i < cred->num_groups; i++)
+            {
+                if (cred->group_array[i] == req_a_p->group)
+                {
+                    break;
+                }
+            }
+            /* no group matches */
+            if (i >= cred->num_groups)
+            {
+                js_p->error_code = -PVFS_EPERM;
+            }
+        }
+    }
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -488,15 +523,33 @@ static PINT_sm_action setattr_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_setattr(PINT_server_op *s_op)
+{
+    int ret;
+
+    if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 PINT_GET_OBJECT_REF_DEFINE(setattr);
+PINT_GET_CREDENTIAL_DEFINE(setattr);
 
 struct PINT_server_req_params pvfs2_set_attr_params =
 {
     .string_name = "setattr",
-    .perm = PINT_SERVER_CHECK_ATTR,
+    .perm = perm_setattr,
     .access_type = PINT_server_req_modify,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_setattr,
+    .get_credential = PINT_get_credential_setattr,
     .state_machine = &pvfs2_set_attr_sm
 };
 

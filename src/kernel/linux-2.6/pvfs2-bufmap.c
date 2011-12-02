@@ -29,11 +29,19 @@ static struct page **bufmap_page_array = NULL;
 
 /* array to track usage of buffer descriptors */
 static int *buffer_index_array = NULL;
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
+#else
+static DEFINE_SPINLOCK(buffer_index_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 /* array to track usage of buffer descriptors for readdir/readdirplus */
 static int readdir_index_array[PVFS2_READDIR_DEFAULT_DESC_COUNT] = {0};
+#ifdef HAVE_SPIN_LOCK_UNLOCKED
 static spinlock_t readdir_index_lock = SPIN_LOCK_UNLOCKED;
+#else
+static DEFINE_SPINLOCK(readdir_index_lock);
+#endif /* HAVE_SPIN_LOCK_UNLOCKED */
 
 static struct pvfs_bufmap_desc *desc_array = NULL;
 
@@ -215,6 +223,9 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
       setting PageReserved in 2.6.x seems to cause more trouble than
       it's worth.  in 2.4.x, marking the pages does what's expected
       and doesn't try to swap out our pages
+
+      since setting the page as reserved has problems in 2.6 these pages
+      need to be mlock() in the user space side 
     */
     for(i = 0; i < bufmap_page_count; i++)
     {
@@ -312,7 +323,7 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
     {
         set_current_state(TASK_INTERRUPTIBLE);
 
-        /* check for available desc */
+        /* check for available desc, slot_lock is the appropriate index_lock */
         spin_lock(slargs->slot_lock);
         for(i = 0; i < slargs->slot_count; i++)
         {
@@ -340,7 +351,8 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
                          slot_timeout_secs);
             if (!schedule_timeout(timeout))
             {
-                gossip_debug(GOSSIP_BUFMAP_DEBUG, "*** wait_for_a_slot timed out\n");
+                gossip_debug(GOSSIP_BUFMAP_DEBUG, 
+                             "*** wait_for_a_slot timed out\n");
                 ret = -ETIMEDOUT;
                 break;
             }
@@ -349,7 +361,8 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
             continue;
         }
 
-        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2: wait_for_a_slot() interrupted.\n");
+        gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2: %s interrupted.\n",
+                     __func__);
         ret = -EINTR;
         break;
     }
@@ -362,12 +375,15 @@ static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
 
 static void put_back_slot(struct slot_args *slargs, int buffer_index)
 {
+
+    /* slot_lock is the appropriate index_lock */ 
+    spin_lock(slargs->slot_lock);
     if (buffer_index < 0 || buffer_index >= slargs->slot_count)
     {
+        spin_unlock(slargs->slot_lock);
         return;
     }
    /* put the desc back on the queue */
-    spin_lock(slargs->slot_lock);
     slargs->slot_array[buffer_index] = 0;
     spin_unlock(slargs->slot_lock);
 
@@ -483,7 +499,6 @@ void readdir_index_put(int buffer_index)
         return;
     }
 
-
     slargs.slot_count = PVFS2_READDIR_DEFAULT_DESC_COUNT;
     slargs.slot_array = readdir_index_array;
     slargs.slot_lock  = &readdir_index_lock;
@@ -528,6 +543,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, size_t size)
 
         from_kaddr = pvfs2_kmap(from->page_array[from_page_index]);
         ret = copy_to_user(to_kaddr, from_kaddr, cur_copy_size);
+        /* not marking dirty, mapped page isn't changed */
         pvfs2_kunmap(from->page_array[from_page_index]);
 
         if (ret)
@@ -633,6 +649,9 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void __user *from, size_t size)
             gossip_debug(GOSSIP_BUFMAP_DEBUG, "First character (integer value) in pvfs_bufmap_copy_from_user: %d\n", tmp_int);
         }
 
+        if( !PageReserved(to->page_array[to_page_index]) )
+            SetPageDirty(to->page_array[to_page_index]);
+
         pvfs2_kunmap(to->page_array[to_page_index]);
 
         if (ret)
@@ -719,6 +738,11 @@ int pvfs_bufmap_copy_to_pages(int buffer_index,
         if (cur_copy_size < PAGE_SIZE) {
             memset(to_kaddr + cur_copy_size, 0, PAGE_SIZE - cur_copy_size);
         }
+        if( !PageReserved(page) )
+            SetPageDirty(page);
+        if( !PageReserved(from->page_array[from_page_index]) )
+            SetPageDirty(from->page_array[from_page_index]);
+
         pvfs2_kunmap(page);
         pvfs2_kunmap(from->page_array[from_page_index]);
 
@@ -790,6 +814,12 @@ int pvfs_bufmap_copy_from_pages(int buffer_index,
                      to_kaddr, from_kaddr, cur_copy_size);
 #endif
         memcpy(to_kaddr, from_kaddr, cur_copy_size);
+
+        if( !PageReserved(to->page_array[to_page_index]) )
+            SetPageDirty(to->page_array[to_page_index]);
+        if( !PageReserved(page) )
+            SetPageDirty(page);
+
         pvfs2_kunmap(page);
         pvfs2_kunmap(to->page_array[to_page_index]);
         amt_copied += cur_copy_size;
@@ -904,6 +934,9 @@ int pvfs_bufmap_copy_iovec_from_user(
         }
         to_kaddr = pvfs2_kmap(to->page_array[to_page_index]);
         ret = copy_from_user(to_kaddr + to_page_offset, from_addr, cur_copy_size);
+        if( !PageReserved(to->page_array[to_page_index]) )
+            SetPageDirty(to->page_array[to_page_index]);
+
         if (!tmp_printer)
         {
             tmp_printer = (char*)(to_kaddr + to_page_offset);
@@ -1043,6 +1076,8 @@ int pvfs_bufmap_copy_iovec_from_kernel(
         }
         to_kaddr = pvfs2_kmap(to->page_array[to_page_index]);
         memcpy(to_kaddr + to_page_offset, from_kaddr, cur_copy_size);
+        if( !PageReserved(to->page_array[to_page_index]) )
+            SetPageDirty(to->page_array[to_page_index]);
         pvfs2_kunmap(to->page_array[to_page_index]);
 #if 0
         gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs2_bufmap_copy_iovec_from_kernel: copying from kernel %p to kernel %p %zd bytes (to_kddr: %p,page_offset: %d)\n",
@@ -1353,7 +1388,7 @@ size_t pvfs_bufmap_copy_to_user_task_iovec(
     struct mm_struct *mm = NULL;
     struct vm_area_struct *vma = NULL;
     struct page *page = NULL;
-    unsigned long to_addr = 0;
+    unsigned long to_addr = 0, copy_amt = 0;
     void *maddr = NULL;
     unsigned int to_offset = 0;
     unsigned int seg, from_page_offset = 0;
@@ -1447,17 +1482,20 @@ size_t pvfs_bufmap_copy_to_user_task_iovec(
         ret = get_user_pages(tsk, mm, to_addr, 
                 1,/* count */
                 1,/* write */
-                1,/* force */
+                0,/* force */
                 &page, &vma);
         if (ret <= 0)
             break;
         to_offset = to_addr & (PAGE_SIZE - 1);
         maddr = pvfs2_kmap(page);
         from_kaddr = pvfs2_kmap(from->page_array[from_page_index]);
-        copy_to_user_page(vma, page, to_addr,
-             maddr + to_offset /* dst */, 
-             from_kaddr + from_page_offset, /* src */
-             cur_copy_size /* len */);
+        /* FIX */
+        copy_amt = copy_to_user(maddr + to_offset, from_kaddr, cur_copy_size );
+        if( copy_amt != 0 )
+        {
+            gossip_err("%s: failure in copy_to_user, %lu could not be copied\n",
+                       __func__, copy_amt);
+        }
         set_page_dirty_lock(page);
         pvfs2_kunmap(from->page_array[from_page_index]);
         pvfs2_kunmap(page);

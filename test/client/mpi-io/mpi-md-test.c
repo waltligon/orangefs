@@ -12,7 +12,7 @@
  * open/create/resize, it is sometimes instructive to compare with independent
  * access
  *
- * usage:  -d /path/to/directory -n number_of_files [-O] [-R] [-i]
+ * usage:  -d /path/to/directory -n number_of_files [-O] [-R] [-D] [-i]
  */
 
 #include <string.h>
@@ -142,6 +142,7 @@ int opt_nfiles;
 char opt_basedir[PATH_MAX];
 int opt_do_open=0;
 int opt_do_resize=0;
+int opt_do_delete=0;
 int opt_do_indep=0;
 
 void usage(char *name);
@@ -149,14 +150,16 @@ int parse_args(int argc, char **argv);
 void handle_error(int errcode, char *str);
 int test_opens(int nfiles, char * test_dir, MPI_Info info);
 int test_resize(int rank, int iterations, char * test_dir, MPI_Info info);
+int test_delete(int rank, int size, int nfiles, char * test_dir, MPI_Info info);
 
 void usage(char *name)
 {
 	fprintf(stderr, "usage: %s -d /path/to/directory -n #_of_files [TEST] [MODE]\n", name);
 	fprintf(stderr, "   where TEST is one of:\n"
-			"     -O       test file open times\n"
+			"     -O       test file open times (if files do not exist tests file creation times)\n"
 			"     -R       test file resize times\n"
-			"   and MODE is one of:\n"
+			"     -D       test file deletion times\n"
+			"   and MODE is one of (applies to -O and -R only):\n"
 			"     -i       independent operations\n"
 			"     -c       collective operations (default)\n");
 
@@ -165,7 +168,7 @@ void usage(char *name)
 int parse_args(int argc, char **argv)
 {
 	int c;
-	while ( (c = getopt(argc, argv, "d:n:ORic")) != -1 ) {
+	while ( (c = getopt(argc, argv, "d:n:ORDic")) != -1 ) {
 		switch (c) {
 			case 'd':
 				strncpy(opt_basedir, optarg, PATH_MAX);
@@ -179,6 +182,9 @@ int parse_args(int argc, char **argv)
 			case 'R':
 				opt_do_resize = 1;
 				break;
+			case 'D':
+				opt_do_delete = 1;
+				break;
 			case 'i':
 				opt_do_indep = 1;
 				break;
@@ -188,7 +194,7 @@ int parse_args(int argc, char **argv)
 				usage(argv[0]);
 		}
 	}
-	if ( (opt_do_open == 0) && (opt_do_resize == 0) ) {
+	if ( (opt_do_open == 0) && (opt_do_resize == 0) && (opt_do_delete == 0)) {
 		usage(argv[0]);
 	}
 	return 0;
@@ -225,6 +231,8 @@ int main(int argc, char **argv)
 		test_opens(opt_nfiles, opt_basedir, info);
 	else if (opt_do_resize)
 		test_resize(rank, opt_nfiles, opt_basedir, info);
+	else if (opt_do_delete)
+		test_delete(rank, nprocs, opt_nfiles, opt_basedir, info);
 
 	test_end = MPI_Wtime();
 	test_time = test_end - test_start;
@@ -244,6 +252,10 @@ int main(int argc, char **argv)
 				total_time, opt_nfiles, 
 				(total_time)/opt_nfiles,
 				(opt_do_indep? "independent" : "collective"));
+		} else if (opt_do_delete) {
+			printf("%f seconds to perform %d delete ops: %f secs/operation\n",
+				total_time, opt_nfiles,
+				(total_time)/opt_nfiles);
 		}
 			
 	}
@@ -320,3 +332,42 @@ int test_resize(int rank, int iterations, char * test_dir, MPI_Info info)
 	}
 	return 0;
 }
+
+
+/*  in line with the above comments - but remove files after creation */
+/*  figured this might be useful at some point for others as well */
+int test_delete(int rank, int size, int nfiles, char * test_dir, MPI_Info info)
+{
+        int i;
+        char test_file[PATH_MAX];
+        int errcode;
+	int start_index;
+	int end_index;
+
+	if (rank == 0)
+		start_index = 0;	
+	else if (rank < nfiles % size)
+		start_index = rank * (nfiles / size + 1);
+	else
+		start_index = nfiles % size + rank * (nfiles / size);
+
+	if (rank == size - 1)
+		end_index = nfiles;
+	else if (rank < nfiles % size)
+		end_index = start_index + nfiles / size + 1;
+	else
+		end_index = start_index + nfiles / size;
+
+        for (i=start_index; i<end_index; i++) {
+                snprintf(test_file, PATH_MAX, "%s/testfile.%d", test_dir, i);
+                errcode = MPI_File_delete (test_file, info);
+
+                if (errcode != MPI_SUCCESS) {
+                        handle_error(errcode, "MPI_File_delete");
+                }
+
+        }
+        /* since handle_error aborts, if we got here we are a-ok */
+        return 0;
+}
+

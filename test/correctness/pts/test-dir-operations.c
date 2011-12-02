@@ -45,12 +45,12 @@ static int read_dirs(PVFS_object_ref refn,
                      int rank)
 {
     int i, iter, ret;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_readdir resp_readdir;
 
     memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     printf("Calling readdir with handle %lld and fsid %d\n",
            lld(refn.handle), refn.fs_id);

@@ -35,21 +35,25 @@ struct options
     int mnt_point_set;
     int verbose;
     int destructive;
+    int safety_check;
+    unsigned int safety_count;
 };
 struct options *fsck_opts = NULL;
 
 /* lost+found reference */
 PVFS_object_ref laf_ref;
+unsigned long int global_removals = 0;
 
 static void handlelist_remove_handle_no_idx(struct handlelist *hl,
 				     PVFS_handle handle);
+static void get_user_action_to_continue( void );
 
 int main(int argc, char **argv)
 {
     int ret = -1, in_admin_mode = 0;
     PVFS_fs_id cur_fs;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_credentials creds;
+    PVFS_credential creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array = NULL;
     struct handlelist *hl_all, *hl_unrefd, *hl_notree;
@@ -81,12 +85,17 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    PVFS_util_gen_credentials(&creds);
+    ret = PVFS_util_gen_credential_defaults(&creds);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     printf("# Current FSID is %u.\n", cur_fs);
 
     /* count how many servers we have */
-    ret = PVFS_mgmt_count_servers(cur_fs, &creds, 
+    ret = PVFS_mgmt_count_servers(cur_fs, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 	&server_count);
     if (ret != 0)
@@ -104,7 +113,6 @@ int main(int argc, char **argv)
 	return -1;
     }
     ret = PVFS_mgmt_get_server_array(cur_fs,
-				     &creds, 
 				     PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
 				     addr_array,
 				     &server_count);
@@ -183,6 +191,8 @@ int main(int argc, char **argv)
 
     handlelist_finalize(&hl_all);
 
+    PVFS_util_refresh_credential(&creds);
+
     param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
     param_value.u.value = PVFS_SERVER_NORMAL_MODE;
 
@@ -219,6 +229,8 @@ int main(int argc, char **argv)
     handlelist_finalize(&hl_unrefd);
 
  exit_now:
+    PVFS_util_refresh_credential(&creds);
+
     if (in_admin_mode) {
 
         param_value.type = PVFS_MGMT_PARAM_TYPE_UINT64;
@@ -245,7 +257,7 @@ int main(int argc, char **argv)
 struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
 				    PVFS_BMI_addr_t *addr_array,
 				    int server_count,
-				    PVFS_credentials *creds)
+				    PVFS_credential *creds)
 {
     int ret, i, more_flag;
     unsigned long j;
@@ -257,6 +269,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     struct PVFS_mgmt_server_stat *stat_array;
     struct handlelist *hl;
     struct PVFS_mgmt_setparam_value param_value;
+
+    PVFS_util_refresh_credential(creds);
 
     /* find out how many handles are in use on each */
     stat_array = (struct PVFS_mgmt_server_stat *)
@@ -362,6 +376,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -446,6 +462,8 @@ struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
     more_flag = 1;
     while (more_flag)
     {
+        PVFS_util_refresh_credential(creds);
+
 	ret = PVFS_mgmt_iterate_handles_list(cur_fs,
 					     creds,
 					     handle_matrix,
@@ -522,12 +540,14 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    struct handlelist *hl,
 			    PVFS_BMI_addr_t *addr_array,
 			    int server_count,
-			    PVFS_credentials *creds)
+			    PVFS_credential *creds)
 {
     int ret, server_idx = 0;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_object_ref pref;
+
+    PVFS_util_refresh_credential(creds);
 
     ret = PVFS_sys_lookup(cur_fs,
 			  "/",
@@ -566,7 +586,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 int match_dirdata(struct handlelist *hl,
 		  struct handlelist *alt_hl,
 		  PVFS_object_ref dir_ref,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret, idx;
     PVFS_handle dirdata_handle;
@@ -603,7 +623,7 @@ int descend(PVFS_fs_id cur_fs,
 	    struct handlelist *hl,
 	    struct handlelist *alt_hl,
 	    PVFS_object_ref dir_ref,
-	    PVFS_credentials *creds)
+	    PVFS_credential *creds)
 {
     int i, count;
     PVFS_ds_position token; 
@@ -786,7 +806,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 		     struct handlelist *alt_hl,
 		     PVFS_object_ref mf_ref,
 		     int df_count,
-		     PVFS_credentials *creds)
+		     PVFS_credential *creds)
 {
     int ret, i, server_idx = 0, error = 0;
     PVFS_handle *df_handles;
@@ -861,7 +881,7 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 				  struct handlelist *hl_all,
 				  PVFS_BMI_addr_t *addr_array,
-				  PVFS_credentials *creds)
+				  PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -882,6 +902,8 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -943,7 +965,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 				       struct handlelist *hl_all,
 				       PVFS_BMI_addr_t *addr_array,
-				       PVFS_credentials *creds)
+				       PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -963,6 +985,8 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1061,7 +1085,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 void cull_leftovers(PVFS_fs_id cur_fs,
 		    struct handlelist *hl_all,
 		    PVFS_BMI_addr_t *addr_array,
-		    PVFS_credentials *creds)
+		    PVFS_credential *creds)
 {
     int ret;
     int server_idx;
@@ -1074,6 +1098,8 @@ void cull_leftovers(PVFS_fs_id cur_fs,
     {
 	PVFS_object_ref handle_ref;
 	PVFS_sysresp_getattr getattr_resp;
+
+	PVFS_util_refresh_credential(creds);
 
 	handle_ref.handle = handle;
 	handle_ref.fs_id  = cur_fs;
@@ -1104,7 +1130,7 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 /********************************************/
 
 int create_lost_and_found(PVFS_fs_id cur_fs,
-			  PVFS_credentials *creds)
+			  PVFS_credential *creds)
 {
     int ret;
     PVFS_object_ref root_ref;
@@ -1123,9 +1149,8 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 	return 0;
     }
 
-    attr.owner = creds->uid;
-    attr.owner = creds->uid;
-    attr.group = creds->gid;
+    attr.owner = creds->userid;
+    attr.group = creds->group_array[0];
     attr.perms = PVFS_util_translate_mode(0755, 0);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
@@ -1161,7 +1186,7 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
 int create_dirent(PVFS_object_ref dir_ref,
 		  char *name,
 		  PVFS_handle handle,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret;
 
@@ -1190,7 +1215,7 @@ int create_dirent(PVFS_object_ref dir_ref,
 int remove_directory_entry(PVFS_object_ref dir_ref,
 			   PVFS_object_ref entry_ref,
 			   char *name,
-			   PVFS_credentials *creds)
+			   PVFS_credential *creds)
 {
     int ret;
 
@@ -1199,6 +1224,11 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 	   name,
 	   llu(entry_ref.handle),
 	   llu(dir_ref.handle));
+    if( (fsck_opts->safety_check) &&
+        (++global_removals >= fsck_opts->safety_count) )
+    {
+        get_user_action_to_continue( );
+    }
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_dirent(dir_ref,
@@ -1217,7 +1247,7 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 
 int remove_object(PVFS_object_ref obj_ref,
 		  PVFS_ds_type obj_type,
-		  PVFS_credentials *creds)
+		  PVFS_credential *creds)
 {
     int ret;
 
@@ -1225,6 +1255,12 @@ int remove_object(PVFS_object_ref obj_ref,
 	   fsck_opts->destructive ? "" : "not",
 	   get_type_str(obj_type),
 	   llu(obj_ref.handle));
+
+    if( (fsck_opts->safety_check) &&
+        (++global_removals >= fsck_opts->safety_count) )
+    {
+        get_user_action_to_continue( );
+    }
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_object(obj_ref,
@@ -1543,7 +1579,7 @@ static struct options *parse_args(int argc, char *argv[])
     memset(opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, "apynvVm:")) != EOF){
+    while((one_opt = getopt(argc, argv, "apyns:vVm:")) != EOF){
 	switch(one_opt)
         {
 	    case 'a':
@@ -1554,6 +1590,10 @@ static struct options *parse_args(int argc, char *argv[])
 	    case 'n':
 		opts->destructive = 0;
 		break;
+            case 's':
+                opts->safety_count = atoi(optarg);
+                opts->safety_check = 1;
+                break;
             case 'V':
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
@@ -1601,12 +1641,14 @@ static struct options *parse_args(int argc, char *argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-vV] [-m fs_mount_point]\n",
+    fprintf(stderr, "Usage  : %s [-vV] <-ayp -s N> [-m fs_mount_point]\n",
 	argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
     fprintf(stderr, "  -V              print version and exit\n");
     fprintf(stderr, "  -v              verbose operation\n");
     fprintf(stderr, "  -n              answer \"no\" to all questions\n");
+    fprintf(stderr, "  -s N            safety check, prompt after N removals, "
+                                       "use with a, p, or y\n");
     fprintf(stderr, "  -y              answer \"yes\" to all questions\n");
     fprintf(stderr, "  -p              automatically repair with no questions\n");
     fprintf(stderr, "  -a              equivalent to \"-p\"\n");
@@ -1647,6 +1689,52 @@ static char *get_type_str(int type)
             break;
     }
     return ret;
+}
+
+void get_user_action_to_continue( )
+{
+    int count = 0;
+    int reply_idx = 0; 
+    int read_c = 0;
+    char reply[3] = { 0 };
+
+    /* only cause the prompt if destructive actions are being taken */
+    if( fsck_opts->destructive )
+    {
+        fprintf(stdout, "%lu objects have been removed, ", global_removals);
+        do
+        {
+            memset(reply, 0, 3);
+            count = 0, reply_idx = 0;
+            fprintf(stdout, "continue removal [Y|N]: ");
+            do
+            {
+                read_c = getchar();
+                count++;
+                /* discard anything beyond the two chars we want */
+                if( (read_c != EOF) && (reply_idx < 2 ) )
+                {
+                    reply[reply_idx++] = (char)read_c;
+                }
+            }
+            while((read_c != EOF) && (read_c != '\n'));
+
+            if( (count == 2) && (strncasecmp("Y\n", reply, 2) == 0) )
+            {
+                fprintf(stdout, "resetting removal count, continuing\n");
+                global_removals = 0;
+                return;
+            }
+            else if( (count == 2) && (strncasecmp("N\n", reply, 2) == 0) )
+            {
+                fprintf(stdout, "aborting\n");
+                exit(1);
+            }
+        }
+        while( 1 ) ;
+    }
+
+    return;
 }
 
 /*

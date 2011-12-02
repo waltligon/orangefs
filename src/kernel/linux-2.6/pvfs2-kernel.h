@@ -23,6 +23,7 @@
 #ifdef HAVE_NOWARNINGS_WHEN_INCLUDING_LINUX_CONFIG_H
 #include <linux/config.h>
 #endif
+#include <linux/kernel.h>
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
@@ -41,7 +42,6 @@ typedef unsigned long sector_t;
 #endif
 
 #else /* !(PVFS2_LINUX_KERNEL_2_4) */
-
 #include <linux/moduleparam.h>
 #include <linux/vermagic.h>
 #include <linux/statfs.h>
@@ -54,7 +54,6 @@ typedef unsigned long sector_t;
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
-#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
@@ -93,7 +92,9 @@ typedef unsigned long sector_t;
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <asm/atomic.h>
+#ifdef HAVE_SMP_LOCK_H
 #include <linux/smp_lock.h>
+#endif
 #include <linux/wait.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
@@ -243,13 +244,8 @@ enum PVFS_async_io_type
 #define PVFS2_GFP_FLAGS (GFP_KERNEL)
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 
-#ifdef CONFIG_HIGHMEM
 #define pvfs2_kmap(page) kmap(page)
 #define pvfs2_kunmap(page) kunmap(page)
-#else
-#define pvfs2_kmap(page) page_address(page)
-#define pvfs2_kunmap(page) do {} while(0)
-#endif /* CONFIG_HIGHMEM */
 
 /* pvfs2 xattr and acl related defines */
 #ifdef HAVE_XATTR
@@ -275,7 +271,12 @@ enum PVFS_async_io_type
 extern int pvfs2_acl_chmod(struct inode *inode);
 extern int pvfs2_init_acl(struct inode *inode, struct inode *dir);
 
+#ifdef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+extern const struct xattr_handler *pvfs2_xattr_handlers[];
+#else
 extern struct xattr_handler *pvfs2_xattr_handlers[];
+#endif /* HAVE_CONST_S_XATTR_IN_SUPERBLOCK */
+
 extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_access_handler;
 extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
@@ -299,14 +300,63 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
     return internal_flag;
 }
 
-int pvfs2_xattr_set_trusted(struct inode *inode, 
-    const char *name, const void *buffer, size_t size, int flags);
-int pvfs2_xattr_get_trusted(struct inode *inode,
-    const char *name, void *buffer, size_t size);
-int pvfs2_xattr_set_default(struct inode *inode, 
-    const char *name, const void *buffer, size_t size, int flags);
-int pvfs2_xattr_get_default(struct inode *inode,
-    const char *name, void *buffer, size_t size);
+int pvfs2_xattr_set_trusted(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    struct dentry *dentry, 
+#else
+    struct inode *inode, 
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    const char *name, 
+    const void *buffer, 
+    size_t size, 
+    int flags
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    );
+
+int pvfs2_xattr_get_trusted(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    struct dentry *dentry,
+#else
+    struct inode *inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    const char *name, 
+    void *buffer, 
+    size_t size
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    );
+
+int pvfs2_xattr_set_default(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    struct dentry *dentry, 
+#else
+    struct inode *inode, 
+#endif /*HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    const char *name, 
+    const void *buffer, 
+    size_t size, 
+    int flags
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+    );
+
+int pvfs2_xattr_get_default(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    struct dentry *dentry,
+#else
+    struct inode *inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    const char *name, 
+    void *buffer, 
+    size_t size
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+    , int handler_flags
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+    );
 
 
 #endif
@@ -709,7 +759,7 @@ int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
 int wait_for_cancellation_downcall(
     pvfs2_kernel_op_t * op);
-void clean_up_interrupted_operation(
+void pvfs2_clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op);
 void purge_waiting_ops(void);
 
@@ -726,6 +776,11 @@ struct super_block* pvfs2_get_sb(
     void *data,
     int silent);
 #else
+#ifdef HAVE_FSTYPE_MOUNT_ONLY
+struct dentry *pvfs2_mount(
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data);
+#else
 #ifdef HAVE_VFSMOUNT_GETSB
 int pvfs2_get_sb(
     struct file_system_type *fst, int flags,
@@ -735,7 +790,8 @@ int pvfs2_get_sb(
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
-#endif
+#endif /* HAVE_VFSMOUNT_GETSB */
+#endif /* HAVE_FSTYPE_MOUNT_ONLY */
 #endif
 
 void pvfs2_read_inode(
@@ -811,8 +867,12 @@ struct inode *pvfs2_iget_common(
 #if defined(PVFS2_LINUX_KERNEL_2_4) || defined(HAVE_TWO_PARAM_PERMISSION)
 int pvfs2_permission(struct inode *, int);
 #else
-int pvfs2_permission(struct inode *inode, 
-					 int mask, struct nameidata *nd);
+int pvfs2_permission(struct inode *, int mask, 
+#ifdef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+                     unsigned int flags);
+#else
+                     struct nameidata *nd);
+#endif /* HAVE_THREE_PARAM_PERMISSION_WITH_FLAG */
 #endif
 
 /*****************************
@@ -844,8 +904,6 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
-int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 int pvfs2_flush_inode(struct inode *inode);
 
@@ -1295,6 +1353,15 @@ static inline void *kzalloc(size_t size, int flags)
 	}
 	return ptr;
 }
+#endif
+
+/* add in true/false enum for 2.6 kernels that don't have it (<2.6.9),
+ * taken include/linux/stddef.h */
+#ifndef HAVE_TRUE_FALSE_ENUM
+enum {
+    false   = 0,
+    true    = 1
+};
 #endif
 
 #endif /* __PVFS2KERNEL_H */

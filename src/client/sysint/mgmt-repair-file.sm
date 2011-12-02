@@ -143,7 +143,7 @@ PVFS_error PVFS_imgmt_repair_file(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle handle,  /*Pull in handle of dfile to create*/
     PVFS_sysresp_create *resp,
     PVFS_sys_op_id *op_id,
@@ -207,7 +207,7 @@ PVFS_error PVFS_imgmt_repair_file(
     memset(sm_p->u.create.datafile_handles, 0,sizeof(PVFS_handle));
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.object_name = object_name;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.datafile_handles[0] = handle; /*Assign handle pulled in here*/
@@ -254,7 +254,7 @@ PVFS_error PVFS_mgmt_repair_file(
     char *object_name,
     PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
-    PVFS_credentials *credentials,
+    PVFS_credential *credential,
     PVFS_handle handle, 
     PVFS_sysresp_create *resp)
 {
@@ -263,7 +263,7 @@ PVFS_error PVFS_mgmt_repair_file(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_repair_file entered\n");
 
-    ret = PVFS_imgmt_repair_file(object_name, parent_ref, attr, credentials,
+    ret = PVFS_imgmt_repair_file(object_name, parent_ref, attr, credential,
                                  handle, resp, &op_id, NULL);
     if (ret)
     {

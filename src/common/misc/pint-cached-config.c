@@ -8,10 +8,14 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <time.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -108,8 +112,11 @@ int PINT_cached_config_initialize(void)
     gettimeofday(&tv, NULL);
     seed += tv.tv_sec;
     seed += tv.tv_usec;
-
+#ifdef WIN32
+    seed += GetCurrentProcessId();
+#else
     seed += getpid();
+#endif
 
     ret = gethostname(hostname, HOST_NAME_MAX);
     if(ret == 0)
@@ -318,7 +325,7 @@ int PINT_cached_config_get_server(
         return(-PVFS_EINVAL);
     }
 
-    if(type != PINT_SERVER_TYPE_META && type != PINT_SERVER_TYPE_IO)
+    if((int)type != PINT_SERVER_TYPE_META && (int)type != PINT_SERVER_TYPE_IO)
     {
         return(-PVFS_EINVAL);
     }
@@ -335,7 +342,7 @@ int PINT_cached_config_get_server(
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
-    if(type == PINT_SERVER_TYPE_META)
+    if((int)type == PINT_SERVER_TYPE_META)
     {
         server_cursor = 
             cur_config_cache->fs->meta_handle_ranges;
@@ -459,7 +466,7 @@ static int PINT_cached_config_get_extents(
     PVFS_BMI_addr_t tmp_addr;
     struct config_fs_cache_s *cur_config_cache = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
-    int num_io_servers, ret;
+    int ret;
 
     hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
     if(!hash_link)
@@ -475,7 +482,6 @@ static int PINT_cached_config_get_extents(
     assert(cur_config_cache->fs);
 
     server_list = cur_config_cache->fs->data_handle_ranges;
-    num_io_servers = PINT_llist_count(server_list);
 
     while(!PINT_llist_empty(server_list))
     {
@@ -1057,6 +1063,7 @@ int PINT_cached_config_map_to_server(
     }
 
     *server_addr = tmp_entry->server_addr;
+
     return(0);
 }
 
@@ -1064,7 +1071,7 @@ int PINT_cached_config_map_to_server(
  *
  * Returns 0 if the number of dfiles has been successfully set
  *
- * Sets the number of dfiles to a distribution approved the value.  Clients
+ * Sets the number of dfiles to a distribution approved value.  Clients
  * may pass in num_dfiles_requested as a hint, if no hint is given, the server
  * configuration is checked to find a hint there.  The distribution will
  * choose a correct number of dfiles even if no hint is set.
@@ -1113,6 +1120,16 @@ int PINT_cached_config_get_num_dfiles(
     {
         gossip_err("Error: distribution failure for %d servers and %d requested datafiles.\n", num_io_servers, num_dfiles_requested);
         return(-PVFS_EINVAL);
+    }
+ 
+    if (*num_dfiles > num_io_servers)
+    {
+        gossip_err("%s: Distribution requires more datafiles(%d) than I/O servers(%d) currently defined in the system. Capping "
+                   "number of datafiles to the number of I/O servers.\n"
+                   ,__func__
+                   ,*num_dfiles
+                   ,num_io_servers);
+        *num_dfiles = num_io_servers;
     }
 
     return 0;
@@ -1785,6 +1802,52 @@ static int load_handle_lookup_table(
         handle_lookup_entry_compare);
 
     return(0);
+}
+
+/* PINT_cached_config_server_names()
+ *
+ * Returns a list of pointers to the IO server names currently running in this   
+ * file system.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_cached_config_io_server_names( char ***list
+                                      , int *size
+                                      , PVFS_fs_id fsid)
+{
+    int i;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    assert(PINT_fsid_config_cache_table);
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if(!hash_link)
+    {
+        return(-PVFS_ENOENT);
+    }
+
+    cur_config_cache = qlist_entry(
+        hash_link, struct config_fs_cache_s, hash_link);
+
+    assert(cur_config_cache);
+
+    *size = cur_config_cache->io_server_count;
+
+    *list = malloc(sizeof(char *) * (*size));
+
+    if (! (*list) )
+       return(-PVFS_ENOMEM);
+
+    memset(*list,0,sizeof(char *) * (*size));
+
+    for (i=0; i<(*size); i++)
+    {
+        /*addr_string originates from the alias mapping->bmi_address*/
+        (*list)[i] = cur_config_cache->io_server_array[i].addr_string;
+    }
+
+   return(0);
 }
 
 /*

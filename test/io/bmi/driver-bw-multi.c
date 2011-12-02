@@ -6,7 +6,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include "gossip.h"
 #include <mpi.h>
@@ -483,7 +485,7 @@ static int bmi_server_postall(
 
 	    ret = BMI_post_recv(&(ids[j][i]), addr_array[j], recv_buffer,
 				bmi_buf_array[0].size, &actual_size,
-				buffer_type, 0, NULL, context);
+				buffer_type, 0, NULL, context, NULL);
 	    if (ret < 0)
 	    {
 		fprintf(stderr, "Server: BMI recv error.\n");
@@ -665,7 +667,7 @@ static int bmi_client_postall(
 
 	    ret = BMI_post_send(&(ids[j][i]), addr_array[j], send_buffer,
 				bmi_buf_array[0].size, buffer_type, 0, NULL,
-				context);
+				context, NULL);
 	    if (ret < 0)
 	    {
 		fprintf(stderr, "Client: BMI send error.\n");

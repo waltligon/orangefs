@@ -13,6 +13,7 @@
 
 #include "server-config.h"
 #include "pvfs2-server.h"
+#include "pint-security.h"
 
 %%
 
@@ -104,10 +105,19 @@ static PINT_sm_action getconfig_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
+static int perm_getconfig(PINT_server_op *s_op)
+{
+    int ret;
+
+    ret = 0;
+
+    return ret;
+}
+
 struct PINT_server_req_params pvfs2_get_config_params =
 {
     .string_name = "getconfig",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_getconfig,
     .state_machine = &pvfs2_get_config_sm
 };
 

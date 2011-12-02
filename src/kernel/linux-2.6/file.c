@@ -33,6 +33,11 @@ static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
 
+static ssize_t wait_for_cached_io(struct rw_options *old_rw, 
+                                  struct iovec *vec, 
+                                  int nr_segs, 
+                                  size_t total_size) __attribute__((unused));
+
 static ssize_t wait_for_direct_io(struct rw_options *rw,
                                   struct iovec *vec,
                                   unsigned long  nr_segs,
@@ -506,7 +511,7 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
           {
               gossip_err(
                     "%s: error in %s handle %llu, "
-                    "FILE: %s\n  -- returning %ld\n",
+                    "FILE: %s, returning %ld\n",
                     rw->fnstr, 
                     rw->type == IO_READV ? "vectored read from" : "vectored write to",
                     llu(get_handle_from_ino(rw->inode)),
@@ -1142,7 +1147,7 @@ out:
  * Returns the actual size of completed I/O.
  */
 static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec, 
-        int nr_segs, size_t total_size)
+        int nr_segs, size_t total_size) 
 {
     ssize_t err = 0, total_actual_io = 0;
     ssize_t ret = 0;
@@ -1176,7 +1181,7 @@ static ssize_t wait_for_cached_io(struct rw_options *old_rw, struct iovec *vec,
         goto cleanup;
     }
     /* return value is basically file size minus current file offset */
-    /* total_actual_io = isize - offset; */
+    //total_actual_io = isize - offset;
 
     /* number of bytes to retrieve from the pagecache should be based on
      * the number of bytes returned from wait_for_missing_io, which executes
@@ -1376,18 +1381,22 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 #ifndef PVFS2_LINUX_KERNEL_2_4
+        /* caching is not working properly. removing functionality for now.  Becky Ligon. */
+        /* caching REQUIRES the user's buffer to be a multiple of 4096; the code breaks if */
+        /* it is not!                                                                      */
+
         /* if a file is immutable, stage its I/O 
          * through the cache */
-        if (IS_IMMUTABLE(rw->inode)) {
+        //if (IS_IMMUTABLE(rw->inode)) {
             /* Stage the I/O through the kernel's pagecache */
-            ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
-        }
-        else 
+        //    ret = wait_for_cached_io(rw, ptr, seg_array[seg], each_count);
+        //}
+        //else 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
-        {
+        //{
             /* push the I/O directly through to storage */
-            ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
-        }
+     ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
+        //}
         if (ret < 0)
         {
             goto out;
@@ -1478,6 +1487,11 @@ ssize_t pvfs2_file_read(
     struct rw_options rw;
     struct iovec vec;
 
+    gossip_debug(GOSSIP_IO_DEBUG,"pvfs2_file_read: count=%zd \toffset=%lld\n"
+               ,count
+               ,(long long)*offset);
+
+
     memset(&rw, 0, sizeof(rw));
     rw.async = 0;
     rw.type = IO_READ;
@@ -1485,7 +1499,7 @@ ssize_t pvfs2_file_read(
     rw.copy_to_user_addresses = 1;
     rw.fnstr = __FUNCTION__;
     vec.iov_base = buf;
-    vec.iov_len  = count;
+    vec.iov_len = count;
     rw.inode = file->f_dentry->d_inode;
     rw.pvfs2_inode = PVFS2_I(rw.inode);
     rw.file = file;
@@ -1493,16 +1507,8 @@ ssize_t pvfs2_file_read(
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
 
-    if (IS_IMMUTABLE(rw.inode)) 
-    {
-        rw.readahead_size = (rw.inode)->i_size;
-    }
-    else 
-    {
-        rw.readahead_size = 0;
-    }
+    rw.readahead_size = 0;
     g_pvfs2_stats.reads++;
-
 
     return do_readv_writev(&rw);
 }
@@ -2408,7 +2414,9 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
          * htable_in_progress or from the req list
          * as the case may be.
          */
-        clean_up_interrupted_operation(op);
+        gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation aio_cancel "
+                     "(tag %lld, op %p)\n", __func__, lld(op->tag), op);
+        pvfs2_clean_up_interrupted_operation(op);
         /* 
          * However, we need to make sure that 
          * the client daemon is not transferring data
@@ -2675,6 +2683,11 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     if (!rw->async)
     {
         error = do_readv_writev(rw);
+        /* not sure this is the correct place or way to update ki_pos but it
+         * definitely needs to occur somehow. otherwise, a write following 
+         * a synchronous writev will not write at the correct file position.
+         * store the offset from the read/write into the kiocb struct */
+        iocb->ki_pos = *offset;
         goto out_error;
     }
     /* Asynchronous I/O */
@@ -2862,6 +2875,11 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
+
+    gossip_err("Executing pvfs2_file_aio_read_iovec.  offset:%lld \ttotal length:%zd\n"
+              ,(long long)offset
+              ,iov_length(iov,nr_segs));
+
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
@@ -2943,8 +2961,12 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
  */
 
 #ifdef HAVE_NO_FS_IOC_FLAGS
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+long pvfs2_ioctl(
+#else
 int pvfs2_ioctl(
         struct inode *inode,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
         struct file *file,
         unsigned int cmd,
         unsigned long arg)
@@ -2953,8 +2975,12 @@ int pvfs2_ioctl(
 }
 #else
 
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+long pvfs2_ioctl(
+#else
 int pvfs2_ioctl(
     struct inode *inode,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     struct file *file,
     unsigned int cmd,
     unsigned long arg)
@@ -2971,9 +2997,19 @@ int pvfs2_ioctl(
     if(cmd == FS_IOC_GETFLAGS)
     {
         val = 0;
-        ret = pvfs2_xattr_get_default(inode,
-                                      "user.pvfs2.meta_hint",
-                                      &val, sizeof(val));
+        ret = pvfs2_xattr_get_default(
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+                file->f_dentry,
+#else
+                file->f_dentry->d_inode,
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+                "user.pvfs2.meta_hint",
+                &val, 
+                sizeof(val)
+#ifdef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+                , 0
+#endif /* HAVE_XATTR_HANDLER_GET_FIVE_PARAM */
+                );
         if(ret < 0 && ret != -ENODATA)
         {
             return ret;
@@ -2994,7 +3030,14 @@ int pvfs2_ioctl(
         {
             return -EFAULT;
         }
-        if(uval & (~(FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL)))
+        /* PVFS_MIRROR_FL is set internally when the mirroring mode is turned 
+         * on for a file.  The user is not allowed to turn on this bit, but the
+         * bit is present if the user first gets the flags and then updates the
+         * flags with some new settings. So, we ignore it in the following
+         * edit. bligon.
+        */
+        if((uval & ~PVFS_MIRROR_FL) & 
+           (~(FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL)))
         {
             gossip_err("pvfs2_ioctl: the FS_IOC_SETFLAGS only supports setting "
                        "one of FS_IMMUTABLE_FL|FS_APPEND_FL|FS_NOATIME_FL\n");
@@ -3003,9 +3046,20 @@ int pvfs2_ioctl(
         val = uval;
         gossip_debug(GOSSIP_FILE_DEBUG, "pvfs2_ioctl: FS_IOC_SETFLAGS: %llu\n",
                      (unsigned long long)val);
-        ret = pvfs2_xattr_set_default(inode,
-                                      "user.pvfs2.meta_hint",
-                                      &val, sizeof(val), 0);
+        ret = pvfs2_xattr_set_default(
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
+                file->f_dentry,
+#else
+                file->f_dentry->d_inode,
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+                "user.pvfs2.meta_hint",
+                &val, 
+                sizeof(val), 
+                0
+#ifdef HAVE_XATTR_HANDLER_SET_SIX_PARAM 
+                , 0                                      
+#endif /* HAVE_XATTR_HANDLER_SET_SIX_PARAM */
+                );
     }
 
     return ret;
@@ -3091,7 +3145,9 @@ int pvfs2_file_release(
  */
 int pvfs2_fsync(
     struct file *file,
+#ifdef HAVE_FSYNC_DENTRY_PARAM
     struct dentry *dentry,
+#endif
     int datasync)
 {
     int ret = -EINVAL;
@@ -3348,7 +3404,11 @@ struct file_operations pvfs2_file_operations =
     .aio_write = pvfs2_file_aio_write,
 #  endif
 #endif
+#ifdef HAVE_UNLOCKED_IOCTL_HANDLER
+    .unlocked_ioctl = pvfs2_ioctl,
+#else
     .ioctl = pvfs2_ioctl,
+#endif /* HAVE_UNLOCKED_IOCTL_HANDLER */
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,

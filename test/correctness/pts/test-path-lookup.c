@@ -31,7 +31,7 @@ static int build_nested_path(
     char cur_filename[64] = {0}, tmp_buf[PVFS_NAME_MAX] = {0};
     PVFS_fs_id cur_fs_id = 0;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_mkdir mkdir_resp;
     PVFS_sysresp_symlink symlink_resp;
@@ -43,7 +43,7 @@ static int build_nested_path(
     PVFS_object_ref *asymlink_refns = NULL;
     char **absolute_paths = NULL;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     if (levels && format)
     {
@@ -67,8 +67,8 @@ static int build_nested_path(
                 llu(root_refn.handle), root_refn.fs_id);
 
         attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.owner = credentials.uid;
-        attr.group = credentials.gid;
+        attr.owner = credentials.userid;
+        attr.group = credentials.group_array[0];
         attr.perms = 1877;
         attr.atime = attr.ctime = attr.mtime = time(NULL);
 

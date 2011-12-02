@@ -139,7 +139,7 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 
 retry:
     ret = db_env_create(&dbenv, 0);
-    if (ret != 0)
+    if (ret != 0 || dbenv == NULL)
     {
         gossip_err("dbpf_getdb_env: %s\n", db_strerror(ret));
         *error = ret;
@@ -291,12 +291,11 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
     return 0;
 }
 
-static int dbpf_db_create(const char *sto_path, 
-                          char *dbname, 
+static int dbpf_db_create(char *dbname, 
                           DB_ENV *envp, 
                           uint32_t flags);
 static DB *dbpf_db_open(
-    const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
+    char *dbname, DB_ENV *envp, int *err_p,
     int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2), uint32_t flags);
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
@@ -329,7 +328,10 @@ int dbpf_collection_getinfo(TROVE_coll_id coll_id,
                 PINT_statfs_t tmp_statfs;
                 TROVE_statfs *tmp_trove_statfs = (TROVE_statfs *)parameter;
 
-                DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
+                /* XXX: this is not entirely accurate when data and metadata
+		 		* are stored on different devices.
+		 		*/
+                DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, sto_p->data_path);
                 ret = PINT_statfs_lookup(path_name, &tmp_statfs);
                 if (ret < 0)
                 {
@@ -569,7 +571,53 @@ int dbpf_collection_geteattr(TROVE_coll_id coll_id,
     return 1;
 }
 
-static int dbpf_initialize(char *stoname,
+int dbpf_collection_deleattr(TROVE_coll_id coll_id,
+                             TROVE_keyval_s *key_p,
+                             TROVE_ds_flags flags,
+                             void *user_ptr,
+                             TROVE_context_id context_id,
+                             TROVE_op_id *out_op_id_p)
+{
+    int ret = -TROVE_EINVAL;
+    struct dbpf_storage *sto_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+    DBT db_key;
+
+    sto_p = my_storage_p;
+    if (sto_p == NULL)
+    {
+        return ret;
+    }
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return ret;
+    }
+
+    memset(&db_key, 0, sizeof(db_key));
+    db_key.data = key_p->buffer;
+    db_key.size = key_p->buffer_sz;
+
+    ret = coll_p->coll_attr_db->del(coll_p->coll_attr_db,
+                                    NULL, &db_key, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("%s: %s\n", __func__, db_strerror(ret));
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    return 1;
+}
+
+static int dbpf_initialize(char *data_path,
+			   char *meta_path,
                            TROVE_ds_flags flags)
 {
     int ret = -TROVE_EINVAL;
@@ -668,13 +716,19 @@ static int dbpf_initialize(char *stoname,
 
     dbpf_pid = getpid();
 
-    if (!stoname)
+    if (!data_path)
     {
-        gossip_err("dbpf_initialize failure: invalid storage name\n");
+        gossip_err("dbpf_initialize failure: invalid data storage path\n");
         return ret;
     }
 
-    sto_p = dbpf_storage_lookup(stoname, &ret, flags);
+    if (!meta_path)
+    {
+	gossip_err("dbpf_initialize failure: invalid metadata storage path\n");
+	return ret;
+    }
+
+    sto_p = dbpf_storage_lookup(data_path, meta_path, &ret, flags);
     if (sto_p == NULL)
     {
         gossip_debug(
@@ -767,12 +821,14 @@ static int stop_directio_threads(void)
     return 0;
 }
 
-static int dbpf_direct_initialize(char *stoname, TROVE_ds_flags flags)
+static int dbpf_direct_initialize(char *data_path,
+				  char *meta_path,
+				  TROVE_ds_flags flags)
 {
     int ret;
 
     /* some parts of initialization are shared with other methods */
-    ret = dbpf_initialize(stoname, flags);
+    ret = dbpf_initialize(data_path, meta_path, flags);
     if(ret < 0)
     {
         return(ret);
@@ -808,35 +864,51 @@ int dbpf_finalize(void)
 
     if (my_storage_p)
     {
-        ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
-        if (ret)
+        if( my_storage_p->sto_attr_db )
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
+            ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize attr sync: %s\n", db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+
+            ret = db_close(my_storage_p->sto_attr_db);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize attr close: %s\n", db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+        }
+        else
+        {
+            gossip_err("dbpf_finalize: attribute database not defined\n");
         }
 
-        ret = db_close(my_storage_p->sto_attr_db);
-        if (ret)
+        if( my_storage_p->coll_db )
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
+            ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize collection sync: %s\n", 
+                           db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
+    
+            ret = db_close(my_storage_p->coll_db);
+            if (ret)
+            {
+                gossip_err("dbpf_finalize collection close: %s\n", 
+                           db_strerror(ret));
+                return -dbpf_db_error_to_trove_error(ret);
+            }
         }
-
-        ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0);
-        if (ret)
+        else
         {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
-        }
-
-        ret = db_close(my_storage_p->coll_db);
-        if (ret)
-        {
-            gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-            return -dbpf_db_error_to_trove_error(ret);
-        }
-
-        free(my_storage_p->name);
+            gossip_err("dbpf_finalize: collections database not defined\n");
+        } 
+        free(my_storage_p->data_path);
+	free(my_storage_p->meta_path);
         free(my_storage_p);
         my_storage_p = NULL;
     }
@@ -850,31 +922,40 @@ int dbpf_finalize(void)
  * - creating storage attribute database, propagating with create time
  * - creating collections database, filling in create time
  */
-int dbpf_storage_create(char *stoname,
+int dbpf_storage_create(char *data_path,
+			char *meta_path,
                         void *user_ptr,
                         TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
-    char storage_dirname[PATH_MAX] = {0};
+    char data_dirname[PATH_MAX] = {0};
+    char meta_dirname[PATH_MAX] = {0};
     char sto_attrib_dbname[PATH_MAX] = {0};
     char collections_dbname[PATH_MAX] = {0};
 
-    DBPF_GET_STORAGE_DIRNAME(storage_dirname, PATH_MAX, stoname);
-    ret = dbpf_mkpath(storage_dirname, 0755);
+    DBPF_GET_DATA_DIRNAME(data_dirname, PATH_MAX, data_path);
+    ret = dbpf_mkpath(data_dirname, 0755);
     if (ret != 0)
     {
         return ret;
     }
 
-    DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, stoname);
-    ret = dbpf_db_create(storage_dirname, sto_attrib_dbname, NULL, 0);
+    DBPF_GET_META_DIRNAME(meta_dirname, PATH_MAX, meta_path);
+    ret = dbpf_mkpath(meta_dirname, 0755);
+    if (ret != 0)
+    {
+	return ret;
+    }
+
+    DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, meta_path);
+    ret = dbpf_db_create(sto_attrib_dbname, NULL, 0);
     if (ret != 0)
     {
         return ret;
     }
 
-    DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, stoname);
-    ret = dbpf_db_create(storage_dirname, collections_dbname, NULL, DB_RECNUM);
+    DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, meta_path);
+    ret = dbpf_db_create(collections_dbname, NULL, DB_RECNUM);
     if (ret != 0)
     {
         gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
@@ -885,9 +966,10 @@ int dbpf_storage_create(char *stoname,
     return 1;
 }
 
-int dbpf_storage_remove(char *stoname,
-                        void *user_ptr,
-                        TROVE_op_id *out_op_id_p)
+int dbpf_storage_remove(char *data_path,
+			char *meta_path,
+            void *user_ptr,
+            TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL;
     char path_name[PATH_MAX] = {0};
@@ -895,11 +977,13 @@ int dbpf_storage_remove(char *stoname,
     if (my_storage_p) {
         db_close(my_storage_p->sto_attr_db);
         db_close(my_storage_p->coll_db);
-        free(my_storage_p->name);
+		free(my_storage_p->meta_path);
+		free(my_storage_p->data_path);
         free(my_storage_p);
         my_storage_p = NULL;
     }
-    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
     if (unlink(path_name) != 0)
@@ -908,7 +992,7 @@ int dbpf_storage_remove(char *stoname,
         goto storage_remove_failure;
     }
 
-    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
     if (unlink(path_name) != 0)
@@ -917,11 +1001,20 @@ int dbpf_storage_remove(char *stoname,
         goto storage_remove_failure;
     }
 
-    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, stoname);
+    DBPF_GET_META_DIRNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
     if (rmdir(path_name) != 0)
     {
-        perror("failure removing storage space");
+		perror("failure removing metadata directory");
+		ret = -trove_errno_to_trove_error(errno);
+		goto storage_remove_failure;
+    }
+
+    DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, data_path);
+    gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
+    if (rmdir(path_name) != 0)
+    {
+        perror("failure removing data directory");
         ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
     }
@@ -1008,11 +1101,11 @@ int dbpf_collection_create(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
+    DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, sto_p->data_path);
     ret = stat(path_name, &dirstat);
     if (ret < 0 && errno != ENOENT)
     {
-        gossip_err("stat failed on storage directory %s\n", path_name);
+        gossip_err("stat failed on data directory %s\n", path_name);
         return -trove_errno_to_trove_error(errno);
     }
     else if (ret < 0)
@@ -1020,21 +1113,49 @@ int dbpf_collection_create(char *collname,
         ret = mkdir(path_name, 0755);
         if (ret != 0)
         {
-            gossip_err("mkdir failed on storage directory %s\n", path_name);
+            gossip_err("mkdir failed on data directory %s\n", path_name);
             return -trove_errno_to_trove_error(errno);
         }
     }
 
-    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = mkdir(path_name, 0755);
-    if (ret != 0)
+    DBPF_GET_META_DIRNAME(path_name, PATH_MAX, sto_p->meta_path);
+    ret = stat(path_name, &dirstat);
+    if (ret < 0 && errno != ENOENT)
     {
-        gossip_err("mkdir failed on collection directory %s\n", path_name);
+		gossip_err("stat failed on metadata directory %s\n", path_name);
+		return -trove_errno_to_trove_error(errno);
+    }
+    else if (ret < 0)
+    {
+		ret = mkdir(path_name, 0755);
+		if (ret != 0)
+		{
+	    	gossip_err("mkdir failed on metadata directory %s\n", path_name);
+	    	return -trove_errno_to_trove_error(errno);
+		}
+    }
+
+
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->data_path, new_coll_id);
+    ret = mkdir(path_name, 0755);
+    if (ret != 0 && strcmp(sto_p->data_path, sto_p->meta_path))
+    {
+        gossip_err("mkdir failed on data collection directory %s\n", 
+		   path_name);
         return -trove_errno_to_trove_error(errno);
     }
 
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->meta_path, new_coll_id);
+    ret = mkdir(path_name, 0755);
+    if (ret != 0 && strcmp(sto_p->data_path, sto_p->meta_path))
+    {
+	gossip_err("mkdir failed on metadata collection directory %s\n",
+		   path_name);
+	return -trove_errno_to_trove_error(errno);
+    }
+
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, new_coll_id);
+                                sto_p->meta_path, new_coll_id);
 
     ret = stat(path_name, &dbstat);
     if(ret < 0 && errno != ENOENT)
@@ -1044,7 +1165,7 @@ int dbpf_collection_create(char *collname,
     }
     else if(ret < 0)
     {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
+	ret = dbpf_db_create(path_name, NULL, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
@@ -1052,7 +1173,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    db_p = dbpf_db_open(sto_p->name, path_name, NULL, &error, NULL, 0);
+    db_p = dbpf_db_open(path_name, NULL, &error, NULL, 0);
     if (db_p == NULL)
     {
         gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -1100,7 +1221,8 @@ int dbpf_collection_create(char *collname,
     db_p->sync(db_p, 0);
     db_close(db_p);
 
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->meta_path, 
+			      new_coll_id);
     ret = stat(path_name, &dbstat);
     if(ret < 0 && errno != ENOENT)
     {
@@ -1109,7 +1231,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
+        ret = dbpf_db_create(path_name, NULL, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1117,7 +1239,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->meta_path, new_coll_id);
     ret = stat(path_name, &dbstat);
     if(ret < 0 && errno != ENOENT)
     {
@@ -1126,7 +1248,7 @@ int dbpf_collection_create(char *collname,
     }
     if(ret < 0)
     {
-        ret = dbpf_db_create(sto_p->name, path_name, NULL, 0);
+        ret = dbpf_db_create(path_name, NULL, 0);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -1134,7 +1256,8 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->data_path,
+			     new_coll_id);
     ret = mkdir(path_name, 0755);
     if(ret != 0)
     {
@@ -1153,7 +1276,7 @@ int dbpf_collection_create(char *collname,
         }
     }
 
-    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name,
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->data_path,
                                       new_coll_id);
     ret = mkdir(path_name, 0755);
     if(ret != 0)
@@ -1204,7 +1327,7 @@ int dbpf_collection_remove(char *collname,
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get collection");
         return -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1231,16 +1354,17 @@ int dbpf_collection_remove(char *collname,
         db_close(db_collection->ds_db);
         db_close(db_collection->keyval_db);
         /* so that environment can also be cleaned up */
-        dbpf_putdb_env(db_collection->coll_env, db_collection->path_name);
+        dbpf_putdb_env(db_collection->coll_env, db_collection->meta_path);
         dbpf_collection_deregister(db_collection);
         free(db_collection->name);
-        free(db_collection->path_name);
+        free(db_collection->meta_path);
+		free(db_collection->data_path);
         PINT_dbpf_keyval_pcache_finalize(db_collection->pcache);
         free(db_collection);
     }
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
-                              sto_p->name, db_data.coll_id);
+                              sto_p->meta_path, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
         gossip_err("failure removing dataspace attrib db\n");
@@ -1248,7 +1372,7 @@ int dbpf_collection_remove(char *collname,
     }
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, db_data.coll_id);
+                           sto_p->meta_path, db_data.coll_id);
     if(unlink(path_name) != 0)
     {
         gossip_err("failure removing keyval db\n");
@@ -1256,7 +1380,7 @@ int dbpf_collection_remove(char *collname,
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, db_data.coll_id);
+                                sto_p->meta_path, db_data.coll_id);
     if (unlink(path_name) != 0)
     {
         gossip_err("failure removing collection attrib db\n");
@@ -1264,7 +1388,7 @@ int dbpf_collection_remove(char *collname,
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX,
-                             sto_p->name, db_data.coll_id);
+                             sto_p->data_path, db_data.coll_id);
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
@@ -1310,7 +1434,7 @@ int dbpf_collection_remove(char *collname,
     }
 
     DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
-                                      sto_p->name, db_data.coll_id);
+                                      sto_p->data_path, db_data.coll_id);
 
     /* remove stranded bstreams directory */
     current_dir = opendir(path_name);
@@ -1353,10 +1477,19 @@ int dbpf_collection_remove(char *collname,
     }
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
-                          sto_p->name, db_data.coll_id);
+			  sto_p->meta_path, db_data.coll_id);
     if (rmdir(path_name) != 0)
     {
-        gossip_err("failure removing collection directory\n");
+		gossip_err("failure removing metadata collection directory\n");
+		ret = -trove_errno_to_trove_error(errno);
+		goto collection_remove_failure;
+    }
+
+    DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
+                          sto_p->data_path, db_data.coll_id);
+    if (rmdir(path_name) != 0)
+    {
+        gossip_err("failure removing data collection directory\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 collection_remove_failure:
@@ -1373,7 +1506,7 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
                             TROVE_op_id *out_op_id_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
-    db_recno_t recno;
+    db_recno_t recno = {0};
     DB *db_p = NULL;
     DBC *dbc_p = NULL;
     DBT key, data;
@@ -1406,19 +1539,12 @@ int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
          * we get back.  here we make sure that the key is big
          * enough to hold the position that we need to pass in.
          */
+       
         memset(&key, 0, sizeof(key));
-        if (sizeof(recno) < name_array[0].buffer_sz)
-        {
-            key.data = name_array[0].buffer;
-            key.size = sizeof(db_recno_t);
-            key.ulen = name_array[0].buffer_sz;
-        }
-        else
-        {
-            key.data = &recno;
-            key.size = key.ulen = sizeof(recno);
-        }
-        *(TROVE_ds_position *) key.data = *inout_position_p;
+        key.data = name_array[0].buffer;
+        key.ulen = name_array[0].buffer_sz;
+        *(db_recno_t *)key.data = (db_recno_t) *inout_position_p;
+        key.size = sizeof(db_recno_t);
         key.flags |= DB_DBT_USERMEM;
 
         memset(&data, 0, sizeof(data));
@@ -1548,39 +1674,55 @@ int dbpf_collection_clear(TROVE_coll_id coll_id)
 
     dbpf_collection_deregister(coll_p);
 
-    if ((ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
+    if( coll_p == NULL )
+    {
+       gossip_err("Trove collection not defined.\n");
+       return 0;
+    }
+
+    if ( (coll_p->coll_attr_db != NULL ) &&
+         (ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->coll_attr_db)) != 0) 
+    if ( (coll_p->coll_attr_db != NULL ) &&
+         (ret = db_close(coll_p->coll_attr_db)) != 0) 
     {
         gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
+    if ( (coll_p->ds_db != NULL ) &&
+         (ret = coll_p->ds_db->sync(coll_p->ds_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->ds_db)) != 0) 
+    if ( (coll_p->ds_db != NULL ) &&
+         (ret = db_close(coll_p->ds_db)) != 0) 
     {
         gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
+    if ( (coll_p->keyval_db != NULL ) &&
+         (ret = coll_p->keyval_db->sync(coll_p->keyval_db, 0)) != 0)
     {
         gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
     }
 
-    if ((ret = db_close(coll_p->keyval_db)) != 0) 
+    if ( (coll_p->keyval_db != NULL ) &&
+         (ret = db_close(coll_p->keyval_db)) != 0) 
     {
         gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
     }
 
-    dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+    if( coll_p->coll_env != NULL )
+    {
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+    }
     free(coll_p->name);
-    free(coll_p->path_name);
+    free(coll_p->data_path);
+    free(coll_p->meta_path);
     PINT_dbpf_keyval_pcache_finalize(coll_p->pcache);
 
     free(coll_p);
@@ -1650,7 +1792,7 @@ int dbpf_collection_lookup(char *collname,
     }
     else if (ret != 0)
     {
-        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get collection");
         gossip_debug(GOSSIP_TROVE_DEBUG, "lookup got error (%d)\n", ret);
         return -dbpf_db_error_to_trove_error(ret);
     }
@@ -1688,32 +1830,47 @@ int dbpf_collection_lookup(char *collname,
         free(coll_p);
         return -TROVE_ENOMEM;
     }
-    /* Path to collection */
-    snprintf(path_name, PATH_MAX, "/%s/%08x/", sto_p->name, coll_p->coll_id);
-    coll_p->path_name = strdup(path_name);
-    if (!coll_p->path_name) 
+    /* Path to data collection dir */
+    snprintf(path_name, PATH_MAX, "/%s/%08x/", sto_p->data_path, 
+	     coll_p->coll_id);
+    coll_p->data_path = strdup(path_name);
+    if (!coll_p->data_path) 
     {
         free(coll_p->name);
         free(coll_p);
         return -TROVE_ENOMEM;
     }
-    /* per-collection environment */
-    if ((coll_p->coll_env = dbpf_getdb_env(coll_p->path_name, COLL_ENV_FLAGS, &ret)) == NULL) 
+
+    snprintf(path_name, PATH_MAX, "/%s/%08x/", 
+	     sto_p->meta_path, coll_p->coll_id);
+    coll_p->meta_path = strdup(path_name);
+    if (!coll_p->meta_path)
     {
-        free(coll_p->path_name);
+	free(coll_p->data_path);
+	free(coll_p->name);
+	free(coll_p);
+	return -TROVE_ENOMEM;
+    }
+
+    if ((coll_p->coll_env = dbpf_getdb_env(coll_p->meta_path, COLL_ENV_FLAGS, &ret)) == NULL) 
+    {
+        free(coll_p->meta_path);
+	free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return -dbpf_db_error_to_trove_error(ret);
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
-                                sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+                                sto_p->meta_path, coll_p->coll_id);
+    
+    coll_p->coll_attr_db = dbpf_db_open(path_name, coll_p->coll_env,
                                         &ret, NULL, 0);
     if (coll_p->coll_attr_db == NULL)
     {
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+	free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return ret;
@@ -1737,8 +1894,9 @@ int dbpf_collection_lookup(char *collname,
         gossip_err("Failed to retrieve collection version: %s\n",
                    db_strerror(ret));
         db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+	free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return -dbpf_db_error_to_trove_error(ret);
@@ -1780,8 +1938,9 @@ int dbpf_collection_lookup(char *collname,
        !strcmp(trove_dbpf_version, "0.1.1"))
     {
         db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+		free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         gossip_err("Trove-dbpf metadata format version mismatch!\n");
@@ -1793,13 +1952,13 @@ int dbpf_collection_lookup(char *collname,
     }
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
-                              sto_p->name, coll_p->coll_id);
+                              sto_p->meta_path, coll_p->coll_id);
 
     if(sto_major == 0 && sto_minor == 1 && sto_inc < 3)
     {
         /* use old comparison function */
         coll_p->ds_db = dbpf_db_open(
-            sto_p->name, path_name, coll_p->coll_env, &ret,
+            path_name, coll_p->coll_env, &ret,
             &PINT_trove_dbpf_ds_attr_compare_reversed, 0);
     }
     else
@@ -1808,30 +1967,33 @@ int dbpf_collection_lookup(char *collname,
          * DB does page reads in the right order (for handle_iterate)
          */
         coll_p->ds_db = dbpf_db_open(
-            sto_p->name, path_name, coll_p->coll_env, &ret,
+            path_name, coll_p->coll_env, &ret,
             &PINT_trove_dbpf_ds_attr_compare, 0);
     }
 
     if (coll_p->ds_db == NULL)
     {
         db_close(coll_p->coll_attr_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+		free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return ret;
     }
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env,
+                           sto_p->meta_path, coll_p->coll_id);
+
+    coll_p->keyval_db = dbpf_db_open(path_name, coll_p->coll_env,
                                      &ret, PINT_trove_dbpf_keyval_compare, 0);
     if(coll_p->keyval_db == NULL)
     {
         db_close(coll_p->coll_attr_db);
         db_close(coll_p->ds_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+		free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return ret;
@@ -1843,8 +2005,9 @@ int dbpf_collection_lookup(char *collname,
         db_close(coll_p->coll_attr_db);
         db_close(coll_p->keyval_db);
         db_close(coll_p->ds_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->meta_path);
+        free(coll_p->meta_path);
+		free(coll_p->data_path);
         free(coll_p->name);
         free(coll_p);
         return -TROVE_ENOMEM;
@@ -1884,7 +2047,7 @@ int dbpf_collection_lookup(char *collname,
  * structure associated with that collection.
  */
 struct dbpf_storage *dbpf_storage_lookup(
-    char *stoname, int *error_p, TROVE_ds_flags flags)
+    char *data_path, char *meta_path, int *error_p, TROVE_ds_flags flags)
 {
     char path_name[PATH_MAX] = {0};
     struct dbpf_storage *sto_p = NULL;
@@ -1895,7 +2058,7 @@ struct dbpf_storage *dbpf_storage_lookup(
         return my_storage_p;
     }
 
-    if (stat(stoname, &sbuf) < 0) 
+    if (stat(data_path, &sbuf) < 0) 
     {
         *error_p = -TROVE_ENOENT;
         return NULL;
@@ -1903,8 +2066,20 @@ struct dbpf_storage *dbpf_storage_lookup(
     if (!S_ISDIR(sbuf.st_mode))
     {
         *error_p = -TROVE_EINVAL;
-        gossip_err("%s is not a directory\n", stoname);
+        gossip_err("%s is not a directory\n", data_path);
         return NULL;
+    }
+
+    if (stat(meta_path, &sbuf) < 0)
+    {
+	*error_p = -TROVE_ENOENT;
+	return NULL;
+    }
+    if (!S_ISDIR(sbuf.st_mode))
+    {
+	*error_p = -TROVE_EINVAL;
+	gossip_err("%s is not a directory\n", meta_path);
+	return NULL;
     }
 
     sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
@@ -1915,17 +2090,25 @@ struct dbpf_storage *dbpf_storage_lookup(
     }
     memset(sto_p, 0, sizeof(struct dbpf_storage));
 
-    sto_p->name = strdup(stoname);
-    if (sto_p->name == NULL)
+    sto_p->data_path = strdup(data_path);
+    if (sto_p->data_path == NULL)
     {
         free(sto_p);
         *error_p = -TROVE_ENOMEM;
         return NULL;
     }
+    sto_p->meta_path = strdup(meta_path);
+    if (sto_p->meta_path == NULL)
+    {
+	free(sto_p->data_path);
+	free(sto_p);
+	*error_p = -TROVE_ENOMEM;
+	return NULL;
+    }
     sto_p->refct = 0;
     sto_p->flags = flags;
 
-    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
+    DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, meta_path);
 
     /* we want to stat the attrib db first in case it doesn't
      * exist but the storage directory does
@@ -1936,25 +2119,31 @@ struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
 
-    sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, NULL,
+    sto_p->sto_attr_db = dbpf_db_open(path_name, NULL,
                                       error_p, NULL, 0);
     if (sto_p->sto_attr_db == NULL)
     {
-        free(sto_p->name);
+        free(sto_p->meta_path);
+		free(sto_p->data_path);
         free(sto_p);
+        gossip_err("Failure opening attribute database\n");
+                   
         my_storage_p = NULL;
         return NULL;
     }
 
-    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
+    DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
 
-    sto_p->coll_db = dbpf_db_open(sto_p->name, path_name, NULL, 
+    sto_p->coll_db = dbpf_db_open(path_name, NULL, 
                                   error_p, NULL, DB_RECNUM);
     if (sto_p->coll_db == NULL)
     {
         db_close(sto_p->sto_attr_db);
-        free(sto_p->name);
+        free(sto_p->meta_path);
+        free(sto_p->data_path);
         free(sto_p);
+        gossip_err("Failure opening collection database\n");
+
         my_storage_p = NULL;
         return NULL;
     }
@@ -2090,8 +2279,7 @@ int db_close(DB *db_p)
 /* Internal function for creating first instances of the databases for
  * a db plus files storage region.
  */
-static int dbpf_db_create(const char *sto_path,
-                          char *dbname,
+static int dbpf_db_create(char *dbname,
                           DB_ENV *envp,
                           uint32_t flags)
 {
@@ -2134,7 +2322,7 @@ static int dbpf_db_create(const char *sto_path,
  * integer pointed to by error_p.
  */
 static DB *dbpf_db_open(
-    const char *sto_path, char *dbname, DB_ENV *envp, int *error_p,
+    char *dbname, DB_ENV *envp, int *error_p,
     int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2),
     uint32_t flags)
 {
@@ -2203,7 +2391,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_direct_ops =
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
-    dbpf_collection_geteattr
+    dbpf_collection_geteattr,
+    dbpf_collection_deleattr
 };
 
 /* dbpf_mgmt_ops
@@ -2225,7 +2414,8 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,
-    dbpf_collection_geteattr
+    dbpf_collection_geteattr,
+    dbpf_collection_deleattr
 };
 
 typedef struct

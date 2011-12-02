@@ -17,6 +17,8 @@
 #include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"
+#include "pint-perf-counter.h"
+#include "pint-security.h"
 
 %%
 
@@ -59,6 +61,8 @@ machine pvfs2_small_io_sm
 static PINT_sm_action small_io_start_job(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing small_io_start_job...\n");
+
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
@@ -179,6 +183,10 @@ static PINT_sm_action small_io_start_job(
         }
         
         s_op->u.small_io.result_bytes = result.bytes;
+
+        gossip_debug(GOSSIP_IO_DEBUG,
+                    "\tsubmitting job_trove_bstream_read_list for handle %llu\n"
+                    ,llu(s_op->req->u.small_io.handle));
         ret = job_trove_bstream_read_list(
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,
@@ -225,6 +233,28 @@ static PINT_sm_action small_io_check_size(
             s_op->resp.u.small_io.result_size = s_op->u.small_io.result_bytes;
         }
     }
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_READ,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_SMALL_READ,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+    }
+    else
+    {
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_WRITE,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+        PINT_perf_count(PINT_server_pc,
+                        PINT_PERF_SMALL_WRITE,
+                        s_op->resp.u.small_io.result_size,
+                        PINT_PERF_ADD);
+    }
 
     return SM_ACTION_COMPLETE;
 }
@@ -243,6 +273,33 @@ static PINT_sm_action small_io_cleanup(
     return server_state_machine_complete(smcb);
 }
 
+static int perm_small_io(PINT_server_op *s_op)
+{
+    int ret = -PVFS_EINVAL;
+    int mask = 0;
+    enum PVFS_io_type type = s_op->req->u.small_io.io_type;
+
+    if (type == PVFS_IO_READ)
+    {
+        mask = PINT_CAP_READ;
+    }
+    else if (type == PVFS_IO_WRITE)
+    {
+        mask = PINT_CAP_WRITE;
+    }
+
+    if (s_op->req->capability.op_mask & mask)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
+
+    return ret;
+}
+
 static inline enum PINT_server_req_access_type PINT_server_req_access_small_io(
     struct PVFS_server_req *req)
 {
@@ -258,7 +315,7 @@ PINT_GET_OBJECT_REF_DEFINE(small_io);
 struct PINT_server_req_params pvfs2_small_io_params =
 {
     .string_name = "small_io",
-    .perm = PINT_SERVER_CHECK_NONE,
+    .perm = perm_small_io,
     .access_type = PINT_server_req_access_small_io,
     .sched_policy = PINT_SERVER_REQ_SCHEDULE,
     .get_object_ref = PINT_get_object_ref_small_io,

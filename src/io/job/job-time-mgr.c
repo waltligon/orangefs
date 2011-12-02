@@ -4,7 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <assert.h>
 #include <string.h>
 

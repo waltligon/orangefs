@@ -3,8 +3,6 @@
 
 #define ZOID_MAX_EXPECTED_MSG (128 * 1024 * 1024)
 #define ZOID_MAX_UNEXPECTED_MSG 8192
-#define ZOID_MAX_EAGER_MSG 1024
-
 
 #define ZOID_ADDR_SERVER_PID -1
 
@@ -26,7 +24,7 @@ void BMI_zoid_server_memfree(void* buffer);
 int BMI_zoid_server_unexpected_free(void* buffer);
 int BMI_zoid_server_testunexpected(int incount, int* outcount,
 				   struct bmi_method_unexpected_info* info,
-				   uint8_t class, int max_idle_time_ms);
+				   int max_idle_time_ms);
 int zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 			    const void*const* buffer_list,
 			    const bmi_size_t* size_list, int list_count,

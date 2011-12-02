@@ -41,7 +41,7 @@ int main(int argc, char **argv)
     }
 
     ret = trove_initialize(
-        TROVE_METHOD_DBPF, NULL, storage_space, 0);
+        TROVE_METHOD_DBPF, NULL, storage_space, storage_space, 0);
     if (ret < 0) {
 	fprintf(stderr, "initialize failed.\n");
 	return -1;
@@ -115,7 +115,7 @@ int main(int argc, char **argv)
         TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) return -1;
 
-    if (s_attr.type != TROVE_TEST_FILE) {
+    if ((int)s_attr.type != TROVE_TEST_FILE) {
 	fprintf(stderr, "%s is not a file.\n", file_name);
 	return -1;
     }

@@ -82,6 +82,7 @@ typedef struct {
     int port;
     ib_connection_t *c;
     int reconnect_flag;
+    int ref_count;  
 } ib_method_addr_t;
 
 /*
@@ -242,7 +243,6 @@ struct ib_work {
     int is_unexpected;      /* send: if user posted an unexpected message */
     u_int64_t rts_mop_id;    /* recv: return tag to give to rts sender */
     bmi_size_t actual_len;   /* recv: could be shorter than posted */
-    uint8_t class;          /* only for unexpected messages */
 };
 
 /*
@@ -265,13 +265,13 @@ endecode_fields_2(msg_header_common_t,
 typedef struct {
     msg_header_common_t c;
     bmi_msg_tag_t bmi_tag;
-    uint32_t class;
+    u_int32_t __pad;
 } msg_header_eager_t;
 endecode_fields_4(msg_header_eager_t,
     enum, c.type,
     uint32_t, c.credit,
     int32_t, bmi_tag,
-    uint32_t, class);
+    uint32_t, __pad);
 
 /*
  * MSG_RTS instead of MSG_EAGER from sender to receiver for big messages.

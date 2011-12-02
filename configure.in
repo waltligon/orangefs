@@ -18,18 +18,21 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
 PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=1
+PVFS2_VERSION_SUB=4
+#PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
-PVFS2_VERSION_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
 
-PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB$PVFS2_VERSION_PRE
+PVFS2_VERSION=$PVFS2_VERSION_MAJOR.$PVFS2_VERSION_MINOR.$PVFS2_VERSION_SUB-$PVFS2_VERSION_RELEASE$PVFS2_VERSION_PRE
 AC_SUBST(PVFS2_VERSION)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_VERSION_MAJOR, major version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MINOR, $PVFS2_VERSION_MINOR, minor version number)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_SUB, $PVFS2_VERSION_SUB, sub version number)
+#AC_DEFINE_UNQUOTED(PVFS2_VERSION_RELEASE, $PVFS2_VERSION_RELEASE, release version number)
 AC_SUBST(PVFS2_VERSION_MAJOR)
 AC_SUBST(PVFS2_VERSION_MINOR)
 AC_SUBST(PVFS2_VERSION_SUB)
+#AC_SUBST(PVFS2_VERSION_RELEASE)
 
 dnl BMI_ONLY_TAG
 
@@ -73,10 +76,24 @@ CFLAGS=$USR_CFLAGS
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
-AC_CHECK_PROG(HAVE_FIND, find, yes, no)
-AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
-AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_PERL = "no"; then
+    AC_MSG_ERROR("perl required in PATH to complete build")
+fi
 
+AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+if test $HAVE_FIND = "no"; then
+    AC_MSG_ERROR("find required in PATH complete build")
+fi
+
+AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
+if test $HAVE_BISON = "no"; then
+    AC_MSG_ERROR("bison required in PATH to complete build")
+fi
+
+AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
+if test $HAVE_FLEX = "no"; then
+    AC_MSG_ERROR("flex required in PATH to complete build")
+fi
 
 AC_MSG_CHECKING([for required Math::BigInt perl module])
 perl -e "use Math::BigInt" 2>&1 > /dev/null
@@ -179,11 +196,22 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
-AC_ARG_WITH(openssl,
-	[  --with-openssl=<dir>    Build with openssl (default=/usr)
-  --without-openssl       Don't build with openssl.],
-	[AX_OPENSSL(${withval})],
-	[AX_OPENSSL_OPTIONAL])
+AX_OPENSSL
+
+dnl check to see if the "fast" getgrouplist function is available
+AX_GETGROUPLIST
+
+AC_ARG_ENABLE(security,
+[  --enable-security       Enables robust security features],
+[if test "x$enableval" = "xyes" ; then
+    ENABLE_SECURITY=1
+    AC_DEFINE(ENABLE_SECURITY, 1, Define if robust security is enabled)
+else
+    ENABLE_SECURITY=
+fi],
+[ENABLE_SECURITY=]
+)
+AC_SUBST(ENABLE_SECURITY)
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -509,16 +537,20 @@ AC_ARG_WITH(kernel,
     if ! test -r $withval/include/linux/version.h ; then
        AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
-    vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
-    if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-    	# 2.6.18 moves UTS_RELEASE into its own header
-	if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h ; then
-	    # 2.6.33 generates UTS_RELEASE at make-time
-	    if ! grep -q  UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h ; then
-	        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
-	    fi
-	fi
+
+    if test -r $withval/include/linux/version.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
+    elif test -r $withval/include/linux/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -q UTS_RELEASE..2\\.6\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    elif test -r  $withval/include/generated/utsrelease.h && grep -qE UTS_RELEASE..3\\. $withval/include/generated/utsrelease.h; then
+        vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/generated/utsrelease.h`
+    else
+        AC_MSG_ERROR(The kernel source tree does not appear to be 2.6 or 3.X)
+        
     fi
+
     # At least up through 2.6.3 needed to write .__modpost.cmd; this changed
     # sometime between then and 2.6.10.   Now anybody can compile out-of-tree
     # modules against a configured kernel tree
@@ -768,6 +800,133 @@ dnl but do not --enable-shared.
 if test "x$build_shared" = "xno" -a "x$build_static" = "xno" ; then
     AC_MSG_ERROR([Must do --enable-shared or --enable-static or both.])
 fi
+
+dnl Method to disable build of user interface libraries
+BUILD_USRINT=
+AC_ARG_ENABLE(usrint,
+[  --disable-usrint        Do not build posix and stdio user libraries],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USRINT_BUILD, 1,
+      [Should we build user interface libraries.])
+   BUILD_USRINT=1
+else
+   AC_DEFINE(PVFS_USRINT_BUILD, 0,
+      [Should we build user interface libraries.])
+fi
+AC_SUBST(BUILD_USRINT)],
+[AC_DEFINE(PVFS_USRINT_BUILD, 1,
+    [Should we build user interface libraries.])
+BUILD_USRINT=1
+AC_SUBST(BUILDUSRINT)])
+ 
+USRINT_KMOUNT=
+dnl Method to enable user interface kmod support
+AC_ARG_ENABLE(usrint-kmount,
+[  --enable-usrint-kmount  Assume FS is mounted via kernel],
+[if test "x$enableval" = "xyes" ; then
+   if test "x$BUILD_KERNEL" = "x1" -o "x$BUILD_FUSE" = "x1" ; then
+      AC_DEFINE(PVFS_USRINT_KMOUNT, 1,
+         [Should user interface assume FS is mounted.])
+      USRINT_KMOUNT=1
+   else
+      AC_MSG_ERROR([Assume FS mounted but neither kernel nor FUSE build ])
+   fi
+else
+   AC_DEFINE(PVFS_USRINT_KMOUNT, 0,
+      [Should user interface assume FS is mounted.])
+fi],
+[AC_DEFINE(PVFS_USRINT_KMOUNT, 0,
+   [Should user interface assume FS is mounted.])
+])
+
+dnl Method to disable user interface CWD support
+AC_ARG_ENABLE(usrint-cwd,
+[  --disable-usrint-cwd    Do not enable user interface CWD support],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_USRINT_CWD, 1,
+      [Should we enable user interface CWD support.])
+else
+   AC_DEFINE(PVFS_USRINT_CWD, 0,
+      [Should we enable user interface CWD support.])
+fi],
+[if test "x$USRINT_KMOUNT" = "x1" ; then
+   AC_DEFINE(PVFS_USRINT_CWD, 0,
+      [Should we enable user interface CWD support.])
+else
+   AC_DEFINE(PVFS_USRINT_CWD, 1,
+      [Should we enable user interface CWD support.])
+fi])
+
+dnl Method to check if dl calls need an explicit link flag
+AC_MSG_CHECKING(if dlfns needs explicit library request)
+AC_LINK_IFELSE(
+[
+#define _GNU_SOURCE 1
+#include <dlfcn.h>
+main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
+],[
+    AC_MSG_RESULT(no)
+],[
+    AC_MSG_RESULT(yes)
+    LIBS="$LIBS -ldl"
+])
+
+dnl Method to enable user interface data cache
+BUILD_UCACHE=
+AC_ARG_ENABLE(ucache,
+[  --enable-ucache         Do not enable user user interface data cache.],
+[if test "x$enableval" = "xyes" ; then
+   AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
+      [Should we enable user interface data cache.])
+   BUILD_UCACHE=1
+else
+   AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
+      [Should we enable user interface data cache.])
+fi
+AC_SUBST(BUILD_UCACHE)],
+[AC_DEFINE(PVFS_UCACHE_ENABLE, 0,
+    [Should we enable user interface data cache.])
+AC_SUBST(BUILD_UCACHE)])
+
+dnl See if we have includes needed for acls
+BUILD_ACL_INTERFACE=
+AC_MSG_CHECKING(for user acl includes sys/acl.h acl/libacl.h)
+AC_TRY_COMPILE([
+#include <sys/acl.h>
+#include <acl/libacl.h>
+], [],
+    AC_MSG_RESULT(yes)
+    BUILD_ACL_INTERFACE=1
+    AC_DEFINE(PVFS_HAVE_ACL_INCLUDES, 1,
+            [Should we build user interface acl routines.])
+,
+    AC_MSG_RESULT(no)
+    BUILD_ACL_INTERFACE=0
+)
+AC_SUBST(BUILD_ACL_INTERFACE)
+
+dnl See if scandir compare arg takes void pointers
+AC_MSG_CHECKING(for scandir compare arg using void pointers)
+AC_TRY_COMPILE([
+#define _LARGEFILE64_SOURCE 1
+#define _GNU_SOURCE 1
+#include <dirent.h>
+int scandir (const char *dir, struct dirent ***list,
+             int (*sel)(const struct dirent *),
+             int (*cmp)(const void *, const void *))
+{ return 0; }
+int scandir64 (const char *dir, struct dirent64 ***list,
+               int (*sel)(const struct dirent64 *),
+               int (*cmp)(const void *, const void *))
+{ return 0; }
+], [],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(PVFS_SCANDIR_VOID, 1,
+            [scandir compare arg takes void pointers.])
+,
+    AC_MSG_RESULT(no)
+)
+    
 
 dnl See if CC is a GNU compiler.  This may require a real test in future
 dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.  First
@@ -1113,10 +1272,13 @@ Makefile
 module.mk
 src/apps/admin/module.mk
 src/apps/admin/pvfs2-config
+src/apps/devel/module.mk
 src/apps/karma/module.mk
 src/apps/vis/module.mk
 src/apps/fuse/module.mk
+src/apps/ucache/module.mk
 src/apps/kernel/linux/module.mk
+src/apps/user/module.mk
 src/io/trove/module.mk
 src/io/trove/trove-handle-mgmt/module.mk
 src/io/trove/trove-dbpf/module.mk
@@ -1131,6 +1293,7 @@ src/common/llist/module.mk
 src/common/statecomp/module.mk
 src/common/events/module.mk
 src/common/mgmt/module.mk
+src/common/security/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
@@ -1151,6 +1314,7 @@ src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
+src/client/usrint/module.mk
 src/kernel/linux-2.6/Makefile
 src/kernel/linux-2.4/Makefile
 doc/module.mk
@@ -1204,9 +1368,9 @@ else
 fi
 
 if test "x$LINUX_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      :  no])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6/3 kernel module      :  no])
 else
-   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module      : yes])
+   AC_MSG_RESULT([PVFS2 configured for the 2.6/3 kernel module      : yes])
 fi
 
 if test "x$LINUX24_KERNEL_SRC" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
@@ -1233,10 +1397,30 @@ else
    AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
+if test "x$ENABLE_SECURITY" = "x1"; then
+   AC_MSG_RESULT([PVFS2 configured with robust security             : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured with robust security             :  no])
+fi
+
 if test "x$BUILD_SERVER" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 server will be built                        : yes])
 else
    AC_MSG_RESULT([PVFS2 server will be built                        :  no])
+
+fi
+
+if test "x$BUILD_USRINT" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user interface libraries will be built      : yes])
+else
+   AC_MSG_RESULT([PVFS2 user interface libraries will be built      :  no])
+
+fi
+
+if test "x$BUILD_UCACHE" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 user interface library cache enabled        : yes])
+else
+   AC_MSG_RESULT([PVFS2 user interface library cache enabled        :  no])
 
 fi
 
@@ -1285,6 +1469,13 @@ if test x$BUILD_GM = x1 -o x$BUILD_MX = x1 -o x$BUILD_IB = x1 -o \
 		    times on the fast interface.  Suggest you configure with
 		    "--without-bmi-tcp" for the best performance.])
     fi
+fi
+
+if test x$HAVE_DB_OLD = x1; then
+    AC_MSG_WARN([The detected version of Berkeley DB is not at least 4.8.30.
+                    Metadata corruption has been documented in versions prior 
+                    to 4.8.30. It is highly recommended that you update the 
+                    version of Berkeley DB you are building against.])
 fi
 
 AC_MSG_RESULT()

@@ -24,11 +24,11 @@ gen_mutex_t     mem_used_lock;  /* lock */
 #endif
 
 /* statics for event logging */
-static PINT_event_type bmi_mx_send_event_id;
-static PINT_event_type bmi_mx_recv_event_id;
+static PINT_event_type bmi_mx_send_event_id __attribute__ ((unused));
+static PINT_event_type bmi_mx_recv_event_id __attribute__ ((unused));
 
-static PINT_event_group bmi_mx_event_group;
-static pid_t bmi_mx_pid;
+static PINT_event_group bmi_mx_event_group __attribute__ ((unused));
+static pid_t bmi_mx_pid __attribute__ ((unused));
 
 mx_unexp_handler_action_t
 bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
@@ -38,6 +38,12 @@ static int
 bmx_peer_connect(struct bmx_peer *peer);
 static void
 bmx_create_peername(void);
+
+void *
+BMI_mx_memalloc(bmi_size_t size, enum bmi_op_type send_recv);
+
+static int
+bmx_peer_init_state(struct bmx_peer *peer) __attribute__ ((unused));
 
 /**** Completion function token handling ****************************/
 /* We should not hold any locks when calling mx_test[_any](),
@@ -532,41 +538,36 @@ bmx_verify_num_str(char *num_str)
 static int
 bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint32_t *ep_id)
 {
-        int             ret             = 0;
-        int             colon1_found    = 0;
-        int             colon2_found    = 0;
-        char           *s               = NULL;
-        char           *colon1          = NULL;
-        char           *colon2          = NULL;
-        char           *fs              = NULL;
-        char           *host            = NULL;
-        uint32_t        bd              = -1;
-        uint32_t        ep              = 0;
+        int             ret          = 0;
+        int             colon1_found = 0;
+        int             colon2_found = 0;
+        char           *tmp_peername = NULL;
+        char           *colon1       = NULL;
+        char           *colon2       = NULL;
+        char           *fs           = NULL;
+        char           *host         = NULL;
+        uint32_t        bd           = -1;
+        uint32_t        ep           = 0;
 
-        if (peername == NULL || hostname == NULL || board == NULL || ep_id == NULL) {
-                debug(BMX_DB_INFO, "parse_peername() called with invalid parameter");
+        tmp_peername = string_key("mx",peername);
+        if (!tmp_peername) {
+                debug(BMX_DB_INFO, "parse_peername() called with invalid peername");
                 return -BMI_EINVAL;
         }
 
-        if (peername[0] != 'm' ||
-            peername[1] != 'x' ||
-            peername[2] != ':' ||
-            peername[3] != '/' ||
-            peername[4] != '/') {
-                debug(BMX_DB_INFO, "parse_peername() peername does not start with mx://");
-                return -1;
+        if (tmp_peername == NULL || hostname == NULL || board == NULL || ep_id == NULL) {
+                debug(BMX_DB_INFO, "parse_peername() called with invalid parameter");
+                return -BMI_EINVAL;
         }
-
-        s = strdup(&peername[5]);
-        fs = strchr(s, '/');
+        fs = strchr(tmp_peername, '/');
         if (fs) {
                 *fs = '\0';
         }
-        colon1 = strchr(s, ':');
+        colon1 = strchr(tmp_peername, ':');
         if (!colon1) {
                 debug(BMX_DB_INFO, "parse_peername() strchr() failed");
         } else {
-                colon2 = strrchr(s, ':');
+                colon2 = strrchr(tmp_peername, ':');
                 if (colon1 == colon2) {
                         /* colon2_found == 0 */
                         debug(BMX_DB_INFO, "parse_peername() MX hostname does not "
@@ -600,15 +601,15 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
                     NULL != strchr(colon2, ':')) {
                         debug(BMX_DB_INFO, "parse_peername() too many ':' (%s %s)", 
                                            colon1, colon2);
-                        free(s);
+                        free(tmp_peername);
                         return -1;
                 }
         }
 
-        host = strdup(s);
+        host = strdup(tmp_peername);
         if (!host) {
                 debug(BMX_DB_MEM, "parse_peername() malloc() failed");
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -620,7 +621,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         } else {
                 debug(BMX_DB_WARN, "%s is not a valid hostname", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -628,21 +629,21 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid hostname", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
         ret = bmx_verify_num_str(colon1);
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid board ID", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
         ret = bmx_verify_num_str(colon2);
         if (ret != 0) {
                 debug(BMX_DB_INFO, "%s is not a valid endpoint ID", host);
                 free(host);
-                free(s);
+                free(tmp_peername);
                 return -1;
         }
 
@@ -650,7 +651,7 @@ bmx_parse_peername(const char *peername, char **hostname, uint32_t *board, uint3
         *board = bd;
         *ep_id = ep;
 
-        free(s);
+        free(tmp_peername);
 
         return 0;
 }
@@ -1410,11 +1411,9 @@ BMI_mx_unexpected_free(void *buf)
 }
 
 static void
-bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag,
-    uint8_t* class)
+bmx_parse_match(uint64_t match, uint8_t *type, uint32_t *id, uint32_t *tag)
 {
         *type   = (uint8_t)  (match >> BMX_MSG_SHIFT);
-        *class  = (uint8_t)  (match >> BMX_CLASS_SHIFT);
         *id     = (uint32_t) ((match >> BMX_ID_SHIFT) & BMX_MAX_PEER_ID); /* 20 bits */
         *tag    = (uint32_t) (match & BMX_MAX_TAG); /* 32 bits */
         return;
@@ -1426,7 +1425,6 @@ bmx_create_match(struct bmx_ctx *ctx)
         int             connect = 0;
         uint64_t        type    = (uint64_t) ctx->mxc_msg_type;
         uint64_t        id      = 0ULL;
-        uint64_t        class   = 0ULL;
         uint64_t        tag     = (uint64_t) ((uint32_t) ctx->mxc_tag);
 
         if (ctx->mxc_msg_type == BMX_MSG_CONN_REQ || 
@@ -1452,9 +1450,7 @@ bmx_create_match(struct bmx_ctx *ctx)
                 exit(1);
         }
 
-        class += ctx->mxc_class;
-        ctx->mxc_match = (type << BMX_MSG_SHIFT) | (id << BMX_ID_SHIFT) |
-            tag | (class << BMX_CLASS_SHIFT);
+        ctx->mxc_match = (type << BMX_MSG_SHIFT) | (id << BMX_ID_SHIFT) | tag;
 
         return;
 }
@@ -1567,8 +1563,8 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                      int numbufs, const void *const *buffers, 
                      const bmi_size_t *sizes, bmi_size_t total_size, 
                      bmi_msg_tag_t tag, void *user_ptr,
-                     bmi_context_id context_id, uint8_t class, 
-                     int is_unexpected, PVFS_hint hints)
+                     bmi_context_id context_id, int is_unexpected,
+                     PVFS_hint hints)
 {
         struct bmx_ctx          *tx     = NULL;
         struct method_op        *mop    = NULL;
@@ -1647,7 +1643,6 @@ bmx_post_send_common(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 
         tx->mxc_tag = tag;
         tx->mxc_peer = peer;
-        tx->mxc_class = class;
         if (!is_unexpected) {
                 tx->mxc_msg_type = BMX_MSG_EXPECTED;
         } else {
@@ -1688,6 +1683,24 @@ out:
 }
 
 static int
+BMI_mx_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+                 const void *buffer, bmi_size_t size,
+                 enum bmi_buffer_type buffer_flag __unused,
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                 PVFS_hint hints)
+{
+        int ret = 0;
+        BMX_ENTER;
+
+        ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
+                                   tag, user_ptr, context_id, 0, hints);
+
+        BMX_EXIT;
+
+        return ret;
+}
+
+static int
 BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                       const void *const *buffers, const bmi_size_t *sizes, int list_count,
                       bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
@@ -1699,8 +1712,27 @@ BMI_mx_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
         BMX_ENTER;
 
         ret = bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id,
-                                    0, 0, hints);
+                                    total_size, tag, user_ptr, context_id, 0,
+                                    hints);
+
+        BMX_EXIT;
+
+        return ret;
+}
+
+static int
+BMI_mx_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+                 const void *buffer, bmi_size_t size,
+                 enum bmi_buffer_type buffer_flag __unused,
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
+                 PVFS_hint hints)
+{
+        int ret = 0;
+
+        BMX_ENTER;
+
+        ret = bmx_post_send_common(id, remote_map, 1, &buffer, &size, size,
+                                   tag, user_ptr, context_id, 1, hints);
 
         BMX_EXIT;
 
@@ -1711,7 +1743,7 @@ static int
 BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                   const void *const *buffers, const bmi_size_t *sizes, int list_count,
                   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
-                  bmi_msg_tag_t tag, uint8_t class, void *user_ptr, bmi_context_id context_id,
+                  bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id,
                   PVFS_hint hints)
 {
         int ret = 0;
@@ -1719,8 +1751,8 @@ BMI_mx_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
         BMX_ENTER;
 
         return bmx_post_send_common(id, remote_map, list_count, buffers, sizes, 
-                                    total_size, tag, user_ptr, context_id,
-                                    class, 1, hints);
+                                    total_size, tag, user_ptr, context_id, 1,
+                                    hints);
 
         BMX_EXIT;
 
@@ -1874,6 +1906,26 @@ out:
 }
 
 static int
+BMI_mx_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+                 void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
+                 enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
+                 bmi_context_id context_id,
+                 PVFS_hint hints)
+{
+        int ret = 0;
+
+        BMX_ENTER;
+
+        ret = bmx_post_recv_common(id, remote_map, 1, &buffer, &expected_len,
+                                    expected_len, tag, user_ptr, context_id,
+                                    hints);
+
+        BMX_EXIT;
+
+        return ret;
+}
+
+static int
 BMI_mx_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
                void *const *buffers, const bmi_size_t *sizes, int list_count,
                bmi_size_t tot_expected_len, bmi_size_t *tot_actual_len __unused,
@@ -1960,12 +2012,11 @@ bmx_post_unexpected_recv(mx_endpoint_addr_t source, uint8_t type, uint32_t id,
         struct bmx_peer *peer   = NULL;
         void            *peerp  = (void *) &peer;
         mx_return_t     mxret   = MX_SUCCESS;
-        uint8_t         class = 0;
 
         BMX_ENTER;
 
         if (id == 0 && tag == 0 && type == 0) {
-                bmx_parse_match(match, &type, &id, &tag, &class);
+                bmx_parse_match(match, &type, &id, &tag);
         }
 
         rx = bmx_get_idle_rx();
@@ -2026,14 +2077,13 @@ bmx_unexpected_recv(void *context, mx_endpoint_addr_t source,
         int                     ret     = MX_RECV_CONTINUE;
         struct bmx_ctx          *rx     = NULL;
         uint8_t                 type    = 0;
-        uint8_t                 class   = 0;
         uint32_t                id      = 0;
         uint32_t                tag     = 0;
         struct bmx_peer         *peer   = NULL;
         void                    *peerp  = &peer;
         mx_return_t             mxret   = MX_SUCCESS;
 
-        bmx_parse_match(match_value, &type, &id, &tag, &class);
+        bmx_parse_match(match_value, &type, &id, &tag);
 
         switch (type) {
         case BMX_MSG_CONN_REQ:
@@ -2259,7 +2309,6 @@ bmx_handle_conn_req(void)
                 mx_test_any(bmi_mx->bmx_ep, match, mask, &status, &result);
                 if (result) {
                         uint8_t                 type    = 0;
-                        uint8_t                 class   = 0;
                         uint32_t                id      = 0;
                         uint32_t                sid     = 0;
                         uint32_t                version = 0;
@@ -2288,8 +2337,7 @@ bmx_handle_conn_req(void)
                                 bmx_put_idle_ctx(rx);
                                 continue;
                         }
-                        bmx_parse_match(rx->mxc_match, &type, &id, &version,
-                            &class);
+                        bmx_parse_match(rx->mxc_match, &type, &id, &version);
                         if (version != BMX_VERSION) {
                                 /* TODO send error conn_ack */
                                 debug(BMX_DB_WARN, "version mismatch with peer "
@@ -2753,7 +2801,7 @@ BMI_mx_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 /* test for unexpected receives only, not unex sends */
 static int
 BMI_mx_testunexpected(int incount __unused, int *outcount,
-            struct bmi_method_unexpected_info *ui, uint8_t class, int max_idle_time __unused)
+            struct bmi_method_unexpected_info *ui, int max_idle_time __unused)
 {
         uint32_t        result          = 0;
         uint64_t        match           = ((uint64_t) BMX_MSG_UNEXPECTED << BMX_MSG_SHIFT);
@@ -2764,7 +2812,6 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         struct bmx_ctx  *rx             = NULL;
         struct bmx_peer *peer           = NULL;
         int             again           = 1;
-        uint64_t        class_match     = 0;
 
         if (count++ % 1000 == 0) {
                 BMX_ENTER;
@@ -2774,10 +2821,6 @@ BMI_mx_testunexpected(int incount __unused, int *outcount,
         bmx_connection_handlers();
 
         bmx_get_completion_token();
-
-        /* must match the correct class as well */
-        class_match += class;
-        match |= (class_match << BMX_CLASS_SHIFT);
 
         /* if the unexpected handler cannot get a rx, it does not post a receive.
          * probe for unexpected and post a rx. */
@@ -3117,6 +3160,9 @@ const struct bmi_method_ops bmi_mx_ops =
     .memalloc                  = BMI_mx_memalloc,
     .memfree                   = BMI_mx_memfree,
     .unexpected_free           = BMI_mx_unexpected_free,
+    .post_send                 = BMI_mx_post_send,
+    .post_sendunexpected       = BMI_mx_post_sendunexpected,
+    .post_recv                 = BMI_mx_post_recv,
     .test                      = BMI_mx_test,
     .testsome                  = 0,
     .testcontext               = BMI_mx_testcontext,

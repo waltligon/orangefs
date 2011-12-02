@@ -45,7 +45,7 @@ while test $# -gt 0; do
 
       ;;
     --libs|--static-libs)
-	libflags="-L@libdir@ -lpvfs2 @LIBS@ @THREAD_LIB@" 
+	libflags="-L@libdir@ -lpvfs2 -lm @LIBS@ @THREAD_LIB@ @OPENSSL_LIB@" 
 	if [ x"@BUILD_GM@" = x"1" ]; then
 		libflags="$libflags -L@GM_LIBDIR@ -lgm"
 	fi
@@ -65,7 +65,7 @@ while test $# -gt 0; do
 	echo $libflags
 	;;
     --serverlibs|--static-serverlibs)
-	libflags="-L@libdir@ -lpthread -lpvfs2-server @LIBS@ @DB_LIB@" 
+	libflags="-L@libdir@ -lpthread -lpvfs2-server @LIBS@ @DB_LIB@ @OPENSSL_LIB@" 
 	if [ x"@NEEDS_LIBRT@" = x"1" ]; then
 		libflags="$libflags -lrt"
 	fi

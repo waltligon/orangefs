@@ -5,7 +5,9 @@
  */
 
 #include <time.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -40,13 +42,14 @@ int main(
     int ret = -1, i = 0;
     PVFS_fs_id fs_id;
     char *name = "/";
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
-    int pvfs_dirent_incount;
+    int pvfs_dirent_incount,
+        pvfs_dirent_outcount;
 
     PVFS_handle lk_handle;
     PVFS_handle lk_fsid;
@@ -69,6 +72,8 @@ int main(
     }
 
     printf("SYSTEM INTERFACE INITIALIZED\n");
+
+    PVFS_util_gen_credential_defaults(&credentials);
 
     /* lookup the root handle */
     printf("looking up the root handle for fsid = %d\n", fs_id);
@@ -99,11 +104,10 @@ int main(
 	return (-1);
     }
     memcpy(entry_name, filename, strlen(filename) + 1);
-    PVFS_util_gen_credentials(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
@@ -477,22 +481,32 @@ int main(
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;
 
-    // call readdir 
-    ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
+    /*
+    do
+    {
+    */
+        // call readdir 
+        ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
 			   &credentials, resp_readdir, NULL);
-    if (ret < 0)
-    {
-	printf("readdir failed with errcode = %d\n", ret);
-	return (-1);
-    }
+        if (ret < 0)
+        {
+	    printf("readdir failed with errcode = %d\n", ret);
+	    return (-1);
+        }
 
-    // print the handle 
-    printf("--readdir--\n");
-    printf("Token:%ld\n", (long int) resp_readdir->token);
-    for (i = 0; i < resp_readdir->pvfs_dirent_outcount; i++)
-    {
-	printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
-    }
+        // print the handle 
+        printf("--readdir--\n");
+        printf("Token:%ld\n", (long int) resp_readdir->token);
+        for (i = 0; i < resp_readdir->pvfs_dirent_outcount; i++)
+        {
+	    printf("name:%s\n", resp_readdir->dirent_array[i].d_name);
+        }
+        token = resp_readdir->token;
+        pvfs_dirent_outcount = resp_readdir->pvfs_dirent_outcount;
+    /*
+    } 
+    while (pvfs_dirent_outcount == 6);
+    */
 #if 0
 
     // test the rmdir function 
@@ -591,6 +605,7 @@ void gen_rand_str(
     int newchar = 0;
     gettimeofday(&poop, NULL);
 
+    srand(poop.tv_sec);
     *gen_str = malloc(len + 1);
     for (i = 0; i < len; i++)
     {

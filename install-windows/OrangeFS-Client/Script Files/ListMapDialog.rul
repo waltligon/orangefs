@@ -1,0 +1,46 @@
+#include "Ifx.h"
+
+// Control Constants
+#define BUTTON_NEXT      1
+#define BUTTON_BACK     12
+#define BUTTON_CANCEL2   9  
+#define EDIT_USERID   1303
+#define EDIT_UID      1305
+#define EDIT_GID      1307
+
+// Prototypes
+prototype ListMapDialog(BYREF STRING, BYREF STRING, BYREF STRING);
+
+function ListMapDialog(svUserID, svUID, svGID)
+    BOOL bDone;
+    NUMBER nResult, nControl;
+begin
+    EzDefineDialog("ListMapDialog",
+                   ISUSER,
+                   "ListMapDialog",
+                   0);
+                   
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("ListMapDialog");
+        switch (nControl)
+            case BUTTON_NEXT:
+                CtrlGetText("ListMapDialog", EDIT_USERID, svUserID);
+                CtrlGetText("ListMapDialog", EDIT_UID, svUID);
+                CtrlGetText("ListMapDialog", EDIT_GID, svGID);
+                nResult = BUTTON_NEXT;
+                bDone = TRUE;
+            case BUTTON_BACK:
+                nResult = BUTTON_BACK;
+                bDone = TRUE;
+            case BUTTON_CANCEL2:
+                Do(EXIT);
+        endswitch;
+    endwhile;
+    
+    EndDialog("ListMapDialog");
+    
+    ReleaseDialog("ListMapDialog");
+    
+    return nResult;                           
+end;

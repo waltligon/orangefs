@@ -2,16 +2,16 @@
 
 #include <assert.h>
 #include <stdio.h>
-#include <string.h>
 
 #include <fcntl.h>
-#include <mqueue.h>
+#include <pthread.h>
 #include <sys/mman.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 #include <bmi-method-support.h>
 #include <bmi-method-callback.h>
-#include <gen-locks.h>
 #include <id-generator.h>
 #include <op-list.h>
 
@@ -20,75 +20,69 @@
 #include "zbmi_protocol.h"
 
 /* method_op_p's method_data points to this structure on the server side.  */
-struct zoid_server_method_data
+struct ZoidServerMethodData
 {
     void* tmp_buffer; /* Used with BMI_EXT_ALLOC to store the address of the
 			 temporary shared memory buffer, NULL otherwise.  */
     int zoid_buf_id; /* 0 if the operation has not yet been sent to ZOID.  */
-    gen_mutex_t post_mutex; /* Used to resolve the race between a post
-			       call and testcontext.  */
 };
-
-#define METHOD_DATA(op) ((struct zoid_server_method_data*)(op)->method_data)
 
 /* Describes a request with BMI_EXT_ALLOC pending for a temporary memory
    buffer.  */
-struct no_mem_descriptor
+struct NoMemDescriptor
 {
-    struct no_mem_descriptor* next;
-    struct no_mem_descriptor* prev;
+    struct NoMemDescriptor* next;
+    struct NoMemDescriptor* prev;
 
     bmi_size_t total_size;
     method_op_p op;
 };
 
-/* Control queue to the zbmi plugin  in the ZOID daemon.  */
-static mqd_t zbmi_control_queue = -1;
-
-/* Reply queues from the zbmi plugin.  */
-#define ZBMI_QUEUES_LEN_INIT 10
-static gen_mutex_t zbmi_queues_mutex = GEN_MUTEX_INITIALIZER;
-static mqd_t* zbmi_queues = NULL;
-static char* zbmi_queues_inuse = NULL; /* Whether a particular zbmi_queues
-					  entry is currently in use.  */
-static int zbmi_queues_len = 0; /* Length of zbmi_queues and
-				   zbmi_queues_inuse.  */
-static int zbmi_queues_used = 0; /* Count of initialized zbmi_queues
-				    entries.  */
+/* Command streams to the zbmi plugin in the ZOID daemon.  */
+#define ZBMI_SOCKETS_LEN_INIT 10
+static pthread_mutex_t zbmi_sockets_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int* zbmi_sockets = NULL;
+static char* zbmi_sockets_inuse = NULL; /* Whether a particular zbmi_sockets
+					   entry is currently in use.  */
+static int zbmi_sockets_len = 0; /* Length of zbmi_sockets and
+				    zbmi_sockets_inuse.  */
+static int zbmi_sockets_used = 0; /* Count of initialized zbmi_sockets
+				     entries.  */
 
 /* An array of client addresses.  */
 #define CLIENTS_LEN_INC 10
-static gen_mutex_t clients_mutex = GEN_MUTEX_INITIALIZER;
+static pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 static bmi_method_addr_p* clients_addr = NULL;
 static int clients_len = 0;
 
 /* Shared memory buffer between the ZBMI plugin an us.  */
-static char* zbmi_shm = NULL;
-static char *zbmi_shm_eager, *zbmi_shm_rzv;
+static void* zbmi_shm = NULL;
+static void *zbmi_shm_unexp, *zbmi_shm_exp;
 
 static int zbmi_shm_size_total;
-static int zbmi_shm_size_eager;
-static struct ZBMIEagerDesc* eager_desc;
+static int zbmi_shm_size_unexp;
 
 /* Queue of operations with BMI_EXT_ALLOC buffers pending for a temporary
    memory buffer, sorted by descending total_size.  */
-static struct no_mem_descriptor *no_mem_queue_first = NULL;
+static struct NoMemDescriptor *no_mem_queue_first = NULL;
 /* Only valid if no_mem_queue_first != NULL.  */
-static struct no_mem_descriptor *no_mem_queue_last;
+static struct NoMemDescriptor *no_mem_queue_last;
 /* Protects access to the above queue.  */
-static gen_mutex_t no_mem_queue_mutex = GEN_MUTEX_INITIALIZER;
+static pthread_mutex_t no_mem_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* Queue of failed/canceled operations (that the ZOID server doesn't know
    about).  */
 static op_list_p error_ops;
-static gen_mutex_t error_ops_mutex = GEN_MUTEX_INITIALIZER;
+static pthread_mutex_t error_ops_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-static mqd_t get_zoid_reply_queue(int* queue_id);
-static void release_zoid_reply_queue(int queue_id);
+static ssize_t socket_read(int fd, void* buf, size_t count);
+static ssize_t socket_write(int fd, const void* buf, size_t count);
+static int get_zoid_socket(int* release_token);
+static void release_zoid_socket(int release_token);
 static bmi_method_addr_p get_client_addr(int zoid_addr);
 static int enqueue_no_mem(method_op_p op, bmi_size_t total_size);
-static int send_post_cmd(method_op_p op, int not_immediate, int* length);
+static int send_post_cmd(method_op_p op);
 
 
 /* These symbols come from external libraries that would need to be linked
@@ -102,56 +96,40 @@ typeof(shm_unlink) shm_unlink __attribute__((weak));
 int
 BMI_zoid_server_initialize(void)
 {
-    struct ZBMIControlInitCmd cmd;
-    struct ZBMIControlInitResp resp;
+    int hdr;
+    struct ZBMIControlInitResp init_resp;
     int shm_fd;
-    mqd_t reply_queue;
-    int queue_id;
+    int zoid_fd, zoid_release;
 
-    /* Connect to the ZBMI plugin in the ZOID daemon.  */
-    while ((zbmi_control_queue = mq_open(ZBMI_CONTROL_QUEUE_NAME, O_WRONLY))
-	   < 0)
-    {
-	if (errno == ENOENT)
-	{
-	    /* Probably the ZOID server is not running yet...  */
-	    sleep(1);
-	}
-	else
-	{
-	    perror("connect to ZOID");
-	    return -BMI_EINVAL;
-	}
-    }
-
-    /* This will initialize all the queue structures first.  */
-    if ((reply_queue = get_zoid_reply_queue(&queue_id)) < 0)
-	return reply_queue;
+    /* Connect to the ZBMI plugin in the ZOID daemon.  This will initialize
+       all the socket structures first.  */
+    
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
 
     /* Initial handshake.  */
 
-    cmd.command_id = ZBMI_CONTROL_INIT;
-    cmd.queue_id = queue_id;
+    hdr = ZBMI_CONTROL_INIT;
 
-    if (mq_send(zbmi_control_queue, (void*)&cmd, sizeof(cmd), 0) < 0)
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr))
     {
-	perror("mq_send");
-	release_zoid_reply_queue(queue_id);
+	perror("write");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    if (mq_receive(reply_queue, (void*)&resp, ZBMI_MAX_MSG_SIZE, NULL)
-	!= sizeof(resp))
+    if (socket_read(zoid_fd, &init_resp, sizeof(init_resp)) !=
+	sizeof(init_resp))
     {
-	perror("mq_receive");
-	release_zoid_reply_queue(queue_id);
+	perror("read");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    release_zoid_reply_queue(queue_id);
+    release_zoid_socket(zoid_release);
 
-    zbmi_shm_size_total = resp.shm_size_total;
-    zbmi_shm_size_eager = resp.shm_size_eager;
+    zbmi_shm_size_total = init_resp.shm_size_total;
+    zbmi_shm_size_unexp = init_resp.shm_size_unexp;
 
     /* Open the shared memory area.  */
 
@@ -171,14 +149,12 @@ BMI_zoid_server_initialize(void)
 
     close(shm_fd);
 
-    /* The shared memory buffer starts with an eager section, which is
+    /* The shared memory buffer starts with an unexpected section, which is
        managed by the ZBMI ZOID plugin.  */
-    zbmi_shm_eager = zbmi_shm;
-    /* Eager section starts with a descriptor.  */
-    eager_desc = (struct ZBMIEagerDesc*)zbmi_shm_eager;
-    /* The rendezvous buffers part is initialized and managed by us.  */
-    zbmi_shm_rzv = zbmi_shm + zbmi_shm_size_eager;
-    zbmi_pool_init(zbmi_shm_rzv, zbmi_shm_size_total - zbmi_shm_size_eager);
+    zbmi_shm_unexp = zbmi_shm;
+    /* The expected buffers part is initialized and managed by us.  */
+    zbmi_shm_exp = zbmi_shm + zbmi_shm_size_unexp;
+    zbmi_pool_init(zbmi_shm_exp, zbmi_shm_size_total - zbmi_shm_size_unexp);
 
     if (!(error_ops = op_list_new()))
 	return -BMI_ENOMEM;
@@ -203,17 +179,11 @@ BMI_zoid_server_finalize(void)
     munmap(zbmi_shm, zbmi_shm_size_total);
 
     /* FIXME!  Send some sort of a FINI message first?  */
-    for (i = 0; i < zbmi_queues_used; i++)
-    {
-	char queue_name[256];
-	mq_close(zbmi_queues[i]);
-	sprintf(queue_name, ZBMI_REPLY_QUEUE_TEMPLATE, i);
-	mq_unlink(queue_name);
-    }
-    free(zbmi_queues_inuse);
-    free(zbmi_queues);
-    zbmi_queues_len = zbmi_queues_used = 0;
-    mq_close(zbmi_control_queue);
+    for (i = 0; i < zbmi_sockets_used; i++)
+	close(zbmi_sockets[i]);
+    free(zbmi_sockets_inuse);
+    free(zbmi_sockets);
+    zbmi_sockets_len = zbmi_sockets_used = 0;
 
     return 0;
 }
@@ -230,24 +200,24 @@ BMI_zoid_server_memalloc(bmi_size_t size)
 void
 BMI_zoid_server_memfree(void* buffer)
 {
-    struct no_mem_descriptor* desc;
+    struct NoMemDescriptor* desc;
 
     zbmi_pool_free(buffer);
 
     /* Once some memory has been freed, go over the queue of requests waiting
        for memory and try to satisfy any of them.  */
-    gen_mutex_lock(&no_mem_queue_mutex);
+    pthread_mutex_lock(&no_mem_queue_mutex);
 
     for (desc = no_mem_queue_first; desc;)
     {
-	struct no_mem_descriptor* desc_next = desc->next;
+	struct NoMemDescriptor* desc_next = desc->next;
 	void* buf;
 
 	if ((buf = BMI_zoid_server_memalloc(desc->total_size)))
 	{
 	    method_op_p op = desc->op;
 
-	    METHOD_DATA(op)->tmp_buffer = buf;
+	    ((struct ZoidServerMethodData*)op->method_data)->tmp_buffer = buf;
 
 	    if (op->send_recv == BMI_SEND)
 	    {
@@ -274,44 +244,47 @@ BMI_zoid_server_memfree(void* buffer)
 		no_mem_queue_last = no_mem_queue_last->prev;
 	    free(desc);
 
-	    /* Post it as "non-immediate" since we do not have facilities
-	       here to manage immediate completions.  */
-	    if ((op->error_code = -send_post_cmd(op, 1, NULL)))
+	    if ((op->error_code = -send_post_cmd(op)))
 	    {
-		gen_mutex_lock(&error_ops_mutex);
+		pthread_mutex_lock(&error_ops_mutex);
 		op_list_add(error_ops, op);
-		gen_mutex_unlock(&error_ops_mutex);
+		pthread_mutex_unlock(&error_ops_mutex);
 	    }
 	}
 
 	desc = desc_next;
     }
 
-    gen_mutex_unlock(&no_mem_queue_mutex);
+    pthread_mutex_unlock(&no_mem_queue_mutex);
 }
 
 /* Invoked on BMI_unexpected_free.  */
 int
 BMI_zoid_server_unexpected_free(void* buffer)
 {
-    struct ZBMIControlEagerFreeCmd cmd;
+    int zoid_fd, zoid_release;
+    int hdr;
+    struct ZBMIControlUnexpFreeCmd cmd;
 
-    if ((char*)buffer < zbmi_shm_eager ||
-	(char*)buffer >= zbmi_shm_eager + zbmi_shm_size_eager)
+    if (buffer < zbmi_shm_unexp ||
+	buffer >= zbmi_shm_unexp + zbmi_shm_size_unexp)
+	return -BMI_EINVAL;
+
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
+
+    hdr = ZBMI_CONTROL_UNEXP_FREE;
+    cmd.buffer = buffer - zbmi_shm_unexp;
+
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
+	socket_write(zoid_fd, &cmd, sizeof(cmd)) != sizeof(cmd))
     {
+	perror("write");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    cmd.command_id = ZBMI_CONTROL_EAGER_FREE;
-    cmd.unexpected = 1;
-    cmd.buffer = (char*)buffer - zbmi_shm_eager;
-
-    if (mq_send(zbmi_control_queue, (void*)&cmd, sizeof(cmd), 0) < 0)
-    {
-	perror("mq_send");
-	return -BMI_EINVAL;
-    }
-
+    release_zoid_socket(zoid_release);
     return 0;
 }
 
@@ -319,92 +292,70 @@ BMI_zoid_server_unexpected_free(void* buffer)
 int
 BMI_zoid_server_testunexpected(int incount, int* outcount,
 			       struct bmi_method_unexpected_info* info,
-			       uint8_t class, int max_idle_time_ms)
+			       int max_idle_time_ms)
 {
-    mqd_t reply_queue;
-    int queue_id;
+    int zoid_fd, zoid_release;
+    int hdr;
     int i;
     struct ZBMIControlUnexpTestCmd cmd;
-    char resp_buffer[ZBMI_MAX_MSG_SIZE];
-    struct ZBMIControlUnexpTestResp* resp;
-    struct SharedMessageDescriptor* msg_desc;
+    struct ZBMIControlUnexpTestResp resp;
+    struct ZBMIControlBufDesc* buf_descs = NULL;
 
-    /* Check for ready messages in the shared memory region first.  */
-    sem_wait(&eager_desc->unexp_queue_sem);
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
 
-    *outcount = 0;
-    for (msg_desc = (struct SharedMessageDescriptor*)
-	     (eager_desc->unexp_queue_first + zbmi_shm_eager);
-	 msg_desc != (struct SharedMessageDescriptor*)zbmi_shm_eager;
-	 msg_desc = (struct SharedMessageDescriptor*)
-	     (msg_desc->next + zbmi_shm_eager))
+    hdr = ZBMI_CONTROL_UNEXP_TEST;
+    cmd.incount = incount;
+    cmd.max_idle_time_ms = max_idle_time_ms;
+
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
+	socket_write(zoid_fd, &cmd, sizeof(cmd)) != sizeof(cmd))
     {
-	if (*outcount >= incount)
-	    break;
+	perror("write");
+	release_zoid_socket(zoid_release);
+	return -BMI_EINVAL;
+    }
 
-	if (msg_desc->message_type == MSG_TYPE_SEND &&
-	    msg_desc->class == class)
+    if (socket_read(zoid_fd, &resp, offsetof(typeof(resp), buffers)) !=
+	offsetof(typeof(resp), buffers))
+    {
+	perror("read");
+	release_zoid_socket(zoid_release);
+	return -BMI_EINVAL;
+    }
+    if (resp.outcount_bytes > 0)
+    {
+	buf_descs = alloca(resp.outcount_bytes);
+
+	if (socket_read(zoid_fd, buf_descs, resp.outcount_bytes) !=
+	    resp.outcount_bytes)
 	{
-	    info[*outcount].error_code = 0;
-	    if (!(info[*outcount].addr = get_client_addr(msg_desc->addr)))
-		return -BMI_ENOMEM;
-	    info[*outcount].buffer = msg_desc->buffer;
-	    info[*outcount].size = msg_desc->size;
-	    info[*outcount].tag = msg_desc->tag;
-
-	    /* Prevent any subsequent tests from matching it.  */
-	    msg_desc->message_type = MSG_TYPE_DONE;
-
-	    (*outcount)++;
+	    perror("read");
+	    release_zoid_socket(zoid_release);
+	    return -BMI_EINVAL;
 	}
     }
 
-    sem_post(&eager_desc->unexp_queue_sem);
+    release_zoid_socket(zoid_release);
 
-    if (*outcount > 0 || max_idle_time_ms == 0)
-	return 0;
-
-    if ((reply_queue = get_zoid_reply_queue(&queue_id)) < 0)
-	return reply_queue;
-
-    cmd.command_id = ZBMI_CONTROL_UNEXP_TEST;
-    cmd.queue_id = queue_id;
-    cmd.incount = incount;
-    cmd.max_idle_time_ms = max_idle_time_ms;
-    cmd.class = class;
-
-    if (mq_send(zbmi_control_queue, (void*)&cmd, sizeof(cmd), 0) < 0)
+    *outcount = resp.outcount;
+    for (i = 0; i < resp.outcount; i++)
     {
-	perror("mq_send");
-	release_zoid_reply_queue(queue_id);
-	return -BMI_EINVAL;
-    }
-
-    if (mq_receive(reply_queue, resp_buffer, sizeof(resp_buffer), NULL) < 0)
-    {
-	perror("mq_receive");
-	release_zoid_reply_queue(queue_id);
-	return -BMI_EINVAL;
-    }
-
-    release_zoid_reply_queue(queue_id);
-
-    resp = (struct ZBMIControlUnexpTestResp*)resp_buffer;
-    *outcount = resp->outcount;
-    for (i = 0; i < resp->outcount; i++)
-    {
-	msg_desc = (struct SharedMessageDescriptor*)
-	    (resp->descs[i] + zbmi_shm_eager);
-
 	info[i].error_code = 0;
-	if (!(info[i].addr = get_client_addr(msg_desc->addr)))
-	    return -BMI_ENOMEM;
-	info[i].buffer = msg_desc->buffer;
-	info[i].size = msg_desc->size;
-	info[i].tag = msg_desc->tag;
 
-	/* msg_desc->message_type has already been set to MSG_TYPE_DONE
-	   by the zbmi plugin.  */
+	if (!(info[i].addr = get_client_addr(buf_descs->addr)))
+	    return -BMI_ENOMEM;
+
+	if (buf_descs->list_count != 1)
+	    return -BMI_EINVAL;
+
+	info[i].buffer = zbmi_shm_unexp + buf_descs->list[0].buffer;
+	info[i].size = buf_descs->list[0].size;
+	info[i].tag = buf_descs->tag;
+
+	buf_descs = (struct ZBMIControlBufDesc*)
+	    (((char*)buf_descs) + offsetof(typeof(*buf_descs), list) +
+	     buf_descs->list_count * sizeof(buf_descs->list[0]));
     }
 
     return 0;
@@ -420,9 +371,11 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 			bmi_context_id context_id, PVFS_hint hints)
 {
     method_op_p new_op;
-    int ret;
 
-    if (!(new_op = bmi_alloc_method_op(sizeof(struct zoid_server_method_data))))
+    /* Server-side sends are never immediate, so we start by allocating a
+       method op.  */
+
+    if (!(new_op = bmi_alloc_method_op(sizeof(struct ZoidServerMethodData))))
 	return -BMI_ENOMEM;
     *id = new_op->op_id;
     new_op->addr = dest;
@@ -444,8 +397,8 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 	new_op->size_list = size_list;
     }
     new_op->error_code = 0;
-    METHOD_DATA(new_op)->tmp_buffer = NULL;
-    METHOD_DATA(new_op)->zoid_buf_id = 0;
+    ((struct ZoidServerMethodData*)new_op->method_data)->tmp_buffer = NULL;
+    ((struct ZoidServerMethodData*)new_op->method_data)->zoid_buf_id = 0;
 
     if (buffer_type == BMI_EXT_ALLOC)
     {
@@ -461,7 +414,7 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 	    return enqueue_no_mem(new_op, total_size);
 	}
 
-	METHOD_DATA(new_op)->tmp_buffer = buf;
+	((struct ZoidServerMethodData*)new_op->method_data)->tmp_buffer = buf;
 
 	for (i = 0; i < list_count; i++)
 	{
@@ -474,24 +427,15 @@ zoid_server_send_common(bmi_op_id_t* id, bmi_method_addr_p dest,
 	/* Verify that the buffer is actually allocated by us.  */
 	int i;
 	for (i = 0; i < list_count; i++)
-	    if ((char*)buffer_list[i] < zbmi_shm_rzv ||
-		(char*)buffer_list[i] + size_list[i] > zbmi_shm_rzv +
-		zbmi_shm_size_total - zbmi_shm_size_eager)
+	    if (buffer_list[i] < zbmi_shm_exp ||
+		buffer_list[i] + size_list[i] > zbmi_shm_exp +
+		zbmi_shm_size_total - zbmi_shm_size_unexp)
 	    {
 		return -BMI_EINVAL;
 	    }
     }
 
-    if ((ret = send_post_cmd(new_op, 0, NULL)) == 1)
-    {
-	/* Immediate completion.  */
-	if (buffer_type == BMI_EXT_ALLOC)
-	    BMI_zoid_server_memfree(METHOD_DATA(new_op)->tmp_buffer);
-
-	bmi_dealloc_method_op(new_op);
-    }
-
-    return ret;
+    return send_post_cmd(new_op);
 }
 
 /* A common receive routine used for all expected messages.  */
@@ -505,81 +449,11 @@ zoid_server_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 			PVFS_hint hints)
 {
     method_op_p new_op;
-    int ret, length;
-    struct SharedMessageDescriptor* msg_desc;
 
-    /* Check for matching eager messages first.  */
+    /* Server-side receives are never immediate, so we start by allocating a
+       method op.  */
 
-    sem_wait(&eager_desc->eager_queue_sem);
-
-    for (msg_desc = (struct SharedMessageDescriptor*)
-	     (eager_desc->eager_queue_first + zbmi_shm_eager);
-	 msg_desc != (struct SharedMessageDescriptor*)zbmi_shm_eager;
-	 msg_desc = (struct SharedMessageDescriptor*)
-	     (msg_desc->next + zbmi_shm_eager))
-    {
-	if (msg_desc->message_type == MSG_TYPE_SEND &&
-	    msg_desc->addr == ((struct zoid_addr*)src->method_data)->pid &&
-	    msg_desc->tag == tag)
-	{
-	    break;
-	}
-    }
-
-    if (msg_desc != (struct SharedMessageDescriptor*)zbmi_shm_eager)
-    {
-	int i;
-	size_t copied;
-	struct ZBMIControlEagerFreeCmd cmd;
-
-	/* We found a matching eager message.  All we need to do is copy
-	   the memory over.  */
-
-	if (total_expected_size < msg_desc->size)
-	{
-	    fprintf(stderr, "Message size mismatch, ION "
-		    "expected size %lld < CN total size %d\n",
-		    total_expected_size, msg_desc->size);
-
-	    sem_post(&eager_desc->eager_queue_sem);
-	    return -BMI_EINVAL;
-	}
-
-	copied = 0;
-	i = 0;
-	while (copied < msg_desc->size)
-	{
-	    size_t tocopy = (size_list[i] < msg_desc->size - copied ?
-			     size_list[i] : msg_desc->size - copied);
-	    memcpy(buffer_list[i], msg_desc->buffer + copied, tocopy);
-	    copied += tocopy;
-	    i++;
-	}
-	*total_actual_size = msg_desc->size;
-
-	/* Prevent any subsequent matches.  */
-	msg_desc->message_type = MSG_TYPE_DONE;
-
-	sem_post(&eager_desc->eager_queue_sem);
-
-	/* Request its release (only the zbmi plugin can do it).  */
-	cmd.command_id = ZBMI_CONTROL_EAGER_FREE;
-	cmd.unexpected = 0;
-	cmd.buffer = (char*)msg_desc - zbmi_shm_eager;
-
-	if (mq_send(zbmi_control_queue, (void*)&cmd, sizeof(cmd), 0) < 0)
-	{
-	    perror("mq_send");
-	    return -BMI_EINVAL;
-	}
-
-	/* Immediate completion.  */
-	return 1;
-    }
-
-    sem_post(&eager_desc->eager_queue_sem);
-
-    if (!(new_op = bmi_alloc_method_op(sizeof(struct zoid_server_method_data))))
+    if (!(new_op = bmi_alloc_method_op(sizeof(struct ZoidServerMethodData))))
 	return -BMI_ENOMEM;
     *id = new_op->op_id;
     new_op->addr = src;
@@ -601,8 +475,8 @@ zoid_server_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 	new_op->size_list = size_list;
     }
     new_op->error_code = 0;
-    METHOD_DATA(new_op)->tmp_buffer = NULL;
-    METHOD_DATA(new_op)->zoid_buf_id = 0;
+    ((struct ZoidServerMethodData*)new_op->method_data)->tmp_buffer = NULL;
+    ((struct ZoidServerMethodData*)new_op->method_data)->zoid_buf_id = 0;
 
     if (buffer_type == BMI_EXT_ALLOC)
     {
@@ -616,50 +490,22 @@ zoid_server_recv_common(bmi_op_id_t* id, bmi_method_addr_p src,
 	    return enqueue_no_mem(new_op, total_expected_size);
 	}
 
-	METHOD_DATA(new_op)->tmp_buffer = buf;
+	((struct ZoidServerMethodData*)new_op->method_data)->tmp_buffer = buf;
     }
     else
     {
 	/* Verify that the buffer is actually allocated by us.  */
 	int i;
 	for (i = 0; i < list_count; i++)
-	    if ((char*)buffer_list[i] < zbmi_shm_rzv ||
-		(char*)buffer_list[i] + size_list[i] > zbmi_shm_rzv +
-		zbmi_shm_size_total - zbmi_shm_size_eager)
+	    if (buffer_list[i] < zbmi_shm_exp ||
+		buffer_list[i] + size_list[i] > zbmi_shm_exp +
+		zbmi_shm_size_total - zbmi_shm_size_unexp)
 	    {
 		return -BMI_EINVAL;
 	    }
     }
 
-    if ((ret = send_post_cmd(new_op, 0, &length)) == 1)
-    {
-	/* Immediate completion.  */
-	*total_actual_size = length;
-
-	if (buffer_type == BMI_EXT_ALLOC)
-	{
-	    /* Copy the memory back to the user buffer(s).  */
-	    int j, size_remaining = length;
-	    void *buf_cur = METHOD_DATA(new_op)->tmp_buffer;
-	    j = 0;
-	    while (size_remaining > 0)
-	    {
-		int tocopy = (new_op->size_list[j] < size_remaining ?
-			      new_op->size_list[j] : size_remaining);
-
-		memcpy(new_op->buffer_list[j], buf_cur, tocopy);
-		buf_cur += tocopy;
-		size_remaining -= tocopy;
-		j++;
-	    }
-
-	    BMI_zoid_server_memfree(METHOD_DATA(new_op)->tmp_buffer);
-	}
-
-	bmi_dealloc_method_op(new_op);
-    }
-
-    return ret;
+    return send_post_cmd(new_op);
 }
 
 /* A common test routine used for all expected messages.  "incount" is 0
@@ -672,20 +518,19 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 			void** user_ptr_array, int max_idle_time_ms,
 			bmi_context_id context_id)
 {
-    mqd_t reply_queue;
-    int queue_id;
-    char cmd_buffer[ZBMI_MAX_MSG_SIZE], resp_buffer[ZBMI_MAX_MSG_SIZE];
+    int zoid_fd, zoid_release;
+    int hdr;
     struct ZBMIControlTestCmd* cmd;
     int cmd_len;
-    struct ZBMIControlTestResp* resp;
-    int i, index;
+    struct ZBMIControlTestResp resp;
+    int i;
     int outcount_used = 0; /* Counter of already used output entries.  */
     int incount_fwd = incount; /* Counter of how many input entries to
 				  forward to the ZBMI plugin.  */
 
     /* We start by checking if there are any local failed/canceled operations
        and taking care of those first.  */
-    gen_mutex_lock(&error_ops_mutex);
+    pthread_mutex_lock(&error_ops_mutex);
     if (incount)
     {
 	for (i = 0; i < incount; i++)
@@ -708,8 +553,15 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 		outcount_used++;
 
 		op_list_remove(op);
-		bmi_dealloc_method_op(op);
+		/* Note: we will dealloc a little later.  */
 	    }
+	}
+
+	if (outcount_used > 0)
+	{
+	    incount_fwd = incount - outcount_used;
+	    if (index_array)
+		index_array += outcount_used;
 	}
     }
     else
@@ -732,155 +584,153 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 	    op_list_remove(op);
 	    bmi_dealloc_method_op(op);
 	}
-    }
-    gen_mutex_unlock(&error_ops_mutex);
 
-    if (outcount_used > 0)
-    {
-	/* Return immediately if there is something to return.  */
-	*outcount = outcount_used;
-	return 0;
-    }
-#if 0 /* Commented out so that testcontext won't return 0 if there are ready
-	 expected rendezvous messages.  */
-    else if (!incount)
-    {
-	/* Testcontext.  Check in the shared memory region for ready
-	   unexpected messages and return immediately if any.  */
-	struct SharedMessageDescriptor* msg_desc;
-
-	sem_wait(&eager_desc->unexp_queue_sem);
-
-	for (msg_desc = (struct SharedMessageDescriptor*)
-		 (eager_desc->unexp_queue_first + zbmi_shm_eager);
-	     msg_desc != (struct SharedMessageDescriptor*)zbmi_shm_eager;
-	     msg_desc = (struct SharedMessageDescriptor*)
-		 (msg_desc->next + zbmi_shm_eager))
+	if (outcount_used > 0)
 	{
-	    if (msg_desc->message_type == MSG_TYPE_SEND)
-		break;
-	}
-
-	sem_post(&eager_desc->unexp_queue_sem);
-
-	if (msg_desc != (struct SharedMessageDescriptor*)zbmi_shm_eager)
-	{
-	    *outcount = 0;
-	    return 0;
+	    id_array += outcount_used;
+	    error_code_array += outcount_used;
+	    actual_size_array += outcount_used;
+	    user_ptr_array += outcount_used;
 	}
     }
-#endif
+    pthread_mutex_unlock(&error_ops_mutex);
 
-    if ((reply_queue = get_zoid_reply_queue(&queue_id)) < 0)
-	return reply_queue;
-
+    hdr = ZBMI_CONTROL_TEST;
     cmd_len = offsetof(typeof(*cmd), zoid_ids) +
 	incount_fwd * sizeof(cmd->zoid_ids[0]);
-    if (cmd_len > ZBMI_MAX_MSG_SIZE)
-	return -BMI_EINVAL;
+    cmd = alloca(cmd_len);
 
-    cmd = (struct ZBMIControlTestCmd*)cmd_buffer;
-    cmd->command_id = ZBMI_CONTROL_TEST;
-    cmd->queue_id = queue_id;
     cmd->timeout_ms = max_idle_time_ms;
+
     /* incount_fwd == 0 indicates "testcontext".  We still need to communicate
        the max. count of outputs we are prepared to handle.  */
     cmd->count = (incount_fwd ? incount_fwd : -outcount_max);
     for (i = 0; i < incount; i++)
     {
 	method_op_p op = (method_op_p)id_gen_fast_lookup(id_array[i]);
-
-	cmd->zoid_ids[i] = METHOD_DATA(op)->zoid_buf_id;
+	if (op->error_code)
+	{
+	    bmi_dealloc_method_op(op);
+	    continue;
+	}
+	cmd->zoid_ids[i] = ((struct ZoidServerMethodData*)op->method_data)->
+	    zoid_buf_id;
     }
 
-    if (mq_send(zbmi_control_queue, (void*)cmd, cmd_len, 0) < 0)
+    if (outcount_used > 0)
     {
-	perror("mq_send");
-	release_zoid_reply_queue(queue_id);
+	outcount_max -= outcount_used;
+	if (outcount_max == 0 || (incount > 0 && incount_fwd == 0))
+	{
+	    *outcount = outcount_used;
+	    return 0;
+	}
+    }
+
+    /* Note: this is shifted later than usual in the function body so that
+       we can invoke bmi_dealloc_method_op above as appropriate.  */
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
+
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
+	socket_write(zoid_fd, cmd, cmd_len) != cmd_len)
+    {
+	perror("write");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    if (mq_receive(reply_queue, resp_buffer, sizeof(resp_buffer), NULL) < 0)
+    if (socket_read(zoid_fd, &resp, offsetof(typeof(resp), list)) !=
+	offsetof(typeof(resp), list))
     {
-	perror("mq_receive");
-	release_zoid_reply_queue(queue_id);
+	perror("read");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
-    resp = (struct ZBMIControlTestResp*)resp_buffer;
-
-    assert(resp->count <= outcount_max);
-    *outcount = resp->count;
-
-    for (i = 0, index = 0; i < resp->count; i++, index++)
+    assert(resp.count <= outcount_max);
+    *outcount = resp.count;
+    if (resp.count > 0)
     {
-	method_op_p op = (method_op_p)id_gen_fast_lookup(resp->list[i].
-							 bmi_id);
-	if (incount_fwd)
+	struct ZBMIControlTestRespList* resp_list;
+	int index;
+
+	resp_list = alloca(resp.count * sizeof(*resp_list));
+
+	if (socket_read(zoid_fd, resp_list, resp.count * sizeof(*resp_list)) !=
+	    resp.count * sizeof(*resp_list))
 	{
-	    for (; index < incount_fwd; index++)
+	    perror("read");
+	    release_zoid_socket(zoid_release);
+	    return -BMI_EINVAL;
+	}
+
+	for (i = 0, index = 0; i < resp.count; i++, index++)
+	{
+	    method_op_p op = (method_op_p)id_gen_fast_lookup(resp_list[i].
+							     bmi_id);
+	    if (incount_fwd)
 	    {
-		if (cmd->zoid_ids[index] == METHOD_DATA(op)->zoid_buf_id)
-		    break;
-	    }
-	    assert(index < incount_fwd);
-
-	    if (index_array)
-		index_array[i] = index;
-	    else
-		assert(i == index);
-	}
-	else /* testcontext */
-	{
-	    /* Make sure the returned method_op is fully initialized.
-	       Only an issue for testcontext, since other test calls
-	       require bmi_op_id_t, which implies full initialization.  */
-	    gen_mutex_lock(&METHOD_DATA(op)->post_mutex);
-	    gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
-	    id_array[i] = resp->list[i].bmi_id;
-	}
-
-	if (resp->list[i].length < 0) /* Most likely BMI_ECANCEL */
-	{
-	    error_code_array[index] = -resp->list[i].length;
-	    actual_size_array[index] = 0;
-	}
-	else
-	{
-	    actual_size_array[index] = resp->list[i].length;
-	    error_code_array[index] = 0;
-	}
-
-	if (user_ptr_array)
-	    user_ptr_array[index] = op->user_ptr;
-
-	/* We are done with this message.  Clean up.  */
-	if (METHOD_DATA(op)->tmp_buffer)
-	{
-	    if (op->send_recv == BMI_RECV)
-	    {
-		/* Copy the memory back to the user buffer(s).  */
-		int j, size_remaining = resp->list[i].length;
-		void *buf_cur = METHOD_DATA(op)->tmp_buffer;
-		j = 0;
-		while (size_remaining > 0)
+		for (; index < incount_fwd; index++)
 		{
-		    int tocopy = (op->size_list[j] < size_remaining ?
-				  op->size_list[j] : size_remaining);
-
-		    memcpy(op->buffer_list[j], buf_cur, tocopy);
-		    buf_cur += tocopy;
-		    size_remaining -= tocopy;
-		    j++;
+		    if (cmd->zoid_ids[index] == ((struct ZoidServerMethodData*)
+						 op->method_data)->zoid_buf_id)
+			break;
 		}
+		assert(index < incount_fwd);
+
+		if (index_array)
+		    index_array[i] = index;
+		else
+		    assert(i == index);
+	    }
+	    else /* testcontext */
+		id_array[i] = resp_list[i].bmi_id;
+
+	    if (resp_list[i].length < 0) /* Most likely BMI_ECANCEL */
+	    {
+		error_code_array[index] = -resp_list[i].length;
+		actual_size_array[index] = 0;
+	    }
+	    else
+	    {
+		actual_size_array[index] = resp_list[i].length;
+		error_code_array[index] = 0;
 	    }
 
-	    BMI_zoid_server_memfree(METHOD_DATA(op)->tmp_buffer);
-	}
+	    if (user_ptr_array)
+		user_ptr_array[index] = op->user_ptr;
 
-	bmi_dealloc_method_op(op);
-    } /* for (i) */
+	    /* We are done with this message.  Clean up.  */
+	    if (((struct ZoidServerMethodData*)op->method_data)->tmp_buffer)
+	    {
+		if (op->send_recv == BMI_RECV)
+		{
+		    /* Copy the memory back to the user buffer(s).  */
+		    int j, size_remaining = resp_list[i].length;
+		    void *buf_cur = ((struct ZoidServerMethodData*)op->
+				     method_data)->tmp_buffer;
+		    j = 0;
+		    while (size_remaining > 0)
+		    {
+			int tocopy = (op->size_list[j] < size_remaining ?
+				      op->size_list[j] : size_remaining);
 
-    release_zoid_reply_queue(queue_id);
+			memcpy(op->buffer_list[j], buf_cur, tocopy);
+			buf_cur += tocopy;
+			size_remaining -= tocopy;
+			j++;
+		    }
+		}
+
+		BMI_zoid_server_memfree(((struct ZoidServerMethodData*)op->
+					 method_data)->tmp_buffer);
+	    }
+
+	    bmi_dealloc_method_op(op);
+	} /* for (i) */
+    } /* if (resp.count > 0) */
+
+    release_zoid_socket(zoid_release);
 
     return 0;
 }
@@ -889,6 +739,8 @@ zoid_server_test_common(int incount, bmi_op_id_t* id_array,
 int
 BMI_zoid_server_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {
+    int zoid_fd, zoid_release;
+    int hdr;
     struct ZBMIControlCancelCmd cmd;
     method_op_p op;
 
@@ -898,17 +750,17 @@ BMI_zoid_server_cancel(bmi_op_id_t id, bmi_context_id context_id)
        with the ZBMI plugin (we need to unregister those) and those that
        have not, most likely because of a lack of memory (those can be handled
        locally).  */
-    if (!METHOD_DATA(op)->zoid_buf_id)
+    if (!((struct ZoidServerMethodData*)op->method_data)->zoid_buf_id)
     {
-	gen_mutex_lock(&no_mem_queue_mutex);
+	pthread_mutex_lock(&no_mem_queue_mutex);
 
 	/* Test again, now with mutex properly locked.  */
-	if (!METHOD_DATA(op)->zoid_buf_id)
+	if (!((struct ZoidServerMethodData*)op->method_data)->zoid_buf_id)
 	{
 	    if (!op->error_code)
 	    {
 		/* It must be an out-of-memory case on no_mem_queue.  */
-		struct no_mem_descriptor* desc;
+		struct NoMemDescriptor* desc;
 
 		op->error_code = BMI_ECANCEL;
 
@@ -928,134 +780,203 @@ BMI_zoid_server_cancel(bmi_op_id_t id, bmi_context_id context_id)
 		    }
 		assert(desc);
 
-		gen_mutex_lock(&error_ops_mutex);
+		pthread_mutex_lock(&error_ops_mutex);
 		op_list_add(error_ops, op);
-		gen_mutex_unlock(&error_ops_mutex);
+		pthread_mutex_unlock(&error_ops_mutex);
 	    }
 
-	    gen_mutex_unlock(&no_mem_queue_mutex);
+	    pthread_mutex_unlock(&no_mem_queue_mutex);
 
 	    return 0;
 	}
 
-	gen_mutex_unlock(&no_mem_queue_mutex);
+	pthread_mutex_unlock(&no_mem_queue_mutex);
     }
 
-    cmd.command_id = ZBMI_CONTROL_CANCEL;
-    cmd.zoid_id = METHOD_DATA(op)->zoid_buf_id;
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
 
-    if (mq_send(zbmi_control_queue, (void*)&cmd, sizeof(cmd), 0) < 0)
+    hdr = ZBMI_CONTROL_CANCEL;
+    cmd.zoid_id = ((struct ZoidServerMethodData*)op->method_data)->
+	    zoid_buf_id;
+
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
+	socket_write(zoid_fd, &cmd, sizeof(cmd)) != sizeof(cmd))
     {
-	perror("mq_send");
+	perror("write");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
     return 0;
 }
 
-/* An internal routine used to obtain a (reply) queue to the ZBMI plugin.  */
-static mqd_t
-get_zoid_reply_queue(int* queue_id)
+/*
+ * A more robust version of read(2).
+ */
+static ssize_t
+socket_read(int fd, void* buf, size_t count)
+{
+    size_t already_read = 0;
+
+    while (already_read < count)
+    {
+	ssize_t n;
+
+	n = read(fd, buf + already_read, count - already_read);
+
+	if (n == -1)
+	{
+	    if (errno == EINTR || errno == EAGAIN)
+		continue;
+	    return -1;
+	}
+	else if (n == 0)
+	    return already_read;
+	else
+	    already_read += n;
+    }
+
+    return already_read;
+}
+
+/*
+ * A more robust version of write(2).
+ */
+static ssize_t
+socket_write(int fd, const void* buf, size_t count)
+{
+    size_t already_written = 0;
+
+    while (already_written < count)
+    {
+	ssize_t n;
+
+	n = write(fd, buf + already_written, count - already_written);
+
+	if (n == -1)
+	{
+	    if (errno == EINTR || errno == EAGAIN)
+		continue;
+	    return -1;
+	}
+	else
+	    already_written += n;
+    }
+
+    return already_written;
+}
+
+/* An internal routine used to obtain a socket to the ZBMI plugin.  */
+static int
+get_zoid_socket(int* release_token)
 {
     int i;
 
-    gen_mutex_lock(&zbmi_queues_mutex);
+    pthread_mutex_lock(&zbmi_sockets_mutex);
 
-    for (i = 0; i < zbmi_queues_used; i++)
-	if (!zbmi_queues_inuse[i])
+    for (i = 0; i < zbmi_sockets_used; i++)
+	if (!zbmi_sockets_inuse[i])
 	    break;
 
-    if (i == zbmi_queues_used)
+    if (i == zbmi_sockets_used)
     {
-	char queue_name[256];
-	struct mq_attr attr;
+	/* All open sockets are currently in use.  Open a new one.  */
+	struct sockaddr_un addr;
 
-	/* All open queues are currently in use.  Open a new one.  */
-	if (zbmi_queues_used == zbmi_queues_len)
+	if (zbmi_sockets_used == zbmi_sockets_len)
 	{
 	    /* Enlarge the arrays first.  */
 	    int j;
-	    int* zbmi_queues_new;
-	    char* zbmi_queues_inuse_new;
+	    int* zbmi_sockets_new;
+	    char* zbmi_sockets_inuse_new;
 
-	    if (zbmi_queues_len == 0)
-		zbmi_queues_len = ZBMI_QUEUES_LEN_INIT;
+	    if (zbmi_sockets_len == 0)
+		zbmi_sockets_len = ZBMI_SOCKETS_LEN_INIT;
 	    else
-		zbmi_queues_len *= 2;
-	    zbmi_queues_new = realloc(zbmi_queues, zbmi_queues_len *
-				      sizeof(*zbmi_queues));
-	    if (!zbmi_queues_new)
+		zbmi_sockets_len *= 2;
+	    zbmi_sockets_new = realloc(zbmi_sockets, zbmi_sockets_len *
+				       sizeof(*zbmi_sockets));
+	    if (!zbmi_sockets_new)
 	    {
-		gen_mutex_unlock(&zbmi_queues_mutex);
+		pthread_mutex_unlock(&zbmi_sockets_mutex);
 		return -BMI_ENOMEM;
 	    }
-	    zbmi_queues = zbmi_queues_new;
-	    zbmi_queues_inuse_new = realloc(zbmi_queues_inuse,
-					    zbmi_queues_len *
-					    sizeof(*zbmi_queues_inuse));
-	    if (!zbmi_queues_inuse_new)
+	    zbmi_sockets = zbmi_sockets_new;
+	    zbmi_sockets_inuse_new = realloc(zbmi_sockets_inuse,
+					     zbmi_sockets_len *
+					     sizeof(*zbmi_sockets_inuse));
+	    if (!zbmi_sockets_inuse_new)
 	    {
-		gen_mutex_unlock(&zbmi_queues_mutex);
+		pthread_mutex_unlock(&zbmi_sockets_mutex);
 		return -BMI_ENOMEM;
 	    }
-	    zbmi_queues_inuse = zbmi_queues_inuse_new;
+	    zbmi_sockets_inuse = zbmi_sockets_inuse_new;
 
-	    for (j = zbmi_queues_used; j < zbmi_queues_len; j++)
-		zbmi_queues_inuse[j] = 0;
+	    for (j = zbmi_sockets_used; j < zbmi_sockets_len; j++)
+		zbmi_sockets_inuse[j] = 0;
 	}
 
-	sprintf(queue_name, ZBMI_REPLY_QUEUE_TEMPLATE, i);
-	attr.mq_flags = 0;
-	attr.mq_maxmsg = 2; /* We never put more than one in there.  */
-	attr.mq_msgsize = ZBMI_MAX_MSG_SIZE;
-	attr.mq_curmsgs = 0;
-
-	zbmi_queues[i] = mq_open(queue_name, O_RDONLY | O_CREAT | O_EXCL,
-				 0666, &attr);
-	if (zbmi_queues[i] < 0)
+	if ((zbmi_sockets[i] = socket(PF_UNIX, SOCK_STREAM, 0)) < 0)
 	{
-	    if (errno == EEXIST)
-	    {
-		/* There's no such thing as O_TRUNC for message queues, so
-		   we need to do it manually.  */
-		mq_unlink(queue_name);
-		zbmi_queues[i] = mq_open(queue_name,
-					 O_RDONLY | O_CREAT | O_EXCL,
-					 0666, &attr);
-	    }
-	}
-
-	if (zbmi_queues[i] < 0)
-	{
-	    perror("ZBMI reply queue");
-	    gen_mutex_unlock(&zbmi_queues_mutex);
+	    perror("ZBMI control socket");
+	    pthread_mutex_unlock(&zbmi_sockets_mutex);
 	    return -BMI_EINVAL;
 	}
 
-	zbmi_queues_used++;
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, ZBMI_SOCKET_NAME);
+#if 0
+	if (bind(zbmi_sockets[i], (struct sockaddr*)&addr, sizeof(addr)) < 0)
+	{
+	    perror("bind " ZBMI_SOCKET_NAME);
+	    close(zbmi_sockets[i]);
+	    pthread_mutex_unlock(&zbmi_sockets_mutex);
+	    return -BMI_EINVAL;
+	}
+#endif
+	while (connect(zbmi_sockets[i], (struct sockaddr*)&addr, sizeof(addr))
+	       < 0)
+	{
+	    if (errno == ENOENT || errno == ECONNREFUSED)
+	    {
+		/* ZOID server not running yet or too many requests?  Wait
+		   a little...  */
+		sleep(1);
+	    }
+	    else
+	    {
+		perror("connect to ZOID");
+		close(zbmi_sockets[i]);
+		pthread_mutex_unlock(&zbmi_sockets_mutex);
+		return -BMI_EINVAL;
+	    }
+	}
+
+	zbmi_sockets_used++;
     }
 
-    zbmi_queues_inuse[i] = 1;
+    zbmi_sockets_inuse[i] = 1;
 
-    gen_mutex_unlock(&zbmi_queues_mutex);
+    pthread_mutex_unlock(&zbmi_sockets_mutex);
 
-    *queue_id = i;
+    *release_token = i;
 
-    return zbmi_queues[i];
+    return zbmi_sockets[i];
 }
 
-/* Releases the queue obtained with get_zoid_reply_queue.  */
+/* Releases the socket obtained with get_zoid_socket.  */
 static void
-release_zoid_reply_queue(int queue_id)
+release_zoid_socket(int release_token)
 {
-    assert(queue_id >= 0 && queue_id < zbmi_queues_used);
+    assert(release_token >= 0 && release_token < zbmi_sockets_used);
 
-    gen_mutex_lock(&zbmi_queues_mutex);
+    pthread_mutex_lock(&zbmi_sockets_mutex);
 
-    assert(zbmi_queues_inuse[queue_id]);
-    zbmi_queues_inuse[queue_id] = 0;
+    assert(zbmi_sockets_inuse[release_token]);
+    zbmi_sockets_inuse[release_token] = 0;
 
-    gen_mutex_unlock(&zbmi_queues_mutex);
+    pthread_mutex_unlock(&zbmi_sockets_mutex);
 }
 
 /* Translates a ZOID address to a BMI address, allocating a new one if
@@ -1067,7 +988,7 @@ get_client_addr(int zoid_addr)
 
     assert(zoid_addr >= 0);
 
-    gen_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&clients_mutex);
 
     if (zoid_addr >= clients_len)
     {
@@ -1080,7 +1001,7 @@ get_client_addr(int zoid_addr)
 					 (zoid_addr + CLIENTS_LEN_INC) *
 					 sizeof(*clients_addr))))
 	{
-	    gen_mutex_unlock(&clients_mutex);
+	    pthread_mutex_unlock(&clients_mutex);
 	    return NULL;
 	}
 	clients_addr = clients_addr_new;
@@ -1104,7 +1025,7 @@ get_client_addr(int zoid_addr)
 
     ret = clients_addr[zoid_addr];
 
-    gen_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clients_mutex);
 
     return ret;
 }
@@ -1113,20 +1034,20 @@ get_client_addr(int zoid_addr)
 void
 zoid_server_free_client_addr(bmi_method_addr_p addr)
 {
-    gen_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&clients_mutex);
 
     assert(((struct zoid_addr*)addr->method_data)->pid < clients_len &&
 	   clients_addr[((struct zoid_addr*)addr->method_data)->pid] == addr);
     clients_addr[((struct zoid_addr*)addr->method_data)->pid] = NULL;
 
-    gen_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 /* Puts an out-of-temporary-buffer-memory operation on the "no_mem" list.  */
 static int
 enqueue_no_mem(method_op_p op, bmi_size_t total_size)
 {
-    struct no_mem_descriptor *nomemdesc, *desc;
+    struct NoMemDescriptor *nomemdesc, *desc;
 
     if (!(nomemdesc = malloc(sizeof(*nomemdesc))))
 	return -BMI_ENOMEM;
@@ -1136,7 +1057,7 @@ enqueue_no_mem(method_op_p op, bmi_size_t total_size)
 
     /* no_mem_queue is sorted in descending size order.
        Look for an appropriate spot to insert a new entry.  */
-    gen_mutex_lock(&no_mem_queue_mutex);
+    pthread_mutex_lock(&no_mem_queue_mutex);
 
     for (desc = no_mem_queue_first; desc; desc = desc->next)
 	if (total_size > desc->total_size)
@@ -1178,107 +1099,71 @@ enqueue_no_mem(method_op_p op, bmi_size_t total_size)
 	no_mem_queue_first = nomemdesc;
     }
 
-    gen_mutex_unlock(&no_mem_queue_mutex);
+    pthread_mutex_unlock(&no_mem_queue_mutex);
 
     return 0;
 }
 
-/* A common internal posting routine for send and receive requests.
-   "not_immediate" is used for messages triggered from memfree; it is
-   inconvenient at that point for messages to succeed immediately (we
-   would need a separate queue for them).
-   The function returns 0 if posted successfully, 1 for immediate
-   completion, and a negative value if failed.
-   For immediate completions of receives, the length of the received
-   message is stored in *length;
-*/
+/* A common internal posting routine for send and receive requests.  */
 static int
-send_post_cmd(method_op_p op, int not_immediate, int* length)
+send_post_cmd(method_op_p op)
 {
-    mqd_t reply_queue;
-    int queue_id;
+    int zoid_fd, zoid_release;
     int cmd_len, i;
-    char cmd_buffer[ZBMI_MAX_MSG_SIZE];
+    int hdr;
     struct ZBMIControlPostCmd* cmd;
     struct ZBMIControlPostResp resp;
     int list_count_zoid;
 
-    if ((reply_queue = get_zoid_reply_queue(&queue_id)) < 0)
-	return reply_queue;
+    if ((zoid_fd = get_zoid_socket(&zoid_release)) < 0)
+	return zoid_fd;
 
-    list_count_zoid = (METHOD_DATA(op)->tmp_buffer ? 1 : op->list_count);
+    hdr = (op->send_recv == BMI_SEND ? ZBMI_CONTROL_POST_SEND :
+	   ZBMI_CONTROL_POST_RECV);
+    list_count_zoid = (((struct ZoidServerMethodData*)op->method_data)->
+		       tmp_buffer ? 1 : op->list_count);
     cmd_len = offsetof(typeof(*cmd), buf.list) +
 	list_count_zoid * sizeof(cmd->buf.list[0]);
-    if (cmd_len > ZBMI_MAX_MSG_SIZE)
-	return -BMI_EINVAL;
-
-    cmd = (struct ZBMIControlPostCmd*)cmd_buffer;
-    cmd->command_id = (op->send_recv == BMI_SEND ? ZBMI_CONTROL_POST_SEND :
-	   ZBMI_CONTROL_POST_RECV);
-    cmd->queue_id = queue_id;
-    cmd->not_immediate = not_immediate;
+    cmd = alloca(cmd_len);
     cmd->bmi_id = op->op_id;
     cmd->buf.addr = ((struct zoid_addr*)op->addr->method_data)->pid;
     cmd->buf.tag = op->msg_tag;
     cmd->buf.list_count = list_count_zoid;
-    if (METHOD_DATA(op)->tmp_buffer)
+    if (((struct ZoidServerMethodData*)op->method_data)->tmp_buffer)
     {
-	cmd->buf.list[0].buffer = (char*)METHOD_DATA(op)->tmp_buffer -
-	    zbmi_shm_rzv;
+	cmd->buf.list[0].buffer = ((struct ZoidServerMethodData*)op->
+				   method_data)->tmp_buffer - zbmi_shm_exp;
 	cmd->buf.list[0].size = (op->send_recv == BMI_SEND ? op->actual_size :
 				 op->expected_size);
     }
     else
 	for (i = 0; i < op->list_count; i++)
 	{
-	    cmd->buf.list[i].buffer = (char*)op->buffer_list[i] - zbmi_shm_rzv;
+	    cmd->buf.list[i].buffer = op->buffer_list[i] - zbmi_shm_exp;
 	    cmd->buf.list[i].size = op->size_list[i];
 	}
 
-    /* The moment the command is written below, we can get a completion of
-       this request on another thread that is waiting in testcontext.  That
-       thread will release method_op_p, resulting in us accessing free memory.
-       This mutex prevents that.  */
-    gen_mutex_init(&METHOD_DATA(op)->post_mutex);
-    gen_mutex_lock(&METHOD_DATA(op)->post_mutex);
-
-    if (mq_send(zbmi_control_queue, (void*)cmd, cmd_len, 0) < 0)
+    if (socket_write(zoid_fd, &hdr, sizeof(hdr)) != sizeof(hdr) ||
+	socket_write(zoid_fd, cmd, cmd_len) != cmd_len)
     {
-	perror("mq_send");
-	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
-	release_zoid_reply_queue(queue_id);
+	perror("write");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    if (mq_receive(reply_queue, (void*)&resp, ZBMI_MAX_MSG_SIZE, NULL) !=
-	sizeof(resp))
+    if (socket_read(zoid_fd, &resp, sizeof(resp)) != sizeof(resp))
     {
-	perror("mq_receive");
-	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
-	release_zoid_reply_queue(queue_id);
+	perror("read");
+	release_zoid_socket(zoid_release);
 	return -BMI_EINVAL;
     }
 
-    release_zoid_reply_queue(queue_id);
+    release_zoid_socket(zoid_release);
 
     if (!resp.zoid_id)
-    {
-	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
 	return -BMI_ENOMEM;
-    }
-    else if (resp.zoid_id == -1)
-    {
-	/* Immediate completion.  */
-	assert(!not_immediate);
-	gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
-	if (length)
-	    *length = resp.length;
-	return 1;
-    }
 
-    METHOD_DATA(op)->zoid_buf_id = resp.zoid_id;
-
-    gen_mutex_unlock(&METHOD_DATA(op)->post_mutex);
+    ((struct ZoidServerMethodData*)op->method_data)->zoid_buf_id = resp.zoid_id;
 
     return 0;
 }

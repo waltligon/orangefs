@@ -1,91 +1,74 @@
 .\" Process this file with
 .\" groff -man -Tascii foo.1
-.\" 
-.TH "PVFS2-GENCONFIG" "1" "OCTOBER 2011" "PVFS2" "PVFS2 Manuals"
-.SH "NAME"
-pvfs2\-genconfig \- create a basic configuration file for PVFS2 servers
-.SH "SYNOPSIS"
-.B pvfs2\-genconfig 
-.I [OPTIONS] <local_config_file>
+.\"
+.TH PVFS2-GENCONFIG 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-genconfig \- create configuration files for PVFS2 servers
+.SH SYNOPSIS
+.B pvfs2-genconfig [ --protocol 
+.I protocol_name
+.B ] [ --port 
+.I port_number
+.B ] [ --ioservers
+.I list_of_servers
+.B ] [ --metaservers 
+.I list_of_servers 
+.B ] [ --logfile     
+.I pathname
+.B ] [ --storage
+.I pathname
+.B ] [ --quiet ]
+.I <global_config_file> <local_config_file>
 
-.SH "DESCRIPTION"
-The pvfs2\-genconfig utility creates configuration files for the PVFS2 file system. 
-The <local_file_name> argument is manditory and specify the name of the configuration
-file that will be written.  This utility will create the fs.conf file.
-.SH "OPTIONS"
-.IP \-\-protocol
+.SH DESCRIPTION
+.B pvfs2-genconfig
+helps create the config files used by 
+.BR pvfs2-server (1).
+Users can pass any number of command line options, in which case 
+.B pvfs2-genconfig
+will not prompt and use the value of the options in the generated config file.
+Without any command line options, it will prompt the user for key information
+
+The
+.I global_config_file
+and
+.I local_config_file
+options warrant a little explanation.  
+.B pvfs2-genconfig
+will create one config file with settings applicable to every server in the
+system.  It will also create one smaller config file with settings applicable
+to the individual servers in the system.  Getting the many server-specific
+config files out to the server nodes is left as an exercise for the reader.
+
+.SH OPTIONS
+.IP --protocol
 The communication method the servers will use.  As of this writing, the only
-supported options are "gm" (for myrinet networks), "tcp","ib" (infiniband), "mx", and "portals".
-.IP \-\-ioservers
-The host names of data servers. Can be <prefix>{#, #\-#, ...}
-.IP \-\-metaservers
-Host names of meta servers. Can be <prefix>{#, #\-#, ...}
-.IP \-\-iospec
-End points of data servers.
-.IP \-\-metaspec
-Endpoints of meta servers.
-.IP \-\-tcpport
-TCP port to use. Default port is 3334.
-.IP \-\-tcpbindspecific
-Bind TCP only to specific interfaces.
-.IP \-\-gmport
-Myrinet port to use. Default is 6.
-.IP \-\-mxboard
-The MX board to use. Default is 0.
-.IP \-\-mxendpoint
-The MX endpoint to use. Default is 3.
-.IP \-\-ibport
-The infiniband port to use. Default is 3335.
-.IP \-\-portal
-Portals index for listening server. Default is 5.
-.IP \-\-logging
-Debugging mask for log files.
-.IP \-\-tracing
-If specified, then event logging will be enabled for this server.
-.IP \-\-logstamp
-Type of timestamp to use for log files. Only 'none', 'usec', or 'datetime' are valid.
-.IP \-\-storage
-Path to the pvfs storage directory.
-.IP \-\-logfile
-File to place all server logging.
-.IP \-\-notrovesync
-If specified, metadata will not sync automatically. A special sync request will be required
-for sync of metadata.
-.IP \-\-server\-job\-timeout
-Max time in seconds before the server times out for any and all requests.
-.IP \-\-client\-job\-timeout
-Max time in seconds before the client times out for any and all requests.
-.IP \-\-trove\-method
-Specify a trove method.
-.IP \-\-first\-handle
-First handle value to reserve.
-.IP \-\-last\-handle
-Last handle value to reserve.
-.IP \-\-root\-handle
-Handle value to reserve for the root object of the file system.
-.IP \-\-fsid
-Filesystem ident value.
-.IP \-\-fsname
-Filesystem name.
-.IP \-\-default\-num\-dfiles
-Number of datafiles to use per file. Defaults to the number of I/O server in the cluster.
-.IP \-\-flow\-buffer\-size
-Set the flow buffer size in bytes
-.IP \-\-trusted
-Indicate whether trusted connection options need to be used. Valid values are either 1 or 0.
-.IP \-\-genkey
-Optionally generate a secret key for the filesystem. This is optional and pvfs2 servers will
-run fine without it.
-.IP \-\-spec\-usage
-Show the usage info for \-\-iospec and \-\-metaspec options.
-.SH "BUGS"
+supported options are "gm" (for myrinet networks) and "tcp".  
+.IP --port
+The port the server will bind to.  This port should be appropriate for the
+protocol: GM ports must be in the range 0-7, for example.
+.IP --ioservers
+A comma-delimited list of servers used for datafiles.  This option can be given
+more than one time.  Each instance will append to the list of servers.
+.IP --metaservers
+A comma-delimited list of servers used for metadata.  This option can be given
+more than one time.  Each instance will append to the list of servers.  Note
+that as of pvfs-0.0.3, more than one metadata server is not supported.
+.IP --logfile
+Directory in which the server will create its logfile.
+.IP --storage
+Directory in which the server will create its storage space
+.IP --quiet
+Generate the config file w/o echoing any output to the screen.
+
+.SH BUGS
 Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
-.SH "AUTHOR"
-The PVFS2 development team (pvfs2\-developers@beowulf\-underground.org)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
 .SH "SEE ALSO"
-.BR pvfs2\-server (1),
-.BR pvfs2\-ls (1),
-.BR pvfs2\-statfs (1)
-.BR pvfs2\-ping (1)
-.BR pvfs2\-cp (1)
-.BR pvfs2\-genconfig (1)
+.BR pvfs2-server (1),
+.BR pvfs2-ls (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

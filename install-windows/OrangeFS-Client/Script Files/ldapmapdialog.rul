@@ -1,0 +1,98 @@
+#include "Ifx.h"
+
+// Control Constants
+#define BUTTON_NEXT       1
+#define BUTTON_BACK      12
+#define BUTTON_CANCEL2    9  
+#define EDIT_HOST      1303
+#define EDIT_USERDN    1305
+#define EDIT_PASSWORD2 1307
+#define EDIT_ROOT      1309
+#define RB_SUBTREE     1331
+#define RB_ONELEVEL    1333
+#define EDIT_CLASS     1336
+#define EDIT_NAMING    1338
+#define EDIT_UID2      1340
+#define EDIT_GID2      1342
+
+// Default types
+#define LDAPMAP_AD       1
+#define LDAPMAP_EDIR     2
+#define LDAPMAP_CUSTOM   3
+
+// LDAP Scopes
+#define LDAPSCOPE_SUBTREE    1
+#define LDAPSCOPE_ONELEVEL   2
+                   
+prototype LDAPSetDefaults(NUMBER);
+                   
+prototype LDAPMapDialog(NUMBER, BYREF STRING, BYREF STRING, BYREF STRING, BYREF STRING,
+                        BYREF NUMBER, BYREF STRING, BYREF STRING, BYREF STRING, BYREF STRING);
+
+function LDAPSetDefaults(nLDAPMapDefault)
+begin
+   if (nLDAPMapDefault = LDAPMAP_AD) then
+       CtrlSetText("LDAPMapDialog", EDIT_CLASS, "User");
+       CtrlSetText("LDAPMapDialog", EDIT_NAMING, "sAMAccountName");
+   elseif (nLDAPMapDefault = LDAPMAP_EDIR) then
+       CtrlSetText("LDAPMapDialog", EDIT_CLASS, "inetOrgPerson");
+       CtrlSetText("LDAPMapDialog", EDIT_NAMING, "CN");
+   endif;    
+   if (nLDAPMapDefault = LDAPMAP_AD || nLDAPMapDefault = LDAPMAP_EDIR) then
+       CtrlSetText("LDAPMapDialog", EDIT_UID2, "uidNumber");
+       CtrlSetText("LDAPMapDialog", EDIT_GID2, "gidNumber");
+   endif;
+   
+   CtrlSetState("LDAPMapDialog", RB_SUBTREE, BUTTON_CHECKED);
+end;
+
+function LDAPMapDialog(nLDAPMapDefault, svHost, svUserDN, svPassword, svRoot, nvScope,
+                       svClass, svNamingAttr, svUIDAttr, svGIDAttr)
+    NUMBER nControl, nResult;
+    BOOL bDone;
+begin  
+    // define dialog for use
+    EzDefineDialog("LDAPMapDialog", 
+                   ISUSER,
+                   "LDAPMapDialog",
+                   0);
+   
+    // Control loop
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("LDAPMapDialog");
+        switch (nControl)
+            case DLG_INIT:
+                LDAPSetDefaults(nLDAPMapDefault);
+            case BUTTON_NEXT:
+                // Retrieve edit values
+                CtrlGetText("LDAPMapDialog", EDIT_HOST, svHost);
+                CtrlGetText("LDAPMapDialog", EDIT_USERDN, svUserDN);
+                CtrlGetText("LDAPMapDialog", EDIT_PASSWORD2, svPassword);
+                CtrlGetText("LDAPMapDialog", EDIT_ROOT, svRoot);
+                CtrlGetText("LDAPMapDialog", EDIT_CLASS, svClass);
+                CtrlGetText("LDAPMapDialog", EDIT_NAMING, svNamingAttr);
+                CtrlGetText("LDAPMapDialog", EDIT_UID2, svUIDAttr);
+                CtrlGetText("LDAPMapDialog", EDIT_GID2, svGIDAttr);
+                // Radio button value
+                if (CtrlGetState("LDAPMapDialog", RB_SUBTREE) = BUTTON_CHECKED) then
+                    nvScope = LDAPSCOPE_SUBTREE;
+                else
+                    nvScope = LDAPSCOPE_ONELEVEL;
+                endif;
+                nResult = BUTTON_NEXT;
+                bDone = TRUE;
+            case BUTTON_BACK:
+                nResult = BUTTON_BACK;
+                bDone = TRUE;
+            case BUTTON_CANCEL2:
+                Do(EXIT);
+        endswitch;
+    endwhile;
+    
+    // close dialog
+    EndDialog("LDAPMapDialog");
+    ReleaseDialog("LDAPMapDialog");
+    
+    return nResult;            
+end;                       

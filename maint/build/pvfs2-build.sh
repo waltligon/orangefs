@@ -67,6 +67,7 @@ usage()
     echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
+    echo "  -s: enable security"
     echo "  -t: build test programs"
     echo "  -v: name of tag or branch in CVS"
     echo ""
@@ -75,11 +76,12 @@ usage()
 }
 
 # get command line arguments
-while getopts k:r:tv: opt
+while getopts k:r:stv: opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
+        s) enablesecurity="true";;
 	t) build_tests="true";;
 	v) cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
@@ -90,6 +92,11 @@ echo "PVFS2 will be built in ${rootdir}."
 
 if [ ! -d $rootdir ] ; then
 	mkdir $rootdir
+fi
+
+if [ "$enablesecurity" = "true" ]
+then
+    configureopts="${configureopts} --enable-security"
 fi
 
 date=`date "+%Y-%m-%d-%H-%M"`

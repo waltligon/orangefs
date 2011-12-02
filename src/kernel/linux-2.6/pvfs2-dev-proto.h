@@ -49,8 +49,15 @@
 #define PVFS2_NAME_LEN                 0x00000100
 #define PVFS2_MAX_DEBUG_STRING_LEN     0x00000400
 
-/* MAX_DIRENT_COUNT cannot be larger than PVFS_REQ_LIMIT_LISTATTR */
-#define MAX_DIRENT_COUNT               0x00000060
+/* MAX_DIRENT_COUNT cannot be larger than PVFS_REQ_LIMIT_LISTATTR.
+ * The value of PVFS_REQ_LIMIT_LISTATTR has been changed from 113 to 60 
+ * to accomodate an attribute object with mirrored handles.             
+ * MAX_DIRENT_COUNT is replaced by MAX_DIRENT_COUNT_READDIR and 
+ * MAX_DIRENT_COUNT_READDIRPLUS, since readdir doesn't trigger a listattr
+ * but readdirplus might.
+*/
+#define MAX_DIRENT_COUNT_READDIR       0x00000060
+#define MAX_DIRENT_COUNT_READDIRPLUS   0x0000003C
 
 #include "pvfs2.h"
 

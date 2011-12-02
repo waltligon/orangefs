@@ -10,12 +10,18 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <time.h>
+#ifndef WIN32
 #include <pwd.h>
 #include <grp.h>
+#endif
 #include <assert.h>
+#ifndef WIN32
 #include <getopt.h>
+#endif
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -25,11 +31,15 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#ifdef WIN32
+#define snprintf    _snprintf
+#endif
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
  */
-#define MAX_NUM_DIRENTS    113
+/* MAX_NUM_DIRENTS cannot be any larger than PVFS_REQ_LIMIT_LISTATTR */
+#define MAX_NUM_DIRENTS  60
 
 /*
   Define the maximum length of a single line of output. This is about the 
@@ -215,8 +225,12 @@ void print_entry_attr(
 {
     char *formatted_size = NULL;
     char *formatted_owner = NULL, *formatted_group = NULL, *formatted_time = NULL;
+#ifdef WIN32
+
+#else
     struct group *grp = NULL;
     struct passwd *pwd = NULL;
+#endif
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
@@ -245,22 +259,38 @@ void print_entry_attr(
         atime = (time_t)attr->atime;
         ctime = (time_t)attr->ctime;
 
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+1,"%F %H:%M:%S %z",time );
+#endif
         strncpy(scratch_big_time,scratch_time,num_bytes);
 
         time = localtime(&atime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
         strncat(scratch_big_time,scratch_time,num_bytes);
 
         time = localtime(&ctime);
+#ifdef WIN32
+        num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %Y-%m-%d %H:%M:%S %z",time );
+#else
         num_bytes = strftime( scratch_time,ALL_TIMES_LENGTH+3,"  %F %H:%M:%S %z",time );
+#endif
         strncat(scratch_big_time,scratch_time,num_bytes);
 
         format_size_string(scratch_big_time,strlen(scratch_big_time),&formatted_time,0,1);
     }
     else
     {
+#ifdef WIN32
+        strftime( scratch_time,17,"%Y-%m-%d %H:%M",time );
+#else
         strftime( scratch_time,17,"%F %H:%M",time );
+#endif
         format_size_string(scratch_time,16,&formatted_time,0,1);
     }
 
@@ -312,14 +342,23 @@ void print_entry_attr(
     {
         if (!opts->list_no_owner)
         {
+#ifdef WIN32
+            owner = scratch_owner;
+#else
             pwd = getpwuid((uid_t)attr->owner);
             owner = (pwd ? pwd->pw_name : scratch_owner);
+#endif
         }
 
         if (!opts->list_no_group)
         {
+#ifdef WIN32
+            group = scratch_group;
+#else
             grp = getgrgid((gid_t)attr->group);
             group = (grp ? grp->gr_name : scratch_group);
+#endif
+
         }
     }
 
@@ -415,7 +454,7 @@ void print_entry(
 {
     int ret = -1;
     PVFS_object_ref ref;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_getattr getattr_response;
 
     if (!opts->list_long)
@@ -442,7 +481,12 @@ void print_entry(
             ref.fs_id = fs_id;
 
             memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-            PVFS_util_gen_credentials(&credentials);
+            ret = PVFS_util_gen_credential_defaults(&credentials);
+            if (ret < 0)
+            {
+                PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+                return;
+            }
 
             ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                 &credentials, &getattr_response, NULL);
@@ -484,7 +528,7 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdirplus rdplus_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
     uint64_t dir_version = 0;
@@ -494,7 +538,12 @@ int do_list(
     name = start;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return -1;
+    }
 
     if (opts->list_recursive || opts->num_starts > 1)
     {
@@ -601,6 +650,8 @@ int do_list(
 
         for(i = 0; i < rdplus_response.pvfs_dirent_outcount; i++)
         {
+            PVFS_sys_attr *attr;
+
             cur_file = rdplus_response.dirent_array[i].d_name;
             cur_handle = rdplus_response.dirent_array[i].handle;
 
@@ -609,7 +660,7 @@ int do_list(
                     rdplus_response.stat_err_array[i],
                     opts, entry_buffer);
 
-            PVFS_sys_attr *attr = &rdplus_response.attr_array[i];
+            attr = &rdplus_response.attr_array[i];
             if(attr->objtype == PVFS_TYPE_DIRECTORY && opts->list_recursive)
             {
                 int path_len = strlen(start) + strlen(cur_file) + 1;
@@ -704,11 +755,144 @@ int do_list(
  *
  * returns pointer to options structure on success, NULL on failure
  */
+#ifdef WIN32
 static struct options* parse_args(int argc, char* argv[])
 {
     int i = 0, ret = 0, option_index = 0;
     const char *cur_option = NULL;
     struct options* tmp_opts = NULL;
+
+    static char str_opts[14][16] = {
+        "help",
+        "human-readable",
+        "si",
+        "version",
+        "recursive",
+        "verbose",
+        "numeric-uid-gid",
+        "directory",
+        "no-group",
+        "almost-all",
+        "all",
+        "inode",
+        "size",
+        "all-times"
+    };
+
+    tmp_opts = (struct options*)malloc(sizeof(struct options));
+    if (!tmp_opts)
+    {
+	return(NULL);
+    }
+    memset(tmp_opts, 0, sizeof(struct options));
+    /* RVndGoAaiglt */
+    option_index = 1;
+    while ((option_index < argc) && (argv[option_index][0] == '-'))
+    {
+        cur_option = argv[option_index];
+
+        if ((strcmp(cur_option, "-?") == 0) || 
+            (strcmp(cur_option, "--help") == 0))
+        {
+            usage(argc, argv);
+            exit(0);
+        }
+        else if ((strcmp(cur_option, "--human-readable") == 0) ||
+                 (strcmp(cur_option, "-h") == 0))
+        {
+            tmp_opts->list_human_readable = 1;
+        }
+        else if (strcmp(cur_option, "--si") == 0)
+        {
+            tmp_opts->list_use_si_units = 1;
+        }
+        else if (strcmp(cur_option, "--version") == 0)
+        {
+            printf("%s\n", PVFS2_VERSION);
+            exit(0);
+        }
+        else if ((strcmp(cur_option, "--recursive") == 0) ||
+                 (strcmp(cur_option, "-R") == 0))
+        {
+            tmp_opts->list_recursive = 1;
+        }
+        else if ((strcmp(cur_option, "--verbose") == 0) ||
+                 (strcmp(cur_option, "-V") == 0))
+        {
+            tmp_opts->list_verbose = 1;
+        }
+        else if ((strcmp(cur_option, "--numeric-uid-gid") == 0) ||
+                 (strcmp(cur_option, "-n") == 0))
+        {
+            tmp_opts->list_long = 1;
+            tmp_opts->list_numeric_uid_gid = 1;
+        }
+        else if ((strcmp(cur_option, "--directory") == 0) ||
+                 (strcmp(cur_option, "-d") == 0))
+        {
+            tmp_opts->list_directory = 1;
+        }
+        else if ((strcmp(cur_option, "--no-group") == 0) ||
+                 (strcmp(cur_option, "-G") == 0))
+        {
+            tmp_opts->list_long = 1;
+            tmp_opts->list_no_group = 1;
+        }
+        else if ((strcmp(cur_option, "--almost-all") == 0) ||
+                 (strcmp(cur_option, "-A") == 0))
+        {
+            tmp_opts->list_almost_all = 1;
+        }
+        else if ((strcmp(cur_option, "--all") == 0) ||
+                 (strcmp(cur_option, "-a") == 0))
+        {
+            tmp_opts->list_all = 1;
+        }
+        else if ((strcmp(cur_option, "--inode") == 0) ||
+                 (strcmp(cur_option, "-i") == 0))
+        {
+            tmp_opts->list_inode = 1;
+        }
+        else if ((strcmp(cur_option, "--all-times") == 0))
+        {
+            tmp_opts->list_all_times = 1;
+        }
+        else if (strcmp(cur_option, "-l") == 0)
+        {
+            tmp_opts->list_long = 1;
+        }
+        else
+        {
+            usage(argc, argv);
+            exit(EXIT_FAILURE);
+        }
+        
+        option_index++;
+    }
+
+    for(i = option_index; i < argc; i++)
+    {
+        if (tmp_opts->num_starts < MAX_NUM_PATHS)
+        {
+            tmp_opts->start[i-option_index] = argv[i];
+            tmp_opts->num_starts++;
+        }
+        else
+        {
+            fprintf(stderr,"Ignoring path %s\n",argv[i]);
+        }
+    }
+
+    return tmp_opts;
+
+}
+#else
+static struct options* parse_args(int argc, char* argv[])
+{
+    int i = 0, ret = 0, option_index = 0;
+    const char *cur_option = NULL;
+    struct options* tmp_opts = NULL;
+
     static struct option long_opts[] =
     {
         {"help",0,0,0},
@@ -875,6 +1059,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     return tmp_opts;
 }
+#endif
 
 static void usage(int argc, char** argv)
 {
@@ -1021,12 +1206,14 @@ int main(int argc, char **argv)
             substr = &user_opts->start[i][strlen(user_opts->start[i])];
         }
 
+
         while ((index != substr) && (substr != NULL))
         {
             index++;
             j++;
         }
-        user_opts->start[i][j] = '\0';
+
+        user_opts->start[i][++j] = '\0';
 
         do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts, entry_buffer);
 

@@ -118,6 +118,7 @@ int PVFS_hint_add_internal(
 {
     int ret;
     const struct PINT_hint_info *info;
+    PINT_hint *new_hint;
 
     info = PINT_hint_get_info_by_type(type);
     if(info)
@@ -129,7 +130,7 @@ int PVFS_hint_add_internal(
         }
     }
 
-    PINT_hint * new_hint = malloc(sizeof(PINT_hint));
+    new_hint = malloc(sizeof(PINT_hint));
     if (!new_hint)
     {
         return -PVFS_ENOMEM;
@@ -219,6 +220,7 @@ int PVFS_hint_add(
 {
     int ret;
     const struct PINT_hint_info *info;
+    PINT_hint *new_hint;
 
     info = PINT_hint_get_info_by_name(type);
     if(info)
@@ -230,7 +232,7 @@ int PVFS_hint_add(
         }
     }
 
-    PINT_hint * new_hint = malloc(sizeof(PINT_hint));
+    new_hint = malloc(sizeof(PINT_hint));
     if (!new_hint)
     {
         return -PVFS_ENOMEM;
@@ -327,10 +329,13 @@ void encode_PINT_hint(char **pptr, const PINT_hint *hint)
             if(tmp_hint->type == PINT_HINT_UNKNOWN)
             {
                 encode_string(pptr, &tmp_hint->type_string);
+                tmp_hint->encode(pptr, (void *)&tmp_hint->value);
             }
-
-            /* encode the hint using the encode function provided */
-            tmp_hint->encode(pptr, & tmp_hint->value);
+            else
+            {
+               /* encode the hint using the encode function provided */
+               tmp_hint->encode(pptr, tmp_hint->value);
+            }
         }
 
         tmp_hint = tmp_hint->next;
@@ -463,12 +468,20 @@ int PVFS_hint_import_env(PVFS_hint * out_hint)
     strncpy(env_copy, env, len+1);
 
     /* parse hints and do not overwrite already specified hints !*/
+#ifdef WIN32
+    aktvar = strtok(env_copy, "+");  /* thread-safe */
+#else
     aktvar = strtok_r(env_copy, "+", & save_ptr);
+#endif
     while( aktvar != NULL )
     {
         char * rest;
 
-        rest = index(aktvar, ':');
+#ifdef WIN32
+        rest = strchr(aktvar, ':');
+#else
+        rest = index(aktvar, ':');        
+#endif
         if (rest == NULL)
         {
             gossip_err("Environment variable PVFS2_HINTS is "
@@ -525,8 +538,11 @@ int PVFS_hint_import_env(PVFS_hint * out_hint)
             free(env_copy);
             return ret;
         }
-
+#ifdef WIN32
+        aktvar = strtok(NULL, "+");
+#else
         aktvar = strtok_r(NULL, "+", & save_ptr);
+#endif
     }
 
     free(env_copy);

@@ -6,6 +6,9 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if robust security is enabled */
+#undef ENABLE_SECURITY
+
 /* Define if kernel has aio support */
 #undef HAVE_AIO
 
@@ -49,8 +52,14 @@
 /* Define if there exists a compat_ioctl member in file_operations */
 #undef HAVE_COMPAT_IOCTL_HANDLER
 
+/* Define if s_xattr member of super_block struct is const */
+#undef HAVE_CONST_S_XATTR_IN_SUPERBLOCK
+
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+
+/* Define if struct ctl_table has ctl_name member */
+#undef HAVE_CTL_NAME
 
 /* Define if cred.h contains current_fsuid */
 #undef HAVE_CURRENT_FSUID
@@ -67,14 +76,23 @@
 /* Define if DB has get_pagesize function */
 #undef HAVE_DB_GET_PAGESIZE
 
+/* Define if d_count member of dentry is of type atomic_t */
+#undef HAVE_DENTRY_D_COUNT_ATOMIC
+
 /* Define if super_operations statfs has dentry argument */
 #undef HAVE_DENTRY_STATFS_SOP
+
+/* Define if dirty_inode takes a flag argument */
+#undef HAVE_DIRTY_INODE_FLAGS
 
 /* Define if kernel super_operations contains drop_inode field */
 #undef HAVE_DROP_INODE
 
 /* Define if dcache.h contains d_alloc_annon */
 #undef HAVE_D_ALLOC_ANON
+
+/* Define if d_delete member of dentry_operations has a const dentry param */
+#undef HAVE_D_DELETE_CONST
 
 /* Define if export_operations has an encode_fh member */
 #undef HAVE_ENCODEFH_EXPORT_OPERATIONS
@@ -101,6 +119,9 @@
    */
 #undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
 
+/* Define if generic_permission takes four parameters */
+#undef HAVE_FOUR_PARAM_GENERIC_PERMISSION
+
 /* Define to 1 if you have the `fsetxattr' function. */
 #undef HAVE_FSETXATTR
 
@@ -109,6 +130,16 @@
 
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
+
+/* Define if only filesystem_type has get_sb */
+#undef HAVE_FSTYPE_GET_SB
+
+/* Define if only filesystem_type has mount and HAVE_FSTYPE_GET_SB is false */
+#undef HAVE_FSTYPE_MOUNT_ONLY
+
+/* Define if fsync function in file_operations struct wants a dentry pointer
+   as the second parameter */
+#undef HAVE_FSYNC_DENTRY_PARAM
 
 /* Define if kernel has generic_file_readv */
 #undef HAVE_GENERIC_FILE_READV
@@ -122,6 +153,9 @@
 /* Define if struct inode_operations in kernel has getattr_lite callback */
 #undef HAVE_GETATTR_LITE_INODE_OPERATIONS
 
+/* Define if distro has getgrouplist */
+#undef HAVE_GETGROUPLIST
+
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
 
@@ -134,8 +168,14 @@
 /* Define if pwd.h exists */
 #undef HAVE_GETPWUID
 
+/* Define if get_sb_nodev function exists */
+#undef HAVE_GETSB_NODEV
+
 /* Define if struct super_operations in kernel has get_fs_key callback */
 #undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+
+/* Define if get_sb is a member of file_system_type struct */
+#undef HAVE_GET_SB_MEMBER_FILE_SYSTEM_TYPE
 
 /* Define if strerror_r is GNU-specific */
 #undef HAVE_GNU_STRERROR_R
@@ -157,6 +197,9 @@
 
 /* Define if kernel has iget_locked */
 #undef HAVE_IGET_LOCKED
+
+/* Define if inode_setattr is defined */
+#undef HAVE_INODE_SETATTR
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
@@ -266,11 +309,8 @@
 /* Define if struct page defines a count member without leading underscore */
 #undef HAVE_OBSOLETE_STRUCT_PAGE_COUNT_NO_UNDERSCORE
 
-/* Define to 1 if you have the <openssl/crypto.h> header file. */
-#undef HAVE_OPENSSL_CRYPTO_H
-
-/* Define to 1 if you have the <openssl/evp.h> header file. */
-#undef HAVE_OPENSSL_EVP_H
+/* Define to 1 if the libssl is available */
+#undef HAVE_OPENSSL
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_FILE_ARG
@@ -331,6 +371,9 @@
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
 
+/* Define if d_compare member of dentry_operations has seven params */
+#undef HAVE_SEVEN_PARAM_D_COMPARE
+
 /* Define if SLAB_KERNEL is defined in kernel */
 #undef HAVE_SLAB_KERNEL
 
@@ -341,6 +384,9 @@
 /* Define if kernel address_space struct has a spin_lock_t member named
    tree_lock */
 #undef HAVE_SPIN_LOCK_TREE_ADDR_SPACE_STRUCT
+
+/* Define if SPIN_LOCK_UNLOCKED defined */
+#undef HAVE_SPIN_LOCK_UNLOCKED
 
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
@@ -353,6 +399,9 @@
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
+
+/* Define if struct ctl_table has strategy member */
+#undef HAVE_STRATEGY_NAME
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -402,6 +451,21 @@
 /* Define if TAU library is used */
 #undef HAVE_TAU
 
+/* Define if acl_check param of generic_permission function has three
+   parameters */
+#undef HAVE_THREE_PARAM_ACL_CHECK
+
+/* Define if d_hash member of dentry_operations has three params, the second
+   inode paramsbeing the difference */
+#undef HAVE_THREE_PARAM_D_HASH
+
+/* Define if permission function pointer of inode_operations struct has three
+   parameters and the third parameter is for flags (unsigned int) */
+#undef HAVE_THREE_PARAM_PERMISSION_WITH_FLAG
+
+/* Define if kernel stddef has true/false enum */
+#undef HAVE_TRUE_FALSE_ENUM
+
 /* Define if register_sysctl_table takes two arguments */
 #undef HAVE_TWO_ARG_REGISTER_SYSCTL_TABLE
 
@@ -421,6 +485,9 @@
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
+/* Define if file_operations struct has unlocked_ioctl member */
+#undef HAVE_UNLOCKED_IOCTL_HANDLER
+
 /* Define if include file valgrind.h exists */
 #undef HAVE_VALGRIND_H
 
@@ -435,6 +502,14 @@
 
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR
+
+/* Define if kernel xattr_handle get function has dentry as first parameter
+   and a fifth parameter */
+#undef HAVE_XATTR_HANDLER_GET_FIVE_PARAM
+
+/* Define if kernel xattr_handle set function has dentry as first parameter
+   and a sixth parameter */
+#undef HAVE_XATTR_HANDLER_SET_SIX_PARAM
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -463,6 +538,24 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
+/* Should we build user interface acl routines. */
+#undef PVFS_HAVE_ACL_INCLUDES
+
+/* scandir compare arg takes void pointers. */
+#undef PVFS_SCANDIR_VOID
+
+/* Should we enable user interface data cache. */
+#undef PVFS_UCACHE_ENABLE
+
+/* Should we build user interface libraries. */
+#undef PVFS_USRINT_BUILD
+
+/* Should we enable user interface CWD support. */
+#undef PVFS_USRINT_CWD
+
+/* Should user interface assume FS is mounted. */
+#undef PVFS_USRINT_KMOUNT
+
 /* The size of `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT
 
@@ -483,9 +576,6 @@
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
-
-/* Define if openssl exists */
-#undef WITH_OPENSSL
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */

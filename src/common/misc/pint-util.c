@@ -13,41 +13,53 @@
 #include <string.h>
 #include <assert.h>
 
+#ifdef WIN32
+#include <io.h>
+#include "wincommon.h"
+#else
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <unistd.h>
-
-#include <grp.h>
-#include <pwd.h>
-#include <sys/types.h>
+#endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "gen-locks.h"
 #include "pint-util.h"
 #include "bmi.h"
 #include "gossip.h"
+#include "security-util.h"
 #include "pvfs2-req-proto.h"
 
 #include "pvfs2-debug.h"
 #include "bmi-byteswap.h"
 
-#ifdef HAVE_GETPWUID
-static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
-static int pw_buf_size = 1024;      // 1 KB
-static int gr_buf_size = 1024*1024; // 1 MB
-static char* check_group_pw_buffer = NULL;
-static char* check_group_gr_buffer = NULL;
-#endif
-static int PINT_check_group(uid_t uid, gid_t gid);
-
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
+#ifdef WIN32
+    FILETIME creation, exit, system, user;
+    ULARGE_INTEGER li_system, li_user;
+#else
     struct rusage usage;
+#endif
 
     gettimeofday(&out_marker->wtime, NULL);
+#ifdef WIN32
+    GetProcessTimes(GetCurrentProcess(), &creation, &exit, &system, &user);
+    li_system.LowPart = system.dwLowDateTime;
+    li_system.HighPart = system.dwHighDateTime;
+    li_user.LowPart = user.dwLowDateTime;
+    li_user.HighPart = user.dwHighDateTime;
+
+    /* FILETIME is in 100-nanosecond increments */
+    out_marker->stime.tv_sec = li_system.QuadPart / 10000000;
+    out_marker->stime.tv_usec = (li_system.QuadPart % 10000000) / 10;
+    out_marker->utime.tv_sec = li_system.QuadPart / 10000000;
+    out_marker->utime.tv_usec = (li_system.QuadPart % 10000000) / 10;
+#else
     getrusage(RUSAGE_SELF, &usage);
     out_marker->utime = usage.ru_utime;
     out_marker->stime = usage.ru_stime;
+#endif
 }
 
 void PINT_time_diff(PINT_time_marker mark1, 
@@ -168,7 +180,8 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 src->u.dir.hint.dist_params_len;
             if (dest->u.dir.hint.dist_params_len > 0)
             {
-                dest->u.dir.hint.dist_params = strdup(src->u.dir.hint.dist_params);
+                dest->u.dir.hint.dist_params 
+                        = strdup(src->u.dir.hint.dist_params);
                 if (dest->u.dir.hint.dist_params == NULL)
                 {
                     free(dest->u.dir.hint.dist_name);
@@ -233,6 +246,41 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
                 dest->u.meta.dfile_count = src->u.meta.dfile_count;
             }
 
+          if(src->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                PVFS_size df_array_size = src->u.meta.dfile_count         *
+                                          src->u.meta.mirror_copies_count *
+                                          sizeof(PVFS_handle);
+
+                if (df_array_size)
+                {
+                    if (   (dest->mask & PVFS_ATTR_META_MIRROR_DFILES) 
+                        && (dest->u.meta.dfile_count > 0)
+                        && (dest->u.meta.mirror_copies_count > 0) )
+                    {
+                        if (dest->u.meta.mirror_dfile_array)
+                        {
+                            free(dest->u.meta.mirror_dfile_array);
+                            dest->u.meta.mirror_dfile_array = NULL;
+                        }
+                    }
+                    dest->u.meta.mirror_dfile_array = malloc(df_array_size);
+                    if (!dest->u.meta.mirror_dfile_array)
+                    {
+                        return ret;
+                    }
+                    memcpy(dest->u.meta.mirror_dfile_array,
+                           src->u.meta.mirror_dfile_array, df_array_size);
+                }
+                else
+                {
+                    dest->u.meta.mirror_dfile_array = NULL;
+                }
+                dest->u.meta.mirror_copies_count 
+                   = src->u.meta.mirror_copies_count;
+            }
+
+
             if(src->mask & PVFS_ATTR_META_DIST)
             {
                 assert(src->u.meta.dist_size > 0);
@@ -261,6 +309,15 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             }
         }
 
+        if (src->mask & PVFS_ATTR_CAPABILITY)
+        {
+            ret = PINT_copy_capability(&src->capability, &dest->capability);
+            if (ret < 0)
+            {
+                return ret;
+            }
+        }
+
 	dest->mask = src->mask;
         ret = 0;
     }
@@ -271,6 +328,16 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
 {
     if (attr)
     {
+        if (attr->mask & PVFS_ATTR_CAPABILITY)
+        {
+            free(attr->capability.signature);
+            attr->capability.signature = NULL;
+            free(attr->capability.handle_array);
+            attr->capability.handle_array = NULL;
+            free(attr->capability.issuer);
+            attr->capability.issuer = NULL;
+        }
+
         if (attr->objtype == PVFS_TYPE_METAFILE)
         {
             if (attr->mask & PVFS_ATTR_META_DFILES)
@@ -279,6 +346,14 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                 {
                     free(attr->u.meta.dfile_array);
                     attr->u.meta.dfile_array = NULL;
+                }
+            }
+            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                if (attr->u.meta.mirror_dfile_array)
+                {
+                    free(attr->u.meta.mirror_dfile_array);
+                    attr->u.meta.mirror_dfile_array = NULL;
                 }
             }
             if (attr->mask & PVFS_ATTR_META_DIST)
@@ -304,7 +379,8 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
         }
         else if (attr->objtype == PVFS_TYPE_DIRECTORY)
         {
-            if ((attr->mask & PVFS_ATTR_DIR_HINT) || (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
+            if ((attr->mask & PVFS_ATTR_DIR_HINT) || 
+                (attr->mask & PVFS_ATTR_DIR_DIRENT_COUNT))
             {
                 if (attr->u.dir.hint.dist_name)
                 {
@@ -346,6 +422,9 @@ char *PINT_util_get_object_type(int objtype)
     return obj_types[6];
 }
 
+/*
+ * this is just a wrapper for gettimeofday
+ */
 void PINT_util_get_current_timeval(struct timeval *tv)
 {
     gettimeofday(tv, NULL);
@@ -357,7 +436,9 @@ int PINT_util_get_timeval_diff(struct timeval *tv_start, struct timeval *tv_end)
         (tv_start->tv_sec * 1e6 + tv_start->tv_usec);
 }
 
-
+/*
+ * this returns time in seconds
+ */
 PVFS_time PINT_util_get_current_time(void)
 {
     struct timeval t = {0,0};
@@ -366,6 +447,47 @@ PVFS_time PINT_util_get_current_time(void)
     gettimeofday(&t, NULL);
     current_time = (PVFS_time)t.tv_sec;
     return current_time;
+}
+
+/*
+ * this gets time in ms - warning, can roll over
+ */
+PVFS_time PINT_util_get_time_ms(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = ((PVFS_time)t.tv_sec) * 1000 + t.tv_usec / 1000;
+    return current_time;
+}
+
+/*
+ * this gets time in us - warning, can roll over
+ */
+PVFS_time PINT_util_get_time_us(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = ((PVFS_time)t.tv_sec) * 1000000 + t.tv_usec;
+    return current_time;
+}
+
+/* parses a struct timeval into a readable timestamp string*/
+/* assumes sufficient memory has been allocated for str, no checking */
+/* to be safe, make str a 64 character string atleast */
+void PINT_util_parse_timeval(struct timeval tv, char *str)
+{
+    time_t now;
+    struct tm *currentTime;
+
+    now = tv.tv_sec;
+    currentTime = localtime(&now);
+    strftime(str, 64, "%m/%d/%Y %H:%M:%S", currentTime);
+
+    return;
 }
 
 PVFS_time PINT_util_mktime_version(PVFS_time time)
@@ -391,23 +513,52 @@ struct timespec PINT_util_get_abs_timespec(int microsecs)
     gettimeofday(&now, NULL);
     add.tv_sec = (microsecs / 1e6);
     add.tv_usec = (microsecs % 1000000);
+#ifdef WIN32
+    result.tv_sec = add.tv_sec + now.tv_sec;
+    result.tv_usec = add.tv_usec + now.tv_usec;
+    if (result.tv_usec >= 1000000)
+    {
+        result.tv_usec -= 1000000;
+        result.tv_sec++;
+    }
+#else
     timeradd(&now, &add, &result);
+#endif
     tv.tv_sec = result.tv_sec;
     tv.tv_nsec = result.tv_usec * 1e3;
     return tv;
 }
 
-void PINT_util_gen_credentials(
-    PVFS_credentials *credentials)
+/*                                                              
+ * Output hex representation of arbitrary data.
+ * The output buffer must have size for count * 2 bytes + 1 (zero-byte).
+ */
+char *PINT_util_bytes2str(unsigned char *bytes, char *output, size_t count)
 {
-    assert(credentials);
+    unsigned char *in_p;
+    char *out_p;
+    size_t i, num;
 
-    memset(credentials, 0, sizeof(PVFS_credentials));
-    credentials->uid = geteuid();
-    credentials->gid = getegid();
+    if (!bytes || !output || !count)
+    {
+        return NULL;
+    }
+
+    for (in_p = bytes, out_p = output, i = 0;
+         i < count;
+         in_p++, out_p += num, i++)
+    {
+        num = sprintf(out_p, "%02x", *in_p);
+    }
+
+    return output;    
+
 }
 
-inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
+#ifndef WIN32
+inline
+#endif
+void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
 
@@ -416,21 +567,29 @@ inline void encode_PVFS_BMI_addr_t(char **pptr, const PVFS_BMI_addr_t *x)
 }
 
 /* determines how much protocol space a BMI_addr_t encoding will consume */
-inline int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
+#ifndef WIN32
+inline
+#endif
+int encode_PVFS_BMI_addr_t_size_check(const PVFS_BMI_addr_t *x)
 {
     const char *addr_str;
     addr_str = BMI_addr_rev_lookup(*x);
     return(encode_string_size_check(&addr_str));
 }
-
-inline void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
+#ifndef WIN32
+inline
+#endif
+void decode_PVFS_BMI_addr_t(char **pptr, PVFS_BMI_addr_t *x)
 {
     char *addr_string;
     decode_string(pptr, &addr_string);
     BMI_addr_lookup(x, addr_string);
 }
 
-inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
+#ifndef WIN32
+inline
+#endif
+void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *x)
 {
     int tmp_size;
     int i;
@@ -465,7 +624,10 @@ inline void encode_PVFS_sys_layout(char **pptr, const struct PVFS_sys_layout_s *
     }
 }
 
-inline void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
+#ifndef WIN32
+inline
+#endif
+void decode_PVFS_sys_layout(char **pptr, struct PVFS_sys_layout_s *x)
 {
     int i;
 
@@ -488,7 +650,6 @@ char *PINT_util_guess_alias(void)
 {
     char tmp_alias[1024];
     char *tmpstr;
-    char *alias;
     int ret;
 
     /* hmm...failed to find alias as part of the server config filename,
@@ -502,7 +663,6 @@ char *PINT_util_guess_alias(void)
                    "process directly\n");
         return NULL;
     }
-    alias = tmp_alias;
 
     tmpstr = strstr(tmp_alias, ".");
     if(tmpstr)
@@ -511,6 +671,11 @@ char *PINT_util_guess_alias(void)
     }
     return strdup(tmp_alias);
 }
+
+/* TODO: orange security 
+   These functions aren't used with the new security code. 
+   However they may be repurposed later. */
+#if 0
 
 /* PINT_check_mode()
  *
@@ -777,6 +942,7 @@ static int in_group_p(PVFS_uid uid, PVFS_gid gid, PVFS_gid attr_group)
     return 0;
 }
 
+/* WARNING!  THIS CODE SUCKS!  REWRITE WITHOUT GOTOS PLEASE! */
 /*
  * Return 0 if requesting clients is granted want access to the object
  * by the acl. Returns -PVFS_E... otherwise.
@@ -793,22 +959,33 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     if (acl_size == 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no acl's present.. denying access\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                    "no acl's present.. denying access\n");
         return -PVFS_EACCES;
     }
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
+#ifdef PVFS_USE_OLD_ACL_FORMAT
     acl_size--;
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
-    " %d (%d acl entries)\n",
-        (int) acl_size, 
-        (int) (acl_size / sizeof(pvfs2_acl_entry)));
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
-        uid, gid, want);
+#else
+    acl_size -= sizeof(pvfs2_acl_header);
+#endif
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                "PINT_check_acls: read keyval size "
+                " %d (%d acl entries)\n",
+                (int) acl_size, 
+                (int) (acl_size / sizeof(pvfs2_acl_entry)));
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                "uid = %d, gid = %d, want = %d\n",
+                uid,
+                gid,
+                want);
 
     assert(acl_buf);
-    /* if the acl format doesn't look valid, then return an error rather than
-     * asserting; we don't want the server to crash due to an invalid keyval
+    /* if the acl format doesn't look valid,
+     * then return an error rather than
+     * asserting; we don't want the server
+     * to crash due to an invalid keyval
      */
     if((acl_size % sizeof(pvfs2_acl_entry)) != 0)
     {
@@ -819,14 +996,24 @@ int PINT_check_acls(void *acl_buf, size_t acl_size,
 
     for (i = 0; i < count; i++)
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         pa = (pvfs2_acl_entry *) acl_buf + i;
+#else
+        pa = &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
+#endif
         /* 
-           NOTE: Remember that keyval is encoded as lebf, so convert it 
-           to host representation 
+           NOTE: Remember that keyval is encoded as lebf,
+           so convert it to host representation 
         */
+#ifdef PVFS_USE_OLD_ACL_FORMT
         pe.p_tag  = bmitoh32(pa->p_tag);
         pe.p_perm = bmitoh32(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
+#else
+        pe.p_tag  = bmitoh16(pa->p_tag);
+        pe.p_perm = bmitoh16(pa->p_perm);
+        pe.p_id   = bmitoh32(pa->p_id);
+#endif
         pa = &pe;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -881,15 +1068,27 @@ mask:
     i = i + 1;
     for (; i < count; i++)
     {
-        pvfs2_acl_entry me, *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
+        pvfs2_acl_entry me;
+#ifdef PVFS_USE_OLD_ACL_FORMAT
+        pvfs2_acl_entry *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
+#else
+        pvfs2_acl_entry *mask_obj =
+                &(((pvfs2_acl_header *)acl_buf)->p_entries[i]);
+#endif
         
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format
          */
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         me.p_tag  = bmitoh32(mask_obj->p_tag);
         me.p_perm = bmitoh32(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
+#else
+        me.p_tag  = bmitoh16(mask_obj->p_tag);
+        me.p_perm = bmitoh16(mask_obj->p_perm);
+        me.p_id   = bmitoh32(mask_obj->p_id);
+#endif
         mask_obj = &me;
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Decoded (mask) ACL entry %d "
             "(p_tag %d, p_perm %d, p_id %d)\n",
@@ -912,6 +1111,109 @@ check_perm:
     return -PVFS_EACCES;
 }
 
+#endif /* #if 0 */
+
+#ifdef WIN32
+int PINT_statfs_lookup(const char *path, struct statfs *buf)
+{
+    char *abs_path, *root_path; 
+    int rc, start, index, slash_max, slash_count;
+    DWORD sect_per_cluster, bytes_per_sect, free_clusters, total_clusters;
+
+    if (path == NULL || buf == NULL) 
+    {
+        errno = EFAULT;
+        return -1;
+    }
+    
+    /* allocate a buffer to get an absolute path */
+    abs_path = (char *) malloc(MAX_PATH + 1);
+    if (_fullpath(abs_path, path, MAX_PATH) == NULL)
+    {
+        free(abs_path);
+        errno = ENOENT;
+        return -1;
+    }
+
+    /* allocate buffer for root path */
+    root_path = (char *) malloc(strlen(abs_path) + 1);
+
+    /* parse out the root directory--it will be in
+       \\MyServer\MyFolder\ form or C:\ form */
+    if (abs_path[0] == '\\' && abs_path[1] == '\\')
+    {
+        start = 2;
+        slash_max = 2;
+    }
+    else 
+    {
+        start = 0;
+        slash_max = 1;
+    }
+
+    slash_count = 0;
+    index = start;
+
+    while (abs_path[index] && slash_count < slash_max)
+    {
+        if (abs_path[index++] == '\\')
+            slash_count++;
+    }
+
+    /* copy root path */
+    strncpy_s(root_path, strlen(abs_path)+1, abs_path, index);
+
+    rc = 0;
+    if (GetDiskFreeSpace(root_path, &sect_per_cluster, &bytes_per_sect,
+                          &free_clusters, &total_clusters))
+    {
+        buf->f_type = 0;  /* not used by PVFS */
+        buf->f_bsize = (uint64_t) sect_per_cluster * bytes_per_sect;
+        buf->f_bavail = buf->f_bfree = (uint64_t) free_clusters;
+        buf->f_blocks = (uint64_t) total_clusters;
+        buf->f_fsid = 0;  /* no meaningful definition on Windows */
+    }
+    else
+    {
+        errno = GetLastError();
+        rc = -1;
+    }
+
+    free(root_path);
+    free(abs_path);
+
+    return rc;
+
+}
+
+int PINT_statfs_fd_lookup(int fd, struct statfs *buf)
+{
+    HANDLE handle;
+    char *path;
+    int rc;
+
+    /* get handle from fd */
+    handle = (HANDLE) _get_osfhandle(fd);
+
+    /* get file path from handle */
+    path = (char *) malloc(MAX_PATH + 1);
+    /* Note: only available on Vista/WS2008 and later */
+    if (GetFinalPathNameByHandle(handle, path, MAX_PATH, 0) != 0)
+    {
+        free(path);
+        errno = GetLastError();
+        return -1;
+    }
+
+    rc = PINT_statfs_lookup(path, buf);
+
+    free(path);
+
+    return rc;
+
+}
+
+#endif
 /*
  * Local variables:
  *  c-indent-level: 4

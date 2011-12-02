@@ -1,0 +1,11 @@
+DIR := src/common/security
+SERVERSRC += $(DIR)/security-util.c
+LIBSRC += $(DIR)/security-util.c \
+          $(DIR)/getugroups.c
+
+ifdef ENABLE_SECURITY
+SERVERSRC += $(DIR)/pint-security.c \
+             $(DIR)/security-hash.c
+else
+SERVERSRC += $(DIR)/security-stubs.c
+endif

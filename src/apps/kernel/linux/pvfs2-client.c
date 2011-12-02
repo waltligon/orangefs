@@ -63,6 +63,7 @@ typedef struct
     char *dev_buffer_size;
     char *logtype;
     char *events;
+    char *keypath;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -428,6 +429,11 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->events;
                 arg_index+=2;
             }
+            if (opts->keypath)
+            {
+                arg_list[arg_index++] = "--keypath";
+                arg_list[arg_index++] = opts->keypath;
+            }
 
             if(opts->verbose)
             {
@@ -481,6 +487,7 @@ static void print_help(char *progname)
     printf("--logstamp=none|usec|datetime override default log message time stamp format\n");
     printf("--logtype=file|syslog         specify writing logs to file or syslog\n");
     printf("--events=EVENTS               enable tracing of certain EVENTS\n");
+    printf("--keypath=PATH                path to credential key file\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -512,6 +519,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"path",1,0,0},
         {"logstamp",1,0,0},
         {"events",1,0,0},
+        {"keypath",1,0,0},
         {0,0,0,0}
     };
 
@@ -623,6 +631,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("events", cur_option) == 0)
                 {
                     opts->events = optarg;
+                }
+                else if (strcmp("keypath", cur_option) == 0)
+                {
+                    opts->keypath = optarg;
                 }
 
                 break;

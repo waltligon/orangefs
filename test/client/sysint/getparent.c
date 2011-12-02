@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_getparent resp_getparent;
     int ret = -1;
     PVFS_fs_id fs_id;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
 
     if (argc != 2)
     {
@@ -42,7 +42,7 @@ int main(int argc,char **argv)
 	return (-1);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_getparent(fs_id, argv[1], &credentials, &resp_getparent, NULL);
     if (ret == 0)
     {

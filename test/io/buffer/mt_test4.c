@@ -26,7 +26,7 @@ int main(int argc, char * argv[])
 
     NCAC_info_t info;
 
-    int ret1, ret2, ret3;
+    int ret1, ret2;
     int extcnt;
     int threadcnt;
 
@@ -50,7 +50,6 @@ int main(int argc, char * argv[])
 
     ret1 = 0;
     ret2 = 1*req_cnt;
-    ret3 = 2*req_cnt;
 
     if (pthread_create(&thread1,
                  NULL,

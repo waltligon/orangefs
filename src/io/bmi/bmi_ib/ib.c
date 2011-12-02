@@ -332,9 +332,6 @@ static void encourage_send_waiting_buffer(struct ib_work *sq)
 	msg_header_init(&mh_eager.c, c, sq->is_unexpected
 	                ? MSG_EAGER_SENDUNEXPECTED : MSG_EAGER_SEND);
 	mh_eager.bmi_tag = sq->bmi_tag;
-        mh_eager.class = 0;
-        if(sq->is_unexpected)
-            mh_eager.class += sq->class;
 	encode_msg_header_eager_t(&ptr, &mh_eager);
 
 	memcpy_from_buflist(&sq->buflist,
@@ -811,7 +808,7 @@ static int
 post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
           int numbufs, const void *const *buffers, const bmi_size_t *sizes,
           bmi_size_t total_size, bmi_msg_tag_t tag, void *user_ptr,
-          bmi_context_id context_id, int is_unexpected, uint8_t class)
+          bmi_context_id context_id, int is_unexpected)
 {
     struct ib_work *sq;
     struct method_op *mop;
@@ -829,7 +826,6 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
     sq = bmi_ib_malloc(sizeof(*sq));
     sq->type = BMI_SEND;
     sq->state.send = SQ_WAITING_BUFFER;
-    sq->class = class;
 
     debug(2, "%s: sq %p len %lld peer %s", __func__, sq, (long long) total_size,
           ibmap->c->peername);
@@ -896,6 +892,17 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 }
 
 static int
+BMI_ib_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+                 const void *buffer, bmi_size_t total_size,
+                 enum bmi_buffer_type buffer_flag __unused,
+                 bmi_msg_tag_t tag, void *user_ptr, bmi_context_id
+                 context_id, PVFS_hint hints __unused)
+{
+    return post_send(id, remote_map, 0, &buffer, &total_size,
+                     total_size, tag, user_ptr, context_id, 0);
+}
+
+static int
 BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   const void *const *buffers, const bmi_size_t *sizes, int list_count,
   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
@@ -903,7 +910,19 @@ BMI_ib_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   hints __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-                     total_size, tag, user_ptr, context_id, 0, 0);
+                     total_size, tag, user_ptr, context_id, 0);
+}
+
+static int
+BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+                           const void *buffer, bmi_size_t total_size,
+                           enum bmi_buffer_type buffer_flag __unused,
+                           bmi_msg_tag_t tag, void *user_ptr,
+			   bmi_context_id context_id, PVFS_hint hints
+                           __unused)
+{
+    return post_send(id, remote_map, 0, &buffer, &total_size,
+                     total_size, tag, user_ptr, context_id, 1);
 }
 
 static int
@@ -912,14 +931,12 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct bmi_method_addr *remote_
 				const bmi_size_t *sizes, int list_count,
                                 bmi_size_t total_size,
 				enum bmi_buffer_type buffer_flag __unused,
-                                bmi_msg_tag_t tag, 
-                                uint8_t class,
-                                void *user_ptr,
-				bmi_context_id context_id, 
-                                PVFS_hint hints __unused)
+                                bmi_msg_tag_t tag, void *user_ptr,
+				bmi_context_id context_id, PVFS_hint hints
+                                __unused)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-                     total_size, tag, user_ptr, context_id, 1, class);
+                     total_size, tag, user_ptr, context_id, 1);
 }
 
 /*
@@ -1047,6 +1064,16 @@ post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
   out:
     gen_mutex_unlock(&interface_mutex);
     return ret;
+}
+
+static int
+BMI_ib_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+  void *buffer, bmi_size_t expected_len, bmi_size_t *actual_len __unused,
+  enum bmi_buffer_type buffer_flag __unused, bmi_msg_tag_t tag, void *user_ptr,
+  bmi_context_id context_id, PVFS_hint hints __unused)
+{
+    return post_recv(id, remote_map, 0, &buffer, &expected_len,
+                     expected_len, tag, user_ptr, context_id);
 }
 
 static int
@@ -1344,7 +1371,7 @@ restart:
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
-  struct bmi_method_unexpected_info *ui, uint8_t class, int max_idle_time)
+  struct bmi_method_unexpected_info *ui, int max_idle_time)
 {
     struct qlist_head *l;
     int activity = 0, n;
@@ -1364,8 +1391,6 @@ restart:
 	    ib_connection_t *c = rq->c;
 
 	    decode_msg_header_eager_t(&ptr, &mh_eager);
-            if(mh_eager.class != class)
-                continue;
 
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
@@ -1532,6 +1557,7 @@ static struct bmi_method_addr *ib_alloc_method_addr(ib_connection_t *c,
     ibmap->hostname = hostname;
     ibmap->port = port;
     ibmap->reconnect_flag = reconnect_flag;
+    ibmap->ref_count = 1;
 
     return map;
 }
@@ -1584,6 +1610,7 @@ static struct bmi_method_addr *BMI_ib_method_addr_lookup(const char *id)
 	    ib_method_addr_t *ibmap = c->remote_map->method_data;
 	    if (ibmap->port == port && !strcmp(ibmap->hostname, hostname)) {
 	       map = c->remote_map;
+	       ibmap->ref_count++;
 	       break;
 	    }
 	}
@@ -1928,8 +1955,12 @@ static int BMI_ib_set_info(int option, void *param __unused)
     case BMI_DROP_ADDR: {
 	struct bmi_method_addr *map = param;
 	ib_method_addr_t *ibmap = map->method_data;
-	free(ibmap->hostname);
-	free(map);
+	ibmap->ref_count--;
+        if (ibmap->ref_count == 0)
+        {
+	   free(ibmap->hostname);
+	   free(map);
+        }
 	break;
     }
     case BMI_OPTIMISTIC_BUFFER_REG: {
@@ -2096,6 +2127,9 @@ const struct bmi_method_ops bmi_ib_ops =
     .memalloc = BMI_ib_memalloc,
     .memfree = BMI_ib_memfree,
     .unexpected_free = BMI_ib_unexpected_free,
+    .post_send = BMI_ib_post_send,
+    .post_sendunexpected = BMI_ib_post_sendunexpected,
+    .post_recv = BMI_ib_post_recv,
     .test = BMI_ib_test,
     .testsome = BMI_ib_testsome,
     .testcontext = BMI_ib_testcontext,

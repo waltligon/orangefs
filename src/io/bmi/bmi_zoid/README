@@ -16,14 +16,7 @@ CONFIGURABLE LIMITS
 - ZOID_MAX_EXPECTED_MSG (in zoid.h): defaults to 128M, can be adjusted as
   needed, but is probably already larger than necessary,
 
-- ZBMI_SHM_SIZE_TOTAL (in init.c in ZeptoOS
-  packages/zoid/src/zbmi/implementation/ directory): total size of the shared
-  memory buffer used to exchange bulk data between the ZOID daemon and the BMI
-  server; defaults to 512M.
-
-- ZBMI_SHM_SIZE_UNEXP (in init.c in ZeptoOS
-  packages/zoid/src/zbmi/implementation/ directory): part of the shared
-  memory buffer used for unexpected messages; defaults to 1M.
+- FIXME ZBMI limits
 
 
 LIMITATIONS
@@ -63,12 +56,7 @@ Additional considerations for the users of this method:
 - make sure to use a long timeout for BMI test routines, especially those
   invoked on the client side, as each such call will result in a
   communication with the I/O node (10ms is *way* too short, 1000ms is pretty
-  short too),
-
-- to reduce the number of round-trip messages from the compute nodes,
-  client-side message post routines can optionally wait (with a timeout)
-  and thus increase a chance of an immediate completion.  Use
-  BMI_set_info(BMI_ZOID_POST_TIMEOUT, <timeout_ms>) to enable this feature.
+  short too).
 
 
 ADDRESS FORMAT
@@ -109,25 +97,21 @@ the I/O node is performed using three ZOID-forwarded function calls:
 zbmi_send, zbmi_recv, and zbmi_test.
 
 The zbmi plugin is mostly stateless so far as the compute node clients are
-concerned.  Specifically, the information on posted expected message
-sends/receives that were not immediately completed is stored exclusively on
-the client side.
+concerned.  Specifically, the information on posted, but not immediately
+completed expected message sends/receives is stored exclusively on the
+client side.
 
 All BMI send routines end up in zoid_post_send_common.  That includes
 unexpected messages and list I/O.  This routine attempts to forward the
 message to the zbmi plugin on the I/O node, using zbmi_send.  For
-unexpected messages, zbmi_send should normally succeed and result in an
-immediate completion; however, if the zbmi plugin is out of memory,
+unexpected messages, zbmi_send is normally expected to succeed and result
+in an immediate completion; however, if the zbmi plugin is out of memory,
 zbmi_send will fail with ENOMEM.  The same failure will occur with expected
 messages if a matching receive has not been posted on the I/O node side by
 the time zbmi_send is invoked.  Either failure is recoverable; the send
 request is put in the "zoid_ops" queue for another attempt later.  For
 expected messages, if a matching receive has been posted, the call succeeds
-resulting in an immediate completion.  zbmi_send normally does not block,
-but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
-matching expected message post from the BMI server side or for memory to be
-released on the BMI server side so that an unexpected message can be
-stored.
+resulting in an immediate completion.
 
 The way zbmi_send is forwarded by ZOID, the data payload is only
 transferred to the I/O nodes if there is memory buffer there for the
@@ -139,9 +123,7 @@ routine attempts to receive a message waiting in the zbmi plugin, using
 zbmi_recv.  If a matching message has been posted on the I/O node side, it
 is sent to the compute node and zbmi_recv returns 1, resulting in an
 immediate completion.  Otherwise, the receive request is put in the
-"zoid_ops" queue for another attempt later.  zbmi_recv normally does not
-block, but if BMI_ZOID_POST_TIMEOUT has been enabled, it can, waiting for a
-matching expected message post from the BMI server side.
+"zoid_ops" queue for another attempt later.
 
 BMI_cancel is very easy to implement thanks to a lack of multi-threading
 considerations and because the state is stored on the client-side only: we
@@ -155,38 +137,37 @@ were it not for the fact that we don't deal with multi-threading.  Anyway,
 the routine needs to treat canceled requests specially -- those won't be
 sent to the server anymore.  For non-canceled requests, it extracts the
 message tag, size, and send/recv indicator and forwards those to the server
-using zbmi_test.  zbmi_test can block on the server for the specified time
-if none of the specified requests is initially ready.  zbmi_test returns
-the number of ready requests; if it is non-zero, then the server side must
-have posted matching sends/receives, so zoid_test_common next attempts to
-satisfy those "ready" requests by invoking zbmi_send/zbmi_recv.  Those
-send/recv routines could still fail in spite of a successful test if there
-is no memory or if the server side canceled its matching request; this is
-recoverable.
+using zbmi_test.  zbmi_test is the only blocking call of the three; it can
+block on the server for the specified time if none of the specified
+requests is initially ready.  zbmi_test returns the number of ready
+requests; if it is non-zero, then zoid_test_common next attempts to satisfy
+those requests by invoking zbmi_send/zbmi_recv.  Those send/recv routines
+could still fail in spite of a successful test, if there is no memory, or
+if the server-side canceled its matching request; this is recoverable.
 
 SERVER
 
 The communication between the I/O node BMI server and the zbmi plugin of
 the ZOID daemon is carried across two channels.  Commands are sent via a
-POSIX message queue (zbmi plugin is the server; multiple threads of the BMI
-server can communicate simultaneously by opening multiple reply queues to
-the server).  Payload is exchanged using a large shared memory segment,
+unix domain socket (zbmi plugin is the server; multiple threads of the BMI
+server can communicate simultaneously by opening multiple connections to
+the socket).  Payload is exchanged using a large shared memory segment,
 allocated by the zbmi plugin.  We make efforts to avoid unnecessary copies
 to/from that segment, so BMI_memalloc() on the BMI server side allocates
 from that segment, and ZOID-forwarded zbmi_send/recv calls store their
 buffers directly into the segment.
 
 The shared memory segment is split in two: a normally smaller region is
-used for unexpected messages and is managed by the zbmi plugin, while a
+used for unexpected messages and is managed by the zbmi plugin, wile a
 larger region is used for expected messages and is managed by the BMI
 server.
 
 The communication with the zbmi plugin is established during
-BMI_initialize, and terminated during BMI_finalize.  The message protocol is
+BMI_initialize, and terminated during BMI_finalize.  The stream protocol is
 documented in zbmi's zbmi_protocol.h.
 
 For BMI testunexpected, we communicate the metadata on the pending received
-messages via the queue, and the payload is in the shared memory buffer
+messages via the socket, and the payload is in the shared memory buffer
 which is returned to the user.  unexpected_free just sends the buffer
 address back to the zbmi plugin, since the unexpected messages memory pool
 is managed by the plugin.
@@ -199,16 +180,11 @@ causes an additional copy overhead.  Failures to allocate the temporary
 buffer are recoverable: we place the request in the "no_mem" queue and
 retry the allocation after every BMI_memfree.
 
-Expected server-side posts, be it sends or receives, can be completed
-immediately if a matching client-side post (or test) is waiting when
-server-side post is issued.  Note that "immediately" is used liberally
-here; the server-side post will not return until the buffer has been
-transferred to/from the compute node, which can take some time when the
-ZOID server is under heavy load.  For posts not completed immediately we
-send a message descriptor to the zbmi plugin which registers the message
-and just sends back a confirmation.  When registering we exchange the
-internal BMI id and the internal ZOID id, since that simplifies subsequent
-testing/canceling.
+Expected server-side posts, be it sends or receives, are never completed
+immediately: we send a message descriptor to the zbmi plugin which
+registers it and just sends back a confirmation.  When registering we
+exchange the internal BMI id and the internal ZOID id, since that
+simplifies subsequent testing/canceling.
 
 Canceling messages is more complex than on the client side.  Generally, we
 have to send a cancel request to the zbmi plugin to unregister an already
@@ -216,7 +192,7 @@ registered message descriptor.  Depending on the progress of the zbmi
 plugin in handing that registered request, the cancellation request might
 be ignored.  An exception is when the request has not been registered
 because of the lack of memory for a temporary buffer as described earlier;
-in that case we cancel it locally and put it in "error_ops" queue.
+in that case we cancel it locally and put in in "error_ops" queue.
 
 When testing (in zoid_server_test_common), we need to deal with locally
 failed/canceled messages separately from the ones registered with the zbmi
@@ -224,13 +200,13 @@ plugin.  This is actually similar to what we also do on the client side.
 Those messages come from the "error_ops" queue and we deal with them first,
 since they involve no communication with the zbmi plugin.  Unlike on the
 client side, where the common test routines sort-of "emulated" testcontext
-by first building an array of all pending request ids, on the server side
+but first building an array of all pending request ids, on the server side
 we have a "native" implementation.  Testcontext is recognized by passing an
 "incount" of 0, and we forward it to the zbmi plugin so that it knows to
 return *any* completed request(s).  This is necessary because of
 multi-threading constraints, and it is possible because the zbmi plugin
-does maintain state for server-side requests.  The test is the only
-server-side command that can block in the zbmi plugin for the specified
+does maintain state for server-side requests.  As with the client, the test
+is the only command that can block in the zbmi plugin for the specified
 time period if no request is initially completed.  Completed requests
 require no further handling, with the exceptions of those that used
 temporary shared memory buffer, which needs to be released (after being

@@ -2,6 +2,7 @@
  * (C) 2003 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
+ *
  */
 
 /** \file
@@ -12,7 +13,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -25,7 +28,8 @@
 #include "pvfs2-internal.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
-#define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE)
+#define IO_ATTR_MASKS (PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE|\
+                       PVFS_ATTR_CAPABILITY)
 
 extern job_context_id pint_client_sm_context;
 
@@ -39,7 +43,10 @@ enum
     IO_ANALYZE_SIZE_RESULTS,
     IO_DO_SMALL_IO,
     IO_UNSTUFF,
-    IO_GETATTR_SERVER
+    IO_GETATTR_SERVER,
+    IO_MIRRORING,
+    IO_NO_MIRRORING,
+    IO_FATAL_ERROR,
 };
 
 /* Helper functions local to sys-io.sm. */
@@ -205,12 +212,28 @@ machine pvfs2_client_io_sm
     {
         run io_datafile_post_msgpairs;
         IO_RETRY => io_datafile_post_msgpairs_retry;
+        IO_FATAL_ERROR => io_cleanup;
         default => io_datafile_complete_operations;
     }
 
     state io_datafile_post_msgpairs_retry
     {
         run io_datafile_post_msgpairs_retry;
+        IO_MIRRORING    => io_datafile_mirror_retry;
+        IO_NO_MIRRORING => io_datafile_no_mirror_retry;
+        default => io_datafile_no_mirror_retry;
+    }
+
+    state io_datafile_no_mirror_retry
+    {
+        run io_datafile_no_mirror_retry;
+        IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
+        default => io_datafile_post_msgpairs;
+    }
+
+    state io_datafile_mirror_retry
+    {
+        run io_datafile_mirror_retry;
         IO_DATAFILE_TRANSFERS_COMPLETE => io_analyze_results;
         default => io_datafile_post_msgpairs;
     }
@@ -227,7 +250,7 @@ machine pvfs2_client_io_sm
     {
         run io_analyze_results;
         IO_RETRY => init;
-        IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;
+        /*IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;*/
         IO_GET_DATAFILE_SIZE => io_datafile_size;
         default => io_cleanup;
     }
@@ -264,7 +287,7 @@ PVFS_error PVFS_isys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
     PVFS_sys_op_id *op_id,
@@ -325,7 +348,7 @@ PVFS_error PVFS_isys_io(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;
@@ -360,7 +383,7 @@ PVFS_error PVFS_sys_io(
     PVFS_offset file_req_offset,
     void *buffer,
     PVFS_Request mem_req,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
     PVFS_hint hints)
@@ -371,7 +394,7 @@ PVFS_error PVFS_sys_io(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
 
     ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
-                       credentials, resp_p, io_type, &op_id, hints, NULL);
+                       credential, resp_p, io_type, &op_id, hints, NULL);
     if (ret == 1)
         return 0;
     else if (ret < 0)
@@ -479,6 +502,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
          */
         PINT_SERVREQ_UNSTUFF_FILL(
                 msg_p->req,
+                sm_p->getattr.attr.capability,
                 (*sm_p->cred_p),
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
@@ -488,6 +512,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     {
         PINT_SERVREQ_GETATTR_FILL(
                 msg_p->req,
+                sm_p->getattr.attr.capability,
                 (*sm_p->cred_p),
                 sm_p->object_ref.fs_id,
                 sm_p->object_ref.handle,
@@ -519,6 +544,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(
     return SM_ACTION_COMPLETE;
 }
 
+
 static PINT_sm_action io_datafile_setup_msgpairs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -546,11 +572,18 @@ static PINT_sm_action io_datafile_setup_msgpairs(
     switch(attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
+
+            assert(attr->mask & PVFS_ATTR_CAPABILITY);
             assert(attr->mask & PVFS_ATTR_META_DFILES);
             assert(attr->mask & PVFS_ATTR_META_DIST);
             assert(attr->u.meta.dist_size > 0);
             assert(attr->u.meta.dfile_array);
             assert(attr->u.meta.dfile_count > 0);
+            if (attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+            {
+                assert(attr->u.meta.mirror_dfile_array);
+                assert(attr->u.meta.mirror_copies_count);
+            }
             break;
         case PVFS_TYPE_DIRECTORY:
             js_p->error_code = -PVFS_EISDIR;
@@ -665,7 +698,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(
 
         PINT_SERVREQ_IO_FILL(
             sm_p->u.io.contexts[i].msg.req,
-            *sm_p->cred_p,
+            attr->capability,
             sm_p->object_ref.fs_id,
             sm_p->u.io.contexts[i].data_handle,
             sm_p->u.io.io_type,
@@ -773,8 +806,12 @@ static PINT_sm_action io_datafile_post_msgpairs(
               FIXME: make this a clean error transition by adjusting
               the completion count and/or (not) exiting
             */
+            /* If one of the msgpairs gets this type of error, then the entire
+             * request should be aborted. Becky Ligon.
+            */
             PVFS_perror_gossip("PINT_encode failed", ret);
-            js_p->error_code = ret;
+            sm_p->u.io.stored_error_code = ret;
+            js_p->error_code = IO_FATAL_ERROR;
             return SM_ACTION_COMPLETE;
         }
 
@@ -786,7 +823,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
         if (!msg->encoded_resp_p)
         {
             /* FIXME: see above FIXME */
-            js_p->error_code = -PVFS_ENOMEM;
+            sm_p->u.io.stored_error_code = -PVFS_ENOMEM;
+            js_p->error_code = IO_FATAL_ERROR;
             return SM_ACTION_COMPLETE;
         }
 
@@ -803,7 +841,6 @@ static PINT_sm_action io_datafile_post_msgpairs(
                      status_user_tag, msg->max_resp_sz);
 
         cur_ctx->session_tag = PINT_util_get_next_tag();
-
         cur_ctx->msg_recv_has_been_posted = 0;
         cur_ctx->msg_recv_in_progress = 0;
 
@@ -852,8 +889,8 @@ static PINT_sm_action io_datafile_post_msgpairs(
             PVFS_perror_gossip("Receive immediately failed",
                                msg->recv_status.error_code);
 
-            ret = msg->recv_status.error_code;
-            js_p->error_code = ret;
+            //ret = msg->recv_status.error_code;
+            js_p->error_code = IO_RETRY;
             continue;
         }
 
@@ -912,7 +949,6 @@ static PINT_sm_action io_datafile_post_msgpairs(
             } else {
                 PVFS_perror_gossip("Send immediately failed, cancelling recv",
                     msg->recv_status.error_code);
-
                 msg->op_status = msg->send_status.error_code;
                 msg->send_id = 0;
 
@@ -928,11 +964,12 @@ static PINT_sm_action io_datafile_post_msgpairs(
             cur_ctx->msg_send_has_been_posted = 1;
             ++sm_p->u.io.msgpair_completion_count;
         }
-    }
+    }/*end for*/
 
     gossip_debug(GOSSIP_IO_DEBUG, "io_datafile_post_msgpairs: "
                  "completion count is %d\n",
                  sm_p->u.io.msgpair_completion_count);
+
 
     /* if anything posted, just wait for that to complete, else
      * go sleep then try the remaining msgpairs again */
@@ -942,24 +979,212 @@ static PINT_sm_action io_datafile_post_msgpairs(
         return SM_ACTION_DEFERRED;  /* means go find another machine to run */
     else {
         js_p->error_code = IO_RETRY;
-        return SM_ACTION_COMPLETE;  /* means look at error_code and run my machine again */
+        return SM_ACTION_COMPLETE;  /* means look at error_code and run my */
+                                    /* machine again. */
     }
 }
 
 /*
  * For IO retry, come here to sleep a bit then go back and post
- * some more msgpairs.
+ * some more msgpairs.  If mirroring, then we have more setup before a
+ * retry can happen.  Also, the retry-count is calculated differently.
  */
-static int
-io_datafile_post_msgpairs_retry(
-        struct PINT_smcb *smcb, job_status_s *js_p)
+static int io_datafile_post_msgpairs_retry (struct PINT_smcb *smcb
+                                          ,job_status_s *js_p)
+{
+    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *attr = &(sm_p->getattr.attr);
+    struct PINT_client_io_sm *io = &(sm_p->u.io);
+
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_post_msgpairs_retry...\n");
+
+    /* Are we mirroring on a READ request? */
+    if ( (attr->mask & PVFS_ATTR_META_MIRROR_DFILES) &&
+         io->io_type == PVFS_IO_READ )
+    {  
+         js_p->error_code = IO_MIRRORING;
+         return SM_ACTION_COMPLETE;
+    }
+
+    js_p->error_code = IO_NO_MIRRORING;
+    return SM_ACTION_COMPLETE;
+}
+
+
+static int io_datafile_mirror_retry(struct PINT_smcb *smcb
+                                   ,job_status_s *js_p )
+{
+    struct PINT_client_sm *sm_p;
+    PVFS_object_attr *attr;
+    PVFS_metafile_attr *meta;
+    struct PINT_client_io_sm *io;
+    PINT_sm_msgpair_state *msg = NULL;
+    PINT_client_io_ctx *ctx = NULL;
+    uint32_t index = 0;
+    uint32_t copies = 0;
+    int i,j,ret;
+    char *enc_req_bytes = NULL;
+
+    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing %s...\n",__func__);
+    gossip_debug(GOSSIP_IO_DEBUG,"Executing io_datafile_mirror_retry...\n");
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    attr = &(sm_p->getattr.attr);
+    meta = &(attr->u.meta);
+    io = &(sm_p->u.io);
+
+    /* Have we exhausted the number of retries */
+    if (io->retry_count >= sm_p->msgarray_op.params.retry_limit)
+    {
+        js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* Find failed contexts and prepare them for retry.
+    */
+    for (i=0; i<io->context_count; i++)
+    {
+        ctx = &(io->contexts[i]);
+        msg = &(ctx->msg);
+        if (ctx->msg_recv_has_been_posted && ctx->msg_send_has_been_posted)
+           /* this context has not failed. */
+           continue;
+
+        /* cleanup the failed context */
+        enc_req_bytes = (char *)&(msg->encoded_req);
+        for (j=0; j<sizeof(msg->encoded_req); j++)
+        {
+           if (enc_req_bytes[j] != '\0')
+           {
+              PINT_encode_release(&(msg->encoded_req),PINT_ENCODE_REQ);
+              break;
+           }
+        }/*end for*/
+        if (msg->encoded_resp_p)
+        {
+           BMI_memfree(msg->svr_addr
+                      ,msg->encoded_resp_p
+                      ,msg->max_resp_sz
+                      ,BMI_RECV);
+        }
+        memset(&(msg->encoded_req),0,sizeof(msg->encoded_req));
+        memset(&(msg->svr_addr),0,sizeof(msg->svr_addr));
+        msg->encoded_resp_p = NULL;
+        
+        /* use the primary data handle */
+        if (ctx->retry_original)
+        {
+            /* setup context to retry the original */
+           ctx->data_handle     = meta->dfile_array[ctx->server_nr];
+           ctx->retry_original  =  0;
+           msg->handle          = ctx->data_handle;
+           msg->req.u.io.handle = ctx->data_handle;
+           ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                               ,msg->handle
+                                               ,msg->fs_id);
+           if (ret)
+           {
+              gossip_lerr("Unable to determine the server address "
+                          "for this handle (%llu)"
+                          ,llu(msg->handle));
+              js_p->error_code = ret;
+              return SM_ACTION_COMPLETE;
+           }
+           PINT_flow_reset(&(ctx->flow_desc));
+           continue;
+        }
+
+        /* get next mirrored handle.  note:  if a mirrored handle is zero, then
+         * this means that the creation of this mirrored object failed for its
+         * particular server.  if so, then get the next valid handle.  as a 
+         * last resort, retry the original handle.
+        */
+        copies = ctx->current_copies_count;
+        for (;copies < meta->mirror_copies_count; copies++)
+        {
+            index = (copies*meta->dfile_count) + ctx->server_nr;
+            if (meta->mirror_dfile_array[index] != 0)
+            {  /* we have found a valid mirrored handle */
+               ctx->data_handle = meta->mirror_dfile_array[index];
+               break;
+            }
+        }
+
+        /* we have NOT found a valid mirrored handle, so retry the primary */
+        if ( copies == meta->mirror_copies_count )
+        {
+           ctx->data_handle = meta->dfile_array[ctx->server_nr];
+           ctx->retry_original = 0;
+           ctx->current_copies_count = 0;
+           io->retry_count++;
+           /* setup context to retry original */
+           msg->handle          = ctx->data_handle;
+           msg->req.u.io.handle = ctx->data_handle;
+           ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                               ,msg->handle
+                                               ,msg->fs_id);
+           if (ret)
+           {
+              gossip_lerr("Unable to determine the server address "
+                          "for this handle (%llu)"
+                          ,llu(msg->handle));
+              js_p->error_code = ret;
+              return SM_ACTION_COMPLETE;
+           }
+           PINT_flow_reset(&(ctx->flow_desc));
+           continue;
+        }
+
+        /* setup the context for the discovered mirrored handle */
+        msg->handle          = ctx->data_handle;
+        msg->req.u.io.handle = ctx->data_handle;
+        ret=PINT_cached_config_map_to_server(&(msg->svr_addr)
+                                            ,msg->handle
+                                            ,msg->fs_id);
+        if (ret)
+        {
+           gossip_lerr("Unable to determine the server address "
+                       "for this handle (%llu)"
+                       ,llu(msg->handle));
+           js_p->error_code = ret;
+           return SM_ACTION_COMPLETE;
+        }
+        PINT_flow_reset(&(ctx->flow_desc));
+
+
+        /* setup for the NEXT io-retry event for this context */
+        ctx->current_copies_count++;
+        if ( ctx->current_copies_count == meta->mirror_copies_count )
+        {/* we have gone through all of the mirrored handles, after this 
+          * iteration executes; so, indicate original for the next retry event.
+         */
+            ctx->current_copies_count = 0;
+            ctx->retry_original = 1;
+            io->retry_count++;
+        }
+    }/*end for each context*/
+
+    /* sleep a small while before starting the next round of retries */
+    return (job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay
+                                    ,smcb
+                                    ,0
+                                    ,js_p
+                                    ,NULL
+                                    ,pint_client_sm_context));
+
+}/*end io_datafile_mirror_retry*/
+
+static int io_datafile_no_mirror_retry(struct PINT_smcb *smcb
+                                      ,job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
     if (sm_p->u.io.retry_count > sm_p->msgarray_op.params.retry_limit) {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
-          __func__, sm_p->u.io.retry_count, sm_p->msgarray_op.params.retry_delay);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n"
+                                        ,__func__
+                                        ,sm_p->u.io.retry_count
+                                        ,sm_p->msgarray_op.params.retry_delay);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return SM_ACTION_COMPLETE;
     }
@@ -970,6 +1195,7 @@ io_datafile_post_msgpairs_retry(
     return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
         smcb, 0, js_p, NULL, pint_client_sm_context);
 }
+
 
 /*
   This state allows us to make sure all posted operations complete and
@@ -1144,7 +1370,7 @@ static PINT_sm_action io_datafile_complete_operations(
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
                      "context %p%s\n", cur_ctx,
                      ((cur_ctx->write_ack_in_progress ?
-                       " and reset write_recv timeout" : "")));
+                      " and reset write_recv timeout" : "")));
 
         cur_ctx->flow_in_progress = 0;
         sm_p->u.io.flow_completion_count--;
@@ -1153,7 +1379,8 @@ static PINT_sm_action io_datafile_complete_operations(
         /* look for flow error when no write ack is in progress (usually a
          * read case) 
          */
-        if (js_p->error_code < 0 && !cur_ctx->write_ack_in_progress) {
+        if (js_p->error_code < 0 && !cur_ctx->write_ack_in_progress) 
+        {
             if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) ||
                  (PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_FLOW) ||
                  (js_p->error_code == -ECONNRESET) || 
@@ -1174,7 +1401,19 @@ static PINT_sm_action io_datafile_complete_operations(
                 /* forcing the count high insures that the sm won't restart */
                 sm_p->u.io.retry_count = sm_p->msgarray_op.params.retry_limit;
             }
+
         }
+
+        /*To test fail-over uncomment the following. This will allow the code
+         * to go through the retry state at least one time on a read operation.
+        */
+        //if (!cur_ctx->write_ack_in_progress && sm_p->u.io.retry_count==0)
+        //{
+        //   cur_ctx->msg_send_has_been_posted = 0;
+        //   cur_ctx->msg_recv_has_been_posted = 0;
+        //}
+
+
     }
     else if (STATUS_USER_TAG_TYPE(status_user_tag, IO_SM_PHASE_FINAL_ACK))
     {
@@ -1225,23 +1464,27 @@ static PINT_sm_action io_datafile_complete_operations(
   check_next_step:
 
     /*
-     * If something is pending, return SM_ACTION_DEFERRED to let SM find the next thing
-     * to do.
+     * If something is pending, return SM_ACTION_DEFERRED to let SM find the
+     * next thing to do.
      */
     if (sm_p->u.io.msgpair_completion_count
      || sm_p->u.io.flow_completion_count
      || sm_p->u.io.write_ack_completion_count) {
         if (PINT_smcb_cancelled(smcb))
+        {
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                          "%d flows and %d write acks pending\n",
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count);
+        }
         else
+        {
             gossip_debug(GOSSIP_IO_DEBUG, " %d flows pending, %d write acks "
                          "pending, %d msgpair\n", 
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count,
                          sm_p->u.io.msgpair_completion_count);
+        }
         return SM_ACTION_DEFERRED;
     }
 
@@ -1338,8 +1581,7 @@ static PINT_sm_action io_analyze_results(
                     (i + 1), sm_p->u.io.datafile_count,
                     lld(sm_p->u.io.total_size));
             }
-            gossip_debug(
-                GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
+            gossip_debug(GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
                 (i + 1), sm_p->u.io.datafile_count,
                 lld(sm_p->u.io.total_size));
         }
@@ -1573,10 +1815,8 @@ static PINT_sm_action io_analyze_results(
              * we need to go and get them
              */
 
-            /* this sets the array that gets filled in by the
-             * getattr_datafile_sizes states machine we jump to
-             */
-            sm_p->getattr.size_array = sm_p->u.io.dfile_size_array;
+            /* NOTE: when jumping to getattr_datafile_sizes, results will be */
+            /* allocated and stored in sm_p->getattr.size_array.             */
 
             /* setting this state result will cause the state machine to
              * jump to getattr_datafile_sizes and get all the 
@@ -1639,7 +1879,7 @@ static PINT_sm_action io_analyze_size_results(
         logical_file_size(
             attr->u.meta.dist->params,
             attr->u.meta.dfile_count,
-            sm_p->u.io.dfile_size_array);
+            sm_p->getattr.size_array);
     if(eof > eor)
     {
         eor = eof;
@@ -1652,7 +1892,7 @@ static PINT_sm_action io_analyze_size_results(
 
         ret = io_zero_fill_holes(sm_p, eor,
                                  attr->u.meta.dfile_count,
-                                 sm_p->u.io.dfile_size_array,
+                                 sm_p->getattr.size_array,
                                  NULL);
         if(ret < 0)
         {
@@ -1675,7 +1915,7 @@ static PINT_sm_action io_analyze_size_results(
 
         ret = io_zero_fill_holes(sm_p, eof,
                                  attr->u.meta.dfile_count,
-                                 sm_p->u.io.dfile_size_array,
+                                 sm_p->getattr.size_array,
                                  NULL);
         if(ret < 0)
         {
@@ -1708,6 +1948,12 @@ static PINT_sm_action io_cleanup(
     {
         PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
     }
+
+    /*these errors occur only within THIS machine and indicate an error that
+     *occurred BEFORE starting msgpairs or small-io.
+    */
+    if (js_p->error_code == IO_FATAL_ERROR)
+        js_p->error_code = sm_p->u.io.stored_error_code;
 
     sm_p->error_code = js_p->error_code;
 
@@ -1769,7 +2015,8 @@ static inline int io_decode_ack_response(
         {
             PVFS_perror_gossip("io_process_context_recv (op_status)",
                                cur_ctx->msg.op_status);
-            gossip_err("server: %s\n", BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
+            gossip_err("server: %s\n"
+                      , BMI_addr_rev_lookup(cur_ctx->msg.svr_addr));
             ret = cur_ctx->msg.op_status;
         }
 
@@ -1777,6 +2024,8 @@ static inline int io_decode_ack_response(
             &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
             decoded_resp, &cur_ctx->msg.svr_addr,
             cur_ctx->msg.max_resp_sz);
+        memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
+        cur_ctx->msg.encoded_resp_p = NULL;
     }
     return ret;
 }
@@ -2136,6 +2385,8 @@ static inline int io_process_context_recv(
         &cur_ctx->msg.encoded_req, cur_ctx->msg.encoded_resp_p,
         &decoded_resp, &cur_ctx->msg.svr_addr,
         cur_ctx->msg.max_resp_sz);
+    memset(&cur_ctx->msg.encoded_req,0,sizeof(cur_ctx->msg.encoded_req));
+    cur_ctx->msg.encoded_resp_p = NULL;
 
     if (ret)
     {

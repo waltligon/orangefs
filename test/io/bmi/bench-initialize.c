@@ -6,7 +6,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <errno.h>
 #include <math.h>
 #include <string.h>
@@ -15,7 +17,9 @@
 #include "bmi.h"
 #include "bench-initialize.h"
 #include "bench-args.h"
+#ifndef WIN32
 #include <strings.h>
+#endif
 
 int bench_init(
     struct bench_options *opts,
@@ -171,7 +175,7 @@ int bench_initialize_bmi_interface(
 
     if (flags & BMI_INIT_SERVER)
     {
-	ret = BMI_initialize(NULL, NULL, 0);
+	ret = BMI_initialize(method, local_address, flags);
     }
     else
     {
@@ -239,7 +243,11 @@ int bench_initialize_mpi_params(
     MPI_Get_processor_name(local_proc_name, &proc_namelen);
 
     /* trim off all but hostname portion */
+#ifdef WIN32
+    trunc_point = strchr(local_proc_name, '.');
+#else
     trunc_point = index(local_proc_name, '.');
+#endif
     if (trunc_point)
     {
 	trunc_point[0] = '\0';
@@ -311,6 +319,7 @@ int bench_initialize_bmi_addresses_client(
     {
 	ret = MPI_Recv(server_name, 256, MPI_BYTE, i, 0, MPI_COMM_WORLD,
 		       &status_foo);
+
 	if (ret != MPI_SUCCESS)
 	{
 	    return (-1);

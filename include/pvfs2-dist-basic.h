@@ -12,6 +12,9 @@
 #define PVFS_DIST_BASIC_NAME_SIZE 11
 
 struct PVFS_basic_params_s {
+#ifdef WIN32
+    int field;
+#endif
 };
 typedef struct PVFS_basic_params_s PVFS_basic_params;
 

@@ -52,7 +52,7 @@ typedef struct PINT_dist_methods_s
                      const char* param_name, void* value);
 
     /* Retrieves a blocksize value suitable to report in stat() */
-    PVFS_size (*get_blksize)(void* params);
+    PVFS_size (*get_blksize)(void* params, int dfile_count);
 
     /* Stores parameters in lebf memory at pptr */
     void (*encode_lebf)(char **pptr, void* params);
@@ -62,6 +62,9 @@ typedef struct PINT_dist_methods_s
 
     /* Called when the distribution is registered */
     void (*registration_init)(void* params);
+
+    /* Called when the distribution is unregisterd */
+    void (*unregister)(void);
     
     char *(*params_string)(void *params);
 } PINT_dist_methods;

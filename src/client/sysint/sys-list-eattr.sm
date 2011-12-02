@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -16,6 +18,7 @@
 #include "str-utils.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "security-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -54,13 +57,14 @@ PVFS_error PVFS_isys_listeattr(
         PVFS_object_ref ref,
         PVFS_ds_position token,
         int32_t nkey,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_sysresp_listeattr *resp_p,
         PVFS_sys_op_id *op_id,
         PVFS_hint hints,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    int i = 0;
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
@@ -72,6 +76,30 @@ PVFS_error PVFS_isys_listeattr(
     {
         gossip_err("invalid (NULL) required argument\n");
 	return ret;
+    }
+
+    /* the resp key array is used to determine how much we allocate,
+     * let's enforce the max key buffer of PVFS_MAX_XATTR_NAMELEN
+     */
+
+    if( nkey > PVFS_REQ_LIMIT_EATTR_LIST )
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: requested number of keys, %d, "
+                     " is larger than the maximum of %d\n", __func__,
+                     resp_p->nkey, PVFS_REQ_LIMIT_EATTR_LIST );
+        return ret; 
+    }
+
+    for( i=0; i < nkey; i++ )
+    {
+        if( resp_p->key_array[i].buffer_sz > PVFS_MAX_XATTR_NAMELEN )
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: key_array item %d "
+                         "buffer_sz of %d is too big (max value %d)\n",
+                         __func__, i, resp_p->key_array[i].buffer_sz,
+                         PVFS_MAX_XATTR_NAMELEN);
+            return ret;
+        }
     }
 
     PINT_smcb_alloc(&smcb, PVFS_SYS_LISTEATTR,
@@ -86,7 +114,7 @@ PVFS_error PVFS_isys_listeattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.listeattr.nkey = nkey;
     sm_p->u.listeattr.resp_p = resp_p;
     sm_p->u.listeattr.pos_token = token;
@@ -102,7 +130,7 @@ PVFS_error PVFS_sys_listeattr(
         PVFS_object_ref ref,
         PVFS_ds_position token,
         int32_t nkey,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_sysresp_listeattr *resp_p,
         PVFS_hint hints)
 {
@@ -111,7 +139,7 @@ PVFS_error PVFS_sys_listeattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_listeattr entered\n");
 
-    ret = PVFS_isys_listeattr(ref, token, nkey, credentials,
+    ret = PVFS_isys_listeattr(ref, token, nkey, credential,
             resp_p, &op_id, hints, NULL);
 
     if (ret)
@@ -140,9 +168,12 @@ static PINT_sm_action list_eattr_setup_msgpair(
     int ret = -PVFS_EINVAL;
     int i;
     PINT_sm_msgpair_state *msg_p;
+    PVFS_capability capability;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"list_eattr state: list_eattr_setup_msgpair\n");
+
+    PINT_null_capability(&capability);
 
     /* this will be the array of key buffer sizes */
     sm_p->u.listeattr.size_array =
@@ -158,7 +189,7 @@ static PINT_sm_action list_eattr_setup_msgpair(
 
     PINT_SERVREQ_LISTEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            capability,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             sm_p->u.listeattr.pos_token,

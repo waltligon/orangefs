@@ -389,36 +389,36 @@ struct TROVE_dspace_ops
 struct TROVE_mgmt_ops
 {
     int (*initialize)(
-		      char *stoname,
+		      char *data_path,
+		      char *meta_path,
 		      TROVE_ds_flags flags);
     
     int (*finalize)(void);
     
     int (*storage_create)(
-			  char *stoname,
+			  char *data_path,
+			  char *meta_path,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     
     int (*storage_remove)(
-			  char *stoname,
+			  char *data_path,
+			  char *meta_path,
 			  void *user_ptr,
 			  TROVE_op_id *out_op_id_p);
     
     int (*collection_create)(
-			     /* char *stoname, */
 			     char *collname,
 			     TROVE_coll_id new_coll_id,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
 
     int (*collection_remove)(
-			     /* char *stoname, */
 			     char *collname,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
     
     int (*collection_lookup)(
-			     /* char *stoname, */
 			     char *collname,
 			     TROVE_coll_id *coll_id_p,
 			     void *user_ptr,
@@ -462,6 +462,14 @@ struct TROVE_mgmt_ops
 			       TROVE_coll_id coll_id,
 			       TROVE_keyval_s *key_p,
 			       TROVE_keyval_s *val_p,
+			       TROVE_ds_flags flags,
+			       void *user_ptr,
+			       TROVE_context_id context_id,
+			       TROVE_op_id *out_op_id_p);
+
+    int (*collection_deleattr)(
+			       TROVE_coll_id coll_id,
+			       TROVE_keyval_s *key_p,
 			       TROVE_ds_flags flags,
 			       void *user_ptr,
 			       TROVE_context_id context_id,

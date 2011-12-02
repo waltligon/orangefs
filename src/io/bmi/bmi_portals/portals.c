@@ -31,7 +31,6 @@
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t */
 #include <src/common/misc/pvfs2-internal.h>  /* lld */
 #include <src/common/id-generator/id-generator.h>
-#include "pint-hint.h"
 
 #ifdef HAVE_VALGRIND_H
 #include <memcheck.h>
@@ -131,19 +130,16 @@ static const char *PtlEventKindStr(ptl_event_kind_t ev_kind)
  * and the receiver has not preposted, later the receiver will issue a Get
  * to us for the data.  That get will use the second set of match bits.
  *
- * The the next 22 top bits are used to encode a sequence number per
+ * The rest of the 30 top bits are used to encode a sequence number per
  * peer.  As BMI can post multiple sends with the same tag, we have to
  * be careful that if send #2 for a given tag goes to the zero_md, that
  * when he does the get, he grabs from buffer #2, not buffer #1 because
  * the sender was too slow in unlinking it.
- *
- * The next 8 bits are used for the class value on unexpected messages.
  */
 static const uint64_t match_bits_unexpected = 1ULL << 63;  /* 8... */
 static const uint64_t match_bits_long_send = 1ULL << 62;   /* 4... */
-static const uint32_t match_bits_seqno_max = 1UL << 22;
+static const uint32_t match_bits_seqno_max = 1UL << 30;
 static const int      match_bits_seqno_shift = 32;
-static const int      match_bits_class_shift = 54;
 
 static uint64_t mb_from_tag_and_seqno(uint32_t tag, uint32_t seqno)
 {
@@ -313,7 +309,6 @@ struct bmip_work {
 
     bmi_msg_tag_t bmi_tag;  /* recv: unexpected or nonpp tag that arrived */
     uint64_t match_bits;    /* recv: full match bits, including seqno */
-    uint8_t bmi_class;      /* recv (unexp): class of unexpected message */
 
     int is_unexpected;      /* send: if user posted this as unexpected */
 
@@ -492,8 +487,6 @@ static int handle_event(ptl_event_t *ev)
 	    }
 	    rq->actual_len = ev->mlength;
 	    rq->bmi_tag = ev->match_bits & 0xffffffffULL;  /* just 32 bits */
-            rq->bmi_class = (uint8_t) (ev->match_bits >>
-                match_bits_class_shift);
 	    rq->mop.addr = addr_from_nidpid(ev->initiator);
 	    memcpy(rq->unex_buf, (char *) ev->md.start + ev->offset,
 		   ev->mlength);
@@ -842,7 +835,6 @@ static int bmip_testsome(int num __unused, bmi_op_id_t *ids __unused,
  */
 static int bmip_testunexpected(int incount, int *outcount,
 			       struct bmi_method_unexpected_info *ui,
-                               uint8_t class,
 			       int max_idle_time)
 {
     struct bmip_work *w, *wn;
@@ -857,8 +849,6 @@ static int bmip_testunexpected(int incount, int *outcount,
 	qlist_for_each_entry_safe(w, wn, &q_unexpected_done, list) {
 	    if (n == incount)
 		break;
-            if(w->bmi_class != class)
-                continue;
 	    ui[n].error_code = 0;
 	    ui[n].addr = w->mop.addr;
 	    ui[n].size = w->actual_len;
@@ -1088,7 +1078,7 @@ static int
 post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	  int numbufs, const void *const *buffers, const bmi_size_t *sizes,
 	  bmi_size_t total_size, bmi_msg_tag_t bmi_tag, void *user_ptr,
-	  bmi_context_id context_id, int is_unexpected, uint8_t class)
+	  bmi_context_id context_id, int is_unexpected)
 {
     struct bmip_method_addr *pma = addr->method_data;
     struct bmip_work *sq;
@@ -1129,11 +1119,7 @@ post_send(bmi_op_id_t *id, struct bmi_method_addr *addr,
 	debug(2, "%s: sq %p len %lld peer %s tag %d unexpected\n", __func__, sq,
 	      lld(total_size), pma->peername, bmi_tag);
 	/* md without any match entry, for sending */
-        mb = 0;
-        mb += class;
-        mb << match_bits_class_shift;
-	mb |= match_bits_unexpected; 
-        mb |= bmi_tag;
+	mb = match_bits_unexpected | bmi_tag;
 	ret = PtlMDBind(ni, mdesc, PTL_UNLINK, &sq->md);
 	if (ret) {
 	    gossip_err("%s: PtlMDBind: %s\n", __func__, PtlErrorStr(ret));
@@ -1185,17 +1171,37 @@ out:
     return ret;
 }
 
+static int bmip_post_send(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+			  const void *buffer, bmi_size_t total_size,
+			  enum bmi_buffer_type buffer_flag __unused,
+			  bmi_msg_tag_t tag, void *user_ptr,
+			  bmi_context_id context_id)
+{
+    return post_send(id, remote_map, 0, &buffer, &total_size,
+		     total_size, tag, user_ptr, context_id, 0);
+}
+
 static int bmip_post_send_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			       const void *const *buffers,
 			       const bmi_size_t *sizes, int list_count,
 			       bmi_size_t total_size,
 			       enum bmi_buffer_type buffer_flag __unused,
 			       bmi_msg_tag_t tag, void *user_ptr,
-			       bmi_context_id context_id,
-                               PVFS_hint hints __unused)
+			       bmi_context_id context_id)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-		     total_size, tag, user_ptr, context_id, 0, 0);
+		     total_size, tag, user_ptr, context_id, 0);
+}
+
+static int bmip_post_sendunexpected(bmi_op_id_t *id,
+				    struct bmi_method_addr *remote_map,
+				    const void *buffer, bmi_size_t total_size,
+				    enum bmi_buffer_type bflag __unused,
+				    bmi_msg_tag_t tag, void *user_ptr,
+				    bmi_context_id context_id)
+{
+    return post_send(id, remote_map, 0, &buffer, &total_size,
+		     total_size, tag, user_ptr, context_id, 1);
 }
 
 static int bmip_post_sendunexpected_list(bmi_op_id_t *id,
@@ -1204,14 +1210,11 @@ static int bmip_post_sendunexpected_list(bmi_op_id_t *id,
 					 const bmi_size_t *sizes,
 					 int list_count, bmi_size_t total_size,
 					 enum bmi_buffer_type bflag __unused,
-					 bmi_msg_tag_t tag, 
-                                         uint8_t class,
-                                         void *user_ptr,
-					 bmi_context_id context_id, 
-                                         PVFS_hint hints __unused)
+					 bmi_msg_tag_t tag, void *user_ptr,
+					 bmi_context_id context_id)
 {
     return post_send(id, remote_map, list_count, buffers, sizes,
-		     total_size, tag, user_ptr, context_id, 1, class);
+		     total_size, tag, user_ptr, context_id, 1);
 }
 
 
@@ -1502,14 +1505,24 @@ out:
     return ret;
 }
 
+static int bmip_post_recv(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
+			  void *buffer, bmi_size_t expected_len,
+			  bmi_size_t *actual_len __unused,
+			  enum bmi_buffer_type buffer_flag __unused,
+			  bmi_msg_tag_t tag, void *user_ptr,
+			  bmi_context_id context_id)
+{
+    return post_recv(id, remote_map, 0, &buffer, &expected_len,
+		     expected_len, tag, user_ptr, context_id);
+}
+
 static int bmip_post_recv_list(bmi_op_id_t *id, struct bmi_method_addr *remote_map,
 			       void *const *buffers, const bmi_size_t *sizes,
 			       int list_count, bmi_size_t tot_expected_len,
 			       bmi_size_t *tot_actual_len __unused,
 			       enum bmi_buffer_type buffer_flag __unused,
 			       bmi_msg_tag_t tag, void *user_ptr,
-			       bmi_context_id context_id, PVFS_hint hints
-                               __unused)
+			       bmi_context_id context_id)
 {
     return post_recv(id, remote_map, list_count, buffers, sizes,
 		     tot_expected_len, tag, user_ptr, context_id);
@@ -2288,6 +2301,9 @@ const struct bmi_method_ops bmi_portals_ops =
     .memalloc = bmip_memalloc,
     .memfree = bmip_memfree,
     .unexpected_free = bmip_unexpected_free,
+    .post_send = bmip_post_send,
+    .post_sendunexpected = bmip_post_sendunexpected,
+    .post_recv = bmip_post_recv,
     .test = bmip_test,
     .testsome = bmip_testsome,
     .testcontext = bmip_testcontext,

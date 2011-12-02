@@ -1,0 +1,42 @@
+
+These codes stack up as follows:
+
+stdio
+posix
+posix-pvfs
+iocommon/openfile-util
+libpvfs
+
+posix also calls out to glibc for non-pvfs file systems.
+user code is expected to call in a stdio, posix, and/or posix-pvfs
+
+stdio
+
+This is an actual implementation of stdio based on the joined file
+descriptor/pointer implemented in openfile-util - this is here mostly
+so calls to libc don't bypass our system calls.
+
+posix
+
+These are wrappers that either call the glibc or the pvfs version
+
+posix-pvfs
+
+These implement the system calls for pvfs using the iocommon calls
+
+iocommon
+
+These are based on the codes in the pvfs apps and other implementations
+that access pvfs via the sysint calls
+
+openfile-util
+
+These are data structures used in the stdio/posix implementation.  Mostly
+an open file table and method tables, various other functions and structures
+needed for those implementations
+
+libpvfs
+
+This is the client sysint code - not in this directory
+
+WBL

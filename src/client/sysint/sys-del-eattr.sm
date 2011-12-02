@@ -6,7 +6,9 @@
 
 #include <string.h>
 #include <assert.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 
 #include "client-state-machine.h"
 #include "pvfs2-debug.h"
@@ -28,6 +30,13 @@ static int del_eattr_comp_fn(
 
 machine pvfs2_client_del_eattr_sm
 {
+    state getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setup_msgpair;
+        default => cleanup;
+    }
+
     state setup_msgpair
     {
         run del_eattr_setup_msgpair;
@@ -52,7 +61,7 @@ machine pvfs2_client_del_eattr_sm
 
 PVFS_error PVFS_isys_deleattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p,
         PVFS_sys_op_id *op_id,
         PVFS_hint hints,
@@ -83,19 +92,27 @@ PVFS_error PVFS_isys_deleattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.deleattr.key_p = key_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     
+
+    PINT_SM_GETATTR_STATE_FILL(
+                               sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_NONE,
+                               0);
+
     return PINT_client_state_machine_post(
             smcb,  op_id, user_ptr);
 }
 
 PVFS_error PVFS_sys_deleattr(
         PVFS_object_ref ref,
-        const PVFS_credentials *credentials,
+        const PVFS_credential *credential,
         PVFS_ds_keyval *key_p, 
         PVFS_hint hints)
 {
@@ -104,7 +121,7 @@ PVFS_error PVFS_sys_deleattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_deleattr entered\n");
 
-    ret = PVFS_isys_deleattr(ref, credentials,
+    ret = PVFS_isys_deleattr(ref, credential,
             key_p, &op_id, hints, NULL);
 
     if (ret)
@@ -136,12 +153,14 @@ static PINT_sm_action del_eattr_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr state: del_eattr_setup_msgpair\n");
 
+    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
     PINT_SERVREQ_DELEATTR_FILL(
             msg_p->req,
-            (*sm_p->cred_p),
+            sm_p->getattr.attr.capability,
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
             (*sm_p->u.deleattr.key_p),
@@ -175,6 +194,8 @@ static PINT_sm_action del_eattr_cleanup(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr state: del_eattr_cleanup\n");
     sm_p->error_code  = js_p->error_code;
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

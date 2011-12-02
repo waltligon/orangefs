@@ -8,10 +8,16 @@
 #include <stdlib.h>
 #include <client.h>
 #include <string.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
+
+#ifdef WIN32
+#define snprintf    _snprintf
+#endif
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
@@ -41,7 +47,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 {
     PVFS_object_ref pinode_refn;
     uint32_t attrmask;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_getattr getattr_response;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
@@ -50,7 +56,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     pinode_refn.fs_id = fs_id;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if (PVFS_sys_getattr(pinode_refn, attrmask,
                          &credentials, &getattr_response, NULL))
     {
@@ -72,7 +78,7 @@ int directory_walk(PVFS_fs_id cur_fs,
     PVFS_sysresp_readdir rd_response;
     char full_path[PVFS_NAME_MAX] = {0};
     char* name;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
@@ -97,7 +103,7 @@ int directory_walk(PVFS_fs_id cur_fs,
     }
     name = full_path;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     if (PVFS_sys_lookup(cur_fs, name, &credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_FOLLOW, NULL))
     {

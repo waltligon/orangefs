@@ -15,7 +15,7 @@ int test_pvfs_datatype_hvector(
     void *params __unused)
 {
     int ret = -1, i = 0, j = 0, num_ok = 0;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_Request req_io;
     PVFS_Request req_mem;
@@ -41,7 +41,7 @@ int test_pvfs_datatype_hvector(
         io_buffer[i] = (char) ti;
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {

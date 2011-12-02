@@ -34,7 +34,7 @@ struct options
 static void usage(int argc, char** argv);
 static int parse_args(int argc, char** argv, struct options * opts);
 static void enable_verbose(struct options * opts);
-static int make_link(PVFS_credentials     * pCredentials,
+static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
     char                szPvfsPath[PVFS_NAME_MAX] = "";
     PVFS_fs_id          fs_id                     = 0;
     struct options      user_opts;
-    PVFS_credentials    credentials;
+    PVFS_credential     credentials;
 
     /* Initialize any memory */
     memset(&user_opts,   0, sizeof(user_opts));
@@ -82,7 +82,12 @@ int main(int argc, char **argv)
    }
 
     /* We will re-use the same credentials for each call */
-    PVFS_util_gen_credentials(&credentials);
+    ret = PVFS_util_gen_credential_defaults(&credentials);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_util_gen_credential_defaults", ret);
+        return(-1);
+    }
 
     ret = make_link(&credentials,
                     fs_id,
@@ -103,7 +108,7 @@ int main(int argc, char **argv)
     return(0);
 }
 
-static int make_link(PVFS_credentials     * pCredentials,
+static int make_link(PVFS_credential      * pCredentials,
                      const PVFS_fs_id       fs_id,
                      const char           * pszLinkTarget,
                      const char           * pszPvfsPath,
@@ -123,8 +128,8 @@ static int make_link(PVFS_credentials     * pCredentials,
     memset(&resp_sym,    0, sizeof(resp_sym));
 
     /* Set the attributes for the new directory */
-    attr.owner = pCredentials->uid;
-    attr.group = pCredentials->gid;
+    attr.owner = pCredentials->userid;
+    attr.group = pCredentials->group_array[0];
     attr.perms = 0777;              
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 

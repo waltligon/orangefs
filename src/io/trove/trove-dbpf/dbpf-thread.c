@@ -138,6 +138,12 @@ void *dbpf_thread_function(void *ptr)
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          &dbpf_op_queue_mutex,
                                          &wait_time);
+            if( ret == EINVAL || ret == EPERM )
+            {
+                /* an error other than timeout occured */
+                gossip_debug(GOSSIP_TROVE_DEBUG, "%s: pthread_cond_timedwait "
+                             "returned an error\n", __func__);
+            }
             gen_mutex_unlock(&dbpf_op_queue_mutex);
         }
     }

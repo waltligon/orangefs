@@ -1,0 +1,186 @@
+%
+%
+\documentclass[11pt, letterpaper]{article}
+\usepackage[dvips]{graphicx}
+\usepackage{epsfig}
+\usepackage{rotating}
+\pagestyle{plain}
+
+%
+% GET THE MARGINS RIGHT, THE UGLY WAY
+%
+\topmargin 0.0in
+\textwidth 6.5in
+\textheight 9.0in
+\columnsep 0.25in
+\oddsidemargin 0.0in
+\evensidemargin 0.0in
+\headsep 0.0in
+\headheight 0.0in
+
+\title{PVFS\\Configuration of Robust Security}
+\author{ Michael Moore }
+\date{ Oct 25, 2011 }
+
+%
+% BEGINNING OF DOCUMENT
+%
+\begin{document}
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+\thispagestyle{plain}
+
+% \setlength{\parindent}{0.0cm}
+
+\section{Introduction}
+
+\section{Building}
+
+\subsection{configure}
+The only change needed when building is to specify the 
+\texttt{--enable-security} option. Currently, the default \texttt{configure} 
+option is to \emph{disable} the robust security code. The option must be 
+specified at configure time to compile support for the robust security code.
+
+\begin{verbatim}
+    ./configure --enable-security --prefix=/usr/local/orangefs \
+        --with-kernel=/usr/src/kernels/2.6.18-194.17.1.el5-x86_64/
+\end{verbatim}
+
+\subsection{build}
+Building is performed normally via \texttt{make}.
+
+\begin{verbatim}
+    make && make kmod && make install && make kmod_install
+\end{verbatim}
+
+\section{Environment}
+
+\subsection{Client}
+
+Each client requires a private key. This allows the servers to verify the 
+identity of the client. Each client can use the same private key or a unique 
+private key. It is recommended to create a private key for each client to 
+mitigate the impact of a compromised private key. To create a private key 
+called \texttt{clientkey.pem}:
+
+\begin{verbatim}
+    root@pvfs-client ~ # cd /usr/local/orangefs/etc/
+    root@pvfs-client ~ # openssl genrsa -out clientkey.pem 1024
+    Generating RSA private key, 1024 bit long modulus
+    ......................++++++
+    .........++++++
+    e is 65537 (0x10001)
+\end{verbatim}
+
+\subsection{Server}
+
+The server side requires a private key for each server and a key store that 
+contains the public keys of each server and client. The private key is 
+required to sign the credentials and capabilities a given server creates and 
+sends to client. The key store is used to verify the keys used in the 
+filesystem. The server private key is created in a similar fashion to the 
+client key. Each server can use the same private key or a different private key.
+It is recommended to create a private key for each server to mitigate the 
+impact of a compromised private key. To create a private key called 
+\texttt{serverkey.pem}:
+
+\begin{verbatim}
+    root@pvfs-server ~ # cd /usr/local/orangefs/etc/
+    root@pvfs-server ~ # openssl genrsa -out serverkey.pem 2048
+    Generating RSA private key, 2048 bit long modulus
+    ...................................+++
+    ............................................+++
+    e is 65537 (0x10001)
+\end{verbatim}
+
+Second, the key store must be created. Assuming a single server and client, 
+as created above, the process to create the key store is to retrieve the public
+keys from each generated key and store them in a text file. To store the server
+and client public keys in \texttt{keystore}:
+
+\begin{verbatim}
+    root@pvfs-server ~ # cd /usr/local/orangefs/etc
+    root@pvfs-server ~ # echo "S:pvfs-server" >> keystore
+    root@pvfs-server ~ # openssl rsa -in serverkey.pem -pubout >> keystore
+    root@pvfs-server ~ # echo "C:pvfs-client" >> keystore
+    root@pvfs-server ~ # openssl rsa -in clientkey.pem -pubout >> keystore
+\end{verbatim}
+
+The actual hostname of the server and client should be substituted in the echo 
+statements above. Note that server hostnames are preceded by "S:", and client 
+hostnames with "C:". An example key store file with one server and one client 
+would look like:
+
+\begin{verbatim}
+    S:pvfs-server
+    -----BEGIN PUBLIC KEY-----
+    MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2Q8KLwg/CMnBwaJLCuvi
+    I7mVhvjupkWZaqwy1nVz+OsWBNZ+eCCwmGjfNyE71qe4SO0kmV1bnhVAzbV28lcT
+    15LDQcYxnDJDboN4c1+kO4xcFErO7XcCWmaiUx6GFVI2X82LvhW4zr8ySbFn0LwF
+    L1eDE6BKN3Qk5DKZjbZJkcHIs+XpOBnxPWr8e3euece5INoVD1OgDDy0DEICsJHa
+    hj2DuvslaOr1qZQeBd63nQshgWvHM77VbsaCjxPOl3gQjRgKbB1jo42cyeVPPjJm
+    bhGetGvSibmJr9ca1cBM5MVCYsiDHHvrMEqq3wdYSekVKAIYX3gx1KvDQF2RjhlF
+    GwIDAQAB
+    -----END PUBLIC KEY-----
+    C:pvfs-client
+    -----BEGIN PUBLIC KEY-----
+    MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCw7sUebHfVGgV5M18nXtXqQq5c
+    uKZvoaQzNISEYH6tGUYcVLnnu3FLBnxUFnByWZed7FtzR3SFXUlwbRbiQyiiLjMa
+    NXlvXE91Cj6UXcDGnvvZE47BEqzYjQ7X8Z+toWMVi37Yj1CcYgEMZwFo7ewpyB7d
+    IEHqPO+/oz2wXGK0DwIDAQAB
+    -----END PUBLIC KEY-----
+\end{verbatim}
+
+\section{Configuration}
+
+\subsection{Client}
+The client needs to be able to locate its private key file. The client's 
+private key is expected at the default location 
+\texttt{SYSCONFDIR/pvfs2credkey.pri}. As an example, if you ran 
+\texttt{./configure --prefix=/usr/local/orangefs} the default location for the 
+client's private key is statically defined as 
+\texttt{/usr/local/orangefs/etc/pvfs2credkey.pri}. If you are using the kernel 
+module and pvfs2-client to access the filesystem you can specify the private 
+key path by appending the \texttt{--keypath <key>} argument to pvfs2-client. 
+Again, assuming the above client key generation and a prefix of 
+\texttt{/usr/local/orangefs}, the pvfs2-client command would be:
+
+\begin{verbatim}
+    /usr/local/orangefs/sbin/pvfs2-client \
+        --keypath /usr/local/orangefs/etc/clientkey.pem
+\end{verbatim}
+
+For \textt{pvfs-*} commands (that use \textt{libpvfs2}) the environment 
+variable PVFS2KEY_FILE should be set to specify a non-default path to the 
+client private key.
+
+\begin{verbatim}
+    export PVFS2KEY_FILE="/usr/local/orangefs/etc/clientkey.pem"
+\end{verbatim}
+
+\subsection{Server}
+
+The server requires two new configuration parameters. The path to the private 
+key must be specified using the \texttt{ServerKey} parameter. The path to the 
+key store must be specified using the \texttt{KeyStore} parameter. The 
+parameters can be specified in the \texttt{Defaults} section or the 
+\texttt{Server} section of the configuration depending on your needs. Example 
+values assuming the server private key and key store generation example above 
+( if the files were moved to {\texttt{/usr/local/orangefs/etc/} ):
+
+\begin{verbatim}
+    KeyStore /usr/local/orangefs/etc/keystore
+    ServerKey /usr/local/orangefs/etc/serverkey.pem
+\end{verbatim}
+
+\section{A Word About Permissions}
+
+
+\end{document}
+
+

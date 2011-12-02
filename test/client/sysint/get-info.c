@@ -22,7 +22,7 @@ int main(int argc,char **argv)
     uint32_t attrmask;
     PVFS_fs_id fs_id;
     char* name;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     char *filename = NULL;
     int ret = -1;
     time_t r_atime, r_mtime, r_ctime;
@@ -53,7 +53,7 @@ int main(int argc,char **argv)
 
     name = filename;
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
     if (ret < 0)

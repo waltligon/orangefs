@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     char test_dir[PATH_MAX];
     PVFS_sys_attr attr;
     PVFS_fs_id cur_fs;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_create create_resp;
     PVFS_sysresp_mkdir mkdir_resp;
@@ -126,11 +126,11 @@ int main(int argc, char **argv)
 		  return ret;
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = credentials.uid;
-    attr.group = credentials.gid;
+    attr.owner = credentials.userid;
+    attr.group = credentials.group_array[0];
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
@@ -174,6 +174,8 @@ int main(int argc, char **argv)
     {
 		  test_util_start_timing();
 
+        PVFS_util_refresh_credential(&credentials);
+
 		  pvfs_error = PVFS_sys_readdir(
 				mkdir_resp.ref,
 				tok,
@@ -194,7 +196,9 @@ int main(int argc, char **argv)
 
     for(i = 0; i < opt_nfiles; ++i)
     {
-		  memset(test_file, 0, PATH_MAX);
+        PVFS_util_refresh_credential(&credentials); 
+ 
+        memset(test_file, 0, PATH_MAX);
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
 		  pvfs_error = PVFS_sys_remove(

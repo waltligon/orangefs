@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 	 char test_file[PATH_MAX];
 	 PVFS_sys_attr attr;
 	 PVFS_fs_id cur_fs;
-	 PVFS_credentials credentials;
+	 PVFS_credential credentials;
 	 PVFS_sysresp_lookup lookup_resp;
 	 PVFS_sysresp_create create_resp;
 	 char basepath[PATH_MAX];
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
 		  return ret;
 	 }
 
-	 PVFS_util_gen_credentials(&credentials);
+	 PVFS_util_gen_credential_defaults(&credentials);
 
 	 pvfs_error = PVFS_sys_lookup(
 		  cur_fs, basepath, &credentials, &lookup_resp, 
@@ -132,8 +132,8 @@ int main(int argc, char **argv)
 	 }
 
 	 attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-	 attr.owner = credentials.uid;
-	 attr.group = credentials.gid;
+	 attr.owner = credentials.userid;
+	 attr.group = credentials.group_array[0];
 	 attr.perms = 1877;
 	 attr.atime = attr.ctime = attr.mtime = time(NULL);
 
@@ -146,6 +146,9 @@ int main(int argc, char **argv)
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
 		  test_util_start_timing();
+
+        PVFS_util_refresh_credential(&credentials);
+
 		  pvfs_error = PVFS_sys_create(test_file, lookup_resp.ref,
 												 attr, &credentials,
 												 NULL, NULL, &create_resp);
@@ -161,6 +164,8 @@ int main(int argc, char **argv)
 	 
 	 for(i = 0; i < opt_nfiles; ++i)
 	 {
+        PVFS_util_refresh_credential(&credentials);
+
 		  memset(test_file, 0, PATH_MAX);
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 

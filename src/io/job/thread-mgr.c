@@ -75,6 +75,8 @@ static int bmi_thread_running = 0;
 static int trove_thread_running = 0;
 static int dev_thread_running = 0;
 
+static gen_mutex_t bmi_thread_running_mutex = GEN_MUTEX_INITIALIZER;
+
 /* trove_thread_function()
  *
  * function executed by the thread in charge of trove
@@ -165,12 +167,16 @@ static void *bmi_thread_function(void *ptr)
     int i=0;
     int test_timeout = thread_mgr_test_timeout;
     struct PINT_thread_mgr_bmi_callback *tmp_callback;
+    int thread_running=0;
 
+    gen_mutex_lock(&bmi_thread_running_mutex);
+    thread_running = bmi_thread_running;
+    gen_mutex_unlock(&bmi_thread_running_mutex);
 #ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_start("BMI");
-    while (bmi_thread_running)
+    while (thread_running)
 #endif
-    {
+    {/*start block*/
 	gen_mutex_lock(&bmi_mutex);
 	if(bmi_unexp_count)
 	{
@@ -287,7 +293,10 @@ static void *bmi_thread_function(void *ptr)
                              stat_bmi_actual_size_array[i],
                              stat_bmi_error_code_array[i]);
 	}
-    }
+        gen_mutex_lock(&bmi_thread_running_mutex);
+        thread_running = bmi_thread_running;
+        gen_mutex_unlock(&bmi_thread_running_mutex);
+    } /*end block*/
 
 #ifdef __PVFS2_JOB_THREADED__
     PINT_event_thread_stop();
@@ -483,14 +492,18 @@ int PINT_thread_mgr_bmi_start(void)
 	return(ret);
     }
 
+    gen_mutex_lock(&bmi_thread_running_mutex);
     bmi_thread_running = 1;
+    gen_mutex_unlock(&bmi_thread_running_mutex);
 #ifdef __PVFS2_JOB_THREADED__
     ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
     if(ret != 0)
     {
 	BMI_close_context(global_bmi_context);
 	gen_mutex_unlock(&bmi_mutex);
+        gen_mutex_lock(&bmi_thread_running_mutex);
 	bmi_thread_running = 0;
+        gen_mutex_unlock(&bmi_thread_running_mutex);
 	/* TODO: convert error code */
 	return(-ret);
     }
@@ -515,8 +528,8 @@ int PINT_thread_mgr_dev_stop(void)
     {
 	assert(dev_thread_ref_count == 0); /* sanity check */
 	dev_thread_running = 0;
-#ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&dev_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(dev_thread_id, NULL);
 #endif
     }
@@ -606,8 +619,8 @@ int PINT_thread_mgr_trove_stop(void)
     {
 	assert(trove_thread_ref_count == 0); /* sanity check */
 	trove_thread_running = 0;
-#ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&trove_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(trove_thread_id, NULL);
 #endif
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -637,9 +650,11 @@ int PINT_thread_mgr_bmi_stop(void)
     if(bmi_thread_ref_count <= 0)
     {
 	assert(bmi_thread_ref_count == 0); /* sanity check */
+        gen_mutex_lock(&bmi_thread_running_mutex);
 	bmi_thread_running = 0;
-#ifdef __PVFS2_JOB_THREADED__
+        gen_mutex_unlock(&bmi_thread_running_mutex);
         gen_mutex_unlock(&bmi_mutex);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_join(bmi_thread_id, NULL);
 #endif
 	BMI_close_context(global_bmi_context);

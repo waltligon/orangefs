@@ -5,10 +5,14 @@
  */
 
 #include <client.h>
+#ifndef WIN32
 #include <sys/time.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include <sys/types.h>
 
 #include "pvfs2-util.h"
@@ -23,7 +27,7 @@ int main(int argc,char **argv)
     char starting_point[256] = "/";
     PVFS_fs_id fs_id;
     char* name;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
@@ -54,7 +58,7 @@ int main(int argc,char **argv)
 
 
     name = starting_point;
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, &credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_FOLLOW, NULL);
     if (ret < 0)

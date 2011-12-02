@@ -22,7 +22,7 @@ int test_pvfs_datatype_init(
 {
     int ret = -1, i = 0, num_test_files_ok = 0;
     PVFS_sys_attr attr;
-    PVFS_credentials credentials;
+    PVFS_credential credentials;
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
     generic_params *args = (generic_params *)params;
@@ -42,7 +42,7 @@ int test_pvfs_datatype_init(
                      args->mode);
     }
 
-    PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credential_defaults(&credentials);
 
     /*
       verify that all test files exist.  it's okay if they
@@ -80,8 +80,8 @@ int test_pvfs_datatype_init(
 
 
             attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-            attr.owner = credentials.uid;
-            attr.group = credentials.gid;
+            attr.owner = credentials.userid;
+            attr.group = credentials.group_array[0];
             attr.perms = 1877;
 	    attr.atime = attr.mtime = attr.ctime = 
 		time(NULL);

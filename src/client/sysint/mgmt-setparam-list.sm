@@ -36,6 +36,19 @@ static int collect_old_values_comp_fn(
 
 machine pvfs2_client_mgmt_setparam_list_sm
 {
+    state init
+    {
+        run mgmt_setparam_list_init;
+        default => setparam_list_get_capability;
+    }
+    
+    state setparam_list_get_capability
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setup_msgpair;
+        default => cleanup;
+    }
+    
     state setup_msgpair
     {
         run mgmt_setparam_list_setup_msgpair;
@@ -62,7 +75,7 @@ machine pvfs2_client_mgmt_setparam_list_sm
  */
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     enum PVFS_server_param param,
     struct PVFS_mgmt_setparam_value *value,
     PVFS_BMI_addr_t *addr_array,
@@ -96,7 +109,7 @@ PVFS_error PVFS_imgmt_setparam_list(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.setparam_list.fs_id = fs_id;
     sm_p->u.setparam_list.param = param;
     sm_p->u.setparam_list.value = value;
@@ -125,7 +138,7 @@ PVFS_error PVFS_imgmt_setparam_list(
  */
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     enum PVFS_server_param param,
     struct PVFS_mgmt_setparam_value *value,
     PVFS_BMI_addr_t *addr_array,
@@ -139,7 +152,7 @@ PVFS_error PVFS_mgmt_setparam_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s entered\n", __func__);
 
     ret = PVFS_imgmt_setparam_list(
-        fs_id, credentials, param, value, addr_array,
+        fs_id, credential, param, value, addr_array,
         count, details, hints, &op_id, NULL);
 
     if (ret)
@@ -163,6 +176,33 @@ PVFS_error PVFS_mgmt_setparam_list(
     return error;
 }
 
+static int mgmt_setparam_list_init(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{    
+    struct PINT_client_sm *sm_p;
+    PVFS_object_ref temp_ref;
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_setparam_list_init called\n");
+
+    sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    temp_ref.fs_id = sm_p->u.setparam_list.fs_id;
+    js_p->error_code = PINT_cached_config_get_root_handle(
+                           sm_p->u.setparam_list.fs_id, 
+                           &temp_ref.handle);
+        
+    assert(js_p->error_code == 0);
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        temp_ref,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
+        PVFS_TYPE_NONE,
+        0);
+        
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action mgmt_setparam_list_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -178,7 +218,7 @@ static PINT_sm_action mgmt_setparam_list_setup_msgpair(
     {
         PINT_SERVREQ_MGMT_SETPARAM_FILL(
             msg_p->req,
-            *sm_p->cred_p,
+            sm_p->getattr.attr.capability,
             sm_p->u.setparam_list.fs_id,
             sm_p->u.setparam_list.param,
             sm_p->u.setparam_list.value,

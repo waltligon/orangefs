@@ -7,7 +7,9 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#ifndef WIN32
 #include <unistd.h>
+#endif
 #include "string.h"
 #include "pvfs2-types.h"
 #include "pint-request.h"
@@ -238,6 +240,7 @@ int PVFS_Request_indexed(int32_t count,
     return PVFS_SUCCESS;
 }
 
+#ifndef WIN32
 static int PVFS_Request_indexed_block(int32_t count,
                                int32_t blocklength,
                                PVFS_size * displacements,
@@ -258,6 +261,7 @@ static int PVFS_Request_indexed_block(int32_t count,
     return PVFS_Request_indexed(count, blocklengths, displacements,
                                 oldreq, newreq);
 }
+#endif
 
 int PVFS_Request_hindexed(int32_t count,
                           int32_t * blocklengths,

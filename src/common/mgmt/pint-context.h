@@ -9,6 +9,7 @@
 
 #include "pint-op.h"
 #include "pint-queue.h"
+#include "quickhash.h"
 
 enum PINT_context_type
 {
@@ -17,6 +18,19 @@ enum PINT_context_type
 };
 
 typedef PVFS_id_gen_t PINT_context_id;
+
+struct PINT_op_entry
+{
+   void *user_ptr;
+   PINT_operation_t op;
+   PVFS_id_gen_t wq_id;
+   PINT_context_id ctx_id;
+   PVFS_error error;
+
+   struct qhash_head link;
+};
+
+
 
 typedef int (*PINT_completion_callback)(PINT_context_id ctx_id,
                                         int count,

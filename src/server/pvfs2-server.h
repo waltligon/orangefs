@@ -17,8 +17,10 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#ifndef WIN32
 #include <pwd.h>
 #include <grp.h>
+#endif
 #include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
@@ -30,8 +32,10 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
+#include "pvfs2-mirror.h"
 #include "state-machine.h"
 #include "pint-event.h"
+
 
 extern job_context_id server_job_context;
 
@@ -78,78 +82,6 @@ enum PINT_server_req_permissions
                                       needs write and execute */
 };
 
-#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
-static inline int PINT_get_object_ref_##req_name(                        \
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
-{                                                                        \
-    *fs_id = req->u.req_name.fs_id;                                      \
-    *handle = req->u.req_name.handle;                                    \
-    return 0;                                                            \
-}
-
-enum PINT_server_req_access_type PINT_server_req_readonly(
-                                    struct PVFS_server_req *req);
-enum PINT_server_req_access_type PINT_server_req_modify(
-                                    struct PVFS_server_req *req);
-
-struct PINT_server_req_params
-{
-    const char* string_name;
-
-    /* For each request that specifies an object ref (fsid,handle) we
-     * get the common attributes on that object and check the permissions.
-     * For the request to proceed the permissions required by this flag
-     * must be met.
-     */
-    enum PINT_server_req_permissions perm;
-
-    /* Specifies the type of access on the object (readonly, modify).  This
-     * is used by the request scheduler to determine 
-     * which requests to queue (block), and which to schedule (proceed).
-     * This is a callback implemented by the request.  For example, sometimes
-     * the io request writes, sometimes it reads.
-     * Default functions PINT_server_req_readonly and PINT_server_req_modify
-     * are used for requests that always require the same access type.
-     */
-    enum PINT_server_req_access_type (*access_type)(
-                                        struct PVFS_server_req *req);
-
-    /* Specifies the scheduling policy for the request.  In some cases,
-     * we can bypass the request scheduler and proceed directly with the
-     * request.
-     */
-    enum PINT_server_sched_policy sched_policy;
-
-    /* A callback implemented by the request to return the object reference
-     * from the server request structure.
-     */
-    int (*get_object_ref)(
-        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-    /* The state machine that performs the request */
-    struct PINT_state_machine_s *state_machine;
-};
-
-struct PINT_server_req_entry
-{
-    enum PVFS_server_op op_type;
-    struct PINT_server_req_params *params;
-};
-
-extern struct PINT_server_req_entry PINT_server_req_table[];
-
-int PINT_server_req_get_object_ref(
-    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
-
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req);
-enum PINT_server_req_access_type
-PINT_server_req_get_access_type(struct PVFS_server_req *req);
-enum PINT_server_sched_policy
-PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
-
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
-
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
@@ -178,6 +110,9 @@ enum
     NUM_DFILES_KEY       = 2,
     NUM_SPECIAL_KEYS     = 3, /* not an index */
     METAFILE_HINT_KEY    = 3,
+    MIRROR_COPIES_KEY    = 4,
+    MIRROR_HANDLES_KEY   = 5,
+    MIRROR_STATUS_KEY    = 6,
 };
 
 typedef enum
@@ -201,8 +136,18 @@ typedef enum
     SERVER_JOB_TIME_MGR_INIT   = (1 << 15),
     SERVER_DIST_INIT           = (1 << 16),
     SERVER_CACHED_CONFIG_INIT  = (1 << 17),
-    SERVER_PRECREATE_INIT  = (1 << 18),
+    SERVER_PRECREATE_INIT      = (1 << 18),
+    SERVER_UID_MGMT_INIT       = (1 << 19), 
+    SERVER_SECURITY_INIT       = (1 << 20)
 } PINT_server_status_flag;
+
+typedef enum
+{   
+    PRELUDE_SCHEDULER_DONE     = (1 << 0),
+    PRELUDE_GETATTR_DONE       = (1 << 1),
+    PRELUDE_PERM_CHECK_DONE    = (1 << 2),
+    PRELUDE_LOCAL_CALL         = (1 << 3),
+} PINT_prelude_flag;
 
 struct PINT_server_create_op
 {
@@ -217,6 +162,160 @@ struct PINT_server_create_op
     int handle_index;
 };
 
+/*MIRROR structures*/
+typedef struct 
+{
+   /* session identifier created in the PVFS_SERV_IO request.  also used as  */
+   /* the flow identifier.                                                   */
+   bmi_msg_tag_t session_tag;
+
+   /*destination server address*/
+   PVFS_BMI_addr_t svr_addr;
+
+   /*status from PVFS_SERV_IO*/
+   PVFS_error io_status;
+
+   /*variables used to setup write completion ack*/
+   void        *encoded_resp_p;
+   job_status_s recv_status;
+   job_id_t     recv_id;
+
+   /*variables used to setup flow between the src & dest datahandle*/
+   flow_descriptor *flow_desc;
+   job_status_s     flow_status;
+   job_id_t         flow_job_id;
+  
+} write_job_t;
+
+
+/*This structure is used during the processing of a "mirror" request.*/
+struct PINT_server_mirror_op
+{
+   /*keep up with the number of outstanding jobs*/
+   int job_count;
+
+   /*maximum response size for the write request*/
+   int max_resp_sz;
+
+   /*info about each job*/
+   write_job_t *jobs;
+};
+typedef struct PINT_server_mirror_op PINT_server_mirror_op;
+
+/* Source refers to the handle being copied, and destination refers to        */
+/* its copy.                                                                  */
+struct PINT_server_create_copies_op
+{
+    /*number of I/O servers required to meet the mirroring request.           */
+    uint32_t io_servers_required;
+
+    /*mirroring mode. attribute key is user.pvfs2.mirror.mode*/
+    MIRROR_MODE mirror_mode;
+
+    /*the expected mirroring mode tells us how to edit the retrieved mirroring*/
+    /*mode.  Example: if mirroring was called when immutable was set, then    */
+    /*the expected mirroring mode would be MIRROR_ON_IMMUTABLE.               */
+    MIRROR_MODE expected_mirror_mode;
+
+    /*buffer holding list of remote servers for all copies of the file*/
+    char **my_remote_servers;
+
+    /*saved error code*/
+    PVFS_error saved_error_code;
+
+    /*number of copies desired. value of user.pvfs2.mirror.copies attribute*/
+    uint32_t copies;
+
+    /*successful/failed writes array in order of source handles         */
+    /*0=>successful  !UINT64_HIGH=>failure   UINT64_HIGH=>initial state */
+    /*accessed as if a 2-dimensional array [SrcHandleNR][#ofCopies]     */
+    PVFS_handle *writes_completed;
+
+    /*number of attempts at writing handles*/
+    int retry_count;
+
+    /*list of server names that will be used as destination servers*/
+    char **io_servers;                       
+
+    /*source remote server names in distribution*/
+    char **remote_io_servers;
+
+    /*source local server names in distribution*/                
+    char **local_io_servers;
+
+    /*number of source server names in the distribution*/                     
+    int num_io_servers;
+
+    /*number of source remote server names in distribution*/                  
+    int remote_io_servers_count;             
+
+    /*number of source local server names in distribution*/
+    int local_io_servers_count;              
+
+    /*source datahandles in order of distribution*/
+    PVFS_handle *handle_array_base;
+
+    /*local source datahandles*/
+    PVFS_handle *handle_array_base_local;
+
+    /*destination datahandles in order of distribution*/          
+    PVFS_handle *handle_array_copies;        
+
+    /*local destination datahandles*/
+    PVFS_handle *handle_array_copies_local;  
+
+    /*remote destination datahandles*/
+    PVFS_handle *handle_array_copies_remote;
+
+    /*number of local source datahandles*/
+    int handle_array_base_local_count; 
+
+    /*number of local destination datahandles*/
+    int handle_array_copies_local_count;      
+
+    /*number of remote destination datahandles*/
+    int handle_array_copies_remote_count;     
+
+    /*number of source datahandles*/
+    uint32_t dfile_count;
+
+    /*source metadata handle*/                     
+    PVFS_handle metadata_handle; 
+
+    /*source file system*/
+    PVFS_fs_id fs_id; 
+
+    /*number of io servers defined in the current file system*/
+    int io_servers_count; 
+
+    /*size of the source distribution structure */
+    uint32_t dist_size;
+
+    /*distribution structure for basic_dist*/
+    PINT_dist *dist;
+
+    /*local source handles' attribute structure*/
+    /*populates bstream_array_base_local with byte stream size*/
+    PVFS_ds_attributes *ds_attr_a;
+
+    /*local source handles' byte stream size*/
+    /*index corresponds to handle_array_base*/
+    PVFS_size *bstream_array_base_local;
+};
+typedef struct PINT_server_create_copies_op PINT_server_create_copies_op;
+
+
+/*This macro is used to initialize a PINT_server_op structure when pjmp'ing */
+/*to pvfs2_create_immutable_copies_sm.                                      */
+#define PVFS_SERVOP_IMM_COPIES_FILL(__new_p,__cur_p)                           \
+do {                                                                           \
+   memcpy(__new_p,__cur_p,sizeof(struct PINT_server_op));                      \
+   (__new_p)->op = PVFS_SERV_IMM_COPIES;                                       \
+   memset(&((__new_p)->u.create_copies),0,sizeof((__new_p)->u.create_copies)); \
+}while(0)
+
+
+
 /* struct PINT_server_lookup_op
  *
  * All the data needed during lookup processing:
@@ -224,20 +323,12 @@ struct PINT_server_create_op
  */
 struct PINT_server_lookup_op
 {
-    /* current segment (0..N), number of segments in the path */
-    int seg_ct, seg_nr; 
-
-    /* number of attrs read succesfully */
-    int attr_ct;
-
-    /* number of handles read successfully */
-    int handle_ct;
-
-    char *segp;
-    void *segstate;
-
+    /* handle used to read directory entries */
     PVFS_handle dirent_handle;
-    PVFS_ds_attributes *ds_attr_array;
+    /* handle of the directory entry */
+    PVFS_handle handle;
+    /* directory entry attributes */
+    PVFS_ds_attributes ds_attr;
 };
 
 struct PINT_server_readdir_op
@@ -290,6 +381,7 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    int saved_error_code; /* holds error_code from previous state. */
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -304,7 +396,9 @@ struct PINT_server_precreate_pool_refiller_op
     PVFS_fs_id fsid;
     char* host;
     PVFS_BMI_addr_t host_addr;
-    PVFS_handle_extent_array data_handle_extent_array;
+    PVFS_handle_extent_array handle_extent_array;
+    PVFS_ds_type type;
+    PVFS_capability capability;
 };
 
 struct PINT_server_batch_create_op
@@ -366,12 +460,13 @@ struct PINT_server_getattr_op
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
-    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
     PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
     PVFS_handle dirent_handle;
     int num_dfiles_req;
+    PVFS_handle *mirror_dfile_status_array;
+    PVFS_credential credential;
 };
 
 struct PINT_server_listattr_op
@@ -394,6 +489,18 @@ struct PINT_server_unstuff_op
     int num_dfiles_req;
     PVFS_sys_layout layout;
     void* encoded_layout;
+};
+
+struct PINT_server_tree_communicate_op
+{
+    int num_partitions;
+    PVFS_handle* handle_array_local; 
+    PVFS_handle* handle_array_remote; 
+    uint32_t *local_join_size;
+    uint32_t *remote_join_size;
+    int handle_array_local_count;
+    int handle_array_remote_count;
+    int handle_index;
 };
 
 /* This structure is passed into the void *ptr 
@@ -421,6 +528,10 @@ typedef struct PINT_server_op
     int keyval_count;
 
     int free_val;
+
+    /* generic int for use by state machines that are accessing
+     * PINT_server_op structs before pjumping to them. */
+    int local_index;
 
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
@@ -451,8 +562,12 @@ typedef struct PINT_server_op
     PVFS_fs_id target_fs_id;
     PVFS_object_attr *target_object_attr;
 
+    PINT_prelude_flag prelude_mask;
+
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
+
+    int num_pjmp_frames;
 
     union
     {
@@ -480,9 +595,127 @@ typedef struct PINT_server_op
         struct PINT_server_batch_create_op batch_create;
         struct PINT_server_batch_remove_op batch_remove;
         struct PINT_server_unstuff_op unstuff;
+        struct PINT_server_create_copies_op create_copies;
+        struct PINT_server_mirror_op mirror;
+        struct PINT_server_tree_communicate_op tree_communicate;
     } u;
 
 } PINT_server_op;
+
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb, __s_op, __handle, __fs_id, __location, __req, __task_id) \
+    do { \
+      char server_name[1024]; \
+      struct server_configuration_s *server_config = get_server_config_struct(); \
+      __s_op = malloc(sizeof(struct PINT_server_op)); \
+      if(!__s_op) { return -PVFS_ENOMEM; } \
+      memset(__s_op, 0, sizeof(struct PINT_server_op)); \
+      __s_op->req = &__s_op->decoded.stub_dec.req; \
+      PINT_sm_push_frame(__smcb, __task_id, __s_op); \
+      if (__location != LOCAL_OPERATION && __location != REMOTE_OPERATION && __handle) { \
+        PINT_cached_config_get_server_name(server_name, 1024, __handle, __fs_id); \
+      } \
+      if (__location != REMOTE_OPERATION && (__location == LOCAL_OPERATION || ( __handle && ! strcmp(server_config->host_id, server_name)))) { \
+        __location = LOCAL_OPERATION; \
+        __req = __s_op->req; \
+        __s_op->prelude_mask = PRELUDE_SCHEDULER_DONE | PRELUDE_PERM_CHECK_DONE | PRELUDE_LOCAL_CALL; \
+      } \
+      else { \
+        memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op)); \
+        PINT_serv_init_msgarray_params(__s_op, __fs_id); \
+      } \
+    } while (0)
+
+/* nlmills: TODO: consider passing request only */
+/* nlmills: in that case we can move this whole block back to the file's top */
+typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
+
+#define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
+static inline int PINT_get_object_ref_##req_name(                        \
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle) \
+{                                                                        \
+    *fs_id = req->u.req_name.fs_id;                                      \
+    *handle = req->u.req_name.handle;                                    \
+    return 0;                                                            \
+}
+
+#define PINT_GET_CREDENTIAL_DEFINE(req_name)             \
+static inline int PINT_get_credential_##req_name(        \
+    struct PVFS_server_req *req, PVFS_credential **cred) \
+{                                                        \
+    *cred = &req->u.req_name.credential;                  \
+    return 0;                                            \
+}
+
+enum PINT_server_req_access_type PINT_server_req_readonly(
+                                    struct PVFS_server_req *req);
+enum PINT_server_req_access_type PINT_server_req_modify(
+                                    struct PVFS_server_req *req);
+
+struct PINT_server_req_params
+{
+    const char* string_name;
+
+    /* For each request that specifies an object ref we
+     * call the permission function set by the op state machine
+     * to authorize access.
+     */
+    PINT_server_req_perm_fun perm;
+
+    /* Specifies the type of access on the object (readonly, modify).  This
+     * is used by the request scheduler to determine 
+     * which requests to queue (block), and which to schedule (proceed).
+     * This is a callback implemented by the request.  For example, sometimes
+     * the io request writes, sometimes it reads.
+     * Default functions PINT_server_req_readonly and PINT_server_req_modify
+     * are used for requests that always require the same access type.
+     */
+    enum PINT_server_req_access_type (*access_type)(
+                                        struct PVFS_server_req *req);
+
+    /* Specifies the scheduling policy for the request.  In some cases,
+     * we can bypass the request scheduler and proceed directly with the
+     * request.
+     */
+    enum PINT_server_sched_policy sched_policy;
+
+    /* A callback implemented by the request to return the object reference
+     * from the server request structure.
+     */
+    int (*get_object_ref)(
+        struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+
+    /* A callback implemented by the request to return the credential from
+     * the server request structure. If the server request does not contain
+     * a credential this field should be set to NULL.
+     */
+    int (*get_credential)(
+        struct PVFS_server_req *req, PVFS_credential **cred);
+
+    /* The state machine that performs the request */
+    struct PINT_state_machine_s *state_machine;
+};
+
+struct PINT_server_req_entry
+{
+    enum PVFS_server_op op_type;
+    struct PINT_server_req_params *params;
+};
+
+extern struct PINT_server_req_entry PINT_server_req_table[];
+
+int PINT_server_req_get_object_ref(
+    struct PVFS_server_req *req, PVFS_fs_id *fs_id, PVFS_handle *handle);
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred);
+
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req);
+enum PINT_server_req_access_type
+PINT_server_req_get_access_type(struct PVFS_server_req *req);
+enum PINT_server_sched_policy
+PINT_server_req_get_sched_policy(struct PVFS_server_req *req);
+
+const char* PINT_map_server_op_to_string(enum PVFS_server_op op);
 
 /* PINT_ACCESS_DEBUG()
  *
@@ -491,26 +724,60 @@ typedef struct PINT_server_op
  * no return value
  */
 #ifdef GOSSIP_DISABLE_DEBUG
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...) do {} while (0)
+#else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+#endif
+#else
+#ifdef WIN32
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, ...)                     \
+    PINT_server_access_debug(__s_op, __mask, format, __VA_ARGS__)
 #else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
     PINT_server_access_debug(__s_op, __mask, format, ##f)
 #endif
+#endif
 
+#ifndef GOSSIP_DISABLE_DEBUG
+#ifdef WIN32
+void PINT_server_access_debug(PINT_server_op * s_op,
+                              int64_t debug_mask,
+                              const char * format,
+                              ...);
+#else
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...) __attribute__((format(printf, 3, 4)));
+#endif
+#endif 
+
+/* server side state machines */
+extern struct PINT_state_machine_s pvfs2_mirror_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_call_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_with_prelude_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_get_attr_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_prelude_work_sm;
 extern struct PINT_state_machine_s pvfs2_final_response_sm;
 extern struct PINT_state_machine_s pvfs2_check_entry_not_exist_sm;
 extern struct PINT_state_machine_s pvfs2_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_remove_with_prelude_sm;
 extern struct PINT_state_machine_s pvfs2_mkdir_work_sm;
 extern struct PINT_state_machine_s pvfs2_unexpected_sm;
+extern struct PINT_state_machine_s pvfs2_create_immutable_copies_sm;
+extern struct PINT_state_machine_s pvfs2_mirror_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_remove_work_sm;
+extern struct PINT_state_machine_s pvfs2_tree_get_file_size_work_sm;
+extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);

@@ -1,5 +1,6 @@
 /*
  * Copyright © Acxiom Corporation, 2005
+ * (C) 2008 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
  */
@@ -7,7 +8,11 @@
 #ifndef __TCACHE_H
 #define __TCACHE_H
 
+#ifndef WIN32
 #include <sys/time.h>
+#else
+#include "wincommon.h"
+#endif
 #include "pvfs2-types.h"
 #include "quicklist.h"
 #include "quickhash.h"
@@ -152,6 +157,13 @@ int PINT_tcache_insert_entry(
     struct PINT_tcache* tcache,
     void* key,
     void* payload,
+    int* purged);
+
+int PINT_tcache_insert_entry_ex(
+    struct PINT_tcache *tcache,
+    void *key,
+    void *payload,
+    struct timeval *expiration,
     int* purged);
 
 int PINT_tcache_lookup(

@@ -42,17 +42,6 @@ struct PINT_worker_s
     struct qlist_head link;
 };
 
-struct PINT_op_entry
-{
-    void *user_ptr;
-    PINT_operation_t op;
-    PVFS_id_gen_t wq_id;
-    PINT_context_id ctx_id;
-    PVFS_error error;
-
-    struct qhash_head link;
-};
-
 struct PINT_manager_s
 {
     PINT_context_id context;
@@ -634,12 +623,15 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
         return ret;
     }
 
-    id_gen_fast_register(&op_entry->op.id, op_entry);
-
     gossip_debug(GOSSIP_MGMT_DEBUG,
                  "[MGMT]: manager ops: adding op id: %llu\n",
                  llu(op_entry->op.id));
     gen_mutex_lock(&manager->mutex);
+    ret = id_gen_safe_register(&op_entry->op.id, op_entry);
+    if (ret < 0)
+    {
+       return ret;
+    }
     qhash_add(manager->ops, &op_entry->op.id, &op_entry->link);
     manager->op_count++;
     gen_mutex_unlock(&manager->mutex);
@@ -657,6 +649,7 @@ int PINT_manager_ctx_post(PINT_manager_t manager,
          * operation and return the error
          */
         gen_mutex_lock(&manager->mutex);
+        id_gen_safe_unregister(op_entry->op.id);
         qhash_search_and_remove(manager->ops, &op_entry->op.id);
         gen_mutex_unlock(&manager->mutex);
 
@@ -1047,7 +1040,7 @@ int PINT_manager_test_op(PINT_manager_t manager,
     struct PINT_op_entry *entry;
     PINT_context_id context;
 
-    entry = id_gen_fast_lookup(op_id);
+    entry = id_gen_safe_lookup(op_id);
     if(!entry)
     {
         return -PVFS_EINVAL;
@@ -1143,13 +1136,17 @@ int PINT_manager_cancel(PINT_manager_t manager,
                        PINT_queue_id,
                        PINT_operation_t *);
 
-    entry = id_gen_fast_lookup(op_id);
+    entry = id_gen_safe_lookup(op_id);
     if(!entry)
     {
         return -PVFS_EINVAL;
     }
     ret = PINT_manager_find_worker(
         manager, NULL, NULL, NULL, entry->wq_id, &worker, &queue_id);
+    if (ret != 0)
+    {
+       return ret;
+    }
     context = entry->ctx_id;
     op = &entry->op;
 
@@ -1215,7 +1212,7 @@ int PINT_manager_wait_op(PINT_manager_t manager,
     int msecs_remaining;
     struct timeval last, now;
 
-    entry = id_gen_fast_lookup(op_id);
+    entry = id_gen_safe_lookup(op_id);
     if(!entry)
     {
         return -PVFS_EINVAL;
@@ -1451,9 +1448,6 @@ int PINT_manager_complete_op(PINT_manager_t manager,
      * since blocking calls never add the op
      * to the table
      */
-
-    /* free the op entry */
-    free(entry);
     return ret;
 }
 

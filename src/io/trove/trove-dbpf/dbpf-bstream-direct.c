@@ -34,6 +34,7 @@
 #include "pint-op.h"
 
 static gen_mutex_t dbpf_update_size_lock = GEN_MUTEX_INITIALIZER;
+static gen_mutex_t grow_bstream_table_lock = GEN_MUTEX_INITIALIZER;
 
 typedef struct
 {
@@ -41,6 +42,17 @@ typedef struct
     TROVE_size size;
     TROVE_offset offset;
 } dbpf_stream_extents_t;
+
+struct qhash_table *grow_bstream_table = NULL;
+
+struct grow_bstream_handle
+{
+    struct qlist_head hash_link;
+    gen_mutex_t handle_lock;
+    gen_mutex_t refcount_lock;
+    PVFS_handle handle;
+    int refcount;
+};
 
 static int dbpf_bstream_get_extents(
     char **mem_offset_array,
@@ -51,6 +63,18 @@ static int dbpf_bstream_get_extents(
     int stream_count,
     int *ext_count,
     dbpf_stream_extents_t *extents);
+
+static int hash_handle_compare(
+    void *key,
+    struct qlist_head *link);
+
+static int hash_handle(
+    void *handle,
+    int table_size);
+
+static int grow_bstream_handle_table_init( int size );
+static int grow_bstream_handle_acquire_lock( TROVE_object_ref ref );
+static int grow_bstream_handle_release_lock( TROVE_object_ref ref );
 
 static size_t direct_aligned_write(int fd, 
                                     void *buf,
@@ -109,19 +133,18 @@ static size_t direct_read(int fd,
  * all bits less than the block size.
  */
 #define BLOCK_MULTIPLES_MASK (~((uintptr_t) BLOCK_SIZE - 1))
-#define BLOCK_MULTIPLES_MASK_OFFSET (~((off_t) BLOCK_SIZE - 1))
 
 /* calculate the max offset that is a multiple of the block size but still
  * less than or equal to requested offset passed in
  */
-#define ALIGNED_OFFSET(__offset) (__offset & BLOCK_MULTIPLES_MASK_OFFSET)
+#define ALIGNED_OFFSET(__offset) (__offset & BLOCK_MULTIPLES_MASK)
 
 /* calculate the minimum size that is a multiple of the block size and
  * still greater than or equal to the requested size
  */
 #define ALIGNED_SIZE(__offset, __size) \
     (((__offset + __size + BLOCK_SIZE - 1) \
-      & BLOCK_MULTIPLES_MASK_OFFSET) - ALIGNED_OFFSET(__offset))
+      & BLOCK_MULTIPLES_MASK) - ALIGNED_OFFSET(__offset))
 
 #define IS_ALIGNED_PTR(__ptr) \
     ((((uintptr_t)__ptr) & BLOCK_MULTIPLES_MASK) == (uintptr_t)__ptr)
@@ -167,7 +190,8 @@ int dbpf_aligned_blocks_finalize(void);
  *
  * @param write_offset - the offset into the bstream to start the write
  *
- * @param stream_size - the actual size of the bstream (might be stored elsewhere)
+ * @param stream_size - the actual size of the bstream (might be stored 
+ *                      elsewhere)
  *
  * @returns bytes written, otherwise a negative errno error code
  */
@@ -682,7 +706,8 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
-        gossip_err("%s: failed to get size in dspace attr: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to get size in dspace attr: (error=%d)\n", 
+                   __func__, ret);
         goto done;
     }
 
@@ -697,7 +722,8 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         NULL);
     if(ret != 0)
     {
-        gossip_err("%s: failed to get bstream extents from offset/sizes: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to get bstream extents from offset/sizes: "
+                   "(error=%d)\n", __func__, ret);
         goto done;
     }
 
@@ -718,7 +744,8 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         stream_extents);
     if(ret != 0)
     {
-        gossip_err("%s: failed to get bstream extents from offset/sizes: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to get bstream extents from offset/sizes: "
+                   "(error=%d)\n", __func__, ret);
         goto done;
     }
 
@@ -733,7 +760,8 @@ static int dbpf_bstream_direct_read_op_svc(void *ptr, PVFS_hint hint)
         if(ret < 0)
         {
             ret = -trove_errno_to_trove_error(-ret);
-            gossip_err("%s: direct_locked_read failed: (error=%d)\n", __func__, ret);
+            gossip_err("%s: direct_locked_read failed: (error=%d)\n", __func__,
+                        ret);
             goto done;
         }
     }
@@ -778,7 +806,8 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         NULL);
     if(ret != 0)
     {
-        gossip_err("%s: failed to count extents from stream offset/sizes: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to count extents from stream offset/sizes: "
+                   "(error=%d)\n", __func__, ret);
         goto cache_put;
     }
 
@@ -800,18 +829,54 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         stream_extents);
     if(ret != 0)
     {
-        gossip_err("%s: failed to get stream extents from stream offset/sizes: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to get stream extents from stream offset/sizes: "
+                   "(error=%d)\n", __func__, ret);
         goto cache_put;
     }
+
+    if( grow_bstream_table == NULL )
+    {
+        ret = grow_bstream_handle_table_init( 1021 );
+        if( ret != 0 )
+        {
+            gossip_err("%s: failed to create grow_bstream_handle_table\n",
+                       __func__);
+            goto cache_put;
+        }
+    } 
+
+    /* acquire a lock on this handle prior to getting the size to prevent
+     * a race condition between multiple writes getting the wrong size */
+    grow_bstream_handle_acquire_lock( ref );
 
     ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
     if(ret != 0)
     {
-        gossip_err("%s: failed to get dspace attr for bstream: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to get dspace attr for bstream: (error=%d)\n",
+                    __func__, ret);
+        grow_bstream_handle_release_lock( ref );
         goto cache_put;
     }
 
+    /* prior to writes see if we are growing the file, if not, release the
+     * lock for growing file size since we won't be updating the file size
+     * below */
+    for(i = 0; i < extent_count; ++ i)
+    {
+        if(eor < stream_extents[i].offset + stream_extents[i].size)
+        {
+            eor = stream_extents[i].offset + stream_extents[i].size;
+        }
+    }
+    if(eor <= attr.u.datafile.b_size)
+    {
+        /* file size is not growing so we do not need to hold the lock
+         * since we won't update the size attribute below */
+        grow_bstream_handle_release_lock( ref );
+    }
+    
     *rw_op->out_size_p = 0;
+
     for(i = 0; i < extent_count; ++ i)
     {
         ret = direct_locked_write(rw_op->open_ref.fd,
@@ -822,15 +887,20 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
                                   attr.u.datafile.b_size);
         if(ret < 0)
         {
-            gossip_err("%s: failed to perform direct locked write: (error=%d)\n", __func__, ret);
+            gossip_err("%s: failed to perform direct locked write: "
+                       "(error=%d)\n", __func__, ret);
+            if(eor > attr.u.datafile.b_size)
+            {
+                grow_bstream_handle_release_lock( ref );
+            }
             goto cache_put;
         }
-
-        if(eor < stream_extents[i].offset + stream_extents[i].size)
-        {
-            eor = stream_extents[i].offset + stream_extents[i].size;
-        }
-
+        /* did this calculation above
+         * if(eor < stream_extents[i].offset + stream_extents[i].size)
+         * {
+         *    eor = stream_extents[i].offset + stream_extents[i].size;
+         * }
+         */
         *rw_op->out_size_p += ret;
     }
 
@@ -842,8 +912,10 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
         ret = dbpf_dspace_attr_get(qop_p->op.coll_p, ref, &attr);
         if(ret != 0)
         {
-            gossip_err("%s: failed to get size from dspace attr: (error=%d)\n", __func__, ret);
+            gossip_err("%s: failed to get size from dspace attr: (error=%d)\n",
+                       __func__, ret);
             gen_mutex_unlock(&dbpf_update_size_lock);
+            grow_bstream_handle_release_lock( ref );
             goto cache_put;
         }
 
@@ -854,8 +926,10 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
             ret = dbpf_dspace_attr_set(qop_p->op.coll_p, ref, &attr);
             if(ret != 0)
             {
-                gossip_err("%s: failed to update size in dspace attr: (error=%d)\n", __func__, ret);
+                gossip_err("%s: failed to update size in dspace attr: "
+                           "(error=%d)\n", __func__, ret);
                 gen_mutex_unlock(&dbpf_update_size_lock);
+                grow_bstream_handle_release_lock( ref );
                 goto cache_put;
             }
             sync_required = 1;
@@ -886,16 +960,41 @@ static int dbpf_bstream_direct_write_op_svc(void *ptr, PVFS_hint hint)
             ret = dbpf_sync_coalesce(qop_p, 0, &outcount);
             if(ret < 0)
             {
-                gossip_err("%s: failed to coalesce size update in dspace attr: (error=%d)\n", __func__, ret);
+                gossip_err("%s: failed to coalesce size update in dspace "
+                           "attr: (error=%d)\n", __func__, ret);
+                grow_bstream_handle_release_lock( ref );
                 goto done;
+            }
+
+            ret = grow_bstream_handle_release_lock( ref );
+            if( ret != 0 )
+            {
+                gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: failed to release "
+                             "grow_bstream_handle lock when not updating "
+                             "file size\n", __func__ );
             }
 
             ret = PINT_MGMT_OP_CONTINUE;
             goto done;
         }
+        else
+        {
+            /* still need to release the lock even thought we didn't update
+             * the size because the size calc prior to doing the writes told
+             * use we would */
+            ret = grow_bstream_handle_release_lock( ref );
+            if( ret != 0 )
+            {
+                gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: failed to release "
+                             "grow_bstream_handle lock when not updating "
+                             "file size\n", __func__ );
+            }
+        }
     }
+    /* if we don't try to update the size then we already released the 
+     * handle grow lock above */
 
-    ret = PINT_MGMT_OP_COMPLETED;
+   ret = PINT_MGMT_OP_COMPLETED;
 
 cache_put:
     dbpf_open_cache_put(&rw_op->open_ref);
@@ -917,7 +1016,7 @@ static int dbpf_bstream_direct_read_at(TROVE_coll_id coll_id,
                                        void *user_ptr,
                                        TROVE_context_id context_id,
                                        TROVE_op_id *out_op_id_p,
-				       PVFS_hint hints)
+                                       PVFS_hint hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -932,7 +1031,7 @@ static int dbpf_bstream_direct_write_at(TROVE_coll_id coll_id,
                                         void *user_ptr,
                                         TROVE_context_id context_id,
                                         TROVE_op_id *out_op_id_p,
-					PVFS_hint hints)
+                                        PVFS_hint hints)
 {
     return -TROVE_ENOSYS;
 }
@@ -962,7 +1061,8 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
-        gossip_err("%s: failed to find collection with fsid %d\n", __func__, coll_id);
+        gossip_err("%s: failed to find collection with fsid %d\n", 
+                   __func__, coll_id);
         return -TROVE_EINVAL;
     }
 
@@ -1019,7 +1119,8 @@ static int dbpf_bstream_direct_read_list(TROVE_coll_id coll_id,
         dbpf_bstream_direct_read_op_svc, op, NULL, io_queue_id);
     if(ret < 0)
     {
-        gossip_err("%s: failed to post direct read op: (error=%d)\n", __func__, ret);
+        gossip_err("%s: failed to post direct read op: (error=%d)\n", 
+                   __func__, ret);
         return ret;
     }
 
@@ -1093,7 +1194,8 @@ static int dbpf_bstream_direct_write_list(TROVE_coll_id coll_id,
 
     *out_op_id_p = q_op_p->op.id;
 
-    gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: queuing direct write operation\n", __func__);
+    gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: queuing direct write operation\n",
+                  __func__);
     PINT_manager_id_post(
         io_thread_mgr, q_op_p, &q_op_p->mgr_op_id,
         dbpf_bstream_direct_write_op_svc, op, NULL, io_queue_id);
@@ -1388,6 +1490,179 @@ static int dbpf_bstream_get_extents(
     return 0;
 }
 
+/* grow_bstream_handle_table_init()
+ * 
+ * initialize the grow_bstream_table
+ *
+ * size: prime number of hash table size
+ */
+static int grow_bstream_handle_table_init( int size )
+{
+    gen_mutex_lock( &grow_bstream_table_lock );
+    if( grow_bstream_table == NULL )
+    {
+        grow_bstream_table = qhash_init(hash_handle_compare, hash_handle, size);
+        if( grow_bstream_table == NULL )
+        {
+            return -PVFS_ENOMEM;
+        } 
+    }
+    gen_mutex_unlock( &grow_bstream_table_lock );
+    return 0;
+}
+
+/* obtains a per-handle lock by locking an existing entry in the 
+ * grow_bstream_table or creating an entry and grabbing the lock.
+ * 
+ * returns 0 on success and the handle lock held or an error
+ */
+static int grow_bstream_handle_acquire_lock( TROVE_object_ref ref )
+{
+    struct qlist_head *hash_link = NULL;
+    struct grow_bstream_handle *grow_handle = NULL;
+
+    gen_mutex_lock( &grow_bstream_table_lock );
+    if( grow_bstream_table == NULL )
+    {
+        gen_mutex_unlock( &grow_bstream_table_lock );
+        return -PVFS_EINVAL;
+    } 
+
+    hash_link = qhash_search(grow_bstream_table, &(ref.handle) );
+    if( hash_link )
+    {
+        grow_handle = qlist_entry( hash_link, struct grow_bstream_handle, 
+                                  hash_link);
+    }
+    else
+    {
+        grow_handle = calloc( 1, sizeof( struct grow_bstream_handle ));
+        if( grow_handle == NULL )
+        {
+            gen_mutex_unlock( &grow_bstream_table_lock );
+            gossip_err( "%s: failed to alloc memory\n", __func__);
+            return -PVFS_ENOMEM;
+        }
+        grow_handle->handle = ref.handle;
+        gen_mutex_init( &(grow_handle->handle_lock) );
+        gen_mutex_init( &(grow_handle->refcount_lock) );
+
+        /* we're safe adding it and waiting on grabbing the lock because
+         * we still have the lock on the table so no one else
+         * should access this new member */
+        qhash_add( grow_bstream_table, &(grow_handle->handle), 
+                   &(grow_handle->hash_link) );
+    }
+
+    /* increment the number of things using the hash member */
+    gen_mutex_lock( &(grow_handle->refcount_lock) );
+    grow_handle->refcount++;
+    gen_mutex_unlock( &(grow_handle->refcount_lock) );
+
+    gen_mutex_unlock( &grow_bstream_table_lock );
+
+    gen_mutex_lock( &(grow_handle->handle_lock));
+
+    return 0;
+}
+
+static int grow_bstream_handle_release_lock( TROVE_object_ref ref )
+{
+    struct qlist_head *hash_link = NULL;
+    struct grow_bstream_handle *grow_handle = NULL;
+    int rcount = 0;
+
+    gen_mutex_lock( &grow_bstream_table_lock );
+    if( grow_bstream_table == NULL )
+    {
+        gen_mutex_unlock( &grow_bstream_table_lock );
+        return -PVFS_EINVAL;
+    } 
+
+    hash_link = qhash_search(grow_bstream_table, &(ref.handle) );
+    if( hash_link )
+    {
+        grow_handle = qlist_entry(hash_link, struct grow_bstream_handle, 
+                                  hash_link);
+
+        gen_mutex_lock( &(grow_handle->refcount_lock) );
+        rcount = --grow_handle->refcount;
+        gen_mutex_unlock( &(grow_handle->refcount_lock) );
+
+        /* if we're the last reference remove it from the hash and free the
+         * memory. may want to optimize this so we aren't continuously 
+         * alloc/free for each read */
+        if( rcount == 0 )
+        {
+            gen_mutex_unlock( &(grow_handle->handle_lock));
+            qhash_del(hash_link);
+            gen_mutex_destroy( &(grow_handle->handle_lock) );
+            gen_mutex_destroy( &(grow_handle->refcount_lock) );
+            free( grow_handle );
+        }
+        else
+        {
+            gen_mutex_unlock( &(grow_handle->handle_lock));
+        }
+    }
+    else
+    {
+       /* should have an entry, but if not just report it for debugging */
+       gossip_debug(GOSSIP_DIRECTIO_DEBUG, "%s: no grow_handle entry when "
+                    "trying to remove with refcount %d\n", __func__, rcount);
+    }
+    gen_mutex_unlock( &grow_bstream_table_lock );
+    return 0;
+}
+
+/* hash_handle()
+ *
+ * hash function for handles added to table
+ * taken from src/server/request-scheduler/request-scheduler.c
+ *
+ * returns integer offset into table
+ */
+static int hash_handle(
+    void *handle,
+    int table_size)
+{
+    /* TODO: update this later with a better hash function,
+     * depending on what handles look like, for now just modding
+     *
+     */
+    unsigned long tmp = 0;
+    PVFS_handle *real_handle = handle;
+
+    tmp += (*(real_handle));
+    tmp = tmp % table_size;
+
+    return ((int) tmp);
+}
+
+/* hash_handle_compare()
+ *
+ * performs a comparison of a hash table entro to a given key
+ * (used for searching)
+ * taken from src/server/request-scheduler/request-scheduler.c
+ *
+ * returns 1 if match found, 0 otherwise
+ */
+static int hash_handle_compare(
+    void *key,
+    struct qlist_head *link)
+{
+    struct grow_bstream_handle *my_handle;
+    PVFS_handle *real_handle = key;
+
+    my_handle = qlist_entry(link, struct grow_bstream_handle, hash_link);
+    if (my_handle->handle == *real_handle)
+    {
+        return (1);
+    }
+
+    return (0);
+}
+
 #if 0
 int dbpf_aligned_blocks_init(void)
 {
@@ -1433,7 +1708,8 @@ void *dbpf_aligned_block_get(void)
         return NULL;
     }
 
-    ablock = qlist_entry(aligned_blocks_unused.next, struct aligned_block, link);
+    ablock = qlist_entry(aligned_blocks_unused.next, struct aligned_block, 
+                         link);
     qlist_del(&ablock->link);
     ptr = ablock->ptr;
     ablock->ptr = NULL;

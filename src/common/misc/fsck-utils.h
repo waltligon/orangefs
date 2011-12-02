@@ -55,14 +55,14 @@ struct PINT_fsck_options
 
 int PVFS_fsck_initialize(
     const struct PINT_fsck_options* options,
-    const PVFS_credentials* creds,
+    const PVFS_credential* cred,
     const PVFS_fs_id* cur_fs);
 
 int PVFS_fsck_validate_dfile(
     const struct PINT_fsck_options* fsck_options,
     const PVFS_handle* handle,
     const PVFS_fs_id* cur_fs,
-    const PVFS_credentials* creds,
+    const PVFS_credential* cred,
     PVFS_size* dfile_total_size);
 
 int PVFS_fsck_validate_dfile_attr(
@@ -73,7 +73,7 @@ int PVFS_fsck_validate_metafile(
     const struct PINT_fsck_options* fsck_options,
     const PVFS_object_ref* obj_ref,
     const PVFS_sysresp_getattr* attributes,
-    const PVFS_credentials* creds);
+    const PVFS_credential* cred);
 
 int PVFS_fsck_validate_metafile_attr(
     const struct PINT_fsck_options* fsck_options,
@@ -96,7 +96,7 @@ int PVFS_fsck_validate_dirdata(
     const struct PINT_fsck_options* fsck_options,
     const PVFS_handle* handle, 
     const PVFS_fs_id* cur_fs, 
-    const PVFS_credentials* creds);
+    const PVFS_credential* cred);
 
 int PVFS_fsck_validate_dirdata_attr(
     const struct PINT_fsck_options* fsck_options,
@@ -106,7 +106,7 @@ int PVFS_fsck_validate_dir(
     const struct PINT_fsck_options* fsck_options,
     const PVFS_object_ref* obj_ref, 
     const PVFS_sysresp_getattr* attributes, 
-    const PVFS_credentials* creds,
+    const PVFS_credential* cred,
     PVFS_dirent* directory_entries);
 
 int PVFS_fsck_validate_dir_attr(
@@ -120,17 +120,17 @@ int PVFS_fsck_validate_dir_ent(
 int PVFS_fsck_finalize(
     const struct PINT_fsck_options* fsck_options,
     const PVFS_fs_id* cur_fs,
-    const PVFS_credentials*);
+    const PVFS_credential*);
 
 int PVFS_fsck_get_attributes(
     const struct PINT_fsck_options*,
     const PVFS_object_ref*,
-    const PVFS_credentials*,
+    const PVFS_credential*,
     PVFS_sysresp_getattr* );
 
 int PVFS_fsck_check_server_configs(
     const struct PINT_fsck_options*,
-    const PVFS_credentials*,
+    const PVFS_credential*,
     const PVFS_fs_id*);
 
 /** TODO: 

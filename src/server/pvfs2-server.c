@@ -16,14 +16,10 @@
 #include <signal.h>
 #include <assert.h>
 #include <getopt.h>
+#include <syslog.h>
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
 #include <execinfo.h>
-
-#ifndef __USE_GNU
-#define __USE_GNU
-#endif
-
 #include <ucontext.h>
 #endif
 
@@ -50,6 +46,9 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "pint-event.h"
 #include "pint-util.h"
+#include "pint-uid-mgmt.h"
+#include "pint-security.h"
+#include "security-util.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -66,6 +65,7 @@
 #endif
 
 #define PVFS2_VERSION_REQUEST 0xFF
+#define PVFS2_HELP            0xFE
 
 /* this controls how many jobs we will test for per job_testcontext()
  * call. NOTE: this is currently independent of the config file
@@ -73,19 +73,6 @@
  * at any given time
  */
 #define PVFS_SERVER_TEST_COUNT 64
-
-/* track performance counters for the server */
-static struct PINT_perf_key server_keys[] =
-{
-    {"bytes read", PINT_PERF_READ, 0},
-    {"bytes written", PINT_PERF_WRITE, 0},
-    {"metadata reads", PINT_PERF_METADATA_READ, PINT_PERF_PRESERVE},
-    {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
-    {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
-    {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
-    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
-    {NULL, 0, 0},
-};
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
@@ -121,7 +108,8 @@ typedef struct
 } options_t;
 
 static options_t s_server_options = { 0, 0, 1, NULL, NULL};
-static char *fs_conf = NULL;
+static char fs_conf[PATH_MAX];
+static char startup_cwd[PATH_MAX+1];
 
 /* each of the elements in this array consists of a string and its length.
  * we're able to use sizeof here because sizeof an inlined string ("") gives
@@ -172,9 +160,10 @@ static int generate_shm_key_hint(int* server_index);
 
 static void precreate_pool_finalize(void);
 static int precreate_pool_initialize(int server_index);
-static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
-    PVFS_handle* pool_handle);
-static int precreate_pool_launch_refiller(const char* host, 
+
+static int precreate_pool_setup_server(const char* host, PVFS_ds_type type,
+    PVFS_fs_id fsid, PVFS_handle* pool_handle);
+static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type, 
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle);
 static int precreate_pool_count(
     PVFS_fs_id fsid, PVFS_handle pool_handle, int* count);
@@ -216,6 +205,10 @@ int main(int argc, char **argv)
     {
         return 0;
     }
+    else if (ret == PVFS2_HELP)
+    {
+        return 0;
+    }
     else if (ret != 0)
     {
         goto server_shutdown;
@@ -226,7 +219,6 @@ int main(int argc, char **argv)
                     s_server_options.server_alias, PVFS2_VERSION);
 
     /* code to handle older two config file format */
-
     ret = PINT_parse_config(&server_config, fs_conf, s_server_options.server_alias);
     if (ret)
     {
@@ -320,10 +312,10 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+#if 0
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
     /* kick off performance update state machine */
-    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
-        &(tmp_op));
+    ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE, &(tmp_op));
     if (ret == 0)
     {
         ret = server_state_machine_start_noreq(tmp_op);
@@ -334,6 +326,7 @@ int main(int argc, char **argv)
                     "state machine.\n", ret);
         goto server_shutdown;
     }
+#endif
 #endif
 
     /* kick off timer for expired jobs */
@@ -364,6 +357,14 @@ int main(int argc, char **argv)
             if (signal_recvd_flag == SIGHUP)
             {
                 reload_config();
+
+                /* re-open log file to allow normal rotation */
+                gossip_reopen_file(server_config.logfile, "a");
+                gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
+                gossip_debug(GOSSIP_SERVER_DEBUG,
+                             "Re-opened log %s, continuing\n", 
+                             server_config.logfile);
+                gossip_set_debug_mask(1, debug_mask);
                 signal_recvd_flag = 0; /* Reset the flag */
             }
             else
@@ -471,6 +472,7 @@ static void remove_pidfile(void)
  *
  * Handles:
  * - backgrounding, redirecting logging
+ * - starting the security module
  * - initializing all the subsystems (BMI, Trove, etc.)
  * - setting up the state table used to map new requests to
  *   state machines
@@ -548,12 +550,22 @@ static int server_initialize(
         return ret;
     }
 
+    /* initialize the security module */
+    ret = PINT_security_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error: Could not initialize security module; "
+                   "aborting.\n");
+        return ret;
+    }
+
+    *server_status_flag |= SERVER_SECURITY_INIT;
+
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
     {
-        gossip_err("Error: Could not initialize server interfaces; "
-                   "aborting.\n");
+        gossip_err("Error: Could not initialize server subsystems\n");
         return ret;
     }
 
@@ -676,7 +688,7 @@ static int server_initialize_subsystems(
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
-    PVFS_fs_id orig_fsid;
+    PVFS_fs_id orig_fsid=0;
     PVFS_ds_flags init_flags = 0;
     int bmi_flags = BMI_INIT_SERVER;
     int shm_key_hint;
@@ -784,15 +796,16 @@ static int server_initialize_subsystems(
     ret = trove_initialize(
         server_config.trove_method, 
         trove_coll_to_method_callback,
-        server_config.storage_path,
+        server_config.data_path,
+		server_config.meta_path,
         init_flags);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
 
         gossip_err("\n***********************************************\n");
-        gossip_err("Invalid Storage Space: %s\n\n",
-                   server_config.storage_path);
+        gossip_err("Invalid Storage Space: %s or %s\n\n",
+                   server_config.data_path, server_config.meta_path);
         gossip_err("Storage initialization failed.  The most "
                    "common reason\nfor this is that the storage space "
                    "has not yet been\ncreated or is located on a "
@@ -871,14 +884,13 @@ static int server_initialize_subsystems(
             gossip_err("Error setting directio threads num\n");
         }
 
-        orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
             cur_fs->trove_method,
-            cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
+            cur_fs->file_system_name, &(orig_fsid), NULL, NULL);
 
         if (ret < 0)
         {
-            gossip_err("Error initializing filesystem %s\n",
+            gossip_err("Error initializing trove for filesystem %s\n",
                         cur_fs->file_system_name);
             return ret;
         }
@@ -886,8 +898,8 @@ static int server_initialize_subsystems(
         if(orig_fsid != cur_fs->coll_id)
         {
             gossip_err("Error: configuration file does not match storage collection.\n");
-            gossip_err("   config file fs_id: %d\n", (int)orig_fsid);
-            gossip_err("   storage fs_id: %d\n", (int)cur_fs->coll_id);
+            gossip_err("   storage file fs_id: %d\n", (int)orig_fsid);
+            gossip_err("   config  file fs_id: %d\n", (int)cur_fs->coll_id);
             gossip_err("Warning: This most likely means that the configuration\n");
             gossip_err("   files have been regenerated without destroying and\n");
             gossip_err("   recreating the corresponding storage collection.\n");
@@ -1084,7 +1096,9 @@ static int server_initialize_subsystems(
     /*
      * Migrate database if needed
      */
-    ret = trove_migrate(server_config.trove_method,server_config.storage_path);
+    ret = trove_migrate(server_config.trove_method,
+			server_config.data_path,
+			server_config.meta_path);
     if (ret < 0)
     {
         gossip_err("trove_migrate failed: ret=%d\n", ret);
@@ -1128,14 +1142,49 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
+                            /* hist size should be in server config too */
     PINT_server_pc = PINT_perf_initialize(server_keys);
     if(!PINT_server_pc)
     {
         gossip_err("Error initializing performance counters.\n");
         return(ret);
     }
+    ret = PINT_perf_set_info(PINT_server_pc, PINT_PERF_UPDATE_INTERVAL, 
+                                        server_config.perf_update_interval);
+    if (ret < 0)
+    {
+        gossip_err("Error PINT_perf_set_info (update interval)\n");
+        return(ret);
+    }
+    /* if history_size is greater than 1, start the rollover SM */
+    if (PINT_server_pc->running)
+    {
+        struct PINT_smcb *tmp_op = NULL;
+        ret = server_state_machine_alloc_noreq(
+                PVFS_SERV_PERF_UPDATE, &(tmp_op));
+        if (ret == 0)
+        {
+            ret = server_state_machine_start_noreq(tmp_op);
+        }
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Error: failed to start perf update "
+                        "state machine.\n", ret);
+            return(ret);
+        }
+    }
+
     *server_status_flag |= SERVER_PERF_COUNTER_INIT;
 #endif
+
+    ret = PINT_uid_mgmt_initialize();
+    if (ret < 0)
+    {
+        gossip_err("Error initializing the uid management interface\n");
+        return (ret);
+    }
+
+    *server_status_flag |= SERVER_UID_MGMT_INIT;
 
     ret = precreate_pool_initialize(server_index);
     if (ret < 0)
@@ -1182,8 +1231,10 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGQUIT, &new_action, NULL);
 #ifdef __PVFS2_SEGV_BACKTRACE__
     sigaction (SIGSEGV, &segv_action, NULL);
+    sigaction (SIGABRT, &segv_action, NULL);
 #else
     sigaction (SIGSEGV, &new_action, NULL);
+    sigaction (SIGABRT, &new_action, NULL);
 #endif
 
     /* ignore these */
@@ -1201,7 +1252,7 @@ static int server_setup_signal_handlers(void)
 #elif defined(REG_RIP)
 #  define REG_INSTRUCTION_POINTER REG_RIP
 #else
-#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#  error Unknown instruction pointer location for your architecture, configure with --disable-segv-backtrace.
 #endif
 
 /* bt_signalhandler()
@@ -1282,6 +1333,8 @@ static void reload_config(void)
     char **tmp_ptr = NULL;
     int *tmp_int_ptr = NULL;
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Reloading configuration %s\n",
+                 fs_conf);
     /* We received a SIGHUP. Update configuration in place */
     if (PINT_parse_config(&sighup_server_config, fs_conf, s_server_options.server_alias) < 0)
     {
@@ -1291,15 +1344,17 @@ static void reload_config(void)
     }
     else /* Successful load of config */
     {
-        /* Get the server configuration to update global items */
+        /* Get the current server configuration and update global items */
         orig_server_config = get_server_config_struct();
-        if(orig_server_config->event_logging)
+        if (orig_server_config->event_logging)
         {
             free(orig_server_config->event_logging);
         }
-        /* Copy the updated configuration logging mask */
+        
+        /* Copy the new logging mask into the current server configuration */
         orig_server_config->event_logging = strdup(sighup_server_config.event_logging);
-
+        
+        /* Reset the debug mask */
         gossip_set_debug_mask(1, PVFS_debug_eventlog_to_mask(orig_server_config->event_logging));
 
         orig_filesystems = server_config.file_systems;
@@ -1566,6 +1621,15 @@ static int server_shutdown(
                      "interface         [ stopped ]\n");
     }
 
+    if (status & SERVER_SECURITY_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting security "
+                     "module           [   ...   ]\n");
+        PINT_security_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         security "
+                     "module           [ stopped ]\n");
+    }
+
     if (status & SERVER_ENCODER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting encoder "
@@ -1591,6 +1655,16 @@ static int server_shutdown(
         PINT_perf_finalize(PINT_server_pc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
+    }
+
+    if (status & SERVER_UID_MGMT_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting uid management "
+                     "interface     [   ...   ]\n");
+        PINT_uid_mgmt_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         uid management "
+                     "interface     [ stopped ]\n");
+
     }
 
     if (status & SERVER_GOSSIP_INIT)
@@ -1674,7 +1748,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
     int total_arguments = 0;
-    const char *cur_option = NULL;
+    const char *cur_option = NULL, *tmp_path = NULL;
     static struct option long_opts[] =
     {
         {"foreground",0,0,0},
@@ -1683,7 +1757,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"rmfs",0,0,0},
         {"version",0,0,0},
         {"pidfile",1,0,0},
-        {"alias",0,0,0},
+        {"alias",1,0,0},
         {0,0,0,0}
     };
 
@@ -1748,7 +1822,8 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 s_server_options.pidfile = optarg;
                 if(optarg[0] != '/')
                 {
-                    gossip_err("Error: pidfile must be specified with an absolute path.\n");
+                    gossip_err("Error: pidfile must be specified with an "
+                               "absolute path.\n");
                     goto parse_cmd_line_args_failure;
                 }
                 break;
@@ -1760,6 +1835,12 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case '?':
             case 'h':
           do_help:
+                usage(argc, argv);
+                if(s_server_options.server_alias)
+                {
+                    free(s_server_options.server_alias);
+                }
+                return PVFS2_HELP; 
             default:
           parse_cmd_line_args_failure:
                 usage(argc, argv);
@@ -1777,7 +1858,64 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         goto parse_cmd_line_args_failure;
     }
 
-    fs_conf = argv[optind++];
+    if (argv[optind][0] != '/')
+    {
+        if( (tmp_path = getcwd(startup_cwd, PATH_MAX)) == NULL )
+        {
+            gossip_err("Failed to get current working directory to create "
+                       "absolute path for configuration file: %s\n",
+                       strerror(errno));
+        }
+
+        if( (strlen(argv[optind]) + strlen(startup_cwd) + 1) >= PATH_MAX )
+        {
+            gossip_err("Config file path greater than %d characters\n",
+                       PATH_MAX);
+            goto parse_cmd_line_args_failure;
+        }
+
+        if( strncat(startup_cwd, "/", PATH_MAX) == NULL )
+        {
+            gossip_err("Failure creating absolute path from relative "
+                       "configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+
+        /* copy the relative path into the string for the user */
+        if( strncat(startup_cwd, argv[optind++], PATH_MAX) == NULL )
+        {
+            gossip_err("Failure creating absolute path from relative "
+                       "configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+
+        if( strncpy(fs_conf, startup_cwd, PATH_MAX) == NULL )
+        {
+            gossip_err("Failure copying created full path into configuration "
+                       "file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+    }
+    else
+    {
+        if( strlen(argv[optind]) >= PATH_MAX )
+        {
+            gossip_err("Config file path greater than %d characters\n",
+                       PATH_MAX);
+            goto parse_cmd_line_args_failure;
+        }
+        if( strncpy( fs_conf, argv[optind++], PATH_MAX) == NULL )
+        {
+            gossip_err("Failure copying configuration file path\n");
+            goto parse_cmd_line_args_failure;
+        }
+    }
+
+    if( fs_conf == NULL )
+    {
+        gossip_err("Failure copying configuration file path\n");
+        goto parse_cmd_line_args_failure;
+    }
 
     if(argc - total_arguments > 2)
     {
@@ -2084,9 +2222,21 @@ int server_state_machine_complete(PINT_smcb *smcb)
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
-    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: smcb op code (%d).\n"
+                                      ,s_op->op);
+    gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,"server_state_machine_complete: "
+                                       "s_op->unexp_bmi_buff.buffer (%p) "
+                                       "\tNULL(%s).\n"
+                                      ,s_op->unexp_bmi_buff.buffer
+                                      ,s_op->unexp_bmi_buff.buffer ? "NO" : "YES");
+
+    /* BMI_unexpected_free MUST execute BEFORE BMI_set_info, because BMI_set_info will */
+    /* remove the addr info from the cur_ref_list if BMI_DEC_ADDR_REF causes the ref   */
+    /* count to become zero.  The addr info holds the "unexpected-free" function       */
+    /* pointer.                                                                        */
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
+    BMI_set_info(s_op->unexp_bmi_buff.addr, BMI_DEC_ADDR_REF, NULL);
     s_op->unexp_bmi_buff.buffer = NULL;
 
 
@@ -2154,14 +2304,15 @@ static TROVE_method_id trove_coll_to_method_callback(TROVE_coll_id coll_id)
 }
 
 #ifndef GOSSIP_DISABLE_DEBUG
+
+/* sampson: new capability-based version */
 void PINT_server_access_debug(PINT_server_op * s_op,
                               int64_t debug_mask,
                               const char * format,
                               ...)
 {
     static char pint_access_buffer[GOSSIP_BUF_SIZE];
-    struct passwd* pw;
-    struct group* gr;
+    char sig_buf[10], mask_buf[10];
     va_list ap;
 
     if ((gossip_debug_on) &&
@@ -2170,24 +2321,37 @@ void PINT_server_access_debug(PINT_server_op * s_op,
     {
         va_start(ap, format);
 
-        pw = getpwuid(s_op->req->credentials.uid);
-        gr = getgrgid(s_op->req->credentials.gid);
-        snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
-            "%s.%s@%s H=%llu S=%p: %s: %s",
-            ((pw) ? pw->pw_name : "UNKNOWN"),
-            ((gr) ? gr->gr_name : "UNKNOWN"),
-            BMI_addr_rev_lookup_unexpected(s_op->addr),
-            llu(s_op->target_handle),
-            s_op,
-            PINT_map_server_op_to_string(s_op->req->op),
-            format);
+        if (strlen(s_op->req->capability.issuer) == 0)
+        {
+            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+                "null@%s H=%llu S=%p: %s: %s",
+                BMI_addr_rev_lookup_unexpected(s_op->addr),
+                llu(s_op->target_handle),
+                s_op,
+                PINT_map_server_op_to_string(s_op->req->op),
+                format);
+        }
+        else
+        {
+            snprintf(pint_access_buffer, GOSSIP_BUF_SIZE,
+                "%s@%s %s sig=%s H=%llu S=%p: %s: %s",
+                s_op->req->capability.issuer,
+                BMI_addr_rev_lookup_unexpected(s_op->addr),
+                PINT_print_op_mask(s_op->req->capability.op_mask, mask_buf),
+                PINT_util_bytes2str(s_op->req->capability.signature, 
+                                    sig_buf, 4),
+                llu(s_op->target_handle),
+                s_op,
+                PINT_map_server_op_to_string(s_op->req->op),
+                format);                
+        }
 
         __gossip_debug_va(debug_mask, 'A', pint_access_buffer, ap);
 
         va_end(ap);
     }
 }
-#endif
+#endif /* GOSSIP_DISABLE_DEBUG */
 
 /* generate_shm_key_hint()
  *
@@ -2251,10 +2415,13 @@ static int precreate_pool_initialize(int server_index)
     int server_count;
     PVFS_BMI_addr_t* addr_array;
     const char* host;
-    int i;
+    int i, j;
     int server_type;
     int handle_count = 0;
     int fs_count = 0;
+    unsigned int types_to_pool = 0;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+    assert(user_opts);
 
     /* iterate through list of file systems */
     while(cur_f)
@@ -2288,9 +2455,9 @@ static int precreate_pool_initialize(int server_index)
             continue;
         }
 
-        /* how many I/O servers do we have? */
+        /* how many servers do we have? */
         ret = PINT_cached_config_count_servers(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO, &server_count);
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL, &server_count);
         if(ret < 0)
         {
             gossip_err("Error: unable to count servers for fsid: %d\n", 
@@ -2301,13 +2468,14 @@ static int precreate_pool_initialize(int server_index)
         addr_array = malloc(server_count*sizeof(PVFS_BMI_addr_t));
         if(!addr_array)
         {
-            gossip_err("Error: unable to allocate book keeping information for precreate pools.\n");
+            gossip_err("Error: unable to allocate book keeping information for "
+                       "precreate pools.\n");
             return(-PVFS_ENOMEM);
         }
 
         /* resolve addrs for each I/O server */
         ret = PINT_cached_config_get_server_array(
-            cur_fs->coll_id, PINT_SERVER_TYPE_IO,
+            cur_fs->coll_id, PINT_SERVER_TYPE_ALL,
             addr_array, &server_count);
         if(ret < 0)
         {
@@ -2323,42 +2491,86 @@ static int precreate_pool_initialize(int server_index)
             if(!strcmp(host, server_config.host_id) == 0)
             {
                 /* this is a peer server */
-                /* make sure a pool exists for that server,fsid pair */
-                ret = precreate_pool_setup_server(host, 
-                    cur_fs->coll_id, &pool_handle);
-                if(ret < 0)
+                /* make sure a pool exists for that server,type, fsid pair */
+
+                /* set ds type of handles to setup in the server's pool based
+                 * on the server type */
+                types_to_pool = PVFS_TYPE_NONE;
+                if( (server_type & PINT_SERVER_TYPE_IO) != 0 )
                 {
-                    gossip_err("Error: precreate_pool_initialize failed to setup pool for %s\n", server_config.host_id);
-                    return(ret);
+                        types_to_pool |= PVFS_TYPE_DATAFILE; 
+                }
+                
+                if( (server_type & PINT_SERVER_TYPE_META) != 0 )
+                {
+                    types_to_pool |= (PVFS_TYPE_METAFILE | PVFS_TYPE_DIRECTORY |
+                                      PVFS_TYPE_SYMLINK | PVFS_TYPE_DIRDATA |
+                                      PVFS_TYPE_INTERNAL);
                 }
 
-                /* count current handles */
-                ret = precreate_pool_count(cur_fs->coll_id, pool_handle, 
-                    &handle_count);
-                if(ret < 0)
+                /* for each possible bit in the ds_type mask check if we should
+                 * create a pool for it */
+                for(j = 0; j < PVFS_DS_TYPE_COUNT; j++ )
                 {
-                    gossip_err("Error: precreate_pool_initialize failed to count pool for %s\n", server_config.host_id);
-                    return(ret);
-                }
+                    PVFS_ds_type t;
+                    int_to_PVFS_ds_type(j, &t);
+                    
+                    /* skip setting up a pool when it doesn't make sense i.e. 
+                     * when the remote host doesn't have handle types we want.
+                     * or in the special case that we don't get TYPE_NONE 
+                     * handles from  IO servers*/
+                    if(((t & types_to_pool) == 0 ) ||
+                       ((t == PVFS_TYPE_NONE) && 
+                        (server_type == PINT_SERVER_TYPE_IO)) )
+                    {
+                        continue;
+                    }
 
-                /* prepare the job interface to use this pool */
-                ret = job_precreate_pool_register_server(host, 
-                    cur_fs->coll_id, pool_handle, handle_count);
-                assert(ret != 0);
-                if(ret < 0)
-                {
-                    gossip_err("Error: precreate_pool_initialize failed to register pool for %s\n", server_config.host_id);
-                    return(ret);
-                }
-
-                /* launch sm to take care of refilling */
-                ret = precreate_pool_launch_refiller(host, addr_array[i],
-                    cur_fs->coll_id, pool_handle);
-                if(ret < 0)
-                {
-                    gossip_err("Error: precreate_pool_initialize failed to launch refiller SM for %s\n", server_config.host_id);
-                    return(ret);
-                }
+                    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: setting up pool on "
+                                 "%s, type: %u, fs_id: %llu, handle: %llu\n",
+                                 __func__, host, t, 
+                                 (long long unsigned int)cur_fs->coll_id, 
+                                 llu(pool_handle));
+                    ret = precreate_pool_setup_server(host, t, 
+                        cur_fs->coll_id, &pool_handle);
+                    if(ret < 0)
+                    {
+                        gossip_err("Error: precreate_pool_initialize failed to "
+                                   "setup pool for %s, type %u\n", 
+                                   server_config.host_id, t);
+                        return(ret);
+                    }
+    
+                    /* count current handles */
+                    ret = precreate_pool_count(cur_fs->coll_id, pool_handle, 
+                        &handle_count);
+                    if(ret < 0)
+                    {
+                        gossip_err("Error: precreate_pool_initialize failed to "
+                                   "count pool for %s\n", 
+                                   server_config.host_id);
+                        return(ret);
+                    }
+    
+                    /* prepare the job interface to use this pool */
+                    ret = job_precreate_pool_register_server(host, t,
+                        cur_fs->coll_id, pool_handle, handle_count,
+                        user_opts->precreate_batch_size);
+    
+                    /* launch sm to take care of refilling */
+                    /* the refiller will only actually launch if the batch count
+                     * for the specified type, t, is greater than 0. Otherwise,
+                     * there is no reason to have a refiller running. */
+                    ret = precreate_pool_launch_refiller(host, t, addr_array[i],
+                        cur_fs->coll_id, pool_handle);
+                    if(ret < 0)
+                    {
+                        gossip_err("Error: precreate_pool_initialize failed to "
+                                   "launch refiller SM for %s\n", 
+                                   server_config.host_id);
+                        return(ret);
+                    }
+                } // for each PVFS_ds_type
             }
         }
 
@@ -2385,11 +2597,17 @@ static void precreate_pool_finalize(void)
 
 /* precreate_pool_setup_server()
  *  
- * This function makes sure that a pool is present for the specified server
+ * This function makes sure that a pool is present for the specified server,
+ * fsid, and type
+ *
+ *  host: hostname of server the pool is associated with
+ *  type: DS type of handles to store in the pool
+ *  fsid: fsid of the filesystem the pool is associated with
+ *  handle: out value of the handle of the pool
  *
  */
-static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
-    PVFS_handle* pool_handle)
+static int precreate_pool_setup_server(const char* host, PVFS_ds_type type, 
+    PVFS_fs_id fsid, PVFS_handle* pool_handle)
 {
     job_status_s js;
     job_id_t job_id;
@@ -2401,13 +2619,25 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     PVFS_ds_keyval val;
 
     /* look for the pool handle for this server */
-    key.buffer_sz = strlen(host) + strlen("precreate-pool-") + 1;
+
+    /* the key for the pool must now be server name plus handle type. 
+     * since the key is currently a string it makes some sense to keep 
+     * the whole thing printable instead of just tacking on a PVFS_ds_type
+     * to the end of the buffer. So, we'll sprint the type as an int and
+     * tack that on the end. Better that just tacking the bits on? 
+     * Maybe not. */
+    char type_string[11] = { 0 }; /* 32 bit type only needs 10 digits */
+    snprintf(type_string, 11, "%u", type);
+
+    key.buffer_sz = strlen(host) + strlen(type_string) + 
+                    strlen("precreate-pool-") + 2;
     key.buffer = malloc(key.buffer_sz);
     if(!key.buffer)
     {
         return(-ENOMEM);
     }
-    snprintf((char*)key.buffer, key.buffer_sz, "precreate-pool-%s", host);
+    snprintf((char*)key.buffer, key.buffer_sz, "precreate-pool-%s-%s", 
+             host, type_string);
     key.read_sz = 0;
 
     val.buffer = pool_handle;
@@ -2436,7 +2666,8 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
     else if(js.error_code == -TROVE_ENOENT)
     {
         /* handle doesn't exist yet; let's create it */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool didn't find handle for %s; creating now.\n", host);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool didn't find handle "
+                     "for %s, type %s; creating now.\n", host, type_string);
 
         /* find extent array for ourselves */
         ret = PINT_cached_config_get_server(
@@ -2480,15 +2711,18 @@ static int precreate_pool_setup_server(const char* host, PVFS_fs_id fsid,
             free(key.buffer);
             return(ret < 0 ? ret : js.error_code);
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool created handle %llu for %s.\n", llu(*pool_handle), host);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool created handle %llu "
+                     "for %s, type %s.\n", llu(*pool_handle), host, 
+                     type_string);
 
     }
     else
     {
         /* handle already exists */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool found handle %llu for %s.\n", llu(*pool_handle), host);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "precreate_pool found handle %llu "
+                     "for %s, type %s.\n", llu(*pool_handle), host, 
+                     type_string);
     }
-
     free(key.buffer);
     return(0);
 }
@@ -2535,12 +2769,37 @@ static int precreate_pool_count(
     return(0);
 }
 
-static int precreate_pool_launch_refiller(const char* host, 
+/*
+ * starts a precreate pool refiller state machine for the specified host and
+ * type of handle.
+ *    host: the remote host to get handles from
+ *    type: the DS type of handle the refiller will be refilling
+ *    addr: the BMI addr of the remote host
+ *    fsid: the filesystem ID of the fs the pool refiller is associated with
+ *    pool_handle: the handle of the pool itself
+ *
+ *    This will only be called for a host/type that matches and needs a filler
+ *    so a remote server that is I/O only will only get refillers for datafile
+ *    handles.
+ */
+static int precreate_pool_launch_refiller(const char* host, PVFS_ds_type type,
     PVFS_BMI_addr_t addr, PVFS_fs_id fsid, PVFS_handle pool_handle)
 {
     struct PINT_smcb *tmp_smcb = NULL;
     struct PINT_server_op *s_op;
-    int ret;
+    int ret, index = 0;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    assert(user_opts);
+    PVFS_ds_type_to_int(type, &index);
+
+    if( user_opts->precreate_batch_size[index] == 0 )
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: NOT launching refiller for "
+                     "host %s, type %d, pool: %llu, batch_size is 0\n",
+                     __func__, host, type, llu(pool_handle));
+        return 0;
+    }
 
     /* allocate smcb */
     ret = server_state_machine_alloc_noreq(PVFS_SERV_PRECREATE_POOL_REFILLER,
@@ -2558,9 +2817,13 @@ static int precreate_pool_launch_refiller(const char* host,
         return(ret);
     }
 
-    ret = PINT_cached_config_get_server(
-        fsid, host, PINT_SERVER_TYPE_IO, 
-        &s_op->u.precreate_pool_refiller.data_handle_extent_array);
+    /* set this refillers handle range based on the type of handle it will 
+     * hold. If it's a datafile get an IO server range, otherwise get a meta
+     * range. */
+    ret = PINT_cached_config_get_server( fsid, host, 
+              ((type == PVFS_TYPE_DATAFILE) ? PINT_SERVER_TYPE_IO : 
+                                              PINT_SERVER_TYPE_META),
+              &s_op->u.precreate_pool_refiller.handle_extent_array);
     if(ret < 0)
     {
         free(s_op->u.precreate_pool_refiller.host);
@@ -2568,8 +2831,14 @@ static int precreate_pool_launch_refiller(const char* host,
         return(ret);
     }
 
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: launching refiller for host %s, "
+                 "type %d, pool: %llu, batch size %d (index %d)\n", __func__, 
+                 s_op->u.precreate_pool_refiller.host, type, llu(pool_handle),
+                 user_opts->precreate_batch_size[index], index);
+
     s_op->u.precreate_pool_refiller.pool_handle = pool_handle;
     s_op->u.precreate_pool_refiller.fsid = fsid;
+    s_op->u.precreate_pool_refiller.type = type;
     s_op->u.precreate_pool_refiller.host_addr = addr;
 
     /* start sm */

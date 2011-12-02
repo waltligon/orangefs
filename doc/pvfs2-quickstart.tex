@@ -64,11 +64,15 @@ instruction for building and installing are provided below.
 
 The following software packages are currently required by PVFS2:
 \begin{itemize}
-\item Berkely DB (version 3 or 4)
+\item Berkeley DB with development libraries (version 3 or 4)
 \item aio support (provided by glibc and librt)
 \item pthreads
 \item gcc 2.96 or newer (DO NOT USE gcc 2.95! gcc 3.x recommended)
 \item GNU Make
+\item flex
+\item bison
+\item kernel sources (for client kernel interface)
+\item GTK+ (for Karma)
 \end{itemize}
 
 The following software packages are currently recommended for use with PVFS2:
@@ -184,16 +188,16 @@ every field.  We will use the hostname ``testhost'' rather than
 root@testhost:~# /usr/bin/pvfs2-genconfig  \
 	/etc/pvfs2-fs.conf
 **********************************************************************
-	Welcome to the PVFS2 Configuration Generator:
+    Welcome to the PVFS2 Configuration Generator:
 
 This interactive script will generate configuration files suitable
 for use with a new PVFS2 file system.  Please see the PVFS2 quickstart
 guide for details.
 
 **********************************************************************
-
 You must first select the network protocol that your file system will use.
-The only currently supported options are "tcp", "gm", and "ib".
+The only currently supported options are "tcp", "gm", "mx", "ib", and "portals".
+(For multi-homed configurations, use e.g. "ib,tcp".)
 
 * Enter protocol type [Default is tcp]: 
 
@@ -202,15 +206,26 @@ script assumes that all servers will use the same port number.
 
 * Enter port number [Default is 3334]: 
 
+Choose a directory for each server to store data in.
+
+* Enter directory name: [Default is /pvfs2-storage-space]: 
+
+Choose a directory for each server to store metadata in.
+
+* Enter directory name: [Default is /pvfs2-storage-space]: 
+
+Choose a file for each server to write log messages to.
+
+* Enter log file location [Default is /tmp/pvfs2-server.log]: 
+
 Next you must list the hostnames of the machines that will act as
 I/O servers.  Acceptable syntax is "node1, node2, ..." or "node{#-#,#,#}".
 
 * Enter hostnames [Default is localhost]: testhost
 
-Now list the hostnames of the machines that will act as Metadata
-servers.  This list may or may not overlap with the I/O server list.
+Use same servers for metadata? (recommended)
 
-* Enter hostnames [Default is localhost]: testhost
+* Enter yes or no [Default is yes]:  
 
 Configured a total of 1 servers:
 1 of them are I/O servers.
@@ -218,17 +233,7 @@ Configured a total of 1 servers:
 
 * Would you like to verify server list (y/n) [Default is n]? 
 
-Choose a file for each server to write log messages to.
-
-* Enter log file location [Default is /tmp/pvfs2-server.log]: 
-
-Choose a directory for each server to store data in.
-
-* Enter directory name: [Default is /pvfs2-storage-space]: 
-
-Writing fs config file... Done.
-
-Configuration complete!
+Writing fs config file... done
 \end{verbatim}
 
 The generated config file will have conservative default values.  The PVFS2
@@ -281,11 +286,11 @@ systems.  The following example demonstrates how to set this up:
 
 \begin{verbatim}
 bash-2.05b# cp /usr/src/pvfs2/examples/pvfs2-server.rc \
-    /etc/rc.d/init.d/pvfs2-server
-bash-2.05b# chmod a+x /etc/rc.d/init.d/pvfs2-server
+    /etc/init.d/pvfs2-server
+bash-2.05b# chmod a+x /etc/init.d/pvfs2-server
 bash-2.05b# chkconfig pvfs2-server on
-bash-2.05b#  ls -al /etc/rc.d/rc3.d/S35pvfs2-server 
-lrwxrwxrwx  1 root  root   22 Sep 21 13:11 /etc/rc.d/rc3.d/S35pvfs2-server \
+bash-2.05b#  ls -al /etc/rc3.d/S35pvfs2-server 
+lrwxrwxrwx  1 root  root   22 Sep 21 13:11 /etc/rc3.d/S35pvfs2-server \
     -> ../init.d/pvfs2-server
 \end{verbatim}
 
@@ -294,14 +299,14 @@ ensure that the pvfs2-server is started and stopped gracefully.
 To manually start the server, you can run the following command:
 
 \begin{verbatim}
-bash-2.05b# /etc/rc.d/init.d/pvfs2-server start
+bash-2.05b# /etc/init.d/pvfs2-server start
 Starting PVFS2 server:                                     [  OK  ]
 \end{verbatim}
 
 To manually stop the server:
 
 \begin{verbatim}
-bash-2.05b# /etc/rc.d/init.d/pvfs2-server stop
+bash-2.05b# /etc/init.d/pvfs2-server stop
 Stopping PVFS2 server:                                     [  OK  ]
 \end{verbatim}
 
@@ -554,7 +559,7 @@ each machine.
 root@cluster1:~# for i in `seq 1 8`; do
 > scp /etc/pvfs2-fs.conf cluster\${i}:/etc/
 > scp /usr/src/pvfs2/examples/pvfs2-server.rc \
-    cluster\${i}:/etc/rc.d/init.d/pvfs2-server
+    cluster\${i}:/etc/init.d/pvfs2-server
 > ssh cluster\${i} /sbin/chkconfig pvfs2-server on
 > done
 \end{verbatim}

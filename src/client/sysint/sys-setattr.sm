@@ -36,7 +36,14 @@ machine pvfs2_client_setattr_sm
     state init
     {
         run setattr_init;
-        default => setattr_msg_setup_msgpair;
+        default => setattr_getattr;
+    }
+
+    state setattr_getattr
+    {
+        jump pvfs2_client_getattr_sm;
+        success => setattr_msg_setup_msgpair;
+        default => cleanup;
     }
 
     state setattr_msg_setup_msgpair
@@ -73,7 +80,7 @@ machine pvfs2_client_setattr_sm
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr)
@@ -105,7 +112,7 @@ PVFS_error PVFS_isys_setattr(
     /* make sure that the permission bits are acceptable */
     if ((attr.mask & PVFS_ATTR_SYS_PERM) && (attr.perms & ~PVFS_PERM_VALID) != 0)
     {
-        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported" 
+        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported " 
                     "permission bits\n");
         return(-PVFS_EINVAL);
     }
@@ -122,7 +129,7 @@ PVFS_error PVFS_isys_setattr(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_msgarray_params(sm_p, ref.fs_id);
-    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->object_ref = ref;
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints, PVFS_HINT_HANDLE_NAME, sizeof(PVFS_handle), &ref.handle);
@@ -133,7 +140,14 @@ PVFS_error PVFS_isys_setattr(
         gossip_lerr("PVFS_isys_setattr() failure: %s\n",
                     strerror(PVFS_get_errno_mapping(-ret)));
         return ret;
-    } 
+    }
+
+    PINT_SM_GETATTR_STATE_FILL(
+                               sm_p->getattr,
+                               sm_p->object_ref,
+                               PVFS_ATTR_CAPABILITY,
+                               PVFS_TYPE_NONE,
+                               0);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %llu "
                  "on fs %d\n", llu(ref.handle),
@@ -148,7 +162,7 @@ PVFS_error PVFS_isys_setattr(
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
-    const PVFS_credentials *credentials,
+    const PVFS_credential *credential,
     PVFS_hint hints)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -156,7 +170,7 @@ PVFS_error PVFS_sys_setattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_setattr entered\n");
 
-    ret = PVFS_isys_setattr(ref, attr, credentials, &op_id, hints, NULL);
+    ret = PVFS_isys_setattr(ref, attr, credential, &op_id, hints, NULL);
     if (ret)
     {
         PVFS_perror_gossip("PVFS_isys_setattr call", ret);
@@ -207,6 +221,8 @@ static PINT_sm_action setattr_msg_setup_msgpair(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
 
+    assert(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY);
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
@@ -215,6 +231,7 @@ static PINT_sm_action setattr_msg_setup_msgpair(
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
+        sm_p->getattr.attr.capability,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
@@ -277,6 +294,8 @@ static PINT_sm_action setattr_cleanup(
     {
         PINT_acache_invalidate(sm_p->object_ref);
     }
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;

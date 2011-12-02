@@ -5,7 +5,7 @@
  */
 
 #include "pvfs2-server.h"
-#include "assert.h"
+#include <assert.h>
 
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;
@@ -47,6 +47,11 @@ extern struct PINT_server_req_params pvfs2_batch_remove_params;
 extern struct PINT_server_req_params pvfs2_unstuff_params;
 extern struct PINT_server_req_params pvfs2_stuffed_create_params;
 extern struct PINT_server_req_params pvfs2_precreate_pool_refiller_params;
+extern struct PINT_server_req_params pvfs2_mirror_params;
+extern struct PINT_server_req_params pvfs2_create_immutable_copies_params;
+extern struct PINT_server_req_params pvfs2_tree_remove_params;
+extern struct PINT_server_req_params pvfs2_tree_get_file_size_params;
+extern struct PINT_server_req_params pvfs2_uid_mgmt_params;
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_entry PINT_server_req_table[] =
@@ -57,7 +62,8 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 3 */ {PVFS_SERV_IO, &pvfs2_io_params},
     /* 4 */ {PVFS_SERV_GETATTR, &pvfs2_get_attr_params},
     /* 5 */ {PVFS_SERV_SETATTR, &pvfs2_set_attr_params},
-    /* 6 */ {PVFS_SERV_LOOKUP_PATH, &pvfs2_lookup_params},
+    /* TODO: orange-security */
+    /* 6 */ {PVFS_SERV_LOOKUP, &pvfs2_lookup_params}, 
     /* 7 */ {PVFS_SERV_CRDIRENT, &pvfs2_crdirent_params},
     /* 8 */ {PVFS_SERV_RMDIRENT, &pvfs2_rmdirent_params},
     /* 9 */ {PVFS_SERV_CHDIRENT, &pvfs2_chdirent_params},
@@ -90,6 +96,11 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 36 */ {PVFS_SERV_BATCH_REMOVE, &pvfs2_batch_remove_params},
     /* 37 */ {PVFS_SERV_PRECREATE_POOL_REFILLER, &pvfs2_precreate_pool_refiller_params},
     /* 38 */ {PVFS_SERV_UNSTUFF, &pvfs2_unstuff_params},
+    /* 39 */ {PVFS_SERV_MIRROR, &pvfs2_mirror_params},
+    /* 40 */ {PVFS_SERV_IMM_COPIES, &pvfs2_create_immutable_copies_params},
+    /* 41 */ {PVFS_SERV_TREE_REMOVE, &pvfs2_tree_remove_params},
+    /* 42 */ {PVFS_SERV_TREE_GET_FILE_SIZE, &pvfs2_tree_get_file_size_params},
+    /* 43 */ {PVFS_SERV_MGMT_GET_UID, &pvfs2_uid_mgmt_params},
 };
 
 #define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
@@ -106,8 +117,8 @@ enum PINT_server_req_access_type PINT_server_req_modify(
     return PINT_SERVER_REQ_MODIFY;
 }
 
-enum PINT_server_req_permissions
-PINT_server_req_get_perms(struct PVFS_server_req *req)
+PINT_server_req_perm_fun
+PINT_server_req_get_perm_fun(struct PVFS_server_req *req)
 {
     CHECK_OP(req->op);
     return PINT_server_req_table[req->op].params->perm;
@@ -148,6 +159,26 @@ int PINT_server_req_get_object_ref(
         return PINT_server_req_table[req->op].params->get_object_ref(
             req, fs_id, handle);
     }
+}
+
+int PINT_server_req_get_credential(
+    struct PVFS_server_req *req, PVFS_credential **cred)
+{
+    int ret;
+    CHECK_OP(req->op);
+
+    if (!PINT_server_req_table[req->op].params->get_credential)
+    {
+        *cred = NULL;
+        ret = 0;
+    }
+    else
+    {
+        ret = PINT_server_req_table[req->op].params->get_credential(
+            req, cred);
+    }
+
+    return ret;
 }
 
 /*

@@ -19,6 +19,7 @@
 
 #include <stdlib.h>
 
+#include "gossip.h"
 #include "trove.h"
 #include "trove-internal.h"
 
@@ -56,7 +57,7 @@ int trove_bstream_read_at(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_read_at(
@@ -94,7 +95,7 @@ int trove_bstream_write_at(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_write_at(
@@ -131,7 +132,7 @@ int trove_bstream_resize(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_resize(
@@ -161,7 +162,7 @@ int trove_bstream_validate(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_validate(
@@ -201,7 +202,7 @@ int trove_bstream_read_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_read_list(
@@ -248,7 +249,7 @@ int trove_bstream_write_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
    return bstream_method_table[method_id]->bstream_write_list(
@@ -286,7 +287,7 @@ int trove_bstream_flush(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return bstream_method_table[method_id]->bstream_flush(
@@ -318,16 +319,16 @@ int trove_keyval_read(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     if (key_p->buffer_sz < 2)
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     if(!(flags & TROVE_BINARY_KEY))
     {
         if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+            return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_read(
@@ -367,16 +368,16 @@ int trove_keyval_write(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     if (key_p->buffer_sz < 2)
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     if(!(flags & TROVE_BINARY_KEY))
     {
         if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
-	    return -TROVE_EINVAL;
+            return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_write(
@@ -411,14 +412,14 @@ int trove_keyval_remove(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_remove(
            coll_id,
            handle,
            key_p,
-	   val_p,
+           val_p,
            flags,
            vtag,
            user_ptr,
@@ -442,7 +443,7 @@ int trove_keyval_validate(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_validate(
@@ -475,7 +476,7 @@ int trove_keyval_iterate(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_iterate(
@@ -511,7 +512,7 @@ int trove_keyval_iterate_keys(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_iterate_keys(
@@ -551,18 +552,18 @@ int trove_keyval_read_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     for (i = 0; i < count; i++)
     {
-	if (key_array[i].buffer_sz < 2)
-	    return -TROVE_EINVAL;
+        if (key_array[i].buffer_sz < 2)
+            return -TROVE_EINVAL;
         if(!(flags & TROVE_BINARY_KEY))
         {
-	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	        return -TROVE_EINVAL;
+            if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+                return -TROVE_EINVAL;
         }
     }
 
@@ -571,7 +572,7 @@ int trove_keyval_read_list(
            handle,
            key_array,
            val_array,
-	   err_array,
+           err_array,
            count,
            flags,
            vtag,
@@ -597,28 +598,32 @@ int trove_keyval_write_list(
     TROVE_op_id* out_op_id_p,
     PVFS_hint  hints)
 {
-    int i;
+    int rc = 0, i;
     TROVE_method_id method_id;
 
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     for (i = 0; i < count; i++)
     {
-	if (key_array[i].buffer_sz < 2)
-	    return -TROVE_EINVAL;
+        if (key_array[i].buffer_sz < 2)
+        {
+            return -TROVE_EINVAL;
+        }
         if(!(flags & TROVE_BINARY_KEY))
         {
-	    if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
-	        return -TROVE_EINVAL;
+            if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+            {
+                return -TROVE_EINVAL;
+            }
         }
     }
 
-    return keyval_method_table[method_id]->keyval_write_list(
+    rc = keyval_method_table[method_id]->keyval_write_list(
            coll_id,
            handle,
            key_array,
@@ -629,7 +634,8 @@ int trove_keyval_write_list(
            user_ptr,
            context_id,
            out_op_id_p,
-	   hints);
+           hints);
+    return rc;
 }
 
 /** Initiate storing of multiple keyword/value pairs to the same
@@ -655,14 +661,14 @@ int trove_keyval_remove_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     /* Check arguments */
     for (i = 0; i < count; i++)
     {
-	if (key_array[i].buffer_sz < 2)
-	    return -TROVE_EINVAL;
+        if (key_array[i].buffer_sz < 2)
+            return -TROVE_EINVAL;
         if(!(flags & TROVE_BINARY_KEY))
         {
             if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
@@ -675,7 +681,7 @@ int trove_keyval_remove_list(
            handle,
            key_array,
            val_array,
-	   error_array,
+           error_array,
            count,
            flags,
            vtag,
@@ -702,7 +708,7 @@ int trove_keyval_flush(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_flush(
@@ -716,12 +722,12 @@ int trove_keyval_flush(
 }
 
 int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
-				 TROVE_handle handle,
-				 TROVE_ds_flags flags,
-				 TROVE_keyval_handle_info *info,
-				 void * user_ptr,
-				 TROVE_context_id context_id,
-				 TROVE_op_id *out_op_id_p,
+                                 TROVE_handle handle,
+                                 TROVE_ds_flags flags,
+                                 TROVE_keyval_handle_info *info,
+                                 void * user_ptr,
+                                 TROVE_context_id context_id,
+                                 TROVE_op_id *out_op_id_p,
                  PVFS_hint  hints)
 {
     TROVE_method_id method_id;
@@ -729,17 +735,17 @@ int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return keyval_method_table[method_id]->keyval_get_handle_info(
-	coll_id,
-	handle,
-	flags,
-	info,
-	user_ptr,
-	context_id,
-	out_op_id_p,
+        coll_id,
+        handle,
+        flags,
+        info,
+        user_ptr,
+        context_id,
+        out_op_id_p,
     hints);
 }
 
@@ -763,7 +769,7 @@ int trove_dspace_create_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_create_list(
@@ -777,7 +783,7 @@ int trove_dspace_create_list(
            user_ptr,
            context_id,
            out_op_id_p,
-	   hints);
+           hints);
 }
 
 /** Initiate creation of a new data space.
@@ -799,7 +805,7 @@ int trove_dspace_create(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_create(
@@ -833,7 +839,7 @@ int trove_dspace_remove_list(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_remove_list(
@@ -863,7 +869,7 @@ int trove_dspace_remove(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_remove(
@@ -892,7 +898,7 @@ int trove_dspace_iterate_handles(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_iterate_handles(
@@ -922,7 +928,7 @@ int trove_dspace_verify(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_verify(
@@ -953,7 +959,7 @@ int trove_dspace_getattr(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_getattr(
@@ -971,10 +977,10 @@ int trove_dspace_getattr(
  */
 int trove_dspace_getattr_list(
     TROVE_coll_id coll_id,
-	 int nhandles,
+         int nhandles,
     TROVE_handle *handle_array,
     TROVE_ds_attributes_s *ds_attr_p,
-	 TROVE_ds_state  *error_array,
+         TROVE_ds_state  *error_array,
     TROVE_ds_flags flags,
     void* user_ptr,
     TROVE_context_id context_id,
@@ -989,11 +995,11 @@ int trove_dspace_getattr_list(
     }
     return dspace_method_table[method_id]->dspace_getattr_list(
            coll_id,
-	   nhandles,
+           nhandles,
            handle_array,
            ds_attr_p,
-	   error_array,
-	   flags,
+           error_array,
+           flags,
            user_ptr,
            context_id,
            out_op_id_p,
@@ -1015,7 +1021,7 @@ int trove_dspace_setattr(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_setattr(
@@ -1039,7 +1045,7 @@ int trove_dspace_cancel(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_cancel(
@@ -1065,7 +1071,7 @@ int trove_dspace_test(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_test(
@@ -1097,7 +1103,7 @@ int trove_dspace_testsome(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_testsome(
@@ -1128,7 +1134,7 @@ int trove_dspace_testcontext(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return dspace_method_table[method_id]->dspace_testcontext(
@@ -1155,7 +1161,7 @@ int trove_collection_geteattr(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return mgmt_method_table[method_id]->collection_geteattr(
@@ -1182,13 +1188,38 @@ int trove_collection_seteattr(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return mgmt_method_table[method_id]->collection_seteattr(
            coll_id,
            key_p,
            val_p,
+           flags,
+           user_ptr,
+           context_id,
+           out_op_id_p);
+}
+
+int trove_collection_deleattr(
+    TROVE_coll_id coll_id,
+    TROVE_keyval_s* key_p,
+    TROVE_ds_flags flags,
+    void* user_ptr,
+    TROVE_context_id context_id,
+    TROVE_op_id* out_op_id_p)
+{
+    TROVE_method_id method_id;
+
+    method_id = global_trove_method_callback(coll_id);
+    if(method_id < 0)
+    {
+        return -TROVE_EINVAL;
+    }
+
+    return mgmt_method_table[method_id]->collection_deleattr(
+           coll_id,
+           key_p,
            flags,
            user_ptr,
            context_id,
@@ -1206,7 +1237,7 @@ int trove_collection_getinfo(
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return mgmt_method_table[method_id]->collection_getinfo(
@@ -1226,31 +1257,40 @@ int trove_collection_setinfo(
 
     if(option == TROVE_DB_CACHE_SIZE_BYTES)
     {
-	TROVE_db_cache_size_bytes = *((int *)parameter);
-	return 0;
+        TROVE_db_cache_size_bytes = *((int *)parameter);
+        return 0;
     }
     if(option == TROVE_SHM_KEY_HINT)
     {
         TROVE_shm_key_hint = *((int*)parameter);
-	return(0);
+        return(0);
     }
     if(option == TROVE_MAX_CONCURRENT_IO)
     {
         TROVE_max_concurrent_io = *((int*)parameter);
-	return(0);
+        return(0);
     }
 
     method_id = global_trove_method_callback(coll_id);
     if(method_id < 0)
     {
-	return -TROVE_EINVAL;
+        return -TROVE_EINVAL;
     }
 
     return mgmt_method_table[method_id]->collection_setinfo(
-	   method_id,
+           method_id,
            coll_id,
            context_id,
            option,
            parameter);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
 

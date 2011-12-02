@@ -23,6 +23,10 @@
 
 #include <stdlib.h>
 
+#ifdef WIN32
+#include <stdint.h>
+#endif
+
 typedef int64_t bmi_size_t;         /**< Data region size */
 typedef int32_t bmi_msg_tag_t;      /**< User-specified message tag */
 typedef int64_t bmi_context_id;     /**< Context identifier */
@@ -84,8 +88,7 @@ enum
     BMI_TCP_BUFFER_RECEIVE_SIZE = 12,
     BMI_TCP_CLOSE_SOCKET = 13,
     BMI_OPTIMISTIC_BUFFER_REG = 14,
-    BMI_TCP_CHECK_UNEXPECTED = 15,
-    BMI_ZOID_POST_TIMEOUT = 16
+    BMI_TCP_CHECK_UNEXPECTED = 15
 };
 
 enum BMI_io_type

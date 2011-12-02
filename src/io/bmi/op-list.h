@@ -32,8 +32,6 @@ struct op_list_search_key
     int msg_tag_yes;
     bmi_op_id_t op_id;
     int op_id_yes;
-    uint8_t class;
-    int class_yes;
 };
 
 int op_list_count(op_list_p olp);
