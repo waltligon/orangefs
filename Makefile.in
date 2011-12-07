@@ -511,29 +511,36 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-LIBRARIES :=
+LIBRARIES_STATIC := lib/libpvfs2.a
+LIBRARIES_SHARED := lib/libpvfs2.so
+LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
+LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
+
 ifdef BUILD_BMI_ONLY
-BMILIBRARIES :=
+LIBRARIES_STATIC += lib/libbmi.a
+LIBRARIES_SHARED += lib/libbmi.so
 endif
-LIBRARIES_THREADED :=
-ifeq ($(build_shared),yes)
-ifdef BUILD_BMI_ONLY
-BMILIBRARIES := lib/libbmi.so
+
+ifdef BUILD_USRINT
+LIBRARIES_STATIC += lib/libofs.a
+LIBRARIES_SHARED += lib/libofs.so
+LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
+LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
-LIBRARIES_SHARED = lib/libpvfs2.so lib/libofs.so
-LIBRARIES += $(LIBRARIES_SHARED)
-LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so lib/libofs-threaded.so
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_SHARED)
+
+ifneq (($build_static),yes)
+LIBRARIES_STATIC := 
+LIBRARIES_THREADED_STATIC :=
 endif
-ifeq ($(build_static),yes)
-ifdef BUILD_BMI_ONLY
-BMILIBRARIES += lib/libbmi.a
+
+ifneq (($build_shared),yes)
+LIBRARIES_SHARED :=
+LIBRARIES_THREADED_SHARED := 
 endif
-LIBRARIES_STATIC = lib/libpvfs2.a lib/libofs.a
-LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a lib/libofs-threaded.a
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
-endif
+
+LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
+LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
+
 
 ################################################################
 # Default target forward pointer, to avoid other targets in make stubs
