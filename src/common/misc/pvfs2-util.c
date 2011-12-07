@@ -156,6 +156,7 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     free(mntent->pvfs_config_servers[0]);
     free(mntent->pvfs_config_servers);
     free(mntent->pvfs_fs_name);
+    mntent->pvfs_fs_name = NULL;
     free(mntent);
     return;
 }
@@ -506,7 +507,6 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     if(!(PINT_FSTAB_NAME(tmp_ent)) || 
                        !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
                     {
-                        /* this entry is a comment */
                         PINT_fstab_entry_destroy(tmp_ent);
                         continue;
                     }
@@ -540,8 +540,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
     /* allocate array of entries */
     current_tab = &s_stat_tab_array[s_stat_tab_count];
+
     current_tab->mntent_array = (struct PVFS_sys_mntent *)malloc(
         (tmp_mntent_count * sizeof(struct PVFS_sys_mntent)));
+
     if (!current_tab->mntent_array)
     {
         gen_mutex_unlock(&s_stat_tab_mutex);
@@ -562,12 +564,31 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     i = 0;
     while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
     {
-        if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
+       if(!(PINT_FSTAB_NAME(tmp_ent)) || !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+       {
+           PINT_fstab_entry_destroy(tmp_ent);
+           continue;
+        }
+
+        if ((PINT_FSTAB_TYPE(tmp_ent) != NULL) && (strncmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2", 5) == 0))
         {
             struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
             char *cp;
             int cur_server;
+	    char *rewrite_pointer;
 
+	    /* Entries in mtab may be prefixed by a process name and '#' */
+	    /* If detected, remove prefix.  */
+	    for(rewrite_pointer=cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++,rewrite_pointer++) {
+		if (*cp == '#') {
+		    rewrite_pointer = PINT_FSTAB_NAME(tmp_ent) - 1;
+		    continue;
+		}
+		if (rewrite_pointer == cp) continue;
+		*rewrite_pointer = *cp;
+	    }
+	    *rewrite_pointer = '\0';
+	       
             /* Enable integrity checks by default */
             me->integrity_check = 1;
             /* comma-separated list of ways to contact a config server */
@@ -600,6 +621,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* parse server list and make sure fsname is same */
             cp = PINT_FSTAB_NAME(tmp_ent);
+
             cur_server = 0;
             for (;;)
             {
@@ -2044,7 +2066,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     }
 
     /* get the path string */
-    nexttok = strtok_r(linestr, " ", &strtok_ctx);
+    nexttok = strtok_r(linestr, " \t", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2054,7 +2076,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     
     /* get the mount point */
 
-    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2062,7 +2084,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     fsentry->fs_file = strdup(nexttok);
 
     /* get the fs type */
-    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;
@@ -2070,7 +2092,7 @@ static struct fstab *PINT_util_my_get_next_fsent(PINT_fstab_t *tab)
     fsentry->fs_vfstype = strdup(nexttok);
 
     /* get the mount opts */
-    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    nexttok = strtok_r(NULL, " \t", &strtok_ctx);
     if(!nexttok)
     {
         goto exit;

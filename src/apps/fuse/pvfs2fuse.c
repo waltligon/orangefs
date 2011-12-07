@@ -1217,7 +1217,7 @@ int main(int argc, char *argv[])
 	  if ( !config )
 		 config = pvfs2fuse.mntent.pvfs_config_servers[0];
 
-	  snprintf( name, 200, "-ofsname=pvfs2fuse#%s", config );
+	  snprintf( name, 200, "-ofsname=pvfs2fuse#%s/%s", config, pvfs2fuse.mntent.pvfs_fs_name );
 	  fuse_opt_insert_arg( &args, 1, name );
 #if (__FreeBSD__ >= 10)
 	  snprintf( name, 200, "-ovolname=%s", pvfs2fuse.mntent.pvfs_fs_name );
