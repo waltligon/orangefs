@@ -170,7 +170,7 @@ int PINT_realpath(
         memset(link_path, 0, PATH_MAX);
         if (ret == 0)
         {
-            n = pvfs_readlink(resolved_path, link_path, PATH_MAX);
+            n = readlink(resolved_path, link_path, PATH_MAX);
         }
         else
         {
