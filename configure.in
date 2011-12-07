@@ -1096,6 +1096,32 @@ dnl
 AX_ZOID
 
 dnl
+dnl check for F_NOCACHE (MACOSX)
+AC_MSG_CHECKING([for F_NOCACHE])
+AC_TRY_COMPILE([
+    #include <sys/fcntl.h>
+    int fd;
+    fcntl(fd, F_NOCACHE, 1);
+    ], [],
+    AC_MSG_RESULT(no),
+    AC_MSG_RESULT(yes),
+    AC_DEFINE(HAVE_FCNTL_F_NOCACHE, 1, Define if system defines F_NOCACHE fcntl)
+)
+
+dnl
+dnl check for open O_DIRECT
+AC_MSG_CHECKING([for open O_DIRECT])
+AC_TRY_COMPILE([
+    #include <fcntl.h>
+    ], [
+    open("somefile", O_DIRECT);
+    ], [],
+    AC_MSG_RESULT(no),
+    AC_MSG_RESULT(yes),
+    AC_DEFINE(HAVE_OPEN_O_DIRECT, 1, Define if system defines O_DIRECT fcntl)
+)
+
+dnl
 dnl check if fgetxattr takes extra arguments
 AC_MSG_CHECKING([for fgetxattr extra arguments])
 AC_TRY_COMPILE([

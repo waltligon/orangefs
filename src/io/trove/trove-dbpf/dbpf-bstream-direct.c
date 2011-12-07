@@ -206,11 +206,19 @@ static size_t direct_aligned_write(int fd,
 
 #ifndef NDEBUG
     /* if debug is enabled, check that fd was opened with O_DIRECT */
-
+#ifdef HAVE_OPEN_O_DIRECT
     if(!(fcntl(fd, F_GETFL) & O_DIRECT))
     {
         return -EINVAL;
     }
+#endif
+
+#ifdef HAVE_FNCTL_F_NOCACHE
+    if (!(fcntl(fd, F_GETFL) & F_NOCACHE)) 
+    {
+        return -EINVAL;
+    }
+#endif
 #endif
 
     /* verify that the buffer is aligned properly */
@@ -571,8 +579,13 @@ static size_t direct_aligned_read(int fd,
 
 #ifndef NDEBUG
     /* if debug is enabled, check that fd was opened with O_DIRECT */
-
+#ifdef HAVE_OPEN_O_DIRECT
     if(!(fcntl(fd, F_GETFL) & O_DIRECT))
+#elif HAVE_FNCTL_F_NOCACHE
+    if (!(fcntl(fd, F_GETFL) & F_NOCACHE)) 
+#else
+    if (0) //TODO: error? fall back to madvise?
+#endif
     {
         gossip_err("dbpf_direct_read: trying to do direct IO but file wasn't "
                    "opened with O_DIRECT\n");

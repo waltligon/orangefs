@@ -100,6 +100,9 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define if system defines F_NOCACHE fcntl */
+#undef HAVE_FCNTL_F_NOCACHE
+
 /* Define to 1 if you have the `fgetxattr' function. */
 #undef HAVE_FGETXATTR
 
@@ -311,6 +314,9 @@
 
 /* Define to 1 if the libssl is available */
 #undef HAVE_OPENSSL
+
+/* Define if system defines F_NOCACHE fcntl */
+#undef HAVE_OPEN_O_DIRECT
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_FILE_ARG
