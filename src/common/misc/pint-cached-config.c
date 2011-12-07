@@ -28,7 +28,7 @@
 #include "pint-cached-config.h"
 #include "pvfs2-internal.h"
 
-/* really old linux distributions (jazz's RHEL 3) don't have this(!?) */
+/* FIXME: obtaining HOST_NAME_MAX is platform specific and should be handled more generally */
 #ifndef HOST_NAME_MAX
 #define HOST_NAME_MAX 64
 #endif

@@ -18,6 +18,11 @@
 #include <grp.h>
 #include <unistd.h>
 
+/* FIXME: obtaining HOST_NAME_MAX is platform specific and should be handled more generally */
+#ifndef HOST_NAME_MAX
+#define HOST_NAME_MAX 64
+#endif
+
 #ifdef ENABLE_SECURITY
 #include <openssl/err.h>
 #include <openssl/evp.h>
