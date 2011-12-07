@@ -519,6 +519,7 @@ LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
 ifdef BUILD_BMI_ONLY
 LIBRARIES_STATIC += lib/libbmi.a
 LIBRARIES_SHARED += lib/libbmi.so
+BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifdef BUILD_USRINT
@@ -528,12 +529,12 @@ LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
 LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
 
-ifneq (($build_static),yes)
+ifneq ($(build_static),yes)
 LIBRARIES_STATIC := 
 LIBRARIES_THREADED_STATIC :=
 endif
 
-ifneq (($build_shared),yes)
+ifneq ($(build_shared),yes)
 LIBRARIES_SHARED :=
 LIBRARIES_THREADED_SHARED := 
 endif
