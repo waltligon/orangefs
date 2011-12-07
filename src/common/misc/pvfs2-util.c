@@ -279,7 +279,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     }
 
     close(filedes[0]);
-    sigaction(SIGCLD, &oldsa, NULL);
+    sigaction(SIGCHLD, &oldsa, NULL);
 
     return ret;
 }

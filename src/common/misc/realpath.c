@@ -37,9 +37,6 @@
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <usrint.h>
-#include <posix-ops.h>
-#include <posix-pvfs.h>
 #include "realpath.h"
 #include <pvfs2-types.h>
 #include "pvfs2-util.h"
