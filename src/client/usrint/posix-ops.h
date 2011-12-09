@@ -192,6 +192,7 @@ typedef struct pvfs_mmap_s
 /* these items are shared between duped descrptors */
 typedef struct pvfs_descriptor_status_s
 {
+    gen_mutex_t lock;         /**< protect struct from mult threads */
     int dup_cnt;              /**< number of table slots with this des */
     posix_ops *fsops;         /**< syscalls to use for this file */
     PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
@@ -207,6 +208,7 @@ typedef struct pvfs_descriptor_status_s
 /* these are unique among descriptors */
 typedef struct pvfs_descriptor_s
 {
+    gen_mutex_t lock;         /**< protect struct from mult threads */
     int is_in_use;            /**< PVFS_FS if this descriptor is valid */
     int fd;                   /**< file number in PVFS descriptor_table */
     int true_fd;              /**< the true file number depending on FS */

@@ -419,7 +419,9 @@ ssize_t pvfs_read(int fd, void *buf, size_t count)
     {
         return -1;
     }
+    gen_mutex_lock(&pd->s->lock);
     pd->s->file_pointer += rc;
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 
@@ -481,7 +483,9 @@ ssize_t pvfs_write(int fd, const void *buf, size_t count)
     {
         return -1;
     }
+    gen_mutex_lock(&pd->s->lock);
     pd->s->file_pointer += rc;
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 
@@ -583,7 +587,9 @@ static ssize_t pvfs_rdwrv(int fd,
 
     if (rc >= 0)
     {
+        gen_mutex_lock(&pd->s->lock);
         pd->s->file_pointer += rc;
+        gen_mutex_unlock(&pd->s->lock);
     }
 
     return rc;

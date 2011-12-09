@@ -74,6 +74,8 @@ int open(const char *path, int flags, ...)
         pd->s->flags = flags;
         glibc_ops.fstat(rc, &sbuf);
         pd->s->mode = sbuf.st_mode;
+        gen_mutex_unlock(&pd->s->lock);
+        gen_mutex_unlock(&pd->lock);
         return pd->fd; 
     }
 }
@@ -410,7 +412,11 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     {
         rc = pd->s->fsops->writev(fd, iov, iovcnt);
         if (rc > 0)
+        {
+            gen_mutex_lock(&pd->s->lock);
             pd->s->file_pointer += rc;
+            gen_mutex_unlock(&pd->s->lock);
+        }
     }
     else
     {

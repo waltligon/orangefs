@@ -162,6 +162,7 @@ int PINT_realpath(
         /* See if last pathname component is a symlink. */
         *npath = '\0';
 
+#ifndef BUILD_USRINT
         /* see if this part of the path has a PVFS mount point */
         ret = PVFS_util_resolve_absolute(resolved_path, &fs_id,
                                          link_path, PATH_MAX);
@@ -175,11 +176,14 @@ int PINT_realpath(
         else
         {
             n = syscall(SYS_readlink, resolved_path, link_path, PATH_MAX);
-/* this doesn't work, a syscall should certainly work */
 #if 0
+            /* this doesn't work, a syscall should certainly work */
             n = glibc_ops.readlink(resolved_path, link_path, PATH_MAX);
 #endif
         }
+#else
+        n = readlink(resolved_path, link_path, PATH_MAX);
+#endif /* BUILD_USRINT */
         if (n < 0)
         {
             /* EINVAL means the file exists but isn't a symlink. */

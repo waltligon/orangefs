@@ -37,6 +37,10 @@
 #ifndef _FILE_OFFSET_BITS
 #define _FILE_OFFSET_BITS 64
 #endif
+#ifdef __OPTIMIZE__
+#undef __OPTIMIZE__
+#endif
+#define __NO_INLINE__ 1
 #endif
 
 /*
@@ -46,13 +50,32 @@
 #include <features.h>
 /*
  * force this stuff off if the source requests
+ * the stuff controlling inlining and def'ing of
+ * functions in stdio is really mixed up and varies from
+ * one generation of the headers to another.
+ * I hate to whack all inlining and related stuff
+ * but it seems the only reliable way to turn it off.
+ * USRINT code can get this or not with the var below
+ * I question that header files should be doing
+ * optimization in the first place.  WBL
  */
 #ifdef USRINT_SOURCE
 #ifdef __USE_FILE_OFFSET64
 #undef __USE_FILE_OFFSET64
 #endif
+/* This seems to reappear on some systems, so whack it again */
 #ifdef __OPTIMIZE__
 #undef __OPTIMIZE__
+#endif
+#ifdef __REDIRECT
+#undef __REDIRECT
+#endif
+#ifdef __USE_EXTERN_INLINES
+#undef __USE_EXTERN_INLINES
+#endif
+#ifdef __USE_FORTIFY_LEVEL
+#undef __FORTIFY_LEVEL
+#define __USE_FORTIFY_LEVEL 0
 #endif
 #endif
 
@@ -144,6 +167,7 @@ extern int fremovexattr(int fd, const char *name);
 #include <pvfs2-debug.h>
 #include <pvfs2-types.h>
 #include <pvfs2-req-proto.h>
+#include <gen-locks.h>
 
 /* magic numbers for PVFS filesystem */
 #define PVFS_FS 537068840

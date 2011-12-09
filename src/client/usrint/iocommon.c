@@ -535,6 +535,8 @@ foundfile:
             pd->s->flags = flags;           /* open flags */
             fstat(rc, &sbuf);
             pd->s->mode = sbuf.st_mode;
+            gen_mutex_unlock(&pd->s->lock);
+            gen_mutex_unlock(&pd->lock);
             goto errorout; /* not really an error, but bailing out */
         }
         if (errno != ENOENT || !(flags & O_CREAT))
@@ -621,6 +623,8 @@ foundfile:
     {
         pd->s->mode |= S_IFLNK;
     }
+    gen_mutex_unlock(&pd->s->lock);
+    gen_mutex_unlock(&pd->lock);
 
     /* Truncate the file if neccesary */
     if (flags & O_TRUNC)
@@ -692,6 +696,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
         errno = EBADF;
         return -1;
     }
+    gen_mutex_lock(&pd->s->lock);
     switch(whence)
     {
         case SEEK_SET:
@@ -754,6 +759,7 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             free(readdir_resp.dirent_array);
         }
     }
+    gen_mutex_unlock(&pd->s->lock);
     return pd->s->file_pointer;
 
 errorout:
@@ -1432,7 +1438,9 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
     assert(*ret_op_id!=-1);//TODO: handle this
 
     PVFS_Request_size(contig_memory_req, &req_size);
+    gen_mutex_lock(&pd->s->lock);
     pd->s->file_pointer += req_size;
+    gen_mutex_unlock(&pd->s->lock);
     *ret_memory_req = contig_memory_req;
     return 0;
 
@@ -1865,6 +1873,7 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
 
     iocommon_cred(&credential);
 
+    gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
     /* posix deals in bytes in buffer and bytes read */
@@ -1897,10 +1906,12 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         bytes += sizeof(struct dirent);
         dirp++;
     }
+    gen_mutex_unlock(&pd->s->lock);
     free(readdir_resp.dirent_array);
     return bytes;
 
 errorout:
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 
@@ -1938,6 +1949,7 @@ int iocommon_getdents64(pvfs_descriptor *pd,
 
     iocommon_cred(&credential);
 
+    gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
     count = size / sizeof(struct dirent64);
@@ -1968,10 +1980,12 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         bytes += sizeof(struct dirent64);
         dirp++;
     }
+    gen_mutex_unlock(&pd->s->lock);
     free(readdir_resp.dirent_array);
     return bytes;
 
 errorout:
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 

@@ -253,6 +253,13 @@ ifneq (,$(STRICT_CFLAGS))
     #GCC_CFLAGS += -Wcast-qual
     #GCC_CFLAGS += -Wshadow
     #GCC_CFLAGS += -Wwrite-strings
+else
+    # these are noisy but come with Wall
+    # use strict if you want them on
+    #GCC_CFLAGS += -Wno-unused-value
+    #GCC_CFLAGS += -Wno-unused-result
+    #GCC_CFLAGS += -Wno-unused-but-set-variable
+    #GCC_CFLAGS += -Wno-unused-but-set-parameter
 endif
 
 # Intel cc options, enable all warnings, then disable some

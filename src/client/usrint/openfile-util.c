@@ -373,7 +373,7 @@ void load_glibc(void)
 }
 
 /*
- * runs on exist to do any cleanup
+ * runs on exit to do any cleanup
  */
 static void usrint_cleanup(void)
 {
@@ -448,8 +448,14 @@ void pvfs_sys_init(void) {
 	memset(descriptor_table, 0,
 			(sizeof(pvfs_descriptor *) * descriptor_table_size));
     descriptor_table[0] = &pvfs_stdin;
+    gen_mutex_init(&pvfs_stdin.lock);
+    gen_mutex_init(&pvfs_stdin.s->lock);
     descriptor_table[1] = &pvfs_stdout;
+    gen_mutex_init(&pvfs_stdout.lock);
+    gen_mutex_init(&pvfs_stdin.s->lock);
     descriptor_table[2] = &pvfs_stderr;
+    gen_mutex_init(&pvfs_stderr.lock);
+    gen_mutex_init(&pvfs_stdin.s->lock);
     descriptor_table_count = PREALLOC;
 
     /* open log file */
@@ -538,21 +544,28 @@ int pvfs_descriptor_table_size(void)
 
     /* allocate new descriptor */
 	descriptor_table_count++;
-    pd = descriptor_table[newfd] =
-                (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+
     if (!pd)
     {
         return NULL;
     }
     memset(pd, 0, sizeof(pvfs_descriptor));
-    pd->s =
-            (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
+
+    gen_mutex_init(&pd->lock);
+    gen_mutex_lock(&pd->lock);
+    descriptor_table[newfd] = pd;
+
+    pd->s = (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
     if (!pd->s)
     {
         free(pd);
         return NULL;
     }
     memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+
+    gen_mutex_init(&pd->s->lock);
+    gen_mutex_lock(&pd->s->lock);
 
 	/* fill in descriptor */
 	pd->is_in_use = PVFS_FS;
@@ -604,6 +617,7 @@ int pvfs_descriptor_table_size(void)
     }
 #endif /* PVFS_UCACHE_ENABLE */
 
+    /* NEW PD IS STILL LOCKED */
     return pd;
 }
 
@@ -655,20 +669,26 @@ int pvfs_dup_descriptor(int oldfd, int newfd)
     }
     /* new set up new pvfs_descfriptor */
 	descriptor_table_count++;
-    pd = descriptor_table[newfd] =
-                (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+    pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
     if (!pd)
     {
         return -1;
     }
     memset(pd, 0, sizeof(pvfs_descriptor));
+    gen_mutex_init(&pd->lock);
+    gen_mutex_lock(&pd->lock);
+    descriptor_table[newfd] = pd;
+
 	pd->is_in_use = PVFS_FS;
 	pd->fd = newfd;
 	pd->true_fd = newfd;
 	pd->fdflags = 0;
     /* share the pvfs_desdriptor_status info */
     pd->s = descriptor_table[oldfd]->s;
+    gen_mutex_lock(&pd->s->lock);
     pd->s->dup_cnt++;
+    gen_mutex_unlock(&pd->s->lock);
+    gen_mutex_unlock(&pd->lock);
     return 0;
 }
 
@@ -700,13 +720,16 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
         }
         /* allocate a descriptor */
 	    descriptor_table_count++;
-        pd = descriptor_table[fd] =
-                    (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
+        pd = (pvfs_descriptor *)malloc(sizeof(pvfs_descriptor));
         if (!pd)
         {
             return NULL;
         }
         memset(pd, 0, sizeof(pvfs_descriptor));
+        gen_mutex_init(&pd->lock);
+        gen_mutex_lock(&pd->lock);
+        descriptor_table[fd] = pd;
+
         pd->s =
              (pvfs_descriptor_status *)malloc(sizeof(pvfs_descriptor_status));
         if (!pd->s)
@@ -715,6 +738,7 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
             return NULL;
         }
         memset(pd->s, 0, sizeof(pvfs_descriptor_status));
+        gen_mutex_init(&pd->s->lock);
     
 	    /* fill in descriptor */
 	    pd->is_in_use = PVFS_FS;
@@ -730,19 +754,27 @@ pvfs_descriptor *pvfs_find_descriptor(int fd)
 	    pd->s->file_pointer = 0;
 	    pd->s->token = 0;
 	    pd->s->dpath = NULL;
-            pd->s->fent = NULL; /* not caching if left NULL */
+        pd->s->fent = NULL; /* not caching if left NULL */
     }
-    /* not a PVFS descriptor and unix descriptor not in use */
-    else if (pd->is_in_use != PVFS_FS)
+    else
     {
-        errno = EBADF;
-        return NULL;
+        /* locks here prevent a thread from getting */
+        /* a pd that is not finish being allocated yet */
+        gen_mutex_lock(&pd->lock);
+        if (pd->is_in_use != PVFS_FS)
+        {
+            errno = EBADF;
+            gen_mutex_unlock(&pd->lock);
+            return NULL;
+        }
     }
+    gen_mutex_unlock(&pd->lock);
 	return pd;
 }
 
 int pvfs_free_descriptor(int fd)
 {
+    int dup_cnt;
     pvfs_descriptor *pd = NULL;
     debug("pvfs_free_descriptor called with %d\n", fd);
 
@@ -760,7 +792,10 @@ int pvfs_free_descriptor(int fd)
 	descriptor_table_count--;
 
     /* check if last copy */
-    if (--(pd->s->dup_cnt) <= 0)
+    gen_mutex_lock(&pd->s->lock);
+    dup_cnt = --(pd->s->dup_cnt);
+    gen_mutex_unlock(&pd->s->lock);
+    if (dup_cnt <= 0)
     {
         if (pd->s->dpath)
         {
