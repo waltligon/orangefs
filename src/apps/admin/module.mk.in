@@ -27,8 +27,9 @@ ADMINSRC := \
 	$(DIR)/pvfs2-ln.c \
 	$(DIR)/pvfs2-perror.c \
 	$(DIR)/pvfs2-check-server.c \
-	$(DIR)/pvfs2-drop-caches.c \
-        $(DIR)/pvfs2-get-uid.c
+	$(DIR)/pvfs2-drop-caches.c 
+#don't build in 2.8.5 release
+#	$(DIR)/pvfs2-get-uid.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
