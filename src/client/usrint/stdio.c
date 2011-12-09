@@ -2676,11 +2676,16 @@ int scandir64 (const char *dir,
 static void init_stdio(void)
 {
     static int init_flag = 0;
+    static gen_mutex_t initlock = GEN_MUTEX_INITIALIZER;
     /* if we've already done this bail right away */
     if (init_flag)
     {
-        /* debugging - causing loops */
-        /* gossip_debug(GOSSIP_USRINT_DEBUG, "init_stdio\n"); */
+        return;
+    }
+    gen_mutex_lock(&initlock);
+    /* don't let more than one thread initialize */
+    if (init_flag)
+    {
         return;
     }
     init_flag = 1;
@@ -2758,8 +2763,8 @@ static void init_stdio(void)
     stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
     stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
     stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
-    /* debugging - causing loops */
-    /* gossip_debug(GOSSIP_USRINT_DEBUG, "init_stdio\n"); */
+
+    gen_mutex_unlock(&initlock);
 };
 
 /*

@@ -406,12 +406,19 @@ void pvfs_sys_init(void) {
 	struct rlimit rl; 
 	int rc; 
     static int pvfs_lib_init_flag = 0; 
+    static gen_mutex_t initlock = GEN_MUTEX_INITIALIZER;
     char curdir[PVFS_PATH_MAX];
 
     if (pvfs_lib_init_flag)
     {
         return;
     }
+    gen_mutex_lock(&initlock);
+    if (pvfs_lib_init_flag)
+    {
+        return;
+    }
+
     pvfs_lib_init_flag = 1; /* should only run this once */
     pvfs_initializing_flag = 1;
 
@@ -496,6 +503,7 @@ void pvfs_sys_init(void) {
 
     //PVFS_perror_gossip_silent(); 
     pvfs_initializing_flag = 0;
+    gen_mutex_unlock(&initlock);
 }
 
 int pvfs_descriptor_table_size(void)
