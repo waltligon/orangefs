@@ -180,6 +180,28 @@ extern int fremovexattr(int fd, const char *name);
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0
 #endif
+
+/* Define AT_FDCWD and related flags on older systems */
+#ifndef AT_FDCWD
+# define AT_FDCWD		-100	/* Special value used to indicate
+					   the *at functions should use the
+					   current working directory. */
+#endif
+#ifndef AT_SYMLINK_NOFOLLOW
+# define AT_SYMLINK_NOFOLLOW	0x100	/* Do not follow symbolic links.  */
+#endif
+#ifndef AT_REMOVDIR
+# define AT_REMOVEDIR		0x200	/* Remove directory instead of
+					   unlinking file.  */
+#endif
+#ifndef AT_SYMLINK_FOLLOW
+# define AT_SYMLINK_FOLLOW	0x400	/* Follow symbolic links.  */
+#endif
+#ifndef AT_EACCESS
+# define AT_EACCESS		0x200	/* Test access permitted for
+					   effective IDs, not real IDs.  */
+#endif
+
 #define true   1 
 #define false  0 
 #define O_HINTS     02000000  /* PVFS hints are present */
