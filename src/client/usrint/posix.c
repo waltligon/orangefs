@@ -1133,7 +1133,11 @@ int rmdir(const char *path)
     }
 }
 
+#if __GLIBC_PREREQ (2,5)
 ssize_t readlink(const char *path, char *buf, size_t bufsiz)
+#else
+int readlink(const char *path, char *buf, size_t bufsiz)
+#endif
 {
     if (!path || !buf)
     {
