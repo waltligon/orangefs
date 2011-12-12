@@ -174,7 +174,9 @@ inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *b
 inline void *ucache_insert(struct file_ent_s *fent, 
                     uint64_t offset, 
                     uint16_t *block_ndx);
-int ucache_remove(struct file_ent_s *fent, uint64_t offset);
+#if 0 
+int ucache_remove(struct file_ent_s *fent, uint64_t offset); 
+#endif
 int ucache_info(FILE *out, char *flags);
 
 int ucache_flush_cache(void); 
@@ -191,7 +193,9 @@ inline ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
 inline int lock_lock(ucache_lock_t * lock);
 inline int lock_unlock(ucache_lock_t * lock);
+#if 0
 int lock_destroy(ucache_lock_t * lock);
+#endif
 inline int lock_trylock(ucache_lock_t * lock);
 
 #endif /* UCACHE_H */
