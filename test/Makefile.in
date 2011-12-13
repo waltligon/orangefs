@@ -101,7 +101,7 @@ LIBS = @LIBS@
 LD = gcc
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LDFLAGS += -Llib 
+LDFLAGS += -L/lib 
 
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
