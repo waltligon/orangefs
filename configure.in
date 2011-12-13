@@ -54,6 +54,9 @@ AC_CHECK_HEADER([sys/vfs.h],
 AC_CHECK_HEADER([sys/mount.h],
 		[AC_DEFINE(HAVE_SYS_MOUNT_H, 1, Define if sys/mount.h exists)])
 
+AC_CHECK_HEADERS(linux/types.h)
+AC_CHECK_HEADERS(features.h)
+
 AC_CHECK_HEADERS([mntent.h, fstab.h])
 
 AC_CHECK_HEADERS(stdarg.h)

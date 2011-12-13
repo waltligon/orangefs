@@ -47,7 +47,10 @@
  * this defines __USE_LARGEFILE, __USE_LARGEFILE64, and
  * __USE_FILE_OFFSET64 which control many of the other includes
  */
+#ifdef HAVE_FEATURES_H
 #include <features.h>
+#endif
+
 /*
  * force this stuff off if the source requests
  * the stuff controlling inlining and def'ing of
@@ -109,7 +112,9 @@
 #include <sys/socket.h>
 #endif
 #include <sys/resource.h>
+#ifdef HAVE_SYS_SENDFILE_H
 #include <sys/sendfile.h>
+#endif
 /* #include <sys/statvfs.h> */ /* struct statfs on OS X */
 #ifdef HAVE_SYS_VFS_H
 #include <sys/vfs.h> /* struct statfs on Linux */
@@ -126,7 +131,10 @@
 #include <sys/mman.h>
 #include <sys/time.h>
 
+#ifdef HAVE_LINUX_TYPES_H
 #include <linux/types.h>
+#endif
+
 #ifdef HAVE_ATTR_XATTR_H
 #include <attr/xattr.h>
 #else

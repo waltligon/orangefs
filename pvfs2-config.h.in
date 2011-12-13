@@ -36,6 +36,12 @@
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
 
+/* Define if sys/sendfile.h exists */
+#define HAVE_SYS_SENDFILE_H
+
+/* Define if features.h exists */
+#define HAVE_SYS_FEATUES_H
+
 /* Define if kernel backing_dev_info struct has a name field */
 #undef HAVE_BACKING_DEV_INFO_NAME
 
