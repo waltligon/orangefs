@@ -15,6 +15,12 @@
 #include "openfile-util.h"
 #include "stdio-ops.h"
 
+/* fdopendir not present until glibc2.5 */
+#if __GLIBC_PREREQ (2,5)
+#else
+extern DIR *fdopendir (int __fd);
+#endif
+
 
 #ifdef gossip_debug
 #undef gossip_debug
