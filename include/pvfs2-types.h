@@ -1060,6 +1060,12 @@ endecode_fields_3a2a_struct (
                                     PVFS_REQ_LIMIT_ISSUER    + \
                                     PVFS_REQ_LIMIT_SIGNATURE)
 
+/* 
+ * NOTE: for backwards compatibility only. 
+ * For all new code use PVFS_credential.
+ */
+typedef PVFS_credential PVFS_credentials;
+
 #endif /* __PVFS2_TYPES_H */
 
 /*
