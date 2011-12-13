@@ -1,8 +1,5 @@
 /* pvfs2-config.h.in.  Generated from configure.in by autoheader.  */
 
-/* Define if building universal (internal helper macro) */
-#undef AC_APPLE_UNIVERSAL_BUILD
-
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
@@ -35,12 +32,6 @@
 
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
-
-/* Define if sys/sendfile.h exists */
-#define HAVE_SYS_SENDFILE_H
-
-/* Define if features.h exists */
-#define HAVE_SYS_FEATUES_H
 
 /* Define if kernel backing_dev_info struct has a name field */
 #undef HAVE_BACKING_DEV_INFO_NAME
@@ -109,6 +100,9 @@
 /* Define if system defines F_NOCACHE fcntl */
 #undef HAVE_FCNTL_F_NOCACHE
 
+/* Define to 1 if you have the <features.h> header file. */
+#undef HAVE_FEATURES_H
+
 /* Define to 1 if you have the `fgetxattr' function. */
 #undef HAVE_FGETXATTR
 
@@ -161,9 +155,6 @@
 
 /* Define if struct inode_operations in kernel has getattr_lite callback */
 #undef HAVE_GETATTR_LITE_INODE_OPERATIONS
-
-/* Define if distro has getgrouplist */
-#undef HAVE_GETGROUPLIST
 
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
@@ -282,6 +273,9 @@
 /* Define to 1 if you have the <linux/syscalls.h> header file. */
 #undef HAVE_LINUX_SYSCALLS_H
 
+/* Define to 1 if you have the <linux/types.h> header file. */
+#undef HAVE_LINUX_TYPES_H
+
 /* Define to 1 if you have the <linux/xattr_acl.h> header file. */
 #undef HAVE_LINUX_XATTR_ACL_H
 
@@ -321,7 +315,7 @@
 /* Define to 1 if the libssl is available */
 #undef HAVE_OPENSSL
 
-/* Define if system defines F_NOCACHE fcntl */
+/* Define if system defines O_DIRECT fcntl */
 #undef HAVE_OPEN_O_DIRECT
 
 /* Define if sysctl proc handlers have 6th argument */
@@ -535,9 +529,6 @@
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
 
-/* Define to the home page for this package. */
-#undef PACKAGE_URL
-
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
@@ -589,14 +580,6 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
-/* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
-   significant byte first (like Motorola and SPARC, unlike Intel). */
-#if defined AC_APPLE_UNIVERSAL_BUILD
-# if defined __BIG_ENDIAN__
-#  define WORDS_BIGENDIAN 1
-# endif
-#else
-# ifndef WORDS_BIGENDIAN
-#  undef WORDS_BIGENDIAN
-# endif
-#endif
+/* Define to 1 if your processor stores words with the most significant byte
+   first (like Motorola and SPARC, unlike Intel and VAX). */
+#undef WORDS_BIGENDIAN

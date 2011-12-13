@@ -4,4 +4,5 @@ if aclocal -I ./maint/config && autoconf ; then
 	echo "configure script successfully regenerated"
 else
 	echo "some part of configure regeneration failed"
+        exit 1
 fi
