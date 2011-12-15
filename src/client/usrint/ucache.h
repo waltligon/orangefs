@@ -4,12 +4,15 @@
  * See COPYING in top-level directory.
  */
 
+/** 
+ * \file 
+ * \ingroup usrint
+ * ucache routines
+ */
 #ifndef UCACHE_H
 #define UCACHE_H 1
 
-#include <stdio.h>
 #include <stdint.h>
-#include <string.h>
 #include <pthread.h>
 #include <sys/shm.h>
 

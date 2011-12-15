@@ -4,17 +4,19 @@
  * See COPYING in top-level directory.
  */
 
-/* Experimental cache for user data
- * Currently under development...
+/** 
+ * \file  
+ * \ingroup usrint
+ * 
+ * Experimental cache for user data. 
+ *
  */
-#include <usrint.h> /* to get PVFS_UCACHE_ENABLE */
 #include "usrint.h"
 #include "posix-ops.h"
 #include "openfile-util.h"
+#include "iocommon.h"
 #if PVFS_UCACHE_ENABLE
-#include <ucache.h>
-#include <iocommon.h>
-#define FILE_SYSTEM_ENABLED 
+#include "ucache.h"
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
@@ -114,7 +116,8 @@ int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment);
  *      tables and data.      
  */
 
-/**  Initializes the cache. 
+/**  
+ * Initializes the cache. 
  * Mainly, it aquires a previously created shared memory segment used to 
  * cache data. The shared mem. creation and ftbl initialization should already
  * have been done by the daemon at this point. 
@@ -175,7 +178,8 @@ int ucache_initialize(void)
     return rc;
 }
 
-/** Returns a pointer to the mtbl corresponding to the blk & ent. 
+/** 
+ * Returns a pointer to the mtbl corresponding to the blk & ent. 
  * Input must be reliable otherwise invalid mtbl could be returned.
  */
 inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
@@ -191,7 +195,8 @@ inline struct mem_table_s *get_mtbl(uint16_t mtbl_blk, uint16_t mtbl_ent)
     }
 }
 
-/** Initializes the ucache file table if it hasn't previously been initialized.
+/** 
+ * Initializes the ucache file table if it hasn't previously been initialized.
  * Although this function is visible, DO NOT CALL THIS FUNCTION. 
  * It is meant to be called in the ucache daemon or during testing.
  * see: src/apps/ucache/ucached.c for more info.
@@ -259,6 +264,9 @@ int ucache_init_file_table(char forceCreation)
     return 0;
 }
 
+/**
+ * Opens a file in ucache.
+ */
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
                      struct file_ent_s **fent)
@@ -321,7 +329,9 @@ done:
     return rc;
 }
 
-/** Returns ptr to block in ucache based on file and offset */
+/** 
+ * Returns ptr to block in ucache based on file and offset 
+ */
 inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, 
                                          uint16_t *block_ndx)
 {
@@ -340,7 +350,8 @@ inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset,
     return retVal;
 }
 
-/** Prepares the data structures for block storage. 
+/** 
+ * Prepares the data structures for block storage. 
  * On success, returns a pointer to where the block of data should be written. 
  * On failure, returns NIL.
  */
@@ -356,7 +367,8 @@ inline void *ucache_insert(struct file_ent_s *fent,
 }
 
 #if 0
-/** Removes a cached block of data from mtbl 
+/** 
+ * Removes a cached block of data from mtbl 
  * Returns 1 on success, 0 on failure.
  */ 
 int ucache_remove(struct file_ent_s *fent, uint64_t offset)
@@ -369,8 +381,10 @@ int ucache_remove(struct file_ent_s *fent, uint64_t offset)
 }
 #endif
 
-/** Flushes the entire ucache's dirty blocks (every file's dirty blocks) */
-/* Returns 0 on success, -1 on failure*/
+/** 
+ * Flushes the entire ucache's dirty blocks (every file's dirty blocks)
+ * Returns 0 on success, -1 on failure
+ */
 int ucache_flush_cache(void)
 {
     int rc = 0;
@@ -402,7 +416,8 @@ done:
     return rc;
 }
 
-/** Externally visible wrapper of the internal flush file function.
+/** 
+ * Externally visible wrapper of the internal flush file function.
  * This is intended to allow and external flush file call which locks the 
  * global lock, flushes the file, then releases the global lock.
  * To prevent deadlock, do not call this in any function that aquires the 
@@ -418,7 +433,8 @@ int ucache_flush_file(struct file_ent_s *fent)
     return rc;
 }
 
-/** Internal only function - Flushes dirty blocks to the I/O Nodes 
+/** 
+ * Internal only function - Flushes dirty blocks to the I/O Nodes 
  * Returns 0 on success and -1 on failure.
  */
 int flush_file(struct file_ent_s *fent)
@@ -444,14 +460,16 @@ int flush_file(struct file_ent_s *fent)
         temp_next = mtbl->mem[i].dirty_next;
         mtbl->mem[i].dirty_next = NIL16; 
 
-        #ifdef FILE_SYSTEM_ENABLED
+        /*#ifdef FILE_SYSTEM_ENABLED*/
         PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
         struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
         rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector); 
+        /*
         #endif
         #ifndef FILE_SYSTEM_ENABLED
         rc = 0;
         #endif
+        */
 
         lock_unlock(blk_lock);
         if(rc == -1)
@@ -467,24 +485,30 @@ done:
     return rc;
 }
 
-/* This function is meant to be called only inside remove_mem. */
-/* Returns 0 on success, -1 on failure */
+/**
+ * This function is meant to be called only inside remove_mem.
+ * Returns 0 on success, -1 on failure 
+ */
 int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment)
 {
     int rc = 0;
-    #ifdef FILE_SYSTEM_ENABLED
+    /*#ifdef FILE_SYSTEM_ENABLED*/
     PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
     struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
     rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector);
+    /*
     #endif
     #ifndef FILE_SYSTEM_ENABLED
     rc = 0;
     #endif
+    */
     return rc;
 }
 
 
-/* For testing purposes only */
+/** 
+ * For testing purposes only!
+ */
 int wipe_ucache(void)
 {
     int rc = 0;
@@ -516,7 +540,8 @@ int wipe_ucache(void)
     return rc;
 }
 
-/** Removes all memory entries in the mtbl corresponding to the file info 
+/** 
+ * Removes all memory entries in the mtbl corresponding to the file info 
  * provided as parameters. It also removes the mtbl and the file entry from 
  * the cache.
  */
@@ -529,7 +554,9 @@ int ucache_close_file(struct file_ent_s *fent)
     return rc;
 }
 
-/** Dumps all cache related information. */
+/** 
+ * Dumps all cache related information. 
+ */
 int ucache_info(FILE *out, char *flags)
 {
     /* Decide what to show */
@@ -744,8 +771,9 @@ int ucache_info(FILE *out, char *flags)
     return 1;
 }
 
-/** Returns a pointer to the lock corresponding to the block_index.
-    If the index is out of range, then 0 is returned.
+/** 
+ * Returns a pointer to the lock corresponding to the block_index.
+ * If the index is out of range, then 0 is returned.
  */
 inline ucache_lock_t *get_lock(uint16_t block_index)
 {
@@ -759,7 +787,8 @@ inline ucache_lock_t *get_lock(uint16_t block_index)
 
 /* Beginning of internal only (static) functions */
 
-/** Initializes the proper lock based on the LOCK_TYPE 
+/** 
+ * Initializes the proper lock based on the LOCK_TYPE 
  * Returns 0 on success, -1 on error
  */
 int lock_init(ucache_lock_t * lock)
@@ -788,7 +817,9 @@ int lock_init(ucache_lock_t * lock)
     return rc;
 }
 
-/** Returns 0 when lock is locked; otherwise, return -1 and sets errno */
+/** 
+ * Returns 0 when lock is locked; otherwise, return -1 and sets errno.
+ */
 inline int lock_lock(ucache_lock_t * lock)
 {
     int rc = 0;
@@ -816,7 +847,9 @@ inline int lock_lock(ucache_lock_t * lock)
     #endif   
 }
 
-/** If successful, return zero; otherwise, return -1 and sets errno */
+/** 
+ * If successful, return zero; otherwise, return -1 and sets errno. 
+ */
 inline int lock_unlock(ucache_lock_t * lock)
 {
     int rc = 0;
@@ -831,7 +864,8 @@ inline int lock_unlock(ucache_lock_t * lock)
     #endif
 }
 
-/** Upon successful completion, returns zero 
+/** 
+ * Upon successful completion, returns zero 
  * Otherwise, returns -1 and sets errno.
  */
 #if (LOCK_TYPE == 0)
@@ -841,7 +875,8 @@ int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
 }
 #endif
 
-/** Upon successful completion, returns zero.
+/** 
+ * Upon successful completion, returns zero.
  * Otherwise, returns -1.
  * The functions have the same return policy.
  */
@@ -860,7 +895,8 @@ int lock_destroy(ucache_lock_t * lock)
 }
 #endif
 
-/* Tries the lock to see if it's available:
+/** 
+ * Tries the lock to see if it's available:
  * Returns 0 if lock has not been aquired ie: success
  * Otherwise, returns -1
  */
@@ -900,26 +936,33 @@ inline int lock_trylock(ucache_lock_t * lock)
 /***************************************** End of Externally Visible API */
 
 /* Dirty List Iterator */
-/** Returns true if current index is NIL, otherwise, returns 0 */
+/** 
+ * Returns true if current index is NIL, otherwise, returns 0.
+ */
 static inline unsigned char dirty_done(uint16_t index)
 {
     return (index == NIL16);
 }
 
-/** Returns the next index in the dirty list for the provided mtbl and index */
+/** 
+ * Returns the next index in the dirty list for the provided mtbl and index 
+ */
 static inline uint16_t dirty_next(struct mem_table_s *mtbl, uint16_t index)
 {
     return mtbl->mem[index].dirty_next;
 }
 
 /*  Memory Entry Chain Iterator */
-/** Returns true if current index is NIL, otherwise, returns 0 */
+/** 
+ * Returns true if current index is NIL, otherwise, returns 0.
+ */
 static inline unsigned char ment_done(uint16_t index)
 {
     return (index == NIL16);
 }
 
-/** Returns the next index in the memory entry chain for the provided mtbl 
+/** 
+ * Returns the next index in the memory entry chain for the provided mtbl 
  * and index. 
  */
 static inline uint16_t ment_next(struct mem_table_s *mtbl, uint16_t index)
@@ -928,13 +971,16 @@ static inline uint16_t ment_next(struct mem_table_s *mtbl, uint16_t index)
 }
 
 /*  File Entry Chain Iterator   */
-/** Returns true if current index is NIL, otherwise, returns 0 */
+/** 
+ * Returns true if current index is NIL, otherwise, returns 0 
+ */
 static unsigned char file_done(uint16_t index)
 {
     return (index == NIL16);
 }
 
-/** Returns the next index in the file entry chain for the provided mtbl 
+/** 
+ * Returns the next index in the file entry chain for the provided mtbl 
  * and index. 
  */
 static uint16_t file_next(struct file_table_s *ftbl, uint16_t index)
@@ -942,7 +988,8 @@ static uint16_t file_next(struct file_table_s *ftbl, uint16_t index)
     return ftbl->file[index].next;
 }
 
-/**This function should only be called when the ftbl has no free mtbls. 
+/**
+ * This function should only be called when the ftbl has no free mtbls. 
  * It initizializes MTBL_PER_BLOCK additional mtbls in the block provided,
  * meaning this block will no longer be used for storing file data but 
  * hash table related data instead.
@@ -972,7 +1019,9 @@ static void add_mtbls(uint16_t blk)
     ftbl->free_mtbl_blk = blk;
     ftbl->free_mtbl_ent = start_mtbl;   
 }
-
+/**
+ * Initializes a memory entry.
+ */
 static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
 {
         if(index > MEM_TABLE_ENTRY_COUNT)
@@ -988,7 +1037,8 @@ static inline int init_memory_entry(struct mem_table_s *mtbl, int16_t index)
         return 0;
 }
 
-/** Initializes a mtbl which is a hash table of memory entries.
+/** 
+ * Initializes a mtbl which is a hash table of memory entries.
  * The mtbl will be located at the provided entry index within 
  * the provided block.
  */
@@ -1020,7 +1070,8 @@ static void init_memory_table(struct mem_table_s *mtbl)
 }
 
 
-/** This function asks the file table if a free block is avaialable. 
+/** 
+ * This function asks the file table if a free block is avaialable. 
  * If so, returns the block's index; otherwise, returns NIL.
  */
 static inline uint16_t get_free_blk(void)
@@ -1038,7 +1089,8 @@ static inline uint16_t get_free_blk(void)
 
 }
 
-/** Accepts an index corresponding to a block that is put back on the file 
+/** 
+ * Accepts an index corresponding to a block that is put back on the file 
  * table free list.
  */
 static inline void put_free_blk(uint16_t blk)
@@ -1050,7 +1102,8 @@ static inline void put_free_blk(uint16_t blk)
     ftbl->free_blk = blk;
 }
 
-/** Consults the file table to retrieve an index corresponding to a file entry
+/** 
+ * Consults the file table to retrieve an index corresponding to a file entry
  * If available, returns the file entry index, otherwise returns NIL.
  */
 static uint16_t get_free_fent(void)
@@ -1069,7 +1122,8 @@ static uint16_t get_free_fent(void)
     }
 }
 
-/** Places the file entry located at the provided index back on the file table's
+/** 
+ * Places the file entry located at the provided index back on the file table's
  * free file entry list. If the index is < FILE_TABLE_HASH_MAX, then set next 
  * to NIL since this index must remain the head of the linked list. Otherwise,
  * set next to the current head of fent free list and set the free list head to
@@ -1093,7 +1147,8 @@ static void put_free_fent(struct file_ent_s *fent)
     }
 }
 
-/** Consults the provided mtbl's memory entry free list to get the index of the
+/** 
+ * Consults the provided mtbl's memory entry free list to get the index of the
  * next free memory entry. Returns the index if one is available, otherwise 
  * returns NIL.
  */
@@ -1108,7 +1163,8 @@ static inline uint16_t get_free_ment(struct mem_table_s *mtbl)
     return ment;
 }
 
-/** Puts the memory entry corresponding to the provided mtbl and entry index 
+/** 
+ * Puts the memory entry corresponding to the provided mtbl and entry index 
  * back on the mtbl's memory entry free list. 
  *
  * If the entry index is < MEM_TABLE_HASH_MAX, then set next to NIL since this 
@@ -1133,7 +1189,8 @@ static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent)
     }
 }
 
-/** Perform a file lookup on the ucache using the provided fs_id and handle.
+/** 
+ * Perform a file lookup on the ucache using the provided fs_id and handle.
  *
  * Additional parameters (references) may used that will be set to values 
  * pertaining to mtbl and file entry location. If NULL is passed in place of 
@@ -1197,7 +1254,8 @@ static struct mem_table_s *lookup_file(
     }    
 }
 
-/** Function that locates the next free mtbl.
+/** 
+ * Function that locates the next free mtbl.
  * On success, Returns 1 and sets reference parameters to proper indexes.
  * On failure, returns NIL; 
  */
@@ -1229,7 +1287,8 @@ static uint16_t get_next_free_mtbl(uint16_t *free_mtbl_blk, uint16_t *free_mtbl_
         return 1;
 }
 
-/** Places memory entries' corresponding blocks 
+/** 
+ * Places memory entries' corresponding blocks 
  * back on the ftbl block free list. Reinitializes mtbl.
  * Assumes mtbl->ref_cnt is 0.  
  */
@@ -1256,7 +1315,8 @@ static int wipe_mtbl(struct mem_table_s *mtbl)
     return 1;
 }
 
-/** Places the provided mtbl back on the ftbl's mtbl free list provided it 
+/** 
+ * Places the provided mtbl back on the ftbl's mtbl free list provided it 
  * isn't currently referenced.
  */
 static int put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
@@ -1282,7 +1342,8 @@ static int put_free_mtbl(struct mem_table_s *mtbl, struct file_ent_s *file)
     return 1;
 }
 
-/** Insert information about file into ucache (no file data inserted)
+/** 
+ * Insert information about file into ucache (no file data inserted)
  * Returns pointer to mtbl on success.
  * 
  * Returns NIL if necessary data structures could not be aquired from the free
@@ -1381,7 +1442,8 @@ uint16_t insert_file(
     return current->index;
 }
 
-/** Remove file entry and memory table of file identified by parameters
+/** 
+ * Remove file entry and memory table of file identified by parameters
  * Returns 1 following removal
  * Returns NIL if file is referenced or if the file could not be located.
  */
@@ -1435,7 +1497,8 @@ static int remove_file(struct file_ent_s *fent)
     return rc;
 }
 
-/** Lookup the memory location of a block of data in cache that is identified 
+/** 
+ * Lookup the memory location of a block of data in cache that is identified 
  * by the mtbl and offset parameters.
  *
  * If located, returns a pointer to memory where the desired block of data is 
@@ -1494,9 +1557,9 @@ inline static void *lookup_mem(struct mem_table_s *mtbl,
     }
 }
 
-/** Update the provided mtbl's LRU doubly-linked list by placing the memory 
+/** 
+ * Update the provided mtbl's LRU doubly-linked list by placing the memory 
  * entry, identified by the provided index, at the head of the list (lru_first).
- *
  */
 static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
 {
@@ -1575,7 +1638,8 @@ static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
     }
 }    
 
-/** Searches the ftbl for the mtbl with the most entries.
+/** 
+ * Searches the ftbl for the mtbl with the most entries.
  * Returns the number of memory entries the max mtbl has. The double ptr 
  * parameter is used to store a reference to the mtbl pointer with the most 
  * memory entries. 
@@ -1618,7 +1682,8 @@ static uint16_t locate_max_fent(struct file_ent_s **fent)
     return value_of_max;
 }
 
-/** Evicts the LRU memory entry from the tail (lru_last) of the provided
+/** 
+ * Evicts the LRU memory entry from the tail (lru_last) of the provided
  * mtbl's LRU list.
  * 
  * Returns 1 on success; 0 on failure, meaning there was no LRU
@@ -1646,7 +1711,8 @@ static int evict_LRU(struct file_ent_s *fent)
 }
 
 
-/** Used to obtain a block for storage of data identified by the offset 
+/** 
+ * Used to obtain a block for storage of data identified by the offset 
  * parameter and maintained in the mtbl at the memory entry identified by the 
  * index parameter.
  *
@@ -1706,7 +1772,8 @@ errout:
     return (void *)(NIL);
 }
 
-/** Requests a location in memory to place the data identified by the mtbl and 
+/** 
+ * Requests a location in memory to place the data identified by the mtbl and 
  * offset parameters. Also inserts the necessary info into the mtbl.
  *
  */
@@ -1780,7 +1847,8 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     } 
 }
 
-/** Removes all table info regarding the block identified by the mtbl and
+/** 
+ * Removes all table info regarding the block identified by the mtbl and
  * offset provided the block isn't locked. 
  *
  * Flushing the block to fs now occurs here upon removal from cache. 
@@ -1865,6 +1933,9 @@ static int remove_mem(struct file_ent_s *fent, uint64_t offset)
 }
 
 /* The following two functions are provided for error checking purposes. */
+/**
+ * Prints the Least Recently Used (LRU) list.
+ */
 void print_LRU(struct mem_table_s *mtbl)
 {
     fprintf(out, "\tprinting lru list:\n");
@@ -1886,6 +1957,10 @@ void print_LRU(struct mem_table_s *mtbl)
         mtbl->mem[mtbl->lru_last].lru_prev, mtbl->mem[mtbl->lru_last].lru_next);
 }
 
+/**
+ * Prints the list of dirty (modified) blocks that should eventually be 
+ * flushed to disk.
+ */
 void print_dirty(struct mem_table_s *mtbl)
 {
     fprintf(out, "\tprinting dirty list:\n");
