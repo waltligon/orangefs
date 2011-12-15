@@ -221,10 +221,19 @@ void PINT_cleanup_capability(PVFS_capability *cap)
 {
     if (cap)
     {
-        free(cap->handle_array);
-        free(cap->signature);
-        free(cap->issuer);
-
+        if (cap->handle_array)
+        {
+            free(cap->handle_array);
+        }
+        if (cap->signature)
+        {
+            free(cap->signature);
+        }
+        if (cap->issuer)
+        {
+            free(cap->issuer);
+        }
+        
         cap->handle_array = NULL;
         cap->signature = NULL;
         cap->sig_size = 0;
@@ -365,10 +374,19 @@ void PINT_cleanup_credential(PVFS_credential *cred)
 {
     if (cred)
     {
-        free(cred->group_array);
-        free(cred->issuer);
-        free(cred->signature);
-
+        if (cred->group_array)
+        {
+            free(cred->group_array);
+        }
+        if (cred->issuer)
+        {
+            free(cred->issuer);
+        }
+        if (cred->signature)
+        {
+            free(cred->signature);
+        }
+        
         cred->group_array = NULL;
         cred->issuer = NULL;
         cred->signature = NULL;
