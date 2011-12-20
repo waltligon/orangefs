@@ -330,11 +330,20 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
     {
         if (attr->mask & PVFS_ATTR_CAPABILITY)
         {
-            free(attr->capability.signature);
+            if (attr->capability.signature)
+            {
+                free(attr->capability.signature);
+            }            
             attr->capability.signature = NULL;
-            free(attr->capability.handle_array);
+            if (attr->capability.handle_array)
+            {
+                free(attr->capability.handle_array);
+            }            
             attr->capability.handle_array = NULL;
-            free(attr->capability.issuer);
+            if (attr->capability.issuer)
+            {
+                free(attr->capability.issuer);
+            }
             attr->capability.issuer = NULL;
         }
 

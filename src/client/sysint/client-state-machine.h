@@ -417,6 +417,7 @@ struct PINT_client_rename_sm
 
     PVFS_object_ref refns[2];        /* old/new object refns */
     PVFS_ds_type types[2];           /* old/new object types */
+    PVFS_capability caps[2];         /* old/new capabilities */
     int retry_count;
     int stored_error_code;
     int rmdirent_index;
