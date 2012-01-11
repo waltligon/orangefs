@@ -24,7 +24,7 @@ FILE *out;                   /* For Logging Purposes */
 union user_cache_u *ucache = 0;
 /* static uint32_t ucache_blk_cnt = 0; */
 
-ucache_lock_t *ucache_locks = 0; /* will refer to the shmem of all ucache locks */
+ucache_lock_t *ucache_locks = 0; /* The shmem of all ucache locks */
 ucache_lock_t *ucache_lock = 0;  /* Global Lock maintaining concurrency */
 
 uint64_t ucache_hits;
@@ -654,7 +654,7 @@ int ucache_info(FILE *out, char *flags)
     /* Other Free Blocks */
     fprintf(out, "\nIterating Over Free Blocks:\n\n");
     uint16_t i;
-    for(i = ftbl->free_blk; i != NIL16; i = ucache->b[i].mtbl[0].
+    for(i = ftbl->free_blk; i < BLOCKS_IN_CACHE; i = ucache->b[i].mtbl[0].
                                                               free_list_blk)
     {
         fprintf(out, "Free Block:\tCurrent: %hu\tNext: %hu\n", i, 
@@ -1078,15 +1078,15 @@ static inline uint16_t get_free_blk(void)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
     uint16_t desired_blk = ftbl->free_blk;
-    if(desired_blk != NIL16)
+    if(desired_blk != NIL16 && desired_blk < BLOCKS_IN_CACHE)
     {  
         /* Update the head of the free block list */ 
         /* Use mtbl index zero since free_blks have no ititialized mem tables */
         ftbl->free_blk = ucache->b[desired_blk].mtbl[0].free_list_blk; 
+        //assert(ftbl->free_blk < BLOCKS_IN_CACHE);
         return desired_blk;
     }
     return NIL16;
-
 }
 
 /** 
@@ -1097,6 +1097,7 @@ static inline void put_free_blk(uint16_t blk)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
     /* set the block's next value to the current head of the block free list */
+    assert(blk < BLOCKS_IN_CACHE);
     ucache->b[blk].mtbl[0].free_list_blk = ftbl->free_blk;
     /* blk is now the head of the ftbl blk free list */
     ftbl->free_blk = blk;
@@ -1761,6 +1762,7 @@ static inline void *set_item(struct file_ent_s *fent,
             update_LRU(mtbl, index);
             /* set item to block number */
             mtbl->mem[index].tag = offset;
+            assert(free_blk < BLOCKS_IN_CACHE);
             mtbl->mem[index].item = free_blk;
             /* add block index to head of dirty list */
             mtbl->mem[index].dirty_next = mtbl->dirty_list;

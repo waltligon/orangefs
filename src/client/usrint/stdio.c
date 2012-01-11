@@ -2692,9 +2692,9 @@ static void init_stdio(void)
     /* don't let more than one thread initialize */
     if (init_flag)
     {
+        gen_mutex_unlock(&initlock);        
         return;
     }
-    init_flag = 1;
     /* init open file chain */
     lock_init_stream(&open_files);
     /* init pointers to glibc stdio calls */
@@ -2769,7 +2769,9 @@ static void init_stdio(void)
     stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
     stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
     stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
-
+    
+    /* Finish */    
+    init_flag = 1;
     gen_mutex_unlock(&initlock);
 };
 

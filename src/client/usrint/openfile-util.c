@@ -399,28 +399,64 @@ int pvfs_ucache_enabled(void)
     return ucache_enabled;
 }
 
+
+void pvfs_sys_init_doit(void);
+
+void pvfs_sys_init(void)
+{
+    static int pvfs_lib_lock_initialized = 0; /* recursive lock init flag */
+    static int pvfs_lib_init_flag = 0;
+
+    int rc = 0;
+
+    /* Mutex protecting initialization of recursive mutex */
+    static gen_mutex_t mutex_mutex = GEN_MUTEX_INITIALIZER;
+    /* The recursive mutex */
+    static pthread_mutex_t rec_mutex;
+
+    if(pvfs_lib_init_flag)
+        return;
+
+    if(!pvfs_lib_lock_initialized)
+    {
+        rc = gen_mutex_lock(&mutex_mutex);
+        if(!pvfs_lib_lock_initialized)
+        {
+            //init recursive mutex
+            pthread_mutexattr_t rec_attr;
+            rc = pthread_mutexattr_init(&rec_attr);
+            rc = pthread_mutexattr_settype(&rec_attr, PTHREAD_MUTEX_RECURSIVE);
+            rc = pthread_mutex_init(&rec_mutex, &rec_attr);
+            rc = pthread_mutexattr_destroy(&rec_attr);
+            pvfs_lib_lock_initialized = 1;
+        }
+        rc = gen_mutex_unlock(&mutex_mutex);
+    }
+
+    rc = pthread_mutex_lock(&rec_mutex);
+    if(pvfs_lib_init_flag || pvfs_initializing_flag)
+    {
+        rc = pthread_mutex_unlock(&rec_mutex);
+        return;
+    }
+
+    /* set this to prevent pvfs_sys_init from running recursively (indirect) */
+    pvfs_initializing_flag = 1;
+
+    //Perform Init
+    pvfs_sys_init_doit();
+    pvfs_initializing_flag = 0;
+    pvfs_lib_init_flag = 1;
+    rc = pthread_mutex_unlock(&rec_mutex);
+}
+
 /* 
  * Perform PVFS initialization tasks
- */ 
-void pvfs_sys_init(void) { 
-	struct rlimit rl; 
-	int rc; 
-    static int pvfs_lib_init_flag = 0; 
-    static gen_mutex_t initlock = GEN_MUTEX_INITIALIZER;
+ */
+void pvfs_sys_init_doit(void) {
+    struct rlimit rl; 
+	int rc;
     char curdir[PVFS_PATH_MAX];
-
-    if (pvfs_lib_init_flag)
-    {
-        return;
-    }
-    gen_mutex_lock(&initlock);
-    if (pvfs_lib_init_flag)
-    {
-        return;
-    }
-
-    pvfs_lib_init_flag = 1; /* should only run this once */
-    pvfs_initializing_flag = 1;
 
     /* this allows system calls to run */
     load_glibc();
@@ -500,10 +536,7 @@ void pvfs_sys_init(void) {
 #else
     ucache_enabled = 0;
 #endif
-
     //PVFS_perror_gossip_silent(); 
-    pvfs_initializing_flag = 0;
-    gen_mutex_unlock(&initlock);
 }
 
 int pvfs_descriptor_table_size(void)

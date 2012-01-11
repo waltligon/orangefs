@@ -988,9 +988,9 @@ static int calc_copy_op_cnt(
 
     int i;
     /* For every block identify source and destination locations in memory and
-     * size of transfer between the ucache and memory buffer while maintaining 
-     * the size left in the request, the size left in the curren iovec segment,
-     * the size left in the current block, and which iovec segment is 
+     * size of transfer between the ucache and memory buffer while maintaining: 
+     * the size left in the request, the size left in the current iovec 
+     * segment, the size left in the current block, and which iovec segment is
      * currently being considered.
      */
     for(i = 0; i < req_blk_cnt; i++)
@@ -1063,7 +1063,7 @@ static int calc_copy_op_cnt(
 }
 
 /**
- * Provided two ucache related structures ureq (the blocks requested) and ucop ( ), determine the 
+ * Provided two ucache related structures ureq and ucop, determine the 
  * reads/writes to be completed between the ucache and user memory (vector). 
  */
 void calc_copy_ops(
@@ -1434,6 +1434,11 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
     for(i = 0; i < count; i++)
     {   
         size += vector[i].iov_len;
+    }
+
+    if(size == 0)
+    {
+        return 0;
     }
 
     rc = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
