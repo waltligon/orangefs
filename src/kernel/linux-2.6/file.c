@@ -2876,10 +2876,6 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
 {
     struct rw_options rw;
 
-    gossip_err("Executing pvfs2_file_aio_read_iovec.  offset:%lld \ttotal length:%zd\n"
-              ,(long long)offset
-              ,iov_length(iov,nr_segs));
-
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
     rw.type = IO_READ;
