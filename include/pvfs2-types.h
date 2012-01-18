@@ -1003,6 +1003,9 @@ struct profiler
 /*
  * New types for robust security implementation.
  */
+#define DEFAULT_CREDENTIAL_TIMEOUT (5*60*60)
+#define DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
+
 typedef unsigned char *PVFS_signature;
 
 typedef struct PVFS_capability PVFS_capability;

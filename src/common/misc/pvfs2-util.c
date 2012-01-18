@@ -22,6 +22,11 @@
 #include <signal.h>
 #include <libgen.h>
 
+#ifndef ENABLE_SECURITY
+#include <pwd.h>
+#include <grp.h>
+#endif
+
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -168,7 +173,7 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
                                     NULL, cred);
 }
 
-
+#ifdef ENABLE_SECURITY
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
@@ -284,6 +289,181 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     return ret;
 }
+#else /* ENABLE_SECURITY */
+/* PINT_gen_unsigned_credential 
+ *
+ * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
+ *
+ */
+int PINT_gen_unsigned_credential(const char *user, const char *group,
+                                 PVFS_credential *cred)
+{
+    unsigned long val;
+    char *endptr;
+    const struct passwd *pwd;
+    const struct group *grp;
+    gid_t groups[PVFS_REQ_LIMIT_GROUPS];
+    int ngroups, ret, i;
+    
+    if (cred == NULL)
+    {
+        gossip_lerr("Credential pointer is null\n");
+        return -PVFS_EINVAL;
+    }
+
+    /* get info for specified user or calling user */
+    if (user)
+    {
+        unsigned long val;
+        char *endptr;
+
+        val = strtoul(user, &endptr, 10);
+        if (*endptr == '\0' && *user != '\0')
+        {
+            if (val > PVFS_UID_MAX)
+            {
+                pwd = NULL;
+            }
+            else
+            {
+                pwd = getpwuid((uid_t)val);
+            }
+        }
+        else
+        {
+            pwd = getpwnam(user);
+        }
+    }
+    else
+    {
+        pwd = getpwuid(getuid());
+    }
+    if (pwd == NULL)
+    {
+        if (user)
+        {        
+            gossip_lerr("Unknown user: %s\n", user);
+        }
+        return -PVFS_EINVAL;
+    }
+
+    /* get info for specified or calling user's group */
+    if (group)
+    {
+        val = strtoul(group, &endptr, 10);
+        if (*endptr == '\0' && *group != '\0')
+        {
+            if (val > PVFS_GID_MAX)
+            {
+                grp = NULL;
+            }
+            else
+            {
+                grp = getgrgid((gid_t)val);
+            }
+        }
+        else
+        {
+            grp = getgrnam(group);
+        }
+    }
+    else
+    {
+        grp = getgrgid(getgid());
+    }
+    if (grp == NULL)
+    {
+        if (group)
+        {
+            gossip_lerr("Unknown group: %s\n", group);
+        }
+        return -PVFS_EINVAL;
+    }
+
+    /* permission checks */
+    if (getuid() && pwd->pw_uid != getuid())
+    {
+        gossip_lerr("error: only %s and root can generate a credential "
+                    "for %s\n", pwd->pw_name, pwd->pw_name);
+        return -PVFS_EPERM;
+    }
+
+    if (getuid() && grp->gr_gid != getgid())
+    {
+        gossip_lerr("error: cannot generate a credential for group %s: "
+                    "Permission denied\n", grp->gr_name);
+        return -PVFS_EPERM;
+    }
+
+    /* get user group list */
+#ifdef HAVE_GETGROUPLIST
+
+    ngroups = sizeof(groups)/sizeof(*groups);
+    ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
+    if (ret == -1)
+    {
+        gossip_lerr("error: unable to get group list for user %s\n",
+                    pwd->pw_name);
+        return -PVFS_EINVAL;
+    }
+    if (groups[0] != grp->gr_gid)
+    {
+        assert(groups[ngroups-1] == grp->gr_gid);
+        groups[ngroups-1] = groups[0];
+        groups[0] = grp->gr_gid;
+    }
+
+#else /* !HAVE_GETGROUPLIST */
+
+    ngroups = sizeof(groups)/sizeof(*groups);
+    ngroups = getugroups(ngroups, groups, pwd->pw_name, grp->gr_gid);
+    if (ngroups == -1)
+    {
+        gossip_lerr("error: unable to get group list for user %s: %s\n",
+                pwd->pw_name, strerror(errno));
+        return -PVFS_EINVAL;
+    }
+
+#endif /* HAVE_GETGROUPLIST */
+
+    /* fill in credential struct */
+    cred->userid = (PVFS_uid)pwd->pw_uid;
+    cred->num_groups = (uint32_t)ngroups;
+    cred->group_array = calloc(ngroups, sizeof(PVFS_gid));
+    if (cred->group_array == NULL)
+    {        
+        return -PVFS_ENOMEM;
+    }
+    for (i = 0; i < ngroups; i++)
+    {
+        cred->group_array[i] = (PVFS_gid)groups[i];
+    }
+
+    /* insert an issuer and a null signature */
+    cred->issuer = strdup("");
+
+    cred->timeout = PINT_util_get_current_time() + DEFAULT_CREDENTIAL_TIMEOUT;
+
+    cred->sig_size = 0;
+    cred->signature = NULL;
+
+    return 0;
+}
+
+int PVFS_util_gen_credential(const char *user, const char *group,
+    unsigned int timeout, const char *keypath, PVFS_credential *cred)
+{
+    if (cred == NULL)
+    {
+        gossip_lerr("PVFS_util_gen_credential: credential is null\n");
+        return -PVFS_EINVAL;
+    }
+
+    memset(cred, 0, sizeof(cred));
+
+    return PINT_gen_unsigned_credential(user, group, cred);
+}
+#endif /* ENABLE_SECURITY */
 
 int PVFS_util_refresh_credential(PVFS_credential *cred)
 {

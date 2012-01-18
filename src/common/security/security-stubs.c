@@ -2,6 +2,9 @@
  * (C) 2010 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
+ *
+ * security-stubs.c - this file is used instead of pint-security.c when
+ *    --enable-security is NOT used with configure
  */
 
 #include <stdlib.h>
@@ -111,3 +114,4 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     return 1;
 }
+

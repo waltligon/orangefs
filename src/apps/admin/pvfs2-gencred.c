@@ -35,11 +35,6 @@
 #include "src/common/security/getugroups.h"
 
 
-/* nlmills: TODO: move these somewhere sane */
-#define DEFAULT_CREDENTIAL_TIMEOUT (5*60*60)
-#define DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
-
-
 typedef struct {
     const char *user;
     const char *group;
@@ -403,7 +398,7 @@ int main(int argc, char **argv)
 
     ngroups = sizeof(groups)/sizeof(*groups);
     ngroups = getugroups(ngroups, groups, pwd->pw_name, grp->gr_gid);
-    if (ret == -1)
+    if (ngroups == -1)
     {
         fprintf(stderr, "error: unable to get group list for user %s: %s\n",
                 pwd->pw_name, strerror(errno));
