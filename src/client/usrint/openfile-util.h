@@ -25,7 +25,7 @@ extern int split_pathname(const char *path,
 
 int pvfs_ucache_enabled(void);
 
-extern void pvfs_sys_init(void); 
+extern int pvfs_sys_init(void); 
 
 extern char *pvfs_qualify_path(const char *path);
 

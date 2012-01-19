@@ -1087,7 +1087,8 @@ void calc_copy_ops(
         /* Record necessary info for the future memcpy operation */
         if(i == 0)
         {
-            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr + offset;
+            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr + 
+                (offset % CACHE_BLOCK_SIZE);
         }
         else
         {

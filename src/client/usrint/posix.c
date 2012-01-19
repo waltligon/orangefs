@@ -26,7 +26,7 @@
  * open wrapper
  */ 
 int open(const char *path, int flags, ...)
-{ 
+{
     va_list ap; 
     mode_t mode = 0; 
     PVFS_hint hints;  /* need to figure out how to set default */
@@ -43,13 +43,14 @@ int open(const char *path, int flags, ...)
        hints = PVFS_HINT_NULL;
     va_end(ap); 
 
+
     if (!path)
     {
         errno = EFAULT;
         return -1;
     }
     if (is_pvfs_path(path))
-    { 
+    {
         /* this handles setup of the descriptor */
         flags |= O_NOTPVFS; /* try to open non-pvfs files too */
         return pvfs_open(path, flags, mode, hints);

@@ -40,7 +40,6 @@ static struct glibc_redirect_s
 #define PREALLOC 3
 static char logfilepath[30];
 static int logfile;
-static int pvfs_initializing_flag = 0;
 static int descriptor_table_count = 0; 
 static int descriptor_table_size = 0; 
 static pvfs_descriptor **descriptor_table; 
@@ -402,8 +401,9 @@ int pvfs_ucache_enabled(void)
 
 void pvfs_sys_init_doit(void);
 
-void pvfs_sys_init(void)
+int pvfs_sys_init(void)
 {
+    static int pvfs_initializing_flag = 0;
     static int pvfs_lib_lock_initialized = 0; /* recursive lock init flag */
     static int pvfs_lib_init_flag = 0;
 
@@ -415,7 +415,7 @@ void pvfs_sys_init(void)
     static pthread_mutex_t rec_mutex;
 
     if(pvfs_lib_init_flag)
-        return;
+        return 0;
 
     if(!pvfs_lib_lock_initialized)
     {
@@ -437,10 +437,11 @@ void pvfs_sys_init(void)
     if(pvfs_lib_init_flag || pvfs_initializing_flag)
     {
         rc = pthread_mutex_unlock(&rec_mutex);
-        return;
+        return 1;
     }
 
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
+    //pvfs_initializing_flag = (int)getpid();
     pvfs_initializing_flag = 1;
 
     //Perform Init
@@ -448,6 +449,7 @@ void pvfs_sys_init(void)
     pvfs_initializing_flag = 0;
     pvfs_lib_init_flag = 1;
     rc = pthread_mutex_unlock(&rec_mutex);
+    return 0;
 }
 
 /* 
@@ -949,15 +951,27 @@ int is_pvfs_path(const char *path)
     char pvfs_path[PVFS_PATH_MAX];
 #endif
 
+    
+    if(pvfs_sys_init())
+    {
+        return 0;
+    }
+
+#if 0
     if (pvfs_initializing_flag)
     {
         /* we cannot open a PVFS file while
          * initializing PVFS
          */
-        return 0;
+        if(pvfs_initializing_flag != getpid())
+        {
+            while(pvfs_initializing_flag){}
+        }
+        //return 0;
     }
 
     pvfs_sys_init();
+#endif 
     if (!path)
     {
         errno = EINVAL;

@@ -361,9 +361,9 @@ inline void *ucache_insert(struct file_ent_s *fent,
 )
 {
     lock_lock(ucache_lock);
-    char * retVal = insert_mem(fent, offset, block_ndx);
+    void * retVal = insert_mem(fent, offset, block_ndx);
     lock_unlock(ucache_lock);
-    return ((void *)retVal); 
+    return (retVal); 
 }
 
 #if 0
@@ -580,11 +580,11 @@ int ucache_info(FILE *out, char *flags)
         }
     }
 
-    int attempts = ucache_hits + ucache_misses;
-    float percentage = 0;
+    float attempts = ucache_hits + ucache_misses;
+    float percentage = 0.0;
     if(attempts)
     {
-        percentage = (float)(ucache_hits / attempts);
+        percentage = (float)ucache_hits / attempts;
     }
 
     if(show_sum)
@@ -764,7 +764,7 @@ int ucache_info(FILE *out, char *flags)
         }
         else
         {
-            fprintf(out, "vacant file entry @ index = %hu\n", i);
+            fprintf(out, "vacant file entry @ index = %hu\n\n", i);
         }
     }
     }
@@ -826,6 +826,7 @@ inline int lock_lock(ucache_lock_t * lock)
     #if LOCK_TYPE == 0
     return sem_wait(lock);
     #elif LOCK_TYPE == 1
+/*
     while(1)
     {
         rc = pthread_mutex_trylock(lock);
@@ -840,7 +841,8 @@ inline int lock_lock(ucache_lock_t * lock)
             break;
         }
     }
-    //rc = pthread_mutex_lock(lock);
+*/
+    rc = pthread_mutex_lock(lock);
     return rc;
     #elif LOCK_TYPE == 2
     return pthread_spin_lock(lock);
@@ -1655,6 +1657,11 @@ static uint16_t locate_max_fent(struct file_ent_s **fent)
     uint16_t i;
     for(i = 0; i < FILE_TABLE_HASH_MAX; i++)
     {
+
+        if((ftbl->file[i].tag_handle == NIL64) ||
+               (ftbl->file[i].tag_handle == 0))
+            continue;
+
         /* Iterate over hash table chain */
         uint16_t j;
         for(j = i; !file_done(j); j = file_next(ftbl, j))
@@ -1698,6 +1705,7 @@ static int evict_LRU(struct file_ent_s *fent)
 
     if(mtbl->num_blocks != 0 && mtbl->lru_last != NIL16)
     {
+        //printf("evicting: %hu\n", mtbl->lru_last);
         rc = remove_mem(fent, mtbl->mem[mtbl->lru_last].tag);
         if(rc != 1)
         {
@@ -1762,7 +1770,6 @@ static inline void *set_item(struct file_ent_s *fent,
             update_LRU(mtbl, index);
             /* set item to block number */
             mtbl->mem[index].tag = offset;
-            assert(free_blk < BLOCKS_IN_CACHE);
             mtbl->mem[index].item = free_blk;
             /* add block index to head of dirty list */
             mtbl->mem[index].dirty_next = mtbl->dirty_list;
@@ -1808,7 +1815,6 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
         if(mentIndex == NIL16)
         {   /* No free ment available, so attempt eviction, and try again */
             evict_rc = evict_LRU(fent);
-            assert(evict_rc != 0);
             mentIndex = get_free_ment(mtbl);
         }
         /* Procede with memory insertion if ment aquired */
@@ -1840,7 +1846,6 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     if(rc != (void *)NIL)
     {
         *block_ndx = mtbl->mem[index].item;
-        assert(*block_ndx == mtbl->mem[index].item);
         return rc;      
     }
     else
@@ -1972,6 +1977,11 @@ void print_dirty(struct mem_table_s *mtbl)
         fprintf(out, "\t\tment index = %hu\t\t\tdirty_next = %hu\n", 
                                             i, dirty_next(mtbl, i));
     }
+    if(i >= MEM_TABLE_ENTRY_COUNT && i != NIL16)
+    {
+        fprintf(out, "BAD MEM_TABLE_ENTRY INDEX: %hu\n", i);
+        exit(0);
+    } 
     fprintf(out, "\t\tdone w/ dirty list\n");
 } 
 
