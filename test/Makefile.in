@@ -320,7 +320,7 @@ $(MPIIOTESTS): %: %.o $(LIBRARIES)
 # default rule for building executables from object files
 %: %.o $(LIBRARIES) $(MISCOBJS) $(SHAREDOBJS)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(LDFLAGS) $(call modldflags,$<) $< $(MISCOBJS) $(SHAREDOBJS) $(LIBS) -o $@
+	$(E)$(LD) $(LDFLAGS) $< $(MISCOBJS) $(SHAREDOBJS) $(LIBS) $(call modldflags,$<) -o $@
 
 # default rule for building objects 
 %.o: %.c
