@@ -51,6 +51,7 @@ static PINT_encoding_table_values *PINT_encoding_table[
 int PINT_encode_initialize(void)
 {
     int ret = -PVFS_EINVAL;
+    void *header = NULL;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_initialize\n");
     if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
@@ -60,10 +61,16 @@ int PINT_encode_initialize(void)
         le_bytefield_table.init_fun();
 
         /* header prepended to all messages of this type */
-        *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
-            htobmi32(PVFS2_PROTO_VERSION);
-        *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
-            htobmi32(ENCODING_LE_BFIELD);
+        header = &(le_bytefield_table.generic_header[0]);
+       *((int32_t *)header) = htobmi32(PVFS2_PROTO_VERSION);
+
+        header = &(le_bytefield_table.generic_header[4]);
+       *((int32_t *)header) = htobmi32(ENCODING_LE_BFIELD);
+
+        //*((int32_t*)&(le_bytefield_table.generic_header[0])) = 
+        //    htobmi32(PVFS2_PROTO_VERSION);
+        //*((int32_t*)&(le_bytefield_table.generic_header[4])) = 
+        //    htobmi32(ENCODING_LE_BFIELD);
 
         le_bytefield_table.enc_type = ENCODING_LE_BFIELD;
         ret = 0;
