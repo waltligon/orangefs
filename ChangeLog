@@ -3,6 +3,26 @@ OrangeFS Release ChangeLog
 -----------------------
 orangefs-2.8.5
 
+SVN changes can be seen at
+http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/orangefs-2-8-5
+
+* Bug Fix:  Problem: server seg faulted when the unstuff state machine tried
+            to unstuff a file defined as needing more datafilesthan I/O servers currently
+            in the system.  A side affect was that this worked when there was more than
+            one server in the system.  The correct behavior is to NEVER define more datahandles than
+            there are I/O servers in the system.
+            Correction:  Modified function PINT_cached_config_get_num_dfiles to return no
+            more than the number of I/O servers, regardless of the number requested by the user 
+	    or needed by the distribution.  This function is called during the sys-create state machine 
+	    BEFORE the number of requested datafiles is sent to the server.  
+	SVN: Change #9082
+
+* Enhancement: Added optimization.  When a file is created and the requested number of dfiles is 1,
+               then we create the metadata without "stuffed" values,i.e., key="nd".  When data
+               is written to this file, there is no need to execute the "unstuff" server side
+               state machine.
+	SVN: Change #9083
+
 Text after "CVS: " can be prepended with "http://www.pvfs.org/fisheye/changelog/~br=Orange-Branch/PVFS/?cs=Orange-Branch:" to view related change sets in FishEye.
 
 * Enhancement: change to kernel source path to support SuSE style kernel sources
