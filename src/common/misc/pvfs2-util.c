@@ -298,140 +298,186 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 int PINT_gen_unsigned_credential(const char *user, const char *group,
                                  PVFS_credential *cred)
 {
-    unsigned long val;
+    unsigned long uid, gid, bufsize;
     char *endptr;
-    const struct passwd *pwd;
-    const struct group *grp;
+    struct passwd pwd;
+    struct group grp;
+    struct passwd *presult = NULL;
+    struct group *gresult = NULL;
+    char *pwdbuf, *grpbuf;
     gid_t groups[PVFS_REQ_LIMIT_GROUPS];
     int ngroups, ret, i;
+
+    /* allocate buffer for pwd functions */
+    bufsize = -1;
+#ifdef _SC_GETPW_R_SIZE_MAX
+    bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+#endif
+    if (bufsize == -1)
+        bufsize = 16384;  /* adequate amount */
     
-    if (cred == NULL)
+    pwdbuf = (char *) malloc(bufsize);
+    if (pwdbuf == NULL)
     {
-        gossip_lerr("Credential pointer is null\n");
-        return -PVFS_EINVAL;
+        return -PVFS_ENOMEM;
     }
 
     /* get info for specified user or calling user */
     if (user)
     {
-        unsigned long val;
-        char *endptr;
-
-        val = strtoul(user, &endptr, 10);
+        uid = strtoul(user, &endptr, 10);
         if (*endptr == '\0' && *user != '\0')
         {
-            if (val > PVFS_UID_MAX)
+            if (uid > PVFS_UID_MAX)
             {
-                pwd = NULL;
+                ret = -1;
+                presult = NULL;
             }
             else
             {
-                pwd = getpwuid((uid_t)val);
+                ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+                if (presult == NULL)
+                {
+                    gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
+                                uid, ret);
+                }
             }
         }
         else
         {
-            pwd = getpwnam(user);
+            ret = getpwnam_r(user, &pwd, pwdbuf, bufsize, &presult);
+            if (presult == NULL)
+            {
+                gossip_lerr("User %s lookup error: %d (0 = not found)\n", 
+                            user, ret);
+            }
         }
     }
     else
     {
-        pwd = getpwuid(getuid());
-    }
-    if (pwd == NULL)
-    {
-        if (user)
-        {        
-            gossip_lerr("Unknown user: %s\n", user);
+        uid = getuid();
+        ret = getpwuid_r((uid_t) uid, &pwd, pwdbuf, bufsize, &presult);
+        if (presult == NULL)
+        {
+            gossip_lerr("User %lu lookup error: %d (0 = not found)\n",
+                        uid, ret);
         }
+    }
+    if (presult == NULL)
+    {
+        free(pwdbuf);
         return -PVFS_EINVAL;
+    }
+
+    /* allocate buffer for grp functions */
+    bufsize = -1;
+#ifdef _SC_GETGR_R_SIZE_MAX
+    bufsize = sysconf(_SC_GETGR_R_SIZE_MAX);
+#endif
+    if (bufsize == -1)
+    {
+        bufsize = 16384;
+    }
+
+    grpbuf = (char *) malloc(bufsize);
+    if (grpbuf == NULL)
+    {
+        free(pwdbuf);
+        return -PVFS_ENOMEM;
     }
 
     /* get info for specified or calling user's group */
     if (group)
     {
-        val = strtoul(group, &endptr, 10);
+        gid = strtoul(group, &endptr, 10);
         if (*endptr == '\0' && *group != '\0')
         {
-            if (val > PVFS_GID_MAX)
+            if (gid > PVFS_GID_MAX)
             {
-                grp = NULL;
+                ret = -1;
+                gresult = NULL;
             }
             else
             {
-                grp = getgrgid((gid_t)val);
+                ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+                if (gresult == NULL)
+                {
+                    gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
+                                gid, ret);
+                }
             }
         }
         else
         {
-            grp = getgrnam(group);
+            ret = getgrnam_r(group, &grp, grpbuf, bufsize, &gresult);
+            if (gresult == NULL)
+            {
+                gossip_lerr("Group %s lookup error: %d (0 = not found)\n",
+                            group, ret);
+            }
         }
     }
     else
     {
-        grp = getgrgid(getgid());
-    }
-    if (grp == NULL)
-    {
-        if (group)
+        gid = getgid();
+        ret = getgrgid_r((gid_t) gid, &grp, grpbuf, bufsize, &gresult);
+        if (gresult == NULL)
         {
-            gossip_lerr("Unknown group: %s\n", group);
+            gossip_lerr("Group %lu lookup error: %d (0 = not found)\n",
+                        gid, ret);
         }
+    }
+    if (gresult == NULL)
+    {
+        free(pwdbuf);
+        free(grpbuf);
         return -PVFS_EINVAL;
     }
 
-    /* permission checks */
-    if (getuid() && pwd->pw_uid != getuid())
-    {
-        gossip_lerr("error: only %s and root can generate a credential "
-                    "for %s\n", pwd->pw_name, pwd->pw_name);
-        return -PVFS_EPERM;
-    }
-
-    if (getuid() && grp->gr_gid != getgid())
-    {
-        gossip_lerr("error: cannot generate a credential for group %s: "
-                    "Permission denied\n", grp->gr_name);
-        return -PVFS_EPERM;
-    }
+    /* Note: without security enabled any user can generate a 
+       credential for another user. */
 
     /* get user group list */
 #ifdef HAVE_GETGROUPLIST
 
     ngroups = sizeof(groups)/sizeof(*groups);
-    ret = getgrouplist(pwd->pw_name, grp->gr_gid, groups, &ngroups);
+    ret = getgrouplist(pwd.pw_name, grp.gr_gid, groups, &ngroups);
     if (ret == -1)
     {
         gossip_lerr("error: unable to get group list for user %s\n",
-                    pwd->pw_name);
+                    pwd.pw_name);
         return -PVFS_EINVAL;
     }
-    if (groups[0] != grp->gr_gid)
+    if (groups[0] != grp.gr_gid)
     {
-        assert(groups[ngroups-1] == grp->gr_gid);
+        assert(groups[ngroups-1] == grp.gr_gid);
         groups[ngroups-1] = groups[0];
-        groups[0] = grp->gr_gid;
+        groups[0] = grp.gr_gid;
     }
 
 #else /* !HAVE_GETGROUPLIST */
 
     ngroups = sizeof(groups)/sizeof(*groups);
-    ngroups = getugroups(ngroups, groups, pwd->pw_name, grp->gr_gid);
+    ngroups = getugroups(ngroups, groups, pwd.pw_name, grp.gr_gid);
     if (ngroups == -1)
     {
         gossip_lerr("error: unable to get group list for user %s: %s\n",
-                pwd->pw_name, strerror(errno));
+                pwd.pw_name, strerror(errno));
+        free(pwdbuf);
+        free(grpbuf);
         return -PVFS_EINVAL;
     }
 
 #endif /* HAVE_GETGROUPLIST */
 
     /* fill in credential struct */
-    cred->userid = (PVFS_uid)pwd->pw_uid;
+    cred->userid = (PVFS_uid)pwd.pw_uid;
     cred->num_groups = (uint32_t)ngroups;
     cred->group_array = calloc(ngroups, sizeof(PVFS_gid));
     if (cred->group_array == NULL)
     {        
+        free(pwdbuf);
+        free(grpbuf);
         return -PVFS_ENOMEM;
     }
     for (i = 0; i < ngroups; i++)
@@ -446,6 +492,9 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
 
     cred->sig_size = 0;
     cred->signature = NULL;
+
+    free(pwdbuf);
+    free(grpbuf);
 
     return 0;
 }

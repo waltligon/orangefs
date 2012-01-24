@@ -138,6 +138,9 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
         return -PVFS_EINVAL;
     }
 
+    /* issuer may be blank, but shouldn't be NULL */
+    assert(src->issuer);
+
     /* first copy by value */
     memcpy(dest, src, sizeof(PVFS_capability));
     dest->issuer = NULL;
@@ -288,6 +291,9 @@ int PINT_copy_credential(const PVFS_credential *src, PVFS_credential *dest)
     {
         return -PVFS_EINVAL;
     }
+
+    /* issuer may be blank, but shouldn't be NULL. */
+    assert(src->issuer);
 
     /* first copy by value */
     memcpy(dest, src, sizeof(PVFS_credential));

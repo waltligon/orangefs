@@ -156,7 +156,8 @@ void funlockfile(FILE *stream)
     unlock_stream(stream);
 }
 
-/** This function coverts from stream style mode to ssycall style flags
+/** This function converts from stream style mode to syscall
+ *  style flags
  *
  */
 static int mode2flags(const char *mode)
@@ -204,6 +205,7 @@ static int mode2flags(const char *mode)
                 break;
             case 'b': /* this is ignored in POSIX */
             case 'c': /* used in glibc ignored here */
+            case 'e': /* used in glibc ignored here */
             case 'm': /* used in glibc ignored here */
                 break;
             case 'x': /* glibc extension */
