@@ -738,8 +738,15 @@ static int perm_tree_remove(struct PINT_server_op *s_op)
 {
     int ret;
 
-    /* nlmills: TODO: add real security checks */
-    ret = 0;
+    /* this capability is for the parent of the target object */
+    if (s_op->req->capability.op_mask & PINT_CAP_REMOVE)
+    {
+        ret = 0;
+    }
+    else
+    {
+        ret = -PVFS_EACCES;
+    }
 
     return ret;
 }

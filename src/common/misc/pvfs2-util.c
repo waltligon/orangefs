@@ -25,6 +25,9 @@
 #ifndef ENABLE_SECURITY
 #include <pwd.h>
 #include <grp.h>
+#ifndef HAVE_GETGROUPLIST
+#include "getugroups.h"
+#endif
 #endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C

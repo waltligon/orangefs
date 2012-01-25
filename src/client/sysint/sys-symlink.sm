@@ -600,9 +600,6 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_capability capability;
-
-    PINT_null_capability(&capability);
 
     js_p->error_code = 0;
 
@@ -611,7 +608,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
 
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
-        capability,
+        sm_p->getattr.attr.capability,
         sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         sm_p->hints);

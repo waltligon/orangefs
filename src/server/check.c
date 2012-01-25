@@ -35,6 +35,11 @@ enum access_type
     EXEC_ACCESS
 };
 
+/* operations where the parent handle's permissions are checked */
+enum PVFS_server_op parent_check_ops[] = {PVFS_SERV_REMOVE,
+                                          PVFS_SERV_TREE_REMOVE};
+#define PARENT_CHECK_OP_COUNT    2
+
 static int check_mode(enum access_type access, PVFS_uid userid,
     PVFS_gid group, const PVFS_object_attr *attr);
 static int check_acls(void *acl_buf, size_t acl_size, 
@@ -181,6 +186,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     PVFS_capability *cap = &s_op->req->capability;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL;
+    char op_mask[16];
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -199,18 +205,52 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     if (s_op->target_handle != PVFS_HANDLE_NULL && 
         !PINT_capability_is_null(cap))
     {
-        int index;
+        int index = 0, op_i;
 
-        /* ensure we have a capability for the target handle */
-        for (index = 0; index < cap->num_handles; index++)
+        /* check if operation is one where parent's permissions are checked */
+        for (op_i = 0; op_i < PARENT_CHECK_OP_COUNT; op_i++)
         {
-            if (cap->handle_array[index] == s_op->target_handle)
+            if (s_op->op == parent_check_ops[op_i])
             {
                 break;
             }
         }
+        /* check target object permissions */
+        if (op_i == PARENT_CHECK_OP_COUNT)
+        {
+            /* ensure we have a capability for the target handle */
+            for (index = 0; index < cap->num_handles; index++)
+            {
+                if (cap->handle_array[index] == s_op->target_handle)
+                {
+                    break;
+                }
+            }
+        }
+        else {
+            /* check parent object permissions */
+            PVFS_handle *parent_handle = (PVFS_handle *)
+                PINT_hint_get_value_by_type(s_op->req->hints, 
+                                            PINT_HINT_HANDLE, 
+                                            NULL);
+            if (parent_handle == NULL)
+            {
+                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Could not retrieve "
+                             "parent handle for %llu from hint\n", 
+                             llu(s_op->target_handle));
+                return -PVFS_EACCES;
+            }
+            for (index = 0; index < cap->num_handles; index++)
+            {
+                if (cap->handle_array[index] == *parent_handle)                    
+                {
+                    break;
+                }
+            }
+        }
         if (index == cap->num_handles)
         {
+            
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "Attempted to perform "
                          "an operation on target handle %llu that was "
                          "not in the capability\n", llu(s_op->target_handle));
@@ -219,9 +259,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     }
 
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
-                 "attr mask %d\n\t(capability mask = %d)\n",
+                 "attr mask %d (capability mask = %s)\n",
                  PINT_map_server_op_to_string(s_op->req->op),
-                 s_op->attr.mask, cap->op_mask);
+                 s_op->attr.mask, PINT_print_op_mask(cap->op_mask, op_mask));
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun)

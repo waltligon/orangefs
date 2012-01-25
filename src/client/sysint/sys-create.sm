@@ -988,7 +988,6 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         return(SM_ACTION_COMPLETE);
     }
 
-    /* nlmills: TODO: ensure the capability is valid before using */
     /*
       for the metafile and each datafile, prepare to post a remove
       send/recv pair
