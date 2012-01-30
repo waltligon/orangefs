@@ -388,6 +388,7 @@ static void usrint_cleanup(void)
     PVFS_sys_finalize();
 }
 
+#if PVFS_UCACHE_ENABLE
 /*
  * access function to see if cache is currently enabled
  * only used by code ouside of this module
@@ -396,7 +397,7 @@ int pvfs_ucache_enabled(void)
 {
     return ucache_enabled;
 }
-
+#endif
 
 void pvfs_sys_init_doit(void);
 
@@ -548,8 +549,6 @@ void pvfs_sys_init_doit(void) {
         /* restore previous gossip_debug_mask */
         //gossip_set_debug_mask(debug_on, curr_mask);
     }
-#else
-    ucache_enabled = 0;
 #endif
     //PVFS_perror_gossip_silent(); 
 }
