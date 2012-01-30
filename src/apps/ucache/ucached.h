@@ -16,8 +16,14 @@
 #include <poll.h>
 #include <ucache.h>
  
-/* Daemon Log */
-#define LOG "/tmp/ucached.log"
+/* Daemon Logging */
+#ifndef UCACHED_LOG_FILE
+#define UCACHED_LOG_FILE "/tmp/ucached.log"
+#endif
+
+#define GOSSIP_UCACHED_DEBUG 0x0001000000000000
+#define GOSSIP_UCACHED_CMD_DEBUG 0x0000100000000000
+
 
 /* FIFO Defines */
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)

@@ -1,4 +1,4 @@
-
+#include <stdio.h>
 #include <usrint.h>
 #include "ucached.h"
 
@@ -8,8 +8,6 @@ static int writefd = 0; /* Response File Descriptor */
 static char buffer[BUFF_SIZE]; /* For FIFO reads and writes */
 char buff[LOG_LEN];
 
-/* Log Globals */
-static FILE *ucached_log = (FILE *)0;
 /* Time Structures For Log 
 static time_t rawtime;
 static struct tm * timeinfo;
@@ -37,7 +35,6 @@ static int run_as_child(char c); /* Run as child of ucached */
 static int execute_cmd(char command);
 static int create_ucache_shmem(void);
 static int destroy_ucache_shmem(char dest_locks, char dest_ucache);
-//static void print_to_log(char *str); /* Logs commands and warnings */
 static void clean_up(void);
 static int ucached_lockchk(void);
 
@@ -50,7 +47,7 @@ void check_rc(int rc)
     }
     else
     {
-        strcpy(buffer, "FAILURE: check log: /tmp/ucached.log");
+        strcpy(buffer, "FAILURE: check log:" UCACHED_LOG_FILE);
     }
 }
 
@@ -70,8 +67,8 @@ static void clean_up(void)
         {
             rc = destroy_ucache_shmem(1, 1);
         }
-        fprintf(ucached_log, "ucached exiting...PID=%d\n", pid);
-        rc = fclose(ucached_log);
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: ucached exiting...PID=%d\n", pid);
         rc = unlink(FIFO1);
         rc = unlink(FIFO2);
     }
@@ -113,8 +110,8 @@ static int ucached_lockchk(void)
                 if((int)time_diff >= BLOCK_LOCK_TIMEOUT)
                 {
                     /*
-                    fprintf(ucached_log, "HUNG LOCK DETECTED @ block index = "
-                                                                   "%d!\n", i);
+                    gossip_debug(GOSSIP_UCACHED_DEBUG,
+                        "WARNING: HUNG LOCK DETECTED @ block index = %d\n", i);
                     TODO: what to do with hung locks?
                     rc = pick_lock(ucache_lock_t * currlock);
                     if(rc == 1)
@@ -124,8 +121,6 @@ static int ucached_lockchk(void)
                     */
                 }
             }
-            fprintf(ucached_log, "%d\n", i);
-            fflush(ucached_log);
         }
     } 
 
@@ -182,6 +177,9 @@ static int execute_cmd(char cmd)
         case 'd':
             rc = destroy_ucache_shmem(1, 1);
             break;
+        case 'i':
+            rc = ucache_info(stdout, "sav");
+            break;
         /* Close Daemon */
         case 'x': 
             writefd = open(FIFO2, O_WRONLY); 
@@ -216,8 +214,8 @@ static int create_ucache_shmem(void)
 
     if(lock_shmid == -1)
     {
-        fprintf(ucached_log, "INFO: shmet on lock_shmid returned -1"
-                                                    " first try\n");
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: shmget on lock_shmid returned -1 on first try\n");
 
         /* Shared memory segment used for locks was not previosly created, 
          * so create it.
@@ -226,15 +224,17 @@ static int create_ucache_shmem(void)
         lock_shmid = shmget(key, size, shmflg);
         if(lock_shmid == -1)
         {
-            fprintf(ucached_log, "ERROR: shmget (IPC_CREATE, IPC_EXCL)"
-                                       " on lock_shmid returned -1\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmget (IPC_CREATE, IPC_EXCL)"
+                " on lock_shmid returned -1\n");
             /* Couldn't create the required segment */
             return -1;
         }
         else
         {
-            fprintf(ucached_log, "INFO: shmget (using IPC_CREATE, IPC_EXCL)"
-                        " on lock_shmid returned shmid = %d\n", lock_shmid);
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: shmget (using IPC_CREATE, IPC_EXCL)"
+                " on lock_shmid returned shmid = %d\n", lock_shmid);
 
             /* Attach to shmem and initialize all the locks */
             shmflg = 0;
@@ -242,8 +242,8 @@ static int create_ucache_shmem(void)
             ucache_locks = shmat(lock_shmid, NULL, shmflg);
             if (!ucache_locks)
             {
-                fprintf(ucached_log, "ERROR: shmat on lock_shmid returned"
-                                                               " NULL\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: shmat on lock_shmid returned NULL");
                 return -1;
             }
 
@@ -254,8 +254,8 @@ static int create_ucache_shmem(void)
                 rc = lock_init(get_lock(i));
                 if (rc == -1)
                 {
-                    fprintf(ucached_log, "ERROR: lock_init returned -1 @"
-                                                " lock index = %d\n", i);
+                    gossip_debug(GOSSIP_UCACHED_DEBUG,
+                        "ERROR: lock_init returned -1 @ lock index = %d\n", i);
                     rc = -1;
                 }
             }
@@ -263,15 +263,17 @@ static int create_ucache_shmem(void)
     }
     else
     {
-        fprintf(ucached_log, "INFO: first shmget on lock_shmid found segment"
-                                               ": shmid = %d\n", lock_shmid);
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: first shmget on lock_shmid found segment"
+            ": shmid = %d\n", lock_shmid);
         old_locks_present = 1;
         /* Shmem for locks was already created, so just attach to it */
         shmflg = 0;
         ucache_locks = shmat(lock_shmid, NULL, shmflg);
         if (!ucache_locks)
         {
-            fprintf(ucached_log, "ERROR: shmat on lock_shmid returned NULL\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmat on lock_shmid returned NULL\n");
             return -1;
         }    
     }
@@ -285,8 +287,8 @@ static int create_ucache_shmem(void)
     ucache_lock = get_lock(BLOCKS_IN_CACHE);
     lock_lock(ucache_lock);
 
-    fprintf(ucached_log, "INFO: lock segment successfully retrieved and"
-                                              " global lock locked.\n");
+    gossip_debug(GOSSIP_UCACHED_DEBUG,
+        "INFO: lock segment successfully retrieved and global lock locked.\n");
 
     /* Try to get/create the shmem required for the ucache */
     id = SHM_ID2;
@@ -297,14 +299,15 @@ static int create_ucache_shmem(void)
     
     if(ucache_shmid == -1)
     {
-        fprintf(ucached_log, "INFO: shgmet on ucache_shmid returned -1"
-                                                       " first try\n");
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: shmget on ucache_shmid returned -1 first try\n");
 
         /* Remember if there was an old lock region detected */
         if(old_locks_present)
         {
-            fprintf(ucached_log, "INFO: old locks discovered, attempting"
-                             " destruction of old locks and starting\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "INFO: old locks discovered, attempting destruction of old" 
+                " locks and starting\n");
 
             /* Destroy old lock region and start function over */
             rc = shmctl(lock_shmid, IPC_RMID, (struct shmid_ds *) NULL);
@@ -324,16 +327,18 @@ static int create_ucache_shmem(void)
         if(ucache_shmid == -1)
         { 
             /* Couldn't create the required segment */
-            fprintf(ucached_log, "ERROR: shmget (using IPC_CREATE, IPC_EXCL)"
-                                           " on ucache_shmid returned -1\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmget (using IPC_CREATE, IPC_EXCL)"
+                " on ucache_shmid returned -1\n");
+
             rc = -1;
             goto errout;
         }
         else
         {
-            fprintf(ucached_log, "INFO: shmget (using IPC_CREATE, IPC_EXCL)"
-                    " on ucache_shmid returned shmid = %d\n", ucache_shmid);
-
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "INFO: shmget (using IPC_CREATE, IPC_EXCL)"
+                " on ucache_shmid returned shmid = %d\n", ucache_shmid);
 
             /* Attach to the ucache shmem region */
             shmflg = 0;
@@ -341,8 +346,8 @@ static int create_ucache_shmem(void)
             ucache = shmat(ucache_shmid, NULL, shmflg);
             if (!ucache)
             {
-                fprintf(ucached_log, "ERROR: shmat on ucache_shmid returned"
-                                                                 " NULL\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: shmat on ucache_shmid returned NULL\n");
                 rc = -1;
                 goto errout;
             }
@@ -351,8 +356,8 @@ static int create_ucache_shmem(void)
             rc = ucache_init_file_table(0);
             if(rc != 0)
             {
-                fprintf(ucached_log, "ERROR: file table initialization"
-                                                          " failed\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: file table initialization failed\n");
                 /* Couldn't Initialize File Table */
                 rc = -1;
                 goto errout;
@@ -361,8 +366,9 @@ static int create_ucache_shmem(void)
     }
     else
     {
-        fprintf(ucached_log, "INFO: first shmget on ucache_shmid found segment"
-                                               ": shmid = %d\n", ucache_shmid);
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: first shmget on ucache_shmid found segment"
+            ": shmid = %d\n", ucache_shmid);
 
         /* Previously created ucache segment present. Need more info. */
         /* See if marked for deletion, but has users attached still */
@@ -371,8 +377,8 @@ static int create_ucache_shmem(void)
         rc = shmctl(ucache_shmid, cmd, &buf);
         if(rc == -1)
         {
-            fprintf(ucached_log, "ERROR: shmctl failed to IPC_STAT,"
-                                                 " ucache_shmid\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmctl failed to IPC_STAT ucache_shmid\n");
             goto errout;
         } 
 
@@ -385,17 +391,19 @@ static int create_ucache_shmem(void)
 
         if(markedForDest && hasAttached)
         {
-            fprintf(ucached_log, "INFO: detected previous ucache shmem segment"
-                                       " marked for destruction that still has" 
-                                   " one or more processes attached to it.\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "INFO: detected previous ucache shmem segment"
+                " marked for destruction that still has" 
+                " one or more processes attached to it.\n");
 
             shmflg = shmflg | IPC_CREAT; /* Note: CREAT w/o EXCL */
             ucache_shmid = shmget(key, size, shmflg);
             if(ucache_shmid == -1)
             {
                 /* Couldn't create the required segment */
-                fprintf(ucached_log, "ERROR: shmget (using IPC_CREAT && !EXCL)"
-                                             " on ucache_shmid returned -1\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: shmget (using IPC_CREAT && !EXCL)"
+                    " on ucache_shmid returned -1\n");
                 rc = -1;
                 goto errout;
             }
@@ -405,8 +413,8 @@ static int create_ucache_shmem(void)
             ucache = shmat(ucache_shmid, NULL, shmflg);
             if (!ucache)
             {
-                fprintf(ucached_log, "ERROR: shmat on ucache_shmid returned"
-                                                                  " NULL\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: shmat on ucache_shmid returned NULL\n");
                 rc = -1;
                 goto errout;
             }
@@ -418,8 +426,8 @@ static int create_ucache_shmem(void)
             if(rc != 0)
             {
                 /* Couldn't Initialize File Table */
-                fprintf(ucached_log, "ERROR: file table initialization"
-                                                          " failed\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: file table initialization failed\n");
                 rc = -1;    
                 goto errout;
             }
@@ -433,8 +441,8 @@ static int create_ucache_shmem(void)
             ucache = shmat(ucache_shmid, NULL, shmflg);
             if (!ucache)
             {
-                fprintf(ucached_log, "ERROR: shmat on ucache_shmid returned"
-                                                                 " NULL\n");
+                gossip_debug(GOSSIP_UCACHED_DEBUG,
+                    "ERROR: shmat on ucache_shmid returned NULL\n");
                 rc = -1;
                 goto errout;
             }
@@ -460,7 +468,8 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
 
     if(dest_ucache)
     {
-        fprintf(ucached_log, "INFO: destroying ucache shmem\n");
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: destroying ucache shmem\n");
 
         /* Destroy shmem segment containing ucache */
         int id = SHM_ID2;
@@ -469,21 +478,22 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
         int ucache_shmid = shmget(key, 0, shmflg);
         if(ucache_shmid == -1)
         {
-            fprintf(ucached_log, "ERROR: shmget on ucache_shmid returned"
-                                                                " -1\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmget on ucache_shmid returned -1\n");
             return -1;
         }
         rc = shmctl(ucache_shmid, IPC_RMID, (struct shmid_ds *) NULL);
         if(rc == -1)
         {
-            fprintf(ucached_log, "WARNING: ucache shmem_destroy: errno"
-                                                    " == %d\n", errno);
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "WARNING: ucache shmem_destroy: errno == %d\n", errno);
         }
     }
 
     if(dest_locks)
     {
-        fprintf(ucached_log, "INFO: destroying locks' shmem\n");
+        gossip_debug(GOSSIP_UCACHED_DEBUG,
+            "INFO: destroying locks' shmem\n");
 
         /* Destroy shmem segment containing locks */
         int id = SHM_ID1;
@@ -492,39 +502,23 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
         int lock_shmid = shmget(key, 0, shmflg);
         if(lock_shmid == -1)
         {
-            fprintf(ucached_log, "ERROR: shmget on lock_shmid returned -1\n");
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: shmget on lock_shmid returned -1\n");
             return -1;
         }
         rc = shmctl(lock_shmid, IPC_RMID, (struct shmid_ds *) NULL);
         if(rc == -1)
         {
-            fprintf(ucached_log,
-                    "WARNING: ucache_locks shmem_destroy: errno"
-                                             " == %d\n", errno);
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "WARNING: ucache_locks shmem_destroy: errno == %d\n", errno);
         }
     }
 
-    fprintf(ucached_log, "INFO: both shmem segments marked for"
-                                            " destruction.\n");
+    gossip_debug(GOSSIP_UCACHED_DEBUG,
+        "INFO: both shmem segments marked for destruction.\n");
+
     return rc;
 }
-
-/*
-static void print_to_log(char *str)
-    ucached_log = fopen(LOG, "a");
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);    
-    if(LOG_TIMESTAMP)
-    {
-        fprintf(ucached_log, "%s\t%s", str, asctime(timeinfo));
-    }
-    else
-    {
-        fprintf(ucached_log, "%s\n", str);
-    }
-    fclose(ucached_log);
-}
-*/
 
 /** This program should be run as root on startup to initialize the shared 
  * memory segments required by the user cache in PVFS. 
@@ -533,6 +527,17 @@ int main(int argc, char **argv)
 {
     int rc = 0; 
     void *rp;
+
+    gossip_enable_file(UCACHED_LOG_FILE, "a");
+    uint64_t curr_mask;
+    int debug_on;
+    gossip_get_debug_mask(&debug_on, &curr_mask);
+    /* Enable the writing of the error message and write the message to file. */
+    gossip_set_debug_mask(1, GOSSIP_UCACHED_DEBUG);
+    //printf("now gossip_debug_mask = 0x%016lx\n", gossip_debug_mask);
+    /* restore previous gossip_debug_mask */
+    //gossip_set_debug_mask(debug_on, curr_mask);
+
     memset(locked_time, 0, (sizeof(time_t) * (BLOCKS_IN_CACHE + 1)));
 
     /* Direct output of ucache library, TODO: change this later */
@@ -568,19 +573,13 @@ int main(int argc, char **argv)
 
     if(rc != 0)
     {
+        
         perror("daemon-izing failed");
         exit(EXIT_FAILURE);
     }
 
-    ucached_log = fopen(LOG, "w");
-
-    if(!ucached_log)
-    {
-        exit(EXIT_FAILURE);
-    }
-
-    fprintf(ucached_log, "ucached running...\n");    
-    fflush(ucached_log);
+    gossip_debug(GOSSIP_UCACHED_DEBUG,
+        "INFO: ucached started\n");
 
     /* Start up with shared memory initialized */
     if(CREATE_AT_START)
@@ -614,23 +613,9 @@ int main(int argc, char **argv)
 
         if(rc == -1)
         {
-            fprintf(ucached_log, "ERROR: poll: errno = %d\n", errno);
+            gossip_debug(GOSSIP_UCACHED_DEBUG,
+                "ERROR: poll: errno = %d\n", errno);
         }
-        /*
-        if(rc == 0)
-        {
-            //Timeout occured, no descriptors ready
-            fprintf(ucached_log, "nothing to read/write after %d seconds\n", 
-                                                          FIFO_TIMEOUT);            
-        }
-        */
-
-        /*
-        if(rc > 0)
-        {
-            fprintf(ucached_log, "poll found descriptors to work on\n");
-        }
-        */
 
         if(fds[0].revents & POLLIN)
         {
@@ -641,8 +626,9 @@ int main(int argc, char **argv)
             {
                 if(count == -1)
                 {
-                    fprintf(ucached_log, "caught error while trying to read"
-                                               " cmd: errno = %d\n", errno);
+                    gossip_debug(GOSSIP_UCACHED_DEBUG,
+                        "ERROR: caught error while trying to read cmd: errno = %d\n", 
+                        errno);
                 }
                 /* Try to read again */ 
                 count = read(readfd, buffer, BUFF_SIZE);
@@ -652,10 +638,10 @@ int main(int argc, char **argv)
                 /* Data read into buffer*/ 
                 char c = buffer[0];
                 /* Valid Command? */
-                if(c == 'c' || c == 'd' || c == 'x')
+                if(c == 'c' || c == 'd' || c == 'x' || 'i')
                 {
-                    fprintf(ucached_log, "Command Received: %c\n", c);
-                    fflush(ucached_log);
+                    gossip_debug(GOSSIP_UCACHED_DEBUG,
+                        "INFO: Command Received: %c\n", c);
                     /* Run creation in child process */
                     if(c == 'c')
                     {
@@ -670,8 +656,8 @@ int main(int argc, char **argv)
                 /* Invalid Command */
                 else
                 {
-                    fprintf(ucached_log, "Invalid Command Received: %c\n", c);
-                    fflush(ucached_log);
+                    gossip_debug(GOSSIP_UCACHED_DEBUG,
+                        "ERROR: Invalid Command Received: %c\n", c);
                     rc = -1;
                     check_rc(rc); 
                 }
@@ -683,7 +669,8 @@ int main(int argc, char **argv)
                     writefd = open(FIFO2, O_WRONLY);
                     if(writefd == -1)
                     {
-                        fprintf(ucached_log, "opening write FIFO: errno = %d\n", errno);
+                        gossip_debug(GOSSIP_UCACHED_DEBUG,
+                           "ERROR: opening write FIFO: errno = %d\n", errno);
                     }
                     rc = write(writefd, buffer, BUFF_SIZE);
                     while(rc <= 0)
@@ -695,7 +682,6 @@ int main(int argc, char **argv)
                 }
             }
         }
-        fflush(ucached_log);
         close(readfd);
 
         if(ucache_avail)

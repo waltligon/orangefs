@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 
     if(writefd == -1)
     {
-        perror("cmd main opening writefd"); 
+        perror("ucached_cmd couldn't open writefd"); 
         return -1;       
     }
 
@@ -60,10 +60,9 @@ int main(int argc, char **argv)
     rc = write(writefd, buffer, BUFF_SIZE);
     if(rc == -1)
     {
-        perror("writing cmd");
+        perror("Error occured during write to ucached");
     }
 
-    /* TODO: what about large responses. chunk data? */
     readfd = open(FIFO2, O_RDONLY); 
 
     /* Collect Response */
