@@ -55,6 +55,13 @@
 #define DBG 0   
 #endif
 
+#ifndef UCACHE_LOG_FILE
+#define UCACHE_LOG_FILE "/tmp/ucache.log"
+#endif
+
+/* TODO: set this to an appropriate value. */
+#define GOSSIP_UCACHE_DEBUG 0x0010000000000000
+
 #define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
 #if (LOCK_TYPE == 0)
 #include <semaphore.h>
@@ -72,6 +79,7 @@
 
 /* Globals */
 extern FILE * out;
+extern int ucache_enabled;
 extern union user_cache_u *ucache;
 extern ucache_lock_t *ucache_locks;
 extern ucache_lock_t *ucache_lock;

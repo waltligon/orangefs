@@ -1201,22 +1201,26 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 {
     int rc = 0;
 #if PVFS_UCACHE_ENABLE
+    if(pvfs_ucache_enabled())
+    {
+        if(!pd->s->fent)
+        {
+            lock_lock(ucache_lock);
+            ucache_pseudo_misses++; /* could overflow, reset periodically */
+            lock_unlock(ucache_lock);
+        }
+    }
 
     if(!pvfs_ucache_enabled() || !pd->s->fent)
     {
-        lock_lock(ucache_lock);
-        ucache_pseudo_misses++; /* could overflow, reset periodically */
-        lock_unlock(ucache_lock);
+
 #endif /* PVFS_UCACHE_ENABLE */
 
         /* Bypass the ucache */
         errno = 0;
         rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
-                                   iovec_count, vector);
-        if (rc < 0)
-        {
-            return -1;
-        }
+                                              iovec_count, vector);
+        return rc;
 #if PVFS_UCACHE_ENABLE
     }
 

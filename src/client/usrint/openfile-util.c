@@ -44,7 +44,6 @@ static int descriptor_table_count = 0;
 static int descriptor_table_size = 0; 
 static pvfs_descriptor **descriptor_table; 
 static char rstate[256];  /* used for random number generation */
-static int ucache_enabled = PVFS_UCACHE_ENABLE;
 
 posix_ops glibc_ops;
 
@@ -441,7 +440,6 @@ int pvfs_sys_init(void)
     }
 
     /* set this to prevent pvfs_sys_init from running recursively (indirect) */
-    //pvfs_initializing_flag = (int)getpid();
     pvfs_initializing_flag = 1;
 
     //Perform Init
@@ -527,13 +525,28 @@ void pvfs_sys_init_doit(void) {
     /* call other initialization routines */
 
 #if PVFS_UCACHE_ENABLE
-    /* ucache initialization - assumes shared memory previously aquired */
+    gossip_enable_file(UCACHE_LOG_FILE, "a");
+    /* ucache initialization - assumes shared memory previously 
+     * aquired (using ucache daemon) 
+     */
     rc = ucache_initialize();
     if (rc < 0)
     {
         /* ucache failed to initialize */
         /* continue without cache */
         ucache_enabled = 0;
+        uint64_t curr_mask;
+        int debug_on;
+        gossip_get_debug_mask(&debug_on, &curr_mask);
+
+        /* Enable the writing of the error message and write the message to file. */
+        gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);
+        gossip_debug(GOSSIP_UCACHE_DEBUG, 
+            "WARNING: client caching configured enabled but couldn't inizialize\n");
+        //printf("now gossip_debug_mask = 0x%016lx\n", gossip_debug_mask);
+
+        /* restore previous gossip_debug_mask */
+        //gossip_set_debug_mask(debug_on, curr_mask);
     }
 #else
     ucache_enabled = 0;
@@ -950,28 +963,12 @@ int is_pvfs_path(const char *path)
     PVFS_fs_id fs_id;
     char pvfs_path[PVFS_PATH_MAX];
 #endif
-
     
     if(pvfs_sys_init())
     {
         return 0;
     }
 
-#if 0
-    if (pvfs_initializing_flag)
-    {
-        /* we cannot open a PVFS file while
-         * initializing PVFS
-         */
-        if(pvfs_initializing_flag != getpid())
-        {
-            while(pvfs_initializing_flag){}
-        }
-        //return 0;
-    }
-
-    pvfs_sys_init();
-#endif 
     if (!path)
     {
         errno = EINVAL;

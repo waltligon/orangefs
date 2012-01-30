@@ -20,6 +20,7 @@
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
+int ucache_enabled = 0;
 
 union user_cache_u *ucache = 0;
 /* static uint32_t ucache_blk_cnt = 0; */
@@ -129,6 +130,7 @@ int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment);
 int ucache_initialize(void)
 {
     int rc = 0;
+    gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);  
     /* Aquire pointers to shmem segments (locks and ucache) */
 
     /* shmget segment containing all locks */
@@ -137,14 +139,16 @@ int ucache_initialize(void)
     int lock_shmid = shmget(key, 0, shmflg);
     if(lock_shmid == -1)
     {
-        perror("ucach_initialize - locks shmget");
+        gossip_debug(GOSSIP_UCACHE_DEBUG, 
+            "ucache_initialize - locks shmget: errno = %d\n", errno);
         return -1;
     }
     /* shmat locks */
     ucache_locks = shmat(lock_shmid, NULL, 0);
     if((long int)ucache_locks == -1)
     {
-        perror("ucache_initialize - locks shmat");
+        gossip_debug(GOSSIP_UCACHE_DEBUG,        
+            "ucache_initialize - locks shmat: errno = %d\n", errno);
         return -1;
     }
    
@@ -165,16 +169,18 @@ int ucache_initialize(void)
     int ucache_shmid = shmget(key, 0, shmflg);
     if(ucache_shmid == -1)
     {
-        perror("ucache_initialize - ucache shmget");
+        gossip_debug(GOSSIP_UCACHE_DEBUG,        
+            "ucache_initialize - ucache shmget: errno = %d\n", errno);
         return -1;
     }
     ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1) 
     {
-        perror("ucache_initialize - ucache shmat");
+        gossip_debug(GOSSIP_UCACHE_DEBUG,        
+            "ucache_initialize - ucache shmat: errno = %d\n", errno);
         return -1;
     }
-
+    ucache_enabled = 1;
     return rc;
 }
 
@@ -555,10 +561,22 @@ int ucache_close_file(struct file_ent_s *fent)
 }
 
 /** 
- * Dumps all cache related information. 
+ * Dumps all cache related information to the specified file pointer.
+ * Returns 0 on succes, -1 on failure meaning the ucache wasn't enabled 
+ * for some reason. 
  */
 int ucache_info(FILE *out, char *flags)
 {
+    if(!ucache_enabled)
+    {
+        ucache_initialize();
+    } 
+    if(!ucache_enabled)
+    {
+        //fprintf(out, "ucache is not enabled. See ucache.log and ucached.log.\n");
+        return -1;
+    }
+   
     /* Decide what to show */
     char show_all=0;
     char show_sum=0;
@@ -768,7 +786,7 @@ int ucache_info(FILE *out, char *flags)
         }
     }
     }
-    return 1;
+    return 0;
 }
 
 /** 
