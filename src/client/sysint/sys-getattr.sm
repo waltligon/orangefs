@@ -754,7 +754,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
 
     attr = &sm_p->getattr.attr;
     assert(attr);
-    
+
+    /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
 
     PINT_msgpair_init(&sm_p->msgarray_op);

@@ -145,7 +145,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
     struct server_configuration_s *server_config = get_server_config_struct();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
-    PVFS_capability capability;
+    PVFS_capability null_cap;
 
     s_op->u.tree_communicate.handle_array_local = calloc(
         num_data_files, sizeof(*s_op->u.tree_communicate.handle_array_local));
@@ -164,9 +164,6 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
-
-    /* nlmills: TODO: replace with real capability */
-    PINT_null_capability(&capability);
 
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
@@ -214,7 +211,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             {
                 PINT_SERVREQ_REMOVE_FILL(
                     *req,
-                    capability,
+                    s_op->req->capability,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[i],
                     s_op->req->hints);
@@ -226,7 +223,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             {
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
-                    capability,
+                    s_op->req->capability,
                     this_req->u.tree_get_file_size.credential,
                     fs_id,
                     s_op->u.tree_communicate.handle_array_local[i],
@@ -302,6 +299,13 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
             gossip_lerr("tree_communicate: failed to allocate msgarray\n");
             return -PVFS_ENOMEM;
         }
+
+        /* Use a null capability with tree_get_file_size op */
+        if (operation == PVFS_SERV_TREE_GET_FILE_SIZE)
+        {
+            PINT_null_capability(&null_cap);
+        }
+        
         /* Fill in the msgarray. */
         for (i = 0; i < num_partitions; i++)
         {
@@ -327,7 +331,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
                 {
                     PINT_SERVREQ_TREE_REMOVE_FILL(
                         msg_p->req,
-                        capability,
+                        s_op->req->capability,
                         fs_id,
                         num_data_files_for_this_server,
                         &s_op->u.tree_communicate.handle_array_remote[i*num_files_per_server],
@@ -342,7 +346,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb
 /* TODO: Need to pass along hints. */
                   PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                       msg_p->req,
-                      capability,
+                      null_cap,
                       this_req->u.tree_get_file_size.credential,
                       fs_id,
                       (i * num_files_per_server),
@@ -772,7 +776,7 @@ static int perm_tree_get_file_size(PINT_server_op *s_op)
 {
     int ret;
 
-    /* nlmills: TODO: add real security checks */
+    /* permission not required */
     ret = 0;
 
     return ret;
