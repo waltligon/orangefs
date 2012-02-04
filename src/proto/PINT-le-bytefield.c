@@ -276,6 +276,7 @@ static void lebf_initialize(void)
 		resp.u.tree_get_file_size.error = NULL;
 		resp.u.tree_get_file_size.handle_count = 0;
                 resp.u.tree_get_file_size.caller_handle_index = 0;
+		reqsize = extra_size_PVFS_servreq_tree_get_file_size;
 		respsize = extra_size_PVFS_servresp_tree_get_file_size;
 		break;
             case PVFS_SERV_MGMT_GET_UID:
