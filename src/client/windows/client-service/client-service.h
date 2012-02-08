@@ -39,6 +39,8 @@ typedef struct
     char cert_dir_prefix[MAX_PATH];
     char ca_path[MAX_PATH];
     int threads;
+    unsigned int new_file_perms,
+                 new_dir_perms;
     int debug;
     int debug_stderr;
     char debug_mask[256];

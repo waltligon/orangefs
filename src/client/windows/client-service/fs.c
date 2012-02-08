@@ -238,7 +238,8 @@ int fs_lookup(char *fs_path,
       returns 0 and handle on success */
 int fs_create(char *fs_path,
               PVFS_credentials *credentials,
-              PVFS_handle *handle)
+              PVFS_handle *handle,
+              unsigned int perms)
 {    
     char *base_dir, *entry_name;
     int len;
@@ -278,8 +279,8 @@ int fs_create(char *fs_path,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
-    /* default permissions: rwxr-xr-x */
-    attr.perms = 0755;
+    /* configurable in options */
+    attr.perms = perms;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_create(entry_name, parent_ref, attr,
@@ -497,7 +498,8 @@ fs_setattr_exit:
 
 int fs_mkdir(char *fs_path,
              PVFS_credentials *credentials,
-             PVFS_handle *handle)
+             PVFS_handle *handle,
+             unsigned int perms)
 {
     char *base_dir, *entry_name;
     int len;
@@ -534,8 +536,8 @@ int fs_mkdir(char *fs_path,
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials->uid;
     attr.group = credentials->gid;
-    /* default permissions: rwxr-xr-x */
-    attr.perms = 0755;
+    /* configurable in options */
+    attr.perms = perms;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
     ret = PVFS_sys_mkdir(entry_name, parent_ref, attr, credentials,

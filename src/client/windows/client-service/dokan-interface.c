@@ -834,7 +834,8 @@ PVFS_Dokan_create_file(
         {
             fs_remove(fs_path, &credentials);
         }
-        ret = fs_create(fs_path, &credentials, &handle);
+        ret = fs_create(fs_path, &credentials, &handle, 
+            goptions->new_file_perms);
         break;
     case CREATE_NEW:
         if (found) 
@@ -845,14 +846,16 @@ PVFS_Dokan_create_file(
         else
         {
             /* create file */
-            ret = fs_create(fs_path, &credentials, &handle);
+            ret = fs_create(fs_path, &credentials, &handle, 
+                goptions->new_file_perms);
         }
         break;
     case OPEN_ALWAYS:
         if (!found)
         {    
             /* create file */
-            ret = fs_create(fs_path, &credentials, &handle);
+            ret = fs_create(fs_path, &credentials, &handle,
+                goptions->new_dir_perms);
         }
         break;
     case OPEN_EXISTING:
@@ -931,7 +934,7 @@ PVFS_Dokan_create_directory(
     if (fs_path == NULL)
         return -1;
 
-    ret = fs_mkdir(fs_path, &credentials, &handle);
+    ret = fs_mkdir(fs_path, &credentials, &handle, goptions->new_dir_perms);
 
     DbgPrint("   fs_mkdir returns: %d\n", ret);
 
