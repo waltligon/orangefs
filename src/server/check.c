@@ -162,14 +162,6 @@ int PINT_get_capabilities(void *acl_buf,
         *op_mask |= PINT_CAP_CREATE | PINT_CAP_REMOVE;
     }
 
-    /* nlmills: TODO: replace this hack */
-    /* if metafile is not initialized allow setattr to complete */
-    if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == 0 
-        && attr->owner == 0)
-    {
-        *op_mask |= PINT_CAP_SETATTR;
-    }
-
     return 0;
 }
 

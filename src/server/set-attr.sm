@@ -526,7 +526,15 @@ static PINT_sm_action setattr_cleanup(
 static int perm_setattr(PINT_server_op *s_op)
 {
     int ret;
+    PVFS_object_attr *attr = &s_op->attr;
 
+    /* attrs may be set for a file with uninitialized metadata */
+    if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == NULL &&
+        attr->owner == 0)
+    {
+        return 0;
+    }
+    
     if (s_op->req->capability.op_mask & PINT_CAP_SETATTR)
     {
         ret = 0;
