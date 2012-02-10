@@ -62,30 +62,63 @@
 /* TODO: set this to an appropriate value. */
 #define GOSSIP_UCACHE_DEBUG 0x0010000000000000
 
-#define LOCK_TYPE 1 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
+#ifndef LOCK_TYPE
+#define LOCK_TYPE 3 /* 0 for Semaphore, 1 for Mutex, 2 for Spinlock */
+#endif
+
 #if (LOCK_TYPE == 0)
-#include <semaphore.h>
-#define ucache_lock_t sem_t
-#define LOCK_SIZE sizeof(sem_t)
+# include <semaphore.h>
+# define ucache_lock_t sem_t
+# define LOCK_SIZE sizeof(sem_t)
 #elif (LOCK_TYPE == 1)
-#define ucache_lock_t pthread_mutex_t /* sizeof(pthread_mutex_t)=24 */
-#define LOCK_SIZE sizeof(pthread_mutex_t)
+# define ucache_lock_t pthread_mutex_t /* sizeof(pthread_mutex_t)=24 */
+# define LOCK_SIZE sizeof(pthread_mutex_t)
 #elif (LOCK_TYPE == 2)
-#define ucache_lock_t pthread_spinlock_t
-#define LOCK_SIZE sizeof(pthread_spinlock_t)
+# define ucache_lock_t pthread_spinlock_t
+# define LOCK_SIZE sizeof(pthread_spinlock_t)
+#elif (LOCK_TYPE == 3)
+# define ucache_lock_t gen_mutex_t
+# define LOCK_SIZE sizeof(gen_mutex_t)
 #endif
 
 #define LOCKS_SIZE ((LOCK_SIZE) * (BLOCKS_IN_CACHE + 1))
+
+#define UCACHE_STATS_64 3
+#define UCACHE_STATS_16 2
+/* This is the size of the ucache_aux auxilliary shared mem segment */
+#define UCACHE_AUX_SIZE ( LOCKS_SIZE + (UCACHE_STATS_64 * 64) + \
+    (UCACHE_STATS_16 * 16))
 
 /* Globals */
 extern FILE * out;
 extern int ucache_enabled;
 extern union user_cache_u *ucache;
+extern struct ucache_aux_s *ucache_aux;
 extern ucache_lock_t *ucache_locks;
 extern ucache_lock_t *ucache_lock;
-extern uint64_t ucache_hits;
-extern uint64_t ucache_misses;
-extern uint64_t ucache_pseudo_misses; /* Chose not to cache */
+extern struct ucache_stats_s *ucache_stats;
+extern struct ucache_stats_s these_stats;
+
+/** A structure containing the statistics summarizing the ucache. 
+ *
+ */
+struct ucache_stats_s
+{
+    uint64_t hits;
+    uint64_t misses;
+    uint64_t pseudo_misses;
+    uint16_t block_count;
+    uint16_t file_count;
+};
+
+/** A structure containing the auxilliary data required by ucache to properly
+ * function.
+ */
+struct ucache_aux_s
+{
+    ucache_lock_t ucache_locks[BLOCKS_IN_CACHE + 1]; /* +1 for global lock */
+    struct ucache_stats_s ucache_stats; /* Summary Statistics of ucache */
+};
 
 /** A link for one block of memory in a files hash table
  *
@@ -185,9 +218,6 @@ inline void *ucache_lookup(struct file_ent_s *fent, uint64_t offset, uint16_t *b
 inline void *ucache_insert(struct file_ent_s *fent, 
                     uint64_t offset, 
                     uint16_t *block_ndx);
-#if 0 
-int ucache_remove(struct file_ent_s *fent, uint64_t offset); 
-#endif
 int ucache_info(FILE *out, char *flags);
 
 int ucache_flush_cache(void); 
@@ -204,9 +234,6 @@ inline ucache_lock_t *get_lock(uint16_t block_index);
 int lock_init(ucache_lock_t * lock);
 inline int lock_lock(ucache_lock_t * lock);
 inline int lock_unlock(ucache_lock_t * lock);
-#if 0
-int lock_destroy(ucache_lock_t * lock);
-#endif
 inline int lock_trylock(ucache_lock_t * lock);
 
 #endif /* UCACHE_H */

@@ -17,21 +17,29 @@
 #include "iocommon.h"
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#include <gen-locks.h>
 
 /* Global Variables */
 FILE *out;                   /* For Logging Purposes */
-int ucache_enabled = 0;
 
-union user_cache_u *ucache = 0;
 /* static uint32_t ucache_blk_cnt = 0; */
 
+/* Global pointers to data in shared mem. Pointers set in ucache_initialize */
+union user_cache_u *ucache = 0;
+struct ucache_aux_s *ucache_aux = 0; /* All locks and stats stored here */
+
+/* ucache_aux is a pointer to the actual data summarized by the following 
+ * pointers 
+*/
 ucache_lock_t *ucache_locks = 0; /* The shmem of all ucache locks */
 ucache_lock_t *ucache_lock = 0;  /* Global Lock maintaining concurrency */
+struct ucache_stats_s *ucache_stats = 0; /* Pointer to stats structure*/
 
-uint64_t ucache_hits;
-uint64_t ucache_misses;
-uint64_t ucache_pseudo_misses; /* Chose not to cache */
+/* Per-process (thread) execution statistics */
+struct ucache_stats_s these_stats = { 0, 0, 0, 0, 0 }; 
 
+/* Flags indicating ucache status */
+int ucache_enabled = 0;
 char ftblInitialized = 0;
 
 /* Internal Only Function Declarations */
@@ -104,6 +112,9 @@ static uint16_t locate_max_fent(struct file_ent_s **fent);
 static void update_LRU(struct mem_table_s *mtbl, uint16_t index);
 static int evict_LRU(struct file_ent_s *fent);
 
+/* Logging */
+static void log_ucache_stats(void);
+
 /* List Printing Functions */ 
 void print_LRU(struct mem_table_s *mtbl);
 void print_dirty(struct mem_table_s *mtbl);
@@ -130,56 +141,54 @@ int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment);
 int ucache_initialize(void)
 {
     int rc = 0;
-    gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);  
-    /* Aquire pointers to shmem segments (locks and ucache) */
+    //gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);  
 
-    /* shmget segment containing all locks */
+    /* Aquire pointers to shmem segments (ucache_aux and ucache) */
+    /* shmget segment containing ucache_aux */
     key_t key = ftok(KEY_FILE, SHM_ID1);
     int shmflg = SVSHM_MODE;
-    int lock_shmid = shmget(key, 0, shmflg);
-    if(lock_shmid == -1)
+    int aux_shmid = shmget(key, 0, shmflg);
+    if(aux_shmid == -1)
     {
-        gossip_debug(GOSSIP_UCACHE_DEBUG, 
-            "ucache_initialize - locks shmget: errno = %d\n", errno);
+        //gossip_debug(GOSSIP_UCACHE_DEBUG, 
+        //    "ucache_initialize - ucache_aux shmget: errno = %d\n", errno);
         return -1;
     }
-    /* shmat locks */
-    ucache_locks = shmat(lock_shmid, NULL, 0);
-    if((long int)ucache_locks == -1)
+    /* shmat ucache_aux */
+    ucache_aux = shmat(aux_shmid, NULL, 0);
+    if((long int)ucache_aux == -1)
     {
-        gossip_debug(GOSSIP_UCACHE_DEBUG,        
-            "ucache_initialize - locks shmat: errno = %d\n", errno);
+        //gossip_debug(GOSSIP_UCACHE_DEBUG,        
+        //    "ucache_initialize - ucache_aux shmat: errno = %d\n", errno);
         return -1;
     }
-   
-    /* Establish and assert lock pointers */ 
-    assert(ucache_locks);
-    ucache_lock = get_lock(BLOCKS_IN_CACHE);
-    assert(ucache_lock);
 
-    int i;
-    for(i = 0; i <= BLOCKS_IN_CACHE; i++)
-    {
-        lock_init(get_lock(i));
-        assert(lock_trylock(get_lock(i)) == 0);
-    }
+    /* Set our global pointers to data in the ucache_aux struct */
+    ucache_locks = ucache_aux->ucache_locks;
+    ucache_lock = get_lock(BLOCKS_IN_CACHE);
+    ucache_stats = &(ucache_aux->ucache_stats);
 
     /* ucache */
     key = ftok(KEY_FILE, SHM_ID2);
     int ucache_shmid = shmget(key, 0, shmflg);
     if(ucache_shmid == -1)
     {
-        gossip_debug(GOSSIP_UCACHE_DEBUG,        
-            "ucache_initialize - ucache shmget: errno = %d\n", errno);
+        //gossip_debug(GOSSIP_UCACHE_DEBUG,        
+        //    "ucache_initialize - ucache shmget: errno = %d\n", errno);
         return -1;
     }
     ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1) 
     {
-        gossip_debug(GOSSIP_UCACHE_DEBUG,        
-            "ucache_initialize - ucache shmat: errno = %d\n", errno);
+        //gossip_debug(GOSSIP_UCACHE_DEBUG,        
+        //    "ucache_initialize - ucache shmat: errno = %d\n", errno);
         return -1;
     }
+
+    /* When this process ends we may want to dump ucache stats to a log file */
+    //rc = atexit(log_ucache_stats);    
+
+    /* Declare the ucache enabled! */
     ucache_enabled = 1;
     return rc;
 }
@@ -252,7 +261,6 @@ int ucache_init_file_table(char forceCreation)
         ucache->ftbl.file[i].mtbl_blk = NIL16;
         ucache->ftbl.file[i].mtbl_ent = NIL16;
         ucache->ftbl.file[i].next = NIL16;
-        assert(ucache->ftbl.file[i].next = NIL16);
     }
 
     /* set up list of free hash table entries */
@@ -394,7 +402,6 @@ int ucache_remove(struct file_ent_s *fent, uint64_t offset)
 int ucache_flush_cache(void)
 {
     int rc = 0;
-    assert(ucache);
     lock_lock(ucache_lock);
     struct file_table_s *ftbl = &ucache->ftbl;
     int i;
@@ -498,16 +505,9 @@ done:
 int flush_block(struct file_ent_s *fent, struct mem_ent_s *ment)
 {
     int rc = 0;
-    /*#ifdef FILE_SYSTEM_ENABLED*/
     PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
     struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
     rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector);
-    /*
-    #endif
-    #ifndef FILE_SYSTEM_ENABLED
-    rc = 0;
-    #endif
-    */
     return rc;
 }
 
@@ -536,7 +536,6 @@ int wipe_ucache(void)
         perror("wipe ucache - ucache shmat");
         return -1;
     }
-    assert(ucache);
 
     /* wipe the cache, locks, and reinitialize */
     memset(ucache, 0, CACHE_SIZE);
@@ -558,6 +557,48 @@ int ucache_close_file(struct file_ent_s *fent)
     rc = remove_file(fent);
     lock_unlock(ucache_lock);
     return rc;
+}
+
+/** May dump stats to log file if the envar LOG_UCACHE_STATS is set to 1.
+ *
+ */
+void log_ucache_stats(void)
+{
+    /* Return if envar not set to 1 */
+    char *var = getenv("LOG_UCACHE_STATS");
+    if(!var)
+    {
+        return;
+    }
+    if(atoi(var) != 1)
+    {
+        return;
+    }
+
+    float attempts = these_stats.hits + these_stats.misses;
+    float percentage = 0.0;
+    /* Don't Divide By Zero! */
+    if(attempts)
+    {
+        percentage = ((float)these_stats.hits) / attempts;
+    }
+   /* 
+    gossip_debug(GOSSIP_UCACHE_DEBUG,
+        "user cache statistics for this execution:\n"
+        "\thits=\t%llu\n"
+        "\tmisses=\t%llu\n"
+        "\thit percentage=\t%f\n"
+        "\tpseudo_misses=\t%llu\n"
+        "\tblock_count=\t%hu\n"
+        "\tfile_count=\t%hu\n",
+        (long long unsigned int) these_stats.hits,
+        (long long unsigned int) these_stats.misses,
+        percentage,
+        (long long unsigned int) these_stats.pseudo_misses,
+        these_stats.block_count,
+        these_stats.file_count
+    );
+   */
 }
 
 /** 
@@ -598,25 +639,31 @@ int ucache_info(FILE *out, char *flags)
         }
     }
 
-    float attempts = ucache_hits + ucache_misses;
+    float attempts = ucache_stats->hits + ucache_stats->misses;
     float percentage = 0.0;
+
+    /* Don't Divide By Zero! */
     if(attempts)
     {
-        percentage = (float)ucache_hits / attempts;
+        percentage = ((float) ucache_stats->hits) / attempts;
     }
 
     if(show_sum)
     {
         fprintf(out, 
             "user cache statistics:\n"
-            "\tucache_hits=\t%llu\n"
-            "\tucache_misses=\t%llu\n"
+            "\thits=\t%llu\n"
+            "\tmisses=\t%llu\n"
             "\thit percentage=\t%f\n"
-            "\tucache_pseudo_misses=\t%llu\n",
-            (long long unsigned int) ucache_hits, 
-            (long long unsigned int) ucache_misses, 
+            "\tpseudo_misses=\t%llu\n"
+            "\tblock_count=\t%hu\n"
+            "\tfile_count=\t%hu\n",
+            (long long unsigned int) ucache_stats->hits, 
+            (long long unsigned int) ucache_stats->misses, 
             percentage, 
-            (long long unsigned int) ucache_pseudo_misses
+            (long long unsigned int) ucache_stats->pseudo_misses,
+            ucache_stats->block_count,
+            ucache_stats->file_count
         );
     }
 
@@ -645,8 +692,6 @@ int ucache_info(FILE *out, char *flags)
     fprintf(out, "NIL16 = 0X%X\n", NIL16);    
     fprintf(out, "NIL32 = 0X%X\n", NIL32);
     fprintf(out, "NIL64 = 0X%lx\n", NIL64);
-
-    fflush(out);
 
     /* Lock's Shared Memory Info */
     fprintf(out, "ucache_lock ptr:\t\t0X%lX\n", (long int)ucache_lock);
@@ -799,11 +844,8 @@ inline ucache_lock_t *get_lock(uint16_t block_index)
     {
         return (ucache_lock_t *)0;
     }
-    return (ucache_locks + block_index);
+    return &ucache_locks[block_index];
 }
-
-
-/* Beginning of internal only (static) functions */
 
 /** 
  * Initializes the proper lock based on the LOCK_TYPE 
@@ -820,7 +862,13 @@ int lock_init(ucache_lock_t * lock)
         rc = 0; 
     }
     #elif LOCK_TYPE == 1
-    rc = pthread_mutex_init(lock, NULL);
+    pthread_mutexattr_t attr;
+    rc = pthread_mutexattr_init(&attr);
+    assert(rc == 0);
+    rc = pthread_mutexattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
+    assert(rc == 0);
+    rc = pthread_mutex_init(lock, &attr);
+    assert(rc == 0);
     if(rc != 0)
     {
         return -1;
@@ -831,6 +879,9 @@ int lock_init(ucache_lock_t * lock)
     {
         return -1;
     }
+    #elif LOCK_TYPE == 3
+    *lock = (ucache_lock_t) GEN_SHARED_MUTEX_INITIALIZER_NP; //GEN_SHARED_MUTEX_INITIALIZER_NP;
+    rc = 0;
     #endif
     return rc;
 }
@@ -864,6 +915,9 @@ inline int lock_lock(ucache_lock_t * lock)
     return rc;
     #elif LOCK_TYPE == 2
     return pthread_spin_lock(lock);
+    #elif LOCK_TYPE == 3
+    rc = gen_mutex_lock(lock);
+    return rc;
     #endif   
 }
 
@@ -872,15 +926,14 @@ inline int lock_lock(ucache_lock_t * lock)
  */
 inline int lock_unlock(ucache_lock_t * lock)
 {
-    int rc = 0;
     #if LOCK_TYPE == 0
     return sem_post(lock);
     #elif LOCK_TYPE == 1
-    rc = pthread_mutex_unlock(lock); 
-    assert(rc == 0);
-    return rc;
+    return pthread_mutex_unlock(lock); 
     #elif LOCK_TYPE == 2
     return pthread_spin_unlock(lock);
+    #elif LOCK_TYPE == 3
+    return gen_mutex_unlock(lock);
     #endif
 }
 
@@ -892,26 +945,6 @@ inline int lock_unlock(ucache_lock_t * lock)
 int ucache_lock_getvalue(ucache_lock_t * lock, int *sval)
 {
     return sem_getvalue(lock, sval);
-}
-#endif
-
-/** 
- * Upon successful completion, returns zero.
- * Otherwise, returns -1.
- * The functions have the same return policy.
- */
-#if 0
-int lock_destroy(ucache_lock_t * lock)
-{
-    int rc = -1;
-    #if (LOCK_TYPE == 0)
-    rc = sem_destroy(lock);
-    #elif (LOCK_TYPE == 1)
-    rc = pthread_mutex_destroy(lock);
-    #elif (LOCK_TYPE == 2)
-    rc = pthread_spin_destroy(lock);
-    #endif
-    return rc;
 }
 #endif
 
@@ -945,6 +978,12 @@ inline int lock_trylock(ucache_lock_t * lock)
     {
         rc = -1;
     }
+    #elif LOCK_TYPE == 3
+    rc = gen_mutex_trylock(lock);
+    if(rc != 0)
+    {
+        rc = -1;
+    }
     #endif
     if(rc == 0)
     {
@@ -954,6 +993,8 @@ inline int lock_trylock(ucache_lock_t * lock)
     return rc;
 }
 /***************************************** End of Externally Visible API */
+
+/* Beginning of internal only (static) functions */
 
 /* Dirty List Iterator */
 /** 
@@ -1103,7 +1144,6 @@ static inline uint16_t get_free_blk(void)
         /* Update the head of the free block list */ 
         /* Use mtbl index zero since free_blks have no ititialized mem tables */
         ftbl->free_blk = ucache->b[desired_blk].mtbl[0].free_list_blk; 
-        //assert(ftbl->free_blk < BLOCKS_IN_CACHE);
         return desired_blk;
     }
     return NIL16;
@@ -1117,7 +1157,6 @@ static inline void put_free_blk(uint16_t blk)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
     /* set the block's next value to the current head of the block free list */
-    assert(blk < BLOCKS_IN_CACHE);
     ucache->b[blk].mtbl[0].free_list_blk = ftbl->free_blk;
     /* blk is now the head of the ftbl blk free list */
     ftbl->free_blk = blk;
@@ -1466,7 +1505,7 @@ uint16_t insert_file(
 /** 
  * Remove file entry and memory table of file identified by parameters
  * Returns 1 following removal
- * Returns NIL if file is referenced or if the file could not be located.
+ * Returns -1 if file is referenced or if the file could not be located.
  */
 static int remove_file(struct file_ent_s *fent)
 {
@@ -1481,14 +1520,17 @@ static int remove_file(struct file_ent_s *fent)
 
     /* Flush file blocks before file removal */
     mtbl->ref_cnt--;
-    if(mtbl->ref_cnt == 0)
+
+    if(mtbl->ref_cnt > 0)
     {
-        /* Flush dirty blocks before file removal from cache */
-        rc = flush_file(fent);
-        if(rc == -1)
-        {
-            return rc;
-        }
+        return 0;
+    }
+
+    /* Flush dirty blocks before file removal from cache */
+    rc = flush_file(fent);
+    if(rc == -1)
+    {
+        return rc;
     }
 
     /* Instead of removing individually, since memory entries are already 
@@ -1514,8 +1556,7 @@ static int remove_file(struct file_ent_s *fent)
     }
 
     /* Success */
-    rc = 0;
-    return rc;
+    return 0;
 }
 
 /** 
@@ -1551,7 +1592,6 @@ inline static void *lookup_mem(struct mem_table_s *mtbl,
             if(item_index != NULL)
             {
                 *item_index = current->item;
-                assert(*item_index != NIL16);
             }
             if((mem_ent_index != NULL) && (mem_ent_prev_index != NULL))
             {
@@ -1589,7 +1629,6 @@ static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
         (mtbl->lru_last == NIL16))
     {
         mtbl->lru_first = index;
-        assert(index != NIL16);
         mtbl->lru_last = index;
         mtbl->mem[index].lru_prev = NIL16;
         mtbl->mem[index].lru_next = NIL16;
@@ -1627,13 +1666,11 @@ static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
         }
         else if(mtbl->mem[index].lru_prev == NIL16)
         {
-            assert(mtbl->lru_first == index);
             /* Already the head of MRU */
             return;
         }
         else if(mtbl->mem[index].lru_next == NIL16)
         {
-            assert(mtbl->lru_last == index);
             /* Relocate the LRU to become the MRU */
             mtbl->lru_last = mtbl->mem[index].lru_prev;
             mtbl->mem[mtbl->lru_last].lru_next = NIL16;
@@ -1646,8 +1683,6 @@ static inline void update_LRU(struct mem_table_s *mtbl, uint16_t index)
             /* Relocate interior LRU list item to head */
             uint16_t current_prev = mtbl->mem[index].lru_prev;
             uint16_t current_next = mtbl->mem[index].lru_next;
-
-            assert(current_prev != NIL16 && current_next != NIL16);
 
             mtbl->mem[current_prev].lru_next = current_next;
             mtbl->mem[current_next].lru_prev = current_prev;

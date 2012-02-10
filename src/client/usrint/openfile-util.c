@@ -463,7 +463,7 @@ void pvfs_sys_init_doit(void) {
     load_glibc();
     PINT_initrand();
 
-    /* if this fails no much we can do about it */
+    /* if this fails not much we can do about it */
     atexit(usrint_cleanup);
 
     /* set up current working dir */
@@ -526,31 +526,25 @@ void pvfs_sys_init_doit(void) {
     /* call other initialization routines */
 
 #if PVFS_UCACHE_ENABLE
-    gossip_enable_file(UCACHE_LOG_FILE, "a");
+    //gossip_enable_file(UCACHE_LOG_FILE, "a");
+    //gossip_enable_stderr();
+
     /* ucache initialization - assumes shared memory previously 
      * aquired (using ucache daemon) 
      */
     rc = ucache_initialize();
     if (rc < 0)
     {
-        /* ucache failed to initialize */
-        /* continue without cache */
+        /* ucache failed to initialize, so continue without it */
+        /* Write a warning message in the ucache.log letting programmer know */
         ucache_enabled = 0;
-        uint64_t curr_mask;
-        int debug_on;
-        gossip_get_debug_mask(&debug_on, &curr_mask);
 
         /* Enable the writing of the error message and write the message to file. */
-        gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);
-        gossip_debug(GOSSIP_UCACHE_DEBUG, 
-            "WARNING: client caching configured enabled but couldn't inizialize\n");
-        //printf("now gossip_debug_mask = 0x%016lx\n", gossip_debug_mask);
-
-        /* restore previous gossip_debug_mask */
-        //gossip_set_debug_mask(debug_on, curr_mask);
+        //gossip_set_debug_mask(1, GOSSIP_UCACHE_DEBUG);
+        //gossip_debug(GOSSIP_UCACHE_DEBUG, 
+        //    "WARNING: client caching configured enabled but couldn't inizialize\n");
     }
 #endif
-    //PVFS_perror_gossip_silent(); 
 }
 
 int pvfs_descriptor_table_size(void)

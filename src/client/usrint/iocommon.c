@@ -103,7 +103,7 @@ int iocommon_fsync(pvfs_descriptor *pd)
     }
     iocommon_cred(&credential); 
 #if PVFS_UCACHE_ENABLE
-    if (pvfs_ucache_enabled())
+    if (ucache_enabled)
     {
         rc = ucache_flush_file(pd->s->fent);
         if(rc != 0)
@@ -1201,19 +1201,19 @@ int iocommon_readorwrite(enum PVFS_io_type which,
 {
     int rc = 0;
 #if PVFS_UCACHE_ENABLE
-    if(pvfs_ucache_enabled())
+    if(ucache_enabled)
     {
         if(!pd->s->fent)
         {
             lock_lock(ucache_lock);
-            ucache_pseudo_misses++; /* could overflow, reset periodically */
+            ucache_stats->pseudo_misses++; /* could overflow */
+            these_stats.pseudo_misses++;
             lock_unlock(ucache_lock);
         }
     }
 
-    if(!pvfs_ucache_enabled() || !pd->s->fent)
+    if(!ucache_enabled || !pd->s->fent)
     {
-
 #endif /* PVFS_UCACHE_ENABLE */
 
         /* Bypass the ucache */
@@ -1290,7 +1290,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         if(ureq[i].ublk_ptr == (void *)NIL) 
         {
             lock_lock(ucache_lock);
-            ucache_misses++; /* could overflow, reset periodically */
+            ucache_stats->misses++; /* could overflow */
+            these_stats.misses++;
             lock_unlock(ucache_lock);
             ureq[i].ublk_hit = 0; /* miss */
             /* Find a place for the block */
@@ -1301,7 +1302,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         else
         {
             lock_lock(ucache_lock);
-            ucache_hits++;  /* could overflow, reset periodically */
+            ucache_stats->hits++;  /* could overflow */
+            these_stats.hits++;
             lock_unlock(ucache_lock);
             ureq[i].ublk_hit = 1; /* hit */
         }
