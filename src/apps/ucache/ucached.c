@@ -203,30 +203,30 @@ static int create_ucache_shmem(void)
 {
     int rc = 0;
 
-    int old_locks_present = 0;
+    int old_aux_present = 0;
 
     /* attempt setup of shmem region for locks (inlcude SYSV later? */
     int id = SHM_ID1;
     key_t key = ftok(KEY_FILE, id);
-    size_t size = LOCKS_SIZE;
+    size_t size = UCACHE_AUX_SIZE;
     int shmflg = SVSHM_MODE;
-    int lock_shmid = shmget(key, size, shmflg);
+    int aux_shmid = shmget(key, size, shmflg);
 
-    if(lock_shmid == -1)
+    if(aux_shmid == -1)
     {
         gossip_debug(GOSSIP_UCACHED_DEBUG,
-            "INFO: shmget on lock_shmid returned -1 on first try\n");
+            "INFO: shmget on aux_shmid returned -1 on first try\n");
 
-        /* Shared memory segment used for locks was not previosly created, 
+        /* Shared memory segment used for aux data was not previosly created, 
          * so create it.
          */
         shmflg = shmflg | IPC_CREAT | IPC_EXCL;
-        lock_shmid = shmget(key, size, shmflg);
-        if(lock_shmid == -1)
+        aux_shmid = shmget(key, size, shmflg);
+        if(aux_shmid == -1)
         {
             gossip_debug(GOSSIP_UCACHED_DEBUG,
                 "ERROR: shmget (IPC_CREATE, IPC_EXCL)"
-                " on lock_shmid returned -1\n");
+                " on aux_shmid returned -1\n");
             /* Couldn't create the required segment */
             return -1;
         }
@@ -234,21 +234,23 @@ static int create_ucache_shmem(void)
         {
             gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: shmget (using IPC_CREATE, IPC_EXCL)"
-                " on lock_shmid returned shmid = %d\n", lock_shmid);
+                " on aux_shmid returned shmid = %d\n", aux_shmid);
 
-            /* Attach to shmem and initialize all the locks */
+            /* Attach to shmem and initialize all the aux struct */
             shmflg = 0;
-            /* ucache_locks is defined in src/client/usrint/ucache.h */
-            ucache_locks = shmat(lock_shmid, NULL, shmflg);
-            if (!ucache_locks)
+            /* ucache_aux is defined in src/client/usrint/ucache.h */
+            ucache_aux = shmat(aux_shmid, NULL, shmflg);
+            if (!ucache_aux)
             {
                 gossip_debug(GOSSIP_UCACHED_DEBUG,
-                    "ERROR: shmat on lock_shmid returned NULL");
+                    "ERROR: shmat on aux_shmid returned NULL");
                 return -1;
             }
 
+            ucache_locks = ucache_aux->ucache_locks;
+
             int i;
-            /* Initialize Block Level Locks */
+            /* Initialize Shared Block Level Locks */
             for(i = 0; i < (BLOCKS_IN_CACHE + 1); i++)
             {
                 rc = lock_init(get_lock(i));
@@ -264,16 +266,16 @@ static int create_ucache_shmem(void)
     else
     {
         gossip_debug(GOSSIP_UCACHED_DEBUG,
-            "INFO: first shmget on lock_shmid found segment"
-            ": shmid = %d\n", lock_shmid);
-        old_locks_present = 1;
-        /* Shmem for locks was already created, so just attach to it */
+            "INFO: first shmget on aux_shmid found segment"
+            ": shmid = %d\n", aux_shmid);
+        old_aux_present = 1;
+        /* Shmem for ucache_aux was already created, so just attach to it */
         shmflg = 0;
-        ucache_locks = shmat(lock_shmid, NULL, shmflg);
-        if (!ucache_locks)
+        ucache_aux = shmat(aux_shmid, NULL, shmflg);
+        if (!ucache_aux)
         {
             gossip_debug(GOSSIP_UCACHED_DEBUG,
-                "ERROR: shmat on lock_shmid returned NULL\n");
+                "ERROR: shmat on aux_shmid returned NULL\n");
             return -1;
         }    
     }
@@ -290,6 +292,10 @@ static int create_ucache_shmem(void)
     gossip_debug(GOSSIP_UCACHED_DEBUG,
         "INFO: lock segment successfully retrieved and global lock locked.\n");
 
+    /* Set and zero out global ucache stats struct */
+    ucache_stats = &(ucache_aux->ucache_stats);
+    *ucache_stats = (struct ucache_stats_s){ 0, 0, 0, 0, 0 };
+
     /* Try to get/create the shmem required for the ucache */
     id = SHM_ID2;
     key = ftok(KEY_FILE, id);
@@ -303,14 +309,14 @@ static int create_ucache_shmem(void)
             "INFO: shmget on ucache_shmid returned -1 first try\n");
 
         /* Remember if there was an old lock region detected */
-        if(old_locks_present)
+        if(old_aux_present)
         {
             gossip_debug(GOSSIP_UCACHED_DEBUG,
-                "INFO: old locks discovered, attempting destruction of old" 
+                "INFO: old ucache_aux found, attempting destruction of old"
                 " locks and starting\n");
 
-            /* Destroy old lock region and start function over */
-            rc = shmctl(lock_shmid, IPC_RMID, (struct shmid_ds *) NULL);
+            /* Destroy old aux region and start function over */
+            rc = shmctl(aux_shmid, IPC_RMID, (struct shmid_ds *) NULL);
 
             /* Let this child process exit, since exiting is required to get
              * the shmem segment to be completely removed. Try to create the 
@@ -569,7 +575,7 @@ int main(int argc, char **argv)
     }
 
     /* Daemonize! */
-    rc = daemon(1, 1);
+    rc = daemon(0, 0);
 
     if(rc != 0)
     {
