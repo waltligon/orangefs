@@ -63,6 +63,29 @@ typedef pthread_t       gen_thread_t;
 typedef pthread_cond_t  gen_cond_t;
 #define GEN_MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
 #define GEN_COND_INITIALIZER PTHREAD_COND_INITIALIZER;
+
+#ifdef __USE_GNU
+/* Support for custom static initializer for a processor-shared pthread mutex.*/
+# if _POSIX_THREAD_PROCESS_SHARED != -1
+#  if __WORDSIZE == 64
+#   define GEN_SHARED_MUTEX_INITIALIZER_NP \
+     { { 0, 0, 0, 0, 128, 0, { 0, 0 } } }
+#  else
+#   define GEN_SHARED_MUTEX_INITIALIZER_NP \
+     { { 0, 0, 0, 0, 128, { 0 } } }
+#  endif /* __WORDSIZE */   
+# endif /* _POSIX_THREAD_PROCESS_SHARED */
+
+/* Support for custom static initializer for a recursive pthread mutex */
+# if __WORDSIZE == 64
+#  define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+    { { 0, 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0, 0 } } }
+# else
+#  define GEN_RECURSIVE_MUTEX_INITIALIZER_NP \
+    { { 0, 0, 0, PTHREAD_MUTEX_RECURSIVE_NP, 0, { 0 } } }
+# endif /* __WORDSIZE */
+#endif /* __USE_GNU */
+
 #define gen_mutex_lock(m) gen_posix_mutex_lock(m)
 #define gen_mutex_unlock(m) gen_posix_mutex_unlock(m)
 #define gen_mutex_trylock(m) gen_posix_mutex_trylock(m)
@@ -147,6 +170,8 @@ typedef unsigned long gen_thread_t;
 typedef int gen_cond_t;
 
 #define GEN_MUTEX_INITIALIZER 0
+#define GEN_SHARED_MUTEX_INITIALIZER_NP 0
+#define GEN_RECURSIVE_MUTEX_INITIALIZER_NP 0
 #define GEN_COND_INITIALIZER 0
 
 static inline int gen_mutex_lock(
