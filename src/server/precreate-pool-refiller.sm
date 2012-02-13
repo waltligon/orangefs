@@ -25,53 +25,53 @@ static int batch_create_comp_fn(
 
 machine pvfs2_precreate_pool_refiller_sm
 {
-        state setup
-        {
-                run setup_fn;
-                success => wait_for_threshold;
-                default => error_retry;
-        }
+    state setup
+    {
+        run setup_fn;
+        success => wait_for_threshold;
+        default => error_retry;
+    }
 
-	state wait_for_threshold 
-	{
-		run wait_for_threshold_fn;
-		success => setup_batch_create;
-		default => error_retry;
-	}
+    state wait_for_threshold 
+    {
+        run wait_for_threshold_fn;
+        success => setup_batch_create;
+        default => error_retry;
+    }
 
-	state setup_batch_create 
-	{
-		run setup_batch_create_fn;
-		success => msgpair_xfer_batch_create;
-		default => error_retry;
-	}
+    state setup_batch_create 
+    {
+        run setup_batch_create_fn;
+        success => msgpair_xfer_batch_create;
+        default => error_retry;
+    }
 
-        state msgpair_xfer_batch_create
-        {
-                jump pvfs2_msgpairarray_sm;
-                success => store_handles;
-                default => msgpair_retry;
-        }
+    state msgpair_xfer_batch_create
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => store_handles;
+        default => msgpair_retry;
+    }
 
-        state msgpair_retry
-        {
-                run msgpair_retry_fn;
-                default => setup_batch_create;
-        }
+    state msgpair_retry
+    {
+        run msgpair_retry_fn;
+        default => setup_batch_create;
+    }
 
-        state store_handles
-        {
-                run store_handles_fn;
-                success => wait_for_threshold;
-                default => error_retry;
-        }
+    state store_handles
+    {
+        run store_handles_fn;
+        success => wait_for_threshold;
+        default => error_retry;
+    }
 
-        state error_retry
-        {
-                run error_fn;
-                success => setup;
-                default => terminate;
-        }
+    state error_retry
+    {
+        run error_fn;
+        success => setup;
+        default => terminate;
+    }
 }
 
 %%
@@ -91,11 +91,11 @@ static PINT_sm_action msgpair_retry_fn(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         js_p->error_code,
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context));
 }
 
 /* wait_for_threshold_fn()
@@ -117,11 +117,11 @@ static PINT_sm_action wait_for_threshold_fn(
         s_op->u.precreate_pool_refiller.pool_handle,
         s_op->u.precreate_pool_refiller.fsid,
         user_opts->precreate_low_threshold[index],
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context));
 }
 
  /* store_handles_fn()
@@ -142,11 +142,11 @@ static PINT_sm_action store_handles_fn(
         s_op->u.precreate_pool_refiller.fsid,
         s_op->u.precreate_pool_refiller.precreate_handle_array,
         user_opts->precreate_batch_size[index],
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context,
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context,
         NULL));
 }
 
@@ -221,7 +221,6 @@ static PINT_sm_action setup_fn(
   
     PVFS_ds_type_to_int( s_op->u.precreate_pool_refiller.type, &index);
 
-    /* nlmills: TODO: ensure this is freed in all cases */
     ret = PINT_init_capability(cap);
     if (ret < 0)
     {
@@ -277,11 +276,11 @@ static PINT_sm_action error_fn(
 
     return(job_req_sched_post_timer(
         (30*1000),
-	smcb,
-	0,
-	js_p,
-	&tmp_id,
-	server_job_context));
+        smcb,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context));
 }
 
 
@@ -305,7 +304,7 @@ static int batch_create_comp_fn(void *v_p,
     if (resp_p->status != 0)
     {
         PVFS_perror_gossip("batch_create request got", resp_p->status);
-	return resp_p->status;
+        return resp_p->status;
     }
 
     for(i = 0; i<resp_p->u.batch_create.handle_count; i++)

@@ -82,7 +82,7 @@ int PINT_get_capabilities(void *acl_buf,
     }
 
     /* if acls are present then use them */
-    if (acl_size < 0)
+    if (acl_size > 0)
     {
         assert(acl_buf);
 
