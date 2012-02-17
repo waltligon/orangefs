@@ -21,6 +21,10 @@
 #define UCACHED_LOG_FILE "/tmp/ucached.log"
 #endif
 
+#ifndef UCACHED_INFO_FILE
+#define UCACHED_INFO_FILE "/tmp/ucached.info"
+#endif
+
 #define GOSSIP_UCACHED_DEBUG 0x0001000000000000
 #define GOSSIP_UCACHED_CMD_DEBUG 0x0000100000000000
 
