@@ -47,7 +47,7 @@ void check_rc(int rc)
     }
     else
     {
-        strcpy(buffer, "FAILURE: check log:" UCACHED_LOG_FILE);
+        strcpy(buffer, "FAILURE: check log: " UCACHED_LOG_FILE);
     }
 }
 
@@ -79,7 +79,7 @@ static void clean_up(void)
  * Returns 1 when 1 or more hung locks are detected and all are gracefully
  * handled. 
  * Returns -1 when 1 or more  hung locks are detected and couldn't
- * be handled properly. (error) 
+* be handled properly. (error) 
  */
 static int ucached_lockchk(void)
 {
@@ -178,8 +178,31 @@ static int execute_cmd(char cmd)
             rc = destroy_ucache_shmem(1, 1);
             break;
         case 'i':
-            rc = ucache_info(stdout, "sav");
+        {
+            char info_options[6];
+            memset(info_options, 0, 6);
+
+            /* Open FILE * to output ucache_info */
+            FILE * info_out = fopen(UCACHED_INFO_FILE, "w");
+            //FILE * info_out = fdopen(writefd, "w");
+
+            int howmany = sscanf(&buffer[1], "%s", info_options);
+            if(howmany > 0)
+            {
+                rc = ucache_info(info_out, info_options);
+            }
+            else
+            {
+                fprintf(info_out, "No display options specified. " 
+                    "Showing all ucache contents.\n");
+                rc = ucache_info(info_out, "a");
+            }
+            rc = 1;
+            fclose(info_out);
+            //shmdt(ucache);
+            //shmdt(ucache_aux);
             break;
+        }
         /* Close Daemon */
         case 'x': 
             writefd = open(FIFO2, O_WRONLY); 
@@ -189,12 +212,13 @@ static int execute_cmd(char cmd)
                 rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
             }
             close(writefd);
+            close(readfd);
             exit(EXIT_SUCCESS);
             break;
         default:
             strcpy(buffer, "FAILURE\tInvalid command character");
-            break;
-     }
+            return -1;
+    }
     return rc;
 }
 
@@ -474,6 +498,7 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
 
     if(dest_ucache)
     {
+//        printf("dest_ucache\n");
         gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: destroying ucache shmem\n");
 
@@ -498,6 +523,7 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
 
     if(dest_locks)
     {
+//        printf("dest_locks\n");
         gossip_debug(GOSSIP_UCACHED_DEBUG,
             "INFO: destroying locks' shmem\n");
 
@@ -522,7 +548,6 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
 
     gossip_debug(GOSSIP_UCACHED_DEBUG,
         "INFO: both shmem segments marked for destruction.\n");
-
     return rc;
 }
 
@@ -575,7 +600,8 @@ int main(int argc, char **argv)
     }
 
     /* Daemonize! */
-    rc = daemon(0, 0);
+    //rc = daemon( 0, 0);
+    rc = daemon( 1, 1);
 
     if(rc != 0)
     {
@@ -644,20 +670,20 @@ int main(int argc, char **argv)
                 /* Data read into buffer*/ 
                 char c = buffer[0];
                 /* Valid Command? */
-                if(c == 'c' || c == 'd' || c == 'x' || 'i')
+                if(c == 'c' || c == 'd' || c == 'x' || c == 'i')
                 {
                     gossip_debug(GOSSIP_UCACHED_DEBUG,
                         "INFO: Command Received: %c\n", c);
-                    /* Run creation in child process */
-                    if(c == 'c')
+                    if(c == 'c' || c == 'i')
                     {
+                        /* Run creation in child process */
                         run_as_child(c);
                     }
                     else
                     {
-                        rc = execute_cmd(c);
+                        execute_cmd(c);
                     }
-                    check_rc(rc);                  
+                    check_rc(rc);
                 }
                 /* Invalid Command */
                 else
@@ -669,22 +695,25 @@ int main(int argc, char **argv)
                 }
 
                 /* Data can be written, not guaranteed anything to write */
-                int responseLength = 0;
-                if((responseLength = strlen(buffer)) != 0)
+                int responseLength = strlen(buffer);
+                if(responseLength != 0)
                 {
                     writefd = open(FIFO2, O_WRONLY);
                     if(writefd == -1)
-                    {
+                    {   perror("Error Opening File");
                         gossip_debug(GOSSIP_UCACHED_DEBUG,
                            "ERROR: opening write FIFO: errno = %d\n", errno);
                     }
                     rc = write(writefd, buffer, BUFF_SIZE);
                     while(rc <= 0)
-                    {
+                    {   printf("rc = %d\n", rc);
                         rc = write(writefd, buffer, BUFF_SIZE);
                     }
                     memset(buffer, 0, BUFF_SIZE);
-                    close(writefd);
+                }
+                else
+                {
+                    printf("no response\n");
                 }
             }
         }
@@ -692,11 +721,10 @@ int main(int argc, char **argv)
 
         if(ucache_avail)
         {
-            /* Gather stats */
-            /* TODO: which stats? */
+            /* TODO: write some stats to file periodically */
 
             /* Write some dirty blocks out */
-            /* TODO: create function to do this or do i already have one that will suffice? */
+            /* TODO: create function to do this. */
 
             /* Check for hung locks */
             rc = ucached_lockchk();
