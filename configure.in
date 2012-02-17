@@ -1249,30 +1249,43 @@ AC_SUBST(GOSSIP_ENABLE_BACKTRACE)
 
 dnl --
 dnl Check for SDL
-AC_MSG_CHECKING([for SDL])
-SDL_CONFIG=`which sdl-config 2> /dev/null`
-if ! test -z "$SDL_CONFIG" && test -x "$SDL_CONFIG"; then
-   AC_MSG_RESULT(yes)
-   SDL_VERSION=`sdl-config --version`
-   VISCFLAGS=`sdl-config --cflags`
-   VISCLIBS=`sdl-config --libs`
+test_for_sdl()
+{
+  AC_MSG_CHECKING([for SDL])
+  SDL_CONFIG=`which sdl-config 2> /dev/null`
+  if ! test -z "$SDL_CONFIG" && test -x "$SDL_CONFIG"; then
+     AC_MSG_RESULT(yes)
+     SDL_VERSION=`sdl-config --version`
+     VISCFLAGS=`sdl-config --cflags`
+     VISCLIBS=`sdl-config --libs`
 
-   dnl We also need SDL ttf support
-   dnl only define BUILD_VIS if we have all required parts
-   AC_CHECK_HEADERS(SDL_ttf.h,
-       [BUILD_VIS="1"
-        CPPFLAGS="$CPPFLAGS $VISCFLAGS"],
-        [AC_CHECK_HEADERS(SDL/SDL_ttf.h,
-            [BUILD_VIS="1"
-            CPPFLAGS="$CPPFLAGS $VISCFLAGS"],)],
-)
+     dnl We also need SDL ttf support
+     dnl only define BUILD_VIS if we have all required parts
+     AC_CHECK_HEADERS(SDL_ttf.h,
+         [BUILD_VIS="1"
+          CPPFLAGS="$CPPFLAGS $VISCFLAGS"],
+          [AC_CHECK_HEADERS(SDL/SDL_ttf.h,
+              [BUILD_VIS="1"
+              CPPFLAGS="$CPPFLAGS $VISCFLAGS"],)],
+  )
 
-   AC_SUBST(BUILD_VIS)
-   AC_SUBST(VISCFLAGS)
-   AC_SUBST(VISLIBS)
-else
-   AC_MSG_RESULT(no)
+     AC_SUBST(BUILD_VIS)
+     AC_SUBST(VISCFLAGS)
+     AC_SUBST(VISLIBS)
+  else
+     AC_MSG_RESULT(no)
+  fi
+}
+
+dnl optionally disable building visualisation tools
+AC_ARG_ENABLE(visual,
+[  --enable-visual         Enable visualisation tools. (Disabled by default, requires SDL)],
+[
+if test "x$enableval" = "xyes" ; then
+   test_for_sdl
 fi
+],
+)
 
 dnl Which form of strerror?
 AC_MSG_CHECKING([for GNU-style strerror_r])
@@ -1376,6 +1389,12 @@ if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to build karma gui               :  no])
+fi
+
+if test "x$BUILD_VIS" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 configured to build visualization tools     : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build visualization tools     :  no])
 fi
 
 if test "x$ENABLE_COVERAGE" = "x1" -a "x$BUILD_BMI_ONLY" != "x1"; then
