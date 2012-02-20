@@ -381,6 +381,11 @@ void set_defaults(PORANGEFS_OPTIONS options)
         strcat(options->debug_file, "\\orangefs.log");
     }
 
+    /* new file/dir permissions
+     *   0755 = rwxr-xr-x 
+     */
+    options->new_file_perms = options->new_dir_perms = 0755; 
+
     /* default LDAP options */
     options->ldap.search_scope = LDAP_SCOPE_ONELEVEL;
     strcpy(options->ldap.search_class, "user");
@@ -398,8 +403,9 @@ int get_config(PORANGEFS_OPTIONS options,
                unsigned int error_msg_len)
 {
     FILE *config_file;
-    char line[256], copy[256], *token, *p;
+    char line[256], copy[256], *token, *p, *endptr;
     int ret = 0, debug_file_flag = FALSE;
+    long mask;
 
     config_file = open_config_file(error_msg, error_msg_len);
     if (config_file == NULL)
@@ -539,6 +545,31 @@ int get_config(PORANGEFS_OPTIONS options,
                         "ca-path option: parse error\n");
                     ret = -1;
                     goto get_config_exit;
+                }
+            }
+            else if (!stricmp(token, "new-file-perms") ||
+                     !stricmp(token, "new-dir-perms"))
+            {
+                p = line + strlen(token);
+                EAT_WS(p);
+                /* get mask in octal format */
+                mask = strtol(p, &endptr, 8);
+                if (!mask || *endptr != '\0')
+                {
+                    _snprintf(error_msg, error_msg_len,
+                        "Configuration file (fatal): "
+                        "%s option: parse error - value must be "
+                        "nonzero octal integer\n", token);
+                    ret = -1;
+                    goto get_config_exit;
+                }
+                if (!stricmp(token, "new-file-perms"))
+                {
+                    options->new_file_perms = (unsigned int) mask;
+                }
+                else
+                {
+                    options->new_dir_perms = (unsigned int) mask;
                 }
             }
             else if (!stricmp(token, "debug"))
