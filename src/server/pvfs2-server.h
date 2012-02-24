@@ -625,8 +625,7 @@ typedef struct PINT_server_op
       } \
     } while (0)
 
-/* nlmills: TODO: consider passing request only */
-/* nlmills: in that case we can move this whole block back to the file's top */
+/* state machine permission function */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \

@@ -65,10 +65,10 @@ static int load_private_key(const char*);
 static int load_public_keys(const char*);
 
 
-/*  PINT_security_initialize	
+/*  PINT_security_initialize    
  *
  *  Initializes the security module
- *	
+ *    
  *  returns PVFS_EALREADY if already initialized
  *  returns PVFS_EIO if key file is missing or invalid
  *  returns 0 on sucess
@@ -139,10 +139,10 @@ int PINT_security_initialize(void)
     return 0;
 }
 
-/*  PINT_security_finalize	
+/*  PINT_security_finalize    
  *
  *  Finalizes the security module
- *	
+ *    
  *  returns PVFS_EALREADY if already finalized
  *  returns 0 on sucess
  */
@@ -174,7 +174,7 @@ int PINT_security_finalize(void)
  *  Function to call after creating an initial capability
  *  structure to initialize needed memory space for the signature.
  *  Sets all fields to 0 or NULL to be safe
- *	
+ *    
  *  returns -PVFS_ENOMEM on error
  *  returns -PVFS_EINVAL if passed an invalid structure
  *  returns 0 on success
@@ -293,14 +293,14 @@ int PINT_sign_capability(PVFS_capability *cap)
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+                     "%s\n", ERR_error_string(ERR_get_error(), buf));
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
 
     ret = EVP_SignUpdate(&mdctx, 
-			 cap->issuer, 
-			 strlen(cap->issuer) * sizeof(char));
+                         cap->issuer, 
+                         strlen(cap->issuer) * sizeof(char));
     ret &= EVP_SignUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_SignUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_SignUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
@@ -308,25 +308,25 @@ int PINT_sign_capability(PVFS_capability *cap)
     if (cap->num_handles)
     {
         ret &= EVP_SignUpdate(&mdctx, 
-			      cap->handle_array, 
-			      cap->num_handles * sizeof(PVFS_handle));
+                              cap->handle_array, 
+                              cap->num_handles * sizeof(PVFS_handle));
     }
 
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+                     "%s\n", ERR_error_string(ERR_get_error(), buf));
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
 
     ret = EVP_SignFinal(&mdctx, 
-			cap->signature, &cap->sig_size, 
+                        cap->signature, &cap->sig_size, 
                         security_privkey);
     if (!ret)
     {
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing capability: "
-                         "%s\n", ERR_error_string(ERR_get_error(), buf));
+                     "%s\n", ERR_error_string(ERR_get_error(), buf));
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
@@ -367,12 +367,18 @@ int PINT_verify_capability(const PVFS_capability *cap)
 
     if (PINT_capability_is_null(cap))
     {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Verified null capability\n");
         return 1;
     }
 
     /* if capability has timed out */
     if (PINT_util_get_current_time() >= cap->timeout)
     {
+        char buf[16];
+
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability (%s) expired (timeout "
+                     "%llu)\n", PINT_util_bytes2str(cap->signature, buf, 4),
+                     llu(cap->timeout));
         return 0;
     }
 
@@ -414,28 +420,28 @@ int PINT_verify_capability(const PVFS_capability *cap)
     }
 
     ret = EVP_VerifyUpdate(&mdctx, 
-			   cap->issuer,
-			   strlen(cap->issuer) * sizeof(char));
+                           cap->issuer,
+                           strlen(cap->issuer) * sizeof(char));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->fsid, sizeof(PVFS_fs_id));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->timeout, sizeof(PVFS_time));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->op_mask, sizeof(uint32_t));
     ret &= EVP_VerifyUpdate(&mdctx, &cap->num_handles,
-			    sizeof(uint32_t));
+                            sizeof(uint32_t));
     if (cap->num_handles)
     {
-	ret &= EVP_VerifyUpdate(&mdctx, 
-				cap->handle_array,
-				cap->num_handles * sizeof(PVFS_handle));
+        ret &= EVP_VerifyUpdate(&mdctx, 
+                               cap->handle_array,
+                               cap->num_handles * sizeof(PVFS_handle));
     }
     if (ret)
     {
-	ret = EVP_VerifyFinal(&mdctx, cap->signature, cap->sig_size, 
-			      pubkey);
+        ret = EVP_VerifyFinal(&mdctx, cap->signature, cap->sig_size, 
+                              pubkey);
     }
     else 
     {
-	EVP_MD_CTX_cleanup(&mdctx);
-	return 0;
+        EVP_MD_CTX_cleanup(&mdctx);
+        return 0;
     }
     
     EVP_MD_CTX_cleanup(&mdctx);
@@ -542,6 +548,19 @@ int PINT_sign_credential(PVFS_credential *cred)
     
     cred->timeout = PINT_util_get_current_time() + config->security_timeout;
 
+    /* If squashing is enabled, server will re-sign a credential with 
+       translated uid/gid. In this case the signature must be reallocated. 
+       -- see prelude_validate */
+    if (cred->signature == NULL)
+    {
+        cred->signature = calloc(1, EVP_PKEY_size(security_privkey));
+        if (cred->signature == NULL)
+        {
+            free(cred->issuer);
+            return -1;
+        }
+    }
+
     if (EVP_PKEY_type(security_privkey->type) == EVP_PKEY_RSA)
     {
         md = EVP_sha1();
@@ -570,12 +589,12 @@ int PINT_sign_credential(PVFS_credential *cred)
     if (cred->issuer)
     {
         ret &= EVP_SignUpdate(&mdctx, cred->issuer, 
-                strlen(cred->issuer) * sizeof(char));
+                              strlen(cred->issuer) * sizeof(char));
     }
     ret &= EVP_SignUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure.\n");
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "SignUpdate failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
         return -1;
     }
@@ -587,7 +606,7 @@ int PINT_sign_credential(PVFS_credential *cred)
     {
         ERR_error_string_n(ERR_get_error(), buf, 256);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error signing credential: "
-		     "%s\n", buf);
+             "%s\n", buf);
         return -1;
     }
 
@@ -620,11 +639,18 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
     if (!cred)
     {
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Null credential\n");
         return 0;
     }
 
     if (PINT_util_get_current_time() >= cred->timeout)
     {
+        char sigbuf[16]; 
+
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Credential (%s) expired "
+                     "(timeout %llu)\n", 
+                     PINT_util_bytes2str(cred->signature, sigbuf, 4),
+                     llu(cred->timeout));
         return 0;
     }
 
@@ -661,7 +687,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     ret = EVP_VerifyInit_ex(&mdctx, md, NULL);
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure.\n");
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyInit failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
         return 0;
     }
@@ -681,7 +707,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     ret &= EVP_VerifyUpdate(&mdctx, &cred->timeout, sizeof(PVFS_time));
     if (!ret)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure.\n");
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "VerifyUpdate failure\n");
         EVP_MD_CTX_cleanup(&mdctx);
         return 0;
     }
@@ -690,8 +716,8 @@ int PINT_verify_credential(const PVFS_credential *cred)
     if (ret < 0)
     {
         ERR_error_string_n(ERR_get_error(), buf, 256);
-	gossip_debug(GOSSIP_SECURITY_DEBUG, "Error verifying credential: "
-		     "%s\n", buf);
+        gossip_debug(GOSSIP_SECURITY_DEBUG, "Error verifying credential: "
+                     "%s\n", buf);
     }
 
     EVP_MD_CTX_cleanup(&mdctx);
@@ -774,7 +800,7 @@ static void cleanup_threading(void)
 static unsigned long id_function(void)
 {
     /* nlmills: TODO: find a more portable way to do this */
-    return (unsigned long)gen_thread_self();
+    return (unsigned long) gen_thread_self();
 }
 
 /* locking_function
@@ -864,7 +890,7 @@ static int load_private_key(const char *path)
     {
         ERR_error_string_n(ERR_get_error(), buf, 256);
         gossip_debug(GOSSIP_SECURITY_DEBUG, "Error loading private key: "
-		     "%s\n", buf);
+             "%s\n", buf);
         fclose(keyfile);
         return -1;
     }
@@ -882,7 +908,7 @@ static int load_private_key(const char *path)
  *  with all host ID / public key pairs.
  *
  *  Uses static storage.
- *	
+ *    
  *  returns -1 on error
  *  returns 0 on success
  */
