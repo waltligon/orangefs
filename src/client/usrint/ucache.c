@@ -113,7 +113,7 @@ static void update_LRU(struct mem_table_s *mtbl, uint16_t index);
 static int evict_LRU(struct file_ent_s *fent);
 
 /* Logging */
-static void log_ucache_stats(void);
+//static void log_ucache_stats(void);
 
 /* List Printing Functions */ 
 void print_LRU(struct mem_table_s *mtbl);
@@ -562,6 +562,7 @@ int ucache_close_file(struct file_ent_s *fent)
 /** May dump stats to log file if the envar LOG_UCACHE_STATS is set to 1.
  *
  */
+#if 0
 void log_ucache_stats(void)
 {
     /* Return if envar not set to 1 */
@@ -600,6 +601,7 @@ void log_ucache_stats(void)
     );
    */
 }
+#endif
 
 /** 
  * Dumps all cache related information to the specified file pointer.
@@ -619,9 +621,12 @@ int ucache_info(FILE *out, char *flags)
     }
    
     /* Decide what to show */
-    char show_all=0;
-    char show_sum=0;
-    char show_verbose=0;
+    unsigned char show_all = 0;
+    unsigned char show_summary = 0;
+    unsigned char show_parameters = 0;
+    unsigned char show_contents = 0;
+    unsigned char show_free = 0;
+
     int char_ndx;
     for (char_ndx=0; char_ndx<strlen(flags); char_ndx++)
     {
@@ -629,13 +634,20 @@ int ucache_info(FILE *out, char *flags)
         switch(c)
         {
             case 'a':
-                show_all=1;
+                show_all = 1;
                 break;
             case 's':
-                show_sum=1;             
+                show_summary = 1;             
                 break;
-            case 'v':
-                show_verbose=1;
+            case 'p':
+                show_parameters = 1;
+                break;
+            case 'c':
+                show_contents = 1;
+                break;
+            case 'f':
+                show_free = 1;
+                break;
         }
     }
 
@@ -648,7 +660,7 @@ int ucache_info(FILE *out, char *flags)
         percentage = ((float) ucache_stats->hits) / attempts;
     }
 
-    if(show_sum)
+    if(show_all || show_summary)
     {
         fprintf(out, 
             "user cache statistics:\n"
@@ -667,169 +679,182 @@ int ucache_info(FILE *out, char *flags)
         );
     }
 
-    if(show_all && show_verbose)
+    if(show_all || show_parameters)
     {
 
-    fprintf(out, "\n#defines:\n");
-    /* First, print many of the #define values */
-    fprintf(out, "MEM_TABLE_ENTRY_COUNT = %d\n", MEM_TABLE_ENTRY_COUNT);
-    fprintf(out, "FILE_TABLE_ENTRY_COUNT = %d\n", FILE_TABLE_ENTRY_COUNT);
-    fprintf(out, "CACHE_BLOCK_SIZE_K = %d\n", CACHE_BLOCK_SIZE_K);
-    fprintf(out, "MEM_TABLE_HASH_MAX = %d\n", MEM_TABLE_HASH_MAX);
-    fprintf(out, "FILE_TABLE_HASH_MAX = %d\n", FILE_TABLE_HASH_MAX);
-    fprintf(out, "MTBL_PER_BLOCK  = %d\n", MTBL_PER_BLOCK );
-    fprintf(out, "KEY_FILE = %s\n", KEY_FILE);
-    fprintf(out, "SHM_ID1 = %d\n", SHM_ID1);
-    fprintf(out, "SHM_ID2 = %d\n", SHM_ID2);
-    fprintf(out, "BLOCKS_IN_CACHE = %d\n", BLOCKS_IN_CACHE);
-    fprintf(out, "CACHE_SIZE = %d(B)\t%d(MB)\n", CACHE_SIZE, 
-                                    (CACHE_SIZE/(1024*1024)));
-    fprintf(out, "AT_FLAGS = %d\n", AT_FLAGS);
-    fprintf(out, "SVSHM_MODE = %d\n", SVSHM_MODE);
-    fprintf(out, "CACHE_FLAGS = %d\n", CACHE_FLAGS);
-    fprintf(out, "NIL = 0X%X\n", NIL);
-    fprintf(out, "NIL8 = 0X%X\n", NIL8);
-    fprintf(out, "NIL16 = 0X%X\n", NIL16);    
-    fprintf(out, "NIL32 = 0X%X\n", NIL32);
-    fprintf(out, "NIL64 = 0X%lx\n", NIL64);
-
-    /* Lock's Shared Memory Info */
-    fprintf(out, "ucache_lock ptr:\t\t0X%lX\n", (long int)ucache_lock);
-
-    /* ucache Shared Memory Info */
-    fprintf(out, "ucache ptr:\t\t0X%lX\n", (long int)ucache);
-
-    /* Print sizes of ucache elements */
-    fprintf(out, "sizeof union cache_block_u = %lu\n", sizeof(union cache_block_u));
-    fprintf(out, "sizeof struct file_table_s = %lu\n", sizeof(struct file_table_s));
-    fprintf(out, "sizeof struct file_ent_s = %lu\n", sizeof(struct file_ent_s));
-    fprintf(out, "sizeof struct mem_table_s = %lu\n", sizeof(struct mem_table_s));
-    fprintf(out, "sizeof struct mem_ent_s = %lu\n", sizeof(struct mem_ent_s));
-
-    /* FTBL Info */
-    struct file_table_s *ftbl = &(ucache->ftbl);
-    fprintf(out, "ftbl ptr:\t\t0X%lX\n", (long int)&(ucache->ftbl));
-    fprintf(out, "free_blk = %hu\n", ftbl->free_blk);
-    fprintf(out, "free_mtbl_blk = %hu\n", ftbl->free_mtbl_blk);
-    fprintf(out, "free_mtbl_ent = %hu\n", ftbl->free_mtbl_ent);
-    fprintf(out, "free_list = %hu\n", ftbl->free_list);
-
-    /* Other Free Blocks */
-    fprintf(out, "\nIterating Over Free Blocks:\n\n");
-    uint16_t i;
-    for(i = ftbl->free_blk; i < BLOCKS_IN_CACHE; i = ucache->b[i].mtbl[0].
-                                                              free_list_blk)
-    {
-        fprintf(out, "Free Block:\tCurrent: %hu\tNext: %hu\n", i, 
-                               ucache->b[i].mtbl[0].free_list_blk); 
-    }
-    fprintf(out, "End of Free Blocks List\n");
-
-    /* Iterate Over Free Mtbls */
-    fprintf(out, "\nIterating Over Free Mtbls:\n");
-    uint16_t current_blk = (uint16_t)ftbl->free_mtbl_blk;
-    uint16_t current_ent = ftbl->free_mtbl_ent;
-    while(current_blk != NIL16)
-    {
-        fprintf(out, "free mtbl: block = %hu\tentry = %hu\n", 
-                current_blk, current_ent);
-        uint16_t temp_blk = ucache->b[current_blk].mtbl[current_ent].free_list_blk;
-        uint16_t temp_ent = ucache->b[current_blk].mtbl[current_ent].free_list;
-        current_blk = temp_blk;
-        current_ent = temp_ent;
-    }
-    fprintf(out, "End of Free Mtbl List\n\n");
+        fprintf(out, "\n#defines:\n");
+        /* First, print many of the #define values */
+        fprintf(out, "MEM_TABLE_ENTRY_COUNT = %d\n", MEM_TABLE_ENTRY_COUNT);
+        fprintf(out, "FILE_TABLE_ENTRY_COUNT = %d\n", FILE_TABLE_ENTRY_COUNT);
+        fprintf(out, "CACHE_BLOCK_SIZE_K = %d\n", CACHE_BLOCK_SIZE_K);
+        fprintf(out, "MEM_TABLE_HASH_MAX = %d\n", MEM_TABLE_HASH_MAX);
+        fprintf(out, "FILE_TABLE_HASH_MAX = %d\n", FILE_TABLE_HASH_MAX);
+        fprintf(out, "MTBL_PER_BLOCK  = %d\n", MTBL_PER_BLOCK );
+        fprintf(out, "KEY_FILE = %s\n", KEY_FILE);
+        fprintf(out, "SHM_ID1 = %d\n", SHM_ID1);
+        fprintf(out, "SHM_ID2 = %d\n", SHM_ID2);
+        fprintf(out, "BLOCKS_IN_CACHE = %d\n", BLOCKS_IN_CACHE);
+        fprintf(out, "CACHE_SIZE = %d(B)\t%d(MB)\n", CACHE_SIZE, 
+                                        (CACHE_SIZE/(1024*1024)));
+        fprintf(out, "AT_FLAGS = %d\n", AT_FLAGS);
+        fprintf(out, "SVSHM_MODE = %d\n", SVSHM_MODE);
+        fprintf(out, "CACHE_FLAGS = %d\n", CACHE_FLAGS);
+        fprintf(out, "NIL = 0X%X\n", NIL);
+        fprintf(out, "NIL8 = 0X%X\n", NIL8);
+        fprintf(out, "NIL16 = 0X%X\n", NIL16);    
+        fprintf(out, "NIL32 = 0X%X\n", NIL32);
+        fprintf(out, "NIL64 = 0X%lX\n", NIL64);
     
-    /* Iterating Over Free File Entries */
-    fprintf(out, "Iterating Over Free File Entries:\n");
-    uint16_t current_fent; 
-    for(current_fent = ftbl->free_list; current_fent != NIL16; 
-                        current_fent = ftbl->file[current_fent].next)
-    {
-        fprintf(out, "free file entry: index = %d\n", (int16_t)current_fent);
+        /* Print sizes of ucache elements */
+        fprintf(out, "sizeof union cache_block_u = %lu\n", sizeof(union cache_block_u));
+        fprintf(out, "sizeof struct file_table_s = %lu\n", sizeof(struct file_table_s));
+        fprintf(out, "sizeof struct file_ent_s = %lu\n", sizeof(struct file_ent_s));
+        fprintf(out, "sizeof struct mem_table_s = %lu\n", sizeof(struct mem_table_s));
+        fprintf(out, "sizeof struct mem_ent_s = %lu\n", sizeof(struct mem_ent_s));
     }
-    fprintf(out, "End of Free File Entry List\n\n");
 
-    fprintf(out, "Iterating Over File Entries in Hash Table:\n\n");
-    /* iterate over file table entries */
-    for(i = 0; i < FILE_TABLE_HASH_MAX; i++)
+    if(show_all || show_contents)
     {
-        if((ftbl->file[i].tag_handle != NIL64) && 
-               (ftbl->file[i].tag_handle != 0))
+        /* Auxilliary structure related to ucache */
+        fprintf(out, "ucache_aux ptr:\t\t0X%lX\n", (long int)ucache_aux);
+
+        /* ucache Shared Memory Info */
+        fprintf(out, "ucache ptr:\t\t0X%lX\n", (long int)ucache);
+    
+        /* FTBL Info */
+        struct file_table_s *ftbl = &(ucache->ftbl);
+        fprintf(out, "ftbl ptr:\t\t0X%lX\n", (long int)&(ucache->ftbl));
+        fprintf(out, "free_blk = %hu\n", ftbl->free_blk);
+        fprintf(out, "free_mtbl_blk = %hu\n", ftbl->free_mtbl_blk);
+        fprintf(out, "free_mtbl_ent = %hu\n", ftbl->free_mtbl_ent);
+        fprintf(out, "free_list = %hu\n", ftbl->free_list);
+    
+        uint16_t i;
+
+        if(show_all || show_free)
         {
-            /* iterate accross file table chain */
-            uint16_t j;
-            for(j = i; !file_done(j); j = file_next(ftbl, j))
+            /* Other Free Blocks */
+            fprintf(out, "\nIterating Over Free Blocks:\n\n");
+            for(i = ftbl->free_blk; i < BLOCKS_IN_CACHE; i = ucache->b[i].mtbl[0].
+                                                                      free_list_blk)
             {
-                fprintf(out, "FILE ENTRY INDEX %hu ********************\n", j);
-                struct file_ent_s * fent = &(ftbl->file[j]);
-                fprintf(out, "tag_handle = 0X%llX\n", 
-                            (long long int)fent->tag_handle);
-                fprintf(out, "tag_id = 0X%X\n", (uint32_t)fent->tag_id);
-                fprintf(out, "mtbl_blk = %hu\n", fent->mtbl_blk);
-                fprintf(out, "mtbl_ent = %hu\n", fent->mtbl_ent);
-                fprintf(out, "next = %hu\n", fent->next);
-                fprintf(out, "index = %hu\n", fent->index);
+                fprintf(out, "Free Block:\tCurrent: %hu\tNext: %hu\n", i, 
+                                       ucache->b[i].mtbl[0].free_list_blk); 
+            }
+            fprintf(out, "End of Free Blocks List\n");
 
-                struct mem_table_s * mtbl = get_mtbl(fent->mtbl_blk, 
-                                                    fent->mtbl_ent);
 
-                fprintf(out, "\tMTBL LRU List ****************\n");
-                print_LRU(mtbl); 
-                print_dirty(mtbl); 
-
-                fprintf(out, "\tMTBL INFO ********************\n");
-                fprintf(out, "\tnum_blocks = %hu\n", mtbl->num_blocks);
-                fprintf(out, "\tfree_list = %hu\n", mtbl->free_list); 
-                fprintf(out, "\tfree_list_blk = %hu\n", mtbl->free_list_blk);
-                fprintf(out, "\tlru_first = %hu\n", mtbl->lru_first);
-                fprintf(out, "\tlru_last = %hu\n", mtbl->lru_last);
-                fprintf(out, "\tdirty_list = %hu\n", mtbl->dirty_list);
-                fprintf(out, "\tref_cnt = %hu\n\n", mtbl->ref_cnt);
-                fflush(out);
-                /* Iterate Over Memory Entries */
-                uint16_t k;
-                for(k = 0; k < MEM_TABLE_HASH_MAX; k++)
-                {   
-                    if(mtbl->mem[k].tag != NIL64)
-                    {
-                        uint16_t l;
-                        for(l = k; !ment_done(l); l = ment_next(mtbl, l)){
-                            struct mem_ent_s * ment = &(mtbl->mem[l]);
-                            fprintf(out, "\t\tMEMORY ENTRY INDEX %hd **********"
-                                                              "*********\n", l);
-                            fprintf(out, "\t\ttag = 0X%lX\n", 
-                                         (long unsigned int)ment->tag);
-
-                            fprintf(out, "\t\titem = %hu\n", 
-                                                ment->item);
-                            fprintf(out, "\t\tnext = %hu\n", 
-                                                ment->next);
-                            fprintf(out, "\t\tdirty_next = %hu\n", 
-                                                ment->dirty_next);
-                            fprintf(out, "\t\tlru_next = %hu\n", 
-                                                ment->lru_next);
-                            fprintf(out, "\t\tlru_prev = %hu\n\n", 
-                                                  ment->lru_prev);
-                        } 
-                    }
-                    else
-                    {
-                        if(mtbl->num_blocks != 0)
+            /* Iterate Over Free Mtbls */
+            fprintf(out, "\nIterating Over Free Mtbls:\n");
+            uint16_t current_blk = (uint16_t)ftbl->free_mtbl_blk;
+            uint16_t current_ent = ftbl->free_mtbl_ent;
+            while(current_blk != NIL16)
+            {
+                fprintf(out, "free mtbl: block = %hu\tentry = %hu\n", 
+                        current_blk, current_ent);
+                uint16_t temp_blk = ucache->b[current_blk].mtbl[current_ent].free_list_blk;
+                uint16_t temp_ent = ucache->b[current_blk].mtbl[current_ent].free_list;
+                current_blk = temp_blk;
+                current_ent = temp_ent;
+            }
+            fprintf(out, "End of Free Mtbl List\n\n");
+        
+            /* Iterating Over Free File Entries */
+            fprintf(out, "Iterating Over Free File Entries:\n");
+            uint16_t current_fent; 
+            for(current_fent = ftbl->free_list; current_fent != NIL16; 
+                                current_fent = ftbl->file[current_fent].next)
+            {
+                fprintf(out, "free file entry: index = %d\n", (int16_t)current_fent);
+            }
+            fprintf(out, "End of Free File Entry List\n\n");
+        }
+    
+        fprintf(out, "Iterating Over File Entries in Hash Table:\n\n");
+        /* iterate over file table entries */
+        for(i = 0; i < FILE_TABLE_HASH_MAX; i++)
+        {
+            if((ftbl->file[i].tag_handle != NIL64) && 
+                   (ftbl->file[i].tag_handle != 0))
+            {
+                /* iterate accross file table chain */
+                uint16_t j;
+                for(j = i; !file_done(j); j = file_next(ftbl, j))
+                {
+                    fprintf(out, "FILE ENTRY INDEX %hu ********************\n", j);
+                    struct file_ent_s * fent = &(ftbl->file[j]);
+                    fprintf(out, "tag_handle = 0X%llX\n", 
+                                (long long int)fent->tag_handle);
+                    fprintf(out, "tag_id = 0X%X\n", (uint32_t)fent->tag_id);
+                    fprintf(out, "mtbl_blk = %hu\n", fent->mtbl_blk);
+                    fprintf(out, "mtbl_ent = %hu\n", fent->mtbl_ent);
+                    fprintf(out, "next = %hu\n", fent->next);
+                    fprintf(out, "index = %hu\n", fent->index);
+    
+                    struct mem_table_s * mtbl = get_mtbl(fent->mtbl_blk, 
+                                                        fent->mtbl_ent);
+    
+                    fprintf(out, "\tMTBL LRU List ****************\n");
+                    print_LRU(mtbl); 
+                    print_dirty(mtbl); 
+    
+                    fprintf(out, "\tMTBL INFO ********************\n");
+                    fprintf(out, "\tnum_blocks = %hu\n", mtbl->num_blocks);
+                    fprintf(out, "\tfree_list = %hu\n", mtbl->free_list); 
+                    fprintf(out, "\tfree_list_blk = %hu\n", mtbl->free_list_blk);
+                    fprintf(out, "\tlru_first = %hu\n", mtbl->lru_first);
+                    fprintf(out, "\tlru_last = %hu\n", mtbl->lru_last);
+                    fprintf(out, "\tdirty_list = %hu\n", mtbl->dirty_list);
+                    fprintf(out, "\tref_cnt = %hu\n\n", mtbl->ref_cnt);
+                    fflush(out);
+                    /* Iterate Over Memory Entries */
+                    uint16_t k;
+                    for(k = 0; k < MEM_TABLE_HASH_MAX; k++)
+                    {   
+                        if(mtbl->mem[k].tag != NIL64)
                         {
-                            fprintf(out, "\tvacant memory entry @ index = %d\n",
-                                                                             k);
+                            uint16_t l;
+                            for(l = k; !ment_done(l); l = ment_next(mtbl, l))
+                            {
+                                struct mem_ent_s * ment = &(mtbl->mem[l]);
+                                fprintf(out, "\t\tMEMORY ENTRY INDEX %hd **********"
+                                                                  "*********\n", l);
+                                fprintf(out, "\t\ttag = 0X%lX\n", 
+                                             (long unsigned int)ment->tag);
+
+                                fprintf(out, "\t\titem = %hu\n", 
+                                                    ment->item);
+                                fprintf(out, "\t\tnext = %hu\n", 
+                                                    ment->next);
+                                fprintf(out, "\t\tdirty_next = %hu\n", 
+                                                    ment->dirty_next);
+                                fprintf(out, "\t\tlru_next = %hu\n", 
+                                                    ment->lru_next);
+                                fprintf(out, "\t\tlru_prev = %hu\n\n", 
+                                                      ment->lru_prev);
+                            } 
+                        }
+                        else
+                        {
+                            if(mtbl->num_blocks != 0 
+                                && (show_all || show_free))
+                            {
+                                fprintf(out, "\tvacant memory entry @ index = %d\n",
+                                                                                 k);
+                            }
                         }
                     }
                 }
+                fprintf(out, "End of chain @ Hash Table Index %hu\n\n", i);
             }
-            fprintf(out, "End of chain @ Hash Table Index %hu\n\n", i);
+            else
+            {
+                if(show_all || show_free)
+                {
+                    fprintf(out, "vacant file entry @ index = %hu\n\n", i);
+                }
+            }
         }
-        else
-        {
-            fprintf(out, "vacant file entry @ index = %hu\n\n", i);
-        }
-    }
     }
     return 0;
 }
@@ -1576,7 +1601,9 @@ inline static void *lookup_mem(struct mem_table_s *mtbl,
                     uint16_t *mem_ent_prev_index)
 {
     /* index into mem hash table */
-    uint16_t index = offset % MEM_TABLE_HASH_MAX;
+    uint16_t index = (uint16_t) ((offset / CACHE_BLOCK_SIZE) % MEM_TABLE_HASH_MAX);
+    //printf("lookup_mem index = %hu\n", index);
+
     struct mem_ent_s *current = &(mtbl->mem[index]);
 
     /* previous, current, next memory entry index in mtbl */
@@ -1847,7 +1874,7 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
     struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
 
     /* Index into mem hash table */
-    uint16_t index = offset % MEM_TABLE_HASH_MAX;
+    uint16_t index = (uint16_t) ((offset / CACHE_BLOCK_SIZE) % MEM_TABLE_HASH_MAX);
 
     /* Lookup first */
     void *returnValue = lookup_mem(mtbl, offset, block_ndx, NULL, NULL);

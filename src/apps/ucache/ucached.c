@@ -194,8 +194,8 @@ static int execute_cmd(char cmd)
             else
             {
                 fprintf(info_out, "No display options specified. " 
-                    "Showing all ucache contents.\n");
-                rc = ucache_info(info_out, "a");
+                    "Showing ucache contents.\n");
+                rc = ucache_info(info_out, "c");
             }
             rc = 1;
             fclose(info_out);
