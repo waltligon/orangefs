@@ -229,6 +229,3 @@ fi
 echo -e "\nDONE"
 exit 0
 
-#alternate and more complicated way to set it
-#sudo sh -c "echo 1031315 > /proc/sys/kernel/shmall"
-#RESORATION FEATURE!!!!!!!!!!OMGMMGOMGMGMGMG
