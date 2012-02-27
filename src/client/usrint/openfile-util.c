@@ -18,6 +18,7 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "posix-pvfs.h"
+#include "aiocommon.h"
 
 #if PVFS_UCACHE_ENABLE
 #include "ucache.h"
@@ -545,6 +546,9 @@ void pvfs_sys_init_doit(void) {
         //    "WARNING: client caching configured enabled but couldn't inizialize\n");
     }
 #endif
+
+   /* initialize aio interface */
+   aiocommon_init();
 }
 
 int pvfs_descriptor_table_size(void)
