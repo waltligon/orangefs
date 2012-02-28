@@ -19,49 +19,6 @@
 #endif
 #include <errno.h>
 
-/* Functions in this file generally define a label errorout
- * for cleanup before exit and return an int rc which is -1
- * on error with the error code in errno, 0 on success.
- * IOCOMMON_RETURN_ERR checks a return code from a function
- * returns the same protocol and goto errorout: if less than 0
- * IOCOMMON_CHECK_ERR assumes the return code contains the
- * negative of the error code as encoded by PVFS sysint
- * functions and decodes these before jumping to errorout.
- * PVFS sysint calls always return error codes in the return
- * value, but system calls inside them might set errno to
- * a value that may or may not have meaning for the programmer
- * calling this library.  Steps are taken to ensure errno
- * is not modified unless the code in this lib wants to
- * modify it.  CHECK_ERR should be called after each sysint
- * call to correctly pass error codes.
- */
-extern PVFS_error PINT_errno_mapping[];
-#define IOCOMMON_RETURN_ERR(rc)                                 \
-do {                                                            \
-    if ((rc) < 0)                                               \
-    {                                                           \
-        goto errorout;                                          \
-    }                                                           \
-} while (0)
-
-#define IOCOMMON_CHECK_ERR(rc)                                  \
-do {                                                            \
-    errno = orig_errno;                                         \
-    if ((rc) < 0)                                               \
-    {                                                           \
-        if (IS_PVFS_NON_ERRNO_ERROR(-(rc)))                     \
-        {                                                       \
-            pvfs_errno = -rc;                                   \
-            errno = EIO;                                        \
-        }                                                       \
-        else if (IS_PVFS_ERROR(-(rc)))                          \
-        {                                                       \
-            errno = PINT_errno_mapping[(-(rc)) & 0x7f];         \
-        }                                                       \
-        rc = -1;                                                \
-        goto errorout;                                          \
-    }                                                           \
-} while (0)
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this si set to the
