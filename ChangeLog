@@ -1,6 +1,7 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
+* Enhancement: Incremented display of handles from 16 to 20 bytes.
 
 * Bug fix: Fix invalid argument errors on chmod though pvfs2fuse
 
