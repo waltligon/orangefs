@@ -1,6 +1,14 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
+SVN changes can be seen at
+http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
+
+Stable
+
+* Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
+to 20 characters.
+
 orangefs-2.8.5
 
 SVN changes can be seen at
