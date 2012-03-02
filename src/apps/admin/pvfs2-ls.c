@@ -238,7 +238,7 @@ void print_entry_attr(
     struct tm *time;
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0}, scratch_time[MAX_TIME_LENGTH] = {0}, scratch_big_time[MAX_TIME_LENGTH] = {0};
-    char scratch_size[16] = {0}, scratch_inode[16] = {0};
+    char scratch_size[16] = {0}, scratch_inode[21] = {0};
     char f_type = '-';
     char group_x_char = '-';
     int num_bytes = 0;
@@ -299,7 +299,7 @@ void print_entry_attr(
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,16,"%llu ",llu(handle));
+        snprintf(scratch_inode,21,"%llu ",llu(handle));
         inode = scratch_inode;
     }
 
@@ -388,7 +388,7 @@ void print_entry_attr(
         group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
     }
 
-    snprintf(entry_buffer,ENTRY_MAX,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+    snprintf(entry_buffer,ENTRY_MAX,"%s %c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%s %s",
              inode,
              f_type,
