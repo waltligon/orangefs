@@ -16,7 +16,7 @@
 #include <pthread.h>
 #include <sys/shm.h>
 
-#define MEM_TABLE_ENTRY_COUNT 682
+#define MEM_TABLE_ENTRY_COUNT 679
 #define FILE_TABLE_ENTRY_COUNT 682
 #define CACHE_BLOCK_SIZE_K 256
 #define CACHE_BLOCK_SIZE (CACHE_BLOCK_SIZE_K * 1024)
@@ -36,7 +36,7 @@
 #define NIL (-1)
 
 #ifndef UCACHE_MAX_REQ 
-#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * BLOCKS_IN_CACHE)
+#define UCACHE_MAX_REQ (CACHE_BLOCK_SIZE * MEM_TABLE_ENTRY_COUNT)
 #endif 
 
 /* Define multiple NILS to there's no need to cast for different types */
@@ -148,8 +148,11 @@ struct mem_table_s
     uint16_t lru_last;          /* index of last block on lru list */
     uint16_t dirty_list;        /* index of first dirty block */
     uint16_t ref_cnt;           /* number of clients using this record */
-    char pad[2];
+    //char pad[2];
+    uint16_t bucket[MEM_TABLE_HASH_MAX]; /* bucket may contain index of ment */
+    char pad[4];
     struct mem_ent_s mem[MEM_TABLE_ENTRY_COUNT];
+    char pad2[8];
 };
 
 /** One allocation block in the cache
