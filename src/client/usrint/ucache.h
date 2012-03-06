@@ -143,12 +143,11 @@ struct mem_table_s
 {
     uint16_t num_blocks;        /* number of used blocks in this mtbl */
     uint16_t free_list;         /* index of next free mem entry */
-    uint16_t free_list_blk;     /* used when mtbl is on mtbl free list  and to track free blks */
+    uint16_t free_list_blk;     /* used when mtbl is on mtbl free list and to track free blks */
     uint16_t lru_first;         /* index of first block on lru list */
     uint16_t lru_last;          /* index of last block on lru list */
     uint16_t dirty_list;        /* index of first dirty block */
     uint16_t ref_cnt;           /* number of clients using this record */
-    //char pad[2];
     uint16_t bucket[MEM_TABLE_HASH_MAX]; /* bucket may contain index of ment */
     char pad[4];
     struct mem_ent_s mem[MEM_TABLE_ENTRY_COUNT];

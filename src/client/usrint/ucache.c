@@ -1161,7 +1161,6 @@ static void init_memory_table(struct mem_table_s *mtbl)
     mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL16;
 }
 
-
 /** 
  * This function asks the file table if a free block is avaialable. 
  * If so, returns the block's index; otherwise, returns NIL.
@@ -1170,14 +1169,11 @@ static inline uint16_t get_free_blk(void)
 {
     struct file_table_s *ftbl = &(ucache->ftbl);
     uint16_t desired_blk = ftbl->free_blk;
-    //printf("get_free_blk called:\n");
     if(desired_blk != NIL16 && desired_blk < BLOCKS_IN_CACHE)
     {  
         /* Update the head of the free block list */ 
         /* Use mtbl index zero since free_blks have no ititialized mem tables */
         ftbl->free_blk = ucache->b[desired_blk].mtbl[0].free_list_blk; 
-        //printf("\tgot: %hu\n", desired_blk);
-        //printf("\tnext: %hu\n", ftbl->free_blk);
         return desired_blk;
     }
     return NIL16;
@@ -1269,17 +1265,10 @@ static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent)
     mtbl->mem[ent].dirty_next = NIL16;
     mtbl->mem[ent].lru_prev = NIL16;
     mtbl->mem[ent].lru_next = NIL16;
-    #if 0
-    if(ent >= MEM_TABLE_HASH_MAX)
-    {
-    #endif
-        /* Set next index to the current head of the free list */
-        mtbl->mem[ent].next = mtbl->free_list;
-        /* Update free list to include this entry */
-        mtbl->free_list = ent;
-    #if 0
-    }
-    #endif
+    /* Set next index to the current head of the free list */
+    mtbl->mem[ent].next = mtbl->free_list;
+    /* Update free list to include this entry */
+    mtbl->free_list = ent;
 }
 
 /** 

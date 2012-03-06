@@ -1161,7 +1161,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                          size_t iovec_count,
                          const struct iovec *vector)
 {
-    //printf("which=%d\n", (int) which);
     int rc = 0;
 #if PVFS_UCACHE_ENABLE
     if(ucache_enabled)
@@ -1215,14 +1214,10 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         mtbl_data_size = CACHE_BLOCK_SIZE * mtbl->num_blocks;
     }
    
-    //printf("offset = %lu\tcount = %zu\n", (uint64_t)offset, req_size);
-
     /* If the ucache request threshold is exceeded, flush and evict file, then
      * peform nocache version of readorwrite */
-    /* if((mtbl_data_size + req_size + 4 * CACHE_BLOCK_SIZE) >= UCACHE_MAX_REQ) */
     if((mtbl_data_size + req_size) > UCACHE_MAX_REQ)
     {
-        //printf("file flushed!\n");
         /* Flush dirty blocks */
         rc = ucache_flush_file(pd->s->fent);
         if(rc != 0)
@@ -1241,44 +1236,14 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     /* Keep a running count of the bytes transfered */
     int transfered = 0;
 
-
-    /* We don't want to have to request the file size every time 
-     * iocommon_readorwrite gets here 
-     */
-    #if 0
-    /* Get the file size to correctly handle reads. */
-    uint64_t file_size = 0; // get file size so we don't read too far
-    PVFS_sys_attr attr;
-    memset(&attr, 0, sizeof(attr));
-    errno = 0;
-
-    /* TODO: cache this so we don't have to call it every time */
-    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_SIZE);
-    file_size = attr.size;
-    printf("file_size = %lu\n", file_size);
-    #endif
-
     /* How many tags? */
     uint64_t start_tag = offset - (offset % CACHE_BLOCK_SIZE);
     /* End_tag isn't really the last tag if the blk is alligned. 
      * This value is used to determine the req_blk_cnt only.
      */
     uint64_t end_tag = 0;    
-
-    /* We don't want to have to request the file size every time 
-     * iocommon_readorwrite gets here 
-     */
-    #if 0
-    if(which == PVFS_IO_READ && file_size < (offset + req_size))
-    {
-        /* Reduce req_size to valid amount */
-        req_size = file_size - offset;
-    }
-    #endif
-
     end_tag = (offset + req_size) - ((offset + req_size) % CACHE_BLOCK_SIZE);
     req_blk_cnt = calc_req_blk_cnt(offset, req_size);
-    //printf("offset=%lu\treq_blk_cnt=%d\n", (uint64_t)offset, req_blk_cnt);
 
     /* Now that we know the req_blk_cnt, allocate the required 
      * space for tags, hits boolean, and ptr to block in ucache shared memory.
@@ -1299,7 +1264,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                                                   &(ureq[i].ublk_index));
         if(ureq[i].ublk_ptr == (void *)NIL) 
         {
-            //printf("MISS\n");
             lock_lock(ucache_lock);
             ucache_stats->misses++; /* could overflow */
             these_stats.misses++;
@@ -1316,7 +1280,6 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         }
         else
         {
-            //printf("HIT\n");
             lock_lock(ucache_lock);
             ucache_stats->hits++;  /* could overflow */
             these_stats.hits++;
@@ -1336,13 +1299,11 @@ int iocommon_readorwrite(enum PVFS_io_type which,
                 /* read single block from fs and write into ucache */
                 struct iovec cache_vec = {ureq[i].ublk_ptr, CACHE_BLOCK_SIZE};
                 lock_lock(get_lock(ureq[i].ublk_index));
-                //printf("i = %d\n", i);
                 rc = iocommon_vreadorwrite(PVFS_IO_READ,
                                            &pd->s->pvfs_ref,
                                            ureq[i].ublk_tag,
                                            1,
                                            &cache_vec);
-                //printf("read rc = %d\n", rc);
                 lock_unlock(get_lock(ureq[i].ublk_index));
             }
         }
@@ -1379,8 +1340,8 @@ int iocommon_readorwrite(enum PVFS_io_type which,
             rc = iocommon_vreadorwrite(PVFS_IO_READ,
                             &pd->s->pvfs_ref,
                             ureq[req_blk_cnt - 1].ublk_tag,
-                                           1,
-                                    &vector);
+                            1,
+                            &vector);
             lock_unlock(get_lock(ureq[req_blk_cnt - 1].ublk_index));
         }
     }
@@ -1416,16 +1377,9 @@ int iocommon_readorwrite(enum PVFS_io_type which,
      */
     for(i = 0; i < copy_count; i++)
     {
-        //printf("ucop[%d].cache_pos = %lu\n", i, (long unsigned int) ucop[i].cache_pos);
-        //printf("ucop[%d].buff_pos = %lu\n", i, (long unsigned int) ucop[i].buff_pos);
-        //printf("ucop[%d].size = %ld\n", i, ucop[i].size);
-        //printf("ucop[%d].hit = %u\n", i, (int) ucop[i].hit);
-        //printf("ucop[%d].blk_index = %hu\n", i, ucop[i].blk_index);
-
         /* perform copy operation */
         lock_lock(get_lock(ureq[i].ublk_index));
         transfered += cache_readorwrite(which, &ucop[i]);
-        //printf("transfered=%d\n", transfered);
         /* Unlock the block */
         lock_unlock(get_lock(ureq[i].ublk_index));
     }
@@ -1464,15 +1418,12 @@ int iocommon_vreadorwrite(enum PVFS_io_type which,
 
     rc = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
     rc = pvfs_convert_iovec(vector, count, &mem_req, &buf);
-
     rc = iocommon_readorwrite_nocache(which,
                                       por,
                                       offset, 
                                       buf,
                                       mem_req,
                                       file_req);
-    //printf("nocache rc = %d\n", rc);
-
     PVFS_Request_free(&mem_req);
     PVFS_Request_free(&file_req);
 
