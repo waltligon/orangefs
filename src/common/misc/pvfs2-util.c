@@ -182,7 +182,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
-    int filedes[2];
+    int filedes[2], errordes[2];
     int ret;
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
@@ -194,7 +194,14 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     newsa.sa_handler = SIG_DFL;
     sigaction(SIGCHLD, &newsa, &oldsa);
 
+    /* pipe to read credential from stdout of pvfs2-gencred */
     ret = pipe(filedes);
+    if (ret == -1)
+    {
+        return -PVFS_errno_to_error(errno);
+    }
+    /* pipe to read any error messages from stderr of pvfs2-gencred */
+    ret = pipe(errordes);
     if (ret == -1)
     {
         return -PVFS_errno_to_error(errno);
@@ -209,6 +216,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char *envp[] = { NULL };
 
         close(STDERR_FILENO);
+        dup(errordes[1]);
         close(STDOUT_FILENO);
         dup(filedes[1]);
         close(STDIN_FILENO);
@@ -244,21 +252,27 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     else if (pid == -1)
     {
         close(filedes[1]);
+        close(errordes[1]);
         ret = -PVFS_errno_to_error(errno);
     }
     else
     {
-        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
-        ssize_t total = 0;
-        ssize_t cnt;
+        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential],
+             ebuf[512];
+        ssize_t total = 0, etotal = 0;
+        ssize_t cnt, ecnt;
 
         /* close write end so we get EOF when child exits */
+        close(errordes[1]);
         close(filedes[1]);
 
+        /* read credential */
         do
         {
-            do cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
-            while (cnt == -1 && errno == EINTR);
+            do
+            {
+                cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
+            } while (cnt == -1 && errno == EINTR);
             total += cnt;
         } while (cnt > 0);
         
@@ -279,15 +293,42 @@ int PVFS_util_gen_credential(const char *user, const char *group,
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
             }
+            else if (WIFEXITED(rc))
+            {                
+                /* error code from pvfs2_gencred */
+                ret = -PVFS_errno_to_error(WEXITSTATUS(rc));
+            }
             else
             {
-                /* nlmills: TODO: find a more appropriate error code */
+                /* catch-all error */
                 ret = -PVFS_EINVAL;
+            }
+
+            /* read errors and warnings */
+            do
+            {
+                do
+                {
+                    ecnt = read(errordes[0], ebuf+etotal, 
+                                (sizeof(ebuf) - etotal));
+                } while (ecnt == -1 && errno == EINTR);
+                etotal += ecnt;
+            } while (ecnt > 0 && etotal < sizeof(ebuf));
+            /* null terminate */
+            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
+
+            /* print errors */
+            if (etotal > 0)
+            {
+                char gbuf[600];
+                snprintf(gbuf, sizeof(gbuf), "pvfs2_gencred: %s", ebuf);
+                gossip_err(gbuf);
             }
         }
     }
 
     close(filedes[0]);
+    close(errordes[0]);
     sigaction(SIGCHLD, &oldsa, NULL);
 
     return ret;

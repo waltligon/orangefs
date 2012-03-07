@@ -79,7 +79,7 @@ static int per_op_post(struct PINT_manager_s *manager,
     ret = pthread_attr_init(&attr);
     if(ret != 0)
     {
-        return PVFS_get_errno_mapping(ret);
+        return -PVFS_errno_to_error(ret);
     }
 
     /* set the thread to detached.  Once the operation finishes
@@ -89,7 +89,7 @@ static int per_op_post(struct PINT_manager_s *manager,
     if(ret != 0)
     {
         pthread_attr_destroy(&attr);
-        return PVFS_get_errno_mapping(ret);
+        return -PVFS_errno_to_error(ret);
     }
 
     /* create the thread */
@@ -99,7 +99,7 @@ static int per_op_post(struct PINT_manager_s *manager,
                          thread);
     if(ret != 0)
     {
-        return PVFS_errno_to_error(ret);
+        return -PVFS_errno_to_error(ret);
     }
 
     return PINT_MGMT_OP_POSTED;

@@ -73,6 +73,7 @@ static int threaded_queues_init(struct PINT_manager_s *manager,
             }
             free(w->threads);
             gen_cond_destroy(&w->cond);
+            goto exit;
         }
         gossip_debug(GOSSIP_MGMT_DEBUG,"%s:thread_id %d:thread #%d.\n"
                                       ,__func__
@@ -528,10 +529,10 @@ static int PINT_worker_queue_thread_start(
     gen_mutex_init(&tentry->mutex);
     ret = pthread_create(&tentry->thread_id, NULL,
                          PINT_worker_queues_thread_function, tentry);
-    if(ret < 0)
+    if(ret != 0)
     {
         /* convert to PVFS error */
-        return PVFS_errno_to_error(ret);
+        return -PVFS_errno_to_error(ret);
     }
     return 0;
 }
@@ -553,7 +554,7 @@ static int PINT_worker_queue_thread_stop(
     gen_mutex_unlock(&w->mutex);
 
     ret = pthread_join(tentry->thread_id, &ptr);
-    if(ret < 0)
+    if(ret != 0)
     {
         return PVFS_errno_to_error(ret);
     }

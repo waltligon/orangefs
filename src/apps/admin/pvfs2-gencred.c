@@ -60,7 +60,7 @@ static int safe_write(int fd, const void *buf, size_t nbyte)
         while (cnt == -1 && errno == EINTR);
         if (cnt == -1)
         {
-            return -1;
+            return errno;
         }
     }
 
@@ -88,7 +88,7 @@ static int parse_options(int argc, char **argv, options_t *opts)
                     fprintf(stderr, "%s: illegal timeout -- %s\n", argv[0],
                             optarg);
                     usage();
-                    return EXIT_FAILURE;
+                    return EINVAL;
                 }
                 break;
             case 'k':
@@ -97,7 +97,7 @@ static int parse_options(int argc, char **argv, options_t *opts)
             case '?':
             default:
                 usage();
-                return EXIT_FAILURE;
+                return EINVAL;
         }
     }
     
@@ -116,7 +116,7 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     issuer = calloc(PVFS_REQ_LIMIT_ISSUER+1, 1);
     if (issuer == NULL)
     {
-        return EXIT_FAILURE;
+        return ENOMEM;
     }
     /* issuer field for clients is prefixed with "C:" */
     issuer[0] = 'C';
@@ -131,7 +131,7 @@ static int create_credential(const struct passwd *pwd, const gid_t *groups,
     if (cred->group_array == NULL)
     {
         free(issuer);
-        return EXIT_FAILURE;
+        return ENOMEM;
     }
     for (i = 0; i < ngroups; i++)
     {
@@ -157,16 +157,18 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     keyfile = fopen(keypath, "rb");
     if (keyfile == NULL)
     {
+        int err = errno;
         perror(keypath);
-        return EXIT_FAILURE;
+        return err;
     }
 
     ret = fstat(fileno(keyfile), &stats);
     if (ret == -1)
     {
+        int err = errno;
         perror("stat");
         fclose(keyfile);
-        return EXIT_FAILURE;
+        return err;
     }
     if (stats.st_mode & (S_IROTH | S_IWOTH))
     {
@@ -179,7 +181,7 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     {
         ERR_print_errors_fp(stderr);
         fclose(keyfile);
-        return EXIT_FAILURE;
+        return ENODATA;
     }
 
     fclose(keyfile);
@@ -189,7 +191,7 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
     if (cred->signature == NULL)
     {
         EVP_PKEY_free(privkey);
-        return EXIT_FAILURE;
+        return ENOMEM;
     }
 
     md = EVP_PKEY_type(privkey->type) == EVP_PKEY_DSA ? EVP_dss1() : 
@@ -216,7 +218,7 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
         free(cred->signature);
         EVP_MD_CTX_cleanup(&mdctx);
         EVP_PKEY_free(privkey);
-        return EXIT_FAILURE;
+        return ENODATA;
     }
     ret = EVP_SignFinal(&mdctx, cred->signature, &cred->sig_size, privkey);
     if (!ret)
@@ -225,7 +227,7 @@ static int sign_credential(PVFS_credential *cred, time_t timeout,
         free(cred->signature);
         EVP_MD_CTX_cleanup(&mdctx);
         EVP_PKEY_free(privkey);
-        return EXIT_FAILURE;
+        return ENODATA;
     }
 
     EVP_MD_CTX_cleanup(&mdctx);
@@ -258,15 +260,15 @@ static int write_credential(const PVFS_credential *cred,
     if (isatty(STDOUT_FILENO))
     {
         fputs("error: stdout is a tty\n", stderr);
-        return EXIT_FAILURE;
+        return EIO;
     }
 
     encode_PVFS_credential(&pptr, cred);
     ret = safe_write(STDOUT_FILENO, buf, sizeof(buf));
-    if (ret == -1)
-    {
+    if (ret)
+    {        
         perror("write");
-        return EXIT_FAILURE;
+        return ret;
     }
 
     return EXIT_SUCCESS;
@@ -325,7 +327,7 @@ int main(int argc, char **argv)
         {        
             fprintf(stderr, "unknown user -- %s\n", opts.user);
         }
-        return EXIT_FAILURE;
+        return EINVAL;
     }
 
     if (opts.group)
@@ -360,21 +362,21 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "unknown group -- %s\n", opts.group);
         }
-        return EXIT_FAILURE;
+        return EINVAL;
     }
 
     if (getuid() && pwd->pw_uid != getuid())
     {
         fprintf(stderr, "error: only %s and root can generate a credential "
                 "for %s\n", pwd->pw_name, pwd->pw_name);
-        return EXIT_FAILURE;
+        return EPERM;
     }
 
     if (getuid() && grp->gr_gid != getgid())
     {
         fprintf(stderr, "error: cannot generate a credential for group %s: "
                 "Permission denied\n", grp->gr_name);
-        return EXIT_FAILURE;
+        return EPERM;
     }
 
 #ifdef HAVE_GETGROUPLIST
@@ -385,7 +387,7 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "error: unable to get group list for user %s\n",
                 pwd->pw_name);
-        return EXIT_FAILURE;
+        return ENOENT;
     }
     if (groups[0] != grp->gr_gid)
     {
@@ -400,9 +402,10 @@ int main(int argc, char **argv)
     ngroups = getugroups(ngroups, groups, pwd->pw_name, grp->gr_gid);
     if (ngroups == -1)
     {
+        int err = errno;
         fprintf(stderr, "error: unable to get group list for user %s: %s\n",
                 pwd->pw_name, strerror(errno));
-        return EXIT_FAILURE;
+        return err;
     }
 
 #endif /* HAVE_GETGROUPLIST */
@@ -435,6 +438,7 @@ int main(int argc, char **argv)
    
     free(credential.issuer);
     free(credential.group_array);
+
     return EXIT_SUCCESS;
 }
 

@@ -910,20 +910,20 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
         PVFS_ERROR_CODE(((positive ? error :               \
                              abs(error))) & ~mask)];       \
     }                                                      \
-    return ret;                        			   \
+    return ret;                                            \
 }                                                          \
 PVFS_error PVFS_errno_to_error(int err)                    \
 {                                                          \
     PVFS_error e = 0;                                      \
-    \
+                                                           \
     for(; e < PVFS_ERRNO_MAX; ++e)                         \
     {                                                      \
         if(PINT_errno_mapping[e] == err)                   \
         {                                                  \
-            return e;                                      \
+            return e | PVFS_ERROR_BIT;                     \
         }                                                  \
     }                                                      \
-    return 0;                                              \
+    return err;                                            \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
