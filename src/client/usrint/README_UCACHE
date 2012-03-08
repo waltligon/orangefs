@@ -119,6 +119,110 @@ OrangeFS User Cache Documentation
 
 4. Examples
     4.1 Simple Test Program
+===============================================================================
+        Compiled with:
+gcc -g -Wall -O0 -o 14 14.c \
+-L/usr/local/lib -lofs -lpvfs2 -rdynamic -lssl -lcrypto -lpthread -ldl
+===============================================================================
+#include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <errno.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#define B_SIZE (1024 * 256)
+#define N_BLKS 679
+
+int main(int argc, char **argv)
+{
+    /* Write buffer */
+    size_t write_buff_size = N_BLKS * B_SIZE;
+    char *write_buff = (char *) malloc(write_buff_size);
+    assert(write_buff);
+    memset(write_buff, '0', write_buff_size);
+
+    /* Open file */
+    char fullpath[]= "/mnt/pvfs2/myfile";
+    int file = open(fullpath, O_RDWR | O_CREAT,
+        S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if(file < 0)
+    {
+        perror("open");
+        return -1;
+    }
+
+    /* Perform the write */
+    int howmany = write(file, write_buff, write_buff_size);
+    if(howmany < write_buff_size)
+    {
+        perror("write");
+        close(file);
+        return -1;
+    }
+
+    /* Seek back to beginning of file */
+    off_t lseek_rc = lseek(file, 0, SEEK_SET);
+    if(lseek_rc == -1)
+    {
+        perror("lseek");
+        close(file);
+        return -1;
+    }
+
+    /* Read Buffer */
+    int read_count = B_SIZE;
+    char read_buff[N_BLKS];
+
+    /* Perform many reads on small segments to demonstrate caching benefit */
+    int i;
+    for(i = 0; i < read_count; i++)
+    {
+        howmany = read(file, read_buff, N_BLKS);
+        if(howmany != N_BLKS)
+        {
+            perror("read");
+            close(file);
+            return -1;
+        }
+    }
+
+    /* Close File */
+    if(close(file) != 0)
+    {
+        perror("file close");
+        return -1;
+    }
+    return 1;
+}
+===============================================================================
+
+    4.2 Timed Test w/o Cache
+        time sudo ./14
+
+        real    1m35.229s
+        user    0m31.900s
+        sys 0m11.110s
+
+    4.3 Timed Test w/ Cache
+        time sudo ./14
+
+        real    0m2.365s
+        user    0m0.860s
+        sys 0m0.690s
+
+    4.4 Test w/ Cache Stats Summary
+        SUCCESS
+            user cache statistics:
+            hits=   262822
+            misses= 679
+            hit percentage= 99.742317
+            pseudo_misses=  0
+            block_count=    0
+            file_count=     0
 
 5. Limits
     5.1 Block Limit
