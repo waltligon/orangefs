@@ -1786,8 +1786,18 @@ void PVFS_util_free_mntent(
         {
             int j;
             for (j=0; j<mntent->num_pvfs_config_servers; j++)
+            {            
                 if (mntent->pvfs_config_servers[j])
+                {
+                    if (mntent->pvfs_config_servers[j] == 
+                        mntent->the_pvfs_config_server)
+                    {
+                        /* don't free further down */
+                        mntent->the_pvfs_config_server = NULL;
+                    }
                     free(mntent->pvfs_config_servers[j]);
+                }
+            }
             free(mntent->pvfs_config_servers);
             mntent->pvfs_config_servers = NULL;
             mntent->num_pvfs_config_servers = 0;
@@ -1806,6 +1816,11 @@ void PVFS_util_free_mntent(
         {
             free(mntent->mnt_opts);
             mntent->mnt_opts = NULL;
+        }
+        if (mntent->the_pvfs_config_server)           
+        {
+            free(mntent->the_pvfs_config_server);
+            mntent->the_pvfs_config_server = NULL;
         }
 
         mntent->flowproto = 0;
@@ -1850,7 +1865,6 @@ int PVFS_util_copy_mntent(
             }
         }
 
-        /* nlmills: TODO: this copy will leak memory. fix that */
         dest_mntent->the_pvfs_config_server = 
             strdup(src_mntent->the_pvfs_config_server);
         if (!dest_mntent->the_pvfs_config_server)
