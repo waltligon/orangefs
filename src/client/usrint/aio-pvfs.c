@@ -56,6 +56,8 @@ ssize_t pvfs_aio_return(struct aiocb *aiocbp)
    free(aiocbp->__next_prio);
    aiocbp->__next_prio = NULL;
 
+   gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p removed\n", aiocbp);
+
    /* return the aio return value */
    return aiocbp->__return_value;
 }

@@ -31,6 +31,8 @@ static int num_aiocbs_running = 0;
 /* Initialization of PVFS AIO system */
 void aiocommon_init()
 {
+   gossip_debug(GOSSIP_USRINT_DEBUG, "Initializing PVFS AIO interface\n");
+
    /* initialize waiting, running, and finished lists for aio implementation */
    aio_waiting_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
    if (aio_waiting_list == NULL)
@@ -52,6 +54,8 @@ void aiocommon_init()
       return;
    }
    INIT_QLIST_HEAD(aio_finished_list);
+   
+   gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
 }
 
 /* IMPLEMENTATION OF LOW LEVEL PVFS AIO ROUTINES */
@@ -82,8 +86,11 @@ int aiocommon_lio_listio(struct pvfs_aiocb *list[],
    {
       assert(list[i]);
 
+      pthread_mutex_lock(&progress_sync_mutex);
       if (num_aiocbs_running < PVFS_AIO_MAX_RUNNING)
       {
+         pthread_mutex_unlock(&progress_sync_mutex);
+
          /* submit the request */
          ret = aiocommon_readorwrite(list[i]);
 
@@ -109,9 +116,15 @@ int aiocommon_lio_listio(struct pvfs_aiocb *list[],
       }
       else
       {
+          gossip_debug(GOSSIP_USRINT_DEBUG, "%d AIO requests already posted,"
+                       "AIO CB %p added to AIO waiting list\n",
+                       num_aiocbs_running, list[i]->a_cb);
+          pthread_mutex_unlock(&progress_sync_mutex);
           /* add the pvfs_cb to the waiting list, the running list is full */
           pthread_mutex_lock(&waiting_list_mutex);
           qlist_add_tail(&(list[i]->link), aio_waiting_list);
+          gossip_debug(GOSSIP_USRINT_DEBUG, "%d AIO requests now waiting\n", 
+                       qlist_count(aio_waiting_list));
           pthread_mutex_unlock(&waiting_list_mutex);
       }
    }
@@ -167,12 +180,15 @@ static int aiocommon_readorwrite(struct pvfs_aiocb *p_cb)
    switch(p_cb->a_cb->aio_lio_opcode)
    {
       case LIO_READ:
+         gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p attempting to read %d bytes\n", p_cb->a_cb, (int)p_cb->a_cb->aio_nbytes);
          which = PVFS_IO_READ;
          break;
       case LIO_WRITE:
+         gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p attempting to write %d bytes\n", p_cb->a_cb, (int)p_cb->a_cb->aio_nbytes);
          which = PVFS_IO_WRITE;
          break;
       case LIO_NOP:
+         gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p, NOP\n", p_cb->a_cb);
          p_cb->a_cb->__error_code = 0;
          p_cb->a_cb->__return_value = 0;
          return 0;
@@ -199,6 +215,8 @@ static int aiocommon_readorwrite(struct pvfs_aiocb *p_cb)
    /* if this pvfs_cb failed set the error and return value */
    if (rc < 0)
    {
+      gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p, FAILED with error %d\n",
+                   p_cb->a_cb, errno);
       p_cb->a_cb->__error_code = errno;
       p_cb->a_cb->__return_value = -1;
    }
@@ -206,6 +224,8 @@ static int aiocommon_readorwrite(struct pvfs_aiocb *p_cb)
    /* else the io operation completed immediately */
    else if (rc == 0 && p_cb->op_id == -1)
    {
+      gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p, COMPLETED immediately (%d bytes)\n",
+                    p_cb->a_cb, (int)p_cb->io_resp.total_completed);
       p_cb->a_cb->__error_code = 0;
       p_cb->a_cb->__return_value = p_cb->io_resp.total_completed;
    }
@@ -213,6 +233,7 @@ static int aiocommon_readorwrite(struct pvfs_aiocb *p_cb)
    /* else, the io operation deferred completion */
    else
    {
+      gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p, DEFERRED\n", p_cb->a_cb);
       p_cb->a_cb->__error_code = EINPROGRESS;
       rc = 1;
    }
@@ -226,11 +247,14 @@ static void *aiocommon_progress(void *ptr)
    int i;
    int ret = 0;
    int op_count = 0;
+   int still_running = 0;
    struct qlist_head *next_io;
    struct pvfs_aiocb *io_cb;
    PVFS_sys_op_id ret_op_ids[PVFS_AIO_MAX_PROGRESS_OPS];
    int err_code_array[PVFS_AIO_MAX_PROGRESS_OPS] = {0};
    struct pvfs_aiocb *aiocb_array[PVFS_AIO_MAX_PROGRESS_OPS] = {NULL};
+
+   gossip_debug(GOSSIP_USRINT_DEBUG, "AIO progress thread starting up\n");
 
    /* progress thread */
    while (1)
@@ -243,6 +267,7 @@ static void *aiocommon_progress(void *ptr)
          pthread_mutex_lock(&waiting_list_mutex);
          if ((num_aiocbs_running == PVFS_AIO_MAX_RUNNING) || qlist_empty(aio_waiting_list))
          {
+            gossip_debug(GOSSIP_USRINT_DEBUG, "AIO thread forcing progress on %d requests\n", num_aiocbs_running);
             pthread_mutex_unlock(&waiting_list_mutex);
             pthread_mutex_unlock(&progress_sync_mutex);
             break;
@@ -253,6 +278,8 @@ static void *aiocommon_progress(void *ptr)
          io_cb = qlist_entry(next_io, struct pvfs_aiocb, link);
          pthread_mutex_unlock(&waiting_list_mutex);
          pthread_mutex_unlock(&progress_sync_mutex);
+
+         gossip_debug(GOSSIP_USRINT_DEBUG, "Adding AIO CB %p to the running list\n", io_cb->a_cb);
 
          /* submit the request */
          ret = aiocommon_readorwrite(io_cb);
@@ -299,6 +326,8 @@ static void *aiocommon_progress(void *ptr)
          /* if the operation had no error */
          if (!err_code_array[i])
          {
+            gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p COMPLETED (%d bytes)\n",
+                         aiocb_array[i]->a_cb, (int)aiocb_array[i]->io_resp.total_completed);
             aiocb_array[i]->a_cb->__error_code = 0;
             aiocb_array[i]->a_cb->__return_value = aiocb_array[i]->io_resp.total_completed;
          }
@@ -316,12 +345,15 @@ static void *aiocommon_progress(void *ptr)
                aiocb_array[i]->a_cb->__error_code = PINT_errno_mapping[(-(err_code_array[i])) & 0x7f];
             }
 
+            gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p FAILED with error %d\n",
+                         aiocb_array[i]->a_cb, aiocb_array[i]->a_cb->__error_code);
             aiocb_array[i]->a_cb->__return_value = -1;
          }
 
          /* remove the cb from the running list */
          pthread_mutex_lock(&running_list_mutex);
          qlist_del(&(aiocb_array[i]->link));
+         still_running = qlist_count(aio_running_list);
          pthread_mutex_unlock(&running_list_mutex);
 
          /* move the cb to the finished list */
@@ -331,13 +363,15 @@ static void *aiocommon_progress(void *ptr)
 
          /* update the number of running cbs, and exit the thread if this number is 0 */
          pthread_mutex_lock(&progress_sync_mutex);
-         num_aiocbs_running--;
+         num_aiocbs_running = still_running;
          if (!num_aiocbs_running)
          {
+            gossip_debug(GOSSIP_USRINT_DEBUG, "No running requests, progress thread exiting\n");
             progress_running = PVFS_AIO_PROGRESS_IDLE;
             pthread_mutex_unlock(&progress_sync_mutex);
             pthread_exit(NULL);
          }
+         gossip_debug(GOSSIP_USRINT_DEBUG, "%d requests still running, progress thread continuing\n", num_aiocbs_running);
          pthread_mutex_unlock(&progress_sync_mutex);
       }
    }
