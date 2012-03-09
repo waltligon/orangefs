@@ -31,8 +31,6 @@ static int num_aiocbs_running = 0;
 /* Initialization of PVFS AIO system */
 void aiocommon_init()
 {
-   gossip_debug(GOSSIP_USRINT_DEBUG, "Initializing PVFS AIO interface\n");
-
    /* initialize waiting, running, and finished lists for aio implementation */
    aio_waiting_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
    if (aio_waiting_list == NULL)
