@@ -21,13 +21,13 @@
 /* Define if read_descriptor_t has an arg member */
 #undef HAVE_ARG_IN_READ_DESCRIPTOR_T
 
-/* Define to 1 if you have the <arpa/inet.h> header file. */
+/* Define if arpa/inet.h exists */
 #undef HAVE_ARPA_INET_H
 
 /* Define to 1 if you have the <asm/ioctl32.h> header file. */
 #undef HAVE_ASM_IOCTL32_H
 
-/* Define to 1 if you have the <attr/xattr.h> header file. */
+/* Define if attr/xattr.h exists */
 #undef HAVE_ATTR_XATTR_H
 
 /* Define if kernel backing_dev_info struct has a name field */
@@ -94,7 +94,10 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
-/* Define to 1 if you have the <features.h> header file. */
+/* Define if system defines F_NOCACHE fcntl */
+#undef HAVE_FCNTL_F_NOCACHE
+
+/* Define if features.h exists */
 #undef HAVE_FEATURES_H
 
 /* Define to 1 if you have the `fgetxattr' function. */
@@ -125,7 +128,7 @@
 /* Define if fsetxattr takes position and option arguments */
 #undef HAVE_FSETXATTR_EXTRA_ARGS
 
-/* Define to 1 if you have the <fstab.h> header file. */
+/* Define if fstab.h exists */
 #undef HAVE_FSTAB_H
 
 /* Define if only filesystem_type has get_sb */
@@ -158,9 +161,6 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
-
-/* Define if pwd.h exists */
-#undef HAVE_GETPWUID
 
 /* Define if get_sb_nodev function exists */
 #undef HAVE_GETSB_NODEV
@@ -255,6 +255,9 @@
 /* Define to 1 if you have the <linux/ioctl32.h> header file. */
 #undef HAVE_LINUX_IOCTL32_H
 
+/* Define if linux/malloc.h exists */
+#undef HAVE_LINUX_MALLOC_H
+
 /* Define to 1 if you have the <linux/mount.h> header file. */
 #undef HAVE_LINUX_MOUNT_H
 
@@ -267,19 +270,22 @@
 /* Define to 1 if you have the <linux/syscalls.h> header file. */
 #undef HAVE_LINUX_SYSCALLS_H
 
+/* Define if linux/types.h exists */
+#undef HAVE_LINUX_TYPES_H
+
 /* Define to 1 if you have the <linux/xattr_acl.h> header file. */
 #undef HAVE_LINUX_XATTR_ACL_H
 
-/* Define to 1 if you have the <malloc.h> header file. */
+/* Define if malloc.h exists */
 #undef HAVE_MALLOC_H
 
 /* Define if kernel defines mapping_nrpages macro -- defined by RT linux */
 #undef HAVE_MAPPING_NRPAGES_MACRO
 
-/* Define to 1 if you have the <memory.h> header file. */
+/* Define if memory.h exists */
 #undef HAVE_MEMORY_H
 
-/* Define to 1 if you have the <mntent.h> header file. */
+/* Define if mntent.h exists */
 #undef HAVE_MNTENT_H
 
 /* Define if mount.h contains MNT_NOATIME flags */
@@ -288,7 +294,7 @@
 /* Define if mount.h contains MNT_NODIRATIME flags */
 #undef HAVE_MNT_NODIRATIME
 
-/* Define to 1 if you have the <netdb.h> header file. */
+/* Define if netdb.h exists */
 #undef HAVE_NETDB_H
 
 /* Define if including linux/config.h gives no warnings */
@@ -305,6 +311,9 @@
 
 /* Define to 1 if you have the <openssl/evp.h> header file. */
 #undef HAVE_OPENSSL_EVP_H
+
+/* Define if system defines O_DIRECT fcntl */
+#undef HAVE_OPEN_O_DIRECT
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_FILE_ARG
@@ -323,6 +332,9 @@
 
 /* Define if kernel super_operations contains put_inode field */
 #undef HAVE_PUT_INODE
+
+/* Define if pwd.h exists */
+#undef HAVE_PWD_H
 
 /* Define if struct file_operations in kernel has readdirplus_lite callback */
 #undef HAVE_READDIRPLUSLITE_FILE_OPERATIONS
@@ -385,19 +397,19 @@
 /* Define if struct super_operations in kernel has statfs_lite callback */
 #undef HAVE_STATFS_LITE_SUPER_OPERATIONS
 
-/* Define to 1 if you have the <stdarg.h> header file. */
+/* Define if stdarg.h exists */
 #undef HAVE_STDARG_H
 
-/* Define to 1 if you have the <stdint.h> header file. */
+/* Define if stdint.h exists */
 #undef HAVE_STDINT_H
 
-/* Define to 1 if you have the <stdlib.h> header file. */
+/* Define if stdlib.h exists */
 #undef HAVE_STDLIB_H
 
 /* Define if struct ctl_table has strategy member */
 #undef HAVE_STRATEGY_NAME
 
-/* Define to 1 if you have the <strings.h> header file. */
+/* Define if strings.h exists */
 #undef HAVE_STRINGS_H
 
 /* Define to 1 if you have the <string.h> header file. */
@@ -427,19 +439,22 @@
 /* Define if sys/mount.h exists */
 #undef HAVE_SYS_MOUNT_H
 
-/* Define to 1 if you have the <sys/socket.h> header file. */
+/* Define if sys/sendfile.h exists */
+#undef HAVE_SYS_SENDFILE_H
+
+/* Define if sys/socket.h exists */
 #undef HAVE_SYS_SOCKET_H
 
-/* Define to 1 if you have the <sys/stat.h> header file. */
+/* Define if sys/stat.h exists */
 #undef HAVE_SYS_STAT_H
 
-/* Define to 1 if you have the <sys/types.h> header file. */
+/* Define if sys/types.h exists */
 #undef HAVE_SYS_TYPES_H
 
 /* Define if sys/vfs.h exists */
 #undef HAVE_SYS_VFS_H
 
-/* Define to 1 if you have the <sys/xattr.h> header file. */
+/* Define if sys/xattr.h exists */
 #undef HAVE_SYS_XATTR_H
 
 /* Define if TAU library is used */
@@ -528,6 +543,24 @@
 
 /* sub version number */
 #undef PVFS2_VERSION_SUB
+
+/* Should we build user interface acl routines. */
+#undef PVFS_HAVE_ACL_INCLUDES
+
+/* scandir compare arg takes void pointers. */
+#undef PVFS_SCANDIR_VOID
+
+/* Should we enable user interface data cache. */
+#undef PVFS_UCACHE_ENABLE
+
+/* Should we build user interface libraries. */
+#undef PVFS_USRINT_BUILD
+
+/* Should we enable user interface CWD support. */
+#undef PVFS_USRINT_CWD
+
+/* Should user interface assume FS is mounted. */
+#undef PVFS_USRINT_KMOUNT
 
 /* The size of a `long int', as computed by sizeof. */
 #undef SIZEOF_LONG_INT

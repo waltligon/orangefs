@@ -11,7 +11,8 @@
 # docsclean      cleans up documentation files
 # publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
-# usertools	 builds user tools
+# usertools	     builds user tools
+# ucachedtools	 builds ucached tools
 # kernapps       builds userland helper programs for kernel driver
 # cscope         generates information for cscope utility
 # tags           generates tags file for use by editors
@@ -64,6 +65,7 @@ mandir = $(DESTDIR)@mandir@
 sbindir = $(DESTDIR)@sbindir@
 bindir = $(DESTDIR)@bindir@
 libdir = $(DESTDIR)@libdir@
+sysconfdir = $(DESTDIR)@sysconfdir@
 
 VPATH = $(srcdir)
 SHELL = @SHELL@
@@ -82,10 +84,13 @@ BUILD_PORTALS = @BUILD_PORTALS@
 BUILD_ZOID = @BUILD_ZOID@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
+BUILD_USRINT = @BUILD_USRINT@
+BUILD_UCACHE = @BUILD_UCACHE@
 BUILD_FUSE = @BUILD_FUSE@
 BUILD_SERVER = @BUILD_SERVER@
 BUILD_TAU = @BUILD_TAU@
 BUILD_KERNEL = @BUILD_KERNEL@
+ENABLE_SECURITY = @ENABLE_SECURITY@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -122,7 +127,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools
+.PHONY: all clean develtools dist distclean docs docsclean publish cscope tags codecheck admintools kernapps usertools ucachedtools
 
 ################################################################
 # Find project subdirectories
@@ -158,6 +163,7 @@ INCLUDES := \
     src/common/gossip \
     src/common/gen-locks \
     src/common/events \
+    src/common/security \
     src/client/usrint \
     src/io/trove \
     src/io/bmi \
@@ -189,12 +195,13 @@ LDFLAGS += @LDFLAGS@
 SERVER_LDFLAGS = -L@BUILD_ABSOLUTE_TOP@/lib
 SERVER_LDFLAGS += @SERVER_LDFLAGS@
 DB_CFLAGS = @DB_CFLAGS@
-LDSHARED = $(CC) -shared
+LDSHARED = $(CC) -shared -L@BUILD_ABSOLUTE_TOP@/lib
 PICFLAGS = -fPIC
 LIBS += -lpvfs2 @LIBS@ 
 LIBS_THREADED += -lpvfs2-threaded @LIBS@
 # need to include external dependency libs when building shared libraries
 DEPLIBS := @LIBS@
+ULIBDEPLIBS := -lpvfs2
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
@@ -226,6 +233,9 @@ CFLAGS += $(patsubst %,-I$(builddir)/%,$(GENINCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
+  # make bindir and sysconfdir available to source files
+CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
+
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 
@@ -240,6 +250,13 @@ ifneq (,$(STRICT_CFLAGS))
     #GCC_CFLAGS += -Wcast-qual
     #GCC_CFLAGS += -Wshadow
     #GCC_CFLAGS += -Wwrite-strings
+else
+    # these are noisy but come with Wall
+    # use strict if you want them on
+    #GCC_CFLAGS += -Wno-unused-value
+    #GCC_CFLAGS += -Wno-unused-result
+    #GCC_CFLAGS += -Wno-unused-but-set-variable
+    #GCC_CFLAGS += -Wno-unused-but-set-parameter
 endif
 
 # Intel cc options, enable all warnings, then disable some
@@ -449,8 +466,10 @@ ADMINSRC_SERVER :=
 USERSRC :=
 # LIBSRC is source code for libpvfs2
 LIBSRC :=
-# ULIBSRC is source code for libpvfs2
+# ULIBSRC is source code for libofs
 ULIBSRC :=
+# UCACHEDSRC is source code for ucached programs
+UCACHEDSRC :=
 # SERVERSRC is souce code for the pvfs2 server
 SERVERSRC :=
 ifdef BUILD_BMI_ONLY
@@ -493,29 +512,37 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-LIBRARIES :=
+LIBRARIES_STATIC := lib/libpvfs2.a lib/liborange.a
+LIBRARIES_SHARED := lib/libpvfs2.so lib/liborange.so
+LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
+LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
+
 ifdef BUILD_BMI_ONLY
-BMILIBRARIES :=
+LIBRARIES_STATIC += lib/libbmi.a
+LIBRARIES_SHARED += lib/libbmi.so
+BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
-LIBRARIES_THREADED :=
-ifeq ($(build_shared),yes)
-ifdef BUILD_BMI_ONLY
-BMILIBRARIES := lib/libbmi.so
+
+ifdef BUILD_USRINT
+LIBRARIES_STATIC += lib/libofs.a lib/liborangepre.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangepre.so
+LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
+LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
-LIBRARIES_SHARED = lib/libpvfs2.so lib/libofs.so
-LIBRARIES += $(LIBRARIES_SHARED)
-LIBRARIES_THREADED_SHARED += lib/libpvfs2-threaded.so lib/libofs-threaded.so
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_SHARED)
+
+ifneq ($(build_static),yes)
+LIBRARIES_STATIC := 
+LIBRARIES_THREADED_STATIC :=
 endif
-ifeq ($(build_static),yes)
-ifdef BUILD_BMI_ONLY
-BMILIBRARIES += lib/libbmi.a
+
+ifneq ($(build_shared),yes)
+LIBRARIES_SHARED :=
+LIBRARIES_THREADED_SHARED := 
 endif
-LIBRARIES_STATIC = lib/libpvfs2.a lib/libofs.a
-LIBRARIES += $(LIBRARIES_STATIC)
-LIBRARIES_THREADED_STATIC += lib/libpvfs2-threaded.a lib/libofs-threaded.a
-LIBRARIES_THREADED += $(LIBRARIES_THREADED_STATIC)
-endif
+
+LIBRARIES_THREADED := $(LIBRARIES_THREADED_STATIC) $(LIBRARIES_THREADED_SHARED)
+LIBRARIES := $(LIBRARIES_SHARED) $(LIBRARIES_STATIC) $(LIBRARIES_THREADED)
+
 
 ################################################################
 # Default target forward pointer, to avoid other targets in make stubs
@@ -539,10 +566,16 @@ include $(patsubst %, %/module.mk, $(MODULES))
 
 # LIBOBJS is a list of objects to put in the client lib
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# ULIBOBJS is a list of objects to put in the ofs lib
+ULIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ULIBSRC)))
 # LIBPICOBJS are the same, but compiled for use in a shared library
 LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
+# ULIBPICOBJS are the same, but compiled for use in a shared library
+ULIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(ULIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
+# ULIBDEPENDS is a list of dependency files for the client lib
+ULIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
 
 ifdef BUILD_BMI_ONLY
 # LIBBMIOBJS is a list of objects to put in the bmi lib
@@ -557,14 +590,17 @@ endif
 LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDOBJS is a list of objects to put in the multithreaded ofs lib
 ULIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(ULIBSRC)))
+
 # LIBTHREADEDPICOBJS are the same, but compiled for use in a shared library
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDPICOBJS are the same, but compiled for use in a shared ofs library
 ULIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(ULIBSRC)))
+
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 # ULIBTHREADEDDEPENDS is a list of dependency files for the # multithreaded ofs lib
 ULIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ULIBSRC)))
+
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
 # ADMINTOOLS is a list of admin program executables
@@ -578,6 +614,13 @@ USEROBJS := $(patsubst %.c,%.o, $(filter %.c,$(USERSRC)))
 USERTOOLS := $(patsubst %.c,%, $(filter %.c, $(USERSRC)))
 # USERDEPENDS is a list of dependency files for user programs
 USERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(USERSRC)))
+
+# UCACHEDOBJS is a list of ucached program objects
+UCACHEDOBJS := $(patsubst %.c,%.o, $(filter %.c,$(UCACHEDSRC)))
+# UCACHEDTOOLS is a list of ucached program executables
+UCACHEDTOOLS := $(patsubst %.c,%, $(filter %.c, $(UCACHEDSRC)))
+# UCACHEDDEPENDS is a list of dependency files for ucached programs
+UCACHEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(UCACHEDSRC)))
 
 ifdef BUILD_SERVER
     ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
@@ -663,10 +706,11 @@ DEVELDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DEVELSRC)))
 ifdef BUILD_BMI_ONLY
 DEPENDS := $(sort $(LIBBMIDEPENDS))
 else
-DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(SERVERBINDEPENDS) \
-    $(MISCDEPENDS) $(USERDEPENDS) \
-    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
-    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(FUSEDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) \
+    $(SERVERBINDEPENDS) $(MISCDEPENDS) $(USERDEPENDS) \
+    $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) \
+    $(VISDEPENDS) $(VISMISCDEPENDS) $(KARMADEPENDS) \
+    $(STATECOMPDEPS) $(FUSEDEPENDS) $(UCACHEDDEPENDS) )
 endif
 
 ####################################################################
@@ -676,7 +720,7 @@ endif
 ifdef BUILD_BMI_ONLY
 all:: $(BMILIBRARIES)
 else
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools $(VISS) $(KARMA) $(FUSE)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools usertools ucachedtools $(VISS) $(KARMA) $(FUSE) 
 endif
 
 # target for building admin tools
@@ -684,6 +728,9 @@ admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 #target for building user tools
 usertools: $(USERTOOLS)
+
+# target for building ucached tools
+ucachedtools: $(UCACHEDTOOLS)
 
 # target for building kernel driver userland programs
 kernapps: $(KERNAPPS) $(KERNAPPSTHR)
@@ -773,13 +820,13 @@ lib/libpvfs2-threaded.a: $(LIBTHREADEDOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(LIBTHREADEDOBJS)
 
-# rule for building the pvfs2 library
+# rule for building the shared pvfs2 library
 lib/libpvfs2.so: $(LIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libpvfs2.so -o $@ $(LIBPICOBJS) $(DEPLIBS)
 
-# rule for building the pvfs2 _multithreaded_ library
+# rule for building the shared pvfs2 _multithreaded_ library
 lib/libpvfs2-threaded.so: $(LIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
@@ -797,17 +844,34 @@ lib/libofs-threaded.a: $(ULIBTHREADEDOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)ar rcs $@ $(ULIBTHREADEDOBJS)
 
-# rule for building the ofs library
+# rule for building the shared ofs library
 lib/libofs.so: $(ULIBPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs.so -o $@ $(ULIBPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
-# rule for building the ofs _multithreaded_ library
+# rule for building the shared ofs _multithreaded_ library
 lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 	$(Q) "  LDSO		$@"
 	$(E)$(INSTALL) -d lib
-	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(DEPLIBS)
+	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
+
+# rules for building virtual libraries
+lib/liborange.a: lib/libpvfs2.a
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.a
+
+lib/liborange.so: lib/libpvfs2.so
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.so
+
+lib/liborangepre.a: lib/libpvfs2.a
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.a
+
+lib/liborangepre.so: lib/libpvfs2.so
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.so
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -924,6 +988,8 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 
 $(USERTOOLS): %: %.o $(LIBRARIES)
 
+$(UCACHEDTOOLS): %: %.o $(LIBRARIES)
+
 $(KERNAPPS): %: %.o $(LIBRARIES)
 $(KERNAPPSTHR): %: %.o $(LIBRARIES_THREADED)
 	$(Q) "  LD		$@"
@@ -988,11 +1054,13 @@ clean::
 		$(LIBRARIES) $(LIBRARIES_THREADED) $(DEPENDS) $(SERVER) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
-                $(USERTOOLS) $(USEROBJS) \
+        $(USERTOOLS) $(USEROBJS) \
+        $(UCACHEDTOOLS) $(UCACHEDOBJS) \
 		$(KERNAPPOBJS) $(KERNAPPS) $(KERNAPPSTHR) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) $(BMILIBRARIES) $(FUSEOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(LIBBMIOBJS) \
+        $(BMILIBRARIES) $(FUSEOBJS) \
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS)\
 		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
@@ -1043,6 +1111,8 @@ cleaner: clean
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f Makefile pvfs2-config.h
+	rm -f config.save
+	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
@@ -1114,8 +1184,8 @@ install_doc:
 	rm -f ${mandir}/man5/*.gz
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
-	gzip ${mandir}/man1/*
-	gzip ${mandir}/man5/*
+	gzip -f ${mandir}/man1/*.1
+	gzip -f ${mandir}/man5/*.5
 
 ifdef BUILD_BMI_ONLY
 install:: all
@@ -1132,6 +1202,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-usrint.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)
@@ -1174,6 +1245,9 @@ endif
 	install -d $(bindir)
 	install -m 755 $(ADMINTOOLS) $(bindir)
 	install -m 755 $(USERTOOLS) $(bindir)
+ifdef BUILD_UCACHE
+	install -m 755 $(UCACHEDTOOLS) $(sbindir)
+endif
 	# for compatibility in case anyone really wants "lsplus"
 	$(LN_S) pvfs2-ls $(bindir)/pvfs2-lsplus
 	install -m 755 src/apps/admin/pvfs2-config $(bindir)
