@@ -56,6 +56,7 @@ AC_CHECK_HEADER([sys/mount.h],
 
 AC_CHECK_HEADERS([mntent.h, fstab.h])
 
+AC_CHECK_HEADERS(features.h)
 AC_CHECK_HEADERS(stdarg.h)
 
 AC_CHECK_HEADERS(attr/xattr.h)
