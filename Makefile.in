@@ -1116,8 +1116,7 @@ cleaner: clean
 # except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile pvfs2-config.h
-	rm -f config.save
+	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.me
 	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
