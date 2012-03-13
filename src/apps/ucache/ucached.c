@@ -211,6 +211,7 @@ static int execute_cmd(char cmd)
             {
                 rc = write(writefd, "SUCCESS\tExiting ucached", BUFF_SIZE);
             }
+            remove(UCACHED_STARTED);
             close(writefd);
             close(readfd);
             exit(EXIT_SUCCESS);
@@ -557,7 +558,6 @@ static int destroy_ucache_shmem(char dest_locks, char dest_ucache)
 int main(int argc, char **argv)
 {
     int rc = 0; 
-    void *rp;
 
     gossip_enable_file(UCACHED_LOG_FILE, "a");
     uint64_t curr_mask;
@@ -575,28 +575,6 @@ int main(int argc, char **argv)
     if (!out)
     {
         out = stdout;
-    }
-
-    /* Continue ucached if it's the only ucached */
-    char ps_buff1[256];
-    char ps_buff2[256];
-    FILE *pipe = popen("ps -e | grep -w ucached", "r");
-
-    /* Should catch 1 line result, but not 2 */
-    rp = fgets(ps_buff1, 256, pipe);
-    rp = fgets(ps_buff2, 256, pipe); /* Should be zero if only 1 ucached */
-    if(rp == NULL)
-    {
-        /* Remove old FIFOs in case daemon was killed last time */
-        remove(FIFO1);
-        remove(FIFO2);
-    }
-    else
-    {  
-        puts("FAILURE: Daemon already started");
-        puts(ps_buff1);
-        puts(ps_buff2);
-        exit(EXIT_FAILURE);
     }
 
     /* Daemonize! */
