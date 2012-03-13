@@ -45,7 +45,6 @@ typedef struct posix_ops_s
     int (*ftruncate64)(int fd, off64_t length);
     int (*fallocate)(int fd, off_t offset, off_t length);
     int (*close)( int fd);
-    int (*flush)(int fd);
     int (*stat)(const char *path, struct stat *buf);
     int (*stat64)(const char *path, struct stat64 *buf);
     int (*fstat)(int fd, struct stat *buf);
@@ -54,6 +53,10 @@ typedef struct posix_ops_s
     int (*fstatat64)(int fd, const char *path, struct stat64 *buf, int flag);
     int (*lstat)(const char *path, struct stat *buf);
     int (*lstat64)(const char *path, struct stat64 *buf);
+    int (*futimesat)(int dirfd, const char *path, const struct timeval times[2]);
+    int (*utimes)(const char *path, const struct timeval times[2]);
+    int (*utime)(const char *path, const struct utimbuf *buf);
+    int (*futimes)(int fd, const struct timeval times[2]);
     int (*dup)(int oldfd);
     int (*dup2)(int oldfd, int newfd);
     int (*chown)(const char *path, uid_t owner, gid_t group);
@@ -67,10 +70,10 @@ typedef struct posix_ops_s
     int (*mkdirat)(int dirfd, const char *path, mode_t mode);
     int (*rmdir)(const char *path);
     ssize_t (*readlink)(const char *path, char *buf, size_t bufsiz);
-    int (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
+    ssize_t (*readlinkat)(int dirfd, const char *path, char *buf, size_t bufsiz);
     int (*symlink)(const char *oldpath, const char *newpath);
     int (*symlinkat)(const char *oldpath, int newdirfd, const char *newpath);
-    ssize_t (*link)(const char *oldpath, const char *newpath);
+    int (*link)(const char *oldpath, const char *newpath);
     int (*linkat)(int olddirfd, const char *oldpath,
                   int newdirfd, const char *newpath, int flags);
     int (*readdir)(u_int fd, struct dirent *dirp, u_int count);
@@ -89,6 +92,8 @@ typedef struct posix_ops_s
     int (*statfs64)(const char *path, struct statfs64 *buf);
     int (*fstatfs)(int fd, struct statfs *buf);
     int (*fstatfs64)(int fd, struct statfs64 *buf);
+    int (*statvfs)(const char *path, struct statvfs *buf);
+    int (*fstatvfs)(int fd, struct statvfs *buf);
     int (*mknod)(const char *path, mode_t mode, dev_t dev);
     int (*mknodat)(int dirfd, const char *path, mode_t mode, dev_t dev);
     ssize_t (*sendfile)(int outfd, int infd, off_t *offset, size_t count);
@@ -99,20 +104,32 @@ typedef struct posix_ops_s
                      const void *value, size_t size, int flags);
     int (*fsetxattr)(int fd, const char *name,
                      const void *value, size_t size, int flags);
-    int (*getxattr)(const char *path, const char *name,
-                    void *value, size_t size);
-    int (*lgetxattr)(const char *path, const char *name,
-                     void *value, size_t size);
-    int (*fgetxattr)(int fd, const char *name, void *value, size_t size);
-    int (*listxattr)(const char *path, char *list, size_t size);
-    int (*llistxattr)(const char *path, char *list, size_t size);
-    int (*flistxattr)(int fd, char *list, size_t size);
+    ssize_t (*getxattr)(const char *path, const char *name,
+                        void *value, size_t size);
+    ssize_t (*lgetxattr)(const char *path, const char *name,
+                         void *value, size_t size);
+    ssize_t (*fgetxattr)(int fd, const char *name, void *value, size_t size);
+    ssize_t (*listxattr)(const char *path, char *list, size_t size);
+    ssize_t (*llistxattr)(const char *path, char *list, size_t size);
+    ssize_t (*flistxattr)(int fd, char *list, size_t size);
     int (*removexattr)(const char *path, const char *name);
     int (*lremovexattr)(const char *path, const char *name);
     int (*fremovexattr)(int fd, const char *name);
     mode_t (*umask)(mode_t mask);
     mode_t (*getumask)(void);
     int (*getdtablesize)(void);
+    void *(*mmap)(void *start, size_t length, int prot,
+                    int flags, int fd, off_t offset);
+    int (*munmap)(void *start, size_t length);
+    int (*msync)(void *start, size_t length, int flags);
+#if 0
+    int (*acl_delete_def_file)(const char *path_p);
+    acl_t (*acl_get_fd)(int fd);
+    acl_t (*acl_get_file)(const char *path_p, acl_type_t type);
+    int (*acl_set_fd)(int fd, acl_t acl);
+    int (*acl_set_file)(const char *path_p, acl_type_t type, acl_t acl);
+#endif
+
     /* socket operations */
     int (*socket)(int dowmain, int type, int protocol);
     int (*accept)(int sockfd, struct sockaddr *addr, socklen_t *alen);
@@ -160,21 +177,43 @@ typedef struct posix_ops_s
 extern posix_ops glibc_ops;
 extern posix_ops pvfs_ops;
 
-/** PVFS-POSIX Descriptor table entry */
-typedef struct pvfs_descriptor_s
+typedef struct pvfs_mmap_s
 {
-    int fd;                   /**< file number in PVFS descriptor_table */
+    void *mst;
+    size_t mlen;
+    int mprot;
+    int mflags;
+    int mfd;
+    off_t moff;
+    struct qlist_head link;
+} *pvfs_mmap_t;
+
+/** PVFS-POSIX Descriptor table entry */
+/* these items are shared between duped descrptors */
+typedef struct pvfs_descriptor_status_s
+{
+    gen_mutex_t lock;         /**< protect struct from mult threads */
     int dup_cnt;              /**< number of table slots with this des */
     posix_ops *fsops;         /**< syscalls to use for this file */
-    int true_fd;              /**< the true file number depending on FS */
     PVFS_object_ref pvfs_ref; /**< PVFS fs_id and handle for PVFS file */
     int flags;                /**< the open flags used for this file */
     int mode;                 /**< stat mode of the file - may be volatile */
     off64_t file_pointer;     /**< offset from the beginning of the file */
     PVFS_ds_position token;   /**< used db Trove to iterate dirents */
-    int is_in_use;            /**< PVFS_FS if this descriptor is valid */
     char *dpath;              /**< path of an open directory for fchdir */
-    struct mem_table_s *mtbl; /**< reference to cached objects */            
+    struct file_ent_s *fent; /**< reference to cached objects */            
+                              /**< set to NULL if not caching this file */
+} pvfs_descriptor_status;
+
+/* these are unique among descriptors */
+typedef struct pvfs_descriptor_s
+{
+    gen_mutex_t lock;         /**< protect struct from mult threads */
+    int is_in_use;            /**< PVFS_FS if this descriptor is valid */
+    int fd;                   /**< file number in PVFS descriptor_table */
+    int true_fd;              /**< the true file number depending on FS */
+    int fdflags;              /**< POSIX file descriptor flags */
+    pvfs_descriptor_status *s;
 } pvfs_descriptor;
 
 typedef struct pvfs_descriptor_s PFILE; /* these are for posix interface */

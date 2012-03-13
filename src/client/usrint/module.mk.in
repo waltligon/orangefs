@@ -1,17 +1,21 @@
+ifdef BUILD_USRINT
+
 DIR := src/client/usrint
 
 SRC := \
-#	$(DIR)/posix-pvfs.c \
-#	$(DIR)/request.c \
-#	$(DIR)/iocommon.c \
-#	$(DIR)/openfile-util.c \
-#	$(DIR)/ucache.c \
+	$(DIR)/posix-pvfs.c \
+	$(DIR)/request.c \
+	$(DIR)/iocommon.c \
+	$(DIR)/openfile-util.c \
+	$(DIR)/ucache.c \
+    $(DIR)/mmap.c
 
 USRC := \
-#	$(DIR)/posix.c \
-#	$(DIR)/socket.c \
-#	$(DIR)/stdio.c \
+	$(DIR)/posix.c \
+	$(DIR)/stdio.c 
 
 # list of all .c files (generated or otherwise) that belong in library
 LIBSRC += $(SRC)
 ULIBSRC += $(USRC)
+
+endif # BUILD_USRINT

@@ -15,7 +15,29 @@
 #include "openfile-util.h"
 #include "stdio-ops.h"
 
-#define STDIO_DEBUG 0
+/* fdopendir not present until glibc2.5 */
+#if __GLIBC_PREREQ (2,5)
+#else
+extern DIR *fdopendir (int __fd);
+#endif
+
+
+#ifdef gossip_debug
+#undef gossip_debug
+#endif
+
+#ifdef GOSSIP_USRINT_DEBUG
+#undef GOSSIP_USRINT_DEBUG
+#endif
+
+#ifdef USRINT_DEBUG
+#define GOSSIP_USRINT_DEBUG stderr
+#define gossip_debug fprintf
+#else
+#define gossip_debug(__m, __f, ...)
+#endif /* USRINT_DEBUG */
+
+#define PVFS_STDIO_DEBUG 0
 
 static void init_stdio(void);
 static struct stdio_ops_s stdio_ops;
@@ -134,7 +156,8 @@ void funlockfile(FILE *stream)
     unlock_stream(stream);
 }
 
-/** This function coverts from stream style mode to ssycall style flags
+/** This function converts from stream style mode to syscall
+ *  style flags
  *
  */
 static int mode2flags(const char *mode)
@@ -182,6 +205,7 @@ static int mode2flags(const char *mode)
                 break;
             case 'b': /* this is ignored in POSIX */
             case 'c': /* used in glibc ignored here */
+            case 'e': /* used in glibc ignored here */
             case 'm': /* used in glibc ignored here */
                 break;
             case 'x': /* glibc extension */
@@ -238,12 +262,13 @@ static int mode2flags(const char *mode)
 /**
  * fopen opens a file, then adds a stream to it
  */ 
-FILE *fopen(const char * path, const char * mode)
+FILE *fopen(const char *path, const char *mode)
 { 
     int fd = 0;
     int flags = 0;
     FILE *newfile = NULL;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fopen %s %s\n", path, mode);
     flags = mode2flags(mode);
     if (flags == -1)
     {
@@ -259,6 +284,14 @@ FILE *fopen(const char * path, const char * mode)
     newfile = fdopen(fd, mode);
 
     return newfile;
+}
+
+/**
+ * fopen64 - not clear why there is an fopen64 but there is
+ */
+FILE *fopen64(const char *path, const char *modes)
+{
+    return fopen(path, modes);
 }
 
 /** this function sets up a new stream's buffer area
@@ -301,6 +334,7 @@ FILE *fdopen(int fd, const char *mode)
     FILE *newfile = NULL;
     int flags;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fdopen %d %s\n", fd, mode);
     /* need to check for valid mode here */
     /* it must be compatible with the existing mode */
     flags = mode2flags(mode);
@@ -334,6 +368,15 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 {
     int fd = 0;
     int flags = 0;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "freopen %s %s %p\n", path, mode, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.freopen(path, mode, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -379,6 +422,14 @@ FILE *freopen(const char *path, const char *mode, FILE *stream)
 }
 
 /**
+ * freopen64 - again this appears useless but nevertheless ...
+ */
+FILE *freopen64 (const char *path, const char *modes, FILE *stream)
+{
+    return freopen(path, modes, stream);
+}
+
+/**
  * These functions do not need PVFS versions and thus
  * are not implemented here
  */
@@ -405,6 +456,16 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     int rc = 0;
 
+    /* causing loops */
+    /* gossip_debug(GOSSIP_USRINT_DEBUG, "fwrite %p %d %d %p\n",
+                    ptr, size, nmemb, stream); */
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fwrite(ptr, size, nmemb, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -413,7 +474,7 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             return stdio_ops.fwrite(ptr, size, nmemb, stream);
         }
         errno = EINVAL;
-        return -1;
+        return 0;
     }
     lock_stream(stream);
     rc = fwrite_unlocked(ptr, size, nmemb, stream);
@@ -426,20 +487,30 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     off64_t rsz, rsz_buf, rsz_extra;
     int rc;
 
+    /* causing loops */
+    /* gossip_debug(GOSSIP_USRINT_DEBUG, "fwrite_unlocked %p %d %d %p\n",
+                    ptr, size, nmemb, stream); */
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fwrite_unlocked(ptr, size, nmemb, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.fwrite(ptr, size, nmemb, stream);
+            return stdio_ops.fwrite_unlocked(ptr, size, nmemb, stream);
         }
         errno = EINVAL;
-        return -1;
+        return 0;
     }
     if (!ptr || size <= 0 || nmemb <= 0)
     {
         errno = EINVAL;
-        return -1;
+        return 0;
     }
 
     /* Check to see if switching from read to write */
@@ -471,7 +542,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
     if (rsz_extra)
     {
         /* buffer is full - write the current buffer */
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
         fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -481,14 +552,15 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         if (rc == -1)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
-            return -1;
+            return 0;
         }
+        /* TODO: check for a short write */
         /* reset buffer */
         stream->_IO_write_ptr = stream->_IO_write_base;
         /* if there more data left in request than fits in a buffer */
         if(rsz_extra > stream->_IO_buf_end - stream->_IO_buf_base)
         {
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
             fprintf(stderr,"fwrite writing %d bytes to offset %d\n",
                     (int)rsz_extra,
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -498,8 +570,9 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
             if (rc == -1)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
-                return -1;
+                return 0;
             }
+            /* TODO: check for a short write */
         }
         else
         {
@@ -508,7 +581,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
     }
     
-    return rsz;
+    return rsz / size; /* num items written */
 }
 
 /*
@@ -518,15 +591,24 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fread %p %d %d %p\n",
+                    ptr, size, nmemb, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fread(ptr, size, nmemb, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.fwrite(ptr, size, nmemb, stream);
+            return stdio_ops.fread(ptr, size, nmemb, stream);
         }
         errno = EINVAL;
-        return -1;
+        return 0;
     }
     lock_stream(stream);
     rc = fread_unlocked(ptr, size, nmemb, stream);
@@ -540,27 +622,36 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
     int bytes_read;
     int rc;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fread_unlocked %p %d %d %p\n",
+                    ptr, size, nmemb, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fread_unlocked(ptr, size, nmemb, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.fread(ptr, size, nmemb, stream);
+            return stdio_ops.fread_unlocked(ptr, size, nmemb, stream);
         }
         errno = EINVAL;
-        return -1;
+        return 0;
     }
     if (!ptr || size < 0 || nmemb < 0)
     {
         errno = EINVAL;
-        return -1;
+        return 0;
     }
 
     /* Check to see if switching from write to read */
     if (ISFLAGSET(stream, _IO_CURRENTLY_PUTTING))
     {
         /* write buffer back */
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
         fprintf(stderr,"fread writing %d bytes to offset %d\n",
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -570,7 +661,12 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         if (rc == -1)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
-            return -1;
+            return 0;
+        }
+        else if (rc < stream->_IO_write_ptr - stream->_IO_write_base)
+        {
+            /* short write but no error ??? */
+            SETFLAG(stream, _IO_ERR_SEEN);
         }
         /* reset write pointer */
         stream->_IO_write_ptr = stream->_IO_write_base;
@@ -591,7 +687,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         if (bytes_read == -1)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
-            return -1;
+            return 0;
+        }
+        else if (bytes_read == 0)
+        {
+            SETFLAG(stream, _IO_EOF_SEEN);
         }
         /* indicate end of read area */
         stream->_IO_read_end = stream->_IO_read_base + bytes_read;
@@ -603,7 +703,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
      * we assume there is a block in the buffer now
      * and that the current file pointer corresponds
      * to the end of the read buffer.  The user has
-     * only up to the read pointer.
+     * only seen up to the read pointer.
      */
     rsz = size * nmemb;  /* total bytes requested */
     rsz_buf = PVFS_util_min(rsz, stream->_IO_read_end - stream->_IO_read_ptr);
@@ -630,7 +730,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 if (bytes_read == -1)
                 {
                     SETFLAG(stream, _IO_ERR_SEEN);
-                    return -1;
+                    return 0;
+                }
+                else if (bytes_read == 0)
+                {
+                    SETFLAG(stream, _IO_EOF_SEEN);
                 }
                 if (bytes_read == rsz_extra)
                 {
@@ -640,15 +744,19 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                     if (bytes_read == -1)
                     {
                         SETFLAG(stream, _IO_ERR_SEEN);
-                        return -1;
+                        return 0;
+                    }
+                    else if (bytes_read == 0)
+                    {
+                        SETFLAG(stream, _IO_EOF_SEEN);
                     }
                     stream->_IO_read_end = stream->_IO_read_base + bytes_read;
                     stream->_IO_read_ptr = stream->_IO_read_base;
-                    return rsz;
+                    return rsz / size; /* num items read */
                 }
-                /* have read to EOF */
+                /* MIGHT have read to EOF - check for pipe, tty */
                 SETFLAG(stream, _IO_EOF_SEEN);
-                return rsz_buf + bytes_read;
+                return (rsz_buf + bytes_read) / size; /* num items read */
             }
             /* rest of request fits in a buffer - read next buffer */
             bytes_read = read(stream->_fileno, stream->_IO_buf_base,
@@ -656,7 +764,11 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             if (bytes_read == -1)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
-                return -1;
+                return 0;
+            }
+            else if (bytes_read == 0)
+            {
+                SETFLAG(stream, _IO_EOF_SEEN);
             }
             stream->_IO_read_end = stream->_IO_read_base + bytes_read;
             stream->_IO_read_ptr = stream->_IO_read_base;
@@ -668,21 +780,22 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
                 memcpy(ptr, stream->_IO_read_ptr, rsz_extra);
                 stream->_IO_read_ptr += rsz_extra;
             }
+            /* MIGHT have read to EOF - check for pipe, tty */
             if (rsz_buf + rsz_extra < rsz)
             {
                 SETFLAG(stream, _IO_EOF_SEEN);
             }
-            return rsz_buf + rsz_extra;
+            return (rsz_buf + rsz_extra) / size; /* num items read */
         }
         else
         {
             /* at EOF so return bytes read */
             SETFLAG(stream, _IO_EOF_SEEN);
-            return rsz_buf;
+            return rsz_buf / size; /* num items read */
         }
     }
     /* request totally within current buffer */
-    return rsz;
+    return rsz / size; /* num items read */
 }
 
 /**
@@ -691,6 +804,8 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
 int fcloseall(void)
 {
     int rc = 0;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fcloseall\n");
     while (open_files._chain)
     {
         rc = fclose(open_files._chain);
@@ -705,6 +820,15 @@ int fclose(FILE *stream)
 {
     int rc = 0;
     FILE *f;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fclose %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fclose(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -721,7 +845,7 @@ int fclose(FILE *stream)
     {
         if (stream->_IO_write_ptr > stream->_IO_write_base)
         {
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
             fprintf(stderr,"fclose writing %d bytes to offset %d\n",
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -794,6 +918,16 @@ int fseeko64(FILE *stream, off64_t offset, int whence)
 int fseek64(FILE *stream, const off64_t offset, int whence)
 {
     int rc = 0;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fseek64 %p %llx %d\n",
+                    stream, offset, whence);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fseek64(stream, offset, whence);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -882,7 +1016,7 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             stream->_IO_write_ptr > stream->_IO_write_base)
         {
             /* write buffer back */
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
             fprintf(stderr,"fseek writing %d bytes to offset %d\n",
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -892,6 +1026,7 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             if (rc < 0)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
+                rc = -1;
                 goto exitout;
             }
             /* reset write pointer */
@@ -905,19 +1040,22 @@ int fseek64(FILE *stream, const off64_t offset, int whence)
             stream->_IO_read_ptr = stream->_IO_read_end;
         }
         rc = lseek64(stream->_fileno, offset, whence);
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
         fprintf(stderr,"fseek seeks to offset %d\n",
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
 #endif
         if (rc < 0)
         {
             SETFLAG(stream, _IO_ERR_SEEN);
+            rc = -1;
             goto exitout;
         }
+        /* fseek returns 0 on success */
+        rc = 0;
     }
 exitout:
     /* successful call */
-    lock_stream(stream);
+    unlock_stream(stream);
     CLEARFLAG(stream, _IO_EOF_SEEN);
     return rc;
 }
@@ -967,6 +1105,15 @@ off64_t ftello64(FILE *stream)
 off64_t ftell64(FILE* stream)
 {
     int64_t filepos;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ftell64 %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.ftell64(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1013,6 +1160,13 @@ int fflush(FILE *stream)
 {
     int rc = 0;
 
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fflush(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1032,12 +1186,21 @@ int fflush(FILE *stream)
 int fflush_unlocked(FILE *stream)
 {
     int rc;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fflush_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fflush_unlocked(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.fflush(stream);
+            return stdio_ops.fflush_unlocked(stream);
         }
         errno = EINVAL;
         return -1;
@@ -1047,7 +1210,7 @@ int fflush_unlocked(FILE *stream)
         stream->_IO_write_ptr > stream->_IO_write_base)
     {
         /* write buffer back */
-#if STDIO_DEBUG
+#if PVFS_STDIO_DEBUG
         fprintf(stderr,"fflush writing %d bytes to offset %d\n",
                     (int)(stream->_IO_write_ptr - stream->_IO_write_base),
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
@@ -1072,6 +1235,14 @@ int fputc(int c, FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc %c %p\n", c, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fputc(c, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1091,6 +1262,15 @@ int fputc(int c, FILE *stream)
 int fputc_unlocked(int c, FILE *stream)
 {
     int rc;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputc_unlocked %c %p\n", c, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fputc_unlocked(c, stream);
+    }
+#endif
     rc = fwrite_unlocked(&c, 1, 1, stream);
     if (ferror(stream))
     {
@@ -1106,6 +1286,14 @@ int fputs(const char *s, FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs %s %p\n", s, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fputs(s, stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1126,6 +1314,15 @@ int fputs_unlocked(const char *s, FILE *stream)
 {
     size_t len;
     int rc;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fputs_unlocked %s %p\n", s, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fputs_unlocked(s, stream);
+    }
+#endif
     if (!s)
     {
         errno = EINVAL;
@@ -1172,12 +1369,20 @@ int putchar_unlocked(int c)
 int puts(const char *s)
 {
     int rc;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "puts %s\n", s);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    init_stdio();
+    rc = stdio_ops.puts(s);
+    return rc;
+#else
     rc = fputs(s, stdout);
     if (rc == EOF)
     {
         return EOF;
     }
     return fputs("\n", stdout);
+#endif
 }
 
 /**
@@ -1186,6 +1391,15 @@ int puts(const char *s)
 int putw(int wd, FILE *stream)
 {
     int rc;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "putw %d %p\n", wd, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.putw(wd, stream);
+    }
+#endif
     rc = fwrite(&wd, sizeof(int), 1, stream);
     if (ferror(stream))
     {
@@ -1201,6 +1415,16 @@ char *fgets(char *s, int size, FILE *stream)
 {
     char *rc = NULL;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets %p %d %p\n", s, size, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        rc = stdio_ops.fgets(s, size, stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", s);
+        return rc;
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1209,39 +1433,58 @@ char *fgets(char *s, int size, FILE *stream)
             return stdio_ops.fgets(s, size, stream);
         }
         errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns NULL\n");
         return NULL;
     }
     lock_stream(stream);
     rc = fgets_unlocked(s, size, stream);
-    unlock_stream(stream);
+    unlock_stream(stream); gossip_debug(GOSSIP_USRINT_DEBUG, "fgets returns %s\n", rc);
     return rc;
 }
 
 char *fgets_unlocked(char *s, int size, FILE *stream)
 {
     char c, *p;
+    int feo, fer;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked %p %d %p\n",
+                    s, size, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        s = stdio_ops.fgets_unlocked(s, size, stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns %s\n", s);
+        return s;
+    }
+#endif
     if (!stream || !s || size < 1)
     {
         errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns NULL\n");
         return NULL;
     }
     if (size == 1)
     {
-        *s = '\0';
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns \"\"\n");
         return s;
     }
     p = s;
-    size--;
+    size--; /* for the trailing NULL char */
     do {
         *p++ = c = fgetc_unlocked(stream);
-    } while (--size && c != '\n' && !feof_unlocked(stream)
-                    && !ferror_unlocked(stream));
-    if (ferror_unlocked(stream))
+        /* reduce multiple func calls */
+        feo = feof_unlocked(stream);
+        fer = ferror_unlocked(stream);
+    } while (--size && c != '\n' && !(feo || fer));
+    /* if error or eof and read no chars */
+    if (fer || (feo && p - s == 1))
     {
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns NULL\n");
         return NULL;
     }
-    *p = '\0';
+    *p = 0; /* add null terminating char */
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgets_unlocked returns %s\n", s);
     return s;
 }
 
@@ -1250,26 +1493,54 @@ char *fgets_unlocked(char *s, int size, FILE *stream)
  */
 int fgetc(FILE *stream)
 {
-    int rc, ch;
+    int rc;
+    unsigned char ch;
 
-    rc = fread(&ch, 1, 1, stream);
-    if (ferror(stream))
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
     {
+        init_stdio();
+        rc = stdio_ops.fgetc(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc returns %d(%c)\n",
+                        rc, (char)rc);
+        return rc;
+    }
+#endif
+    rc = fread(&ch, 1, 1, stream);
+    if (ferror(stream) || feof(stream))
+    {
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc returns %d\n", EOF);
         return EOF;
     }
-    return ch;
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc returns %c\n", ch);
+    return (int)ch;
 }
 
 int fgetc_unlocked(FILE *stream)
 {
-    int rc, ch;
+    int rc;
+    char ch;
 
-    rc = fread_unlocked(&ch, 1, 1, stream);
-    if (ferror(stream))
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
     {
+        init_stdio();
+        rc = stdio_ops.fgetc_unlocked(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked returns %d(%c)\n",
+                        rc, (char)rc);
+        return rc;
+    }
+#endif
+    rc = fread_unlocked(&ch, 1, 1, stream);
+    if (ferror_unlocked(stream) || feof_unlocked(stream))
+    {
+        gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked returns %d\n", EOF);
         return EOF;
     }
-    return ch;
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fgetc_unlocked returns %c\n", ch);
+    return (int)ch;
 }
 
 /**
@@ -1300,13 +1571,23 @@ int getchar_unlocked(void)
 
 /**
  * getw wrapper
+ *
+ * not sure if feof should return an EOF or not
  */
 int getw(FILE *stream)
 {
     int rc, wd;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "getw %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.getw(stream);
+    }
+#endif
     rc = fread(&wd, sizeof(int), 1, stream);
-    if (ferror(stream))
+    if (ferror(stream) || feof(stream))
     {
         return EOF;
     }
@@ -1318,8 +1599,15 @@ int getw(FILE *stream)
  */
 char *gets(char * s)
 {
+#ifdef PVFS_STDIO_REDEFSTREAM
     char c, *p;
+#endif
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "gets %p\n", s);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    init_stdio();
+    return stdio_ops.gets(s);
+#else
     if (!s)
     {
         errno = EINVAL;
@@ -1338,6 +1626,7 @@ char *gets(char * s)
         *(p-1) = 0; /* replace terminating char with null */
     }
     return s;
+#endif
 }
 
 /**
@@ -1358,6 +1647,15 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     int i = 0;
     char c, *p;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "getdelim %p, %d, %d, %p\n", 
+                    lnptr, *n, delim, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.getdelim(lnptr, n, delim, stream);
+    }
+#endif
     if (!stream || !n)
     {
         errno = EINVAL;
@@ -1365,11 +1663,12 @@ ssize_t __getdelim(char **lnptr, size_t *n, int delim, FILE *stream)
     }
     if (!*lnptr)
     {
-        if (*n <= 0)
-        {
-            *n = 256;
-        }
+        *n = 256;
         *lnptr = (char *)malloc(*n);
+        if (!*lnptr)
+        {
+            return -1;
+        }
     }
     p = *lnptr;
     do {
@@ -1405,6 +1704,15 @@ int ungetc(int c, FILE *stream)
 {
     int64_t rc;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ungetc %d, %p\n", 
+                    c, stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.ungetc(c, stream);
+    }
+#endif
     rc = fseek64(stream, -1L, SEEK_CUR);
     if (rc < 0)
     {
@@ -1442,7 +1750,7 @@ int dprintf(int fd, const char *format, ...)
 int vdprintf(int fd, const char *format, va_list ap)
 {
     char *buf;
-    int len, rc;
+    int len, rc = 0;
 
     len = vasprintf(&buf, format, ap);
     if (len < 0)
@@ -1466,8 +1774,15 @@ int vdprintf(int fd, const char *format, va_list ap)
 int vfprintf(FILE *stream, const char *format, va_list ap)
 {
     char *buf;
-    int len, rc;
+    int len, rc = 0;
 
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.vfprintf(stream, format, ap);
+    }
+#endif
     len = vasprintf(&buf, format, ap);
     if (len < 0)
     {
@@ -1525,6 +1840,11 @@ int printf(const char *format, ...)
  */
 void perror(const char *s)
 {
+#ifndef PVFS_STDIO_REDEFSTREAM
+    init_stdio();
+    stdio_ops.perror(s);
+    return;
+#else
     char *msg;
     if (s && *s)
     {
@@ -1533,6 +1853,7 @@ void perror(const char *s)
     msg = strerror(errno);
     fwrite(msg, strlen(msg), 1, stderr);
     fwrite("\n", 1, 1, stderr);
+#endif
 }
 
 #if 0
@@ -1557,6 +1878,14 @@ vfscanf()
  */
 void clearerr (FILE *stream)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "clearerr %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.clearerr(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1575,12 +1904,20 @@ void clearerr (FILE *stream)
 
 void clearerr_unlocked (FILE *stream)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "clearerr_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.clearerr_unlocked(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            stdio_ops.clearerr(stream);
+            stdio_ops.clearerr_unlocked(stream);
             return;
         }
         return;
@@ -1596,6 +1933,16 @@ int feof (FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "feof %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        rc = stdio_ops.feof(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "feof returns %d\n", rc);
+        return rc;
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1604,27 +1951,44 @@ int feof (FILE *stream)
             return stdio_ops.feof(stream);
         }
         errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "feof returns %d\n", -1);
         return -1;
     }
     lock_stream(stream);
     rc = ISFLAGSET(stream, _IO_EOF_SEEN);
     unlock_stream(stream);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "feof returns %d\n", rc);
     return rc;
 }
 
 int feof_unlocked (FILE *stream)
 {
+    int rc = 0;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        rc = stdio_ops.feof_unlocked(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked returns %d\n", rc);
+        return rc;
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.feof(stream);
+            return stdio_ops.feof_unlocked(stream);
         }
         errno = EBADF;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked returns %d\n", -1);
         return -1;
     }
-    return ISFLAGSET(stream, _IO_EOF_SEEN);
+    rc = ISFLAGSET(stream, _IO_EOF_SEEN);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "feof_unlocked returns %d\n", rc);
+    return rc;
 }
 
 /**
@@ -1634,6 +1998,16 @@ int ferror (FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ferror %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        rc = stdio_ops.ferror(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "ferror returns %d\n", rc);
+        return rc;
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1642,26 +2016,41 @@ int ferror (FILE *stream)
             return stdio_ops.ferror(stream);
         }
         errno = EINVAL;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "ferror returns %d\n", -1);
         return -1;
     }
     lock_stream(stream);
     rc = ISFLAGSET(stream, _IO_ERR_SEEN);
     unlock_stream(stream);
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ferror returns %d\n", rc);
     return rc;
 }
 
 int ferror_unlocked (FILE *stream)
 {
+    int rc = 0;
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        rc =stdio_ops.ferror_unlocked(stream);
+        gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
+        return rc;
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.ferror(stream);
+            return stdio_ops.ferror_unlocked(stream);
         }
         errno = EBADF;
+        gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", -1);
         return -1;
     }
+    gossip_debug(GOSSIP_USRINT_DEBUG, "ferror_unlocked returns %d\n", rc);
     return ISFLAGSET(stream, _IO_ERR_SEEN);
 }
 
@@ -1672,6 +2061,14 @@ int fileno (FILE *stream)
 {
     int rc = 0;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fileno %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fileno(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1690,12 +2087,20 @@ int fileno (FILE *stream)
 
 int fileno_unlocked (FILE *stream)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fileno_unlocked %p\n", stream);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.fileno_unlocked(stream);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
         {
             init_stdio();
-            return stdio_ops.fileno(stream);
+            return stdio_ops.fileno_unlocked(stream);
         }
         errno = EBADF;
         return -1;
@@ -1711,6 +2116,7 @@ int remove (const char *path)
     int rc;
     struct stat buf;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "remove %s\n", path);
     rc = stat(path, &buf);
     if (S_ISDIR(buf.st_mode))
         return rmdir (path);
@@ -1748,6 +2154,15 @@ void setlinebuf (FILE *stream)
  */
 int setvbuf (FILE *stream, char *buf, int mode, size_t size)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "setvbuf %p %p %d %d\n", 
+                    stream, buf, mode, size);
+#ifndef PVFS_STDIO_REDEFSTREAM
+    if (stream == stdin || stream == stdout || stream == stderr)
+    {
+        init_stdio();
+        return stdio_ops.setvbuf(stream, buf, mode, size);
+    }
+#endif
     if (!stream || !ISMAGICSET(stream, _P_IO_MAGIC))
     {
         if (stream && ISMAGICSET(stream, _IO_MAGIC))
@@ -1896,6 +2311,8 @@ FILE *tmpfile(void)
 DIR *opendir (const char *name)
 {
     int fd;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "opendir %s\n", name);
     if(!name)
     {
         errno = EINVAL;
@@ -1915,6 +2332,8 @@ DIR *opendir (const char *name)
 DIR *fdopendir (int fd)
 {
     DIR *dstr;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "fdopendir %d\n", fd);
     dstr = (DIR *)malloc(sizeof(DIR));
     if (dstr == NULL)
     {
@@ -1941,6 +2360,7 @@ DIR *fdopendir (int fd)
  */
 int dirfd (DIR *dir)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "dirfd %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -1956,6 +2376,7 @@ struct dirent *readdir (DIR *dir)
 {
     struct dirent64 *de64;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "readdir %p\n", dir);
     de64 = readdir64(dir);
     if (de64 == NULL)
     {
@@ -1963,6 +2384,7 @@ struct dirent *readdir (DIR *dir)
     }
     /* linux hard defines d_name to 256 bytes */
     /* if others don't should replace with a define */
+    memset(&dir->de, 0, sizeof(dir->de));
     memcpy(dir->de.d_name, de64->d_name, 256);
     dir->de.d_ino = de64->d_ino;
     /* these are system specific fields from the dirent */
@@ -1994,6 +2416,8 @@ int getdents64(int fd, struct dirent64 *buf, size_t size);
 struct dirent64 *readdir64 (DIR *dir)
 {
     struct dirent64 *rval;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "readdir64 %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -2005,6 +2429,10 @@ struct dirent64 *readdir64 (DIR *dir)
         /* read a block of dirent64s into the buffer */
         bytes_read = getdents64(dir->fileno, (struct dirent64 *)dir->buf_base,
                                (dir->buf_end - dir->buf_base));
+        if (bytes_read <= 0)
+        {
+            return NULL; /* EOF if errno == 0 */
+        }
         dir->buf_act = dir->buf_base + bytes_read;
         dir->buf_ptr = dir->buf_base;
     }
@@ -2023,6 +2451,8 @@ struct dirent64 *readdir64 (DIR *dir)
 void rewinddir (DIR *dir)
 {
     off64_t filepos;
+ 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "rewinddir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -2047,6 +2477,8 @@ void rewinddir (DIR *dir)
 void seekdir (DIR *dir, off_t offset)
 {
     off64_t filepos;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "seekdir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -2072,6 +2504,8 @@ void seekdir (DIR *dir, off_t offset)
 off_t telldir (DIR *dir)
 {
     off64_t filepos;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "telldir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -2090,6 +2524,7 @@ off_t telldir (DIR *dir)
  */
 int closedir (DIR *dir)
 {
+    gossip_debug(GOSSIP_USRINT_DEBUG, "closedir %p\n", dir);
     if (!dir || !ISMAGICSET(dir, DIRSTREAM_MAGIC))
     {
         errno = EBADF;
@@ -2101,16 +2536,26 @@ int closedir (DIR *dir)
     return 0;
 }
 
+#ifdef PVFS_SCANDIR_VOID
 int scandir (const char *dir,
              struct dirent ***namelist,
              int(*filter)(const struct dirent *),
-             int(*compar)(const void *, const void *))
+             int(*compar)(const void *,
+                          const void *))
+#else
+int scandir (const char *dir,
+             struct dirent ***namelist,
+             int(*filter)(const struct dirent *),
+             int(*compar)(const struct dirent **,
+                          const struct dirent **))
+#endif
 {
     struct dirent *de;
     DIR *dp;
     int len, i, rc;
     int asz = ASIZE;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "scandir %p\n", dir);
     /* open directory */
     dp = opendir(dir);
     /* allocate namelist */
@@ -2129,7 +2574,7 @@ int scandir (const char *dir,
                 struct dirent **darray;
                 /* ran out of space, realloc */
                 darray = (struct dirent **)realloc(*namelist, asz + ASIZE);
-                if (!rc)
+                if (!darray)
                 {
                     int j;
                     for (j = 0; j < i; j++)
@@ -2151,7 +2596,7 @@ int scandir (const char *dir,
         }
     }
     /* now sort entries */
-    qsort(*namelist, i, sizeof(struct dirent *), compar);
+    qsort(*namelist, i, sizeof(struct dirent *), (__compar_fn_t)compar);
     rc = closedir(dp);
     if (rc == -1)
     {
@@ -2167,16 +2612,26 @@ int scandir (const char *dir,
  * and then call from two wrapper versions would be beter
  * pass in a flag to control the copy of the dirent into the array
  */
+#ifdef PVFS_SCANDIR_VOID
 int scandir64 (const char *dir,
                struct dirent64 ***namelist,
                int(*filter)(const struct dirent64 *),
-               int(*compar)(const void *, const void *))
+               int(*compar)(const void *,
+                            const void *))
+#else
+int scandir64 (const char *dir,
+               struct dirent64 ***namelist,
+               int(*filter)(const struct dirent64 *),
+               int(*compar)(const struct dirent64 **,
+                            const struct dirent64 **))
+#endif
 {
     struct dirent64 *de;
     DIR *dp;
     int len, i, rc;
     int asz = ASIZE;
 
+    gossip_debug(GOSSIP_USRINT_DEBUG, "scandir64 %p\n", dir);
     /* open directory */
     dp = opendir(dir);
     /* allocate namelist */
@@ -2195,7 +2650,7 @@ int scandir64 (const char *dir,
                 struct dirent64 **darray;
                 /* ran out of space, realloc */
                 darray = (struct dirent64 **)realloc(*namelist, asz + ASIZE);
-                if (!rc)
+                if (!darray)
                 {
                     int j;
                     for (j = 0; j < i; j++)
@@ -2217,7 +2672,7 @@ int scandir64 (const char *dir,
         }
     }
     /* now sort entries */
-    qsort(*namelist, i, sizeof(struct dirent64 *), compar);
+    qsort(*namelist, i, sizeof(struct dirent64 *), (__compar_fn_t)compar);
     rc = closedir(dp);
     if (rc == -1)
     {
@@ -2229,11 +2684,19 @@ int scandir64 (const char *dir,
 static void init_stdio(void)
 {
     static int init_flag = 0;
+    static gen_mutex_t initlock = GEN_MUTEX_INITIALIZER;
+    /* if we've already done this bail right away */
     if (init_flag)
     {
         return;
     }
-    init_flag = 1;
+    gen_mutex_lock(&initlock);
+    /* don't let more than one thread initialize */
+    if (init_flag)
+    {
+        gen_mutex_unlock(&initlock);        
+        return;
+    }
     /* init open file chain */
     lock_init_stream(&open_files);
     /* init pointers to glibc stdio calls */
@@ -2241,7 +2704,9 @@ static void init_stdio(void)
     stdio_ops.fdopen = dlsym(RTLD_NEXT, "fdopen" );
     stdio_ops.freopen = dlsym(RTLD_NEXT, "freopen" );
     stdio_ops.fwrite = dlsym(RTLD_NEXT, "fwrite" );
-    stdio_ops.fread = dlsym(RTLD_NEXT, "fread" );
+    stdio_ops.fwrite_unlocked = dlsym(RTLD_NEXT, "fwrite_unlocked" );
+    stdio_ops.fread  = dlsym(RTLD_NEXT, "fread" );
+    stdio_ops.fread_unlocked = dlsym(RTLD_NEXT, "fread_unlocked" );
     stdio_ops.fclose = dlsym(RTLD_NEXT, "fclose" );
     stdio_ops.fseek = dlsym(RTLD_NEXT, "fseek" );
     stdio_ops.fseek64 = dlsym(RTLD_NEXT, "fseek64" );
@@ -2250,28 +2715,43 @@ static void init_stdio(void)
     stdio_ops.ftell = dlsym(RTLD_NEXT, "ftell" );
     stdio_ops.ftell64 = dlsym(RTLD_NEXT, "ftell64" );
     stdio_ops.fgetpos = dlsym(RTLD_NEXT, "fgetpos" );
-    stdio_ops.fflush = dlsym(RTLD_NEXT, "fflush" );
-    stdio_ops.fputc = dlsym(RTLD_NEXT, "fputc" );
-    stdio_ops.fputs = dlsym(RTLD_NEXT, "fputs" );
-    stdio_ops.putc = dlsym(RTLD_NEXT, "putc" );
-    stdio_ops.putchar = dlsym(RTLD_NEXT, "putchar" );
+    stdio_ops.fflush  = dlsym(RTLD_NEXT, "fflush" );
+    stdio_ops.fflush_unlocked = dlsym(RTLD_NEXT, "fflush_unlocked" );
+    stdio_ops.fputc  = dlsym(RTLD_NEXT, "fputc" );
+    stdio_ops.fputc_unlocked = dlsym(RTLD_NEXT, "fputc_unlocked" );
+    stdio_ops.fputs  = dlsym(RTLD_NEXT, "fputs" );
+    stdio_ops.fputs_unlocked = dlsym(RTLD_NEXT, "fputs_unlocked" );
+    stdio_ops.putc  = dlsym(RTLD_NEXT, "putc" );
+    stdio_ops.putc_unlocked = dlsym(RTLD_NEXT, "putc_unlocked" );
+    stdio_ops.putchar  = dlsym(RTLD_NEXT, "putchar" );
+    stdio_ops.putchar_unlocked = dlsym(RTLD_NEXT, "putchar_unlocked" );
     stdio_ops.puts = dlsym(RTLD_NEXT, "puts" );
+    stdio_ops.putw = dlsym(RTLD_NEXT, "putw" );
     stdio_ops.fgets = dlsym(RTLD_NEXT, "fgets" );
     stdio_ops.fgetc = dlsym(RTLD_NEXT, "fgetc" );
     stdio_ops.getc = dlsym(RTLD_NEXT, "getc" );
+    stdio_ops.getc_unlocked = dlsym(RTLD_NEXT, "getc_unlocked" );
     stdio_ops.getchar = dlsym(RTLD_NEXT, "getchar" );
+    stdio_ops.getchar_unlocked = dlsym(RTLD_NEXT, "getchar_unlocked" );
+    stdio_ops.getw = dlsym(RTLD_NEXT, "getw" );
     stdio_ops.gets = dlsym(RTLD_NEXT, "gets" );
+    stdio_ops.getdelim = dlsym(RTLD_NEXT, "getdelim" );
     stdio_ops.ungetc = dlsym(RTLD_NEXT, "ungetc" );
     stdio_ops.vfprintf = dlsym(RTLD_NEXT, "vfprintf" );
     stdio_ops.vprintf = dlsym(RTLD_NEXT, "vprintf" );
     stdio_ops.fprintf = dlsym(RTLD_NEXT, "fprintf" );
     stdio_ops.printf = dlsym(RTLD_NEXT, "printf" );
+    stdio_ops.perror = dlsym(RTLD_NEXT, "perror" );
     stdio_ops.fscanf = dlsym(RTLD_NEXT, "fscanf" );
     stdio_ops.scanf = dlsym(RTLD_NEXT, "scanf" );
     stdio_ops.clearerr  = dlsym(RTLD_NEXT, "clearerr" );
+    stdio_ops.clearerr_unlocked  = dlsym(RTLD_NEXT, "clearerr_unlocked" );
     stdio_ops.feof  = dlsym(RTLD_NEXT, "feof" );
+    stdio_ops.feof_unlocked  = dlsym(RTLD_NEXT, "feof_unlocked" );
     stdio_ops.ferror  = dlsym(RTLD_NEXT, "ferror" );
+    stdio_ops.ferror_unlocked  = dlsym(RTLD_NEXT, "ferror_unlocked" );
     stdio_ops.fileno  = dlsym(RTLD_NEXT, "fileno" );
+    stdio_ops.fileno_unlocked  = dlsym(RTLD_NEXT, "fileno_unlocked" );
     stdio_ops.remove  = dlsym(RTLD_NEXT, "remove" );
     stdio_ops.setbuf  = dlsym(RTLD_NEXT, "setbuf" );
     stdio_ops.setbuffer  = dlsym(RTLD_NEXT, "setbuffer" );
@@ -2291,6 +2771,10 @@ static void init_stdio(void)
     stdio_ops.closedir  = dlsym(RTLD_NEXT, "closedir" );
     stdio_ops.scandir  = dlsym(RTLD_NEXT, "scandir" );
     stdio_ops.scandir64  = dlsym(RTLD_NEXT, "scandir64" );
+    
+    /* Finish */    
+    init_flag = 1;
+    gen_mutex_unlock(&initlock);
 };
 
 /*

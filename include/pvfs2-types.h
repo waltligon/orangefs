@@ -722,6 +722,7 @@ PVFS_error PVFS_errno_to_error(int err);
 #define PVFS_EALREADY        E(57) /* Operation already in progress */
 #define PVFS_EACCES          E(58) /* Access not allowed */
 #define PVFS_ECONNRESET      E(59) /* Connection reset by peer */
+#define PVFS_ERANGE          E(60) /* Math out of range or buf too small */
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))

@@ -1,5 +1,5 @@
-/* 
- * (C) 2011 Clemson University and The University of Chicago 
+/* we will keep a copy and keep one in the environment */
+/* (C) 2011 Clemson University and The University of Chicago 
  *
  * See COPYING in top-level directory.
  */
@@ -14,51 +14,11 @@
 #include "posix-ops.h"
 #include "openfile-util.h"
 #include "iocommon.h"
+#if PVFS_UCACHE_ENABLE
 #include "ucache.h"
+#endif
+#include <errno.h>
 
-/* Functions in this file generally define a label errorout
- * for cleanup before exit and return an int rc which is -1
- * on error with the error code in errno, 0 on success.
- * IOCOMMON_RETURN_ERR checks a return code from a function
- * returns the same protocol and goto errorout: if less than 0
- * IOCOMMON_CHECK_ERR assumes the return code contains the
- * negative of the error code as encoded by PVFS sysint
- * functions and decodes these before jumping to errorout.
- * PVFS sysint calls always return error codes in the return
- * value, but system calls inside them might set errno to
- * a value that may or may not have meaning for the programmer
- * calling this library.  Steps are taken to ensure errno
- * is not modified unless the code in this lib wants to
- * modify it.  CHECK_ERR should be called after each sysint
- * call to correctly pass error codes.
- */
-extern PVFS_error PINT_errno_mapping[];
-#define IOCOMMON_RETURN_ERR(rc)                                 \
-do {                                                            \
-    if ((rc) < 0)                                               \
-    {                                                           \
-        goto errorout;                                          \
-    }                                                           \
-} while (0)
-
-#define IOCOMMON_CHECK_ERR(rc)                                  \
-do {                                                            \
-    errno = orig_errno;                                         \
-    if ((rc) < 0)                                               \
-    {                                                           \
-        if (IS_PVFS_NON_ERRNO_ERROR(-(rc)))                     \
-        {                                                       \
-            pvfs_errno = -rc;                                   \
-            errno = EIO;                                        \
-        }                                                       \
-        else if (IS_PVFS_ERROR(-(rc)))                          \
-        {                                                       \
-            errno = PINT_errno_mapping[(-(rc)) & 0x7f];         \
-        }                                                       \
-        rc = -1;                                                \
-        goto errorout;                                          \
-    }                                                           \
-} while (0)
 
 /** this is a global analog of errno for pvfs specific
  *  errors errno is set to EIO and this si set to the
@@ -94,12 +54,19 @@ int iocommon_fsync(pvfs_descriptor *pd)
         errno = EBADF;
         return -1;
     }
-    iocommon_cred(&credentials);
-    if(ucache!=0 && ucache_locks!=0)
+    iocommon_cred(&credentials); 
+#if PVFS_UCACHE_ENABLE
+    if (ucache_enabled)
     {
-        ucache_flush(pd);
+        rc = ucache_flush_file(pd->s->fent);
+        if(rc != 0)
+        {
+            goto errorout;
+        }
     }
-    rc = PVFS_sys_flush(pd->pvfs_ref, credentials, PVFS_HINT_NULL);
+#endif
+    errno = 0;
+    rc = PVFS_sys_flush(pd->s->pvfs_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
@@ -129,13 +96,24 @@ int iocommon_lookup_absolute(const char *abs_path,
     iocommon_cred(&credentials);
 
     /* Determine the fs_id and pvfs_path */
+    errno = 0;
     rc = PVFS_util_resolve(abs_path, &lookup_fs_id, pvfs_path, PVFS_PATH_MAX);
-    IOCOMMON_CHECK_ERR(rc);
+    if (rc < 0)
+    {
+        if (rc == -PVFS_ENOENT)
+        {
+            errno = ESTALE; /* this signals open that resolve failed */
+            rc = -1;
+            goto errorout;
+        }
+        IOCOMMON_CHECK_ERR(rc);
+    }
 
     /* set up buffer to return partially looked up path */
     /* in failure.  This is most likely a non-PVFS path */
 
-    /* Set up error path */
+    /* Set up error path
+       TODO: orange-security 
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -147,7 +125,9 @@ int iocommon_lookup_absolute(const char *abs_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
+    */
 
+    errno = 0;
     rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
                          credentials, &resp_lookup,
                          PVFS2_LOOKUP_LINK_FOLLOW, NULL);
@@ -190,7 +170,8 @@ int iocommon_lookup_relative(const char *rel_path,
     /* Set credentials */
     iocommon_cred(&credentials);
 
-    /* Set up error path */
+    /* Set up error path
+       TODO: orange-security 
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -202,6 +183,7 @@ int iocommon_lookup_relative(const char *rel_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
+    */
 
     current_seg_ref = parent_ref;
     cur = (char *)rel_path;
@@ -246,6 +228,7 @@ int iocommon_lookup_relative(const char *rel_path,
         last = cur;
 
         /* Contact server */
+        errno = 0;
         rc = PVFS_sys_ref_lookup(parent_ref.fs_id,
                                 current_seg_path,
                                 current_seg_ref,
@@ -367,6 +350,7 @@ int iocommon_create_file(const char *filename,
     iocommon_cred(&credentials);
 
     /* Contact server */
+    errno = 0;
     rc = PVFS_sys_create((char*)filename,
                          parent_ref,
                          attr,
@@ -435,15 +419,29 @@ pvfs_descriptor *iocommon_open(const char *path,
     /* Get reference for the parent directory */
     if (pdir == NULL)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(directory, &parent_ref, NULL, 0);
-        IOCOMMON_RETURN_ERR(rc);
+        if (rc < 0)
+        {
+            if (errno == ESTALE)
+            {
+                /* special case we are opening the root dir of PVFS */
+                errno = 0;
+                rc = iocommon_lookup_absolute(path, &file_ref, NULL, 0);
+                /* in this case we don't need to look up anything else */
+                /* jump right to found the file code */
+                goto foundfile;
+            }
+            IOCOMMON_RETURN_ERR(rc);
+        }
     }
     else
     {
         if (directory)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(directory,
-                                          pdir->pvfs_ref,
+                                          pdir->s->pvfs_ref,
                                           follow_link,
                                           &parent_ref,
                                           NULL,
@@ -452,19 +450,21 @@ pvfs_descriptor *iocommon_open(const char *path,
         }
         else
         {
-            parent_ref = pdir->pvfs_ref;
+            parent_ref = pdir->s->pvfs_ref;
         }
     }
 
     /* An open procedure safe for multiprocessing */
 
     /* Attempt to find file */
+    errno = 0;
     rc = iocommon_lookup_relative(filename,
                                   parent_ref,
                                   follow_link,
                                   &file_ref,
                                   error_path,
                                   sizeof(error_path));
+foundfile:
     if ((rc == 0) && (flags & O_EXCL) && (flags & O_CREAT))
     {
         /* File was found but EXCLUSIVE so fail */
@@ -482,12 +482,14 @@ pvfs_descriptor *iocommon_open(const char *path,
             /* try to open using glibc */
             rc = (*glibc_ops.open)(error_path, flags & 01777777, mode);
             IOCOMMON_RETURN_ERR(rc);
-            pd = pvfs_alloc_descriptor(&glibc_ops, -1, NULL);
+            pd = pvfs_alloc_descriptor(&glibc_ops, -1, NULL, 0);
             pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
             pd->true_fd = rc;
-            pd->flags = flags;           /* open flags */
+            pd->s->flags = flags;           /* open flags */
             fstat(rc, &sbuf);
-            pd->mode = sbuf.st_mode;
+            pd->s->mode = sbuf.st_mode;
+            gen_mutex_unlock(&pd->s->lock);
+            gen_mutex_unlock(&pd->lock);
             goto errorout; /* not really an error, but bailing out */
         }
         if (errno != ENOENT || !(flags & O_CREAT))
@@ -499,6 +501,7 @@ pvfs_descriptor *iocommon_open(const char *path,
         /* file not found but create flag */
         /* clear errno, it was not an error */
         errno = orig_errno;
+        errno = 0;
         rc = iocommon_create_file(filename,
                                   mode,
                                   file_creation_param,
@@ -515,6 +518,7 @@ pvfs_descriptor *iocommon_open(const char *path,
              * created by a different process
              * just open it
              */
+            errno = 0;
             rc = iocommon_lookup_relative(filename,
                                           parent_ref,
                                           follow_link,
@@ -529,52 +533,56 @@ pvfs_descriptor *iocommon_open(const char *path,
     /* Translate the pvfs reference into a file descriptor */
     /* Set the file information */
     /* create fd object */
-    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref);
+    pd = pvfs_alloc_descriptor(&pvfs_ops, -1, &file_ref, 0);
     if (!pd)
     {
         rc = -1;
         goto errorout;
     }
-    pd->flags = flags;           /* open flags */
+    pd->s->flags = flags;           /* open flags */
     pd->is_in_use = PVFS_FS;    /* indicate fd is valid! */
 
     /* Get the file's type information from its attributes */
-    rc = PVFS_sys_getattr(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credentials,
                           &attributes_resp,
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
-    pd->mode = attributes_resp.attr.perms; /* this may change */
+    pd->s->mode = attributes_resp.attr.perms; /* this may change */
 
     if (attributes_resp.attr.objtype == PVFS_TYPE_METAFILE)
     {
-        pd->mode |= S_IFREG;
+        pd->s->mode |= S_IFREG;
     }
     if (attributes_resp.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
-        pd->mode |= S_IFDIR;
+        pd->s->mode |= S_IFDIR;
         if (pdir)
         {
-            pd->dpath = (char *)malloc(strlen(pdir->dpath) + strlen(path) + 2);
-            strcpy(pd->dpath, pdir->dpath);
-            strcat(pd->dpath, "/");
-            strcat(pd->dpath, path);
+            pd->s->dpath = (char *)malloc(strlen(pdir->s->dpath) + strlen(path) + 2);
+            strcpy(pd->s->dpath, pdir->s->dpath);
+            strcat(pd->s->dpath, "/");
+            strcat(pd->s->dpath, path);
         }
         else
         {
-            pd->dpath = (char *)malloc(strlen(path) + 1);
-            strcpy(pd->dpath, path);
+            pd->s->dpath = (char *)malloc(strlen(path) + 1);
+            strcpy(pd->s->dpath, path);
         }
     }
     if (attributes_resp.attr.objtype == PVFS_TYPE_SYMLINK)
     {
-        pd->mode |= S_IFLNK;
+        pd->s->mode |= S_IFLNK;
     }
+    gen_mutex_unlock(&pd->s->lock);
+    gen_mutex_unlock(&pd->lock);
 
     /* Truncate the file if neccesary */
     if (flags & O_TRUNC)
     {
+        errno = 0;
         rc = PVFS_sys_truncate(file_ref, 0, credentials, NULL);
         IOCOMMON_CHECK_ERR(rc);
     }
@@ -618,6 +626,7 @@ int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
 
     pvfs_sys_init();
     iocommon_cred(&credentials);
+    errno = 0;
     rc =  PVFS_sys_truncate(file_ref, length, credentials, NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -640,16 +649,17 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
         errno = EBADF;
         return -1;
     }
+    gen_mutex_lock(&pd->s->lock);
     switch(whence)
     {
         case SEEK_SET:
         {
-            pd->file_pointer = (offset * unit_size);
+            pd->s->file_pointer = (offset * unit_size);
             break;
         }
         case SEEK_CUR:
         {
-            pd->file_pointer += (offset * unit_size);
+            pd->s->file_pointer += (offset * unit_size);
             break;
         }
         case SEEK_END:
@@ -660,13 +670,14 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             memset(&attributes_resp, 0, sizeof(attributes_resp));
             iocommon_cred(&credentials);
             /* Get the file's size in bytes as the ending offset */
-            rc = PVFS_sys_getattr(pd->pvfs_ref,
+            errno = 0;
+            rc = PVFS_sys_getattr(pd->s->pvfs_ref,
                                   PVFS_ATTR_SYS_SIZE,
                                   credentials,
                                   &attributes_resp,
                                   NULL);
             IOCOMMON_CHECK_ERR(rc);
-            pd->file_pointer = attributes_resp.attr.size + (offset * unit_size);
+            pd->s->file_pointer = attributes_resp.attr.size + (offset * unit_size);
             break;
         }
         default:
@@ -674,9 +685,10 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             errno = EINVAL;
             goto errorout;
         }
-    }
+    
+    /* Sum the individal segment sizes */}
     /* if this is a directory adjust token, the hard way */
-    if (S_ISDIR(pd->mode))
+    if (S_ISDIR(pd->s->mode))
     {
         int dirent_no;
         PVFS_credentials *credentials;
@@ -684,23 +696,25 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
 
         memset(&readdir_resp, 0, sizeof(readdir_resp));
         iocommon_cred(&credentials);
-        dirent_no = pd->file_pointer / sizeof(PVFS_dirent);
-        pd->file_pointer = dirent_no * sizeof(PVFS_dirent);
-        pd->token = PVFS_READDIR_START;
+        dirent_no = pd->s->file_pointer / sizeof(PVFS_dirent);
+        pd->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
+        pd->s->token = PVFS_READDIR_START;
         if(dirent_no)
         {
-            rc = PVFS_sys_readdir(pd->pvfs_ref,
-                                  pd->token,
+            errno = 0;
+            rc = PVFS_sys_readdir(pd->s->pvfs_ref,
+                                  pd->s->token,
                                   dirent_no,
                                   credentials,
                                   &readdir_resp,
                                   NULL);
             IOCOMMON_CHECK_ERR(rc);
-            pd->token = readdir_resp.token;
+            pd->s->token = readdir_resp.token;
             free(readdir_resp.dirent_array);
         }
     }
-    return pd->file_pointer;
+    gen_mutex_unlock(&pd->s->lock);
+    return pd->s->file_pointer;
 
 errorout:
     return -1;
@@ -737,6 +751,7 @@ int iocommon_remove (const char *path,
 
     if (!pdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -744,6 +759,7 @@ int iocommon_remove (const char *path,
     {
         if (parentdir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(parentdir, *pdir,
                             PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -755,10 +771,12 @@ int iocommon_remove (const char *path,
     }
 
     /* need to verify this is a file or symlink */
+    errno = 0;
     rc = iocommon_lookup_relative(file, parent_ref,
                 PVFS2_LOOKUP_LINK_NO_FOLLOW, &file_ref, NULL, 0);
     IOCOMMON_RETURN_ERR(rc);
 
+    errno = 0;
     rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_TYPE);
     IOCOMMON_RETURN_ERR(rc);
 
@@ -775,6 +793,7 @@ int iocommon_remove (const char *path,
 
     /* should check to see if any process has file open */
     /* but at themoment we don't have a way to do that */
+    errno = 0;
     rc = PVFS_sys_remove(file, parent_ref, credentials, PVFS_HINT_NULL);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -836,6 +855,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
 
     if (!oldpdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(olddir, &oldref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -843,6 +863,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     {
         if (olddir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(olddir, *oldpdir, 
                                 PVFS2_LOOKUP_LINK_FOLLOW, &oldref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -856,6 +877,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     IOCOMMON_RETURN_ERR(rc);
     if (!newpdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(newdir, &newref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -863,6 +885,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     {
         if (newdir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(newdir, *newpdir,
                             PVFS2_LOOKUP_LINK_FOLLOW, &newref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -872,6 +895,7 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
             newref = *newpdir;
         }
     }
+    errno = 0;
     rc = PVFS_sys_rename(oldname, oldref, newname, newref, creds, hints);
     IOCOMMON_CHECK_ERR(rc);
 
@@ -895,260 +919,520 @@ errorout:
     return rc;
 }
 
-/*The Wrapper Fuction calls to the "nocache" version of 
- *  io_common_readorwrite (below)   
+#if PVFS_UCACHE_ENABLE
+/* Returns how many copy operations to/from the ucache will need to be 
+ * completed.
  */
-/** do a blocking read or write, possibly utilizing the user cache.
- * 
+static int calc_copy_op_cnt(
+    off64_t offset,     /* offset into file where transfer should begin */
+    size_t req_size,    /* total Request Size */
+    int req_blk_cnt,    /* requested Block Count */
+    size_t iovec_count, /* number of iovecs in vector */ 
+    const struct iovec *vector /* pointer to array of iovecs */
+)
+{
+    int copy_count = 0; /* The number of memcpy operations to be completed */
+    size_t size_left = req_size; /* Bytes left to convert to copy ops */
+    size_t iovec_left = vector[0].iov_len; /* bytes left in this iovec */
+    int vec_ndx = 0; /* Index into iovec array */
+
+    /* Compute the size of the first block to be transfered */
+    size_t block_size_to_transfer = CACHE_BLOCK_SIZE - (offset % CACHE_BLOCK_SIZE);
+
+    int i;
+    /* For every block identify source and destination locations in memory and
+     * size of transfer between the ucache and memory buffer while maintaining: 
+     * the size left in the request, the size left in the current iovec 
+     * segment, the size left in the current block, and which iovec segment is
+     * currently being considered.
+     */
+    for(i = 0; i < req_blk_cnt; i++)
+    {
+        size_t block_left = block_size_to_transfer;
+        while(block_left != 0)
+        {
+            /* block_left is the limiting factor */
+            if(iovec_left > block_left)
+            {
+                size_left -= block_left;
+                iovec_left -= block_left;
+                block_left = 0; /* Done with this block */
+            }
+            /* iovec_left is the limiting factor */
+            else if(iovec_left < block_left)
+            {
+                size_left -= iovec_left;
+                block_left -= iovec_left;
+                vec_ndx++;  /* Done with this iovec */
+                if(vec_ndx < iovec_count)
+                {
+                    iovec_left = vector[vec_ndx].iov_len;
+                }
+            }
+            /* This transfer operation would complete both */
+            else /* They must be equal */
+            {
+                size_left -= iovec_left;
+                block_left = 0;
+                vec_ndx++; /* Done with this iovec and block */
+
+                /* Only set the next iovec_left if one is available */
+                if(vec_ndx < iovec_count)
+                {
+                    iovec_left = vector[vec_ndx].iov_len;
+                }
+            }
+            /* Increment the number of the memcpy calls that will need to be 
+             * performed 
+             */
+            copy_count++; 
+        }
+
+        /* Break when there are no more bytes to be read/written so that the 
+         * following if/else code block won't been run unless there is another
+         * block of data to be transfered. */
+        if(size_left == 0)
+        {
+            break;
+        }
+      
+        if(size_left >= CACHE_BLOCK_SIZE)
+        {
+            /* Must transfer full block */
+            block_size_to_transfer = CACHE_BLOCK_SIZE;
+        }
+        else
+        {
+            /* size_left is less than a full block's size, so size_left is all
+             * that needs to be transfered to/from this block 
+             */
+            block_size_to_transfer = size_left;
+        }
+    }
+    /* Finally, return the number of memcpy operations that must be completed 
+     * to satisfy this request.
+     */
+    return copy_count;
+}
+
+/**
+ * Provided two ucache related structures ureq and ucop, determine the 
+ * reads/writes to be completed between the ucache and user memory (vector). 
+ */
+void calc_copy_ops(
+                off64_t offset,
+                size_t req_size,
+                struct ucache_req_s *ureq,
+                struct ucache_copy_s *ucop,
+                int copy_count,
+                const struct iovec *vector
+)
+{
+    int ureq_ndx = 0;
+    int vec_ndx = 0;
+    size_t size_left = req_size;
+    size_t blk_tfer_size = CACHE_BLOCK_SIZE - (offset % CACHE_BLOCK_SIZE);
+    size_t blk_left = blk_tfer_size;
+    size_t vec_left = vector[0].iov_len;
+    int i;
+    for(i = 0; i < copy_count; i++)
+    {
+        /* Record necessary info for the future memcpy operation */
+        if(i == 0)
+        {
+            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr + 
+                (offset % CACHE_BLOCK_SIZE);
+        }
+        else
+        {
+            ucop[i].cache_pos = ureq[ureq_ndx].ublk_ptr +
+                (blk_tfer_size - blk_left);
+        }
+        ucop[i].buff_pos = vector[vec_ndx].iov_base +
+                (vector[vec_ndx].iov_len - vec_left);
+        ucop[i].hit = ureq[ureq_ndx].ublk_hit;
+        ucop[i].blk_index = ureq[ureq_ndx].ublk_index;
+
+        if(vec_left > blk_left) /* Finish block */
+        {
+            ucop[i].size = blk_left;
+            vec_left -= blk_left;
+            size_left -= blk_left;
+            if(size_left >= CACHE_BLOCK_SIZE)
+            {
+                blk_tfer_size = CACHE_BLOCK_SIZE;
+                blk_left = blk_tfer_size;
+            }
+            else
+            {
+                blk_tfer_size = size_left;
+                blk_left = blk_tfer_size;
+            }
+            ureq_ndx++;
+        }
+        else if(vec_left < blk_left) /* Finish iovec */
+        {
+            ucop[i].size = vec_left;
+            blk_left -= vec_left;
+            size_left -= vec_left;
+            vec_ndx++;
+            vec_left = vector[vec_ndx].iov_len;
+        }
+        else /* They must be equal - finish both */
+        {
+            ucop[i].size = blk_left;
+            size_left -= blk_left;
+            if(size_left >= CACHE_BLOCK_SIZE)
+            {
+                blk_tfer_size = CACHE_BLOCK_SIZE;                
+                blk_left = blk_tfer_size;
+            }
+            else
+            {
+                blk_tfer_size = size_left;
+                blk_left = blk_tfer_size;
+            }
+            vec_ndx++;
+            vec_left = vector[vec_ndx].iov_len;
+            ureq_ndx++;
+        }
+    }
+}
+
+static int cache_readorwrite(
+    enum PVFS_io_type which, 
+    struct ucache_copy_s * ucop
+)
+{
+    int rc = 0;
+    if(which == PVFS_IO_READ)
+    {
+        /* Copy from cache to user mem */
+        memcpy(ucop->buff_pos, ucop->cache_pos, ucop->size);
+        rc = (int)ucop->size;
+    }
+    else
+    {
+        /* Copy from user mem to cache */
+        memcpy(ucop->cache_pos, ucop->buff_pos, ucop->size);
+        rc = (int)ucop->size;
+    }
+    return rc; 
+}
+
+int calc_req_blk_cnt(off64_t offset, size_t req_size)
+{   
+    if(((offset % CACHE_BLOCK_SIZE) + req_size) < CACHE_BLOCK_SIZE)
+    {
+        return 1;
+    }
+
+    /* Count next blocks */
+    size_t req_left = req_size - (CACHE_BLOCK_SIZE - 
+        (offset % CACHE_BLOCK_SIZE));
+    int blk_cnt = req_left / CACHE_BLOCK_SIZE;
+
+    /* Account for last block if necessary */
+    if((req_left - (blk_cnt * CACHE_BLOCK_SIZE)) != 0)
+    {
+        blk_cnt++;
+    }
+
+    return (blk_cnt + 1); /* Add one to account for first block */
+}
+
+#endif /* PVFS_UCACHE_ENABLE */
+
+/** Do a blocking read or write, possibly utilizing the user cache.
+ * Returns -1 on error, some positive value on success; 
  */
 int iocommon_readorwrite(enum PVFS_io_type which,
                          pvfs_descriptor *pd,
                          PVFS_size offset,
-                         void *buf,
-                         PVFS_Request mem_req,
-                         PVFS_Request file_req,
-                         size_t count,
+                         size_t iovec_count,
                          const struct iovec *vector)
 {
-    /* Incorporate this elsewhere to enable/disable caching */
-    int USE_CACHE = (int)(ucache!=0 && ucache_locks!=0); 
-    /* Eventually, a per file flag */
-    int CACHE_FILE = 1;
-
-    if(!USE_CACHE || !CACHE_FILE)
-    {
-        /* Bypass the ucache */
-        return iocommon_readorwrite_nocache(which, pd, offset, buf, mem_req,
-                                                                  file_req);
-    }
     int rc = 0;
-    int tag_cnt = 0;
-    uint64_t remainder = 0;
-    uint32_t blk_size = CACHE_BLOCK_SIZE_K * 1024;
-    uint64_t pos = 0;
-    uint64_t end = offset + count;
-    PVFS_fs_id *fs_id = &(pd->pvfs_ref.fs_id);
-    PVFS_handle *handle = &(pd->pvfs_ref.handle);
-    /* Used to determine if we finished writing a block without filling up the 
-     * current io segment 
-     */
-    unsigned char scratch = 0;  
-    /* The offset into the last io semgment that was partially used (so use 
-     * this ptr then move on to the next io segment) .
-     */
-    void  *scratch_ptr = 0; 
-    uint64_t scratch_left = 0;
-    int iovec_ndx = 0;
-    uint32_t block_ndx = 0;
+#if PVFS_UCACHE_ENABLE
+    if(ucache_enabled)
+    {
+        if(!pd->s->fent)
+        {
+            lock_lock(ucache_lock);
+            ucache_stats->pseudo_misses++; /* could overflow */
+            these_stats.pseudo_misses++;
+            lock_unlock(ucache_lock);
+        }
+    }
 
+    if(!ucache_enabled || !pd->s->fent)
+    {
+#endif /* PVFS_UCACHE_ENABLE */
+
+        /* Bypass the ucache */
+        errno = 0;
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset,
+                                              iovec_count, vector);
+        return rc;
+#if PVFS_UCACHE_ENABLE
+    }
+
+    /* define all the values we'll need to fill the ucache_req_s struct */
+    int i; /* index used for 'for loops' */
+    int req_blk_cnt = 0; /* how many blocks to r/w */
+    size_t req_size = 0; /* size in bytes of r/w */
+    int transfered = 0;
+
+    /* How many bytes is the request? */
+    /* These will be contiguous in file starting at offset. */
+    /* Also, they may be spread in out memory */
+    /* Sum the individal segment sizes */
+    for (i = 0; i < iovec_count; i++)
+    {
+        req_size += vector[i].iov_len;
+    }
+
+    //printf("req_size = %ld\n", req_size);
+    //printf("iovec_count = %ld\n", iovec_count);
+
+    /* If the ucache request threshold is exceeded, flush and evict file, then
+     * peform nocache version of readorwrite */
+    if(req_size > UCACHE_MAX_REQ || (req_size > (FILE_TABLE_ENTRY_COUNT * CACHE_BLOCK_SIZE)))
+    {
+        /* Flush dirty blocks */
+        rc = ucache_flush_file(pd->s->fent);
+        if(rc != 0)
+        {
+            rc = -1;
+        }
+
+        /*TODO Possibly remove the file - bad idea? What if it's referenced? */
+
+        /* Bypass the ucache */
+        rc = iocommon_vreadorwrite(which, &pd->s->pvfs_ref, offset, 
+                                              iovec_count, vector);
+        return rc;
+    }
 
     /* How many tags? */
-    tag_cnt = count / (CACHE_BLOCK_SIZE_K * 1024);
+    uint64_t start_tag = offset - (offset % CACHE_BLOCK_SIZE);
+    /* End_tag isn't really the last tag if the blk is alligned. 
+     * This value is used to determine the req_blk_cnt only.
+     */
+    uint64_t end_tag = (offset + req_size) - ((offset + req_size) % CACHE_BLOCK_SIZE);
+    req_blk_cnt = calc_req_blk_cnt(offset, req_size);
+    //printf("req_blk_cnt = %d\n", req_blk_cnt);
 
-    /* Add 2 to be sure we have enough tags (may not need them) */
-    tag_cnt += 2;
-
-    /* Array of the tags we need to read/write to */
-    uint64_t tags[tag_cnt];
-   
-    remainder = offset % blk_size;
-
-    /* Block Aligned */
-    if(remainder == 0) 
+    /* Now that we know the req_blk_cnt, allocate the required 
+     * space for tags, hits boolean, and ptr to block in ucache shared memory.
+     */
+    struct ucache_req_s ureq[req_blk_cnt];
+    ureq[0].ublk_tag = start_tag;
+    /* Loop over positions storing tags (ment identifiers) */
+    for(i = 1; i < req_blk_cnt; i++)
     {
-        tags[0] = offset;        
+        ureq[i].ublk_tag = ureq[ (i - 1) ].ublk_tag + CACHE_BLOCK_SIZE;
+    }
+
+    /* Now that tags are set fill in array of lookup responses */
+    for(i = 0; i < req_blk_cnt; i++)
+    {
+        /* if lookup returns nil set char to 0, otherwise 1 */
+        ureq[i].ublk_ptr = ucache_lookup(pd->s->fent, ureq[i].ublk_tag, 
+                                                  &(ureq[i].ublk_index));
+        if(ureq[i].ublk_ptr == (void *)NIL) 
+        {
+            lock_lock(ucache_lock);
+            ucache_stats->misses++; /* could overflow */
+            these_stats.misses++;
+            lock_unlock(ucache_lock);
+            ureq[i].ublk_hit = 0; /* miss */
+            /* Find a place for the block */
+            ureq[i].ublk_ptr = ucache_insert(pd->s->fent, ureq[i].ublk_tag,
+                                                      &(ureq[i].ublk_index));
+            assert(ureq[i].ublk_ptr != (void *)NILP);            
+        }
+        else
+        {
+            lock_lock(ucache_lock);
+            ucache_stats->hits++;  /* could overflow */
+            these_stats.hits++;
+            lock_unlock(ucache_lock);
+            ureq[i].ublk_hit = 1; /* hit */
+        }
+    }
+
+    if(which == PVFS_IO_READ)
+    {
+        /* Loop over ureq structure and perform reads on misses */
+        for(i = 0; i < req_blk_cnt; i++)
+        {
+            if(ureq[i].ublk_hit == 0)
+            {
+                /* Perform read */
+                /* read single block from fs and write into ucache */
+                struct iovec cache_vec = {ureq[i].ublk_ptr, CACHE_BLOCK_SIZE};
+                lock_lock(get_lock(ureq[i].ublk_index));
+                rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                                           &pd->s->pvfs_ref,
+                                           ureq[i].ublk_tag,
+                                           1,
+                                           &cache_vec);
+                lock_unlock(get_lock(ureq[i].ublk_index));
+            }
+        }
+    }
+
+    /* Read beginning and end blks into cache before writing if 
+     * either end of the request are unalligned.
+     */
+    if(which == PVFS_IO_WRITE) /* Write */
+    {
+        /* Consult ureq to see if block was hit or missed */
+        /* Also see if block was alligned or not */
+        if((ureq[0].ublk_hit == 0) && (offset != ureq[0].ublk_tag))
+        {
+            /* Seek to the beginning so we read from the beginning of the 
+             * first block 
+             */
+            iocommon_lseek(pd, (off64_t)start_tag, 1, SEEK_SET);
+        
+            /* Read first block from fs into ucache */
+            struct iovec vector = {ureq[0].ublk_ptr, CACHE_BLOCK_SIZE};
+            lock_lock(get_lock(ureq[0].ublk_index));
+            rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                            &pd->s->pvfs_ref,
+                            ureq[0].ublk_tag,
+                                           1,
+                                    &vector);
+            lock_unlock(get_lock(ureq[0].ublk_index));
+        }
+        if((ureq[req_blk_cnt - 1].ublk_hit == 0) &&
+           (((offset + req_size) % CACHE_BLOCK_SIZE) != 0))
+        {
+            iocommon_lseek(pd, (off64_t)end_tag, 1, SEEK_SET);
+            /* Read last block from fs into ucache */
+            struct iovec vector = {ureq[req_blk_cnt - 1].ublk_ptr,
+                                            CACHE_BLOCK_SIZE};
+            lock_lock(get_lock(ureq[req_blk_cnt - 1].ublk_index));
+            rc = iocommon_vreadorwrite(PVFS_IO_READ,
+                            &pd->s->pvfs_ref,
+                            ureq[req_blk_cnt - 1].ublk_tag,
+                                           1,
+                                    &vector);
+            lock_unlock(get_lock(ureq[req_blk_cnt - 1].ublk_index));
+        }
+    }
+
+    /* At this point we know how many blocks the request will cover, the tags
+     * (indexes into file) of the blocks, whether the corresponding block was
+     * hit, and the ptr to the corresponding blk in memory. The blocks are also
+     * locked at this point. They will be unlocked as reads/writes happen.
+     */
+
+    /* If only one iovec then we can assume there will be req_blk_cnt 
+     * memcpy operations, otherwise we need to determine how many 
+     * memcpy operations will be required so we can create the ucache_copy_s
+     * struct array of proper length.
+     */
+    int copy_count = 0;
+    if(iovec_count == 1)
+    {
+        copy_count = req_blk_cnt;
     }
     else
     {
-        tags[0] = offset - remainder;
-    }
-    
-    /* Loop over positions storing tags (ment identifiers) */
-    pos = tags[0] + blk_size;
-    int i;
-    for(i = 1; pos < end; i++)
-    {
-        tags[i] = pos;
-        pos += blk_size;
+        copy_count = calc_copy_op_cnt(offset, req_size, req_blk_cnt, 
+            iovec_count, vector);
     }
 
-    /* This should represent the number of blks */
-    tag_cnt = i - 1;
+    //printf("copy_count = %d\n", copy_count);
 
-    /* Now that tags are set build array of lookup responses*/
-    unsigned char hits[tag_cnt];
-    for(i = 0; i < tag_cnt; i++)
-    {
-        /* if lookup returns nil set char to 0, otherwise 1 */
-        if(ucache_lookup(fs_id, handle, tags[i], NULL) == (void *)NIL) 
-        {
-            hits[tag_cnt] = 0; /* miss */
-        }
-        else{
-            hits[tag_cnt] = 1; /* hit */
-        }
-    }
+    /* Create copy structure and fill with appropriate values */
+    struct ucache_copy_s ucop[copy_count];
+    calc_copy_ops(offset, req_size, &ureq[0], &ucop[0], copy_count, vector);
 
-    //Could do this serially or in parallel
-    uint64_t block_loc = 0;
-    for(i = 0; i < tag_cnt; i++)
+    /* The ucache copy structure should now be filled and we can procede with 
+     * the necessary memcpy operations.
+     */
+    for(i = 0; i < copy_count; i++)
     {
-        if(which == 1) /* Read */
-        {
-            if(hits[i] == 1) /* Hit */
-            {
-                /* Read from Cache */
-                //instead of looking up again, save lookup somehow
-                block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx);
-                lock_lock(ucache_lock);
-                lock_lock(&ucache_block_lock[block_ndx]); 
-                rc = place_data(1, block_loc, vector, &iovec_ndx, 
-                                   &scratch, &scratch_ptr, &scratch_left);
-                lock_unlock(&ucache_block_lock[block_ndx]);
-                lock_unlock(ucache_lock);
-            }
-            else /* Miss */
-            {
-                /* read from fs into user mem */
-                rc = iocommon_readorwrite_nocache(which, pd, offset, 
-                                                  buf, mem_req, file_req);
-                if(rc > 0)
-                {
-                    block_loc = (voidp_t)ucache_insert(fs_id, handle, tags[i], 
-                                                         &block_ndx);
-                }
-                /* Copy into cache if possible */
-                if(block_loc != (uint64_t)NIL)
-                {
-                    lock_lock(ucache_lock);
-                    lock_lock(&ucache_block_lock[block_ndx]); 
-                    rc = place_data(2, block_loc, vector, &iovec_ndx, 
-                                       &scratch, &scratch_ptr, &scratch_left);
-                    lock_unlock(&ucache_block_lock[block_ndx]);
-                    lock_unlock(ucache_lock);
-                }
-            }
-        }
-        else if(which == 2) /* Write */
-        {
-            if(hits[i] == 1) /* Hit */
-            {
-                /* Overwrite block in cache */
-                /* //or use previous return value */
-                block_loc = (voidp_t)ucache_lookup(fs_id, handle, tags[i], &block_ndx); 
-                lock_lock(ucache_lock);
-                lock_lock(&ucache_block_lock[block_ndx]);  
-                rc = place_data(2, block_loc, vector, &iovec_ndx, 
-                                   &scratch, &scratch_ptr, &scratch_left);
-                lock_unlock(&ucache_block_lock[block_ndx]);
-                lock_unlock(ucache_lock);
-            }
-            else /* Miss */
-            {
-                /* Attempt ucache insert, on fail, send to file system */
-                block_loc = (voidp_t)ucache_insert(fs_id, handle, tags[i], &block_ndx);
-                if(block_loc != (uint64_t)NIL)
-                {
-                    lock_lock(ucache_lock);
-                    lock_lock(&ucache_block_lock[block_ndx]); 
-                    rc = place_data(2, block_loc, vector, &iovec_ndx,
-                                       &scratch, &scratch_ptr, &scratch_left);
-                    lock_unlock(&ucache_block_lock[block_ndx]);
-                    lock_unlock(ucache_lock);
-                }
-                else
-                {
-                    rc = iocommon_readorwrite_nocache(which, pd, offset, 
-                                                  buf, mem_req, file_req);
-                }
-            }
-        }
+        //printf("ucop[%d].cache_pos = %lu\n", i, (long unsigned int) ucop[i].cache_pos);
+        //printf("ucop[%d].buff_pos = %lu\n", i, (long unsigned int) ucop[i].buff_pos);
+        //printf("ucop[%d].size = %ld\n", i, ucop[i].size);
+        //printf("ucop[%d].hit = %u\n", i, (int) ucop[i].hit);
+        //printf("ucop[%d].blk_index = %hu\n", i, ucop[i].blk_index);
+
+        /* perform copy operation */
+        lock_lock(get_lock(ureq[i].ublk_index));
+        transfered += cache_readorwrite(which, &ucop[i]);
+        /* Unlock the block */
+        lock_unlock(get_lock(ureq[i].ublk_index));
     }
+    rc = transfered;
+#endif /* PVFS_UCACHE_ENABLE */
     return rc;
 }
 
-/** TODO
- * 1: read, read from user cache and write to user mem
- * 2: write, read from user mem and write to user cache
+/** do a blocking read or write from an iovec
+ *  this just converts to PVFS Request notation
+ *  other interfaces can still do direct reads to
+ *  RorW_nocache below
  */
-uint32_t place_data(enum PVFS_io_type which, const uint64_t block, 
-                                  const struct iovec *vector, 
-                      int *iovec_ndx, unsigned char *scratch, 
-                  void **scratch_ptr, uint64_t *scratch_left)
+int iocommon_vreadorwrite(enum PVFS_io_type which,
+                         PVFS_object_ref *por,
+                         PVFS_size offset,
+                         size_t count,
+                         const struct iovec *vector)
 {
-    const uint64_t block_size = CACHE_BLOCK_SIZE_K * 1024;
-    /* Bytes of block remaining to be read/written */
-    uint64_t left = CACHE_BLOCK_SIZE_K * 1024;    
-    void *user_mem = 0; /* Where to read/write */
-    uint64_t user_mem_size = 0; /* How much to read/write */
+    int rc = 0;
+    int i, size = 0;
+    void *buf;
+    PVFS_Request mem_req;
+    PVFS_Request file_req;
 
-    /* Continue read/writing strips of data until the whole block completed */
-    while(left != 0)
-    {
-        /* Do we need to use the scratch_ptr or a fresh segment */
-        if(*scratch)
-        {
-            /* Use a previously used buffer that wasn't quite filled by the 
-             * previous cache block.
-             */
-            user_mem = *scratch_ptr;
-            user_mem_size = *scratch_left;
-            *scratch = 0;
-        }
-        else
-        {
-            user_mem = vector[*iovec_ndx].iov_base;
-            user_mem_size = vector[*iovec_ndx].iov_len;
-        }
-
-        /* Will this transfer complete the block but not the user mem segment */
-        if(user_mem_size > left)
-        {
-            /* Save a reference to where we left off with this segment*/
-            *scratch_ptr = (void *)(user_mem + left);
-            *scratch_left = user_mem_size - left;
-            *scratch = 1;
-        }
-        else
-        {
-            /* We're done with this user mem segment */
-            (*iovec_ndx)++;
-        }
-
-        /* More Data! */
-        if(which == 1)
-        {
-            /* Read */
-            memcpy(user_mem, (void *)(voidp_t)(block + (block_size - left)), (size_t)user_mem_size);
-        }
-        else
-        {
-            /* Write */           
-            memcpy((void*)(voidp_t)(block + (block_size - left)), user_mem, (size_t)user_mem_size);
-        }
-
-        left -= user_mem_size;
+    for(i = 0; i < count; i++)
+    {   
+        size += vector[i].iov_len;
     }
-    return 1;
+
+    if(size == 0)
+    {
+        return 0;
+    }
+
+    rc = PVFS_Request_contiguous(size, PVFS_BYTE, &file_req);
+    rc = pvfs_convert_iovec(vector, count, &mem_req, &buf);
+
+    rc = iocommon_readorwrite_nocache(which,
+                                      por,
+                                      offset, 
+                                      buf,
+                                      mem_req,
+                                      file_req);
+
+    PVFS_Request_free(&mem_req);
+    PVFS_Request_free(&file_req);
+
+    return rc;
 }
 
 /** do a blocking read or write
- * 
+ *  all sync reads or writes to disk come here
  */
 int iocommon_readorwrite_nocache(enum PVFS_io_type which,
-                         pvfs_descriptor *pd,
+                         PVFS_object_ref *por,
                          PVFS_size offset,
                          void *buf,
                          PVFS_Request mem_req,
                          PVFS_Request file_req)
-        //returned by nonblocking operations
 {
     int rc = 0;
     int orig_errno = errno;
     PVFS_credentials *creds;
     PVFS_sysresp_io io_resp;
 
-    if (!pd || pd->is_in_use != PVFS_FS)
+    if (!por)
     {
         errno = EBADF;
         return -1;
@@ -1156,17 +1440,10 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     /* Initialize */
     memset(&io_resp, 0, sizeof(io_resp));
 
-    //Ensure descriptor is used for the correct type of access
-    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE))) ||
-        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE))))
-    {
-        errno = EBADF;
-        return -1;
-    }
-
     iocommon_cred(&creds);
 
-    rc = PVFS_sys_io(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_io(*por,
                      file_req,
                      offset,
                      buf,
@@ -1244,8 +1521,8 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
         return -1;
     }
     //Ensure descriptor is used for the correct type of access
-    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->flags & O_ACCMODE))) ||
-        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->flags & O_ACCMODE))))
+    if ((which==PVFS_IO_READ && (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which==PVFS_IO_WRITE && (O_RDONLY == (pd->s->flags & O_ACCMODE))))
     {
         errno = EBADF;
         return PVFS_FD_FAILURE;
@@ -1256,9 +1533,10 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
 
     iocommon_cred(&credentials);
 
-    rc = PVFS_isys_io(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_isys_io(pd->s->pvfs_ref,
                       file_req,
-                      pd->file_pointer+extra_offset,
+                      pd->s->file_pointer+extra_offset,
                       buf,
                       contig_memory_req,
                       credentials,
@@ -1272,7 +1550,9 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
     assert(*ret_op_id!=-1);//TODO: handle this
 
     PVFS_Request_size(contig_memory_req, &req_size);
-    pd->file_pointer += req_size;
+    gen_mutex_lock(&pd->s->lock);
+    pd->s->file_pointer += req_size;
+    gen_mutex_unlock(&pd->s->lock);
     *ret_memory_req = contig_memory_req;
     return 0;
 
@@ -1297,6 +1577,7 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     iocommon_cred(&credentials);
 
     /* now get attributes */
+    errno = 0;
     rc = PVFS_sys_getattr(obj,
                           mask,
                           credentials,
@@ -1341,12 +1622,13 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
-    rc = iocommon_getattr(pd->pvfs_ref, &attr, mask);
+    errno = 0;
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
     IOCOMMON_RETURN_ERR(rc);
 
     /* copy attributes into standard stat struct */
-    buf->st_dev = pd->pvfs_ref.fs_id;
-    buf->st_ino = pd->pvfs_ref.handle;
+    buf->st_dev = pd->s->pvfs_ref.fs_id;
+    buf->st_ino = pd->s->pvfs_ref.handle;
     buf->st_mode = attr.perms;
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -1366,7 +1648,10 @@ int iocommon_stat(pvfs_descriptor *pd, struct stat *buf, uint32_t mask)
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    buf->st_blocks = 0; /* don't have blocks at this time */
+    if (attr.blksize)
+    {
+        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
+    }
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -1392,12 +1677,13 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     /* Initialize */
     memset(&attr, 0, sizeof(attr));
 
-    rc = iocommon_getattr(pd->pvfs_ref, &attr, mask);
+    errno = 0;
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, mask);
     IOCOMMON_RETURN_ERR(rc);
 
     /* copy attributes into standard stat struct */
-    buf->st_dev = pd->pvfs_ref.fs_id;
-    buf->st_ino = pd->pvfs_ref.handle;
+    buf->st_dev = pd->s->pvfs_ref.fs_id;
+    buf->st_ino = pd->s->pvfs_ref.handle;
     buf->st_mode = attr.perms;
     if (attr.objtype == PVFS_TYPE_METAFILE)
     {
@@ -1417,7 +1703,10 @@ int iocommon_stat64(pvfs_descriptor *pd, struct stat64 *buf, uint32_t mask)
     buf->st_rdev = 0; /* no dev special files */
     buf->st_size = attr.size;
     buf->st_blksize = attr.blksize;
-    buf->st_blocks = 0; /* don't have blocks at this time */
+    if (attr.blksize)
+    {
+        buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
+    }
     buf->st_atime = attr.atime;
     buf->st_mtime = attr.mtime;
     buf->st_ctime = attr.ctime;
@@ -1450,7 +1739,8 @@ int iocommon_chown(pvfs_descriptor *pd, uid_t owner, gid_t group)
         attr.mask |= PVFS_ATTR_SYS_GID;
     }
 
-    rc = iocommon_setattr(pd->pvfs_ref, &attr);
+    errno = 0;
+    rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
     return rc;
 }
 
@@ -1470,7 +1760,8 @@ int iocommon_chmod(pvfs_descriptor *pd, mode_t mode)
     attr.perms = mode & 07777; /* mask off any stray bits */
     attr.mask = PVFS_ATTR_SYS_PERM;
 
-    rc = iocommon_setattr(pd->pvfs_ref, &attr);
+    errno = 0;
+    rc = iocommon_setattr(pd->s->pvfs_ref, &attr);
     return rc;
 }
 
@@ -1505,6 +1796,7 @@ int iocommon_make_directory(const char *pvfs_path,
     /* lookup parent */
     if (!pdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -1512,6 +1804,7 @@ int iocommon_make_directory(const char *pvfs_path,
     {
         if (parentdir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(parentdir, *pdir,
                             PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -1528,6 +1821,7 @@ int iocommon_make_directory(const char *pvfs_path,
     attr.perms = mode & 07777; /* mask off stray bits */
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
+    errno = 0;
     rc = PVFS_sys_mkdir(filename,
                         parent_ref,
                         attr,
@@ -1559,8 +1853,9 @@ int iocommon_readlink(pvfs_descriptor *pd, char *buf, int size)
     }
     /* Initialize any variables */
     memset(&attr, 0, sizeof(attr));
-
-    rc = iocommon_getattr(pd->pvfs_ref, &attr, PVFS_ATTR_SYS_TYPE | 
+ 
+    errno = 0;
+    rc = iocommon_getattr(pd->s->pvfs_ref, &attr, PVFS_ATTR_SYS_TYPE | 
                                                PVFS_ATTR_SYS_LNK_TARGET);
     IOCOMMON_RETURN_ERR(rc);
 
@@ -1609,6 +1904,7 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     /* lookup parent */
     if (!pdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -1616,6 +1912,7 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     {
         if (parentdir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(parentdir, *pdir,
                             PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -1632,6 +1929,7 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     attr.perms = 0777;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
+    errno = 0;
     rc = PVFS_sys_symlink(filename,
                           parent_ref,
                           (char *)link_target,
@@ -1671,12 +1969,12 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
         errno = EBADF;
         return -1;
     }
-    if (pd->token == PVFS_READDIR_END)
+    if (pd->s->token == PVFS_READDIR_END)
     {
-        return -1;  /* EOF */
+        return 0;  /* EOF */
     }
 
-    if (!S_ISDIR(pd->mode))
+    if (!S_ISDIR(pd->s->mode))
     {
         errno = ENOENT;
         return -1;
@@ -1687,7 +1985,8 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
 
     iocommon_cred(&credentials);
 
-    token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
+    gen_mutex_lock(&pd->s->lock);
+    token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
     /* posix deals in bytes in buffer and bytes read */
     /* PVFS deals in number of records to read or were read */
@@ -1696,7 +1995,8 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     {
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
-    rc = PVFS_sys_readdir(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,
                           credentials,
@@ -1704,24 +2004,26 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
 
-    pd->token = readdir_resp.token;
+    pd->s->token = readdir_resp.token;
     name_max = PVFS_util_min(NAME_MAX, PVFS_NAME_MAX);
     for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
         /* copy a PVFS_dirent to a struct dirent */
         dirp->d_ino = (long)readdir_resp.dirent_array[i].handle;
-        dirp->d_off = pd->file_pointer;
+        dirp->d_off = pd->s->file_pointer;
         dirp->d_reclen = sizeof(PVFS_dirent);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
-        pd->file_pointer += sizeof(struct dirent);
+        pd->s->file_pointer += sizeof(struct dirent);
         bytes += sizeof(struct dirent);
         dirp++;
     }
+    gen_mutex_unlock(&pd->s->lock);
     free(readdir_resp.dirent_array);
     return bytes;
 
 errorout:
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 
@@ -1743,12 +2045,12 @@ int iocommon_getdents64(pvfs_descriptor *pd,
         errno = EBADF;
         return -1;
     }
-    if (pd->token == PVFS_READDIR_END)
+    if (pd->s->token == PVFS_READDIR_END)
     {
-        return -1;  /* EOF */
+        return 0;  /* EOF */
     }
 
-    if (!S_ISDIR(pd->mode))
+    if (!S_ISDIR(pd->s->mode))
     {
         errno = ENOENT;
         return -1;
@@ -1759,14 +2061,16 @@ int iocommon_getdents64(pvfs_descriptor *pd,
 
     iocommon_cred(&credentials);
 
-    token = pd->token == 0 ? PVFS_READDIR_START : pd->token;
+    gen_mutex_lock(&pd->s->lock);
+    token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
 
     count = size / sizeof(struct dirent64);
     if (count > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
         count = PVFS_REQ_LIMIT_DIRENT_COUNT;
     }
-    rc = PVFS_sys_readdir(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_readdir(pd->s->pvfs_ref,
                           token,
                           count,
                           credentials,
@@ -1774,24 +2078,26 @@ int iocommon_getdents64(pvfs_descriptor *pd,
                           NULL);
     IOCOMMON_CHECK_ERR(rc);
 
-    pd->token = readdir_resp.token;
+    pd->s->token = readdir_resp.token;
     name_max = PVFS_util_min(NAME_MAX, PVFS_NAME_MAX);
     for(i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
         /* copy a PVFS_dirent to a struct dirent64 */
         dirp->d_ino = (uint64_t)readdir_resp.dirent_array[i].handle;
-        dirp->d_off = (off64_t)pd->file_pointer;
+        dirp->d_off = (off64_t)pd->s->file_pointer;
         dirp->d_reclen = sizeof(struct dirent64);
         memcpy(dirp->d_name, readdir_resp.dirent_array[i].d_name, name_max);
         dirp->d_name[name_max] = 0;
-        pd->file_pointer += sizeof(struct dirent64);
+        pd->s->file_pointer += sizeof(struct dirent64);
         bytes += sizeof(struct dirent64);
         dirp++;
     }
+    gen_mutex_unlock(&pd->s->lock);
     free(readdir_resp.dirent_array);
     return bytes;
 
 errorout:
+    gen_mutex_unlock(&pd->s->lock);
     return rc;
 }
 
@@ -1858,6 +2164,7 @@ int iocommon_access(const char *pvfs_path,
 
     if (!pdir)
     {
+        errno = 0;
         rc = iocommon_lookup_absolute(parentdir, &parent_ref, NULL, 0);
         IOCOMMON_RETURN_ERR(rc);
     }
@@ -1865,6 +2172,7 @@ int iocommon_access(const char *pvfs_path,
     {
         if (parentdir)
         {
+            errno = 0;
             rc = iocommon_lookup_relative(parentdir, *pdir,
                             PVFS2_LOOKUP_LINK_FOLLOW, &parent_ref, NULL, 0);
             IOCOMMON_RETURN_ERR(rc);
@@ -1879,6 +2187,7 @@ int iocommon_access(const char *pvfs_path,
     {
         followflag = PVFS2_LOOKUP_LINK_NO_FOLLOW;
     }
+    errno = 0;
     rc = iocommon_lookup_relative(file,
                                   parent_ref,
                                   followflag,
@@ -1887,6 +2196,7 @@ int iocommon_access(const char *pvfs_path,
                                   0);
     IOCOMMON_CHECK_ERR(rc);
     /* Get file atributes */
+    errno = 0;
     rc = iocommon_getattr(file_ref, &attr, PVFS_ATTR_SYS_COMMON_ALL);
     IOCOMMON_RETURN_ERR(rc);
 
@@ -1965,7 +2275,8 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
     iocommon_cred(&credentials);
     memset(&statfs_resp, 0, sizeof(statfs_resp));
 
-    rc = PVFS_sys_statfs(pd->pvfs_ref.fs_id,
+    errno = 0;
+    rc = PVFS_sys_statfs(pd->s->pvfs_ref.fs_id,
                          credentials,
                          &statfs_resp,
                          NULL);
@@ -2005,7 +2316,8 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
     iocommon_cred(&credentials);
     memset(&statfs_resp, 0, sizeof(statfs_resp));
 
-    rc = PVFS_sys_statfs(pd->pvfs_ref.fs_id,
+    errno = 0;
+    rc = PVFS_sys_statfs(pd->s->pvfs_ref.fs_id,
                          credentials,
                          &statfs_resp,
                          NULL);
@@ -2045,8 +2357,13 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
     PVFS_Request_contiguous(buffer_size, PVFS_BYTE, &mem_req);
     file_req = PVFS_BYTE;
 
-    rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
-                               buffer, mem_req, file_req);
+    errno = 0;
+    rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
+                                      &pd->s->pvfs_ref,
+                                      *offset + bytes_read,
+                                      buffer,
+                                      mem_req,
+                                      file_req);
     while(rc > 0)
     {
         int flags = 0;
@@ -2060,8 +2377,13 @@ int iocommon_sendfile(int sockfd, pvfs_descriptor *pd,
         {
             break;
         }
-        rc = iocommon_readorwrite_nocache(PVFS_IO_READ, pd, *offset + bytes_read,
-                                   buffer, mem_req, file_req);
+        errno = 0;
+        rc = iocommon_readorwrite_nocache(PVFS_IO_READ,
+                                          &pd->s->pvfs_ref,
+                                          *offset + bytes_read,
+                                          buffer,
+                                          mem_req,
+                                          file_req);
     }  
     PVFS_Request_free(&mem_req);
     free(buffer);
@@ -2110,11 +2432,24 @@ int iocommon_geteattr(pvfs_descriptor *pd,
     val.buffer_sz = size;
 
     /* now get attributes */
-    rc = PVFS_sys_geteattr(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_geteattr(pd->s->pvfs_ref,
                           credentials,
                           &key,
                           &val,
                           NULL);
+    switch (rc)
+    {
+    case -PVFS_ENOENT:
+        /* file exists if we have a pd */
+        /* either attr does not exist or */
+        /* we do not have access to it */
+        rc = -PVFS_ENODATA;
+        break;
+    case -PVFS_EMSGSIZE:
+        /* buffer was too small for the attribute value */
+        rc = -PVFS_ERANGE;
+    }
     IOCOMMON_CHECK_ERR(rc);
     rc = val.read_sz;
 
@@ -2170,12 +2505,20 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     }
 
     /* now set attributes */
-    rc = PVFS_sys_seteattr(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_seteattr(pd->s->pvfs_ref,
                           credentials,
                           &key,
                           &val,
                           pvfs_flag,
                           NULL);
+    if (rc == -PVFS_ENOENT)
+    {
+        /* file exists if we have a pd */
+        /* either attr does not exist or */
+        /* we do not have access to it */
+        rc = -PVFS_ENODATA;
+    }
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
@@ -2211,10 +2554,18 @@ int iocommon_deleattr(pvfs_descriptor *pd,
     key.buffer_sz = strlen(key_p) + 1;
 
     /* now set attributes */
-    rc = PVFS_sys_deleattr(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_deleattr(pd->s->pvfs_ref,
                            credentials,
                            &key,
                            NULL);
+    if (rc == -PVFS_ENOENT)
+    {
+        /* file exists if we have a pd */
+        /* either attr does not exist or */
+        /* we do not have access to it */
+        rc = -PVFS_ENODATA;
+    }
     IOCOMMON_CHECK_ERR(rc);
 
 errorout:
@@ -2234,7 +2585,7 @@ errorout:
 int iocommon_listeattr(pvfs_descriptor *pd,
                        char *list,
                        int size,
-                       int *numkeys)
+                       int *retsize)
 {
     int rc = 0;
     int orig_errno = errno;
@@ -2260,25 +2611,27 @@ int iocommon_listeattr(pvfs_descriptor *pd,
     iocommon_cred(&credentials);
 
     /* find number of attributes */
-    rc = PVFS_sys_listeattr(pd->pvfs_ref,
+    errno = 0;
+    rc = PVFS_sys_listeattr(pd->s->pvfs_ref,
                             token,
                             nkey,
                             credentials,
                             &listeattr_resp,
                             NULL);
+    if (rc == -PVFS_ENOENT)
+    {
+        /* file exists if we have a pd */
+        /* either attr does not exist or */
+        /* we do not have access to it */
+        rc = -PVFS_ENODATA;
+    }
     IOCOMMON_CHECK_ERR(rc);
 
     /* get available keys */
     nkey = listeattr_resp.nkey;
 
-    if (size == 0)
-    {
-        *numkeys = nkey;
-        goto errorout;
-    }
-
     /* allocate key_array */
-    if (nkey < PVFS_MAX_XATTR_LISTLEN)
+    if (nkey > PVFS_MAX_XATTR_LISTLEN)
     {
         max_keys = PVFS_MAX_XATTR_LISTLEN;
     }
@@ -2300,30 +2653,44 @@ int iocommon_listeattr(pvfs_descriptor *pd,
     {
         token = listeattr_resp.token;
         listeattr_resp.nkey = max_keys;
-        rc = PVFS_sys_listeattr(pd->pvfs_ref,
+        errno = 0;
+        rc = PVFS_sys_listeattr(pd->s->pvfs_ref,
                                 token,
                                 nkey,
                                 credentials,
                                 &listeattr_resp,
                                 NULL);
+        if (rc == -PVFS_ENOENT)
+        {
+            /* file exists if we have a pd */
+            /* either attr does not exist or */
+            /* we do not have access to it */
+            rc = -PVFS_ENODATA;
+        }
         IOCOMMON_CHECK_ERR(rc);
 
         /* copy keys out to caller */
         for (k = 0; k < listeattr_resp.nkey; k++)
         {
-            if (total_size + listeattr_resp.key_array[k].read_sz > size)
+            if (size > 0)
             {
-                total_size = size;
-                break; /* ran out of buffer space */
+                if (total_size + listeattr_resp.key_array[k].read_sz > size)
+                {
+                    total_size = size;
+                    errno = ERANGE;
+                    rc = -1;
+                    break; /* ran out of buffer space */
+                }
+                strncpy(list, listeattr_resp.key_array[k].buffer,
+                        listeattr_resp.key_array[k].read_sz);
+                list += listeattr_resp.key_array[k].read_sz;
             }
-            strncpy(list, listeattr_resp.key_array[k].buffer,
-                    listeattr_resp.key_array[k].read_sz);
-            list += listeattr_resp.key_array[k].read_sz;
             total_size += listeattr_resp.key_array[k].read_sz;
         }
         total_keys += listeattr_resp.nkey;
     } while (total_keys < nkey && listeattr_resp.nkey > 0 &&
              total_size < size);
+    *retsize = total_size;
     /* free key_array */
     for (k = 0; k < max_keys; k++)
     {

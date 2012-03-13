@@ -516,14 +516,16 @@ int PINT_cached_config_map_servers(
     PVFS_BMI_addr_t *addr_array,
     PVFS_handle_extent_array *handle_extent_array)
 {
-    struct qhash_head *hash_link;
-    struct PINT_llist *server_list;
-    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct qhash_head *hash_link = NULL;
+    struct PINT_llist *server_list = NULL;
+    struct PINT_llist *server_list_head = NULL;
+    struct host_handle_mapping_s *sv = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    int num_io_servers, i, ret;
+    int num_io_servers, i, df, ret;
+    int current_sv = -1;
     int start_index = -1;
-    int index;
-    int random_attempts;
+    int *random_array = NULL;
+    int *server_array = NULL;
 
     assert(inout_num_datafiles);
 
@@ -540,8 +542,8 @@ int PINT_cached_config_map_servers(
     assert(cur_config_cache);
     assert(cur_config_cache->fs);
 
-    server_list = cur_config_cache->fs->data_handle_ranges;
-    num_io_servers = PINT_llist_count(server_list);
+    server_list_head = cur_config_cache->fs->data_handle_ranges;
+    num_io_servers = PINT_llist_count(server_list_head);
 
     switch(layout->algorithm)
     {
@@ -560,9 +562,9 @@ int PINT_cached_config_map_servers(
                 if(handle_extent_array)
                 {
                     ret = PINT_cached_config_get_extents(
-                        fsid,
-                        &layout->server_list.servers[i],
-                        &handle_extent_array[i]);
+                            fsid,
+                            &layout->server_list.servers[i],
+                            &handle_extent_array[i]);
                     if(ret < 0)
                     {
                         gossip_err("The address specified in the datafile "
@@ -576,43 +578,76 @@ int PINT_cached_config_map_servers(
             break;
 
         case PVFS_SYS_LAYOUT_NONE:
+            /*
+             * This layout is just like Round Robin except
+             * it does not randomly set the start_index with
+             * a random call but uses zero
+             */
             start_index = 0;
             /* fall through */
 
         case PVFS_SYS_LAYOUT_ROUND_ROBIN:
+            /*
+             * This layout generates a random number from 
+             * zero to num_io_servers - 1 and then allocates
+             * inout_num_datafiles servers starting with that
+             * as the first.  Other parts of the code ensure
+             * that inout_num_datafiles < num_io_servers but
+             * this code should correctly allocate multiple
+             * datafiles per server round robin - though that
+             * won't happen with the current caode base 
+             */
 
+            /* This is handled by the caller in get_num_dfiles
+             */
+            /*
             if(num_io_servers < *inout_num_datafiles)
             {
                 *inout_num_datafiles = num_io_servers;
             }
+             */
 
             if(start_index == -1)
             {
-                start_index = rand() % *inout_num_datafiles;
+                start_index = rand() % num_io_servers;
             }
 
-            for(i = 0; i < *inout_num_datafiles; ++i)
+            /* start at beginning of server list */
+            server_list = server_list_head;
+            /* search for the start_index server */
+            for (i = 0; i < start_index; i++)
             {
-                cur_mapping = PINT_llist_head(server_list);
-                assert(cur_mapping);
                 server_list = PINT_llist_next(server_list);
-
-                index = (i + start_index) % *inout_num_datafiles;
-                ret = BMI_addr_lookup(
-                    &addr_array[index],
-                    cur_mapping->alias_mapping->bmi_address);
+            }
+            sv = PINT_llist_head(server_list);
+            assert(sv);
+            /* for each data file */
+            for(df = 0; df < *inout_num_datafiles; df++)
+            {
+                /* lookup addresses */
+                ret = BMI_addr_lookup(&addr_array[df],
+                                      sv->alias_mapping->bmi_address);
                 if (ret)
                 {
                     return ret;
                 }
 
+                /* no one uses this but we get it anyway */
                 if(handle_extent_array)
                 {
-                    handle_extent_array[index].extent_count =
-                        cur_mapping->handle_extent_array.extent_count;
-                    handle_extent_array[index].extent_array =
-                        cur_mapping->handle_extent_array.extent_array;
+                    handle_extent_array[df].extent_count =
+                            sv->handle_extent_array.extent_count;
+                    handle_extent_array[df].extent_array =
+                            sv->handle_extent_array.extent_array;
                 }
+                /* go to next server in list */
+                if (!server_list)
+                {
+                    server_list = server_list_head;
+                }
+                sv = PINT_llist_head(server_list);
+                assert(sv);
+                server_list = PINT_llist_next(server_list);
             }
             break;
 
@@ -624,61 +659,74 @@ int PINT_cached_config_map_servers(
             /* limit this layout to a number of datafiles no greater than
              * the number of servers
              */
+            /* again this is handled in get_num_dfiles
+             * so we will comment out here for now
+             */
+            /*
             if(num_io_servers < *inout_num_datafiles)
             {
                 *inout_num_datafiles = num_io_servers;
             }
-
+             */
             /* init all the addrs to 0, so we know whether we've set an
              * address at a particular index or not
              */
-            memset(addr_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
+            random_array = (int *)malloc(*inout_num_datafiles * sizeof(int));
+            server_array = (int *)malloc(num_io_servers * sizeof(int));
+            memset(random_array, 0, (*inout_num_datafiles)*sizeof(*addr_array));
+            memset(server_array, 0, (num_io_servers)*sizeof(*addr_array));
 
-            for(i = 0; i < *inout_num_datafiles; ++i)
+            /* generate list of unique random numbers from 0 to */
+            /* inout_num_datafiles - 1 */
+            for(df = 0; df < *inout_num_datafiles; df++)
             {
-                /* go through server list in order */
-                cur_mapping = PINT_llist_head(server_list);
-                assert(cur_mapping);
-                server_list = PINT_llist_next(server_list);
-
-                /* select random index into caller's list */
-                index = rand() % *inout_num_datafiles;
-                random_attempts = 1;
-
-                /* if we have already filled that index, try another random
-                 * index 
-                 */ 
-                while(addr_array[index] != 0 && random_attempts < 6)
+                int server = rand() % num_io_servers;
+                while (server_array[server])
                 {
-                    index = rand() % *inout_num_datafiles;
-                    random_attempts++;
+                    /* if we get a conflict skip on down to next entry */
+                    server = server + 1 % num_io_servers;
                 }
+                server_array[server] = 1;
+                random_array[df] = server;
+            }
+            /* server array is only to make sure we don't duplicate */
+            free(server_array);
 
-                /* if we exhausted a max number of randomization attempts,
-                 * then just go linearly through list
-                 */
-                while(addr_array[index] != 0)
+            current_sv = -1;
+            server_list = server_list_head;
+            /* go through data file list in order */
+            for(df = 0; df < *inout_num_datafiles; df++)
+            {
+                /* if we're already past the next one on the list */
+                /* go back to head of the list */
+                if (random_array[df] < current_sv)
                 {
-                    index = (index + 1) % *inout_num_datafiles;
+                    server_list = server_list_head;
+                    current_sv = 0;
                 }
-
-                /* found an unused index */
-                ret = BMI_addr_lookup(
-                    &addr_array[index],
-                    cur_mapping->alias_mapping->bmi_address);
-                if (ret)
+                /* skip down the list to the one we want */
+                while(current_sv < random_array[df])
                 {
-                    return ret;
+                    server_list = PINT_llist_next(server_list);
+                    current_sv++;
                 }
-
+                /* get the server info */
+                sv = PINT_llist_head(server_list);
+                assert(sv);
+                /* lookup addresses */
+                ret = BMI_addr_lookup(&addr_array[df],
+                                      sv->alias_mapping->bmi_address);
+                /* no one uses this but we get it anyway */
                 if(handle_extent_array)
                 {
-                    handle_extent_array[index].extent_count =
-                        cur_mapping->handle_extent_array.extent_count;
-                    handle_extent_array[index].extent_array =
-                        cur_mapping->handle_extent_array.extent_array;
+                    handle_extent_array[df].extent_count =
+                            sv->handle_extent_array.extent_count;
+                    handle_extent_array[df].extent_array =
+                            sv->handle_extent_array.extent_array;
                 }
             }
+            /* done with this so free it */
+            free(random_array);
             break;
         default:
             gossip_err("Unknown datafile mapping algorithm\n");
