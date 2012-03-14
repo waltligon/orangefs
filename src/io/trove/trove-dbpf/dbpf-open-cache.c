@@ -553,12 +553,22 @@ static int open_fd(
         mode = TROVE_FD_MODE;
     }
 
+#ifdef HAVE_OPEN_O_DIRECT
     if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
     {
         flags |= O_DIRECT;
     }
+#endif
 
     *fd = DBPF_OPEN(filename, flags, mode);
+
+#ifdef HAVE_FCNTL_F_NOCACHE
+    if(type == DBPF_FD_DIRECT_WRITE || type == DBPF_FD_DIRECT_READ)
+    {
+        fcntl(*fd, F_NOCACHE, 1);
+    }
+#endif
+
     return ((*fd < 0) ? -trove_errno_to_trove_error(errno) : 0);
 }
 
