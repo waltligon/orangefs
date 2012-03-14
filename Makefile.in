@@ -1215,10 +1215,18 @@ ifneq (,$(LIBRARIES_STATIC))
 	for i in $(notdir $(LIBRARIES_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
-ifneq (,$(KERNAPPSTHR))
+ifdef TARGET_OS_DARWIN
+#       TOC needs to be regenerated in libs after they get moved
+	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES_STATIC))
+endif
+endif
+ifneq (,$(LIBRARIES_THREADED_STATIC))
 	for i in $(notdir $(LIBRARIES_THREADED_STATIC)) ; do \
 	    install -m 755 lib/$$i $(libdir) ;\
 	done
+ifdef TARGET_OS_DARWIN
+#       TOC needs to be regenerated in libs after they get moved
+	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES_THREADED_STATIC))
 endif
 endif
 ifneq (,$(LIBRARIES_SHARED))
@@ -1227,18 +1235,13 @@ ifneq (,$(LIBRARIES_SHARED))
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	    $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
-ifneq (,$(KERNAPPSTHR))
+endif
+ifneq (,$(LIBRARIES_THREADED_SHARED))
 	for i in $(notdir $(LIBRARIES_THREADED_SHARED)) ; do \
 	    install -m 755 lib/$$i $(libdir)/$$i.$(SO_FULLVER) ;\
 	    $(LN_S) $$i.$(SO_FULLVER) $(libdir)/$$i.$(SO_VER) ;\
 	   $(LN_S) $$i.$(SO_VER) $(libdir)/$$i ;\
 	done
-endif
-endif
-
-ifdef TARGET_OS_DARWIN
-#       TOC needs to be regenerated in libs after they get moved
-	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
 endif
 
 	install -d $(bindir)
