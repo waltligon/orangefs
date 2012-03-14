@@ -26,7 +26,9 @@
 
 #ifdef __GEN_POSIX_LOCKING__
 #include <pthread.h>
+#ifdef HAVE_LINUX_UNISTD_H
 #include <linux/unistd.h>
+#endif
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <unistd.h>
