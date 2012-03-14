@@ -1186,6 +1186,46 @@ AC_TRY_COMPILE([
 )
 
 dnl
+dnl check if setxattr takes extra arguments
+AC_MSG_CHECKING([for setxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	setxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SETXATTR_EXTRA_ARGS, 1, Define if setxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
+
+dnl
+dnl check if getxattr takes extra arguments
+AC_MSG_CHECKING([for getxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	getxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GETXATTR_EXTRA_ARGS, 1, Define if getxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
+
+dnl
 dnl look for sysinfo header
 AC_CHECK_HEADER(sys/sysinfo.h,
        AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)

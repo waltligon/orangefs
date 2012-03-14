@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-config.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
@@ -57,10 +58,19 @@ int main(int argc, char **argv)
 
     /*Get the mirroring attributes for the given file*/
     if (my_args.mode) {
+#ifdef HAVE_GETXATTR_EXTRA_ARGS
+       ret = getxattr(my_args.filename
+                     ,"user.pvfs2.mirror.mode"
+                     ,&mode
+                     ,sizeof(mode)
+                     ,0
+	             ,0 );
+#else
        ret = getxattr(my_args.filename
                      ,"user.pvfs2.mirror.mode"
                      ,&mode
                      ,sizeof(mode) );
+#endif
        if (!ret)
           perror("Failure to get mirror mode");
        else {
@@ -88,10 +98,19 @@ int main(int argc, char **argv)
     }/*end if mode*/
 
     if (my_args.copies){
+#ifdef HAVE_GETXATTR_EXTRA_ARGS
+        ret = getxattr(my_args.filename
+                      ,"user.pvfs2.mirror.copies"
+                      ,&(copies)
+                      ,sizeof(copies)
+		      ,0
+                      ,0);
+#else
         ret = getxattr(my_args.filename
                       ,"user.pvfs2.mirror.copies"
                       ,&(copies)
                       ,sizeof(copies) );
+#endif
         if (!ret)
            perror("Failure to get mirror copies");
         else
