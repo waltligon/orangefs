@@ -260,6 +260,11 @@ fi],
 )
 AC_SUBST(ENABLE_SECURITY)
 
+dnl OpenSSL is required for robust security
+if test "x$ENABLE_SECURITY" = "x1" && test "x$OPENSSL_CPPFLAGS" = "x"; then
+    AC_MSG_ERROR("OpenSSL required for robust security (use --with-ssl)")
+fi
+
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
 AC_ARG_ENABLE(karma-mem-usage-stats,

@@ -63,12 +63,18 @@ AC_DEFUN([AX_OPENSSL],
 
 		if test "$ac_ssl_path" != ""; then
 			OPENSSL_CPPFLAGS="-I$ac_ssl_path/include"
-			OPENSSL_LDFLAGS="-L$ac_ssl_path/lib64 -L$ac_ssl_path/lib"
+            if test -d "$ac_ssl_path/lib64"; then
+                OPENSSL_LDFLAGS="-L$ac_ssl_path/lib64"
+            fi
+			OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path/lib"
 		else
 			for ac_ssl_path_tmp in /usr /usr/local /opt ; do
 				if test -d "$ac_ssl_path_tmp" && test -r "$ac_ssl_path_tmp/include/openssl/md5.h"; then
 					OPENSSL_CPPFLAGS="-I$ac_ssl_path_tmp/include"
-					OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib64 -L$ac_ssl_path_tmp/lib"
+                    if test -d "$ac_ssl_path_tmp/lib64"; then
+                        OPENSSL_LDFLAGS="-L$ac_ssl_path_tmp/lib64"
+                    fi
+					OPENSSL_LDFLAGS="$OPENSSL_LDFLAGS -L$ac_ssl_path_tmp/lib"
 					break;
 				fi
 			done
