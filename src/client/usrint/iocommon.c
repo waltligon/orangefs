@@ -26,24 +26,35 @@
  */
 int pvfs_errno;
 
-void iocommon_cred(PVFS_credential **credential)
+int iocommon_cred(PVFS_credential **credential)
 {
     static PVFS_credential creds_buf;
     static int cred_init = 0;
+    int rc;
 
     if(!cred_init)
     {
         memset(&creds_buf, 0, sizeof(creds_buf));
-/*
-        creds_buf.uid = getuid();
-        creds_buf.gid = getgid();
-*/
-        PVFS_util_gen_credential_defaults(&creds_buf);
-/* TODO: orange-security - no error handling */
+        rc = PVFS_util_gen_credential_defaults(&creds_buf);
+        if (!rc)
+        {
+            errno = rc;
+            return -1;
+        }
         cred_init = 1;
+    }
+    else
+    {
+        rc = PVFS_util_refresh_credential(&creds_buf);
+        if (!rc)
+        {
+            errno = rc;
+            return -1;
+        }
     }
 
     *credential = &creds_buf;
+    return 0;
 }
 
 int iocommon_fsync(pvfs_descriptor *pd)
@@ -58,7 +69,11 @@ int iocommon_fsync(pvfs_descriptor *pd)
         errno = EBADF;
         return -1;
     }
-    iocommon_cred(&credential); 
+    rc = iocommon_cred(&credential); 
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 #if PVFS_UCACHE_ENABLE
     if (ucache_enabled)
     {
@@ -97,7 +112,11 @@ int iocommon_lookup_absolute(const char *abs_path,
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* Determine the fs_id and pvfs_path */
     errno = 0;
@@ -172,7 +191,11 @@ int iocommon_lookup_relative(const char *rel_path,
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
     /* Set credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* Set up error path
        TODO: orange-security 
@@ -351,7 +374,11 @@ int iocommon_create_file(const char *filename,
     }
 
     /* Set credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* Contact server */
     errno = 0;
@@ -404,7 +431,11 @@ pvfs_descriptor *iocommon_open(const char *path,
     memset(error_path, 0, sizeof(error_path));
 
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* Split the path into a directory and file */
     rc = split_pathname(path, 0, &directory, &filename);
@@ -629,7 +660,11 @@ int iocommon_truncate(PVFS_object_ref file_ref, off64_t length)
     PVFS_credential *credential;
 
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
     errno = 0;
     rc =  PVFS_sys_truncate(file_ref, length, credential, NULL);
     IOCOMMON_CHECK_ERR(rc);
@@ -672,7 +707,11 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
             PVFS_sysresp_getattr attributes_resp;
 
             memset(&attributes_resp, 0, sizeof(attributes_resp));
-            iocommon_cred(&credential);
+            rc = iocommon_cred(&credential);
+            if (rc != 0)
+            {
+                goto errorout;
+            }
             /* Get the file's size in bytes as the ending offset */
             errno = 0;
             rc = PVFS_sys_getattr(pd->s->pvfs_ref,
@@ -699,7 +738,11 @@ off64_t iocommon_lseek(pvfs_descriptor *pd, off64_t offset,
         PVFS_sysresp_readdir readdir_resp;
 
         memset(&readdir_resp, 0, sizeof(readdir_resp));
-        iocommon_cred(&credential);
+        rc = iocommon_cred(&credential);
+        if (rc != 0)
+        {
+            goto errorout;
+        }
         dirent_no = pd->s->file_pointer / sizeof(PVFS_dirent);
         pd->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
         pd->s->token = PVFS_READDIR_START;
@@ -748,7 +791,11 @@ int iocommon_remove (const char *path,
 
     /* Initialize the system interface for this process */
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     rc = split_pathname(path, dirflag, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
@@ -853,7 +900,11 @@ int iocommon_rename(PVFS_object_ref *oldpdir, const char *oldpath,
     memset(&oldref, 0, sizeof(oldref));
     memset(&newref, 0, sizeof(newref));
 
-    iocommon_cred(&creds);
+    rc = iocommon_cred(&creds);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
     rc = split_pathname(oldpath, 0, &olddir, &oldname);
     IOCOMMON_RETURN_ERR(rc);
 
@@ -1453,7 +1504,11 @@ int iocommon_readorwrite_nocache(enum PVFS_io_type which,
     /* Initialize */
     memset(&io_resp, 0, sizeof(io_resp));
 
-    iocommon_cred(&creds);
+    rc = iocommon_cred(&creds);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     errno = 0;
     rc = PVFS_sys_io(*por,
@@ -1544,7 +1599,11 @@ int iocommon_ireadorwrite(enum PVFS_io_type which,
     //Create the memory request of a contiguous region: 'mem_req' x count
     rc = PVFS_Request_contiguous(count, etype_req, &contig_memory_req);
 
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     errno = 0;
     rc = PVFS_isys_io(pd->s->pvfs_ref,
@@ -1587,7 +1646,11 @@ int iocommon_getattr(PVFS_object_ref obj, PVFS_sys_attr *attr, uint32_t mask)
     memset(&getattr_response, 0, sizeof(getattr_response));
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* now get attributes */
     errno = 0;
@@ -1612,7 +1675,11 @@ int iocommon_setattr(PVFS_object_ref obj, PVFS_sys_attr *attr)
     PVFS_credential *credential;
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* now get attributes */
     rc = PVFS_sys_setattr(obj, *attr, credential, NULL);
@@ -1799,7 +1866,11 @@ int iocommon_make_directory(const char *pvfs_path,
     memset(&resp_mkdir,  0, sizeof(resp_mkdir));
 
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     rc = split_pathname(pvfs_path, 1, &parentdir, &filename);
     IOCOMMON_RETURN_ERR(rc);
@@ -1906,7 +1977,11 @@ int iocommon_symlink(const char *pvfs_path,   /* where new linkis created */
     memset(&resp_symlink,0, sizeof(resp_symlink));
 
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
 
     rc = split_pathname(pvfs_path, 0, &parentdir, &filename);
@@ -1996,7 +2071,11 @@ int iocommon_getdents(pvfs_descriptor *pd, /**< pvfs fiel descriptor */
     /* Initialize */
     memset(&readdir_resp, 0, sizeof(readdir_resp));
 
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
@@ -2072,7 +2151,11 @@ int iocommon_getdents64(pvfs_descriptor *pd,
     /* Initialize */
     memset(&readdir_resp, 0, sizeof(readdir_resp));
 
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     gen_mutex_lock(&pd->s->lock);
     token = pd->s->token == 0 ? PVFS_READDIR_START : pd->s->token;
@@ -2170,7 +2253,11 @@ int iocommon_access(const char *pvfs_path,
 
     /* Initialize the system interface for this process */
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     rc = split_pathname(pvfs_path, 0, &parentdir, &file);
     IOCOMMON_RETURN_ERR(rc);
@@ -2285,7 +2372,11 @@ int iocommon_statfs(pvfs_descriptor *pd, struct statfs *buf)
     }
     /* Initialize the system interface for this process */
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
     memset(&statfs_resp, 0, sizeof(statfs_resp));
 
     errno = 0;
@@ -2326,7 +2417,11 @@ int iocommon_statfs64(pvfs_descriptor *pd, struct statfs64 *buf)
     }
     /* Initialize the system interface for this process */
     pvfs_sys_init();
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
     memset(&statfs_resp, 0, sizeof(statfs_resp));
 
     errno = 0;
@@ -2437,7 +2532,11 @@ int iocommon_geteattr(pvfs_descriptor *pd,
     memset(&val, 0, sizeof(val));
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
@@ -2501,7 +2600,11 @@ int iocommon_seteattr(pvfs_descriptor *pd,
     memset(&val, 0, sizeof(val));
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
@@ -2561,7 +2664,11 @@ int iocommon_deleattr(pvfs_descriptor *pd,
     memset(&key, 0, sizeof(key));
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     key.buffer = (char *)key_p;
     key.buffer_sz = strlen(key_p) + 1;
@@ -2621,7 +2728,11 @@ int iocommon_listeattr(pvfs_descriptor *pd,
     nkey = 0;
 
     /* check credential */
-    iocommon_cred(&credential);
+    rc = iocommon_cred(&credential);
+    if (rc != 0)
+    {
+        goto errorout;
+    }
 
     /* find number of attributes */
     errno = 0;

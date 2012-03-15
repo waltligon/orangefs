@@ -169,6 +169,10 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
+/*
+ * This is a wrapper for creating a new credential
+ * It should be used whenever a fresh credential is needed
+ */
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
@@ -177,6 +181,10 @@ int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 }
 
 #ifdef ENABLE_SECURITY
+/*
+ * This function generates a signed credential using an external
+ * process for use with robust security
+ */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
@@ -337,7 +345,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
- *
+ * for use when robuste security is disabled.
  */
 int PINT_gen_unsigned_credential(const char *user, const char *group,
                                  PVFS_credential *cred)
@@ -543,6 +551,10 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
     return 0;
 }
 
+/*
+ * This function generates an unsigned credential for use when
+ * robuste security is disabled.
+ */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
@@ -558,11 +570,17 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 }
 #endif /* ENABLE_SECURITY */
 
+/*
+ * This function checks to see if the credential is still valid
+ * and is not about to time out - if so then it does notheing
+ * otherwise calls util_gen_crednetial_defaults to make a fresh
+ * one.  Call this before tunning any sys call.
+ */
 int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
-    /* =if the credential is valid for at least an hour */
+    /* if the credential is valid for at least an hour */
     if (PINT_util_get_current_time() <= cred->timeout - 3600)
     {
         ret = 0;
