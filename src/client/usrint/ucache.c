@@ -672,7 +672,7 @@ int ucache_info(FILE *out, char *flags)
             "\tfile_count=\t%hu\n",
             (long long unsigned int) ucache_stats->hits, 
             (long long unsigned int) ucache_stats->misses, 
-            percentage, 
+            (percentage * 100), 
             (long long unsigned int) ucache_stats->pseudo_misses,
             ucache_stats->block_count,
             ucache_stats->file_count
