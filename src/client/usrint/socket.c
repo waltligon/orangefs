@@ -11,6 +11,7 @@
  */
 #define USRINT_SOURCE 1
 #include "usrint.h"
+#include <sys/syscall.h>
 #include "posix-ops.h"
 #include "posix-pvfs.h"
 #include "openfile-util.h"
@@ -24,12 +25,13 @@ int socket (int domain, int type, int protocol)
     int sockfd;
     pvfs_descriptor *pd;
 
-    sockfd = glibc_ops.socket(domain, type, protocol);
+    /* sockfd = glibc_ops.socket(domain, type, protocol); */
+    sockfd = syscall(SYS_socketcall, domain, type, protocol);
     if (sockfd < 0)
     {
         return sockfd;
     }
-    pd = pvfs_alloc_descriptor(&glibc_ops, sockfd, NULL);
+    pd = pvfs_alloc_descriptor(&glibc_ops, sockfd, NULL, 0);
     pd->mode |= S_IFSOCK;
     return pd->fd;
 }
@@ -58,7 +60,7 @@ int accept (int sockfd, struct sockaddr *addr, socklen_t *alen)
         rc = -1;
         goto errorout;
     }
-    pd = pvfs_alloc_descriptor(&glibc_ops, fd , NULL);
+    pd = pvfs_alloc_descriptor(&glibc_ops, fd , NULL, 0);
     pd->mode |= S_IFSOCK;
     rc = fd;   
 errorout:
@@ -435,12 +437,12 @@ int socketpair (int d, int type, int protocol, int sv[2])
     {
         goto errorout;
     }
-    pd0 = pvfs_alloc_descriptor(&glibc_ops, sv[0], NULL);
+    pd0 = pvfs_alloc_descriptor(&glibc_ops, sv[0], NULL, 0);
     if (!pd0)
     {
         goto errorout;
     }
-    pd1 = pvfs_alloc_descriptor(&glibc_ops, sv[1], NULL);
+    pd1 = pvfs_alloc_descriptor(&glibc_ops, sv[1], NULL, 0);
     if (!pd1)
     {
         pvfs_free_descriptor(pd0->fd);
@@ -472,12 +474,12 @@ int pipe(int filedes[2])
     {
         goto errorout;
     }
-    f0 = pvfs_alloc_descriptor(&glibc_ops, fa[0], NULL);
+    f0 = pvfs_alloc_descriptor(&glibc_ops, fa[0], NULL, 0);
     if (!f0)
     {
         goto errorout;
     }
-    f1 = pvfs_alloc_descriptor(&glibc_ops, fa[1], NULL);
+    f1 = pvfs_alloc_descriptor(&glibc_ops, fa[1], NULL, 0);
     if (!f1)
     {
         pvfs_free_descriptor(f0->fd);

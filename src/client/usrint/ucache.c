@@ -810,11 +810,14 @@ int ucache_info(FILE *out, char *flags)
                     /* Iterate Over Memory Entries */
                     uint16_t k;
                     for(k = 0; k < MEM_TABLE_HASH_MAX; k++)
-                    {   
-                        if(mtbl->mem[k].tag != NIL64)
+                    {
+                        if(mtbl->bucket[k] == NIL16)
+                            continue;
+   
+                        if(mtbl->mem[mtbl->bucket[k]].tag != NIL64)
                         {
                             uint16_t l;
-                            for(l = k; !ment_done(l); l = ment_next(mtbl, l))
+                            for(l = mtbl->bucket[k]; !ment_done(l); l = ment_next(mtbl, l))
                             {
                                 struct mem_ent_s * ment = &(mtbl->mem[l]);
                                 fprintf(out, "\t\tMEMORY ENTRY INDEX %hd **********"
@@ -840,7 +843,7 @@ int ucache_info(FILE *out, char *flags)
                                 && (show_all || show_free))
                             {
                                 fprintf(out, "\tvacant memory entry @ index = %d\n",
-                                                                                 k);
+                                    mtbl->bucket[k]);
                             }
                         }
                     }
@@ -1138,23 +1141,25 @@ static void init_memory_table(struct mem_table_s *mtbl)
     mtbl->lru_last = NIL16;
     mtbl->dirty_list = NIL16;
     mtbl->ref_cnt = 0;
-    /* set up hash table */
-    for (i = 0; i < MEM_TABLE_HASH_MAX; i++)
+
+    /* Initialize Buckets */
+    for(i = 0; i < MEM_TABLE_HASH_MAX; i++)
     {
-        rc = init_memory_entry(mtbl, i);
+        mtbl->bucket[i] = NIL16;
     }
-    /* set up list of free hash table entries */
-    mtbl->free_list = MEM_TABLE_HASH_MAX;
-    for (i = MEM_TABLE_HASH_MAX; i < (MEM_TABLE_ENTRY_COUNT - 1); i++)
+
+    /* set up free ments */
+    mtbl->free_list = 0;
+    for(i = 0; i < (MEM_TABLE_ENTRY_COUNT - 1); i++)
     {
         rc = init_memory_entry(mtbl, i);
         mtbl->mem[i].next = i + 1;
 
     }
+    /* NIL Terminate the last entries next index */
     rc = init_memory_entry(mtbl, MEM_TABLE_ENTRY_COUNT - 1);
     mtbl->mem[MEM_TABLE_ENTRY_COUNT - 1].next = NIL16;
 }
-
 
 /** 
  * This function asks the file table if a free block is avaialable. 
@@ -1251,11 +1256,6 @@ static inline uint16_t get_free_ment(struct mem_table_s *mtbl)
 /** 
  * Puts the memory entry corresponding to the provided mtbl and entry index 
  * back on the mtbl's memory entry free list. 
- *
- * If the entry index is < MEM_TABLE_HASH_MAX, then set next to NIL since this 
- * index must remain the head of the linked list. Otherwise, set next to the 
- * current head of ment free list and set the free list head to the provided 
- * index.
  */
 static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent)
 {
@@ -1265,13 +1265,10 @@ static void put_free_ment(struct mem_table_s *mtbl, uint16_t ent)
     mtbl->mem[ent].dirty_next = NIL16;
     mtbl->mem[ent].lru_prev = NIL16;
     mtbl->mem[ent].lru_next = NIL16;
-    if(ent >= MEM_TABLE_HASH_MAX)
-    {
-        /* Set next index to the current head of the free list */
-        mtbl->mem[ent].next = mtbl->free_list;
-        /* Update free list to include this entry */
-        mtbl->free_list = ent;
-    }
+    /* Set next index to the current head of the free list */
+    mtbl->mem[ent].next = mtbl->free_list;
+    /* Update free list to include this entry */
+    mtbl->free_list = ent;
 }
 
 /** 
@@ -1383,7 +1380,7 @@ static int wipe_mtbl(struct mem_table_s *mtbl)
     for(i = 0; i < MEM_TABLE_HASH_MAX; i++)
     {
         uint16_t j;
-        for(j = i; !ment_done(j); j = ment_next(mtbl, j))
+        for(j = mtbl->bucket[i]; !ment_done(j); j = ment_next(mtbl, j))
         {
             /* Current Memory Entry */
             struct mem_ent_s *ment = &(mtbl->mem[j]);
@@ -1602,13 +1599,19 @@ inline static void *lookup_mem(struct mem_table_s *mtbl,
 {
     /* index into mem hash table */
     uint16_t index = (uint16_t) ((offset / CACHE_BLOCK_SIZE) % MEM_TABLE_HASH_MAX);
-    //printf("lookup_mem index = %hu\n", index);
 
-    struct mem_ent_s *current = &(mtbl->mem[index]);
+    /* If the bucket is empty then go ahead and return */
+    if(mtbl->bucket[index] == NIL16)
+    {
+        return (struct mem_table_s *)NIL;
+    }
+
+    uint16_t bucket_index = mtbl->bucket[index];
+    struct mem_ent_s *current = &(mtbl->mem[bucket_index]);
 
     /* previous, current, next memory entry index in mtbl */
     int16_t p = NIL16;
-    int16_t c = index;
+    int16_t c = bucket_index;
     int16_t n = current->next;  
 
     while(1)
@@ -1870,11 +1873,7 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
                                               uint16_t *block_ndx)
 {
     void* rc = 0;
-
     struct mem_table_s *mtbl = get_mtbl(fent->mtbl_blk, fent->mtbl_ent);
-
-    /* Index into mem hash table */
-    uint16_t index = (uint16_t) ((offset / CACHE_BLOCK_SIZE) % MEM_TABLE_HASH_MAX);
 
     /* Lookup first */
     void *returnValue = lookup_mem(mtbl, offset, block_ndx, NULL, NULL);
@@ -1884,52 +1883,41 @@ static inline void *insert_mem(struct file_ent_s *fent, uint64_t offset,
         return returnValue;
     }
 
-    /* Entry doesn't exist, insertion required */
-    struct mem_ent_s *current = &(mtbl->mem[index]);
-    uint16_t mentIndex = 0;
+    /* Index into mem hash table */
+    /* Hash to a bucket */
+    uint16_t index = (uint16_t) ((offset / CACHE_BLOCK_SIZE) % MEM_TABLE_HASH_MAX);
+
     int evict_rc = 0;
-    if(mtbl->mem[index].tag != NIL64)
-    {
-        /* If head occupied, need to get free ment */
+    uint16_t mentIndex = get_free_ment(mtbl);
+    if(mentIndex == NIL16)
+    {   /* No free ment available, so attempt eviction, and try again */
+        evict_rc = evict_LRU(fent);
         mentIndex = get_free_ment(mtbl);
-        if(mentIndex == NIL16)
-        {   /* No free ment available, so attempt eviction, and try again */
-            evict_rc = evict_LRU(fent);
-            mentIndex = get_free_ment(mtbl);
-        }
-        /* Procede with memory insertion if ment aquired */
-        if(mentIndex != NIL16)
-        {   
-            /* Insert directly after head of chain */
-            uint16_t next_ment = current->next;
-            current->next = mentIndex;
-            mtbl->mem[mentIndex].next = next_ment;
-            rc = set_item(fent, offset, mentIndex); 
-            if(rc != (void *)NIL)
-            {
-                *block_ndx = mtbl->mem[mentIndex].item;
-                return rc;      
-            }
-            else
-            {
-                return (void *)NIL;   
-            } 
-        }
-        /* Eviction Failed */
-        else
-        {
-            return (void *)NULL;
-        }
     }
-    /* Head vacant. No need to iterate to next in chain, just use head */
-    rc = set_item(fent, offset, index);
+
+    /* Eviction Failed */
+    if(mentIndex == NIL16)
+    {
+        return (void *)NULL;
+    }
+
+    /* Procede with memory insertion if ment aquired */
+    uint16_t next_ment = NIL16;
+    /* Insert at head, keeping track of the previous head */
+    next_ment = mtbl->bucket[index];
+    mtbl->bucket[index] = mentIndex;
+
+    rc = set_item(fent, offset, mentIndex);
     if(rc != (void *)NIL)
     {
-        *block_ndx = mtbl->mem[index].item;
+        mtbl->mem[mentIndex].next = next_ment;
+        *block_ndx = mtbl->mem[mentIndex].item;
         return rc;      
     }
     else
     {
+        /* Restore the previous head back to head of the chain */
+        mtbl->bucket[index] = next_ment;
         return (void *)NIL;   
     } 
 }
