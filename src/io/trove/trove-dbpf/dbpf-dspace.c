@@ -522,8 +522,11 @@ static int remove_one_handle(
     {
         case DB_NOTFOUND:
             gossip_err("tried to remove non-existant dataspace\n");
+/*
             ret = -TROVE_ENOENT;
             goto return_error;
+*/
+            break;
         default:
             coll_p->ds_db->err(
                 coll_p->ds_db, ret, "dbpf_dspace_remove");
