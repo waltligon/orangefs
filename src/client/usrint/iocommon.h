@@ -17,10 +17,6 @@
 #include <pvfs2-request.h>
 #include <pvfs2-debug.h>
 
-/* this is needed because the security updates are not included yet */
-#define PVFS_credential PVFS_credentials
-#define PVFS_util_gen_credential_defaults PVFS_util_gen_credentials
-
 /* Define GNU's O_NOFOLLOW flag to be false if its not set */
 #ifndef O_NOFOLLOW
 #define O_NOFOLLOW 0
@@ -63,7 +59,7 @@ extern int pvfs_errno;
 /* Perform PVFS initialization if not already finished */
 void iocommon_ensure_init(void);
 
-void iocommon_cred(PVFS_credential **credential);
+void iocommon_cred(PVFS_credentials **credentials);
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
 
