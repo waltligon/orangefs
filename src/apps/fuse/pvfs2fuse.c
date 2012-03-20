@@ -107,7 +107,7 @@ static int pvfs_fuse_gen_credential(
    /* generate credential -- this process must be running as root */
    ret = PVFS_util_gen_credential(uid, 
                                   gid, 
-                                  PVFS_DEFAULT_CREDENTIAL_TIMEOUT, 
+                                  PVFS2_DEFAULT_CREDENTIAL_TIMEOUT, 
                                   NULL,
                                   new_cred);
 

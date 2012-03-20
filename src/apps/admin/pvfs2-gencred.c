@@ -419,8 +419,8 @@ int main(int argc, char **argv)
     }
 
     ret = sign_credential(&credential, (opts.timeout ? (time_t)opts.timeout :
-                          DEFAULT_CREDENTIAL_TIMEOUT), (opts.keypath ?
-                          opts.keypath : DEFAULT_CREDENTIAL_KEYPATH));
+                          PVFS2_DEFAULT_CREDENTIAL_TIMEOUT), (opts.keypath ?
+                          opts.keypath : PVFS2_DEFAULT_CREDENTIAL_KEYPATH));
     if (ret != EXIT_SUCCESS)
     {
         free(credential.issuer);

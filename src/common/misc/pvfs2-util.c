@@ -169,21 +169,28 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
-/*
- * This is a wrapper for creating a new credential
- * It should be used whenever a fresh credential is needed
+/* PVFS_util_gen_credential_defaults
+ * 
+ * Generate a signed credential for the current user, with a 
+ * default timeout.
  */
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
-                                    PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
+                                    PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
                                     NULL, cred);
 }
 
 #ifdef ENABLE_SECURITY
-/*
- * This function generates a signed credential using an external
- * process for use with robust security
+/* PVFS_util_gen_credential
+ * 
+ * Generate signed credential object using external app pvfs2-gencred.
+ *
+ * user - string representation of numeric uid
+ * group - string representation of numeric gid
+ * timeout - in seconds; value of 0 will result in default (1 hour)
+ * keypath - path to client private key file
+ * cred - the credential object
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
@@ -241,7 +248,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             *ptr++ = "-g";
             *ptr++ = (char*)group;
         }
-        if (timeout != PVFS_DEFAULT_CREDENTIAL_TIMEOUT)
+        if (timeout != 0 && 
+            timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
         {
            snprintf(timearg, sizeof(timearg), "%u", timeout);
            *ptr++ = "-t";
@@ -345,10 +353,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
- * for use when robuste security is disabled.
+ * For use when robust security is disabled.
  */
 int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                 PVFS_credential *cred)
+                                 unsigned int timeout, PVFS_credential *cred)
 {
     unsigned long uid, gid, bufsize;
     char *endptr;
@@ -540,7 +548,8 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
     /* insert an issuer and a null signature */
     cred->issuer = strdup("");
 
-    cred->timeout = PINT_util_get_current_time() + DEFAULT_CREDENTIAL_TIMEOUT;
+    cred->timeout = PINT_util_get_current_time() + 
+        (timeout != 0 ? timeout : PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
 
     cred->sig_size = 0;
     cred->signature = NULL;
@@ -553,7 +562,7 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
 
 /*
  * This function generates an unsigned credential for use when
- * robuste security is disabled.
+ * robust security is disabled.
  */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
@@ -566,15 +575,15 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     memset(cred, 0, sizeof(cred));
 
-    return PINT_gen_unsigned_credential(user, group, cred);
+    return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
 #endif /* ENABLE_SECURITY */
 
 /*
  * This function checks to see if the credential is still valid
- * and is not about to time out - if so then it does notheing
- * otherwise calls util_gen_crednetial_defaults to make a fresh
- * one.  Call this before tunning any sys call.
+ * and is not about to time out - if so then it does nothing,
+ * otherwise it calls PVFS_util_gen_credential_defaults to make a
+ * fresh one. Call this before running any system call.
  */
 int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
