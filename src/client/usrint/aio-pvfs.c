@@ -53,7 +53,7 @@ ssize_t pvfs_aio_return(struct aiocb *aiocbp)
    /* remove the pvfs aiocb from internal structures (this will make future calls
     * to return() or error() fail) */
    aiocommon_remove_cb((struct pvfs_aiocb *)aiocbp->__next_prio);
-   free(aiocbp->__next_prio);
+   free((struct pvfs_aiocb *)aiocbp->__next_prio);
    aiocbp->__next_prio = NULL;
 
    gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p removed\n", aiocbp);
