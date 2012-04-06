@@ -768,7 +768,7 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
-int server_post_unexpected_recv(job_status_s *js_p);
+int server_post_unexpected_recv(void);
 int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
