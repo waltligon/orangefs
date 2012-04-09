@@ -5,6 +5,17 @@ SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
 Stable
+* Bug Fix: Corrected a long time bug: if the number of unexpected requests
+defined in the config file is greater than 64, then the code inadvertently
+used invalid job_status_s addresses when calling
+server_post_unexpected_recv(). If a failure occurs, the error code in the
+status structure is updated with the error value. In this case, the code would
+NOT segfault, because the address is actually within valid address space on
+the heap; however, the code would be overwriting other global structures, like
+the known_method_table, etc. To correct this problem, I use a local
+job_status_s structure inside the server_post_unexpected_recv(). Please read
+the comments in that function to understand why this works.
+	SVN:  Change #9272
 
 * Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
 to 20 characters.
