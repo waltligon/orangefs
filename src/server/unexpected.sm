@@ -85,7 +85,7 @@ static PINT_sm_action unexpected_map(
     qlist_add_tail(&s_op->next, &inprogress_sop_list);
 
     /* start replacement unexpected recv */
-    ret = server_post_unexpected_recv(js_p);
+    ret = server_post_unexpected_recv();
     if (ret < 0)
     {
         /* TODO: do something here, the return value was
@@ -93,7 +93,7 @@ static PINT_sm_action unexpected_map(
          * put something here to make it exit for the
          * moment.  -Phil
          */
-        gossip_lerr("Error: post unexpected failure when restarting.\n");
+        PVFS_perror_gossip("pvfs2_unexpected_sm.unexpected_map: server_post_unexpected_recv() returned an error: ",ret);
     }
 
     /* restart as new request state machine */

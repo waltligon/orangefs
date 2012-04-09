@@ -574,7 +574,7 @@ static int server_initialize(
     /* Post starting set of BMI unexpected msg buffers */
     for (i = 0; i < server_config.initial_unexpected_requests; i++)
     {
-        ret = server_post_unexpected_recv(&job_status_structs[i]);
+        ret = server_post_unexpected_recv();
         if (ret < 0)
         {
             gossip_err("Error posting unexpected recv\n");
@@ -1943,44 +1943,59 @@ static int server_parse_cmd_line_args(int argc, char **argv)
  *
  * Returns 0 on success, -PVFS_error on failure.
  */
-int server_post_unexpected_recv(job_status_s *js_p)
+int server_post_unexpected_recv(void)
 {
     int ret = -PVFS_EINVAL;
     /* job_id_t j_id; */
     struct PINT_smcb *smcb = NULL;
     struct PINT_server_op *s_op;
 
+    /* The job status structure js that is sent into PINT_state_machine_start() below is used until
+     * the job_bmi_unexp() function call is executed in pvfs2_unexpected_sm.unexpected_post.  Once
+     * job_bmi_unexp() puts the unexp job on the job queue, then a job_status_s structure will be
+     * assigned from the global structure, server_job_status_array, when the job system processes it.
+     * (The job system performs this task in a later call to job_testcontext()). It is THIS job_status_s
+     * structure that carries into the next state of pvfs2_unexpected_sm.  Thus, the original js
+     * structure is ONLY used by job_bmi_unexp() to return an error if something within job_bmi_unexp()
+     * fails, like a memory issue.  It is NOT forwarded through the job system. In the case of an error,
+     * ret (below) will be SM_ACTION_TERMINATE upon return from PINT_state_machine_start() and the error_code
+     * is then properly propagated.
+     *
+     * NOTE: If an error occurs when this function is called during server_initialize() time, then the 
+     * server will not start.  If an error occurs during the pvfs2_unexpected_sm.unexpected_map state, the
+     * error is noted but the system continues to run.
+     */
+    job_status_s js={0};
+
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "server_post_unexpected_recv\n");
 
-    if (js_p)
+    ret = PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
+            sizeof(struct PINT_server_op),
+            server_op_state_get_machine,
+            server_state_machine_terminate,
+            server_job_context);
+    if (ret < 0)
     {
-        ret = PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP,
-                sizeof(struct PINT_server_op),
-                server_op_state_get_machine,
-                server_state_machine_terminate,
-                server_job_context);
-        if (ret < 0)
-        {
-            gossip_lerr("Error: failed to allocate SMCB "
-                        "of op type %x\n", BMI_UNEXPECTED_OP);
-            return ret;
-        }
-        s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-        memset(s_op, 0, sizeof(PINT_server_op));
-        s_op->op = BMI_UNEXPECTED_OP;
-        s_op->target_handle = PVFS_HANDLE_NULL;
-        s_op->target_fs_id = PVFS_FS_ID_NULL;
-        /* Add an unexpected s_ops to the list */
-        qlist_add_tail(&s_op->next, &posted_sop_list);
+        gossip_lerr("Error: failed to allocate SMCB "
+                    "of op type %x\n", BMI_UNEXPECTED_OP);
+        return ret;
+    }
+    s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    memset(s_op, 0, sizeof(PINT_server_op));
+    s_op->op = BMI_UNEXPECTED_OP;
+    s_op->target_handle = PVFS_HANDLE_NULL;
+    s_op->target_fs_id = PVFS_FS_ID_NULL;
 
-        ret = PINT_state_machine_start(smcb, js_p);
-        if(ret == SM_ACTION_TERMINATE)
-        {
-            /* error posting unexpected */
-            PINT_smcb_free(smcb);
-            return js_p->error_code;
-        }
+    /* Add an unexpected s_ops to the list */
+    qlist_add_tail(&s_op->next, &posted_sop_list);
+
+    ret = PINT_state_machine_start(smcb, &js);
+    if(ret == SM_ACTION_TERMINATE)
+    {
+        /* error posting unexpected */
+        PINT_smcb_free(smcb);
+        return js.error_code;
     }
     return ret;
 }
@@ -2058,10 +2073,13 @@ int server_state_machine_start(
     else if (ret == 0)
     {
         s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
+        /* PINT_smcb_set_op returns 1 when the op's state machine has correctly
+         * been found and the first state has been set.
+         */
         ret = PINT_smcb_set_op(smcb, s_op->req->op);
         s_op->op = s_op->req->op;
         PVFS_hint_add(&s_op->req->hints, PVFS_HINT_SERVER_ID_NAME, sizeof(uint32_t), &server_config.host_index);
-        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_OP_ID_NAME, sizeof(uint32_t), &s_op->req->op);
+        PVFS_hint_add(&s_op->req->hints, PVFS_HINT_OP_ID_NAME,     sizeof(uint32_t), &s_op->req->op);
     }
     else
     {
@@ -2096,6 +2114,9 @@ int server_state_machine_start(
 
     if (!ret)
     {
+        /* ret will be zero when PINT_smcb_set_op cannot find the state machine associated
+         * with the request's op.
+         */ 
         gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
