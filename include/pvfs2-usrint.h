@@ -16,8 +16,20 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE 1
 #endif
+#ifndef _ATFILE_SOURCE
+#define _ATFILE_SOURCE 1
+#endif
+#ifndef _LARGEFILE_SOURCE
+#define _LARGEFILE_SOURCE 1
+#endif
 #ifndef _LARGEFILE64_SOURCE
 #define _LARGEFILE64_SOURCE 1
+#endif
+#ifndef _USE_FILE_OFFSET64
+#define _USE_FILE_OFFSET64 1
+#endif
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
 #endif
 
 #include <features.h>
@@ -32,6 +44,10 @@
 #include <sys/statvfs.h>
 #include <sys/time.h>
 #include <sys/vfs.h>
+
+/* define open flags unique to PVFS here */
+#define O_HINTS     02000000  /* PVFS hints are present */
+#define O_NOTPVFS   04000000  /* Open non-PVFS files if possible */
 
 /* define FD flags unique to PVFS here */
 #define PVFS_FD_NOCACHE 0x10000

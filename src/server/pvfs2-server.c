@@ -217,7 +217,8 @@ int main(int argc, char **argv)
                     s_server_options.server_alias, PVFS2_VERSION);
 
     /* code to handle older two config file format */
-    ret = PINT_parse_config(&server_config, fs_conf, s_server_options.server_alias);
+    ret = PINT_parse_config(&server_config, fs_conf,
+                            s_server_options.server_alias, 1);
     if (ret)
     {
         gossip_err("Error: Please check your config files.\n");
@@ -831,7 +832,8 @@ static int server_initialize_subsystems(
             break;
         }
 
-        ret = PINT_cached_config_handle_load_mapping(cur_fs);
+        ret = PINT_cached_config_handle_load_mapping(cur_fs,
+                &server_config);
         if(ret)
         {
             PVFS_perror("Error: PINT_handle_load_mapping", ret);
@@ -1322,7 +1324,8 @@ static void reload_config(void)
     gossip_debug(GOSSIP_SERVER_DEBUG, "Reloading configuration %s\n",
                  fs_conf);
     /* We received a SIGHUP. Update configuration in place */
-    if (PINT_parse_config(&sighup_server_config, fs_conf, s_server_options.server_alias) < 0)
+    if (PINT_parse_config(&sighup_server_config, fs_conf,
+                          s_server_options.server_alias, 1) < 0)
     {
         gossip_err("Error: Please check your config files.\n");
         gossip_err("Error: SIGHUP unable to update configuration.\n");

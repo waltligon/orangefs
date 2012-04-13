@@ -859,19 +859,19 @@ lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 # rules for building virtual libraries
 lib/liborange.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.a
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.a
 
 lib/liborange.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.so
+	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.so
 
 lib/liborangepre.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.a
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangepre.a
 
 lib/liborangepre.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.so
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangepre.so
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
@@ -1197,6 +1197,7 @@ install:: all
 else
 install:: all install_doc
 	install -d $(includedir)
+	install -m 644 $(builddir)/include/orange.h $(includedir)
 	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)

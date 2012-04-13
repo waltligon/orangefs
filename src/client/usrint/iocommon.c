@@ -18,10 +18,14 @@
 #include "ucache.h"
 #endif
 #include <errno.h>
+#include <pint-cached-config.h>
 
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid);
 
 /** this is a global analog of errno for pvfs specific
- *  errors errno is set to EIO and this si set to the
+ *  errors errno is set to EIO and this is set to the
  *  original code 
  */
 int pvfs_errno;
@@ -252,6 +256,73 @@ errorout:
 }
 
 /**
+ * Parses a simple string to find the number and select of servers
+ * for the LIST layout method
+ */
+static int iocommon_parse_serverlist(char *serverlist,
+                                     struct PVFS_sys_server_list *slist,
+                                     PVFS_fs_id fsid)
+{
+    PVFS_BMI_addr_t *server_array;
+    int count;
+    char *tok, *save_ptr;
+    int i;
+
+    /* expects slist->servers to be NULL */
+    if (!slist || slist->servers)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    tok = strtok_r(serverlist, ":", &save_ptr);
+    if (!tok)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->count = atoi(tok);
+    PINT_cached_config_count_servers(fsid, PINT_SERVER_TYPE_IO, &count);
+    if (slist->count < 1 || slist->count > count)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    slist->servers = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t) *
+                                                slist->count);
+    if (!slist->servers)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    server_array = (PVFS_BMI_addr_t *)malloc(sizeof(PVFS_BMI_addr_t)*count);
+    if (!server_array)
+    {
+        free(slist->servers);
+        slist->servers = NULL;
+        errno = ENOMEM;
+        return -1;
+    }
+    PINT_cached_config_get_server_array(fsid, PINT_SERVER_TYPE_IO,
+                    server_array, &count);
+    for (i = 0; i < slist->count; i++)
+    {
+        tok = strtok_r(NULL, ":", &save_ptr);
+        if (!tok || atoi(tok) < 0 || atoi(tok) >= count)
+        {
+            free(slist->servers);
+            slist->servers = NULL;
+            free(server_array);
+            errno = EINVAL;
+            return -1;
+        }
+        slist->servers[i] = server_array[atoi(tok)];
+    }
+    free(server_array);
+    return 0;
+}
+    
+
+/**
  * Create a file via the PVFS system interface
  */
 int iocommon_create_file(const char *filename,
@@ -269,25 +340,12 @@ int iocommon_create_file(const char *filename,
     PVFS_sysresp_create resp_create;
     PVFS_sys_dist *dist = NULL;
     PVFS_sys_layout *layout = NULL;
+    PVFS_hint hints = NULL;
 
     /* Initialize */
     pvfs_sys_init();
     memset(&attr, 0, sizeof(attr));
     memset(&resp_create, 0, sizeof(resp_create));
-
-    /* this is not right - need to pull parameters out of hints */
-    /* investigate PVFS hint mechanism */
-#if 0
-    if (file_creation_param.striping_unit > 0)
-    {
-        dist = PVFS_sys_dist_lookup("simple_stripe");
-        if (PVFS_sys_dist_setparam(dist, "strip_size",
-                                  &(file_creation_param.striping_unit)) < 0)
-        {
-            fprintf(stderr, "Error: failed to set striping_factor\n");
-        }
-    }
-#endif
 
     attr.owner = geteuid();
     attr.group = getegid();
@@ -296,12 +354,78 @@ int iocommon_create_file(const char *filename,
     attr.ctime = attr.atime;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
-#if 0
-    if (file_creation_param.striping_factor > 0){
-        attributes.dfile_count = file_creation_param.striping_factor;
-        attributes.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+    if (file_creation_param) /* these are hints */
+    {
+        int length;
+        void *value;
+        /* check for distribution */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DISTRIBUTION,
+                                            &length);
+        if (value)
+        {
+            dist = PVFS_sys_dist_lookup((char *)value);
+            if (!dist) /* distribution not found */
+            {
+                rc = EINVAL;
+                goto errorout;
+            }
+        }
+        /* check for dfile count */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_DFILE_COUNT,
+                                            &length);
+        if (value)
+        {
+            attr.dfile_count = *(int *)value;
+            attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
+        }
+        /* check for layout */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_LAYOUT,
+                                            &length);
+        if (value)
+        {
+            layout = (PVFS_sys_layout *)malloc(sizeof(PVFS_sys_layout));
+            layout->algorithm = *(int *)value;
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+        }
+        /* check for server list */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_SERVERLIST,
+                                            &length);
+        if (value)
+        {
+            if(!layout)
+            {
+                /* serverlist makes no sense without a layout */
+                rc = EINVAL;
+                goto errorout;
+            }
+            layout->server_list.count = 0;
+            layout->server_list.servers = NULL;
+            rc = iocommon_parse_serverlist(value, &layout->server_list,
+                                           parent_ref.fs_id);
+            if (rc < 0)
+            {
+                return rc;
+            }
+        }
+        /* check for nocache flag */
+        value = PINT_hint_get_value_by_type(file_creation_param,
+                                            PINT_HINT_NOCACHE,
+                                            &length);
+        if (value)
+        {
+            /* this should probably move into the open routine */
+        }
+        /* look for hints handled on the server */
+        if (PVFS_hint_check_transfer(&file_creation_param))
+        {
+            hints = file_creation_param;
+        }
     }
-#endif
 
     /* Extract the users umask (and restore it to the original value) */
     mode_mask = umask(0);
@@ -358,7 +482,7 @@ int iocommon_create_file(const char *filename,
                          dist,
                          &resp_create,
                          layout,
-                         NULL);
+                         hints);
     IOCOMMON_CHECK_ERR(rc);
     *ref = resp_create.ref;
 
@@ -366,6 +490,10 @@ errorout:
     if (dist)
     {
         PVFS_sys_dist_free(dist);
+    }
+    if (layout)
+    {
+        free(layout);
     }
     return rc;
 }

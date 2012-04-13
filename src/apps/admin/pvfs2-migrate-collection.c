@@ -173,7 +173,7 @@ int main(int argc, char **argv)
         server_alias = PINT_util_guess_alias();
     }
 
-    ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias);
+    ret = PINT_parse_config(&server_config, opts.fs_conf, server_alias, 1);
     if(ret < 0)
     {
         gossip_err("Error: Please check your config files.\n");

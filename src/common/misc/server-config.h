@@ -141,7 +141,7 @@ typedef struct distribution_configuration_s
 
 typedef struct server_configuration_s
 {
-    char *host_id;
+    char *host_id;                  /* bmi_address of this server */
     int host_index;
     char *server_alias;             /* the command line server-alias parameter */
     int my_server_options;
@@ -207,7 +207,8 @@ typedef struct server_configuration_s
 int PINT_parse_config(
     struct server_configuration_s *config_s,
     char *global_config_filename,
-    char *server_alias_name);
+    char *server_alias_name,
+    int server_flag);
 
 void PINT_config_release(
     struct server_configuration_s *config_s);
@@ -271,6 +272,10 @@ struct filesystem_configuration_s *PINT_config_find_fs_id(
 PVFS_fs_id PINT_config_get_fs_id_by_fs_name(
     struct server_configuration_s *config_s,
     char *fs_name);
+
+struct host_handle_mapping_s *PINT_get_handle_mapping(
+    PINT_llist *list,
+    char *alias);
 
 PINT_llist *PINT_config_get_filesystems(
     struct server_configuration_s *config_s);

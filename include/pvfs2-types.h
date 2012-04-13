@@ -212,7 +212,10 @@ enum PVFS_sys_layout_algorithm
     PVFS_SYS_LAYOUT_RANDOM = 3,
 
     /* order the datafiles based on the list specified */
-    PVFS_SYS_LAYOUT_LIST = 4
+    PVFS_SYS_LAYOUT_LIST = 4,
+
+    /* order the datafiles based on the list specified */
+    PVFS_SYS_LAYOUT_LOCAL = 5
 };
 #define PVFS_SYS_LAYOUT_DEFAULT NULL
 

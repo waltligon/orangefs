@@ -216,6 +216,8 @@ PVFS_error PVFS_isys_create(
         switch(layout->algorithm)
         {
             /* these are valid */
+            case PVFS_SYS_LAYOUT_NONE:
+            case PVFS_SYS_LAYOUT_LOCAL:
             case PVFS_SYS_LAYOUT_ROUND_ROBIN:
             case PVFS_SYS_LAYOUT_RANDOM:
             case PVFS_SYS_LAYOUT_LIST:

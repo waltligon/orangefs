@@ -5,6 +5,21 @@ SVN changes can be seen at
 http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
 Stable
+
+* New Feature: added hint support to pvfs_open() to allow user to
+* provide various things like the number of servers to use, the
+* distribution to use, the layout to use, as well as tags that can be
+* used to trace requests.
+
+* New Feature: added new layout LOCAL which puts a file on the server on
+* the same node as the client, if there is one.  Otherwise defaults to
+* ROUND_ROBIN
+
+* Bug Fix: repaired a bug in the layout processing
+
+* Bug Fix: fixed some problems with void pointers and replaced a missing
+* function prototype
+
 * Bug Fix: Corrected a long time bug: if the number of unexpected requests
 defined in the config file is greater than 64, then the code inadvertently
 used invalid job_status_s addresses when calling
@@ -16,6 +31,13 @@ the known_method_table, etc. To correct this problem, I use a local
 job_status_s structure inside the server_post_unexpected_recv(). Please read
 the comments in that function to understand why this works.
 	SVN:  Change #9272
+
+* New Feature: added usrint and ucache code allows programs to link
+* directly bypassing kernel
+
+* Bug Fix: rewrote layout algorithms for RANDOM and ROUND_ROBIN which
+* did not perform as advertized.  Still a question if metadata
+* selection works correctly or stuffed file allocation.
 
 * Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
 to 20 characters.

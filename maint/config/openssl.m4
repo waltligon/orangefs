@@ -29,6 +29,7 @@ AC_DEFUN([AX_OPENSSL],
         
 	AC_CHECK_HEADERS(openssl/evp.h)
 	AC_CHECK_HEADERS(openssl/crypto.h)
+	AC_CHECK_HEADERS(openssl/sha.h)
     fi
 ])
 
@@ -56,6 +57,7 @@ AC_DEFUN([AX_OPENSSL_OPTIONAL],
 
     AC_CHECK_HEADERS(openssl/evp.h)
     AC_CHECK_HEADERS(openssl/crypto.h)
+    AC_CHECK_HEADERS(openssl/sha.h)
 
 ])
 

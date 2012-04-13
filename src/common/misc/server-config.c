@@ -1028,7 +1028,9 @@ static const configoption_t options[] =
  *           global_config_filename - common config file for all servers
  *                                    and clients
  *           server_alias_name      - alias (if any) provided for this server
- *                                    (ignored on client side)
+ *                                    client side can provide to check
+ *                                    for a local server
+ *           server_flag            - true if running on a server
  *
  * Returns:  0 on success; 1 on failure
  *
@@ -1036,7 +1038,8 @@ static const configoption_t options[] =
 int PINT_parse_config(
     struct server_configuration_s *config_obj,
     char *global_config_filename,
-    char *server_alias_name)
+    char *server_alias_name,
+    int server_flag)
 {
     struct server_configuration_s *config_s;
     configfile_t *configfile = (configfile_t *)0;
@@ -1051,6 +1054,11 @@ int PINT_parse_config(
     config_s = config_obj;
     memset(config_s, 0, sizeof(struct server_configuration_s));
 
+    if (server_flag && !server_alias_name)
+    {
+        gossip_err("Server alias not provided for server config\n");
+        return 1;
+    }
     config_s->server_alias = server_alias_name;
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
@@ -1097,21 +1105,28 @@ int PINT_parse_config(
                                 config_s, server_alias_name, &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
-            gossip_err("Configuration file error. "
+            if (server_flag)
+            {
+                gossip_err("Configuration file error. "
                        "No host ID specified for alias %s.\n", server_alias_name);
-            return 1;
+                return 1;
+            }
         }
-        config_s->host_id = strdup(halias->bmi_address);
+        else
+        {
+            /* save alias bmi_address */
+            config_s->host_id = strdup(halias->bmi_address);
+        }
     }
 
-    if (server_alias_name && !config_s->data_path)
+    if (server_flag && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
                    "No data storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
-    if (server_alias_name && !config_s->meta_path)
+    if (server_flag && !config_s->meta_path)
     {
         gossip_err("Configuration file error. "
                    "No metadata storage path specified for alias %s.\n", server_alias_name);
@@ -3602,6 +3617,27 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     }
     if(index) *index = ind - 1;
     return ret;
+}
+
+/* the static function below allocates a new mapping structure
+ * if one is not found.  This wrapper removes it and returns
+ * NULL if not found
+ */
+struct host_handle_mapping_s *PINT_get_handle_mapping(
+        PINT_llist *list,
+        char *alias)
+{
+    struct host_handle_mapping_s *mapping;
+    mapping = get_or_add_handle_mapping(list, alias);
+    if (mapping && mapping->alias_mapping)
+    {
+        return mapping;
+    }
+    else
+    {
+        free(mapping);
+        return NULL;
+    }
 }
 
 static struct host_handle_mapping_s *get_or_add_handle_mapping(

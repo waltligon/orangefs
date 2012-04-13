@@ -140,6 +140,17 @@ extern int iocommon_vreadorwrite(enum PVFS_io_type which,
                          size_t count,
                          const struct iovec *vector);
 
+extern int iocommon_ireadorwrite(enum PVFS_io_type which,
+                          pvfs_descriptor *pd,
+                          PVFS_size extra_offset,
+                          void *buf,
+                          PVFS_Request etype_req,
+                          PVFS_Request file_req,
+                          size_t count,
+                          PVFS_sys_op_id *ret_op_id,
+                          PVFS_sysresp_io *ret_resp,
+                          PVFS_Request *ret_memory_req);
+
 /* do a blocking read or write
  */
 extern int iocommon_readorwrite_nocache(enum PVFS_io_type which,

@@ -29,7 +29,8 @@ int PINT_cached_config_initialize(void);
 int PINT_cached_config_finalize(void);
 
 int PINT_cached_config_handle_load_mapping(
-    struct filesystem_configuration_s *fs);
+    struct filesystem_configuration_s *fs,
+    struct server_configuration_s *config);
 
 int PINT_cached_config_map_alias(
     const char *alias,
@@ -52,11 +53,14 @@ int PINT_cached_config_get_io(
     PVFS_BMI_addr_t *io_addr,
     PVFS_handle_extent_array *ext_array);
 
+/* This appears to be obsolete */
+#if 0
 int PINT_cached_config_get_next_io(
     PVFS_fs_id fsid,
     int num_servers,
     PVFS_BMI_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
+#endif
 
 const char *PINT_cached_config_map_addr(
     PVFS_fs_id fsid,
