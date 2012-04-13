@@ -21,6 +21,7 @@
 #define __GEN_LOCKS_H
 
 #include <stdlib.h>
+#include <unistd.h>
 
 /* we will make posix locks the default unless turned off for now. */
 /* this is especially important for development in which case the locks
