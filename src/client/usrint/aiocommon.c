@@ -257,7 +257,6 @@ static void *aiocommon_progress(void *ptr)
          pthread_mutex_lock(&waiting_list_mutex);
          if ((num_aiocbs_running == PVFS_AIO_MAX_RUNNING) || qlist_empty(aio_waiting_list))
          {
-            gossip_debug(GOSSIP_USRINT_DEBUG, "AIO thread forcing progress on %d requests\n", num_aiocbs_running);
             pthread_mutex_unlock(&waiting_list_mutex);
             break;
          }
@@ -298,13 +297,6 @@ static void *aiocommon_progress(void *ptr)
        */
       memcpy(ret_op_ids, running_ops, (num_aiocbs_running * sizeof(PVFS_sys_op_id)));
       op_count = num_aiocbs_running;
-      pthread_mutex_unlock(&progress_sync_mutex);
-      gossip_debug(GOSSIP_USRINT_DEBUG, "AIO interface calling testsome on ops: ");
-      for (j = 0; j < op_count; j++)
-      {
-         gossip_debug(GOSSIP_USRINT_DEBUG, "%ld\t", ret_op_ids[j]);
-         if (j == op_count - 1) gossip_debug(GOSSIP_USRINT_DEBUG, "\n");
-      }
       ret = PVFS_sys_testsome(ret_op_ids,
                               &op_count,
                               (void *)aiocb_array,
@@ -312,7 +304,6 @@ static void *aiocommon_progress(void *ptr)
                               PVFS_AIO_DEFAULT_TIMEOUT_MS);
 
       /* for each op returned */
-      pthread_mutex_lock(&progress_sync_mutex);
       for (i = 0; i < op_count; i++)
       {
          /* ignore completed items that do not have a user pointer (these are not aiocbs)*/
@@ -356,12 +347,10 @@ static void *aiocommon_progress(void *ptr)
          }
 
          /* update the number of running cbs, and exit the thread if this number is 0 */
-       //  pthread_mutex_lock(&progress_sync_mutex);
          for (j = 0; j < num_aiocbs_running; j++)
          {
             if (running_ops[j] == aiocb_array[i]->op_id)
             {
-               gossip_debug(GOSSIP_CLIENT_DEBUG, "OP ID %ld removed from AIO running list\n", aiocb_array[i]->op_id);
                /* remove it from the running op_ids array */
                if (j > 0) memcpy(temp_running_ops, running_ops, j * sizeof(PVFS_sys_op_id));
                if (j < num_aiocbs_running - 1) memcpy(temp_running_ops + j, running_ops + j + 1, (num_aiocbs_running - 1 - j) * sizeof(PVFS_sys_op_id));
@@ -370,7 +359,6 @@ static void *aiocommon_progress(void *ptr)
             }
          }
 
-         gossip_debug(GOSSIP_CLIENT_DEBUG, "%d requests still outstanding in AIO interface\n", num_aiocbs_running - 1);
          num_aiocbs_running--;
          if (!num_aiocbs_running)
          {
@@ -379,7 +367,6 @@ static void *aiocommon_progress(void *ptr)
             pthread_mutex_unlock(&progress_sync_mutex);
             pthread_exit(NULL);
          }
-         //pthread_mutex_unlock(&progress_sync_mutex);
       }
       pthread_mutex_unlock(&progress_sync_mutex);
    }

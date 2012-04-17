@@ -165,7 +165,6 @@ static PVFS_error completion_list_retrieve_completed(
         {
            if (sm_p->sys_op_id == op_id_array[j])
            {
-              gossip_debug(GOSSIP_CLIENT_DEBUG, "%s found OP %ld in the completed list\n", __func__, op_id_array[j]);
               found = 1;
               break;
            }
@@ -208,7 +207,6 @@ static PVFS_error completion_list_retrieve_completed(
         }
         else
         {
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s added OP %ld back to the completed list\n", __func__, sm_p->sys_op_id);
             tmp_completion_list[new_list_index++] = smcb;
         }
     }
@@ -471,9 +469,7 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "waiting on test_mutex in post");
     gen_mutex_lock(&test_mutex);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "test_mutex acquired in post");
     /*
       start state machine and continue advancing while we're getting
       immediate completions
@@ -745,7 +741,6 @@ PVFS_error PINT_client_state_machine_test(
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(smcb);
         gen_mutex_unlock(&test_mutex);
         return 0;
     }
@@ -787,7 +782,6 @@ PVFS_error PINT_client_state_machine_test(
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(smcb);
     }
     gen_mutex_unlock(&test_mutex);
     return 0;
@@ -929,6 +923,8 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
         {
             *out_error = sm_p->error_code;
         }
+
+        conditional_remove_sm_if_in_completion_list(smcb);
     }
 
     return ret;
