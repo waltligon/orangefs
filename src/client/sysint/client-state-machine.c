@@ -120,17 +120,24 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
  *  completion array - only checks first limit slots in comp array
  *  scoots any beyond limit down for future calls
  */
+
+/* Moves completed jobs
+ *
+ */ 
 static PVFS_error completion_list_retrieve_completed(
     PVFS_sys_op_id *op_id_array, /* out */
     void **user_ptr_array,       /* out if present */
     int *error_code_array,       /* out */
     int limit,                   /* in  */
-    int *out_count)              /* what exactly is this supposed to return */
+    int *out_count)              /* out, number of input op_ids that completed */
 {
-    int i = 0, new_list_index = 0;
+    int i = 0, j = 0, new_list_index = 0;
+    int out_op_count = 0;
+    int found;
     PINT_smcb *smcb = NULL;
     PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
     PINT_client_sm *sm_p;
+    PVFS_sys_op_id out_ops[MAX_RETURNED_JOBS] = {0};
 
     assert(op_id_array);
     assert(error_code_array);
@@ -150,11 +157,24 @@ static PVFS_error completion_list_retrieve_completed(
         smcb = s_completion_list[i];
         assert(smcb);
 
-        if (i < limit)
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        found = 0;
+
+        /* here, we only return op_ids that were passed in via the op_id array */
+        for (j = 0; j < limit; j++)
         {
-            sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-            op_id_array[i] = sm_p->sys_op_id;
-            error_code_array[i] = sm_p->error_code;
+           if (sm_p->sys_op_id == op_id_array[j])
+           {
+              gossip_debug(GOSSIP_CLIENT_DEBUG, "%s found OP %ld in the completed list\n", __func__, op_id_array[j]);
+              found = 1;
+              break;
+           }
+        }
+
+        if ((out_op_count < limit) && found == 1)
+        {
+            out_ops[out_op_count] = sm_p->sys_op_id;
+            error_code_array[out_op_count] = sm_p->error_code;
 
             if (user_ptr_array)
             {
@@ -174,29 +194,34 @@ static PVFS_error completion_list_retrieve_completed(
                                  "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
                                  "user_ptr(%p)\n", __func__, sm_base_p, 
                                  sm_base_p->user_ptr);
-                    user_ptr_array[i] = sm_base_p->user_ptr;
+                    user_ptr_array[out_op_count] = sm_base_p->user_ptr;
                 }
                 else
                 {
-                    user_ptr_array[i] = (void *)sm_p->user_ptr;
+                    user_ptr_array[out_op_count] = (void *)sm_p->user_ptr;
                 }
             }
             s_completion_list[i] = NULL;
+            out_op_count++;
 
             PINT_sys_release(sm_p->sys_op_id);
         }
         else
         {
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s added OP %ld back to the completed list\n", __func__, sm_p->sys_op_id);
             tmp_completion_list[new_list_index++] = smcb;
         }
     }
-    *out_count = PVFS_util_min(i, limit);
+    *out_count = out_op_count;
 
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
            (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
-    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s has %d items left on completed list\n", __func__, new_list_index);    
+    /* return only the op_ids that were found in the input list */
+    memcpy(op_id_array, out_ops, (out_op_count * sizeof(PVFS_sys_op_id)));
+
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
@@ -446,7 +471,9 @@ PVFS_error PINT_client_state_machine_post(
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "waiting on test_mutex in post");
     gen_mutex_lock(&test_mutex);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "test_mutex acquired in post");
     /*
       start state machine and continue advancing while we're getting
       immediate completions
@@ -903,6 +930,7 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
             *out_error = sm_p->error_code;
         }
     }
+
     return ret;
 }
 
