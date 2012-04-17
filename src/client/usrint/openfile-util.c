@@ -549,7 +549,7 @@ void pvfs_sys_init_doit(void) {
     }
 #endif
 
-#if PVFS_AIO_ENABLE
+#ifdef PVFS_AIO_ENABLE
    /* initialize aio interface */
    aiocommon_init();
 #endif
