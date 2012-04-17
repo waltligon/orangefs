@@ -306,9 +306,16 @@ int PINT_cached_config_handle_load_mapping(
         cur_config_fs_cache->data_local_alias =
                 config->host_id;
         /* find handle mapping of local host */
-        cur_config_fs_cache->data_local_mapping =
-                PINT_get_handle_mapping(fs->data_handle_ranges, 
-                cur_config_fs_cache->data_local_alias);
+        if (cur_config_fs_cache->data_local_alias)
+        {
+            cur_config_fs_cache->data_local_mapping =
+                    PINT_get_handle_mapping(fs->data_handle_ranges, 
+                    cur_config_fs_cache->data_local_alias);
+        }
+        else
+        {
+            cur_config_fs_cache->data_local_mapping = NULL;
+        }
 
         /* populate table used to speed up mapping of handle values 
          * to servers
