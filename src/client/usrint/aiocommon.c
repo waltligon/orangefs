@@ -122,6 +122,7 @@ int aiocommon_lio_listio(struct pvfs_aiocb *list[],
           /* add the pvfs_cb to the waiting list, the running list is full */
           pthread_mutex_lock(&waiting_list_mutex);
           qlist_add_tail(&(list[i]->link), aio_waiting_list);
+          list[i]->a_cb->__error_code = EINPROGRESS;
           gossip_debug(GOSSIP_USRINT_DEBUG, "%d AIO requests now waiting\n", 
                        qlist_count(aio_waiting_list));
           pthread_mutex_unlock(&waiting_list_mutex);
@@ -239,10 +240,10 @@ static void *aiocommon_progress(void *ptr)
    int op_count = 0;
    struct qlist_head *next_io;
    struct pvfs_aiocb *io_cb;
-   PVFS_sys_op_id ret_op_ids[PVFS_AIO_MAX_PROGRESS_OPS];
+   PVFS_sys_op_id ret_op_ids[PVFS_AIO_MAX_RUNNING];
    PVFS_sys_op_id temp_running_ops[PVFS_AIO_MAX_RUNNING] = {0};
-   int err_code_array[PVFS_AIO_MAX_PROGRESS_OPS] = {0};
-   struct pvfs_aiocb *aiocb_array[PVFS_AIO_MAX_PROGRESS_OPS] = {NULL};
+   int err_code_array[PVFS_AIO_MAX_RUNNING] = {0};
+   struct pvfs_aiocb *aiocb_array[PVFS_AIO_MAX_RUNNING] = {NULL};
 
    gossip_debug(GOSSIP_USRINT_DEBUG, "AIO progress thread starting up\n");
 
@@ -360,13 +361,16 @@ static void *aiocommon_progress(void *ptr)
          }
 
          num_aiocbs_running--;
-         if (!num_aiocbs_running)
+         pthread_mutex_lock(&waiting_list_mutex);
+         if (!num_aiocbs_running && qlist_empty(aio_waiting_list))
          {
             gossip_debug(GOSSIP_USRINT_DEBUG, "No running requests, progress thread exiting\n");
             progress_running = PVFS_AIO_PROGRESS_IDLE;
+            pthread_mutex_unlock(&waiting_list_mutex);
             pthread_mutex_unlock(&progress_sync_mutex);
             pthread_exit(NULL);
          }
+         pthread_mutex_unlock(&waiting_list_mutex);
       }
       pthread_mutex_unlock(&progress_sync_mutex);
    }

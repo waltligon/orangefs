@@ -17,9 +17,8 @@
 #include "quicklist.h"
 #include "gossip.h"
 
-#define PVFS_AIO_MAX_RUNNING 5
+#define PVFS_AIO_MAX_RUNNING 10
 #define PVFS_AIO_LISTIO_MAX 10
-#define PVFS_AIO_MAX_PROGRESS_OPS 10
 
 #define PVFS_AIO_PROGRESS_IDLE 0
 #define PVFS_AIO_PROGRESS_RUNNING 1
