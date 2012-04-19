@@ -1197,8 +1197,8 @@ install:: all
 else
 install:: all install_doc
 	install -d $(includedir)
-	install -m 644 $(builddir)/include/orange.h $(includedir)
 	install -m 644 $(builddir)/include/pvfs2.h $(includedir)
+	install -m 644 $(srcdir)/include/orange.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
