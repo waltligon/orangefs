@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
 
     memset(&serverconfig,0,sizeof(serverconfig));
-    if (PINT_parse_config(&serverconfig, argv[1], argv[2]))
+    if (PINT_parse_config(&serverconfig, argv[1], argv[2], 1))
     {
         printf("Failed to parse config files\n");
         return 1;
