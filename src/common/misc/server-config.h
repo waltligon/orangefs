@@ -202,6 +202,8 @@ typedef struct server_configuration_s
                                      */
     int trove_method;
     void *private_data;
+    int32_t tree_width;
+    int32_t tree_threshhold;
 } server_configuration_s;
 
 int PINT_parse_config(

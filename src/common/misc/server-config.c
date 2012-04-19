@@ -125,6 +125,8 @@ static DOTCONF_CB(get_small_file_size);
 static DOTCONF_CB(directio_thread_num);
 static DOTCONF_CB(directio_ops_per_queue);
 static DOTCONF_CB(directio_timeout);
+static DOTCONF_CB(tree_width);
+static DOTCONF_CB(tree_threshhold);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -1017,6 +1019,14 @@ static const configoption_t options[] =
     /* Specifies the timeout in Direct I/O to wait before checking the next queue. */
     {"DirectIOTimeout", ARG_INT, directio_timeout, NULL,
         CTX_STORAGEHINTS, "1000"},
+
+    /* Specifies the number of partitions to use for tree communication. */
+    {"TreeWidth", ARG_INT, tree_width, NULL,
+        CTX_FILESYSTEM, "2"},
+
+    /* Specifies the minimum number of servers to contact before tree communication kicks in. */
+    {"TreeThreshhold", ARG_INT, tree_threshhold, NULL,
+        CTX_FILESYSTEM, "2"},
 
     LAST_OPTION
 };
@@ -3023,6 +3033,26 @@ DOTCONF_CB(directio_timeout)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->directio_timeout = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(tree_width)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->tree_width = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(tree_threshhold)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->tree_threshhold = cmd->data.value;
 
     return NULL;
 }
