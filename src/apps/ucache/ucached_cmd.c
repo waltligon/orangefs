@@ -1,4 +1,4 @@
-
+#include <stdio.h>
 #include <usrint.h>
 #include "ucached.h"
 
@@ -17,11 +17,12 @@ int main(int argc, char **argv)
     }
 
     int rc = 0;
-    void *rp;
+    //void *rp;
 
     char this_cmd = argv[1][0];
     if(this_cmd == 's')
     {
+        /*
         char ps_buff[256];
         FILE *pipe = popen("ps -e | grep -w ucached", "r");
         rp = fgets(ps_buff, 256, pipe);
@@ -29,14 +30,28 @@ int main(int argc, char **argv)
         {
             rc = remove(FIFO1);
             rc = remove(FIFO2);
-            /* Crank up the daemon since it's not running */
+            // Crank up the daemon since it's not running 
             rc = system("ucached");
+            puts("SUCCESS: Daemon started");
+        }
+        */
+        /* Look in /tmp for ucached.started indicating the ucached has been started */
+        FILE *ucached_started = fopen(UCACHED_STARTED, "r");
+        if(!ucached_started)
+        {
+            rc = remove(FIFO1);
+            rc = remove(FIFO2);
+            // Crank up the daemon since it's not running 
+            rc = system("ucached");
+            ucached_started = fopen(UCACHED_STARTED, "w");
+            if(ucached_started)
+                fclose(ucached_started);
             puts("SUCCESS: Daemon started");
         }
         else
         {  
             puts("FAILURE: Daemon already started");
-            puts(ps_buff);
+            //puts(ps_buff);
         }
         return 1;
     }

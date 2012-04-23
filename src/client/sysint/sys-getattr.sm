@@ -355,6 +355,28 @@ static PINT_sm_action getattr_acache_lookup(
         return SM_ACTION_COMPLETE;
     }
 
+    /* Report a miss if capability is expired or within 
+     * CAP_TIMEOUT_BUFFER of expiration
+     *
+     * sampson: TODO: in practice the acache timeout is likely 
+     * much less than the capability timeout. Therefore it is
+     * unlikely the capability will have expired. Additionally
+     * this code may not be needed when more sophisticated caches
+     * are added. 
+     */
+    if (sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY)
+    {
+        PVFS_time now = PINT_util_get_current_time();
+        if (now > (sm_p->getattr.attr.capability.timeout - CAP_TIMEOUT_BUFFER))
+        {
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: cache miss due to "
+                         "capability timeout [%llu]\n", 
+                         llu(object_ref.handle));
+            js_p->error_code = GETATTR_ACACHE_MISS;
+            return SM_ACTION_COMPLETE;
+        }
+    }
+
     /* acache hit, check results */
   
     /* The sys attr mask request is converted to object
@@ -398,10 +420,6 @@ static PINT_sm_action getattr_acache_lookup(
         /* add back the capability flag */
         trimmed_mask |= PVFS_ATTR_CAPABILITY;
     }
-
-    /* nlmills: TODO: don't accept the capability if it is about to
-     * time out. make use of CAP_TIMEOUT_BUFFER.
-     */
   
     /* trimmed_mask contains the list of attributes
      * requested for a particular object, 

@@ -59,7 +59,7 @@ extern int pvfs_errno;
 /* Perform PVFS initialization if not already finished */
 void iocommon_ensure_init(void);
 
-void iocommon_cred(PVFS_credential **credential);
+int iocommon_cred(PVFS_credential **credential);
 
 extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
 

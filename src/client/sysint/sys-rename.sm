@@ -35,7 +35,8 @@ enum
     RENAME_CHDIRENT = 130,
     RENAME_REMOVE_REQUIRED,
     RENAME_CRDIRENT_RETRY,
-    RENAME_RMDIRENT_RETRY
+    RENAME_RMDIRENT_RETRY,
+    RENAME_SKIP_DEST_CAP
 };
 
 static int rename_lookups_comp_fn(
@@ -54,7 +55,6 @@ machine pvfs2_client_rename_sm
     state init
     {
         run rename_init;
-        /* default => rename_lookups_setup_msgpair_array; */
         default => rename_getattr_src_parent_setup;
     }
 
@@ -76,6 +76,7 @@ machine pvfs2_client_rename_sm
     {
         run rename_getattr_src_parent_interpret;
         success => rename_getattr_dest_parent;
+        RENAME_SKIP_DEST_CAP => rename_lookups_setup_msgpair_array;
         default => cleanup;
     }
 
@@ -103,7 +104,7 @@ machine pvfs2_client_rename_sm
     state rename_lookups_xfer_msgpair_array
     {
         jump pvfs2_msgpairarray_sm;
-        success => rename_crdirent_init;
+        success => rename_crdirent_setup_msgpair;
         RENAME_CHDIRENT => rename_getattr_src;
         default => rename_lookups_failure;
     }
@@ -124,7 +125,7 @@ machine pvfs2_client_rename_sm
     state rename_getattr_dest
     {
         jump pvfs2_client_getattr_sm;
-        success => rename_chdirent_init;
+        success => rename_chdirent_setup_msgpair;
         default => cleanup;
     }
 
@@ -132,20 +133,6 @@ machine pvfs2_client_rename_sm
     {
         run rename_lookups_failure;
         default => cleanup;
-    }
-    
-    state rename_crdirent_init
-    {
-        run getattr_crdirent_init;
-        success => rename_getattr_crdirent;
-        default => rename_crdirent_retry_or_fail;
-    }
-    
-    state rename_getattr_crdirent
-    {
-        jump pvfs2_client_getattr_sm;
-        success => rename_crdirent_setup_msgpair;
-        default => rename_crdirent_retry_or_fail;
     }
 
     state rename_crdirent_setup_msgpair
@@ -158,7 +145,7 @@ machine pvfs2_client_rename_sm
     state rename_crdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => rename_rmdirent_init;
+        success => rename_rmdirent_setup_msgpair;
         default => rename_crdirent_retry_or_fail;
     }
 
@@ -172,21 +159,7 @@ machine pvfs2_client_rename_sm
     state rename_crdirent_timer
     {
         run rename_generic_timer;
-        default => rename_crdirent_init;
-    }
-    
-    state rename_rmdirent_init
-    {
-        run getattr_rmdirent_init;
-        success => rename_getattr_rmdirent;
-        default => rename_rmdirent_retry_or_fail;
-    }
-    
-    state rename_getattr_rmdirent
-    {
-        jump pvfs2_client_getattr_sm;
-        success => rename_rmdirent_setup_msgpair;
-        default => rename_rmdirent_retry_or_fail;
+        default => rename_crdirent_setup_msgpair;
     }
 
     state rename_rmdirent_setup_msgpair
@@ -213,13 +186,13 @@ machine pvfs2_client_rename_sm
     state rename_rmdirent_timer
     {
         run rename_generic_timer;
-        default => rename_rmdirent_init;
+        default => rename_rmdirent_setup_msgpair;
     }
 
     state rename_rmdirent_failure
     {
         run rename_rmdirent_failure;
-        success => rename_rmdirent_init;
+        success => rename_rmdirent_setup_msgpair;
         default => rename_warn_user_to_run_fsck;
     }
 
@@ -242,20 +215,6 @@ machine pvfs2_client_rename_sm
         run rename_warn_user_to_run_fsck;
         default => cleanup;
     }
-    
-    state rename_chdirent_init
-    {
-        run getattr_chdirent_init;
-        success => rename_getattr_chdirent;
-        default => rename_chdirent_failure;
-    }
-    
-    state rename_getattr_chdirent
-    {
-        jump pvfs2_client_getattr_sm;
-        success => rename_chdirent_setup_msgpair;
-        default => rename_chdirent_failure;
-    }
 
     state rename_chdirent_setup_msgpair
     {
@@ -267,7 +226,7 @@ machine pvfs2_client_rename_sm
     state rename_chdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => rename_rmdirent_init;
+        success => rename_rmdirent_setup_msgpair;
         default => rename_chdirent_failure;
     }
 
@@ -497,6 +456,8 @@ static int rename_lookups_comp_fn(
     else
     {
         assert(index == 1);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Looked up new handle %llu\n",
+                     llu(sm_p->u.rename.refns[index].handle));
         /*
           flag the fact that we need to do a dirent exchange on the
           existing dirent, rather than creating a new one.  we flag it
@@ -632,14 +593,30 @@ static PINT_sm_action rename_getattr_src_parent_interpret(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: requesting capability for %llu\n",
                  llu(sm_p->u.rename.parent_refns[1].handle));
 
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    /* if parents are identical, just copy capability */
+    if ((sm_p->u.rename.parent_refns[0].fs_id == 
+           sm_p->u.rename.parent_refns[1].fs_id) &&
+        (sm_p->u.rename.parent_refns[0].handle == 
+           sm_p->u.rename.parent_refns[1].handle))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "rename: copied identical " 
+                     "capability\n");
+        PINT_copy_capability(&sm_p->u.rename.caps[0], 
+                             &sm_p->u.rename.caps[1]);
 
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->u.rename.parent_refns[1],
-        PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
+        js_p->error_code = RENAME_SKIP_DEST_CAP;
+    }
+    else
+    {
+        PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+        PINT_SM_GETATTR_STATE_FILL(
+            sm_p->getattr,
+            sm_p->u.rename.parent_refns[1],
+            PVFS_ATTR_CAPABILITY, 
+            PVFS_TYPE_DIRECTORY,
+            0);
+    }
 
     return SM_ACTION_COMPLETE;
 }
@@ -721,25 +698,6 @@ static PINT_sm_action rename_lookups_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_crdirent_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: grabbing cap crdirent\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        /* changing the new parent */
-        sm_p->u.rename.parent_refns[1],
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
-
-   return SM_ACTION_COMPLETE;
-}
-
 static PINT_sm_action rename_crdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -762,7 +720,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
     */
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.rename.caps[1],
         sm_p->u.rename.entries[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.parent_refns[1].handle,
@@ -785,26 +743,6 @@ static PINT_sm_action rename_crdirent_setup_msgpair(
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
-}
-
-static PINT_sm_action getattr_rmdirent_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: grabbing cap rmdirent\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        /* use rmdirent_index to grab capability for either 0 (the parent) when
-         * things go well or 1 (the new parent) when cleaning up */
-        sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index],
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
-
-   return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action rename_rmdirent_setup_msgpair(
@@ -835,7 +773,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(
     */
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.rename.caps[sm_p->u.rename.rmdirent_index],
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
         sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
@@ -890,25 +828,6 @@ static PINT_sm_action rename_rmdirent_failure(
     return SM_ACTION_COMPLETE;
 }
 
-static PINT_sm_action getattr_chdirent_init(
-        struct PINT_smcb *smcb, job_status_s *js_p)
-{
-    struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
-    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: grabbing cap rmdirent\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        /* adding reference in the new directory */
-        sm_p->u.rename.parent_refns[1],
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT|PVFS_ATTR_CAPABILITY, 
-        PVFS_TYPE_DIRECTORY,
-        0);
-
-   return SM_ACTION_COMPLETE;
-}
-
 static PINT_sm_action rename_chdirent_setup_msgpair(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -921,9 +840,11 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
      * ok before we continue
      */
     attr = &sm_p->getattr.attr;
-    assert(attr);
+
     sm_p->u.rename.types[1] = attr->objtype;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename source type: %d\n", sm_p->u.rename.types[0]);
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest type: %d\n", attr->objtype);
     if(attr->objtype == PVFS_TYPE_DIRECTORY)
@@ -947,14 +868,14 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     /* do the types match? */
     if(sm_p->u.rename.types[0] != sm_p->u.rename.types[1])
     {
-        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        if(sm_p->u.rename.types[0] == PVFS_TYPE_DIRECTORY)
         {
-            js_p->error_code = -PVFS_EISDIR;
+            js_p->error_code = -PVFS_ENOTDIR;
             return SM_ACTION_COMPLETE;
         }
         if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
         {
-            js_p->error_code = -PVFS_ENOTDIR;
+            js_p->error_code = -PVFS_EISDIR;
             return SM_ACTION_COMPLETE;
         }
         /* TODO: what about other cases? */
@@ -983,7 +904,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(
     */
     PINT_SERVREQ_CHDIRENT_FILL(
         msg_p->req,
-        sm_p->getattr.attr.capability,
+        sm_p->u.rename.caps[1],
         sm_p->u.rename.parent_refns[1].fs_id,
         sm_p->u.rename.parent_refns[1].handle,
         sm_p->u.rename.refns[0].handle,
@@ -1029,6 +950,10 @@ static PINT_sm_action rename_check_for_remove(
     /* setup the handle to be removed */
     sm_p->object_ref.handle = sm_p->u.rename.old_dirent_handle;
     sm_p->object_ref.fs_id = sm_p->u.rename.parent_refns[1].fs_id;
+
+    /* Use the capability for the parent of the old handle */
+    PINT_copy_capability(&(sm_p->u.rename.caps[0]), 
+                         &(sm_p->u.remove.parent_capability));
 
     return SM_ACTION_COMPLETE;
 }
@@ -1171,7 +1096,7 @@ static PINT_sm_action rename_getattr_src_interpret(
      */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
          sm_p->object_ref,
-         (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT|PVFS_ATTR_CAPABILITY),
+         (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT),
          PVFS_TYPE_NONE,
          PINT_SM_GETATTR_BYPASS_CACHE);
     js_p->error_code = 0;

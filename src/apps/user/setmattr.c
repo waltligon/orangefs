@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-config.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
@@ -57,11 +58,20 @@ int main(int argc, char **argv)
     if (my_args.mode > 0) {
        printf("Setting mirror mode to %d\n"
              ,my_args.mode);
+#ifdef HAVE_SETXATTR_EXTRA_ARGS
+       ret = setxattr(my_args.filename
+                     ,"user.pvfs2.mirror.mode"
+                     ,&(my_args.mode)
+                     ,sizeof(my_args.mode)
+                     ,0
+                     ,0);
+#else
        ret = setxattr(my_args.filename
                      ,"user.pvfs2.mirror.mode"
                      ,&(my_args.mode)
                      ,sizeof(my_args.mode)
                      ,0);
+#endif
        if (ret)
           perror("Failure to set mirror mode");
     }
@@ -69,11 +79,20 @@ int main(int argc, char **argv)
     if (my_args.copies >= 0){
         printf("Setting number of mirrored copies to %d\n"
           ,my_args.copies);
+#ifdef HAVE_SETXATTR_EXTRA_ARGS
+        ret = setxattr(my_args.filename
+                      ,"user.pvfs2.mirror.copies"
+                      ,&(my_args.copies)
+                      ,sizeof(my_args.copies)
+                      ,0
+                      ,0);
+#else
         ret = setxattr(my_args.filename
                       ,"user.pvfs2.mirror.copies"
                       ,&(my_args.copies)
                       ,sizeof(my_args.copies)
                       ,0);
+#endif
         if (ret)
            perror("Failure to set mirror copies");
     }

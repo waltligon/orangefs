@@ -400,10 +400,23 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         ret = PINT_verify_credential(cred);   
         if (!ret)
         {
+            char sig_buf[16];
+
             gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                         "Credential failed verification.\n");
-            /* nlmills: TODO: find a better error code */
-            js_p->error_code = -PVFS_EAGAIN;
+                         "Credential (%s) from %s failed verification.\n",
+                         PINT_util_bytes2str(cred->signature, sig_buf, 4),
+                         cred->issuer);
+
+            /* have client try again on timeout */
+            if (PINT_util_get_current_time() >= cred->timeout)
+            {
+                js_p->error_code = -PVFS_EAGAIN;
+            }
+            else
+            {
+                js_p->error_code = -PVFS_EPERM;
+            }
+            
             return SM_ACTION_COMPLETE;
         }
     }
@@ -425,14 +438,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             cred->group_array[0] = translated_gid;
             cred->num_groups = 1;
 
-            /* nlmills: XXX: will re-signing the credential (after it was
-             * verified once) with the server's issuer string and key
-             * have any unwanted side-effects?
-             */
             /* nlmills: can't call PINT_cleanup_credential because
              * the issuer string points inside the message buffer.
              */
             free(cred->signature);
+            cred->signature = NULL;
             ret = PINT_sign_credential(cred);
             if (ret)
             {
@@ -467,10 +477,25 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         ret = PINT_perm_check(s_op);
     }
     else
-    {
-        /* nlmills: TODO: find a better way to the client 'try again' */
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Capability failed verification.\n");
-        js_p->error_code = -PVFS_EAGAIN;
+    {        
+        char sig_buf[16]; 
+
+        gossip_debug(GOSSIP_SECURITY_DEBUG, 
+                     "Capability (%s) from %s failed verification.\n",
+                     PINT_util_bytes2str(s_op->req->capability.signature,
+                                         sig_buf, 4),
+                     cred->issuer);
+
+        /* have client try again on timeout */
+        if (PINT_util_get_current_time() >= s_op->req->capability.timeout)
+        {
+            js_p->error_code = -PVFS_EAGAIN;
+        }
+        else
+        {
+            js_p->error_code = -PVFS_EPERM;
+        }
+        
         return SM_ACTION_COMPLETE;
     }
 

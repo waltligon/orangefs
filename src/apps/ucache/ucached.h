@@ -25,6 +25,10 @@
 #define UCACHED_INFO_FILE "/tmp/ucached.info"
 #endif
 
+#ifndef UCACHED_STARTED
+#define UCACHED_STARTED "/tmp/ucached.started"
+#endif
+
 #define GOSSIP_UCACHED_DEBUG 0x0001000000000000
 #define GOSSIP_UCACHED_CMD_DEBUG 0x0000100000000000
 

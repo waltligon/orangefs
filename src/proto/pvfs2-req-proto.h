@@ -974,7 +974,6 @@ endecode_fields_1_struct(
 /* chdirent ****************************************************/
 /* - modifies an existing directory entry on a particular file system */
 
-/* nlmills: TODO: add another capability for new_dirent_handle? */
 struct PVFS_servreq_chdirent
 {
     char *entry;                   /* name of entry to remove */

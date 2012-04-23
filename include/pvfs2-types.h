@@ -910,20 +910,20 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
         PVFS_ERROR_CODE(((positive ? error :               \
                              abs(error))) & ~mask)];       \
     }                                                      \
-    return ret;                        			   \
+    return ret;                                            \
 }                                                          \
 PVFS_error PVFS_errno_to_error(int err)                    \
 {                                                          \
     PVFS_error e = 0;                                      \
-    \
+                                                           \
     for(; e < PVFS_ERRNO_MAX; ++e)                         \
     {                                                      \
         if(PINT_errno_mapping[e] == err)                   \
         {                                                  \
-            return e;                                      \
+            return e | PVFS_ERROR_BIT;                     \
         }                                                  \
     }                                                      \
-    return 0;                                              \
+    return err;                                            \
 }                                                          \
 DECLARE_ERRNO_MAPPING()
 #define PVFS_ERROR_TO_ERRNO(__error) PVFS_get_errno_mapping(__error)
@@ -1003,8 +1003,8 @@ struct profiler
 /*
  * New types for robust security implementation.
  */
-#define DEFAULT_CREDENTIAL_TIMEOUT (5*60*60)
-#define DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
+#define PVFS2_DEFAULT_CREDENTIAL_TIMEOUT (3600)   /* 1 hour */
+#define PVFS2_DEFAULT_CREDENTIAL_KEYPATH SYSCONFDIR "/pvfs2credkey.pri"
 
 typedef unsigned char *PVFS_signature;
 

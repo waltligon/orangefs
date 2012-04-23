@@ -236,7 +236,7 @@ CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
   # make bindir and sysconfdir available to source files
 CFLAGS += -DBINDIR='"$(bindir)"' -DSYSCONFDIR='"$(sysconfdir)"'
 
-  # OpenSSL support
+  # OpenSLL support
 CFLAGS += @OPENSSL_CPPFLAGS@
 
 # always want these gcc flags
@@ -518,8 +518,8 @@ SERVER := src/server/pvfs2-server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries that will be installed
-LIBRARIES_STATIC := lib/libpvfs2.a
-LIBRARIES_SHARED := lib/libpvfs2.so
+LIBRARIES_STATIC := lib/libpvfs2.a lib/liborange.a
+LIBRARIES_SHARED := lib/libpvfs2.so lib/liborange.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a
 LIBRARIES_THREADED_SHARED := lib/libpvfs2-threaded.so
 
@@ -530,8 +530,8 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifdef BUILD_USRINT
-LIBRARIES_STATIC += lib/libofs.a
-LIBRARIES_SHARED += lib/libofs.so
+LIBRARIES_STATIC += lib/libofs.a lib/liborangepre.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangepre.so
 LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
 LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
@@ -862,6 +862,23 @@ lib/libofs-threaded.so: $(ULIBTHREADEDPICOBJS)
 	$(E)$(INSTALL) -d lib
 	$(E)$(LDSHARED) -Wl,-soname,libofs-threaded.so -o $@ $(ULIBTHREADEDPICOBJS) $(ULIBDEPLIBS) $(DEPLIBS)
 
+# rules for building virtual libraries
+lib/liborange.a: lib/libpvfs2.a
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.a
+
+lib/liborange.so: lib/libpvfs2.so
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -rdynamic $(LIBS) )\n" > lib/liborange.so
+
+lib/liborangepre.a: lib/libpvfs2.a
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.a
+
+lib/liborangepre.so: lib/libpvfs2.so
+	$(Q) "  VLIB		$@"
+	$(E)printf "GROUP ( -lofs -rdynamic $(LIBS) )\n" > lib/liborangepre.so
+
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
 	$(Q) "  RANLIB	$@"
@@ -1099,7 +1116,8 @@ cleaner: clean
 # except, don't remove generated .c files if this is a distributed release
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile pvfs2-config.h
+	rm -f Makefile pvfs2-config.h pvfs2-config.h.in configure aclocal.me
+	rm -rf lib
 	rm -f src/server/simple.conf
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
@@ -1189,6 +1207,7 @@ install:: all install_doc
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(includedir)
+	install -m 644 $(srcdir)/include/pvfs2-usrint.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(includedir)
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(includedir)

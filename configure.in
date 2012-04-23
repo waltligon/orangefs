@@ -6,7 +6,7 @@ dnl You may need to use autoheader as well if changing any DEFINEs
 
 dnl sanity checks, output header, location of scripts used here
 AC_INIT(include/pvfs2-types.h)
-AC_PREREQ(2.59)
+AC_PREREQ(2.57)
 AC_CONFIG_AUX_DIR(maint/config)
 
 dnl
@@ -17,8 +17,8 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_VERSION_MAJOR=2
-PVFS2_VERSION_MINOR=8
-PVFS2_VERSION_SUB=4
+PVFS2_VERSION_MINOR=9
+PVFS2_VERSION_SUB=0
 #PVFS2_VERSION_RELEASE="orangefs"
 #PVFS2_PRE=""
 PVFS2_VERSION_PRE="orangefs-$CONFIGURE_TIME"
@@ -45,24 +45,68 @@ if test "x$USR_CFLAGS" = "x"; then
 	USR_CFLAGS_SET=no
 fi
 
+dnl if we use headers that might not be on every platform, add them here
 AC_CONFIG_HEADER(pvfs2-config.h)
 
 AC_CHECK_HEADER([pwd.h],
-    [AC_DEFINE(HAVE_GETPWUID, 1, Define if pwd.h exists)])
+        [AC_DEFINE(HAVE_PWD_H, 1, Define if pwd.h exists)])
+AC_CHECK_HEADER([features.h],
+        [AC_DEFINE(HAVE_FEATURES_H, 1, Define if features.h exists)])
+AC_CHECK_HEADER([fstab.h],
+        [AC_DEFINE(HAVE_FSTAB_H, 1, Define if fstab.h exists)])
+AC_CHECK_HEADER([malloc.h],
+        [AC_DEFINE(HAVE_MALLOC_H, 1, Define if malloc.h exists)])
+AC_CHECK_HEADER([memory.h],
+        [AC_DEFINE(HAVE_MEMORY_H, 1, Define if memory.h exists)])
+AC_CHECK_HEADER([mntent.h],
+        [AC_DEFINE(HAVE_MNTENT_H, 1, Define if mntent.h exists)])
+AC_CHECK_HEADER([netdb.h],
+        [AC_DEFINE(HAVE_NETDB_H, 1, Define if netdb.h exists)])
+AC_CHECK_HEADER([stdarg.h],
+        [AC_DEFINE(HAVE_STDARG_H, 1, Define if stdarg.h exists)])
+AC_CHECK_HEADER([stdint.h],
+        [AC_DEFINE(HAVE_STDINT_H, 1, Define if stdint.h exists)])
+AC_CHECK_HEADER([stdlib.h],
+        [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+AC_CHECK_HEADER([strings.h],
+        [AC_DEFINE(HAVE_STRINGS_H, 1, Define if strings.h exists)])
+AC_CHECK_HEADER([stdlib.h],
+        [AC_DEFINE(HAVE_STDLIB_H, 1, Define if stdlib.h exists)])
+
+AC_CHECK_HEADER([linux/types.h],
+        [AC_DEFINE(HAVE_LINUX_TYPES_H, 1, Define if linux/types.h exists)])
+AC_CHECK_HEADER([linux/malloc.h],
+        [AC_DEFINE(HAVE_LINUX_MALLOC_H, 1, Define if linux/malloc.h exists)])
+
+dnl Kernel Headers checked in maint/config/kernel.m4
+dnl AC_CHECK_HEADERS([linux/compat.h])
+dnl AC_CHECK_HEADERS([linux/exportfs.h])
+dnl AC_CHECK_HEADERS([linux/ioctl32.h])
+dnl AC_CHECK_HEADERS([linux/mount.h])
+dnl AC_CHECK_HEADERS([linux/posix_acl.h])
+dnl AC_CHECK_HEADERS([linux/posix_acl_xattr.h])
+dnl AC_CHECK_HEADERS([linux/syscalls.h])
+dnl AC_CHECK_HEADERS([linux/xattr_acl.h])
+
 AC_CHECK_HEADER([sys/vfs.h],
 		[AC_DEFINE(HAVE_SYS_VFS_H, 1, Define if sys/vfs.h exists)])
 AC_CHECK_HEADER([sys/mount.h],
 		[AC_DEFINE(HAVE_SYS_MOUNT_H, 1, Define if sys/mount.h exists)])
+AC_CHECK_HEADER([sys/stat.h],
+        [AC_DEFINE(HAVE_SYS_STAT_H, 1, Define if sys/stat.h exists)])
+AC_CHECK_HEADER([sys/types.h],
+        [AC_DEFINE(HAVE_SYS_TYPES_H, 1, Define if sys/types.h exists)])
+AC_CHECK_HEADER([sys/socket.h],
+        [AC_DEFINE(HAVE_SYS_SOCKET_H, 1, Define if sys/socket.h exists)])
+AC_CHECK_HEADER([sys/sendfile.h],
+        [AC_DEFINE(HAVE_SYS_SENDFILE_H, 1, Define if sys/sendfile.h exists)])
+AC_CHECK_HEADER([sys/xattr.h],
+        [AC_DEFINE(HAVE_SYS_XATTR_H, 1, Define if sys/xattr.h exists)])
 
-AC_CHECK_HEADERS(linux/types.h)
-AC_CHECK_HEADERS(features.h)
-
-AC_CHECK_HEADERS([mntent.h, fstab.h])
-
-AC_CHECK_HEADERS(stdarg.h)
-
-AC_CHECK_HEADERS(attr/xattr.h)
-AC_CHECK_HEADERS(sys/xattr.h)
+AC_CHECK_HEADER([arpa/inet.h],
+        [AC_DEFINE(HAVE_ARPA_INET_H, 1, Define if arpa/inet.h exists)])
+AC_CHECK_HEADER([attr/xattr.h],
+        [AC_DEFINE(HAVE_ATTR_XATTR_H, 1, Define if attr/xattr.h exists)])
 
 AC_CHECK_SIZEOF([long int])
 
@@ -215,6 +259,11 @@ fi],
 [ENABLE_SECURITY=]
 )
 AC_SUBST(ENABLE_SECURITY)
+
+dnl OpenSSL is required for robust security
+if test "x$ENABLE_SECURITY" = "x1" && test "x$OPENSSL_CPPFLAGS" = "x"; then
+    AC_MSG_ERROR("OpenSSL required for robust security (use --with-ssl)")
+fi
 
 dnl a mechanism to turn off memory usage statistics in karma (may be
 dnl confusing for some classes of users)
@@ -1029,9 +1078,6 @@ case "$host_os" in
     ;;
 esac
 
-AC_CHECK_HEADERS(netdb.h)
-AC_CHECK_HEADERS(arpa/inet.h)
-AC_CHECK_HEADERS(sys/socket.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
@@ -1145,6 +1191,46 @@ AC_TRY_COMPILE([
 )
 
 dnl
+dnl check if setxattr takes extra arguments
+AC_MSG_CHECKING([for setxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	setxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SETXATTR_EXTRA_ARGS, 1, Define if setxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
+
+dnl
+dnl check if getxattr takes extra arguments
+AC_MSG_CHECKING([for getxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	getxattr(0, 0, 0, 0, 0, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GETXATTR_EXTRA_ARGS, 1, Define if getxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
+
+dnl
 dnl look for sysinfo header
 AC_CHECK_HEADER(sys/sysinfo.h,
        AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
@@ -1222,9 +1308,6 @@ AC_TRY_COMPILE([
 dnl check for getmntent(), special test
 AC_FUNC_GETMNTENT
 
-dnl if we use headers that might not be on every platform, add them here
-AC_CHECK_HEADERS(malloc.h)
-AC_CHECK_HEADERS(mntent.h)
 
 AC_ARG_ENABLE(static-server,
 [  --enable-static-server  Builds the server static],

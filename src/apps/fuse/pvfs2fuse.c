@@ -107,7 +107,7 @@ static int pvfs_fuse_gen_credential(
    /* generate credential -- this process must be running as root */
    ret = PVFS_util_gen_credential(uid, 
                                   gid, 
-                                  PVFS_DEFAULT_CREDENTIAL_TIMEOUT, 
+                                  PVFS2_DEFAULT_CREDENTIAL_TIMEOUT, 
                                   NULL,
                                   new_cred);
 
@@ -591,8 +591,10 @@ static int pvfs_fuse_chmod(const char *path, mode_t mode)
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW );
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   
-   new_attr.perms = mode;
+   /* FUSE passes in 5 octets in 'mode'. However, the the first 
+    * octet is not related to permissions, hence checking only
+    *  the lower 4 octets */
+   new_attr.perms = mode & 07777;
    new_attr.mask = PVFS_ATTR_SYS_PERM;
  
    ret = PVFS_sys_setattr(pfh.ref,new_attr,&pfh.cred);

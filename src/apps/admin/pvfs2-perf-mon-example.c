@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
-    PVFS_credential creds;
+    PVFS_credential cred;
     int io_server_count;
     int64_t** perf_matrix;
     uint64_t* end_time_ms_array;
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = PVFS_util_gen_credential(NULL, NULL, 1*60*60, NULL, &creds);
+    ret = PVFS_util_gen_credential_defaults(&cred);
     if (ret < 0)
     {
         PVFS_perror("PVFS_util_gen_credential", ret);
@@ -164,10 +164,10 @@ int main(int argc, char **argv)
     /* loop for ever, grabbing stats at regular intervals */
     while (1)
     {
-        PVFS_util_refresh_credential(&creds);
+        PVFS_util_refresh_credential(&cred);
         key_cnt = MAX_KEY_CNT;
 	ret = PVFS_mgmt_perf_mon_list(cur_fs,
-				      &creds,
+				      &cred,
 				      perf_matrix, 
 				      end_time_ms_array,
 				      addr_array,

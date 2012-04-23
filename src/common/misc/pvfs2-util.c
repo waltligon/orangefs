@@ -169,20 +169,35 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
     return;
 }
 
+/* PVFS_util_gen_credential_defaults
+ * 
+ * Generate a signed credential for the current user, with a 
+ * default timeout.
+ */
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
     return PVFS_util_gen_credential(NULL, NULL, 
-                                    PVFS_DEFAULT_CREDENTIAL_TIMEOUT,
+                                    PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
                                     NULL, cred);
 }
 
 #ifdef ENABLE_SECURITY
+/* PVFS_util_gen_credential
+ * 
+ * Generate signed credential object using external app pvfs2-gencred.
+ *
+ * user - string representation of numeric uid
+ * group - string representation of numeric gid
+ * timeout - in seconds; value of 0 will result in default (1 hour)
+ * keypath - path to client private key file
+ * cred - the credential object
+ */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
     struct sigaction newsa, oldsa;
     pid_t pid;
-    int filedes[2];
+    int filedes[2], errordes[2];
     int ret;
 
     if (!keypath && getenv("PVFS2KEY_FILE"))
@@ -194,7 +209,14 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     newsa.sa_handler = SIG_DFL;
     sigaction(SIGCHLD, &newsa, &oldsa);
 
+    /* pipe to read credential from stdout of pvfs2-gencred */
     ret = pipe(filedes);
+    if (ret == -1)
+    {
+        return -PVFS_errno_to_error(errno);
+    }
+    /* pipe to read any error messages from stderr of pvfs2-gencred */
+    ret = pipe(errordes);
     if (ret == -1)
     {
         return -PVFS_errno_to_error(errno);
@@ -209,6 +231,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
         char *envp[] = { NULL };
 
         close(STDERR_FILENO);
+        dup(errordes[1]);
         close(STDOUT_FILENO);
         dup(filedes[1]);
         close(STDIN_FILENO);
@@ -225,7 +248,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
             *ptr++ = "-g";
             *ptr++ = (char*)group;
         }
-        if (timeout != PVFS_DEFAULT_CREDENTIAL_TIMEOUT)
+        if (timeout != 0 && 
+            timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
         {
            snprintf(timearg, sizeof(timearg), "%u", timeout);
            *ptr++ = "-t";
@@ -244,21 +268,27 @@ int PVFS_util_gen_credential(const char *user, const char *group,
     else if (pid == -1)
     {
         close(filedes[1]);
+        close(errordes[1]);
         ret = -PVFS_errno_to_error(errno);
     }
     else
     {
-        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential];
-        ssize_t total = 0;
-        ssize_t cnt;
+        char buf[sizeof(PVFS_credential)+extra_size_PVFS_credential],
+             ebuf[512];
+        ssize_t total = 0, etotal = 0;
+        ssize_t cnt, ecnt;
 
         /* close write end so we get EOF when child exits */
+        close(errordes[1]);
         close(filedes[1]);
 
+        /* read credential */
         do
         {
-            do cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
-            while (cnt == -1 && errno == EINTR);
+            do
+            {
+                cnt = read(filedes[0], buf+total, (sizeof(buf) - total));
+            } while (cnt == -1 && errno == EINTR);
             total += cnt;
         } while (cnt > 0);
         
@@ -279,15 +309,42 @@ int PVFS_util_gen_credential(const char *user, const char *group,
                 decode_PVFS_credential(&ptr, &tmp);
                 ret = PINT_copy_credential(&tmp, cred);
             }
+            else if (WIFEXITED(rc))
+            {                
+                /* error code from pvfs2_gencred */
+                ret = -PVFS_errno_to_error(WEXITSTATUS(rc));
+            }
             else
             {
-                /* nlmills: TODO: find a more appropriate error code */
+                /* catch-all error */
                 ret = -PVFS_EINVAL;
+            }
+
+            /* read errors and warnings */
+            do
+            {
+                do
+                {
+                    ecnt = read(errordes[0], ebuf+etotal, 
+                                (sizeof(ebuf) - etotal));
+                } while (ecnt == -1 && errno == EINTR);
+                etotal += ecnt;
+            } while (ecnt > 0 && etotal < sizeof(ebuf));
+            /* null terminate */
+            ebuf[(etotal < sizeof(ebuf)) ? etotal : sizeof(ebuf)] = '\0';
+
+            /* print errors */
+            if (etotal > 0)
+            {
+                char gbuf[600];
+                snprintf(gbuf, sizeof(gbuf), "pvfs2_gencred: %s", ebuf);
+                gossip_err(gbuf);
             }
         }
     }
 
     close(filedes[0]);
+    close(errordes[0]);
     sigaction(SIGCHLD, &oldsa, NULL);
 
     return ret;
@@ -296,10 +353,10 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 /* PINT_gen_unsigned_credential 
  *
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
- *
+ * For use when robust security is disabled.
  */
 int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                 PVFS_credential *cred)
+                                 unsigned int timeout, PVFS_credential *cred)
 {
     unsigned long uid, gid, bufsize;
     char *endptr;
@@ -491,7 +548,8 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
     /* insert an issuer and a null signature */
     cred->issuer = strdup("");
 
-    cred->timeout = PINT_util_get_current_time() + DEFAULT_CREDENTIAL_TIMEOUT;
+    cred->timeout = PINT_util_get_current_time() + 
+        (timeout != 0 ? timeout : PVFS2_DEFAULT_CREDENTIAL_TIMEOUT);
 
     cred->sig_size = 0;
     cred->signature = NULL;
@@ -502,6 +560,10 @@ int PINT_gen_unsigned_credential(const char *user, const char *group,
     return 0;
 }
 
+/*
+ * This function generates an unsigned credential for use when
+ * robust security is disabled.
+ */
 int PVFS_util_gen_credential(const char *user, const char *group,
     unsigned int timeout, const char *keypath, PVFS_credential *cred)
 {
@@ -513,15 +575,21 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     memset(cred, 0, sizeof(cred));
 
-    return PINT_gen_unsigned_credential(user, group, cred);
+    return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
 #endif /* ENABLE_SECURITY */
 
+/*
+ * This function checks to see if the credential is still valid
+ * and is not about to time out - if so then it does nothing,
+ * otherwise it calls PVFS_util_gen_credential_defaults to make a
+ * fresh one. Call this before running any system call.
+ */
 int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
-    /* =if the credential is valid for at least an hour */
+    /* if the credential is valid for at least an hour */
     if (PINT_util_get_current_time() <= cred->timeout - 3600)
     {
         ret = 0;
@@ -1745,8 +1813,18 @@ void PVFS_util_free_mntent(
         {
             int j;
             for (j=0; j<mntent->num_pvfs_config_servers; j++)
+            {            
                 if (mntent->pvfs_config_servers[j])
+                {
+                    if (mntent->pvfs_config_servers[j] == 
+                        mntent->the_pvfs_config_server)
+                    {
+                        /* don't free further down */
+                        mntent->the_pvfs_config_server = NULL;
+                    }
                     free(mntent->pvfs_config_servers[j]);
+                }
+            }
             free(mntent->pvfs_config_servers);
             mntent->pvfs_config_servers = NULL;
             mntent->num_pvfs_config_servers = 0;
@@ -1765,6 +1843,11 @@ void PVFS_util_free_mntent(
         {
             free(mntent->mnt_opts);
             mntent->mnt_opts = NULL;
+        }
+        if (mntent->the_pvfs_config_server)           
+        {
+            free(mntent->the_pvfs_config_server);
+            mntent->the_pvfs_config_server = NULL;
         }
 
         mntent->flowproto = 0;
@@ -1809,7 +1892,6 @@ int PVFS_util_copy_mntent(
             }
         }
 
-        /* nlmills: TODO: this copy will leak memory. fix that */
         dest_mntent->the_pvfs_config_server = 
             strdup(src_mntent->the_pvfs_config_server);
         if (!dest_mntent->the_pvfs_config_server)

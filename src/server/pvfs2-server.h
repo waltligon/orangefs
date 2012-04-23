@@ -625,8 +625,7 @@ typedef struct PINT_server_op
       } \
     } while (0)
 
-/* nlmills: TODO: consider passing request only */
-/* nlmills: in that case we can move this whole block back to the file's top */
+/* state machine permission function */
 typedef int (*PINT_server_req_perm_fun)(PINT_server_op *s_op);
 
 #define PINT_GET_OBJECT_REF_DEFINE(req_name)                             \
@@ -783,7 +782,7 @@ extern struct PINT_state_machine_s pvfs2_call_msgpairarray_sm;
 struct server_configuration_s *get_server_config_struct(void);
 
 /* exported state machine resource reclamation function */
-int server_post_unexpected_recv(job_status_s *js_p);
+int server_post_unexpected_recv(void);
 int server_state_machine_start( PINT_smcb *smcb, job_status_s *js_p);
 int server_state_machine_complete(PINT_smcb *smcb);
 int server_state_machine_terminate(PINT_smcb *smcb, job_status_s *js_p);
