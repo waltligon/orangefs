@@ -628,7 +628,7 @@ struct inode *pvfs2_get_custom_inode_common(
 	    inode->i_fop = &pvfs2_dir_operations;
 
 	    /* dir inodes start with i_nlink == 2 (for "." entry) */
-	    inode->i_nlink++;
+            pvfs2_i_inc_nlink(inode);
         }
         else
         {

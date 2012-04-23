@@ -285,7 +285,7 @@ int copy_attributes_to_inode(
                  * directories across clients; keep constant at 1.  Why 1?  If
                  * we go with 2, then find(1) gets confused and won't work
                  * properly withouth the -noleaf option */
-                inode->i_nlink = 1;
+                pvfs2_i_set_nlink(inode, 1);
                 ret = 0;
                 break;
             case PVFS_TYPE_SYMLINK:

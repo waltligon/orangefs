@@ -3141,6 +3141,10 @@ int pvfs2_file_release(
  */
 int pvfs2_fsync(
     struct file *file,
+#ifdef HAVE_FSYNC_LOFF_T_PARAMS
+    loff_t start,
+    loff_t end,
+#endif
 #ifdef HAVE_FSYNC_DENTRY_PARAM
     struct dentry *dentry,
 #endif

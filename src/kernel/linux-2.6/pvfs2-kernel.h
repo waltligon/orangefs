@@ -1333,6 +1333,42 @@ static inline loff_t pvfs2_i_size_read(struct inode *inode)
 #endif
 }
 
+static inline void pvfs2_i_set_nlink(struct inode *inode, unsigned int nlink)
+{
+#ifdef HAVE_I_SET_NLINK
+    set_nlink(inode, nlink); 
+#else
+    inode->i_nlink = nlink;
+#endif
+}
+
+static inline void pvfs2_i_inc_nlink(struct inode *inode)
+{
+#ifdef HAVE_I_INC_NLINK
+    inc_nlink(inode); 
+#else
+    inode->i_nlink++;
+#endif
+}
+
+static inline void pvfs2_i_drop_nlink(struct inode *inode)
+{
+#ifdef HAVE_I_DROP_NLINK
+    drop_nlink(inode);    
+#else
+    inode->i_nlink--;
+#endif
+}
+
+static inline void pvfs2_i_clear_nlink(struct inode *inode)
+{
+#ifdef HAVE_I_CLEAR_NLINK
+    clear_nlink(inode);    
+#else
+    inode->i_nlink = 0;
+#endif
+}
+
 static inline unsigned int diff(struct timeval *end, struct timeval *begin)
 {
     if (end->tv_usec < begin->tv_usec) {
