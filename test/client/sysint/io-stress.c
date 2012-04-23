@@ -229,7 +229,7 @@ static void do_pvfs_io(int num_io)
         op_count = MAX_OPS;
         memset(error_code_array, 0, MAX_OPS * sizeof(int));
         memset(all_request, 0, MAX_OPS * sizeof(io_request *));
-        ret = PVFS_sys_testsome(
+        ret = PVFS_sys_testany(
                 op_id_array, &op_count, (void *) all_request,
                 error_code_array, 10);
         for (i = 0; i < op_count; i++)
