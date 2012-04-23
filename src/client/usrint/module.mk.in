@@ -8,9 +8,7 @@ SRC := \
  	$(DIR)/iocommon.c \
  	$(DIR)/openfile-util.c \
  	$(DIR)/ucache.c \
- 	$(DIR)/mmap.c \
-	$(DIR)/aiocommon.c \
-	$(DIR)/aio-pvfs.c
+ 	$(DIR)/mmap.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed
