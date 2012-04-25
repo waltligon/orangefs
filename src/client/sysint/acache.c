@@ -58,7 +58,6 @@ struct acache_payload
     /** Static objects */
     uint32_t mask;
 
-    /* static fields that can be cached separately */
     PVFS_ds_type objtype;
     PINT_dist *dist;
     uint32_t dist_size;
