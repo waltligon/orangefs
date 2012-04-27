@@ -30,7 +30,7 @@
 /* this one is modeled after TROVE_DEFAULT_HANDLE_PURGATORY_SEC */
 #define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 18000000    /* 5 hours      */
 #define DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS 5000       /* 5 seconds    */
-#define SECURITY_ACACHE_DEFAUTL_TIMEOUT_MSECS 7200000   /* 2 hours      */
+#define SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
 
 
 struct PINT_perf_key acache_keys[] = 
@@ -69,8 +69,8 @@ struct acache_payload
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
 
-    uint64_t msecs__security; /**< Time when the security attr was refreshed.  */
-    uint64_t msecs__dynamic;  /**< Time when the dynamic attrs were refreshed. */
+    uint64_t msecs_security; /**< Time when the security attr was refreshed.  */
+    uint64_t msecs_dynamic;  /**< Time when the dynamic attrs were refreshed. */
 };
  
 /* static data to be stored in a cached entry */
@@ -351,17 +351,9 @@ int PINT_acache_get_cached_entry(
     struct acache_payload* tmp_payload;
     /* struct static_payload* tmp_static_payload; */
     int status;
-
-
-    /* Get the current time */
+    /* Storage of current time */
     struct timeval current_time = { 0, 0};
     uint64_t current_time_msecs = 0;
-
-    gettimeofday(&current_time, NULL);
-   
-    current_time_msecs = current_time.sec * 1000;
-    current_time_msecs += current_time.usec / 1000;
- 
     /* Flags indicating whether dynamic attrs or security attr have expired. */
     unsigned char security_expired = 0;
     unsigned char dynamic_attrs_expired = 0;
@@ -406,19 +398,6 @@ int PINT_acache_get_cached_entry(
     {
         PINT_perf_count(acache_pc, PERF_ACACHE_HITS, 1, PINT_PERF_ADD);
         tmp_payload = tmp_entry->payload;
-
-        /* Check to see if either the security or dynamic attrs have expired.
-        if()
-        {
-            security_expired = 1;
-        }
-
-        if()
-        {
-            dynamic_attrs_expired = 1;
-        }
-        */
-
     }
 
     if(!tmp_payload)
@@ -427,7 +406,31 @@ int PINT_acache_get_cached_entry(
         gen_mutex_unlock(&acache_mutex);
         return(ret);
     }
- 
+
+    gettimeofday(&current_time, NULL);
+    current_time_msecs = current_time.tv_sec * 1000;
+    current_time_msecs += current_time.tv_usec / 1000;
+
+    /* Check to see if either the security or dynamic attrs have expired. */
+    if((current_time_msecs - tmp_payload->msecs_security) > 
+        SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        security_expired = 1;
+
+        /* Fetch/update security attr */
+
+    }
+
+    if((current_time_msecs - tmp_payload->msecs_dynamic) >
+        DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        dynamic_attrs_expired = 1;
+
+        /* Fetch/update dynamic attrs */
+
+    }
+
+
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
                  "status=%d, attr_status=%d, size_status=%d\n",
