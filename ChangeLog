@@ -6,6 +6,11 @@ http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
 Stable
 
+* Bug fix:  modified the kernel code to re-post data to the shared memory
+* system (for I/O requests) whenever pvfs2-client-core aborts.  Because the 
+* data was not re-posted prior to these changes, the resulting file contained 
+* corrupted data.
+
 * New Feature: added hint support to pvfs_open() to allow user to
 * provide various things like the number of servers to use, the
 * distribution to use, the layout to use, as well as tags that can be

@@ -298,8 +298,8 @@ static int monitor_pvfs2_client(options_t *opts)
                     gossip_enable_stderr();
                 }
 
-                gossip_err("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", core_pid, WTERMSIG(ret));
+                gossip_err("Child process with pid %d was killed by "
+                           "signal %d\n", core_pid, WTERMSIG(ret));
                 core_pid = -1;
 
                 gettimeofday(&now, NULL);

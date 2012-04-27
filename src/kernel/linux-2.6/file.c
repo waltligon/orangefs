@@ -466,6 +466,8 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
     new_op->upcall.req.io.io_type = (rw->type == IO_READV) ?
                                      PVFS_IO_READ : PVFS_IO_WRITE;
     new_op->upcall.req.io.refn = rw->pvfs2_inode->refn;
+
+populate_shared_memory:
     /* get a shared buffer index */
     ret = pvfs_bufmap_get(&buffer_index);
     if (ret < 0)
@@ -476,6 +478,7 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
     }
     gossip_debug(GOSSIP_FILE_DEBUG, "GET op %p -> buffer_index %d\n", new_op, buffer_index);
 
+    new_op->uses_shared_memory = 1;
     new_op->upcall.req.io.buf_index = buffer_index;
     new_op->upcall.req.io.count = total_size;
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
@@ -483,14 +486,29 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
     gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
             "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user_addresses, 
             nr_segs, llu(*(rw->off.io.offset)), total_size);
+
     /* Stage 1: copy the buffers into client-core's address space */
     if ((ret = precopy_buffers(buffer_index, rw, vec, nr_segs, total_size)) < 0) 
     {
         goto out;
     }
+
     /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
          get_interruptible_flag(rw->inode));
+
+    /* If service_operation() returns -EAGAIN #and# the operation was purged from
+     * pvfs2_request_list or htable_ops_in_progress, then we know that the
+     * client was restarted, causing the share memory area to be wiped clean.  To restart an 
+     * I/O operation in this case, we must re-copy the data from the user's iovec 
+     * to a NEW shared memory location.
+    */
+    if ( ret == -EAGAIN && op_state_purged(new_op) )
+    {
+       gossip_debug(GOSSIP_WAIT_DEBUG,"%s:going to populate_shared_memory.\n",__func__);
+       goto populate_shared_memory;
+    }
+
 
     if (ret < 0)
     {

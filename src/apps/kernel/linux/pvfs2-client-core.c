@@ -3315,11 +3315,14 @@ int main(int argc, char **argv)
     sigemptyset (&segv_action.sa_mask);
     segv_action.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONESHOT;
     sigaction (SIGSEGV, &segv_action, NULL);
+    sigaction (SIGABRT, &segv_action, NULL);
 #else
 
-    /* if pvfs2-client-core segfaults, at least log the occurence so
-     * pvfs2-client won't repeatedly respawn pvfs2-client-core */
+    /* if pvfs2-client-core segfaults or aborts, at least log the occurence so
+     * pvfs2-client won't repeatedly respawn pvfs2-client-core 
+     * */
     signal(SIGSEGV, client_segfault_handler);
+    signal(SIGABRT, client_segfault_handler);
 #endif
 
     memset(&s_opts, 0, sizeof(options_t));

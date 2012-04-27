@@ -135,6 +135,8 @@ typedef unsigned long sector_t;
 #define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
+#define PVFS2_BUFMAP_WAIT_TIMEOUT_SECS      30
+
 #define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
@@ -377,6 +379,12 @@ typedef struct
 {
     enum pvfs2_vfs_op_states op_state;
     uint64_t tag;
+
+    /* Set uses_shared_memory to 1 if this operation uses shared memory. */
+    /*  If true, then a retry on the op must also get a new shared memory*/
+    /*  buffer and re-populate it.                                       */ 
+    int uses_shared_memory;
+
 
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
@@ -1006,6 +1014,8 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct file_operations pvfs2_devreq_file_operations;
+
+extern wait_queue_head_t pvfs2_bufmap_init_waitq;
 
 /************************************
  * misc convenience macros
