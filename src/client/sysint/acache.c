@@ -407,13 +407,36 @@ int PINT_acache_get_cached_entry(
         return(ret);
     }
 
+
+    /* Get the time of day and store in millisecond resolution format */
     gettimeofday(&current_time, NULL);
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
 
-    /* Reset Dynamic attrs timestamp since it was hit regardless of timeout. */
-    tmp_payload->msecs_dynamic = current_time_msecs;
+    if((current_time_msecs - tmp_payload->msecs_security) >
+        SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        security_expired = 1;
 
+        /* TODO Fetch/update only security attr */
+
+
+        tmp_payload->msecs_security = current_time_msecs;
+    }
+
+    /* Check to see if dynamic attrs have expired. */
+    if((current_time_msecs - tmp_payload->msecs_dynamic) >
+        DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        dynamic_attrs_expired = 1;
+
+        /* TODO Fetch/update dynamic attrs */
+
+
+    }
+
+    /* Reset Dynamic attrs timestamp since it was hit regardless */
+    tmp_payload->msecs_dynamic = current_time_msecs;
 
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
@@ -442,7 +465,7 @@ int PINT_acache_get_cached_entry(
         *size_status = 0;
     }
   
-    /* copy out static attributes if valid */
+    /* copy out static attributes */
     if(tmp_payload)
     {
         attr->mask |= tmp_payload->mask;
@@ -505,13 +528,6 @@ int PINT_acache_get_cached_entry(
         }
         *attr_status = 0;
     }
-
-    /* set timers  here? */
-    /*
-     *
-     *
-     */
-     
 
     gen_mutex_unlock(&acache_mutex);
   
@@ -639,9 +655,6 @@ int PINT_acache_update(
     /* unsigned int enabled; */
     uint32_t old_mask;
     int ret = -1;
-    /* Storage of current time */
-    struct timeval current_time = { 0, 0};
-    uint64_t current_time_msecs = 0;
 
     /* skip out immediately if the cache is disabled */
     /*
@@ -762,18 +775,6 @@ int PINT_acache_update(
  
     }
 
-    /* Get the time of day and convert to millisecond resolution. */
-    gettimeofday(&current_time, NULL);
-    current_time_msecs = current_time.tv_sec * 1000;
-    current_time_msecs += current_time.tv_usec / 1000;
-
-    /* See if the security attr timestamp has been set, if not then set it. */
-    if(!tmp_payload->msecs_security)
-    {
-        tmp_payload->msecs_security = current_time_msecs;
-    }
-    /* Update the dynamic attrs' timestamp regardless of if it has already been set. */
-    tmp_payload->msecs_dynamic = current_time_msecs;
 
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): attr_status=%d, size_status=%d\n",
@@ -996,18 +997,37 @@ static void load_payload(struct PINT_tcache* instance,
     int purged;
     struct PINT_tcache_entry* tmp_entry;
     int ret;
+    /* Storage of current time */
+    struct timeval current_time = { 0, 0};
+    uint64_t current_time_msecs = 0;
 
     /* find out if the entry is already in the cache */
     ret = PINT_tcache_lookup(instance, 
                              &refn,
                              &tmp_entry,
                              &status);
+
+    /* Get the time of day and convert to millisecond resolution. */
+    gettimeofday(&current_time, NULL);
+    current_time_msecs = current_time.tv_sec * 1000;
+    current_time_msecs += current_time.tv_usec / 1000;
+
     if(ret == 0)
     {
-        /* found match in cache; destroy old payload, replace, and
-         * refresh time stamp
-         */
+        /* Update the dynamic attrs' timestamp */
+        ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
+
+        /* Copy out previous timestamps */
+        ((struct acache_payload *)payload)->msecs_security = 
+            ((struct acache_payload *)(tmp_entry->payload))->msecs_security;
+
+        /* TODO Potentially invalidate msecs_security here if expired? */
+
+
+        /* Free the entry's old payload */
         instance->free_payload(tmp_entry->payload);
+
+        /* Point to the new one */
         tmp_entry->payload = payload;
         ret = PINT_tcache_refresh_entry(instance, tmp_entry);
         /* this counts as an update of an existing entry */
@@ -1015,6 +1035,10 @@ static void load_payload(struct PINT_tcache* instance,
     }
     else
     {
+        /* Set the timestamps we'll track outside of tcache control */
+        ((struct acache_payload *)payload)->msecs_security = current_time_msecs;
+        ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
+
         /* not found in cache; insert new payload*/
         ret = PINT_tcache_insert_entry(instance, 
             &refn, payload, &purged);
