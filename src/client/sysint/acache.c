@@ -385,7 +385,7 @@ int PINT_acache_get_cached_entry(
     }
     */
   
-    /* lookup non-static components */
+    /* lookup */
     ret = PINT_tcache_lookup(acache, &refn, &tmp_entry, &status);
     if(ret < 0 || status != 0)
     {
@@ -411,24 +411,8 @@ int PINT_acache_get_cached_entry(
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
 
-    /* Check to see if either the security or dynamic attrs have expired. */
-    if((current_time_msecs - tmp_payload->msecs_security) > 
-        SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS)
-    {
-        security_expired = 1;
-
-        /* Fetch/update security attr */
-
-    }
-
-    if((current_time_msecs - tmp_payload->msecs_dynamic) >
-        DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
-    {
-        dynamic_attrs_expired = 1;
-
-        /* Fetch/update dynamic attrs */
-
-    }
+    /* Reset Dynamic attrs timestamp since it was hit regardless of timeout. */
+    tmp_payload->msecs_dynamic = current_time_msecs;
 
 
 #if 0
@@ -655,6 +639,9 @@ int PINT_acache_update(
     /* unsigned int enabled; */
     uint32_t old_mask;
     int ret = -1;
+    /* Storage of current time */
+    struct timeval current_time = { 0, 0};
+    uint64_t current_time_msecs = 0;
 
     /* skip out immediately if the cache is disabled */
     /*
@@ -735,14 +722,19 @@ int PINT_acache_update(
     /* do we have size or other non-static fields? */
     if(size || (attr && (attr->mask & (~(PVFS_STATIC_ATTR_MASK)))))
     {
-        tmp_payload = 
-            (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
+        /* Allocate memory for acache payload if not previously done. */
         if(!tmp_payload)
         {
-            ret = -PVFS_ENOMEM;
-            goto err;
-        }
-        tmp_payload->refn = refn;
+            tmp_payload = 
+                (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
+            if(!tmp_payload)
+            {
+                ret = -PVFS_ENOMEM;
+                goto err;
+            }
+            tmp_payload->refn = refn;
+        }        
+
         tmp_payload->attr_status = -PVFS_ETIME;
         tmp_payload->size_status = -PVFS_ETIME;
 
@@ -769,7 +761,20 @@ int PINT_acache_update(
         }
  
     }
-   
+
+    /* Get the time of day and convert to millisecond resolution. */
+    gettimeofday(&current_time, NULL);
+    current_time_msecs = current_time.tv_sec * 1000;
+    current_time_msecs += current_time.tv_usec / 1000;
+
+    /* See if the security attr timestamp has been set, if not then set it. */
+    if(!tmp_payload->msecs_security)
+    {
+        tmp_payload->msecs_security = current_time_msecs;
+    }
+    /* Update the dynamic attrs' timestamp regardless of if it has already been set. */
+    tmp_payload->msecs_dynamic = current_time_msecs;
+
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): attr_status=%d, size_status=%d\n",
                  tmp_payload->attr_status, tmp_payload->size_status);
