@@ -27,11 +27,9 @@
 #define ACACHE_DEFAULT_RECLAIM_PERCENTAGE 25
 #define ACACHE_DEFAULT_REPLACE_ALGORITHM LEAST_RECENTLY_USED
 
-/* this one is modeled after TROVE_DEFAULT_HANDLE_PURGATORY_SEC */
 #define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 18000000    /* 5 hours      */
 #define DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS 5000       /* 5 seconds    */
 #define SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
-
 
 struct PINT_perf_key acache_keys[] = 
 {
@@ -408,7 +406,7 @@ int PINT_acache_get_cached_entry(
     }
 
 
-    /* Get the time of day and store in millisecond resolution format */
+    /* Get the time of day and store as milliseconds */
     gettimeofday(&current_time, NULL);
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
@@ -435,7 +433,7 @@ int PINT_acache_get_cached_entry(
 
     }
 
-    /* Reset Dynamic attrs timestamp since it was hit regardless */
+    /* Reset Dynamic attrs timestamp since it was hit  */
     tmp_payload->msecs_dynamic = current_time_msecs;
 
 #if 0
@@ -775,7 +773,6 @@ int PINT_acache_update(
  
     }
 
-
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): attr_status=%d, size_status=%d\n",
                  tmp_payload->attr_status, tmp_payload->size_status);
@@ -1007,7 +1004,7 @@ static void load_payload(struct PINT_tcache* instance,
                              &tmp_entry,
                              &status);
 
-    /* Get the time of day and convert to millisecond resolution. */
+    /* Get the time of day and convert to milliseconds. */
     gettimeofday(&current_time, NULL);
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
