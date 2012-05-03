@@ -27,9 +27,9 @@
 #define ACACHE_DEFAULT_RECLAIM_PERCENTAGE 25
 #define ACACHE_DEFAULT_REPLACE_ALGORITHM LEAST_RECENTLY_USED
 
-#define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 18000000    /* 5 hours      */
+#define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000     /* 2 hours      */
+#define CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
 #define DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS 5000       /* 5 seconds    */
-#define SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
 
 struct PINT_perf_key acache_keys[] = 
 {
@@ -67,7 +67,8 @@ struct acache_payload
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
 
-    uint64_t msecs_security; /**< Time when the security attr was refreshed.  */
+    /* Additional time stamps */
+    uint64_t msecs_capabilities; /**< Time when the capabilities attr was refreshed.  */
     uint64_t msecs_dynamic;  /**< Time when the dynamic attrs were refreshed. */
 };
  
@@ -352,8 +353,8 @@ int PINT_acache_get_cached_entry(
     /* Storage of current time */
     struct timeval current_time = { 0, 0};
     uint64_t current_time_msecs = 0;
-    /* Flags indicating whether dynamic attrs or security attr have expired. */
-    unsigned char security_expired = 0;
+    /* Flags indicating whether dynamic attrs or capabilities attr have expired. */
+    unsigned char capabilities_expired = 0;
     unsigned char dynamic_attrs_expired = 0;
   
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%llu\n",
@@ -411,26 +412,30 @@ int PINT_acache_get_cached_entry(
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
 
-    if((current_time_msecs - tmp_payload->msecs_security) >
-        SECURITY_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    if((current_time_msecs - tmp_payload->msecs_capabilities) >
+        CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS)
     {
-        security_expired = 1;
-
-        /* TODO Fetch/update only security attr */
-
-
-        tmp_payload->msecs_security = current_time_msecs;
+        capabilities_expired = 1;
+        /* Invalidate entire entry */
+        PINT_tcache_delete(acache, tmp_entry);
+        PINT_perf_count(acache_pc, PERF_ACACHE_DELETIONS, 1,
+            PINT_PERF_ADD);
+        /* set the new current number of entries */
+        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
+            acache->num_entries, PINT_PERF_SET);
     }
+    
 
     /* Check to see if dynamic attrs have expired. */
     if((current_time_msecs - tmp_payload->msecs_dynamic) >
         DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
     {
         dynamic_attrs_expired = 1;
-
-        /* TODO Fetch/update dynamic attrs */
-
-
+        /* Mark the dynamic attrs invalid */
+        tmp_payload->attr_status = -PVFS_ETIME;
+        *attr_status = -PVFS_ETIME;
+        tmp_payload->size_status = -PVFS_ETIME;
+        *size_status = -PVFS_ETIME;
     }
 
     /* Reset Dynamic attrs timestamp since it was hit  */
@@ -534,7 +539,7 @@ int PINT_acache_get_cached_entry(
                  "size_status=%d, attr_status=%d\n",
                  llu(refn.handle), *size_status, *attr_status);
   
-    if(*size_status == 0 || *attr_status == 0)
+    if(*size_status == 0 || *attr_status == 0) /* TODO what about the static attrs? */
     {
         /* return success if we got _anything_ out of the cache */
         return(0);
@@ -730,7 +735,7 @@ int PINT_acache_update(
         }
     }
 
-    /* do we have size or other non-static fields? */
+    /* do we have size or other non-static fields? TODO non-static fields in the attr-mask? */
     if(size || (attr && (attr->mask & (~(PVFS_STATIC_ATTR_MASK)))))
     {
         /* Allocate memory for acache payload if not previously done. */
@@ -1014,12 +1019,9 @@ static void load_payload(struct PINT_tcache* instance,
         /* Update the dynamic attrs' timestamp */
         ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
 
-        /* Copy out previous timestamps */
-        ((struct acache_payload *)payload)->msecs_security = 
-            ((struct acache_payload *)(tmp_entry->payload))->msecs_security;
-
-        /* TODO Potentially invalidate msecs_security here if expired? */
-
+        /* Copy out previous timestamps */ 
+        ((struct acache_payload *)payload)->msecs_capabilities = 
+            ((struct acache_payload *)(tmp_entry->payload))->msecs_capabilities;
 
         /* Free the entry's old payload */
         instance->free_payload(tmp_entry->payload);
@@ -1033,7 +1035,7 @@ static void load_payload(struct PINT_tcache* instance,
     else
     {
         /* Set the timestamps we'll track outside of tcache control */
-        ((struct acache_payload *)payload)->msecs_security = current_time_msecs;
+        ((struct acache_payload *)payload)->msecs_capabilities = current_time_msecs;
         ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
 
         /* not found in cache; insert new payload*/
