@@ -28,7 +28,9 @@
 #define ACACHE_DEFAULT_REPLACE_ALGORITHM LEAST_RECENTLY_USED
 
 #define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000     /* 2 hours      */
+#if 0
 #define CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
+#endif
 #define DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS 5000       /* 5 seconds    */
 
 struct PINT_perf_key acache_keys[] = 
@@ -68,7 +70,9 @@ struct acache_payload
     uint32_t mirror_copies_count;
 
     /* Additional time stamps */
+    #if 0
     uint64_t msecs_capabilities; /**< Time when the capabilities attr was refreshed.  */
+    #endif
     uint64_t msecs_dynamic;  /**< Time when the dynamic attrs were refreshed. */
 };
  
@@ -272,7 +276,7 @@ int PINT_acache_get_cached_entry(
     struct timeval current_time = { 0, 0};
     uint64_t current_time_msecs = 0;
     /* Flags indicating whether dynamic attrs or capabilities attr have expired. */
-    unsigned char capabilities_expired = 0;
+    /* unsigned char capabilities_expired = 0; */
     unsigned char dynamic_attrs_expired = 0;
   
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%llu\n",
@@ -290,7 +294,7 @@ int PINT_acache_get_cached_entry(
     if(ret < 0 || status != 0)
     {
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss non-static: H=%llu\n",
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss: H=%llu\n",
                      llu(refn.handle));
         tmp_payload = NULL;
     }
@@ -312,6 +316,7 @@ int PINT_acache_get_cached_entry(
     current_time_msecs = current_time.tv_sec * 1000;
     current_time_msecs += current_time.tv_usec / 1000;
 
+    #if 0
     if((current_time_msecs - tmp_payload->msecs_capabilities) >
         CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS)
     {
@@ -327,6 +332,7 @@ int PINT_acache_get_cached_entry(
         gen_mutex_unlock(&acache_mutex);
         return(ret); /* Todo return indicating invalid credentials or -PVFS_ENOENT? */
     }
+    #endif
 
     /* Check to see if dynamic attrs have expired. */
     if((current_time_msecs - tmp_payload->msecs_dynamic) >
@@ -343,11 +349,11 @@ int PINT_acache_get_cached_entry(
     /* Reset Dynamic attrs timestamp since it was hit  */
     tmp_payload->msecs_dynamic = current_time_msecs;
 
-#if 0
+//#if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
                  "status=%d, attr_status=%d, size_status=%d\n",
                  status, tmp_payload->attr_status, tmp_payload->size_status);
-#endif
+//#endif
 
     /* copy out non-static attributes if valid */
     if(tmp_payload && tmp_payload->attr_status == 0)
@@ -816,9 +822,11 @@ static void load_payload(struct PINT_tcache* instance,
         /* Update the dynamic attrs' timestamp */
         ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
 
+        #if 0
         /* Copy out previous timestamps */ 
         ((struct acache_payload *)payload)->msecs_capabilities = 
             ((struct acache_payload *)(tmp_entry->payload))->msecs_capabilities;
+        #endif
 
         /* Free the entry's old payload */
         instance->free_payload(tmp_entry->payload);
@@ -832,7 +840,7 @@ static void load_payload(struct PINT_tcache* instance,
     else
     {
         /* Set the timestamps we'll track outside of tcache control */
-        ((struct acache_payload *)payload)->msecs_capabilities = current_time_msecs;
+        /* ((struct acache_payload *)payload)->msecs_capabilities = current_time_msecs; */
         ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
 
         /* not found in cache; insert new payload*/
