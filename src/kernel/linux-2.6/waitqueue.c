@@ -366,7 +366,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
         pvfs2_clean_up_interrupted_operation(op);
         ret = -EINTR;
         break;
-    }
+    }/*end while*/
 
     set_current_state(TASK_RUNNING);
 

@@ -6,6 +6,13 @@ http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
 Stable
 
+* Bug fix:  modified pvfs2_readdir, which is executed by the kernel module
+* on behalf of an "ls", to properly retry or quit when pvfs2-client-core
+* aborts/restarts or when pvfs2-client terminates.  Prior to these
+* changes, pvfs2_readdir could possibly corrupt another process's "ls"
+* command by releasing access to a shared memory buffer index that may
+* be legitimately in use.
+
 * Bug fix:  modified the kernel code to re-post data to the shared memory
 * system (for I/O requests) whenever pvfs2-client-core aborts.  Because the 
 * data was not re-posted prior to these changes, the resulting file contained 
