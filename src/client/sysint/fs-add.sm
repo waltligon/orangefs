@@ -220,7 +220,7 @@ PVFS_error PVFS_isys_fs_add(
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 {
     int ret = -PVFS_EINVAL, error = 0;
-    PVFS_sys_op_id op_id;
+    PVFS_sys_op_id op_id = -1;
 
     ret = PVFS_isys_fs_add(mntent, &op_id, NULL);
     if (ret)

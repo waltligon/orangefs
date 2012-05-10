@@ -54,6 +54,9 @@ the comments in that function to understand why this works.
 * Enhancement: pvfs2-ls.c - modified the display of handles from 16 characters
 to 20 characters.
 
+* Bug Fix: uninitialized variable could cause seg fault when file system 
+* cannot be initialized.
+
 orangefs-2.8.5
 
 SVN changes can be seen at
