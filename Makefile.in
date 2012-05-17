@@ -1267,7 +1267,7 @@ ifdef BUILD_KARMA
 endif
 
 ifdef BUILD_FUSE
-	install -m 755 $(FUSE) $(prefix)/bin
+	install -m 755 $(FUSE) $(bindir)
 endif
 
 	# install any development tools built
