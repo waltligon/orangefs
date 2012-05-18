@@ -200,6 +200,9 @@ void job_time_mgr_rem(struct job_desc* jd)
 
     tmp_bucket = (struct time_bucket*)jd->time_bucket;
 
+    /* this item needs to be removed before the test. Otherwise, the removal
+     * of the bucket_link will never happen and the list will grow forever */
+    qlist_del(&jd->job_time_link);
     if(qlist_empty(&tmp_bucket->jd_queue))
     {
 	/* no need for this bucket any longer; it is empty */
@@ -207,7 +210,6 @@ void job_time_mgr_rem(struct job_desc* jd)
 	INIT_QLIST_HEAD(&tmp_bucket->jd_queue);
 	free(tmp_bucket);
     }
-    qlist_del(&jd->job_time_link);
     jd->time_bucket = NULL;
 
     gen_mutex_unlock(&bucket_mutex);
