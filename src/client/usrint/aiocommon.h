@@ -36,7 +36,7 @@ struct pvfs_aiocb
     struct qlist_head link;
 };
 
-void aiocommon_init(void);
+int aiocommon_init(void);
 
 int aiocommon_lio_listio(struct pvfs_aiocb *list[],
                          int nent);

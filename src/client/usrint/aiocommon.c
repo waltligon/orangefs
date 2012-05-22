@@ -30,31 +30,33 @@ static int num_aiocbs_running = 0;
 static PVFS_sys_op_id running_ops[PVFS_AIO_MAX_RUNNING] = {0};
 
 /* Initialization of PVFS AIO system */
-void aiocommon_init()
+int aiocommon_init()
 {
    /* initialize waiting, running, and finished lists for aio implementation */
    aio_waiting_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
    if (aio_waiting_list == NULL)
    {
-      return;
+      return -1;
    }
    INIT_QLIST_HEAD(aio_waiting_list);
 
    aio_running_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
    if (aio_running_list == NULL)
    {
-      return;
+      return -1;
    }
    INIT_QLIST_HEAD(aio_running_list);
 
    aio_finished_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
    if (aio_finished_list == NULL)
    {
-      return;
+      return -1;
    }
    INIT_QLIST_HEAD(aio_finished_list);
    
    gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
+
+   return 0;
 }
 
 /* IMPLEMENTATION OF LOW LEVEL PVFS AIO ROUTINES */

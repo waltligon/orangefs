@@ -547,8 +547,12 @@ void pvfs_sys_init_doit(void) {
     }
 #endif
 
-   /* initialize aio interface */
-   aiocommon_init();
+    /* initialize the asynchronous i/o interface */
+    rc = aiocommon_init();
+    if (rc < 0)
+    {
+       gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS AIO interface failed to initialize\n");
+    }
 }
 
 int pvfs_descriptor_table_size(void)

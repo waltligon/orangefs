@@ -36,7 +36,7 @@ int iocommon_cred(PVFS_credential **credential)
     {
         memset(&creds_buf, 0, sizeof(creds_buf));
         rc = PVFS_util_gen_credential_defaults(&creds_buf);
-        if (!rc)
+        if (rc < 0)
         {
             errno = rc;
             return -1;
@@ -46,7 +46,7 @@ int iocommon_cred(PVFS_credential **credential)
     else
     {
         rc = PVFS_util_refresh_credential(&creds_buf);
-        if (!rc)
+        if (rc < 0)
         {
             errno = rc;
             return -1;
