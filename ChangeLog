@@ -17,9 +17,6 @@ the comments in that function to understand why this works.
 
 * Bug fix: Fix invalid argument errors on chmod though pvfs2fuse
 
-* Bug fix: uninitialized variable could cause seg fault when file system 
-* cannot be initialized.
-
 orangefs-2.8.4
 * Change verisioning to no longer include dates, just increment the sub version for every release
 

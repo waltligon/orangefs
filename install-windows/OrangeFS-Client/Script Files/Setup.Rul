@@ -452,7 +452,7 @@ begin
 	    // uninstall driver
         szExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
     
-        LaunchAppAndWait(szExePath, "/r d", LAAW_OPTION_WAIT);
+        LaunchAppAndWait(szExePath, "/u d", LAAW_OPTION_WAIT);
                                        
         // remove files etc.
         FeatureRemoveAll();
