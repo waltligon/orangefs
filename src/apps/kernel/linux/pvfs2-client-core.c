@@ -3431,10 +3431,10 @@ static PVFS_error process_vfs_requests(void)
 #if 0
         /* generates too much logging, but useful sometimes */
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                 "Calling PVFS_sys_testsome for new requests\n");
+                 "Calling PVFS_sys_testany for new requests\n");
 #endif
 
-        ret = PVFS_sys_testsome(
+        ret = PVFS_sys_testany(
             op_id_array, &op_count, (void *)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 

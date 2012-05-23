@@ -658,6 +658,12 @@ PVFS_error PVFS_sys_get_info(
     unsigned int* arg);
 
 /* exported test functions for isys calls */
+int PVFS_sys_testany(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count,
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
 
 int PVFS_sys_testsome(
     PVFS_sys_op_id *op_id_array,

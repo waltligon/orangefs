@@ -120,17 +120,106 @@ static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
  *  completion array - only checks first limit slots in comp array
  *  scoots any beyond limit down for future calls
  */
-static PVFS_error completion_list_retrieve_completed(
-    PVFS_sys_op_id *op_id_array, /* out */
+static PVFS_error completion_list_retrieve_any_completed(
+   PVFS_sys_op_id *op_id_array, /* out */
+   void **user_ptr_array,       /* out if present */
+   int *error_code_array,       /* out */
+   int limit,                   /* in  */
+   int *out_count)              /* what exactly is this supposed to return */
+{
+   int i = 0, new_list_index = 0;
+   PINT_smcb *smcb = NULL;
+   PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
+   PINT_client_sm *sm_p;
+ 
+   assert(op_id_array);
+   assert(error_code_array);
+   assert(out_count);
+ 
+   memset(tmp_completion_list, 0,
+          (MAX_RETURNED_JOBS * sizeof(PINT_smcb *)));
+ 
+   gen_mutex_lock(&s_completion_list_mutex);
+   for(i = 0; i < s_completion_list_index; i++)
+   {
+       if (s_completion_list[i] == NULL)
+       {
+           continue;
+       }
+ 
+       smcb = s_completion_list[i];
+       assert(smcb);
+ 
+       if (i < limit)
+       {
+           sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+           op_id_array[i] = sm_p->sys_op_id;
+           error_code_array[i] = sm_p->error_code;
+ 
+           if (user_ptr_array)
+           {
+               /* if this smcb has been set cancelled and is a PVFS_SYS_IO
+                 * state machine then stick the user_ptr of the base frame
+                 * in to the user_ptr_array instead of the standard sm_p 
+                 * user_ptr. This prevents segfaults back in 
+                 * process_vfs_requests which expects the pointer to be a 
+                 * vfs_request.
+                 */
+               if( smcb->op_cancelled && smcb->op == PVFS_SYS_IO )
+               {
+                   PINT_client_sm *sm_base_p = PINT_sm_frame(smcb,
+                                                (-(smcb->frame_count -1)));
+                   assert(sm_base_p);
+                   gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: assignment of "
+                                "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
+                                "user_ptr(%p)\n", __func__, sm_base_p,
+                                sm_base_p->user_ptr);
+                   user_ptr_array[i] = sm_base_p->user_ptr;
+               }
+               else
+               {
+                   user_ptr_array[i] = (void *)sm_p->user_ptr;
+               }
+           }
+           s_completion_list[i] = NULL;
+ 
+           PINT_sys_release(sm_p->sys_op_id);
+       }
+       else
+       {
+           tmp_completion_list[new_list_index++] = smcb;
+       }
+   }
+   *out_count = PVFS_util_min(i, limit);
+ 
+   /* clean up and adjust the list and it's book keeping */
+   s_completion_list_index = new_list_index;
+   memcpy(s_completion_list, tmp_completion_list,
+          (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
+   
+   gen_mutex_unlock(&s_completion_list_mutex);
+   return 0;
+}
+
+/*  Moves finished jobs from the finished list if they are found in the in/out parameter op_id_array.
+ *  If nothing is passed in the op_id_array, nothing is returned. This function is to be used with 
+ *  testsome().
+ *
+ */ 
+static PVFS_error completion_list_retrieve_some_completed(
+    PVFS_sys_op_id *op_id_array, /* in/out */
     void **user_ptr_array,       /* out if present */
     int *error_code_array,       /* out */
     int limit,                   /* in  */
-    int *out_count)              /* what exactly is this supposed to return */
+    int *out_count)              /* out, number of input op_ids that completed */
 {
-    int i = 0, new_list_index = 0;
+    int i = 0, j = 0, new_list_index = 0;
+    int out_op_count = 0;
+    int found;
     PINT_smcb *smcb = NULL;
     PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
     PINT_client_sm *sm_p;
+    PVFS_sys_op_id out_ops[MAX_RETURNED_JOBS] = {0};
 
     assert(op_id_array);
     assert(error_code_array);
@@ -150,11 +239,23 @@ static PVFS_error completion_list_retrieve_completed(
         smcb = s_completion_list[i];
         assert(smcb);
 
-        if (i < limit)
+        sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+        found = 0;
+
+        /* here, we only return op_ids that were passed in via the op_id array */
+        for (j = 0; j < limit; j++)
         {
-            sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-            op_id_array[i] = sm_p->sys_op_id;
-            error_code_array[i] = sm_p->error_code;
+           if (sm_p->sys_op_id == op_id_array[j])
+           {
+              found = 1;
+              break;
+           }
+        }
+
+        if ((out_op_count < limit) && found == 1)
+        {
+            out_ops[out_op_count] = sm_p->sys_op_id;
+            error_code_array[out_op_count] = sm_p->error_code;
 
             if (user_ptr_array)
             {
@@ -174,14 +275,15 @@ static PVFS_error completion_list_retrieve_completed(
                                  "PVFS_SYS_IO user_ptr from sm_base_p(%p), "
                                  "user_ptr(%p)\n", __func__, sm_base_p, 
                                  sm_base_p->user_ptr);
-                    user_ptr_array[i] = sm_base_p->user_ptr;
+                    user_ptr_array[out_op_count] = sm_base_p->user_ptr;
                 }
                 else
                 {
-                    user_ptr_array[i] = (void *)sm_p->user_ptr;
+                    user_ptr_array[out_op_count] = (void *)sm_p->user_ptr;
                 }
             }
             s_completion_list[i] = NULL;
+            out_op_count++;
 
             PINT_sys_release(sm_p->sys_op_id);
         }
@@ -190,13 +292,16 @@ static PVFS_error completion_list_retrieve_completed(
             tmp_completion_list[new_list_index++] = smcb;
         }
     }
-    *out_count = PVFS_util_min(i, limit);
+    *out_count = out_op_count;
 
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
            (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
-    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s has %d items left on completed list\n", __func__, new_list_index);    
+    /* return only the op_ids that were found in the input list */
+    memcpy(op_id_array, out_ops, (out_op_count * sizeof(PVFS_sys_op_id)));
+
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
@@ -718,7 +823,6 @@ PVFS_error PINT_client_state_machine_test(
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(smcb);
         gen_mutex_unlock(&test_mutex);
         return 0;
     }
@@ -760,7 +864,6 @@ PVFS_error PINT_client_state_machine_test(
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(smcb);
     }
     gen_mutex_unlock(&test_mutex);
     return 0;
@@ -768,11 +871,104 @@ PVFS_error PINT_client_state_machine_test(
 
 /** Checks completion of one or more state machines.
  *
- *  If none of the state machines listed in op_id_array have completed,
- *  then progress is made on all posted state machines.
- *
  *  NOTE: checks if ANY state machine is completed and does not
- *  look at what if anything is passed in via op_id_array
+ *  look at what if anything is passed in via op_id_array. To check
+ *  on specific op_ids, use testsome().
+ */
+PVFS_error PINT_client_state_machine_testany(
+   PVFS_sys_op_id *op_id_array,  /* out */
+   int *op_count,                /* in/out */
+   void **user_ptr_array,        /* out if present */
+   int *error_code_array,        /* out */
+   int timeout_ms)
+{
+   PVFS_error ret = -PVFS_EINVAL;
+   int i = 0, limit = 0, job_count = 0;
+   PINT_smcb *smcb = NULL;
+   job_id_t job_id_array[MAX_RETURNED_JOBS];
+   job_status_s job_status_array[MAX_RETURNED_JOBS];
+   void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
+ 
+   gen_mutex_lock(&test_mutex);
+ 
+   CLIENT_SM_ASSERT_INITIALIZED();
+ 
+   if (!op_id_array || !op_count || !error_code_array)
+   {
+       PVFS_perror_gossip("PINT_client_state_machine_testany", ret);
+       gen_mutex_unlock(&test_mutex);
+       return ret;
+   }
+ 
+   if ((*op_count < 1) || (*op_count > MAX_RETURNED_JOBS))
+   {
+       PVFS_perror_gossip("testany() got invalid op_count", ret);
+       gen_mutex_unlock(&test_mutex);
+       return ret;
+   }
+ 
+   job_count = MAX_RETURNED_JOBS;
+   limit = *op_count;
+   *op_count = 0;
+ 
+   /* check for requests completed previously */
+   ret = completion_list_retrieve_any_completed(
+       op_id_array, user_ptr_array, error_code_array, limit, op_count);
+ 
+   /* return them if found */
+   if ((ret == 0) && (*op_count > 0))
+   {
+       gen_mutex_unlock(&test_mutex);
+       return ret;
+   }
+ 
+   /* see if there are requests ready to make progress */
+   ret = job_testcontext(job_id_array,
+                          &job_count, /* in/out parameter */
+                          smcb_p_array,
+                          job_status_array,
+                          timeout_ms,
+                          pint_client_sm_context);
+ 
+   assert(ret > -1); /* this assert is wrong
+                       * should at least test for
+                       * ETIMEDOUT
+                       */
+ 
+   /* do as much as we can on every job that has completed */
+   for(i = 0; i < job_count; i++)
+   {
+        smcb = (PINT_smcb *)smcb_p_array[i];
+       assert(smcb);
+ 
+       if (!PINT_smcb_complete(smcb))
+       {
+           ret = PINT_state_machine_continue(smcb, &job_status_array[i]);
+ 
+           /* (ret < 0) indicates a problem from the job system
+             * itself; the return value of the underlying operation is
+             * kept in the job status structure.
+             */
+           if (ret != SM_ACTION_DEFERRED &&
+                   ret != SM_ACTION_TERMINATE)
+           {
+               continue;
+           }
+       }
+   }
+ 
+   /* terminated SMs have added themselves to the completion list */
+   ret = completion_list_retrieve_any_completed(
+       op_id_array, user_ptr_array, error_code_array, limit, op_count);
+   gen_mutex_unlock(&test_mutex);
+   return(ret);
+}
+
+/** Checks completion of one or more state machines.
+ *
+ *  NOTE: Only checks for completion on the op_ids passed in in the op_id_array.
+ *        Progress is forced on all state machines in this context, but only the
+ *        op_ids passed in will be returned if found on the completion list.
  */
 PVFS_error PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,  /* out */
@@ -811,7 +1007,7 @@ PVFS_error PINT_client_state_machine_testsome(
     *op_count = 0;
 
     /* check for requests completed previously */
-    ret = completion_list_retrieve_completed(
+    ret = completion_list_retrieve_some_completed(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
 
     /* return them if found */
@@ -857,7 +1053,7 @@ PVFS_error PINT_client_state_machine_testsome(
     }
 
     /* terminated SMs have added themselves to the completion list */
-    ret = completion_list_retrieve_completed(
+    ret = completion_list_retrieve_some_completed(
         op_id_array, user_ptr_array, error_code_array, limit, op_count);
     gen_mutex_unlock(&test_mutex);
     return(ret);
@@ -902,7 +1098,10 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
         {
             *out_error = sm_p->error_code;
         }
+
+        conditional_remove_sm_if_in_completion_list(smcb);
     }
+
     return ret;
 }
 
@@ -1035,6 +1234,20 @@ const char *PINT_client_get_name_str(int op_type)
         }
     }
     return op_info[limit-1].type_str;
+}
+
+/* exposed wrapper around the client-state-machine testany function */
+int PVFS_sys_testany(PVFS_sys_op_id *op_id_array, /* out */
+                     int *op_count,               /* in/out */
+                     void **user_ptr_array,       /* out if present */
+                     int *error_code_array,       /* out */
+                     int timeout_ms)
+{
+   return PINT_client_state_machine_testany(op_id_array,
+                                            op_count,
+                                            user_ptr_array,
+                                            error_code_array,
+                                            timeout_ms);                    
 }
 
 /* exposed wrapper around the client-state-machine testsome function */

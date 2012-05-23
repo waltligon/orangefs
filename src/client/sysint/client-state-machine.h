@@ -669,6 +669,13 @@ PVFS_error PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code);
 
+PVFS_error PINT_client_state_machine_testany(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
+
 PVFS_error PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
     int *op_count, /* in/out */
