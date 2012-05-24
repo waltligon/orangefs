@@ -220,7 +220,7 @@ if [[ $performChanges == 1 ]]
         echo 
         echo -e "To make these changes persistent add (or adjust) the\nfollowing 2 lines in /etc/sysctl.conf:\n\n"
         echo "kernel.shmall=$NewShmall"
-        echo "kernel.hmmax=$NewShmmax"
+        echo "kernel.shmmax=$NewShmmax"
         echo -e "\n\nThen run: sysctl -p\nAfter that, restart the system and the changes should persist.\n"
     else
         exit 0
