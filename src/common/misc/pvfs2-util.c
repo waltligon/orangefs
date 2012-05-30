@@ -97,12 +97,6 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-static int PINT_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max);
-
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     char* config_server,
     char* fs_name)
@@ -1015,7 +1009,7 @@ int PVFS_util_resolve(
     /* the most common case first; just try to resolve the path that we
      * were given
      */
-    ret = PINT_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
+    ret = PVFS_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
         out_fs_path_max);
     if(ret == 0)
     {
@@ -1073,7 +1067,7 @@ int PVFS_util_resolve(
             return(-PVFS_ENOENT);
         }
 
-        ret = PINT_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
+        ret = PVFS_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
             out_fs_path_max);
         free(tmp_path);
 
@@ -1766,7 +1760,7 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
     return 0;
 }
 
-/* PINT_util_resolve_absolute()
+/* PVFS_util_resolve_absolute()
  *
  * given a local path of a file that may reside on a pvfs2 volume,
  * determine what the fsid and fs relative path is. Makes no attempt
@@ -1774,7 +1768,7 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
  *
  * returns 0 on succees, -PVFS_error on failure
  */
-static int PINT_util_resolve_absolute(
+int PVFS_util_resolve_absolute(
     const char* local_path,
     PVFS_fs_id* out_fs_id,
     char* out_fs_path,

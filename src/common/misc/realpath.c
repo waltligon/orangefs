@@ -33,13 +33,21 @@
 #ifndef WIN32
 #include <unistd.h>
 #endif
+#include <sys/syscall.h>
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
 #include "realpath.h"
-#include "pvfs2-types.h"
+#include <pvfs2-types.h>
+#include "pvfs2-util.h"
 
 #define MAX_READLINKS 32
+
+extern int PVFS_util_resolve_absolute(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max);
 
 #ifdef WIN32
 /* PINT_realpath()
@@ -82,6 +90,7 @@ int PINT_realpath(
     char *resolved_path,
     int maxreslth)
 {
+    PVFS_fs_id fs_id;
     int readlinks = 0;
     char *npath;
     char link_path[PATH_MAX + 1];
@@ -152,7 +161,29 @@ int PINT_realpath(
 
         /* See if last pathname component is a symlink. */
         *npath = '\0';
+
+#ifndef BUILD_USRINT
+        /* see if this part of the path has a PVFS mount point */
+        ret = PVFS_util_resolve_absolute(resolved_path, &fs_id,
+                                         link_path, PATH_MAX);
+        /* we don't care about the output of resolve */
+        /* link_path was just a placeholder */
+        memset(link_path, 0, PATH_MAX);
+        if (ret == 0)
+        {
+            n = readlink(resolved_path, link_path, PATH_MAX);
+        }
+        else
+        {
+            n = syscall(SYS_readlink, resolved_path, link_path, PATH_MAX);
+#if 0
+            /* this doesn't work, a syscall should certainly work */
+            n = glibc_ops.readlink(resolved_path, link_path, PATH_MAX);
+#endif
+        }
+#else
         n = readlink(resolved_path, link_path, PATH_MAX);
+#endif /* BUILD_USRINT */
         if (n < 0)
         {
             /* EINVAL means the file exists but isn't a symlink. */

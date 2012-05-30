@@ -527,8 +527,8 @@ BMILIBRARIES := lib/libbmi.a lib/libbmi.so
 endif
 
 ifdef BUILD_USRINT
-LIBRARIES_STATIC += lib/libofs.a lib/liborangepre.a
-LIBRARIES_SHARED += lib/libofs.so lib/liborangepre.so
+LIBRARIES_STATIC += lib/libofs.a lib/liborangeposix.a
+LIBRARIES_SHARED += lib/libofs.so lib/liborangeposix.so
 LIBRARIES_THREADED_STATIC += lib/libofs-threaded.a
 LIBRARIES_THREADED_SHARED += lib/libofs-threaded.so
 endif
@@ -868,13 +868,13 @@ lib/liborange.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
 	$(E)printf "GROUP ( $(LIBS) )\n" > lib/liborange.so
 
-lib/liborangepre.a: lib/libpvfs2.a
+lib/liborangeposix.a: lib/libpvfs2.a
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangepre.a
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangeposix.a
 
-lib/liborangepre.so: lib/libpvfs2.so
+lib/liborangeposix.so: lib/libpvfs2.so
 	$(Q) "  VLIB		$@"
-	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangepre.so
+	$(E)printf "GROUP ( -lofs $(LIBS) )\n" > lib/liborangeposix.so
 
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
