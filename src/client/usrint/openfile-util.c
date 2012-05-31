@@ -204,7 +204,7 @@ static int my_glibc_getcwd(char *buf, unsigned long size)
 void load_glibc(void)
 { 
     void *libc_handle;
-    libc_handle = dlopen("libc.so", RTLD_LAZY|RTLD_GLOBAL);
+    libc_handle = dlopen("libc.so.6", RTLD_LAZY|RTLD_GLOBAL);
     if (!libc_handle)
     {
         fprintf(stderr,"Failed to open libc.so\n");
