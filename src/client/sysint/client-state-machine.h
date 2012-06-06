@@ -569,6 +569,24 @@ struct PINT_client_mgmt_get_uid_list_sm
     uint32_t *uid_count;               /* out */
 };
 
+struct PINT_client_aio_open_sm
+{
+    const char *path;
+    int flags;
+    PVFS_hint file_creation_param;
+    mode_t mode;
+    pvfs_descriptor *pdir;
+    char *directory;
+    char *filename;
+    int follow_link;
+    PVFS_object_ref parent_ref;
+    PVFS_object_ref file_ref;
+
+    /* fields needed for relative lookups */
+    char *cur, *last, *start;
+    PVFS_sysresp_lookup lookup_resp;
+};
+
 typedef struct 
 {
     PVFS_dirent **dirent_array;
@@ -647,6 +665,7 @@ typedef struct PINT_client_sm
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
         struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
+        struct PINT_client_aio_open_sm;
     } u;
 } PINT_client_sm;
 
@@ -746,7 +765,8 @@ enum
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
-    PVFS_DEV_UNEXPECTED            = 400
+    PVFS_DEV_UNEXPECTED            = 400,
+    PVFS_CLIENT_AIO_OPEN           = 500
 };
 
 #define PVFS_OP_SYS_MAXVALID  21
@@ -855,6 +875,7 @@ extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_uid_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_aio_open_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
