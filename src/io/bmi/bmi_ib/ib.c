@@ -614,19 +614,24 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 	    }
 	}
 
-	bmi_ib_assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
-		      __func__, llu(mh_rts_done.mop_id));
-
+	if (rq == NULL) {
+		warning("%s: mop_id %llx in RTS_DONE message not found",
+			      __func__, llu(mh_rts_done.mop_id));
+	}
+	else {
 #if MEMCACHE_BOUNCEBUF
-	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
+		memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
 	                  rq->buflist.tot_len);
 #else
-	memcache_deregister(ib_device->memcache, &rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #endif
+	}
 
 	post_rr(c, bh);
 
-	rq->state.recv = RQ_RTS_WAITING_USER_TEST;
+	if (rq) {
+		rq->state.recv = RQ_RTS_WAITING_USER_TEST;
+	}
 
     } else if (type == MSG_BYE) {
 	/*
