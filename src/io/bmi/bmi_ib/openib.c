@@ -928,12 +928,12 @@ static int return_active_nic_handle (struct openib_device_priv* od, struct ibv_p
 		   error_xerrno(ret,"%s: couldnt close device",__func__);
 		
 		memset(hca_port,0,sizeof(struct ibv_port_attr));
-		warning("%s: found an inactive device/port\n",__func__);
+		warning("%s: found an inactive device/port",__func__);
 		
 		// if we get to num_devs, no valid devices found
 		if(i == (num_devs-1))		// FATAL
 		{
-		  warning("%s: No Active IB ports/devices found\n", __func__);
+		  warning("%s: No Active IB ports/devices found", __func__);
 		  return -ENOSYS;
 		}
 		
@@ -991,7 +991,7 @@ int openib_ib_initialize(void)
     od->ctx = ctx;
     od->nic_port = IBV_PORT;  /* maybe let this be configurable */
 
-    if(!od->ctx) warning("%s: CTX=0\n",__func__);
+    if(!od->ctx) warning("%s: CTX=0",__func__);
 
     /* get the lid and verify port state */
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
