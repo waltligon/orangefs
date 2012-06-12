@@ -2706,8 +2706,13 @@ DOTCONF_CB(get_alias_list)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     struct host_alias_s *cur_alias = NULL;
+    int i = 0;
+    int len = 0;
+    char *ptr;
 
-    assert(cmd->arg_count == 2);
+    if (cmd->arg_count < 2) {
+        return "Error: alias must include at least one bmi address";
+    }
 
     /* prevent users from adding the same alias twice */
     if(config_s->host_aliases &&
@@ -2721,7 +2726,17 @@ DOTCONF_CB(get_alias_list)
     cur_alias = (host_alias_s *)
         malloc(sizeof(host_alias_s));
     cur_alias->host_alias = strdup(cmd->data.list[0]);
-    cur_alias->bmi_address = strdup(cmd->data.list[1]);
+
+    cur_alias->bmi_address = (char *)calloc(1, 2048);
+    ptr = cur_alias->bmi_address;
+    for (i=1; i < cmd->arg_count; i++) {
+	strncat(ptr, cmd->data.list[i], 2048 - len);
+ 	len += strlen(cmd->data.list[i]);
+        if (i+1 < cmd->arg_count) {
+            strncat(ptr, ",", 2048 - len);
+        }
+ 	len++;
+    }
 
     if (!config_s->host_aliases)
     {
