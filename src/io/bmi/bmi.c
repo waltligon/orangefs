@@ -244,8 +244,14 @@ int BMI_initialize(const char *method_list,
 	    goto bmi_initialize_failure;
 	}
 
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_initialize: "
+			"method_list=%s\n", method_list);
+
 	/* Today is that day! */
 	addr_count = PINT_split_string_list(&listen_addrs, listen_addr);
+
+        gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_initialize: "
+			"listen_addr=%s\n", listen_addr);
 	
 	for (i=0; i<numreq; i++) {
 
@@ -288,6 +294,9 @@ int BMI_initialize(const char *method_list,
 		gen_mutex_unlock(&active_method_count_mutex);
 		goto bmi_initialize_failure;
 	    }
+
+            gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "BMI_initialize: "
+                "Activating %s with %s\n", requested_methods[i], this_addr); 
 
 	    ret = activate_method(requested_methods[i], this_addr, flags);
 	    if (ret < 0) {
@@ -2183,6 +2192,11 @@ activate_method(const char *name, const char *listen_addr, int flags)
 	/* this is a bit of a hack */
 	new_addr->method_type = active_method_count - 1;
     }
+
+    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, "activate_method: " 
+            "listen_addr=%s, active_method_count-1=%d, flags=%d\n",
+            listen_addr, active_method_count-1, flags); 
+
     ret = meth->initialize(new_addr, active_method_count - 1, flags);
     if (ret < 0) {
 	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
