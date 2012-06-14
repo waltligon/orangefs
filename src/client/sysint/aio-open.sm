@@ -90,7 +90,7 @@ machine pvfs2_client_aio_open_sm
     state resolve_fail_file_lookup_setup
     {
         run open_resolve_fail_file_lookup_abs;
-        OPEN_RUN_LOOKUP_SM => resolve_fail_file_lookup
+        OPEN_RUN_LOOKUP_SM => resolve_fail_file_lookup;
         default => file_found;
     }
 

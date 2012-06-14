@@ -658,7 +658,7 @@ PVFS_error PVFS_sys_get_info(
     unsigned int* arg);
 
 PVFS_error PVFS_aio_open(
-    pvfs_descriptor **fildes
+    pvfs_descriptor **fildes,
     const char *path,
     int flags,
     PVFS_hint file_creation_param,
