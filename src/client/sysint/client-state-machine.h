@@ -1,4 +1,5 @@
 /*
+ * 
  * (C) 2003 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
@@ -581,10 +582,14 @@ struct PINT_client_aio_open_sm
     int follow_link;
     PVFS_object_ref parent_ref;
     PVFS_object_ref file_ref;
+    pvfs_descriptor **pd;
 
     /* fields needed for relative lookups */
     char *cur, *last, *start;
     PVFS_sysresp_lookup lookup_resp;
+    PVFS_sysresp_getattr getattr_resp;
+    PVFS_sysresp_create create_resp;
+    PVFS_sysresp_readdir readdir_resp;
 };
 
 typedef struct 
@@ -665,7 +670,7 @@ typedef struct PINT_client_sm
         struct PINT_sysdev_unexp_sm sysdev_unexp;
         struct PINT_client_job_timer_sm job_timer;
         struct PINT_client_mgmt_get_uid_list_sm get_uid_list;
-        struct PINT_client_aio_open_sm;
+        struct PINT_client_aio_open_sm aio_open;
     } u;
 } PINT_client_sm;
 
@@ -766,7 +771,7 @@ enum
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
     PVFS_DEV_UNEXPECTED            = 400,
-    PVFS_CLIENT_AIO_OPEN           = 500
+    PVFS_AIO_OPEN                  = 500
 };
 
 #define PVFS_OP_SYS_MAXVALID  21

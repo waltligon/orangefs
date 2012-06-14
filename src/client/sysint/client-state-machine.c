@@ -1222,6 +1222,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
+        { PVFS_AIO_OPEN, "PVFS_AIO_OPEN" },
         { 0, "UNKNOWN" }
     };
 

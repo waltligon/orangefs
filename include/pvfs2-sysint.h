@@ -657,6 +657,28 @@ PVFS_error PVFS_sys_get_info(
     enum PVFS_sys_setinfo_opt option,
     unsigned int* arg);
 
+PVFS_error PVFS_aio_open(
+    pvfs_descriptor **fildes
+    const char *path,
+    int flags,
+    PVFS_hint file_creation_param,
+    mode_t mode,
+    pvfs_descriptor *pdir,
+    const PVFS_credential *credential,
+    PVFS_hint hints);
+
+PVFS_error PVFS_iaio_open(
+    pvfs_descriptor **fildes,
+    const char *path,
+    int flags,
+    PVFS_hint file_creation_param,
+    mode_t mode,
+    pvfs_descriptor *pdir,
+    const PVFS_credential *credential,
+    PVFS_sys_op_id *op_id,
+    PVFS_hint hints,
+    void *user_ptr);
+
 /* exported test functions for isys calls */
 int PVFS_sys_testany(
     PVFS_sys_op_id *op_id_array,
