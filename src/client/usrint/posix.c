@@ -18,6 +18,16 @@
 #include "posix-pvfs.h"
 #include "openfile-util.h"
 
+/**
+ * function prototypes not defined in libc, though it is a linux
+ * system call and we define it in the usr lib
+ */
+
+int getdents(unsigned int, struct dirent *, unsigned int);
+int getdents64(unsigned int, struct dirent64 *, unsigned int);
+int flock(int, int);
+int fadvise64(int, off64_t, off64_t, int);
+
 /*
  * SYSTEM CALLS
  */
@@ -1304,6 +1314,7 @@ int posix_readdir(unsigned int fd, struct dirent *dirp, unsigned int count)
     return rc;
 }
 
+
 /**
  * man page calls last arg count but is ambiguous if it is number
  * of bytes or number of records to read.  The former appears to be
@@ -1406,6 +1417,7 @@ int faccessat(int dirfd, const char *path, int mode, int flags)
     }
     return rc;
 }
+
 
 int flock(int fd, int op)
 {

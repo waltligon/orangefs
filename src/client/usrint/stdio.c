@@ -566,7 +566,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
                     (int)lseek(stream->_fileno, 0, SEEK_CUR));
 #endif
             /* write data directly */
-            rc = write(stream->_fileno, ptr + rsz_buf, rsz_extra);
+            rc = write(stream->_fileno, (char *)ptr + rsz_buf, rsz_extra);
             if (rc == -1)
             {
                 SETFLAG(stream, _IO_ERR_SEEN);
@@ -576,7 +576,7 @@ size_t fwrite_unlocked(const void *ptr, size_t size, size_t nmemb, FILE *stream)
         }
         else
         {
-            memcpy(stream->_IO_write_ptr, ptr + rsz_buf, rsz_extra);
+            memcpy(stream->_IO_write_ptr, (char *)ptr + rsz_buf, rsz_extra);
             stream->_IO_write_ptr += rsz_extra;
         }
     }
@@ -716,7 +716,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
         stream->_IO_read_ptr += rsz_buf;
     }
 
-    /* if more bytes requested */
+   /* if more bytes requested */
     if (rsz_extra)
     {
         /* if current buffer not at EOF */
@@ -726,7 +726,7 @@ size_t fread_unlocked(void *ptr, size_t size, size_t nmemb, FILE *stream)
             if (rsz_extra > (stream->_IO_buf_end - stream->_IO_buf_base))
             {
                 /* read directly from file for remainder of request */
-                bytes_read = read(stream->_fileno, ptr+rsz_buf, rsz_extra);
+                bytes_read = read(stream->_fileno, (char *)ptr+rsz_buf, rsz_extra);
                 if (bytes_read == -1)
                 {
                     SETFLAG(stream, _IO_ERR_SEEN);

@@ -385,7 +385,6 @@ typedef struct
     /*  buffer and re-populate it.                                       */ 
     int uses_shared_memory;
 
-
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
 

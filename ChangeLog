@@ -6,6 +6,18 @@ http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
 Stable
 
+* New Feature: users can now specify at configure time how they want the
+* kernel module to handle the file pointer when an error occurs.  The
+* default behavior is to leave the file pointer alone, i.e., the file
+* pointer will always represent the position of the last byte written,
+* even though the user's entire request is not totally satisfied. In 
+* this case, a the actual number of bytes written is returned to the user.
+* The new feature will change this default behavior such that the file pointer
+* is repositioned to the byte just prior to the user's write request, a
+* -1 is returned to the user's call, and errno is appropriately set.  To
+* enable this feature, add --enable-reset-file-pos on the configure
+* command line when your OrangeFS system is configured.
+
 * Bug fix:  modified pvfs2_readdir, which is executed by the kernel module
 * on behalf of an "ls", to properly retry or quit when pvfs2-client-core
 * aborts/restarts or when pvfs2-client terminates.  Prior to these

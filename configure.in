@@ -298,6 +298,18 @@ fi]
 ,)
 AC_SUBST(MMAP_RA_CACHE)
 
+dnl a mechanism that resets the file position pointer when an error occurs whether
+dnl or not any bytes were written (kernel interface only).
+RESET_FILE_POS=""
+AC_ARG_ENABLE(reset-file-pos,
+[  --enable-reset-file-pos Resets file position pointer in kernel interface upon error],
+[if test "x$enableval" = "xyes" ; then
+RESET_FILE_POS="-DRESET_FILE_POS"
+fi]
+,)
+AC_SUBST(RESET_FILE_POS)
+
+
 dnl See if the --enable-trusted-connections  option was given to configure
 AC_ARG_ENABLE(trusted-connections,
 [  --enable-trusted-connections
@@ -1500,6 +1512,12 @@ if test "x$MMAP_RA_CACHE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
    AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      :  no])
 else
    AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache      : yes])
+fi
+
+if test "x$RESET_FILE_POS" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then
+   AC_MSG_RESULT([PVFS2 configured for resetting file position      :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for resetting file position      : yes])
 fi
 
 if test "x$REDHAT_RELEASE" = "x" -a "x$BUILD_BMI_ONLY" != "x1"; then

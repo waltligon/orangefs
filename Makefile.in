@@ -203,6 +203,7 @@ LIBS_THREADED += -lpvfs2-threaded @LIBS@
 DEPLIBS := @LIBS@
 ULIBDEPLIBS := -lpvfs2
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
+RESET_FILE_POS = @RESET_FILE_POS@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 NPTL_WORKAROUND = @NPTL_WORKAROUND@
@@ -432,6 +433,13 @@ endif
 # enable mmap-readahead cache (unless disabled by configure)
 ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
+endif
+
+# reset the file position pointer when a write call encounters errors (kernel only)
+# by default, this feature is disabled.  Default behavior is to increment the file
+# position pointer as bytes are written.
+ifdef RESET_FILE_POS
+CFLAGS += @RESET_FILE_POS@
 endif
 
 # enable trusted connections (unless disabled by configure)
