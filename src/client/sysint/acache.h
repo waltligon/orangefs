@@ -110,8 +110,7 @@ enum
 /** acache performance counter keys */
 extern struct PINT_perf_key acache_keys[];
 
-void PINT_acache_enable_perf_counter(struct PINT_perf_counter* pc,
-    struct PINT_perf_counter* static_pc);
+void PINT_acache_enable_perf_counter(struct PINT_perf_counter* pc);
 
 int PINT_acache_initialize(void);
 
