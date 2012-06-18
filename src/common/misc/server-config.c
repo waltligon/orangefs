@@ -128,6 +128,8 @@ static DOTCONF_CB(directio_timeout);
 static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
+static DOTCONF_CB(tree_width);
+static DOTCONF_CB(tree_threshhold);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -1030,6 +1032,14 @@ static const configoption_t options[] =
     {"SecurityTimeout", ARG_INT, get_security_timeout, NULL,
         CTX_DEFAULTS, "3600"},
 
+    /* Specifies the number of partitions to use for tree communication. */
+    {"TreeWidth", ARG_INT, tree_width, NULL,
+        CTX_FILESYSTEM, "2"},
+
+    /* Specifies the minimum number of servers to contact before tree communication kicks in. */
+    {"TreeThreshhold", ARG_INT, tree_threshhold, NULL,
+        CTX_FILESYSTEM, "2"},
+
     LAST_OPTION
 };
 
@@ -1040,7 +1050,9 @@ static const configoption_t options[] =
  *           global_config_filename - common config file for all servers
  *                                    and clients
  *           server_alias_name      - alias (if any) provided for this server
- *                                    (ignored on client side)
+ *                                    client side can provide to check
+ *                                    for a local server
+ *           server_flag            - true if running on a server
  *
  * Returns:  0 on success; 1 on failure
  *
@@ -1048,7 +1060,8 @@ static const configoption_t options[] =
 int PINT_parse_config(
     struct server_configuration_s *config_obj,
     char *global_config_filename,
-    char *server_alias_name)
+    char *server_alias_name,
+    int server_flag)
 {
     struct server_configuration_s *config_s;
     configfile_t *configfile = (configfile_t *)0;
@@ -1067,6 +1080,13 @@ int PINT_parse_config(
     {
         config_s->server_alias = strdup(server_alias_name);
     }
+    if (server_flag && !server_alias_name)
+    {
+        gossip_err("Server alias not provided for server config\n");
+        return 1;
+    }
+    config_s->server_alias = server_alias_name;
+
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
     config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
@@ -1112,21 +1132,28 @@ int PINT_parse_config(
                                 config_s, server_alias_name, &config_s->host_index);
         if (!halias || !halias->bmi_address) 
         {
-            gossip_err("Configuration file error. "
+            if (server_flag)
+            {
+                gossip_err("Configuration file error. "
                        "No host ID specified for alias %s.\n", server_alias_name);
-            return 1;
+                return 1;
+            }
         }
-        config_s->host_id = strdup(halias->bmi_address);
+        else
+        {
+            /* save alias bmi_address */
+            config_s->host_id = strdup(halias->bmi_address);
+        }
     }
 
-    if (server_alias_name && !config_s->data_path)
+    if (server_flag && !config_s->data_path)
     {
         gossip_err("Configuration file error. "
                    "No data storage path specified for alias %s.\n", server_alias_name);
         return 1;
     }
 
-    if (server_alias_name && !config_s->meta_path)
+    if (server_flag && !config_s->meta_path)
     {
         gossip_err("Configuration file error. "
                    "No metadata storage path specified for alias %s.\n", server_alias_name);
@@ -2711,8 +2738,13 @@ DOTCONF_CB(get_alias_list)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     struct host_alias_s *cur_alias = NULL;
+    int i = 0;
+    int len = 0;
+    char *ptr;
 
-    assert(cmd->arg_count == 2);
+    if (cmd->arg_count < 2) {
+        return "Error: alias must include at least one bmi address";
+    }
 
     /* prevent users from adding the same alias twice */
     if(config_s->host_aliases &&
@@ -2726,7 +2758,17 @@ DOTCONF_CB(get_alias_list)
     cur_alias = (host_alias_s *)
         malloc(sizeof(host_alias_s));
     cur_alias->host_alias = strdup(cmd->data.list[0]);
-    cur_alias->bmi_address = strdup(cmd->data.list[1]);
+
+    cur_alias->bmi_address = (char *)calloc(1, 2048);
+    ptr = cur_alias->bmi_address;
+    for (i=1; i < cmd->arg_count; i++) {
+	strncat(ptr, cmd->data.list[i], 2048 - len);
+ 	len += strlen(cmd->data.list[i]);
+        if (i+1 < cmd->arg_count) {
+            strncat(ptr, ",", 2048 - len);
+        }
+ 	len++;
+    }
 
     if (!config_s->host_aliases)
     {
@@ -3077,6 +3119,26 @@ DOTCONF_CB(get_security_timeout)
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
     config_s->security_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(tree_width)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->tree_width = cmd->data.value;
+
+    return NULL;
+}
+
+DOTCONF_CB(tree_threshhold)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    config_s->tree_threshhold = cmd->data.value;
+
     return NULL;
 }
 
@@ -3675,6 +3737,27 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     }
     if(index) *index = ind - 1;
     return ret;
+}
+
+/* the static function below allocates a new mapping structure
+ * if one is not found.  This wrapper removes it and returns
+ * NULL if not found
+ */
+struct host_handle_mapping_s *PINT_get_handle_mapping(
+        PINT_llist *list,
+        char *alias)
+{
+    struct host_handle_mapping_s *mapping;
+    mapping = get_or_add_handle_mapping(list, alias);
+    if (mapping && mapping->alias_mapping)
+    {
+        return mapping;
+    }
+    else
+    {
+        free(mapping);
+        return NULL;
+    }
 }
 
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
