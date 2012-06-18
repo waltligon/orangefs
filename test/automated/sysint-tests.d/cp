@@ -30,25 +30,25 @@ copy_test()
 }
 
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure0\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in0\
 	${PVFS2_DEST}/config0 
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure1\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in1\
 	${PVFS2_DEST}/config1 -s 128 
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure2\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in2\
 	${PVFS2_DEST}/config2 -s $((1024*1024))
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure3\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in3\
 	${PVFS2_DEST}/config3 -n 1
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure4\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in4\
 	${PVFS2_DEST}/config4 -n 4
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure5\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in5\
 	${PVFS2_DEST}/config5 -b 128
 
-copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure6\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure.in ${PVFS2_MOUNTPOINT}/configure.in6\
 	${PVFS2_DEST}/config6 -b $((1024*1024))
 
 if [ $nr_errors -ne 0 ] ; then 
