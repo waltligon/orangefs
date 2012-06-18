@@ -38,6 +38,9 @@ struct openib_device_priv {
     int nic_max_sge;
     int nic_max_wr;
 
+    /* max MTU reported by NIC port */
+    int max_mtu;
+
     /*
      * Temp array for filling scatter/gather lists to pass to IB functions,
      * allocated once at start to max size defined as reported by the qp.
@@ -90,6 +93,7 @@ static void init_connection_modify_qp(struct ibv_qp *qp,
 static void openib_post_rr(const ib_connection_t *c, struct buf_head *bh);
 int openib_ib_initialize(void);
 static void openib_ib_finalize(void);
+
 
 /*
  * Build new conneciton.
@@ -301,10 +305,16 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
     attr.max_dest_rd_atomic = 1;
     attr.ah_attr.dlid = remote_lid;
     attr.ah_attr.port_num = od->nic_port;
-    attr.path_mtu = IBV_MTU;
+    if (od->max_mtu > IBV_MTU) {
+        attr.path_mtu = od->max_mtu;
+    }
+    else {
+        attr.path_mtu = IBV_MTU;
+    }
     attr.rq_psn = 0;
     attr.dest_qp_num = remote_qp_num;
     attr.min_rnr_timer = 31;
+    debug(1, "%s: attr.path_mtu=%d", __func__, attr.path_mtu);
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
 	error_xerrno(ret, "%s: ibv_modify_qp INIT -> RTR", __func__);
@@ -322,8 +332,10 @@ static void init_connection_modify_qp(struct ibv_qp *qp, uint32_t remote_qp_num,
     attr.sq_psn = 0;
     attr.max_rd_atomic = 1;
     attr.timeout = 26;  /* 4.096us * 2^26 = 5 min */
-    attr.retry_cnt = 20;
-    attr.rnr_retry = 20;
+    attr.retry_cnt = 7;
+    attr.rnr_retry = 7;
+    debug(1, "%s: attr.timeout=%d, attr.retry_cnt=%d, attr.rnr_retry=%d", 
+	__func__, attr.timeout, attr.retry_cnt, attr.rnr_retry);
     ret = ibv_modify_qp(qp, &attr, mask);
     if (ret)
 	error_xerrno(ret, "%s: ibv_modify_qp RTR -> RTS", __func__);
@@ -691,6 +703,7 @@ static const char *openib_wc_status_string(int status)
     return s;
 }
 
+#ifdef HAVE_IBV_GET_DEVICES
 static const char *openib_port_state_string(enum ibv_port_state state)
 {
     const char *s = "(UNKNOWN)";
@@ -705,6 +718,7 @@ static const char *openib_port_state_string(enum ibv_port_state state)
     }
     return s;
 }
+#endif /* HAVE_IBV_GET_DEVICES */
 
 static const char *async_event_type_string(enum ibv_event_type event_type)
 {
@@ -731,6 +745,7 @@ static const char *async_event_type_string(enum ibv_event_type event_type)
 #ifdef HAVE_IBV_EVENT_CLIENT_REREGISTER
 	CASE(IBV_EVENT_CLIENT_REREGISTER);
 #endif
+	CASE(IBV_EVENT_GID_CHANGE);
     }
     return s;
 }
@@ -796,6 +811,7 @@ static void openib_mem_deregister(memcache_entry_t *c)
       c->buf, lld(c->len), c->memkeys.lkey, c->memkeys.rkey);
 }
 
+#ifdef HAVE_IBV_GET_DEVICES
 static struct ibv_device *get_nic_handle(void)
 {
     struct ibv_device *nic_handle;
@@ -830,6 +846,7 @@ static struct ibv_device *get_nic_handle(void)
 
     return nic_handle;
 }
+#endif /* HAVE_IBV_GET_DEVICES */
 
 static int openib_check_async_events(void)
 {
@@ -849,14 +866,104 @@ static int openib_check_async_events(void)
 }
 
 
+/* function like the original get_nic_handle, only for newer OFED
+ * versions that accept get_device_list.  This function returns
+ * the first active HCA device which returns a valid IBV_PORT_ACTIVE.
+ * 
+ * This is going to make the customizable IBV_PORT funcunality a pita.
+ * Inputs: 
+ * 	od* : preallocated from openib_ib_initialize
+ * 	ctx* : allocated by ibv_open_device inside this func, but located 
+ * 		at od->ctx
+ * 	hca_port* : hca_port attributes
+ * Returns :
+ * 	od* : possibly filled out by ibv_query_port
+ * 	ret : 0 on good, !0 on failure (FATAL)
+ * 	hca_port : queried, comes in empty
+ */
+
+static int return_active_nic_handle (struct openib_device_priv* od, struct ibv_port_attr * hca_port )
+{	
+	int ret = 0, i=0;
+	struct ibv_device *nic_handle = NULL;
+	struct ibv_device **hca_list;
+	int num_devs = 0;
+	struct ibv_context *ctx;
+	
+	/* make this configurable once we decide how 
+	 * adding more than one HCA REALLY complicates the configuable
+ 	 * nature that we had discussed */
+	od->nic_port = IBV_PORT;
+	
+	hca_list = ibv_get_device_list(&num_devs);
+	
+	if(num_devs <= 0)   			// FATAL!!
+	{
+	  error("%s : NO IB DEVICES FOUND ", __func__);
+	}
+	else 
+	{	// return a device which is active
+	  for(i=0;i<num_devs;i++)
+	  { 
+	    nic_handle = hca_list[i]; 
+		// test the device to see if active
+	    ctx = NULL;
+	    ctx = ibv_open_device(nic_handle);
+	    od->ctx=ctx;
+	    if (!od->ctx || ctx==NULL || !ctx) {
+	      error("%s: ibv_open_device", __func__);
+	      return -ENOSYS;
+            }
+ 	    ret = ibv_query_port(ctx, od->nic_port, hca_port );
+ 
+//	    ret = ibv_query_port(od->ctx, od->nic_port, hca_port );
+	    if(ret)
+		error_xerrno(ret, "%s: ibv_query_port", __func__);
+
+	    if(hca_port->state != IBV_PORT_ACTIVE)
+	    {	
+		// in this case, continue, delete old hca_port info
+		ret = ibv_close_device(od->ctx);  // not sure if this breaks
+		if(ret)
+		   error_xerrno(ret,"%s: couldnt close device",__func__);
+		
+		memset(hca_port,0,sizeof(struct ibv_port_attr));
+		warning("%s: found an inactive device/port",__func__);
+		
+		// if we get to num_devs, no valid devices found
+		if(i == (num_devs-1))		// FATAL
+		{
+		  warning("%s: No Active IB ports/devices found", __func__);
+		  return -ENOSYS;
+		}
+		
+		continue;
+	    }
+            // if we get here, we had a valid device found, done searching
+            else {
+		od->max_mtu = hca_port->max_mtu;
+	    	break; 	
+            }
+	  }
+
+	}
+
+   	VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
+	// cleanup
+	ibv_free_device_list(hca_list);
+	return 0;
+}
+
 /*
  * Startup, once per application.
  */
 int openib_ib_initialize(void)
 {
     int flags, ret = 0;
+#ifdef HAVE_IBV_GET_DEVICES
     struct ibv_device *nic_handle;
     struct ibv_context *ctx;
+#endif /* HAVE_IBV_GET_DEVICES */
     int cqe_num; /* local variables, mainly for debug */
     struct openib_device_priv *od;
     struct ibv_port_attr hca_port;
@@ -864,6 +971,10 @@ int openib_ib_initialize(void)
 
     debug(1, "%s: init", __func__);
 
+    od = bmi_ib_malloc(sizeof(*od));
+    ib_device->priv = od;
+
+#ifdef HAVE_IBV_GET_DEVICES
     nic_handle = get_nic_handle();
     if (!nic_handle) {
 	warning("%s: no NIC found", __func__);
@@ -877,29 +988,10 @@ int openib_ib_initialize(void)
 	return -ENOSYS;
     }
     VALGRIND_MAKE_MEM_DEFINED(ctx, sizeof(*ctx));
-
-    od = bmi_ib_malloc(sizeof(*od));
-    ib_device->priv = od;
-
-    /* set the function pointers for openib */
-    ib_device->func.new_connection = openib_new_connection;
-    ib_device->func.close_connection = openib_close_connection;
-    ib_device->func.drain_qp = openib_drain_qp;
-    ib_device->func.ib_initialize = openib_ib_initialize;
-    ib_device->func.ib_finalize = openib_ib_finalize;
-    ib_device->func.post_sr = openib_post_sr;
-    ib_device->func.post_rr = openib_post_rr;
-    ib_device->func.post_sr_rdmaw = openib_post_sr_rdmaw;
-    ib_device->func.check_cq = openib_check_cq;
-    ib_device->func.prepare_cq_block = openib_prepare_cq_block;
-    ib_device->func.ack_cq_completion_event = openib_ack_cq_completion_event;
-    ib_device->func.wc_status_string = openib_wc_status_string;
-    ib_device->func.mem_register = openib_mem_register;
-    ib_device->func.mem_deregister = openib_mem_deregister;
-    ib_device->func.check_async_events = openib_check_async_events;
-
     od->ctx = ctx;
     od->nic_port = IBV_PORT;  /* maybe let this be configurable */
+
+    if(!od->ctx) warning("%s: CTX=0",__func__);
 
     /* get the lid and verify port state */
     ret = ibv_query_port(od->ctx, od->nic_port, &hca_port);
@@ -918,6 +1010,40 @@ int openib_ib_initialize(void)
     if (ret)
 	error_xerrno(ret, "%s: ibv_query_device", __func__);
     VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
+#else
+    ret = return_active_nic_handle(od, &hca_port);
+    if(ret)
+	return -ENOSYS;
+#endif
+
+    //od->ctx = ctx;
+    od->nic_lid = hca_port.lid;
+
+   /* Query the device for the max_ requests and such */
+    ret = ibv_query_device(od->ctx, &hca_cap);
+    if (ret)
+	error_xerrno(ret, "%s: ibv_query_device", __func__);
+    VALGRIND_MAKE_MEM_DEFINED(&hca_cap, sizeof(hca_cap));
+
+
+    /* set the function pointers for openib */
+    ib_device->func.new_connection = openib_new_connection;
+    ib_device->func.close_connection = openib_close_connection;
+    ib_device->func.drain_qp = openib_drain_qp;
+    ib_device->func.ib_initialize = openib_ib_initialize;
+    ib_device->func.ib_finalize = openib_ib_finalize;
+    ib_device->func.post_sr = openib_post_sr;
+    ib_device->func.post_rr = openib_post_rr;
+    ib_device->func.post_sr_rdmaw = openib_post_sr_rdmaw;
+    ib_device->func.check_cq = openib_check_cq;
+    ib_device->func.prepare_cq_block = openib_prepare_cq_block;
+    ib_device->func.ack_cq_completion_event = openib_ack_cq_completion_event;
+    ib_device->func.wc_status_string = openib_wc_status_string;
+    ib_device->func.mem_register = openib_mem_register;
+    ib_device->func.mem_deregister = openib_mem_deregister;
+    ib_device->func.check_async_events = openib_check_async_events;
+
+
 
     debug(1, "%s: max %d completion queue entries", __func__, hca_cap.max_cq);
     cqe_num = IBV_NUM_CQ_ENTRIES;
@@ -946,10 +1072,10 @@ int openib_ib_initialize(void)
 	error("%s: ibv_create_cq failed", __func__);
 
     /* use non-blocking IO on the async fd and completion fd */
-    flags = fcntl(ctx->async_fd, F_GETFL);
+    flags = fcntl(od->ctx->async_fd, F_GETFL);
     if (flags < 0)
 	error_errno("%s: get async fd flags", __func__);
-    if (fcntl(ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+    if (fcntl(od->ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
 	error_errno("%s: set async fd nonblocking", __func__);
 
     flags = fcntl(od->channel->fd, F_GETFL);
@@ -993,4 +1119,7 @@ static void openib_ib_finalize(void)
     free(od);
     ib_device->priv = NULL;
 }
+
+
+
 

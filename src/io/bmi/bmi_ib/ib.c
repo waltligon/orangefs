@@ -123,23 +123,26 @@ static int ib_check_cq(void)
 	debug(4, "%s: found something", __func__);
 	++ret;
 	if (wc.status != 0) {
+	    struct buf_head *bh = ptr_from_int64(wc.id);
 	    /* opcode is not necessarily valid; only wr_id, status, qp_num,
 	     * and vendor_err can be relied upon */
 	    if (wc.opcode == BMI_IB_OP_SEND) {
-		debug(0, "%s: entry id 0x%llx SEND error %s", __func__,
-		  llu(wc.id), wc_status_string(wc.status));
+		debug(0, "%s: entry id 0x%llx SEND error %s to %s", __func__,
+		  llu(wc.id), wc_status_string(wc.status), bh->c->peername);
 		if (wc.id) {
 		    ib_connection_t *c = ptr_from_int64(wc.id);
 		    if (c->cancelled) {
 			debug(0,
 			  "%s: ignoring send error on cancelled conn to %s",
-			  __func__, c->peername);
+			  __func__, bh->c->peername);
 		    }
 		}
 	    } else {
-		error("%s: entry id 0x%llx opcode %s error %s", __func__,
+		warning("%s: entry id 0x%llx opcode %s error %s from %s", 
+		  __func__,
 		  llu(wc.id), wc_opcode_string(wc.opcode),
-		  wc_status_string(wc.status));
+		  wc_status_string(wc.status), bh->c->peername);
+		continue;
 	    }
 	}
 
@@ -611,19 +614,24 @@ encourage_recv_incoming(struct buf_head *bh, msg_type_t type, u_int32_t byte_len
 	    }
 	}
 
-	bmi_ib_assert(rq, "%s: mop_id %llx in RTS_DONE message not found",
-		      __func__, llu(mh_rts_done.mop_id));
-
+	if (rq == NULL) {
+		warning("%s: mop_id %llx in RTS_DONE message not found",
+			      __func__, llu(mh_rts_done.mop_id));
+	}
+	else {
 #if MEMCACHE_BOUNCEBUF
-	memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
+		memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf,
 	                  rq->buflist.tot_len);
 #else
-	memcache_deregister(ib_device->memcache, &rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #endif
+	}
 
 	post_rr(c, bh);
 
-	rq->state.recv = RQ_RTS_WAITING_USER_TEST;
+	if (rq) {
+		rq->state.recv = RQ_RTS_WAITING_USER_TEST;
+	}
 
     } else if (type == MSG_BYE) {
 	/*
