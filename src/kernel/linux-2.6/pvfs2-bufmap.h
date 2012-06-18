@@ -27,6 +27,8 @@ int pvfs_bufmap_shift_query(void);
 int pvfs_bufmap_initialize(
     struct PVFS_dev_map_desc *user_desc);
 
+int get_bufmap_init(void);
+
 void pvfs_bufmap_finalize(void);
 
 int pvfs_bufmap_get(

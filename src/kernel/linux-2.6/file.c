@@ -49,6 +49,9 @@ static ssize_t wait_for_iox(struct rw_options *rw,
                             struct xtvec *xtvec,
                             unsigned long xtnr_segs,
                             size_t total_size);
+#ifdef RESET_FILE_POS  
+static ssize_t do_readv_writev_wrapper( struct rw_options *rw);
+#endif
 
 #define wake_up_daemon_for_return(op)             \
 do {                                              \
@@ -175,6 +178,7 @@ struct rw_options {
         /* Contiguous file I/O operations use a single offset */
         struct {
             loff_t        *offset;
+            loff_t         offset_before_request;
         } io;
         /* Non-contiguous file I/O operations use a vector of offsets */
         struct {
@@ -450,7 +454,7 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
             || !rw->pvfs2_inode || !rw->inode || !rw->fnstr)
     {
         gossip_lerr("invalid parameters (rw: %p, vec: %p, nr_segs: %lu, "
-                "total_size: %zd)\n", rw, vec, nr_segs, total_size);
+                    "total_size: %zd)\n", rw, vec, nr_segs, total_size);
         ret = -EINVAL;
         goto out;
     }
@@ -466,6 +470,8 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
     new_op->upcall.req.io.io_type = (rw->type == IO_READV) ?
                                      PVFS_IO_READ : PVFS_IO_WRITE;
     new_op->upcall.req.io.refn = rw->pvfs2_inode->refn;
+
+populate_shared_memory:
     /* get a shared buffer index */
     ret = pvfs_bufmap_get(&buffer_index);
     if (ret < 0)
@@ -474,23 +480,58 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
                 rw->fnstr, (long) ret);
         goto out;
     }
-    gossip_debug(GOSSIP_FILE_DEBUG, "GET op %p -> buffer_index %d\n", new_op, buffer_index);
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): GET op %p -> buffer_index %d\n"
+                                  , __func__
+                                  ,rw->fnstr
+                                  , llu(rw->pvfs2_inode->refn.handle)
+                                  , new_op, buffer_index);
 
+    new_op->uses_shared_memory = 1;
     new_op->upcall.req.io.buf_index = buffer_index;
     new_op->upcall.req.io.count = total_size;
     new_op->upcall.req.io.offset = *(rw->off.io.offset);
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: copy_to_user %d nr_segs %lu, "
-            "offset: %llu total_size: %zd\n", rw->fnstr, rw->copy_to_user_addresses, 
-            nr_segs, llu(*(rw->off.io.offset)), total_size);
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): copy_to_user %d nr_segs %lu, "
+                                    "offset: %llu total_size: %zd\n"
+                                   ,__func__
+                                   ,rw->fnstr
+                                   ,llu(rw->pvfs2_inode->refn.handle)
+                                   ,rw->copy_to_user_addresses
+                                   ,nr_segs
+                                   ,llu(*(rw->off.io.offset))
+                                   ,total_size);
+
+
     /* Stage 1: copy the buffers into client-core's address space */
+    /* precopy_buffers only pertains to writes.                   */
     if ((ret = precopy_buffers(buffer_index, rw, vec, nr_segs, total_size)) < 0) 
     {
         goto out;
     }
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Calling post_io_request with tag(%d)\n"
+                                  ,__func__
+                                  ,rw->fnstr
+                                  ,llu(rw->pvfs2_inode->refn.handle)
+                                  ,(int)new_op->tag);
+
     /* Stage 2: Service the I/O operation */
     ret = service_operation(new_op, rw->fnstr,
          get_interruptible_flag(rw->inode));
+
+    /* If service_operation() returns -EAGAIN #and# the operation was purged from
+     * pvfs2_request_list or htable_ops_in_progress, then we know that the
+     * client was restarted, causing the shared memory area to be wiped clean.  To restart a 
+     * write operation in this case, we must re-copy the data from the user's iovec 
+     * to a NEW shared memory location. To restart a read operation, we must get a new
+     * shared memory location.
+    */
+    if ( ret == -EAGAIN && op_state_purged(new_op) )
+    {
+       gossip_debug(GOSSIP_WAIT_DEBUG,"%s:going to repopulate_shared_memory.\n",__func__);
+       goto populate_shared_memory;
+    }
+
 
     if (ret < 0)
     {
@@ -521,7 +562,9 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
           }
           goto out;
     }
+
     /* Stage 3: Post copy buffers from client-core's address space */
+    /* postcopy_buffers only pertains to reads.                    */
     if ((ret = postcopy_buffers(buffer_index, rw, vec, nr_segs, 
                     new_op->downcall.resp.io.amt_complete)) < 0) {
         /* put error codes in downcall so that handle_io_error()
@@ -531,8 +574,15 @@ static ssize_t wait_for_direct_io(struct rw_options *rw,
         handle_io_error();
         goto out;
     }
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Amount written as returned by the sys-io call:%d\n"
+                                  ,__func__
+                                  ,rw->fnstr
+                                  ,llu(rw->pvfs2_inode->refn.handle)
+                                  ,(int)new_op->downcall.resp.io.amt_complete);
+
     ret = new_op->downcall.resp.io.amt_complete;
-    gossip_debug(GOSSIP_FILE_DEBUG, "wait_for_io returning %ld\n", (long) ret);
+    
     /*
       tell the device file owner waiting on I/O that this read has
       completed and it can return now.  in this exact case, on
@@ -545,7 +595,10 @@ out:
     if (buffer_index >= 0)
     {
         pvfs_bufmap_put(buffer_index);
-        gossip_debug(GOSSIP_FILE_DEBUG, "PUT buffer_index %d\n", buffer_index);
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s(%llu): PUT buffer_index %d\n"
+                                      , rw->fnstr
+                                      , llu(rw->pvfs2_inode->refn.handle)
+                                      , buffer_index);
         buffer_index = -1;
     }
     if (new_op) 
@@ -1269,6 +1322,13 @@ static ssize_t do_readv_writev(struct rw_options *rw)
                                                      , max_new_nr_segs);
         goto out;
     }
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s-BEGIN/%s(%llu): count(%d) after estimate_max_iovecs.\n"
+                                  ,__func__
+                                  ,rw->fnstr
+                                  ,llu(pvfs2_inode->refn.handle)
+                                  ,(int)count);
+
     if (rw->type == IO_WRITEV)
     {
         if (!file)
@@ -1293,10 +1353,14 @@ static ssize_t do_readv_writev(struct rw_options *rw)
             gossip_err("%s: failed generic argument checks.\n", rw->fnstr);
             goto out;
         }
-        gossip_debug(GOSSIP_FILE_DEBUG, "%s: proceeding with offset : %llu, "
-                                        "size %zd\n",
-                                        rw->fnstr, llu(*offset), count);
-    }
+
+        gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): proceeding with offset : %llu, size %d\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,llu(*offset), (int)count);
+    } /*endif IO_WRITEV*/
+
     if (count == 0)
     {
         ret = 0;
@@ -1309,6 +1373,11 @@ static ssize_t do_readv_writev(struct rw_options *rw)
      * the kernel-set blocksize of PVFS2, then we split the iovecs
      * such that no iovec description straddles a block size limit
      */
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s: pvfs_bufmap_size:%d\n"
+                                  ,rw->fnstr
+                                  ,pvfs_bufmap_size_query());
+
     if (count > pvfs_bufmap_size_query())
     {
         /*
@@ -1353,10 +1422,17 @@ static ssize_t do_readv_writev(struct rw_options *rw)
     }
     ptr = iovecptr;
 
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s %zd@%llu\n", 
-            rw->fnstr, count, llu(*offset));
-    gossip_debug(GOSSIP_FILE_DEBUG, "%s: new_nr_segs: %lu, seg_count: %lu\n", 
-            rw->fnstr, new_nr_segs, seg_count);
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu) %d@%llu\n"
+                                  , __func__
+                                  , rw->fnstr
+                                  , llu(pvfs2_inode->refn.handle)
+                                  , (int)count, llu(*offset));
+    gossip_debug(GOSSIP_FILE_DEBUG, "%s/%s(%llu): new_nr_segs: %lu, seg_count: %lu\n"
+                                  , __func__
+                                  , rw->fnstr
+                                  , llu(pvfs2_inode->refn.handle)
+                                  , new_nr_segs, seg_count);
+
 #ifdef PVFS2_KERNEL_DEBUG
     for (seg = 0; seg < new_nr_segs; seg++)
     {
@@ -1395,18 +1471,43 @@ static ssize_t do_readv_writev(struct rw_options *rw)
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
         //{
             /* push the I/O directly through to storage */
-     ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
-        //}
+
+        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): size of each_count(%d)\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,(int)each_count);
+        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): BEFORE wait_for_io: offset is %d\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,(int)*offset);
+
+        ret = wait_for_direct_io(rw, ptr, seg_array[seg], each_count);
+
+        gossip_debug(GOSSIP_FILE_DEBUG,"%s%s(%llu): return from wait_for_io:%d\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,(int)ret);
+
         if (ret < 0)
         {
             goto out;
         }
+
         /* advance the iovec pointer */
         ptr += seg_array[seg];
         seg++;
         *offset += ret;
         total_count += ret;
         amt_complete = ret;
+
+        gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): AFTER wait_for_io: offset is %d\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,(int)*offset);
 
         /* if we got a short I/O operations,
          * fall out and return what we got so far 
@@ -1415,7 +1516,8 @@ static ssize_t do_readv_writev(struct rw_options *rw)
         {
             break;
         }
-    }
+    }/*end while*/
+
     if (total_count > 0)
     {
         ret = total_count;
@@ -1440,6 +1542,13 @@ out:
         }
         mark_inode_dirty_sync(inode);
     }
+
+    gossip_debug(GOSSIP_FILE_DEBUG,"%s/%s(%llu): Value(%d) returned.\n"
+                                      ,__func__
+                                      ,rw->fnstr
+                                      ,llu(pvfs2_inode->refn.handle)
+                                      ,(int)ret);
+
     return ret;
 }
 
@@ -1510,7 +1619,11 @@ ssize_t pvfs2_file_read(
     rw.readahead_size = 0;
     g_pvfs2_stats.reads++;
 
+#ifdef RESET_FILE_POS
+    return do_readv_writev_wrapper(&rw);
+#else
     return do_readv_writev(&rw);
+#endif
 }
 
 /** Write data from a contiguous user buffer into a file at a specified
@@ -1541,7 +1654,12 @@ static ssize_t pvfs2_file_write(
     rw.dest.address.nr_segs = 1;
     rw.off.io.offset = offset;
     g_pvfs2_stats.writes++;
+
+#ifdef RESET_FILE_POS
+    return do_readv_writev_wrapper(&rw);
+#else
     return do_readv_writev(&rw);
+#endif
 }
 
 /* compat code, < 2.6.19 */
@@ -2682,7 +2800,13 @@ static ssize_t do_aio_read_write(struct rw_options *rw)
     /* synchronous I/O */
     if (!rw->async)
     {
+
+#ifdef RESET_FILE_POS
+        error = do_readv_writev_wrapper(rw);
+#else
         error = do_readv_writev(rw);
+#endif
+
         /* not sure this is the correct place or way to update ki_pos but it
          * definitely needs to occur somehow. otherwise, a write following 
          * a synchronous writev will not write at the correct file position.
@@ -2875,10 +2999,6 @@ static ssize_t pvfs2_file_aio_read_iovec(struct kiocb *iocb,
                                          unsigned long nr_segs, loff_t offset)
 {
     struct rw_options rw;
-
-    gossip_err("Executing pvfs2_file_aio_read_iovec.  offset:%lld \ttotal length:%zd\n"
-              ,(long long)offset
-              ,iov_length(iov,nr_segs));
 
     memset(&rw, 0, sizeof(rw));
     rw.async = !is_sync_kiocb(iocb);
@@ -3145,6 +3265,10 @@ int pvfs2_file_release(
  */
 int pvfs2_fsync(
     struct file *file,
+#ifdef HAVE_FSYNC_LOFF_T_PARAMS
+    loff_t start,
+    loff_t end,
+#endif
 #ifdef HAVE_FSYNC_DENTRY_PARAM
     struct dentry *dentry,
 #endif
@@ -3533,6 +3657,41 @@ out:
     return err;
 }
 #endif
+
+
+#ifdef RESET_FILE_POS
+/* This function wrapper imposes the rule that the user's
+ * request was either entirely fulfilled or it wasn't.  If it wasn't,
+ * then errno will be set appropriately, -1 will be returned as the
+ * request's return value, and the file offset will be repositioned to
+ * the beginning of the request.   If it was successfully completed, then
+ * the amount written/read will be returned and the file offset will be
+ * incremented the appropriate amount.
+ */
+static ssize_t do_readv_writev_wrapper( struct rw_options *rw)
+{
+    ssize_t ret;
+    
+    gossip_err("Wrapper called.\n");
+
+    /* Save the file's current offset before issuing this read/write
+     * request.
+     */
+    rw->off.io.offset_before_request = *(rw->off.io.offset);
+
+    /* If the return code from the request is negative,
+     * restore the offset to it's original value.
+     */
+    ret = do_readv_writev(rw);
+    if (ret < 0)
+    {
+       *(rw->off.io.offset) = rw->off.io.offset_before_request;
+    }
+    return (ret);
+}
+#endif
+
+
 
 /*
  * Local variables:

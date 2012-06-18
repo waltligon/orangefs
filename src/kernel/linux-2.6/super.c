@@ -1382,7 +1382,18 @@ struct super_block *pvfs2_get_sb(
          * mount_nodev. if the kernel still has get_sb_nodev use that in
          * favor of mount_nodev to minimize changes for currently working
          * kernels. */
-#ifdef HAVE_FSTYPE_MOUNT_ONLY
+#ifdef HAVE_GETSB_NODEV
+#ifdef HAVE_VFSMOUNT_GETSB
+        ret = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
+        if (ret)
+            goto free_op;
+        sb = mnt->mnt_sb;
+#else
+        sb = get_sb_nodev(
+            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
+#endif /* HAVE_VFSMOUNT_GETSB */
+#else /* !HAVE_GETSB_NODEV */
         mnt_sb_d = mount_nodev(
                     fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
         if( !IS_ERR(mnt_sb_d) )
@@ -1394,18 +1405,7 @@ struct super_block *pvfs2_get_sb(
             sb = ERR_CAST(mnt_sb_d);
             goto free_op;
         }
-#else
-#ifdef HAVE_VFSMOUNT_GETSB
-        ret = get_sb_nodev(
-            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb, mnt);
-        if (ret)
-            goto free_op;
-        sb = mnt->mnt_sb;
-#else
-        sb = get_sb_nodev(
-            fst, flags, (void *)&mount_sb_info, pvfs2_fill_sb);
-#endif /* HAVE_VFSMOUNT_GETSB */
-#endif /* HAVE_FSTYPE_MOUNT_ONLY */
+#endif /* HAVE_GETSB_NODEV */
 
         if (sb && !IS_ERR(sb) && (PVFS2_SB(sb)))
         {

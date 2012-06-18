@@ -263,7 +263,7 @@ static int pvfs2_unlink(
     if (ret == 0)
     {
         pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
-        inode->i_nlink--;
+        pvfs2_i_drop_nlink(inode);
 
         SetMtimeFlag(dir_pinode);
         pvfs2_update_inode_time(dir);
@@ -372,7 +372,7 @@ static int pvfs2_rmdir(
     if (ret == 0)
     {
         pvfs2_inode_t *dir_pinode = PVFS2_I(dir);
-        inode->i_nlink--; 
+        pvfs2_i_drop_nlink(inode);
 #if 0
         /* NOTE: we have no good way to keep nlink consistent for directories
          * across clients; keep constant at 1  -Phil
