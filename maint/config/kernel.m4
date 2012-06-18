@@ -816,8 +816,24 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_GENERIC_PERMISSION, 1, Define if kernel has generic_permission),
 	)
 
-        dnl generic_permission in 2.6.38 and newer has a four parameter 
-        dnl signature
+        dnl generic_permission in < 2.6.38 has three parameters
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for three-param generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *f;
+	], 
+	[ 
+	        generic_permission(f, 0, NULL);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_THREE_PARAM_GENERIC_PERMISSION, 1, [Define if generic_permission takes three parameters]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl generic_permission in >= 2.6.38 and 3.0.x has four parameters
 	tmp_cflags=$CFLAGS
 	CFLAGS="$CFLAGS -Werror"
 	AC_MSG_CHECKING(for four-param generic_permission)
@@ -834,13 +850,200 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	AC_MSG_RESULT(no)
 	)
 
+        dnl generic_permission in >= 3.1.x has two parameters
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for two-param generic_permission)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+                struct inode *f;
+	], 
+	[ 
+	        generic_permission(f, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TWO_PARAM_GENERIC_PERMISSION, 1, [Define if generic_permission takes two parameters]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl set_nlink is defined in 3.2.x 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for set_nlink)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		struct inode *i;
+	], 
+	[
+		set_nlink(i, 0);
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_SET_NLINK, 1, [Define if set_nlink exists]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl inc_nlink is defined in 3.2.x 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for inc_nlink)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		struct inode *i;
+	], 
+	[
+		inc_nlink(i);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_INC_NLINK, 1, [Define if inc_nlink exists]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl drop_nlink is defined in 3.2.x 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for drop_nlink)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		struct inode *i;
+	], 
+	[
+		drop_nlink(i);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_DROP_NLINK, 1, [Define if drop_nlink exists]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl clear_nlink is defined in 3.2.x 
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for clear_nlink)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		struct inode *i;
+	], 
+	[
+		clear_nlink(i);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_I_CLEAR_NLINK, 1, [Define if clear_nlink exists]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl check for posix_acl_equiv_mode umode_t type  
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for posix_acl_equiv_mode umode_t)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct posix_acl *acl;
+		umode_t mode = 0;
+	],
+	[
+		posix_acl_equiv_mode(acl, &mode);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_EQUIV_MODE_UMODE_T, 1, [Define if posix_acl_equiv_mode accepts umode_t type]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl check for posix_acl_create
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for posix_acl_create)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct posix_acl *acl;
+		umode_t mode = 0;
+	],
+	[
+		posix_acl_create(&acl, GFP_KERNEL, &mode);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_CREATE, 1, [Define if posix_acl_create_masq accepts umode_t type]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl check for posix_acl_chmod
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for posix_acl_chmod)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct posix_acl *acl;
+		struct inode *inode;
+		umode_t mode = 0;
+	],
+	[
+		posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode );
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_CHMOD, 1, [Define if posix_acl_chmod exists]),
+	AC_MSG_RESULT(no)
+	)
+
+
+        dnl check for posix_acl_clone
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for posix_acl_clone)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		#include <linux/posix_acl.h>
+		struct posix_acl *acl;
+	],
+	[
+		posix_acl_clone(acl, GFP_KERNEL);
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_POSIX_ACL_CLONE, 1, [Define if posix_acl_clone exists]),
+	AC_MSG_RESULT(no)
+	)
+
+        dnl check for fsync with loff_t  
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS -Werror"
+	AC_MSG_CHECKING(for fsync with loff_t)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+
+		int my_fsync(struct file *, loff_t, loff_t, int);
+
+		int my_fsync(struct file *f, loff_t start, loff_t end, int datasync)
+		{
+		}
+	],
+	[
+		struct file_operations fop;
+		
+		fop.fsync = my_fsync;
+	], 
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FSYNC_LOFF_T_PARAMS, 1, [Define if fsync has loff_t params]),
+	AC_MSG_RESULT(no)
+	)
+
+
 	AC_MSG_CHECKING(for generic_getxattr api in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined
 	AC_TRY_COMPILE([
 		#define __KERNEL__
 		#include <linux/fs.h>
-				#include <linux/xattr.h>
+		#include <linux/xattr.h>
 		int generic_getxattr(struct inode *inode)
 		{
 			return 0;
