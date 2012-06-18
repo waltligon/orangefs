@@ -1,10 +1,8 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
-SVN changes can be seen at
-http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/stable
 
-Stable
+orangefs-2.8.6
 
 * New Feature: users can now specify at configure time how they want the
 * kernel module to handle the file pointer when an error occurs.  The
