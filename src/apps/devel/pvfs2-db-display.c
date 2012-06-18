@@ -43,7 +43,9 @@ typedef struct
     int verbose;
 } options_t;
 
+/* globals */
 static options_t opts;
+int hex = 0;
 
 int open_db( DB **db_p, char *path, int type, int flags);
 void close_db( DB *db_p );
@@ -240,7 +242,10 @@ void print_collection( DBT key, DBT val )
     int32_t v;
     k = key.data;
     v = *(int32_t *)val.data;
-    printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+    if (hex) 
+        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+    else
+        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
     return;
 }
 
@@ -250,7 +255,10 @@ void print_storage( DBT key, DBT val )
     int32_t v;
     k = key.data;
     v = *(int32_t *)val.data;
-    printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
+    if (hex) 
+        printf("(%s)(%d) -> (%x)(%d)\n", k, key.size, v, val.size);
+    else
+        printf("(%s)(%d) -> (%d)(%d)\n", k, key.size, v, val.size);
     return;
 }
 
@@ -262,14 +270,25 @@ void print_dspace( DBT key, DBT val )
     k = *(uint64_t *)key.data;
     v = val.data;
 
-    printf("(%llu)(%d) -> ", llu(k), key.size);
+    if (hex)
+        printf("(%llx)(%d) -> ", llu(k), key.size);
+    else
+        printf("(%llu)(%d) -> ", llu(k), key.size);
  
     print_ds_type( v->type );
 
-    printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
+    if (hex) {
+        printf("(fsid: %d)(handle: %llx)(uid: %u)(gid: %u)"
            "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
            v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
            llu(v->ctime), llu(v->mtime), llu(v->atime), val.size);
+    } 
+    else {
+        printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
+           "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
+           v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
+           llu(v->ctime), llu(v->mtime), llu(v->atime), val.size);
+    }
 
     /* union elements are not printed */
     return;
@@ -283,7 +302,10 @@ void print_keyval( DBT key, DBT val )
 
 
     k = key.data;
-    printf("(%llu)", llu(k->handle));
+    if (hex)
+        printf("(%llx)", llu(k->handle));
+    else
+        printf("(%llu)", llu(k->handle));
     if( key.size == 8 )
     {
         printf("()(%d) -> ", key.size);
@@ -291,7 +313,10 @@ void print_keyval( DBT key, DBT val )
     else if( key.size == 16 )
     {
         kh = *(uint64_t *)k->key;
-        printf("(%llu)(%d) -> ", llu(kh), key.size);
+        if (hex)
+            printf("(%llx)(%d) -> ", llu(kh), key.size);
+        else
+            printf("(%llu)(%d) -> ", llu(kh), key.size);
     }
     else
     {
@@ -304,7 +329,10 @@ void print_keyval( DBT key, DBT val )
         while(s < val.size )
         {
             vh = *(uint64_t *)(val.data + s);
-            printf("(%llu)", llu(vh));
+            if (hex)
+                printf("(%llx)", llu(vh));
+            else
+                printf("(%llu)", llu(vh));
             s += sizeof(TROVE_handle);
         }
         printf("(%d)\n", val.size);
@@ -325,13 +353,19 @@ void print_keyval( DBT key, DBT val )
     {
         /* should be cases of filename to handle */
         vh = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vh), val.size );
+        if (hex)
+            printf("(%llx)(%d)\n", llu(vh), val.size );
+        else
+            printf("(%llu)(%d)\n", llu(vh), val.size );
     }
  
     else if( (key.size == 8 || key.size == 16 ) && val.size == 4 )
     {
         vi = *(uint32_t *)val.data;
-        printf("(%u)(%d)\n", vi, val.size );
+        if (hex)
+            printf("(%x)(%d)\n", vi, val.size );
+        else
+            printf("(%u)(%d)\n", vi, val.size );
     }
 /*
  * not implemented
@@ -369,7 +403,10 @@ void print_collection_attr( DBT key, DBT val )
     if( val.size == 8 )
     {
         vu = *(uint64_t *)val.data;
-        printf("(%llu)(%d)\n", llu(vu), val.size);
+        if (hex)
+            printf("(%llx)(%d)\n", llu(vu), val.size);
+        else
+            printf("(%llu)(%d)\n", llu(vu), val.size);
     }
     else
     {
@@ -388,6 +425,7 @@ int process_args(int argc, char ** argv)
         {"verbose",0,0,0},
         {"dbpath",1,0,0},
         {"hexdir",1,0,0},
+        {"hexhandles",0,0,0},
         {0,0,0,0}
     };
 
@@ -409,6 +447,9 @@ int process_args(int argc, char ** argv)
                 break;
             case 3: /* hexdir */
                 strncpy(opts.hexdir, optarg, PATH_MAX);
+                break;
+            case 4: /* hexhandles */
+                hex = 1;
                 break;
             default:
                 print_help(argv[0]);
@@ -447,6 +488,7 @@ void print_help(char *progname)
     fprintf(stderr, "\nOptions:\n"
                     "\t--verbose\t\tEnable verbose output\n"
                     "\t--help\t\t\tThis message.\n"
+                    "\t--hexhandles\t\tPrint handles in hex\n"
                     "\t--dbpath <path>\t\tThe path of the server's "
                     "StorageSpace. The path\n\t\t\t\tshould contain "
                     "collections.db and \n\t\t\t\tstorage_attributes.db\n"
