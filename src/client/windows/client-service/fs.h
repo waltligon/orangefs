@@ -29,7 +29,8 @@ int fs_lookup(char *fs_path,
 
 int fs_create(char *fs_path,
               PVFS_credentials *credentials,
-              PVFS_handle *handle);
+              PVFS_handle *handle,
+              unsigned int perms);
 
 int fs_remove(char *fs_path,
               PVFS_credentials *credentials);
@@ -52,7 +53,8 @@ int fs_setattr(char *fs_path,
 
 int fs_mkdir(char *fs_path,
              PVFS_credentials *credentials,
-             PVFS_handle *handle);
+             PVFS_handle *handle,
+             unsigned int perms);
 
 int fs_io(enum PVFS_io_type io_type,
           char *fs_path,

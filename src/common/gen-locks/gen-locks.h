@@ -21,6 +21,9 @@
 #define __GEN_LOCKS_H
 
 #include <stdlib.h>
+#ifndef WIN32
+#include <unistd.h>
+#endif
 
 /* we will make posix locks the default unless turned off for now. */
 /* this is especially important for development in which case the locks

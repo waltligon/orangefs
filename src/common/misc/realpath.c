@@ -32,8 +32,8 @@
 #endif
 #ifndef WIN32
 #include <unistd.h>
-#endif
 #include <sys/syscall.h>
+#endif
 #include <string.h>
 #include <errno.h>
 #include <stdlib.h>
