@@ -27,8 +27,11 @@
 #define ACACHE_DEFAULT_RECLAIM_PERCENTAGE 25
 #define ACACHE_DEFAULT_REPLACE_ALGORITHM LEAST_RECENTLY_USED
 
-/* this one is modeled after TROVE_DEFAULT_HANDLE_PURGATORY_SEC */
-#define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 360000
+#define STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000     /* 2 hours      */
+#if 0
+#define CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS 7200000   /* 2 hours      */
+#endif
+#define DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS 5000       /* 5 seconds    */
 
 struct PINT_perf_key acache_keys[] = 
 {
@@ -45,23 +48,19 @@ struct PINT_perf_key acache_keys[] =
    {NULL, 0, 0},
 };
 
-/* non-static data to be stored in a cached entry */
+/* data to be stored in a cached entry */
 struct acache_payload
 {
-    PVFS_object_ref refn;    /* PVFS2 object reference */
-    PVFS_object_attr attr;   /* cached attributes */  
-    int attr_status;         /* are the attributes valid? */
-    PVFS_size size;          /* cached size */
-    int size_status;         /* is the size valid? */
-};
- 
-/* static data to be stored in a cached entry */
-struct static_payload
-{
-    PVFS_object_ref refn;    /* PVFS2 object reference */
+    /** Non-static objects */
+    PVFS_object_ref refn;    /**< PVFS2 object reference */
+    PVFS_object_attr attr;   /**< cached attributes */  
+    int attr_status;         /**< are the attributes valid? */
+    PVFS_size size;          /**< cached size */
+    int size_status;         /**< is the size valid? */
+    
+    /** Static objects */
     uint32_t mask;
 
-    /* static fields that can be cached separately */
     PVFS_ds_type objtype;
     PINT_dist *dist;
     uint32_t dist_size;
@@ -69,20 +68,23 @@ struct static_payload
     uint32_t dfile_count;
     PVFS_handle *mirror_dfile_array;
     uint32_t mirror_copies_count;
+
+    /* Additional time stamps */
+    #if 0
+    uint64_t msecs_capabilities; /**< Time when the capabilities attr was refreshed.  */
+    #endif
+    uint64_t msecs_dynamic;  /**< Time when the dynamic attrs were refreshed. */
 };
-  
+ 
 static struct PINT_tcache* acache = NULL;
-static struct PINT_tcache* static_acache = NULL;
 static gen_mutex_t acache_mutex = GEN_MUTEX_INITIALIZER;
   
 static int acache_compare_key_entry(void* key, struct qhash_head* link);
 static int acache_free_payload(void* payload);
-static int static_compare_key_entry(void* key, struct qhash_head* link);
-static int static_free_payload(void* payload);
 
 static int acache_hash_key(void* key, int table_size);
 static struct PINT_perf_counter* acache_pc = NULL;
-static struct PINT_perf_counter* static_pc = NULL;
+
 static int set_tcache_defaults(struct PINT_tcache* instance);
 
 static void load_payload(struct PINT_tcache* instance, 
@@ -94,16 +96,12 @@ static void load_payload(struct PINT_tcache* instance,
  * Enables perf counter instrumentation of the acache
  */
 void PINT_acache_enable_perf_counter(
-    struct PINT_perf_counter* pc_in, /**< counter for non static fields */
-    struct PINT_perf_counter* static_pc_in) /**< counter for static fields */
+    struct PINT_perf_counter* pc_in) /**< counter for cache fields */
 {
     gen_mutex_lock(&acache_mutex);
 
     acache_pc = pc_in;
     assert(acache_pc);
-
-    static_pc = static_pc_in;
-    assert(static_pc);
 
     /* set initial values */
     PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
@@ -113,15 +111,7 @@ void PINT_acache_enable_perf_counter(
     PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
         acache->enable, PINT_PERF_SET);
 
-    PINT_perf_count(static_pc, PERF_ACACHE_SOFT_LIMIT,
-        static_acache->soft_limit, PINT_PERF_SET);
-    PINT_perf_count(static_pc, PERF_ACACHE_HARD_LIMIT,
-        static_acache->hard_limit, PINT_PERF_SET);
-    PINT_perf_count(static_pc, PERF_ACACHE_ENABLED,
-        static_acache->enable, PINT_PERF_SET);
-
     gen_mutex_unlock(&acache_mutex);
-
     return;
 }
 
@@ -146,35 +136,12 @@ int PINT_acache_initialize(void)
         return(-PVFS_ENOMEM);
     }
  
-    static_acache = PINT_tcache_initialize(static_compare_key_entry,
-                                    acache_hash_key,
-                                    static_free_payload,
-                                    -1 /* default tcache table size */);
-    if(!static_acache)
-    {
-        PINT_tcache_finalize(acache);
-        gen_mutex_unlock(&acache_mutex);
-        return(-PVFS_ENOMEM);
-    }
-  
-    /* fill in defaults that are specific to non-static cache */
     ret = PINT_tcache_set_info(acache, TCACHE_TIMEOUT_MSECS,
-                               ACACHE_DEFAULT_TIMEOUT_MSECS);
-    if(ret < 0)
-    {
-        PINT_tcache_finalize(acache);
-        PINT_tcache_finalize(static_acache);
-        gen_mutex_unlock(&acache_mutex);
-        return(ret);
-    }
-
-    /* fill in defaults that are specific to static cache */
-    ret = PINT_tcache_set_info(static_acache, TCACHE_TIMEOUT_MSECS,
                                STATIC_ACACHE_DEFAULT_TIMEOUT_MSECS);
     if(ret < 0)
     {
         PINT_tcache_finalize(acache);
-        PINT_tcache_finalize(static_acache);
+        /* PINT_tcache_finalize(static_acache); */
         gen_mutex_unlock(&acache_mutex);
         return(ret);
     }
@@ -184,20 +151,11 @@ int PINT_acache_initialize(void)
     if(ret < 0)
     {
         PINT_tcache_finalize(acache);
-        PINT_tcache_finalize(static_acache);
+        /* PINT_tcache_finalize(static_acache); */
         gen_mutex_unlock(&acache_mutex);
         return(ret);
     }
  
-    ret = set_tcache_defaults(static_acache);
-    if(ret < 0)
-    {
-        PINT_tcache_finalize(acache);
-        PINT_tcache_finalize(static_acache);
-        gen_mutex_unlock(&acache_mutex);
-        return(ret);
-    }
-  
     gen_mutex_unlock(&acache_mutex);
     return(0);
 }
@@ -208,9 +166,7 @@ void PINT_acache_finalize(void)
     gen_mutex_lock(&acache_mutex);
 
     PINT_tcache_finalize(acache);
-    PINT_tcache_finalize(static_acache);
     acache = NULL;
-    static_acache = NULL;
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -235,7 +191,7 @@ int PINT_acache_get_info(
          * tcache
          */
         option -= STATIC_ACACHE_OPT;
-        ret = PINT_tcache_get_info(static_acache, option, arg);
+        ret = PINT_tcache_get_info(acache, option, arg);
     }
     else
     {
@@ -266,17 +222,17 @@ int PINT_acache_set_info(
          * tcache
          */
         option -= STATIC_ACACHE_OPT;
-        ret = PINT_tcache_set_info(static_acache, option, arg);
+        ret = PINT_tcache_set_info(acache, option, arg);
 
         /* record any parameter changes that may have resulted*/
-        PINT_perf_count(static_pc, PERF_ACACHE_SOFT_LIMIT,
-            static_acache->soft_limit, PINT_PERF_SET);
-        PINT_perf_count(static_pc, PERF_ACACHE_HARD_LIMIT,
-            static_acache->hard_limit, PINT_PERF_SET);
-        PINT_perf_count(static_pc, PERF_ACACHE_ENABLED,
-            static_acache->enable, PINT_PERF_SET);
-        PINT_perf_count(static_pc, PERF_ACACHE_NUM_ENTRIES,
-            static_acache->num_entries, PINT_PERF_SET);
+        PINT_perf_count(acache_pc, PERF_ACACHE_SOFT_LIMIT,
+            acache->soft_limit, PINT_PERF_SET);
+        PINT_perf_count(acache_pc, PERF_ACACHE_HARD_LIMIT,
+            acache->hard_limit, PINT_PERF_SET);
+        PINT_perf_count(acache_pc, PERF_ACACHE_ENABLED,
+            acache->enable, PINT_PERF_SET);
+        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
+            acache->num_entries, PINT_PERF_SET);
     }
     else
     {
@@ -315,8 +271,13 @@ int PINT_acache_get_cached_entry(
     int ret = -1;
     struct PINT_tcache_entry* tmp_entry;
     struct acache_payload* tmp_payload;
-    struct static_payload* tmp_static_payload;
     int status;
+    /* Storage of current time */
+    struct timeval current_time = { 0, 0};
+    uint64_t current_time_msecs = 0;
+    /* Flags indicating whether dynamic attrs or capabilities attr have expired. */
+    /* unsigned char capabilities_expired = 0; */
+    unsigned char dynamic_attrs_expired = 0;
   
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: get_cached_entry(): H=%llu\n",
                  llu(refn.handle));
@@ -328,27 +289,12 @@ int PINT_acache_get_cached_entry(
   
     gen_mutex_lock(&acache_mutex);
   
-    /* lookup static components */
-    ret = PINT_tcache_lookup(static_acache, &refn, &tmp_entry, &status);
-    if(ret < 0 || status != 0)
-    {
-        PINT_perf_count(static_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss static: H=%llu\n",
-                     llu(refn.handle));
-        tmp_static_payload = NULL;
-    }
-    else
-    {
-        PINT_perf_count(static_pc, PERF_ACACHE_HITS, 1, PINT_PERF_ADD);
-        tmp_static_payload = tmp_entry->payload;
-    }
-  
-    /* lookup non-static components */
+    /* lookup */
     ret = PINT_tcache_lookup(acache, &refn, &tmp_entry, &status);
     if(ret < 0 || status != 0)
     {
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss non-static: H=%llu\n",
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: miss: H=%llu\n",
                      llu(refn.handle));
         tmp_payload = NULL;
     }
@@ -358,18 +304,56 @@ int PINT_acache_get_cached_entry(
         tmp_payload = tmp_entry->payload;
     }
 
-    if(!tmp_payload && !tmp_static_payload)
+    if(!tmp_payload)
     {
         /* missed everything */
         gen_mutex_unlock(&acache_mutex);
         return(ret);
     }
- 
-#if 0
+
+    /* Get the time of day and store as milliseconds */
+    gettimeofday(&current_time, NULL);
+    current_time_msecs = current_time.tv_sec * 1000;
+    current_time_msecs += current_time.tv_usec / 1000;
+
+    #if 0
+    if((current_time_msecs - tmp_payload->msecs_capabilities) >
+        CAPABILITIES_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        capabilities_expired = 1;
+        /* Invalidate entire entry */
+        PINT_tcache_delete(acache, tmp_entry);
+        PINT_perf_count(acache_pc, PERF_ACACHE_DELETIONS, 1,
+            PINT_PERF_ADD);
+        /* set the new current number of entries */
+        PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
+            acache->num_entries, PINT_PERF_SET);
+        /* return since record is invalid */
+        gen_mutex_unlock(&acache_mutex);
+        return(ret); /* Todo return indicating invalid credentials or -PVFS_ENOENT? */
+    }
+    #endif
+
+    /* Check to see if dynamic attrs have expired. */
+    if((current_time_msecs - tmp_payload->msecs_dynamic) >
+        DYNAMIC_ACACHE_DEFAULT_TIMEOUT_MSECS)
+    {
+        dynamic_attrs_expired = 1;
+        /* Mark the dynamic attrs invalid */
+        tmp_payload->attr_status = -PVFS_ETIME;
+        *attr_status = -PVFS_ETIME;
+        tmp_payload->size_status = -PVFS_ETIME;
+        *size_status = -PVFS_ETIME;
+    }
+
+    /* Reset Dynamic attrs timestamp since it was hit  */
+    tmp_payload->msecs_dynamic = current_time_msecs;
+
+//#if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: "
                  "status=%d, attr_status=%d, size_status=%d\n",
                  status, tmp_payload->attr_status, tmp_payload->size_status);
-#endif
+//#endif
 
     /* copy out non-static attributes if valid */
     if(tmp_payload && tmp_payload->attr_status == 0)
@@ -392,53 +376,58 @@ int PINT_acache_get_cached_entry(
         *size_status = 0;
     }
   
-    /* copy out static attributes if valid */
-    if(tmp_static_payload)
+    /* copy out static attributes */
+    if(tmp_payload)
     {
-        attr->mask |= tmp_static_payload->mask;
-        if(tmp_static_payload->mask & PVFS_ATTR_COMMON_TYPE)
+        attr->mask |= tmp_payload->mask;
+        if(tmp_payload->mask & PVFS_ATTR_COMMON_TYPE)
         {
-            attr->objtype = tmp_static_payload->objtype;
+            attr->objtype = tmp_payload->objtype;
         }
-        if(tmp_static_payload->mask & PVFS_ATTR_META_DFILES)
+        
+        if(tmp_payload->mask & PVFS_ATTR_META_DFILES)
         {
             if(attr->u.meta.dfile_array)
                 free(attr->u.meta.dfile_array);
             attr->u.meta.dfile_array = 
-                malloc(tmp_static_payload->dfile_count*sizeof(PVFS_handle));
+                malloc(tmp_payload->dfile_count*sizeof(PVFS_handle));
             if(!attr->u.meta.dfile_array)
             {
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
             }
-            memcpy(attr->u.meta.dfile_array, tmp_static_payload->dfile_array,
-                tmp_static_payload->dfile_count*sizeof(PVFS_handle));
-            attr->u.meta.dfile_count = tmp_static_payload->dfile_count;
+            memcpy(attr->u.meta.dfile_array, tmp_payload->dfile_array,
+                tmp_payload->dfile_count*sizeof(PVFS_handle));
+            attr->u.meta.dfile_count = tmp_payload->dfile_count;
         }
-        if(tmp_static_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        
+        if(tmp_payload->mask & PVFS_ATTR_META_MIRROR_DFILES)
         {
             if(attr->u.meta.mirror_dfile_array)
                 free(attr->u.meta.mirror_dfile_array);
             attr->u.meta.mirror_dfile_array = 
-                malloc(tmp_static_payload->dfile_count*sizeof(PVFS_handle)*
-                       tmp_static_payload->mirror_copies_count);
+                malloc(tmp_payload->dfile_count*sizeof(PVFS_handle)*
+                       tmp_payload->mirror_copies_count);
+		
             if(!attr->u.meta.mirror_dfile_array)
             {
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
             }
+            
             memcpy(attr->u.meta.mirror_dfile_array
-                  ,tmp_static_payload->mirror_dfile_array
-                  ,tmp_static_payload->dfile_count*sizeof(PVFS_handle)*
-                   tmp_static_payload->mirror_copies_count);
+                  ,tmp_payload->mirror_dfile_array
+                  ,tmp_payload->dfile_count*sizeof(PVFS_handle)*
+                   tmp_payload->mirror_copies_count);
             attr->u.meta.mirror_copies_count = 
-                     tmp_static_payload->mirror_copies_count;
+                     tmp_payload->mirror_copies_count;
         }
-        if(tmp_static_payload->mask & PVFS_ATTR_META_DIST)
+        
+        if(tmp_payload->mask & PVFS_ATTR_META_DIST)
         {
             if(attr->u.meta.dist)
                 PINT_dist_free(attr->u.meta.dist);
-            attr->u.meta.dist = PINT_dist_copy(tmp_static_payload->dist);
+            attr->u.meta.dist = PINT_dist_copy(tmp_payload->dist);
             if(!attr->u.meta.dist)
             {
                 if(attr->u.meta.dfile_array)
@@ -446,7 +435,7 @@ int PINT_acache_get_cached_entry(
                 gen_mutex_unlock(&acache_mutex);
                 return(-PVFS_ENOMEM);
             }
-            attr->u.meta.dist_size = tmp_static_payload->dist_size;
+            attr->u.meta.dist_size = tmp_payload->dist_size;
         }
         *attr_status = 0;
     }
@@ -458,7 +447,7 @@ int PINT_acache_get_cached_entry(
                  "size_status=%d, attr_status=%d\n",
                  llu(refn.handle), *size_status, *attr_status);
   
-    if(*size_status == 0 || *attr_status == 0)
+    if(*size_status == 0 || *attr_status == 0) /* TODO what about the static attrs? */
     {
         /* return success if we got _anything_ out of the cache */
         return(0);
@@ -494,23 +483,9 @@ void PINT_acache_invalidate(
                         PINT_PERF_ADD);
     }
   
-    /* find out if we have static items cached */
-    ret = PINT_tcache_lookup(static_acache, 
-                             &refn,
-                             &tmp_entry,
-                             &tmp_status);
-    if(ret == 0)
-    {
-        PINT_tcache_delete(static_acache, tmp_entry);
-        PINT_perf_count(static_pc, PERF_ACACHE_DELETIONS, 1,
-                        PINT_PERF_ADD);
-    }
-
     /* set the new current number of entries */
     PINT_perf_count(acache_pc, PERF_ACACHE_NUM_ENTRIES,
                     acache->num_entries, PINT_PERF_SET);
-    PINT_perf_count(static_pc, PERF_ACACHE_NUM_ENTRIES,
-                    static_acache->num_entries, PINT_PERF_SET);
 
     gen_mutex_unlock(&acache_mutex);
     return;
@@ -569,18 +544,9 @@ int PINT_acache_update(
     PVFS_size* size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload* tmp_payload = NULL;
-    struct static_payload* tmp_static_payload = NULL;
-    unsigned int enabled;
     uint32_t old_mask;
     int ret = -1;
 
-    /* skip out immediately if the cache is disabled */
-    PINT_tcache_get_info(static_acache, TCACHE_ENABLE, &enabled);
-    if(!enabled)
-    {
-        return(0);
-    }
-    
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): H=%llu\n",
                  llu(refn.handle));
   
@@ -592,64 +558,6 @@ int PINT_acache_update(
     /* do we have static fields? */
     if(attr && (attr->mask & PVFS_STATIC_ATTR_MASK))
     {
-        tmp_static_payload = 
-            (struct static_payload*)calloc(1, sizeof(*tmp_static_payload));
-        if(!tmp_static_payload)
-        {
-            ret = -PVFS_ENOMEM;
-            goto err;
-        }
-        tmp_static_payload->refn = refn;
-        tmp_static_payload->mask = attr->mask & PVFS_STATIC_ATTR_MASK;
-        if(attr->mask & PVFS_ATTR_COMMON_TYPE)
-        {
-            tmp_static_payload->objtype = attr->objtype;
-        }
-        if(attr->mask & PVFS_ATTR_META_DFILES)
-        {
-            tmp_static_payload->dfile_array = 
-                malloc(attr->u.meta.dfile_count*sizeof(PVFS_handle));
-            if(!tmp_static_payload->dfile_array)
-            {
-                ret = -PVFS_ENOMEM;
-                goto err;
-            }
-            memcpy(tmp_static_payload->dfile_array, attr->u.meta.dfile_array,
-                attr->u.meta.dfile_count*sizeof(PVFS_handle));
-            tmp_static_payload->dfile_count = attr->u.meta.dfile_count;
-        }
-        if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
-        {
-           tmp_static_payload->mirror_dfile_array =
-                malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle) *
-                       attr->u.meta.mirror_copies_count);
-           if (!tmp_static_payload->mirror_dfile_array)
-           {
-                ret = -PVFS_ENOMEM;
-                goto err;
-           }
-           memcpy(tmp_static_payload->mirror_dfile_array
-                 ,attr->u.meta.mirror_dfile_array
-                 ,attr->u.meta.dfile_count * sizeof(PVFS_handle) *
-                  attr->u.meta.mirror_copies_count);
-           tmp_static_payload->mirror_copies_count =
-                attr->u.meta.mirror_copies_count;
-        }
-        if(attr->mask & PVFS_ATTR_META_DIST)
-        {
-            tmp_static_payload->dist = PINT_dist_copy(attr->u.meta.dist);
-            if(!tmp_static_payload->dist)
-            {
-                ret = -PVFS_ENOMEM;
-                goto err;
-            }
-            tmp_static_payload->dist_size = attr->u.meta.dist_size;
-        }
-    }
-
-    /* do we have size or other non-static fields? */
-    if(size || (attr && (attr->mask & (~(PVFS_STATIC_ATTR_MASK)))))
-    {
         tmp_payload = 
             (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
         if(!tmp_payload)
@@ -657,7 +565,71 @@ int PINT_acache_update(
             ret = -PVFS_ENOMEM;
             goto err;
         }
+        
         tmp_payload->refn = refn;
+        tmp_payload->mask = attr->mask & PVFS_STATIC_ATTR_MASK;
+        if(attr->mask & PVFS_ATTR_COMMON_TYPE)
+        {
+            tmp_payload->objtype = attr->objtype;
+        }
+        if(attr->mask & PVFS_ATTR_META_DFILES)
+        {
+            tmp_payload->dfile_array = 
+                malloc(attr->u.meta.dfile_count*sizeof(PVFS_handle));
+            if(!tmp_payload->dfile_array)
+            {
+                ret = -PVFS_ENOMEM;
+                goto err;
+            }
+            memcpy(tmp_payload->dfile_array, attr->u.meta.dfile_array,
+                attr->u.meta.dfile_count*sizeof(PVFS_handle));
+            tmp_payload->dfile_count = attr->u.meta.dfile_count;
+        }
+        if(attr->mask & PVFS_ATTR_META_MIRROR_DFILES)
+        {
+           tmp_payload->mirror_dfile_array =
+                malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle) *
+                       attr->u.meta.mirror_copies_count);
+           if (!tmp_payload->mirror_dfile_array)
+           {
+                ret = -PVFS_ENOMEM;
+                goto err;
+           }
+           memcpy(tmp_payload->mirror_dfile_array
+                 ,attr->u.meta.mirror_dfile_array
+                 ,attr->u.meta.dfile_count * sizeof(PVFS_handle) *
+                  attr->u.meta.mirror_copies_count);
+           tmp_payload->mirror_copies_count =
+                attr->u.meta.mirror_copies_count;
+        }
+        if(attr->mask & PVFS_ATTR_META_DIST)
+        {
+            tmp_payload->dist = PINT_dist_copy(attr->u.meta.dist);
+            if(!tmp_payload->dist)
+            {
+                ret = -PVFS_ENOMEM;
+                goto err;
+            }
+            tmp_payload->dist_size = attr->u.meta.dist_size;
+        }
+    }
+
+    /* do we have size or other non-static fields? TODO non-static fields in the attr-mask? */
+    if(size || (attr && (attr->mask & (~(PVFS_STATIC_ATTR_MASK)))))
+    {
+        /* Allocate memory for acache payload if not previously done. */
+        if(!tmp_payload)
+        {
+            tmp_payload = 
+                (struct acache_payload*)calloc(1, sizeof(*tmp_payload));
+            if(!tmp_payload)
+            {
+                ret = -PVFS_ENOMEM;
+                goto err;
+            }
+            tmp_payload->refn = refn;
+        }        
+
         tmp_payload->attr_status = -PVFS_ETIME;
         tmp_payload->size_status = -PVFS_ETIME;
 
@@ -684,7 +656,7 @@ int PINT_acache_update(
         }
  
     }
-   
+
 #if 0
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): attr_status=%d, size_status=%d\n",
                  tmp_payload->attr_status, tmp_payload->size_status);
@@ -692,10 +664,6 @@ int PINT_acache_update(
 
     gen_mutex_lock(&acache_mutex);
 
-    if(tmp_static_payload)
-    {
-        load_payload(static_acache, refn, tmp_static_payload, static_pc);
-    }
     if(tmp_payload)
     {
         load_payload(acache, refn, tmp_payload, acache_pc);
@@ -706,52 +674,27 @@ int PINT_acache_update(
     return(0);
 
 err:
-
-    if(tmp_static_payload)
-    {
-        if(tmp_static_payload->dfile_array)
-            free(tmp_static_payload->dfile_array);
-        if(tmp_static_payload->mirror_dfile_array)
-            free(tmp_static_payload->mirror_dfile_array);
-        if(tmp_static_payload->dist)
-            PINT_dist_free(tmp_static_payload->dist);
-        free(tmp_static_payload);
-    }
     if(tmp_payload)
     {
+	    if(tmp_payload->dfile_array)
+        {
+            free(tmp_payload->dfile_array);
+        }
+        if(tmp_payload->mirror_dfile_array)
+        {
+            free(tmp_payload->mirror_dfile_array);
+        }
+        if(tmp_payload->dist)
+        {
+            PINT_dist_free(tmp_payload->dist);
+        }
+        free(tmp_payload);
         PINT_free_object_attr(&tmp_payload->attr);
         free(tmp_payload);
     }
-    
     return(ret);
 }
   
-/* static_compare_key_entry()
- *
- * compares an opaque key (object ref in this case) against a payload to see
- * if there is a match
- *
- * returns 1 on match, 0 otherwise
- */
-static int static_compare_key_entry(void* key, struct qhash_head* link)
-{
-    PVFS_object_ref* real_key = (PVFS_object_ref*)key;
-    struct static_payload* tmp_payload = NULL;
-    struct PINT_tcache_entry* tmp_entry = NULL;
-  
-    tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
-    assert(tmp_entry);
-  
-    tmp_payload = (struct static_payload*)tmp_entry->payload;
-    if(real_key->handle == tmp_payload->refn.handle &&
-       real_key->fs_id == tmp_payload->refn.fs_id)
-    {
-        return(1);
-    }
-  
-    return(0);
-}
-
 /* acache_compare_key_entry()
  *
  * compares an opaque key (object ref in this case) against a payload to see
@@ -793,34 +736,6 @@ static int acache_hash_key(void* key, int table_size)
     return(tmp_ret);
 }
   
-/* static_free_payload()
- *
- * frees payload that has been stored in the acache 
- *
- * returns 0 on success, -PVFS_error on failure
- */
-static int static_free_payload(void* payload)
-{
-    struct static_payload* tmp_static_payload = 
-        (struct static_payload*)payload;
-  
-    if(tmp_static_payload->dfile_array)
-    {
-        free(tmp_static_payload->dfile_array);
-    }
-    if(tmp_static_payload->mirror_dfile_array)
-    {
-        free(tmp_static_payload->mirror_dfile_array);
-    }
-    if(tmp_static_payload->dist)
-    {
-        PINT_dist_free(tmp_static_payload->dist);
-    }
-    free(tmp_static_payload);
-    return(0);
-
-}
-
 /* acache_free_payload()
  *
  * frees payload that has been stored in the acache 
@@ -831,12 +746,26 @@ static int acache_free_payload(void* payload)
 {
     struct acache_payload* tmp_payload = (struct acache_payload*)payload;
   
-    PINT_free_object_attr(&tmp_payload->attr);
+    if(&tmp_payload->attr)
+      PINT_free_object_attr(&tmp_payload->attr);
+    
+    if(tmp_payload->dfile_array)
+    {
+        free(tmp_payload->dfile_array);
+    }
+    if(tmp_payload->mirror_dfile_array)
+    {
+        free(tmp_payload->mirror_dfile_array);
+    }
+    if(tmp_payload->dist)
+    {
+        PINT_dist_free(tmp_payload->dist);
+    }
+    
     free(tmp_payload);
     return(0);
 
 }
-
 
 static int set_tcache_defaults(struct PINT_tcache* instance)
 {
@@ -873,18 +802,36 @@ static void load_payload(struct PINT_tcache* instance,
     int purged;
     struct PINT_tcache_entry* tmp_entry;
     int ret;
+    /* Storage of current time */
+    struct timeval current_time = { 0, 0};
+    uint64_t current_time_msecs = 0;
 
     /* find out if the entry is already in the cache */
     ret = PINT_tcache_lookup(instance, 
                              &refn,
                              &tmp_entry,
                              &status);
+
+    /* Get the time of day and convert to milliseconds. */
+    gettimeofday(&current_time, NULL);
+    current_time_msecs = current_time.tv_sec * 1000;
+    current_time_msecs += current_time.tv_usec / 1000;
+
     if(ret == 0)
     {
-        /* found match in cache; destroy old payload, replace, and
-         * refresh time stamp
-         */
+        /* Update the dynamic attrs' timestamp */
+        ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
+
+        #if 0
+        /* Copy out previous timestamps */ 
+        ((struct acache_payload *)payload)->msecs_capabilities = 
+            ((struct acache_payload *)(tmp_entry->payload))->msecs_capabilities;
+        #endif
+
+        /* Free the entry's old payload */
         instance->free_payload(tmp_entry->payload);
+
+        /* Point to the new one */
         tmp_entry->payload = payload;
         ret = PINT_tcache_refresh_entry(instance, tmp_entry);
         /* this counts as an update of an existing entry */
@@ -892,6 +839,10 @@ static void load_payload(struct PINT_tcache* instance,
     }
     else
     {
+        /* Set the timestamps we'll track outside of tcache control */
+        /* ((struct acache_payload *)payload)->msecs_capabilities = current_time_msecs; */
+        ((struct acache_payload *)payload)->msecs_dynamic = current_time_msecs;
+
         /* not found in cache; insert new payload*/
         ret = PINT_tcache_insert_entry(instance, 
             &refn, payload, &purged);
