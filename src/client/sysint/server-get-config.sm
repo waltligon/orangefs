@@ -163,7 +163,8 @@ static int server_parse_config(
 {
     int ret = 1, template_index = 1;
     char temp_path[MAX_PATH], temp_file[MAX_PATH];
-    DWORD rc = 1, use_temp_path, bytes;
+    char *server_alias = NULL;
+    DWORD rc = 1, error, use_temp_path, bytes;
     HANDLE hFile;
 
     if (config == NULL)
@@ -208,17 +209,19 @@ static int server_parse_config(
     assert(!fs_config_buf[fs_config_buf_size - 1]);
 
     rc = WriteFile(hFile, fs_config_buf, fs_config_buf_size - 1, &bytes, NULL);
+    error = GetLastError();
     
     CloseHandle(hFile);
     
     if (rc && (bytes == fs_config_buf_size - 1))
     {
-        ret = PINT_parse_config(config, temp_file, NULL);
+        server_alias = PINT_util_guess_alias();
+        ret = PINT_parse_config(config, temp_file, server_alias, 0);
     }
     else
     {
         gossip_err("Failed to write fs.conf buffer to temp file: %s: %d\n",
-                   temp_file, GetLastError());
+                   temp_file, error);
     }    
 
     DeleteFile(temp_file);
@@ -233,6 +236,7 @@ static int server_parse_config(
 {
     int ret = 1, template_index = 1;
     int fs_fd = 0;
+    char *server_alias = NULL;
     char fs_template_array[2][64] =
     {
         ".__pvfs_fs_configXXXXXX",
@@ -267,7 +271,8 @@ static int server_parse_config(
         if (write(fs_fd,fs_config_buf, 
 		    (fs_config_buf_size - 1)) == (fs_config_buf_size - 1))
         {
-            ret = PINT_parse_config(config, fs_template, NULL);
+            server_alias = PINT_util_guess_alias();
+            ret = PINT_parse_config(config, fs_template, server_alias, 0);
         }
         else
         {

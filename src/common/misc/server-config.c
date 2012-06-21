@@ -129,7 +129,7 @@ static DOTCONF_CB(get_key_store);
 static DOTCONF_CB(get_server_key);
 static DOTCONF_CB(get_security_timeout);
 static DOTCONF_CB(tree_width);
-static DOTCONF_CB(tree_threshhold);
+static DOTCONF_CB(tree_threshold);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -1037,7 +1037,7 @@ static const configoption_t options[] =
         CTX_FILESYSTEM, "2"},
 
     /* Specifies the minimum number of servers to contact before tree communication kicks in. */
-    {"TreeThreshhold", ARG_INT, tree_threshhold, NULL,
+    {"TreeThreshold", ARG_INT, tree_threshold, NULL,
         CTX_FILESYSTEM, "2"},
 
     LAST_OPTION
@@ -3132,12 +3132,12 @@ DOTCONF_CB(tree_width)
     return NULL;
 }
 
-DOTCONF_CB(tree_threshhold)
+DOTCONF_CB(tree_threshold)
 {
     struct server_configuration_s *config_s =
         (struct server_configuration_s *)cmd->context;
 
-    config_s->tree_threshhold = cmd->data.value;
+    config_s->tree_threshold = cmd->data.value;
 
     return NULL;
 }
