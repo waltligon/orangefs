@@ -11,27 +11,6 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-int pvfs2_gen_credentials(
-    PVFS_credentials *credentials)
-{
-    int ret = -1;
-
-    if (credentials)
-    {
-        memset(credentials, 0, sizeof(PVFS_credentials));
-#ifdef HAVE_CURRENT_FSUID
-        credentials->uid = current_fsuid();
-        credentials->gid = current_fsgid();
-#else
-        credentials->uid = current->fsuid;
-        credentials->gid = current->fsgid;
-#endif
-
-        ret = 0;
-    }
-    return ret;
-}
-
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op)
 {
     PVFS_fs_id fsid = PVFS_FS_ID_NULL;
@@ -285,7 +264,7 @@ int copy_attributes_to_inode(
                  * directories across clients; keep constant at 1.  Why 1?  If
                  * we go with 2, then find(1) gets confused and won't work
                  * properly withouth the -noleaf option */
-                pvfs2_i_set_nlink(inode, 1);
+                inode->i_nlink = 1;
                 ret = 0;
                 break;
             case PVFS_TYPE_SYMLINK:
@@ -1997,9 +1976,6 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     return (ret);
 }
 
-/*
-  We want to clear everything except for rw_semaphore and the vfs_inode
-*/
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
 {
     if (!InitFlag(pvfs2_inode))

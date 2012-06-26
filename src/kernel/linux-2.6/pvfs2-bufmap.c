@@ -8,9 +8,6 @@
 #include "pint-dev-shared.h"
 
 
-DECLARE_WAIT_QUEUE_HEAD(pvfs2_bufmap_init_waitq);
-
-
 static int bufmap_page_count, pages_per_desc;
 
 static int32_t pvfs2_bufmap_desc_size, pvfs2_bufmap_desc_shift,
@@ -50,32 +47,6 @@ static struct pvfs_bufmap_desc *desc_array = NULL;
 
 static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
 static DECLARE_WAIT_QUEUE_HEAD(readdir_waitq);
-
-/* get_bufmap_init
- *
- * If bufmap_init is 1, then the shared memory system, including the 
- * buffer_index_array, is available.  Otherwise, it is not.
- *
- * returns the value of bufmap_init
- */
-int get_bufmap_init(void)
-{
-   int ret  = -EINVAL;
-   int lock = 0;
-
-   lock=down_read_trylock(&bufmap_init_sem);
-
-   if (lock == 1)
-   { /* semaphore obtained */
-     ret = bufmap_init;
-     up_read(&bufmap_init_sem);
-     return (ret);
-   }
-
-   /* semaphore locked */
-   /* value of lock will be zero */
-   return(lock);
-}
 
 static int initialize_bufmap_descriptors(int ndescs)
 {
@@ -288,17 +259,6 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
 
     bufmap_init = 1;
     up_write(&bufmap_init_sem);
-
-    /* If there are operations in pvfs2_bufmap_init_waitq, wake them up.
-     * This scenario occurs when the client-core is restarted and I/O
-     * requests in the in-progress or waiting tables are restarted.  I/O
-     * requests cannot be restarted until the shared memory system is completely
-     * re-initialized, so we put the I/O requests in this waitq until 
-     * initialization has completed.  NOTE:  the I/O requests are also on a
-     * timer, so they don't wait forever (just in case the client-core doesn't
-     * come back up.
-     */
-     wake_up_interruptible(&pvfs2_bufmap_init_waitq);
 
     gossip_debug(GOSSIP_BUFMAP_DEBUG, "pvfs_bufmap_initialize: exiting normally\n");
     return 0;

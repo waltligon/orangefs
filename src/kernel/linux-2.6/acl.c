@@ -40,6 +40,7 @@
  * Probably not in the fast-path though...
  */
 
+#ifdef PVFS_USE_OLD_ACL_FORMAT
 /*
  * PVFS2 ACL decode
  */
@@ -185,6 +186,7 @@ fail:
     gossip_err("pvfs2_acl_encode: returning EINVAL\n");
     return ERR_PTR(-EINVAL);
 }
+#endif /* PVFS_USE_OLD_ACL_FORMAT */
 
 /**
  * Routines that retrieve and/or set ACLs for PVFS2 files.
@@ -233,7 +235,11 @@ pvfs2_get_acl(struct inode *inode, int type)
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         acl = pvfs2_acl_decode(value, ret);
+#else
+        acl = posix_acl_from_xattr(value, ret);
+#endif
     }
     else if (ret == -ENODATA || ret == -ENOSYS)
     {
@@ -279,11 +285,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
             name = PVFS2_XATTR_NAME_ACL_ACCESS;
             if (acl) 
             {
-#ifdef HAVE_POSIX_ACL_EQUIV_MODE_UMODE_T
-                umode_t mode = inode->i_mode;
-#else
                 mode_t mode = inode->i_mode;
-#endif /* HAVE_POSIX_ACL_EQUIV_MODE_UMODE_T */ 
                 /* can we represent this with the UNIXy permission bits? */
                 error = posix_acl_equiv_mode(acl, &mode);
                 /* uh oh some error.. */
@@ -329,11 +331,25 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
     /* If we do have an access control list, then we need to encode that! */
     if (acl) 
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         value = pvfs2_acl_encode(acl, &size);
         if (IS_ERR(value))
         {
             return (int) PTR_ERR(value);
         }
+#else
+        value = (char *) kmalloc(PVFS_MAX_XATTR_VALUELEN, GFP_KERNEL);
+        if (IS_ERR(value)) 
+        {
+            return (int) PTR_ERR(value);
+        }
+        size = posix_acl_to_xattr(acl, value, PVFS_MAX_XATTR_VALUELEN);
+        if (size < 0)
+        {
+            error = size;
+            goto errorout;
+        }
+#endif
     }
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl: name %s, value %p, size %zd, "
             " acl %p\n", name, value, size, acl);
@@ -344,6 +360,8 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
      * does not exist.
      */
     error = pvfs2_inode_setxattr(inode, "", name, value, size, 0);
+
+errorout:
     if (value) 
     {
         kfree(value);
@@ -607,14 +625,8 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
     }
     if (get_acl_flag(inode) == 1 && acl)
     {
-#ifdef HAVE_POSIX_ACL_CREATE
-        umode_t mode;
-#elif defined(HAVE_POSIX_ACL_CLONE)
-        struct posix_acl *clone = NULL;
+        struct posix_acl *clone;
         mode_t mode;
-#else
-	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */ 
 
         if (S_ISDIR(inode->i_mode)) 
         {
@@ -626,9 +638,6 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
                 goto cleanup;
             }
         }
-#ifdef HAVE_POSIX_ACL_CREATE
-        error = posix_acl_create(&acl, GFP_KERNEL, &mode);
-#elif defined(HAVE_POSIX_ACL_CLONE)
         clone = posix_acl_clone(acl, GFP_KERNEL);
         error = -ENOMEM;
         if (!clone) {
@@ -638,18 +647,10 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
         }
         mode = inode->i_mode;
         error = posix_acl_create_masq(clone, &mode);
-#else
-	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */
         if (error >= 0)
         {
-#ifdef HAVE_POSIX_ACL_CREATE
-            gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create changed mode "
-                    "from %o to %o\n", inode->i_mode, mode);
-#else
             gossip_debug(GOSSIP_ACL_DEBUG, "posix_acl_create_masq changed mode "
                     "from %o to %o\n", inode->i_mode, mode);
-#endif /* HAVE_POSIX_ACL_CREATE */
             /*
              * Dont do a needless ->setattr() if mode has not changed 
              */
@@ -662,19 +663,11 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
              */
             if (error > 0)
             {
-#ifdef HAVE_POSIX_ACL_CREATE
-                error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
-#elif defined(HAVE_POSIX_ACL_CLONE)
                 error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, clone);
-#else 
-	#error No posix_acl_create or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CREATE */
                 gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_set_acl (access) returned %d\n", error);
             }
         }
-#ifdef HAVE_POSIX_ACL_CLONE
         posix_acl_release(clone);
-#endif /* HAVE_POSIX_ACL_CREATE */
     }
     /* If mode of the inode was changed, then do a forcible ->setattr */
     if (ModeFlag(pvfs2_inode))
@@ -693,10 +686,7 @@ cleanup:
  */
 int pvfs2_acl_chmod(struct inode *inode)
 {
-    struct posix_acl *acl = NULL;
-#ifdef HAVE_POSIX_ACL_CLONE
-    struct posix_acl *clone = NULL;
-#endif /* HAVE_POSIX_ACL_CLONE */
+    struct posix_acl *acl, *clone;
     int error;
 
     if (get_acl_flag(inode) == 0)
@@ -723,36 +713,14 @@ int pvfs2_acl_chmod(struct inode *inode)
         error = 0;
         goto out;
     }
-#ifdef HAVE_POSIX_ACL_CHMOD
-    error = posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode);
-#else
-    error = posix_acl_chmod_masq(acl, inode->i_mode);
-#endif /* HAVE_POSIX_ACL_CHMOD */
-    if (!error)
-    {
-        error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
-                "(access) returned %d\n", error);
-    }
-#ifdef HAVE_POSIX_CLONE
     clone = posix_acl_clone(acl, GFP_KERNEL);
+    posix_acl_release(acl);
     if (!clone)
     {
         gossip_err("pvfs2_acl_chmod failed with ENOMEM\n");
         error = -ENOMEM;
         goto out;
     }
-#endif /* HAVE_POSIX_CLONE */
-
-#ifdef HAVE_POSIX_ACL_CHMOD
-    error = posix_acl_chmod(&acl, GFP_KERNEL, inode->i_mode);
-    if (!error)
-    {
-        error = pvfs2_set_acl(inode, ACL_TYPE_ACCESS, acl);
-        gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_acl_chmod: pvfs2 set acl "
-                "(access) returned %d\n", error);
-    }
-#elif defined(HAVE_POSIX_ACL_CLONE)
     error = posix_acl_chmod_masq(clone, inode->i_mode);
     if (!error)
     {
@@ -761,17 +729,10 @@ int pvfs2_acl_chmod(struct inode *inode)
                 "(access) returned %d\n", error);
     }
     posix_acl_release(clone);
-#else
-	#error No posix_acl_chmod or posix_acl_clone defined
-#endif /* HAVE_POSIX_ACL_CHMOD */
-
 out:
-    posix_acl_release(acl);
     return error;
 }
 
-#if defined(HAVE_THREE_PARAM_GENERIC_PERMISSION) || \
-	defined(HAVE_FOUR_PARAM_GENERIC_PERMISSION)
 static int pvfs2_check_acl(struct inode *inode, int mask
 #ifdef HAVE_THREE_PARAM_ACL_CHECK
                            , unsigned int flags
@@ -803,8 +764,6 @@ static int pvfs2_check_acl(struct inode *inode, int mask
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_check_acl returning EAGAIN\n");
     return -EAGAIN;
 }
-#endif
-
 
 #ifdef HAVE_TWO_PARAM_PERMISSION
 int pvfs2_permission(struct inode *inode, int mask)
@@ -826,15 +785,11 @@ struct nameidata *nd)
 #ifdef HAVE_GENERIC_PERMISSION
     int ret;
 
-#if defined(HAVE_TWO_PARAM_GENERIC_PERMISSION)
-    ret = generic_permission(inode, mask); 
-#elif defined(HAVE_THREE_PARAM_GENERIC_PERMISSION)
-    ret = generic_permission(inode, mask, pvfs2_check_acl); 
-#elif defined(HAVE_FOUR_PARAM_GENERIC_PERMISSION)
-    ret = generic_permission(inode, mask, 0, pvfs2_check_acl); 
-#else
-    #error generic_permission has an unknown number of parameters
-#endif
+    ret = generic_permission(inode, mask, 
+#ifdef HAVE_FOUR_PARAM_GENERIC_PERMISSION
+                             0,
+#endif /* HAVE_FOUR_PARAM_GENERIC_PERMISSION */ 
+                             pvfs2_check_acl);
     if (ret != 0)
     {
         gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission failed: inode: %llu mask = %o"
@@ -858,7 +813,7 @@ struct nameidata *nd)
                 llu(get_handle_from_ino(inode)));
     }
     return ret;
-#else 
+#else
     /* We sort of duplicate the code below from generic_permission. */
     int mode = inode->i_mode;
     int error;
@@ -941,7 +896,7 @@ check_capabilities:
 
     gossip_debug(GOSSIP_ACL_DEBUG, "pvfs2_permission: disallowing access\n");
     return -EACCES;
-#endif /* HAVE_GENERIC_PERMISSION */
+#endif
 }
 
 #endif

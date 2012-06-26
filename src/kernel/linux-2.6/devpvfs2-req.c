@@ -632,7 +632,7 @@ static int pvfs2_devreq_release(
 {
     int unmounted = 0;
 
-    gossip_debug(GOSSIP_DEV_DEBUG, "%s:pvfs2-client-core: exiting, closing device\n",__func__);
+    gossip_debug(GOSSIP_DEV_DEBUG, "pvfs2-client-core: exiting, closing device\n");
 
     down(&devreq_semaphore);
     pvfs_bufmap_finalize();
@@ -1121,13 +1121,8 @@ static unsigned int pvfs2_devreq_poll(
 {
     int poll_revent_mask = 0;
 
-    gossip_debug(GOSSIP_WAIT_DEBUG,"%s:Is daemon in service(%d).\n"
-                                  ,__func__
-                                  ,is_daemon_in_service());
-
     if (open_access_count == 1)
     {
-        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call poll_wait.\n",__func__);
         poll_wait(file, &pvfs2_request_list_waitq, poll_table);
 
         spin_lock(&pvfs2_request_list_lock);

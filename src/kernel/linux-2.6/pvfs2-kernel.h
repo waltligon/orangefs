@@ -135,8 +135,6 @@ typedef unsigned long sector_t;
 #define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
-#define PVFS2_BUFMAP_WAIT_TIMEOUT_SECS      30
-
 #define PVFS2_DEFAULT_SLOT_TIMEOUT_SECS     1800 /* 30 minutes */
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
@@ -379,11 +377,6 @@ typedef struct
 {
     enum pvfs2_vfs_op_states op_state;
     uint64_t tag;
-
-    /* Set uses_shared_memory to 1 if this operation uses shared memory. */
-    /*  If true, then a retry on the op must also get a new shared memory*/
-    /*  buffer and re-populate it.                                       */ 
-    int uses_shared_memory;
 
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
@@ -911,8 +904,6 @@ int     fs_mount_pending(PVFS_fs_id fsid);
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
-int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
 PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 int pvfs2_flush_inode(struct inode *inode);
 
@@ -1013,8 +1004,6 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct file_operations pvfs2_devreq_file_operations;
-
-extern wait_queue_head_t pvfs2_bufmap_init_waitq;
 
 /************************************
  * misc convenience macros
@@ -1339,42 +1328,6 @@ static inline loff_t pvfs2_i_size_read(struct inode *inode)
     return inode->i_size;
 #else
     return i_size_read(inode);
-#endif
-}
-
-static inline void pvfs2_i_set_nlink(struct inode *inode, unsigned int nlink)
-{
-#ifdef HAVE_I_SET_NLINK
-    set_nlink(inode, nlink); 
-#else
-    inode->i_nlink = nlink;
-#endif
-}
-
-static inline void pvfs2_i_inc_nlink(struct inode *inode)
-{
-#ifdef HAVE_I_INC_NLINK
-    inc_nlink(inode); 
-#else
-    inode->i_nlink++;
-#endif
-}
-
-static inline void pvfs2_i_drop_nlink(struct inode *inode)
-{
-#ifdef HAVE_I_DROP_NLINK
-    drop_nlink(inode);    
-#else
-    inode->i_nlink--;
-#endif
-}
-
-static inline void pvfs2_i_clear_nlink(struct inode *inode)
-{
-#ifdef HAVE_I_CLEAR_NLINK
-    clear_nlink(inode);    
-#else
-    inode->i_nlink = 0;
 #endif
 }
 
