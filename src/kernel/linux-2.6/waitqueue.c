@@ -16,6 +16,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-bufmap.h"
 
 
 /* What we do in this function is to walk the list of operations that are present 
@@ -56,12 +57,19 @@ int service_operation(
 {
     sigset_t orig_sigset; 
     int ret = 0;
-    op->upcall.pid = current->pid;
+
+    /* irqflags and wait_entry are only used IF the client-core aborts */
+    unsigned long irqflags;
+    DECLARE_WAITQUEUE(wait_entry, current);
+
+
 #ifdef PVFS2_LINUX_KERNEL_2_4
     op->upcall.tgid = -1;
 #else
     op->upcall.tgid = current->tgid;
 #endif
+    op->upcall.pid = current->pid;
+
 
 retry_servicing:
     op->downcall.status = 0;
@@ -89,12 +97,16 @@ retry_servicing:
             return(ret);
         }
     }
+
+    gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call is_daemon_in_service().\n",__func__);
     
     if (is_daemon_in_service() < 0)
     {
         /* By incrementing the per-operation attempt counter, we directly go into the timeout logic
          * while waiting for the matching downcall to be read
          */
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:client core is NOT in service(%d).\n",__func__
+                                                                                ,is_daemon_in_service());
         op->attempts++;
     }
 
@@ -105,6 +117,7 @@ retry_servicing:
     }
     else
     {
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call add_op_to_request_list().\n",__func__);
         add_op_to_request_list(op);
     }
 
@@ -121,6 +134,7 @@ retry_servicing:
     
     if(flags & PVFS2_OP_CANCELLATION)
     {
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call wait_for_cancellation_downcall().\n",__func__);
         ret = wait_for_cancellation_downcall(op);
     }
     else
@@ -156,8 +170,56 @@ retry_servicing:
     {
         gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: tag %lld (%s) -- operation to be retried (%d attempt)\n", 
                 lld(op->tag), op_name, op->attempts + 1);
-        goto retry_servicing;
-    }
+
+        if (!op->uses_shared_memory)
+        {
+           /* this operation doesn't use the shared memory system */
+           goto retry_servicing;
+        }
+
+        /* op uses shared memory */
+        if (get_bufmap_init() == 0)
+        {
+            /* This operation uses the shared memory system AND the system is not yet ready.     */
+            /* This situation occurs when the client-core is restarted AND there were operations */
+            /* waiting to be processed or were already in process.                               */
+            gossip_debug(GOSSIP_WAIT_DEBUG,"uses_shared_memory is true.\n");
+            gossip_debug(GOSSIP_WAIT_DEBUG,"Client core in-service status(%d).\n",is_daemon_in_service());
+            gossip_debug(GOSSIP_WAIT_DEBUG,"bufmap_init:%d.\n",get_bufmap_init());
+            gossip_debug(GOSSIP_WAIT_DEBUG,"operation's status is 0x%0x.\n",op->op_state);
+
+            /* let process sleep for a few seconds so shared memory system can be initialized. */
+            spin_lock_irqsave(&op->lock,irqflags);
+            add_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
+            spin_unlock_irqrestore(&op->lock,irqflags);
+
+            set_current_state(TASK_INTERRUPTIBLE);
+
+            /* Wait for pvfs_bufmap_initialize() to wake me up within the allotted time. */
+            ret=schedule_timeout(MSECS_TO_JIFFIES(1000 * PVFS2_BUFMAP_WAIT_TIMEOUT_SECS));
+
+            gossip_debug(GOSSIP_WAIT_DEBUG,"Value returned from schedule_timeout:%d.\n",ret);
+            gossip_debug(GOSSIP_WAIT_DEBUG,"Is shared memory available? (%d).\n",get_bufmap_init());
+
+            spin_lock_irqsave(&op->lock,irqflags);
+            remove_wait_queue(&pvfs2_bufmap_init_waitq, &wait_entry);
+            spin_unlock_irqrestore(&op->lock,irqflags);
+
+            if (get_bufmap_init() == 0)
+            {
+               gossip_err("%s:The shared memory system has not started in %d seconds after the "
+                          "client core restarted.  Aborting user's request(%s).\n"
+                         ,__func__
+                         ,PVFS2_BUFMAP_WAIT_TIMEOUT_SECS
+                         ,get_opname_string(op));
+               return(-EIO);
+            }
+
+            /* Return to the calling function and re-populate a shared memory buffer. */
+            return(-EAGAIN);
+        }/*endif*/
+    }/*endif*/
+
     gossip_debug(GOSSIP_WAIT_DEBUG, "pvfs2: service_operation %s returning: %d for %p.\n", op_name, ret, op);
     return(ret);
 }
@@ -304,7 +366,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
         pvfs2_clean_up_interrupted_operation(op);
         ret = -EINTR;
         break;
-    }
+    }/*end while*/
 
     set_current_state(TASK_RUNNING);
 
@@ -339,28 +401,50 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
 	spin_lock(&op->lock);
         if (op_state_serviced(op))
 	{
+            gossip_debug(GOSSIP_WAIT_DEBUG,"%s:op-state is SERVICED.\n",__func__);
 	    spin_unlock(&op->lock);
 	    ret = 0;
 	    break;
 	}
 	spin_unlock(&op->lock);
 
-        if (!schedule_timeout
-            (MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
+        if (signal_pending(current))
         {
-            gossip_debug(GOSSIP_WAIT_DEBUG, "*** %s: operation timed out: "
-                         "(tag %lld, op %p)\n", __func__, lld(op->tag), op);
+           gossip_debug(GOSSIP_WAIT_DEBUG,"%s:operation interrupted by a signal (tag %lld, op %p)\n"
+                                         ,__func__
+                                         ,lld(op->tag)
+                                         ,op);
+           pvfs2_clean_up_interrupted_operation(op);
+           ret = -EINTR;
+           break;
+        }
+
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:About to call schedule_timeout.\n",__func__);
+        ret=schedule_timeout(MSECS_TO_JIFFIES(1000 * op_timeout_secs));
+
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:Value returned from schedule_timeout(%d).\n"
+                                      ,__func__,ret);
+        if (!ret)
+        {
+            gossip_debug(GOSSIP_WAIT_DEBUG, "%s:*** operation timed out: %p\n", __func__,op);
             pvfs2_clean_up_interrupted_operation(op);
             ret = -ETIMEDOUT;
             break;
         }
-    }
+
+        gossip_debug(GOSSIP_WAIT_DEBUG,"%s:Breaking out of loop, regardless of value returned by schedule_timeout.\n",__func__);
+        ret = -ETIMEDOUT;
+        break;
+    }/*end while*/
+
 
     set_current_state(TASK_RUNNING);
 
     spin_lock(&op->lock);
     remove_wait_queue(&op->waitq, &wait_entry);
     spin_unlock(&op->lock);
+
+    gossip_debug(GOSSIP_WAIT_DEBUG,"%s:returning ret(%d)\n",__func__,ret);
 
     return ret;
 }
