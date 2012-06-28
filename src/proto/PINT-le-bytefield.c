@@ -110,12 +110,6 @@ static void lebf_initialize(void)
                 resp.u.getconfig.fs_config_buf = tmp_name;
                 respsize = extra_size_PVFS_servresp_getconfig;
                 break;
-            case PVFS_SERV_LOOKUP:
-                req.u.lookup.name = "";
-                reqsize = extra_size_PVFS_servreq_lookup;
-                respsize = extra_size_PVFS_servresp_lookup;
-                break;
-/* TODO: orange-security
             case PVFS_SERV_LOOKUP_PATH:
                 req.u.lookup_path.path = "";
                 resp.u.lookup_path.handle_count = 0;
@@ -123,7 +117,6 @@ static void lebf_initialize(void)
                 reqsize = extra_size_PVFS_servreq_lookup_path;
                 respsize = extra_size_PVFS_servresp_lookup_path;
                 break;
-*/
             case PVFS_SERV_BATCH_CREATE:
                 /* can request a range of handles */
                 req.u.batch_create.handle_extent_array.extent_count = 0;
@@ -443,9 +436,7 @@ static int lebf_encode_req(
     switch (req->op) {
 
         /* call standard function defined in headers */
-        CASE(PVFS_SERV_LOOKUP, lookup);
-        /* TODO: orange-security
-        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path); */
+        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -555,9 +546,7 @@ static int lebf_encode_resp(
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
-        /* TODO: orange-security 
-        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path); */
-        CASE(PVFS_SERV_LOOKUP, lookup);
+        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -661,9 +650,7 @@ static int lebf_decode_req(
     switch (req->op) {
 
         /* call standard function defined in headers */
-        /* TODO: orange-security 
-        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path); */
-        CASE(PVFS_SERV_LOOKUP, lookup);
+        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -763,9 +750,7 @@ static int lebf_decode_resp(
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
-        /* TODO: orange-security 
-        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path); */
-        CASE(PVFS_SERV_LOOKUP, lookup);
+        CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
@@ -960,10 +945,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.unstuff.credential.signature);
                 break;
 
-        case PVFS_SERV_GETCONFIG:
-            /* TODO: orange-security
-            case PVFS_SERV_LOOKUP_PATH: */
-            case PVFS_SERV_LOOKUP:
+            case PVFS_SERV_GETCONFIG:
+            case PVFS_SERV_LOOKUP_PATH:
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
@@ -1005,8 +988,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         if(resp->status == 0)
         {
             switch (resp->op)
-            {
-                /* TODO: orange-security 
+            {                
                 case PVFS_SERV_LOOKUP_PATH: 
                     {
                         struct PVFS_servresp_lookup_path *lookup =
@@ -1015,7 +997,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                         decode_free(lookup->attr_array);
                         break;
                     }
-                */
+                
                 case PVFS_SERV_READDIR:
                     decode_free(resp->u.readdir.dirent_array);
                     break;
@@ -1160,8 +1142,6 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 case PVFS_SERV_BATCH_REMOVE:
                 case PVFS_SERV_IMM_COPIES:
                 case PVFS_SERV_TREE_REMOVE:
-                /* TODO: orange-security */
-                case PVFS_SERV_LOOKUP:
                   /*nothing to free */
                    break;
                 case PVFS_SERV_INVALID:

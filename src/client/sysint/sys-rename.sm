@@ -293,6 +293,12 @@ PVFS_error PVFS_isys_rename(
         return -PVFS_ENAMETOOLONG;
     }
 
+    /* no slashes in entry names */
+    if (index(old_entry, '/') || index(new_entry, '/'))
+    {
+        return ret;
+    }
+
     PINT_smcb_alloc(&smcb, PVFS_SYS_RENAME,
              sizeof(struct PINT_client_sm),
              client_op_state_get_machine,
@@ -411,8 +417,7 @@ static int rename_lookups_comp_fn(
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_lookups_comp_fn\n");
     
-    /* TODO: orange-security */
-    assert(resp_p->op == PVFS_SERV_LOOKUP);
+    assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
     assert((index > -1) && (index < 2));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup[%d] got response %d\n",
@@ -443,7 +448,9 @@ static int rename_lookups_comp_fn(
       generally we won't be here on index == 1, since 'new'
       may not exist
     */
-    sm_p->u.rename.refns[index].handle = resp_p->u.lookup.handle;
+    assert(resp_p->u.lookup_path.handle_count == 1);
+    sm_p->u.rename.refns[index].handle =
+        resp_p->u.lookup_path.handle_array[0];
     sm_p->u.rename.refns[index].fs_id =
         sm_p->u.rename.parent_refns[index].fs_id;
 
@@ -659,10 +666,10 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
                      i, llu(sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
-        /* TODO: orange-security lookup */
-        PINT_SERVREQ_LOOKUP_FILL(
+        PINT_SERVREQ_LOOKUP_PATH_FILL(
             msg_p->req,
             sm_p->u.rename.caps[i],
+            *sm_p->cred_p,
             sm_p->u.rename.entries[i],
             sm_p->u.rename.parent_refns[i].fs_id,
             sm_p->u.rename.parent_refns[i].handle,

@@ -74,6 +74,25 @@ if ! test -x $SYSINT_TEST_DIR/lookup; then
     exit 1
 fi
 
+# absolute links now require the file system root,
+# so read this from the tab file
+TAB_FILE=$PVFS2TAB_FILE
+if test "x$TAB_FILE" = "x";  then
+    TAB_FILE=/etc/pvfs2tab
+fi
+if ! test -f $TAB_FILE; then
+    echo "Cannot open tab file: $TAB_FILE"
+    exit 1
+fi
+
+LINK_ROOT=`head -n 1 $TAB_FILE | cut -d' ' -f 2`
+if test "x$LINK_ROOT" = "x"; then
+    echo "Could not read file system root from tab file"
+    exit 1
+fi
+
+echo "Using root $LINK_ROOT..."
+
 # create the test directory tree
 $SYSINT_TEST_DIR/mkdir /a
 $SYSINT_TEST_DIR/mkdir /a/b
@@ -83,13 +102,13 @@ $SYSINT_TEST_DIR/mkdir /a/b/c/d/e
 
 
 # symlink /a/b/c/d/e/blink1 -> /a/b
-$SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink1 /a/b
+$SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink1 $LINK_ROOT/a/b
 
 # symlink /a/b/c/d/e/blink2 -> ../../../../b
 $SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink2 ../../../../b
 
 # symlink /a/blink3 -> /a/b
-$SYSINT_TEST_DIR/symlink /a/blink3 /a/b
+$SYSINT_TEST_DIR/symlink /a/blink3 $LINK_ROOT/a/b
 
 # symlink /a/blink4 -> ./b
 $SYSINT_TEST_DIR/symlink /a/blink4 ./b
@@ -98,16 +117,16 @@ $SYSINT_TEST_DIR/symlink /a/blink4 ./b
 $SYSINT_TEST_DIR/symlink /a/blink5 b
 
 # symlink /a/b/c/d/e/blink6 -> /a/blink4
-$SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink6 /a/blink4
+$SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink6 $LINK_ROOT/a/blink4
 
 # symlink /a/b/c/d/e/blink7 -> ../../../../blink3
 $SYSINT_TEST_DIR/symlink /a/b/c/d/e/blink7 ../../../../blink3
 
 # symlink /a/blink8 -> /a/b/c/d/e/blink7
-$SYSINT_TEST_DIR/symlink /a/blink8 /a/b/c/d/e/blink7
+$SYSINT_TEST_DIR/symlink /a/blink8 $LINK_ROOT/a/b/c/d/e/blink7
 
 # symlink /a/blink9 -> /a/b/c/d/e/blink6
-$SYSINT_TEST_DIR/symlink /a/blink9 /a/b/c/d/e/blink6
+$SYSINT_TEST_DIR/symlink /a/blink9 $LINK_ROOT/a/b/c/d/e/blink6
 
 # symlink /a/blink-invalid -> ../../../../invalid
 $SYSINT_TEST_DIR/symlink /a/blink-invalid ../../../../invalid

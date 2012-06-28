@@ -62,8 +62,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
     /* 3 */ {PVFS_SERV_IO, &pvfs2_io_params},
     /* 4 */ {PVFS_SERV_GETATTR, &pvfs2_get_attr_params},
     /* 5 */ {PVFS_SERV_SETATTR, &pvfs2_set_attr_params},
-    /* TODO: orange-security */
-    /* 6 */ {PVFS_SERV_LOOKUP, &pvfs2_lookup_params}, 
+    /* 6 */ {PVFS_SERV_LOOKUP_PATH, &pvfs2_lookup_params},
     /* 7 */ {PVFS_SERV_CRDIRENT, &pvfs2_crdirent_params},
     /* 8 */ {PVFS_SERV_RMDIRENT, &pvfs2_rmdirent_params},
     /* 9 */ {PVFS_SERV_CHDIRENT, &pvfs2_chdirent_params},

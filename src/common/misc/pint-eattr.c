@@ -318,8 +318,12 @@ int PINT_eattr_namespace_verify(PVFS_ds_keyval *k, PVFS_ds_keyval *v)
 
 static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val)
 {
-
-    assert(!strcmp(key->buffer, "system.posix_acl_access"));
+    /* may verify one of these attrs */
+    if ((strcmp(key->buffer, "system.posix_acl_access") != 0) &&
+        (strcmp(key->buffer, "system.posix_acl_default") != 0))
+    {
+        return -PVFS_EINVAL;
+    }
 
     /* verify that the acl is formatted properly.  Right now
      * all we can do is make sure the size matches a non-zero
@@ -336,7 +340,7 @@ static int PINT_eattr_verify_acl_access(PVFS_ds_keyval *key, PVFS_ds_keyval *val
 #else
     /* New Posix compliant PVFS2 ACL format */
     if(val->buffer_sz == 0 || 
-            (val->buffer_sz - sizeof(pvfs2_acl_header)) %
+            (val->buffer_sz - sizeof(pvfs2_acl_header) - 1) %
                 sizeof(pvfs2_acl_entry) != 0)
     {
         return -PVFS_EINVAL;

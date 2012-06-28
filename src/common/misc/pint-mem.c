@@ -12,6 +12,8 @@
 #include <malloc.h>
 #endif
 
+#include "pvfs2-config.h"
+
 #ifdef WIN32
 #include "wincommon.h"
 
@@ -34,15 +36,22 @@ inline void PINT_mem_aligned_free(void *ptr);
  */
 inline void* PINT_mem_aligned_alloc(size_t size, size_t alignment)
 {
-    int ret;
+    int ret = 0;
     void *ptr;
 
-#ifdef WIN32    
+#if defined(WIN32)
     ret = 0;
     ptr = _aligned_malloc(size, alignment);
     if (ptr == NULL)
     {
         ret = ENOMEM;
+    }
+#elif defined(HAVE_LIBEFENCE)    
+    /* Electric Fence only works with malloc */
+    ptr = malloc(size);
+    if (ptr == NULL)
+    {
+        ret = errno;
     }
 #else
     ret = posix_memalign(&ptr, alignment, size);

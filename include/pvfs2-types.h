@@ -503,7 +503,6 @@ typedef struct
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         PVFS_NAME_MAX
 /* max len of an entire path */
-/* note protocol only handles a segment, not a path */
 #define PVFS_PATH_MAX            4096
 
 /* max extended attribute name len as imposed by the VFS and exploited for the

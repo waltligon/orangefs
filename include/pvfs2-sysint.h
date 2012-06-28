@@ -97,11 +97,8 @@ typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 struct PVFS_sysresp_lookup_s
 {
     PVFS_object_ref ref;
-/** TODO: orange-security */
-#if 0
     char *error_path;       /* on error, the unresolved path segments */
     int error_path_size;    /* size of the buffer provided by the user */
-#endif
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 

@@ -21,7 +21,7 @@
 
 
 /** this is a global analog of errno for pvfs specific
- *  errors errno is set to EIO and this si set to the
+ *  errors errno is set to EIO and this is set to the
  *  original code 
  */
 int pvfs_errno;
@@ -135,8 +135,7 @@ int iocommon_lookup_absolute(const char *abs_path,
     /* set up buffer to return partially looked up path */
     /* in failure.  This is most likely a non-PVFS path */
 
-    /* Set up error path
-       TODO: orange-security 
+    /* Set up error path */
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -148,7 +147,6 @@ int iocommon_lookup_absolute(const char *abs_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
-    */
 
     errno = 0;
     rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
@@ -197,8 +195,7 @@ int iocommon_lookup_relative(const char *rel_path,
         goto errorout;
     }
 
-    /* Set up error path
-       TODO: orange-security 
+    /* Set up error path */
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -210,7 +207,6 @@ int iocommon_lookup_relative(const char *rel_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
-    */
 
     current_seg_ref = parent_ref;
     cur = (char *)rel_path;

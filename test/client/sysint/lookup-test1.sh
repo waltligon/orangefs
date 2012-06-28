@@ -40,6 +40,24 @@ if ! test -x $SYSINT_TEST_DIR/lookup; then
     exit 1
 fi
 
+# absolute links now require the file system root,
+# so read this from the tab file
+TAB_FILE=$PVFS2TAB_FILE
+if test "x$TAB_FILE" = "x";  then
+    TAB_FILE=/etc/pvfs2tab
+fi
+if ! test -f $TAB_FILE; then
+    echo "Cannot open tab file: $TAB_FILE"
+    exit 1
+fi
+
+LINK_ROOT=`head -n 1 $TAB_FILE | cut -d' ' -f 2`
+if test "x$LINK_ROOT" = "x"; then
+    echo "Could not read file system root from tab file"
+    exit 1
+fi
+
+echo "Using root $LINK_ROOT..."
 
 # create the test directory tree
 $SYSINT_TEST_DIR/mkdir /foo
@@ -54,25 +72,25 @@ $SYSINT_TEST_DIR/mkdir /foo/bar/baz/dir1/dir2/dir3/dir4/dir5/dir6
 
 
 # symlink /foo/barlink1 -> /foo/bar
-$SYSINT_TEST_DIR/symlink /foo/barlink1 /foo/bar
+$SYSINT_TEST_DIR/symlink /foo/barlink1 $LINK_ROOT/foo/bar
 
 # symlink /foo/barlink2 -> bar
 $SYSINT_TEST_DIR/symlink /foo/barlink2 bar
 
 # symlink /baz -> /foo/bar/baz
-$SYSINT_TEST_DIR/symlink /baz /foo/bar/baz
+$SYSINT_TEST_DIR/symlink /baz $LINK_ROOT/foo/bar/baz
 
 # symlink /foo/bar/baz/dir1/dir2link1 -> /foo/barlink1/baz/dir1/dir2
-$SYSINT_TEST_DIR/symlink /foo/bar/baz/dir1/dir2link1 /foo/barlink1/baz/dir1/dir2
+$SYSINT_TEST_DIR/symlink /foo/bar/baz/dir1/dir2link1 $LINK_ROOT/foo/barlink1/baz/dir1/dir2
 
 # symlink /foo/bar/baz/dir1/dir2link2 -> dir2
 $SYSINT_TEST_DIR/symlink /foo/bar/baz/dir1/dir2link2 dir2
 
 # symlink /dir2 -> /foo/barlink2/baz/dir1/dir2link2
-$SYSINT_TEST_DIR/symlink /dir2 /foo/barlink2/baz/dir1/dir2link2
+$SYSINT_TEST_DIR/symlink /dir2 $LINK_ROOT/foo/barlink2/baz/dir1/dir2link2
 
 # symlink /deadlink1 -> /deadlink1
-$SYSINT_TEST_DIR/symlink /deadlink1 /deadlink1
+$SYSINT_TEST_DIR/symlink /deadlink1 $LINK_ROOT/deadlink1
 
 # symlink /deadlink2 -> deadlink1
 $SYSINT_TEST_DIR/symlink /deadlink2 deadlink1

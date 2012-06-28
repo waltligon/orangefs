@@ -33,11 +33,9 @@
 #include "pint-util.h"
 #include "security-util.h"
 
-/* TODO: orange-security
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
-*/
-#define MAX_LOOKUP_SEGMENTS 40
+
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
  */
@@ -366,23 +364,24 @@ struct PINT_client_readdirplus_sm
     PVFS_handle     **handles;
 };
 
-/* TODO: orange-security
+/* 
  * A segment is part of a path - namely each part of the
- * path delimited by / characters.  as each segment is
+ * path delimited by / characters.  As each segment is
  * looked up we record the PVFS_object_ref for the
  * object in the FS, and its attributes.  Other fields
- * keep up with the segment in contect of the whole path
+ * keep up with the segment in context of the whole path.
  */
 typedef struct
 {
     char *seg_name;
-    char *seg_remaining;
+    char *path_remaining;
     PVFS_object_attr seg_attr;
     PVFS_object_ref seg_starting_refn;
     PVFS_object_ref seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
 
-/* TODO: orange-security
+#define PVFS2_MAX_LOOKUP_CONTEXTS    256
+/* 
  * A context is a group of segments that have been looked up
  * on a server.  A server can resolve more than one segment
  * in a single request, and these groupings are maintained
@@ -612,8 +611,8 @@ typedef struct PINT_client_sm
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
 
-
     PVFS_credential *cred_p;
+
     union
     {
         struct PINT_client_remove_sm remove;

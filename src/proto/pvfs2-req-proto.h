@@ -50,10 +50,8 @@ enum PVFS_server_op
     PVFS_SERV_REMOVE = 2,
     PVFS_SERV_IO = 3,
     PVFS_SERV_GETATTR = 4,
-    PVFS_SERV_SETATTR = 5,
-    /* TODO: orange-security 
-    PVFS_SERV_LOOKUP_PATH = 6, */
-    PVFS_SERV_LOOKUP = 6,
+    PVFS_SERV_SETATTR = 5,    
+    PVFS_SERV_LOOKUP_PATH = 6,
     PVFS_SERV_CRDIRENT = 7,
     PVFS_SERV_RMDIRENT = 8,
     PVFS_SERV_CHDIRENT = 9,
@@ -117,7 +115,7 @@ enum PVFS_server_op
  * in pvfs2-genconfig as well. */
 #define PVFS_REQ_LIMIT_CONFIG_FILE_BYTES  65536
 /* max size of all path strings */
-#define PVFS_REQ_LIMIT_PATH_NAME_BYTES    PVFS_NAME_MAX
+#define PVFS_REQ_LIMIT_PATH_NAME_BYTES    PVFS_PATH_MAX
 /* max size of strings representing a single path element */
 #define PVFS_REQ_LIMIT_SEGMENT_BYTES      PVFS_SEGMENT_MAX
 /* max total size of I/O request descriptions */
@@ -278,12 +276,12 @@ endecode_fields_5_struct(
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
 #define PINT_SERVREQ_BATCH_CREATE_FILL(__req,          \
-				       __cap,	       \
-				       __fsid,	       \
-				       __objtype,      \
-				       __objcount,     \
-				       __ext_array,    \
-				       __hints)	       \
+                                       __cap,          \
+                                       __fsid,         \
+                                       __objtype,      \
+                                       __objcount,     \
+                                       __ext_array,    \
+                                       __hints)        \
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_BATCH_CREATE;               \
@@ -716,8 +714,6 @@ do {                                             \
 
 /* lookup path ************************************************/
 /* - looks up as many elements of the specified path as possible */
-/* TODO: orange-security */
-#if 0
 struct PVFS_servreq_lookup_path
 {
     char *path;                  /* path name */
@@ -725,19 +721,23 @@ struct PVFS_servreq_lookup_path
     PVFS_handle handle; /* handle of path parent */
     /* mask of attribs to return with lookup results */
     uint32_t attrmask;
+    PVFS_credential credential;
 };
-endecode_fields_5_struct(
+endecode_fields_6_struct(
     PVFS_servreq_lookup_path,
     string, path,
     PVFS_fs_id, fs_id,
     skip4,,
     PVFS_handle, handle,
-    uint32_t, attrmask);
+    uint32_t, attrmask,
+    PVFS_credential, credential);
 #define extra_size_PVFS_servreq_lookup_path \
-  roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1)
+    (roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1) + \
+        extra_size_PVFS_credential)
 
 #define PINT_SERVREQ_LOOKUP_PATH_FILL(__req,           \
                                       __cap,           \
+                                      __cred,          \
                                       __path,          \
                                       __fsid,          \
                                       __handle,        \
@@ -746,11 +746,12 @@ endecode_fields_5_struct(
 do {                                                   \
     memset(&(__req), 0, sizeof(__req));                \
     (__req).op = PVFS_SERV_LOOKUP_PATH;                \
+    (__req).u.lookup_path.credential = (__cred);       \
     (__req).capability = (__cap);                      \
     (__req).hints = (__hints);                         \
     (__req).u.lookup_path.path = (__path);             \
     (__req).u.lookup_path.fs_id = (__fsid);            \
-    (__req).u.lookup_path.handle = (__handle);\
+    (__req).u.lookup_path.handle = (__handle);         \
     (__req).u.lookup_path.attrmask = (__amask);        \
 } while (0)
 
@@ -775,60 +776,6 @@ endecode_fields_1a_1a_struct(
 * or lots of handles, just use the max io req limit */
 #define extra_size_PVFS_servresp_lookup_path \
   (PVFS_REQ_LIMIT_IOREQ_BYTES)
-#endif /* #if 0 */
-
-/* lookup *****************************************************/
-/* - looks up an entry in a directory */
-
-struct PVFS_servreq_lookup
-{
-    char *name;                  /* entry name */
-    PVFS_fs_id fs_id;            /* file system */
-    PVFS_handle handle; /* handle of parent directory */
-    /* mask of attribs to return with lookup results */
-    uint32_t attrmask;
-};
-endecode_fields_5_struct(
-    PVFS_servreq_lookup,
-    string, name,
-    PVFS_fs_id, fs_id,
-    skip4,,
-    PVFS_handle, handle,
-    uint32_t, attrmask);
-#define extra_size_PVFS_servreq_lookup \
-  roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES + 1)
-
-#define PINT_SERVREQ_LOOKUP_FILL(__req,           \
-                                 __cap,           \
-                                 __name,          \
-                                 __fsid,          \
-                                 __handle,        \
-                                 __amask,         \
-                                 __hints)         \
-do {                                              \
-    memset(&(__req), 0, sizeof(__req));           \
-    (__req).op = PVFS_SERV_LOOKUP;                \
-    (__req).capability = (__cap);                 \
-    (__req).hints = (__hints);                    \
-    (__req).u.lookup.name = (__name);             \
-    (__req).u.lookup.fs_id = (__fsid);            \
-    (__req).u.lookup.handle = (__handle);         \
-    (__req).u.lookup.attrmask = (__amask);        \
-} while (0)
-
-struct PVFS_servresp_lookup
-{
-    /* handle of the directory entry */
-    PVFS_handle handle;            
-    /* attributes of the directory entry (when available) */
-    PVFS_object_attr attr;
-};
-endecode_fields_2_struct(
-    PVFS_servresp_lookup,
-    PVFS_handle, handle,
-    PVFS_object_attr, attr);
-#define extra_size_PVFS_servresp_lookup \
-  (extra_size_PVFS_object_attr)
 
 /* mkdir *******************************************************/
 /* - makes a new directory object */
@@ -2077,9 +2024,7 @@ struct PVFS_server_req
         struct PVFS_servreq_setattr setattr;
         struct PVFS_servreq_mkdir mkdir;
         struct PVFS_servreq_readdir readdir;
-        /* TODO: orange-security 
-        struct PVFS_servreq_lookup_path lookup_path; */
-        struct PVFS_servreq_lookup lookup;
+        struct PVFS_servreq_lookup_path lookup_path;
         struct PVFS_servreq_crdirent crdirent;
         struct PVFS_servreq_rmdirent rmdirent;
         struct PVFS_servreq_chdirent chdirent;
@@ -2142,9 +2087,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_getattr getattr;
         struct PVFS_servresp_mkdir mkdir;
         struct PVFS_servresp_readdir readdir;
-        /* TODO: orange-security 
-        struct PVFS_servresp_lookup_path lookup_path; */
-        struct PVFS_servresp_lookup lookup;
+        struct PVFS_servresp_lookup_path lookup_path;
         struct PVFS_servresp_rmdirent rmdirent;
         struct PVFS_servresp_chdirent chdirent;
         struct PVFS_servresp_getconfig getconfig;

@@ -355,6 +355,9 @@ static int check_acls(void *acl_buf,
                       uint32_t num_groups, 
                       int want)
 {
+#ifndef PVFS_USE_OLD_ACL_FORMAT
+    pvfs2_acl_header *ph;
+#endif
     pvfs2_acl_entry pe, *pa;
     int i = 0, found = 0, count = 0;
     int j;
@@ -372,10 +375,13 @@ static int check_acls(void *acl_buf,
 
     /* keyval for ACLs includes a \0. so subtract the thingie */
     acl_size--;
+#ifndef PVFS_USE_OLD_ACL_FORMAT
+    /* remove header when calculating size */
+    acl_size -= sizeof(pvfs2_acl_header);
+#endif
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "PINT_check_acls: read keyval size "
-    " %d (%d acl entries)\n",
-        (int) acl_size, 
-        (int) (acl_size / sizeof(pvfs2_acl_entry)));
+        " %d (%d acl entries)\n",
+        (int) acl_size, (int) (acl_size / sizeof(pvfs2_acl_entry)));
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "uid = %d, gid = %d, want = %d\n",
         uid, group_array[0], want);
 
@@ -390,9 +396,18 @@ static int check_acls(void *acl_buf,
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
 
+#ifndef PVFS_USE_OLD_ACL_FORMAT
+    /* point to header */
+    ph = (pvfs2_acl_header *) acl_buf;
+#endif
+
     for (i = 0; i < count; i++)
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         pa = (pvfs2_acl_entry *) acl_buf + i;
+#else        
+        pa = &(ph->p_entries[i]);
+#endif
         /* 
            NOTE: Remember that keyval is encoded as lebf, so convert it 
            to host representation 
@@ -463,8 +478,11 @@ mask:
     i = i + 1;
     for (; i < count; i++)
     {
+#ifdef PVFS_USE_OLD_ACL_FORMAT
         pvfs2_acl_entry me, *mask_obj = (pvfs2_acl_entry *) acl_buf + i;
-        
+#else
+        pvfs2_acl_entry me, *mask_obj = &(ph->p_entries[i]);        
+#endif
         /* 
           NOTE: Again, since pvfs2_acl_entry is in lebf, we need to
           convert it to host endian format

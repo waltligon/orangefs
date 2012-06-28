@@ -174,8 +174,7 @@ int gui_comm_setup(
                            GUI_FSLIST_FSID, (gint) cur_fs_id, -1);
     }
 
-    /* TODO: orange-security 
-       PVFS_util_gen_credentials(&creds); */    
+    /* credential for current user */
     PVFS_util_gen_credential_defaults(&cred); 
     
     /* print message indicating what file system we are monitoring */
