@@ -926,7 +926,7 @@ main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
 dnl Method to enable user interface data cache
 BUILD_UCACHE=
 AC_ARG_ENABLE(ucache,
-[  --enable-ucache         Do not enable user user interface data cache.],
+[  --enable-ucache         Enable user interface data cache.],
 [if test "x$enableval" = "xyes" ; then
    AC_DEFINE(PVFS_UCACHE_ENABLE, 1,
       [Should we enable user interface data cache.])
