@@ -1432,7 +1432,7 @@ int iocommon_readorwrite(enum PVFS_io_type which,
     }
 
     /** Update cache's perception of the file size, so that we flush the 
-     * correct ammount on file close. 
+     * correct amount on file close. 
      */
     if((which == PVFS_IO_WRITE) && (fent->size < (offset + transfered)))
     {
