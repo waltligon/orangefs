@@ -531,7 +531,7 @@ void pvfs_sys_init_doit(void) {
     //gossip_enable_stderr();
 
     /* ucache initialization - assumes shared memory previously 
-     * aquired (using ucache daemon) 
+     * acquired (using ucache daemon) 
      */
     rc = ucache_initialize();
     if (rc < 0)

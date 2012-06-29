@@ -1430,8 +1430,16 @@ int iocommon_readorwrite(enum PVFS_io_type which,
         /* Unlock the block */
         lock_unlock(get_lock(ureq[i].ublk_index));
     }
-    rc = transfered;
 
+    /** Update cache's perception of the file size, so that we flush the 
+     * correct ammount on file close. 
+     */
+    if((which == PVFS_IO_WRITE) && (fent->size < (offset + transfered)))
+    {
+        fent->size = offset + transfered;
+    }     
+
+    rc = transfered;
 #endif /* PVFS_UCACHE_ENABLE */
     return rc;
 }

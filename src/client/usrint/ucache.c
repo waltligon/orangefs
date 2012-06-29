@@ -260,6 +260,7 @@ int ucache_init_file_table(char forceCreation)
         ucache->ftbl.file[i].tag_id = NIL32;
         ucache->ftbl.file[i].mtbl_blk = NIL16;
         ucache->ftbl.file[i].mtbl_ent = NIL16;
+        ucache->ftbl.file[i].size = NIL64;
         ucache->ftbl.file[i].next = NIL16;
     }
 
@@ -473,16 +474,26 @@ int flush_file(struct file_ent_s *fent)
         temp_next = mtbl->mem[i].dirty_next;
         mtbl->mem[i].dirty_next = NIL16; 
 
-        /*#ifdef FILE_SYSTEM_ENABLED*/
         PVFS_object_ref ref = {fent->tag_handle, fent->tag_id, 0};
-        struct iovec vector = {&(ucache->b[ment->item].mblk[0]), CACHE_BLOCK_SIZE_K * 1024};
+        
+        /** If this is the last block needing flushing, then check the file,
+         * size, so that we know how much of the last block to write to disk.
+         */
+        struct iovec vector = 
+        {
+            &(ucache->b[ment->item].mblk[0]),
+            0
+        };
+        if((fent->size - ment->tag) < (CACHE_BLOCK_SIZE_K * 1024))
+        {
+            vector.iov_len = fent->size - ment->tag;
+        }
+        else
+        {
+            vector.iov_len = CACHE_BLOCK_SIZE_K * 1024;
+        }
+
         rc = iocommon_vreadorwrite(2, &ref, ment->tag, 1, &vector); 
-        /*
-        #endif
-        #ifndef FILE_SYSTEM_ENABLED
-        rc = 0;
-        #endif
-        */
 
         lock_unlock(blk_lock);
         if(rc == -1)
@@ -790,6 +801,7 @@ int ucache_info(FILE *out, char *flags)
                     fprintf(out, "mtbl_ent = %hu\n", fent->mtbl_ent);
                     fprintf(out, "next = %hu\n", fent->next);
                     fprintf(out, "index = %hu\n", fent->index);
+                    fprintf(out, "size = %lu\n", fent->size);
     
                     struct mem_table_s * mtbl = get_mtbl(fent->mtbl_blk, 
                                                         fent->mtbl_ent);
@@ -1224,6 +1236,7 @@ static void put_free_fent(struct file_ent_s *fent)
     struct file_table_s *ftbl = &(ucache->ftbl);
     fent->tag_handle = NIL64;
     fent->tag_id = NIL32;
+    fent->size = NIL64;
     if(fent->index < FILE_TABLE_HASH_MAX)
     {
         fent->next = NIL16;
@@ -1519,6 +1532,7 @@ uint16_t insert_file(
     /* Update fent with it's new mtbl: blk and ent */
     current->mtbl_blk = free_mtbl_blk;
     current->mtbl_ent = free_mtbl_ent;
+    current->size = 0;
     /* Initialize Memory Table */
     init_memory_table(get_mtbl(free_mtbl_blk, free_mtbl_ent));
     return current->index;
