@@ -3,6 +3,8 @@ OrangeFS Release ChangeLog
 -----------------------
 Stable
 
+* New Feature: added human readable times to pvfs2-db-display.  Rev 9366.
+
 * New Feature:  when setting the mode (admin or normal) of a filesystem 
 * using pvfs2-set-mode, you can now do so for individual servers.  Prior
 * to this change, the mode was set for all the servers within a particular 

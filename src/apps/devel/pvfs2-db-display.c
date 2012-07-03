@@ -267,8 +267,56 @@ void print_dspace( DBT key, DBT val )
     uint64_t k;
     struct PVFS_ds_attributes_s *v;
 
+    time_t r_ctime, r_mtime, r_atime;
+    char ctimeStr[1024], mtimeStr[1024], atimeStr[1024];
+
     k = *(uint64_t *)key.data;
     v = val.data;
+
+    printf("(%llu)(%d) -> ", llu(k), key.size);
+
+    print_ds_type( v->type );
+
+    if (v->ctime != 0)
+    {
+       r_ctime = (time_t) v->ctime;
+
+       ctime_r(&r_ctime, ctimeStr);
+
+       ctimeStr[strlen(ctimeStr)-1] = '\0';
+    }
+    else
+    {
+        strcpy(ctimeStr, "");
+    }
+
+    if (v->mtime != 0)
+    {
+
+        r_mtime = (time_t) v->mtime;
+
+        ctime_r(&r_mtime, mtimeStr);
+
+        mtimeStr[strlen(mtimeStr)-1] = '\0';
+    }
+    else
+    {
+        strcpy(mtimeStr, "");
+    }
+
+    if (v->atime != 0)
+    {
+        r_atime = (time_t) v->atime;
+
+        ctime_r(&r_atime, atimeStr);
+
+        atimeStr[strlen(atimeStr)-1] = '\0';
+    }
+    else
+    {
+        strcpy(atimeStr, "");
+    }
+
 
     if (hex)
         printf("(%llx)(%d) -> ", llu(k), key.size);
@@ -279,18 +327,38 @@ void print_dspace( DBT key, DBT val )
 
     if (hex) {
         printf("(fsid: %d)(handle: %llx)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)(%d)\n", 
            v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
-           llu(v->ctime), llu(v->mtime), llu(v->atime), val.size);
+           ctimeStr, mtimeStr, atimeStr, val.size);
     } 
     else {
-        printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
-           "(perm: %u)(ctime: %llu)(mtime: %llu)(atime: %llu)(%d)\n", 
+         printf("(fsid: %d)(handle: %llu)(uid: %u)(gid: %u)"
+           "(perm: %u)(ctime: %s)(mtime: %s)(atime: %s)",
            v->fs_id, llu(v->handle), v->uid, v->gid, v->mode,
-           llu(v->ctime), llu(v->mtime), llu(v->atime), val.size);
+           ctimeStr, mtimeStr, atimeStr);
     }
 
-    /* union elements are not printed */
+    /* union elements */
+    switch (v->type)
+    {
+        case PVFS_TYPE_METAFILE:
+            printf("(dfile_count: %u)(dist_size: %u)(%d)\n",
+                    v->u.metafile.dfile_count, v->u.metafile.dist_size, val.size);
+            break;
+
+        case PVFS_TYPE_DATAFILE:
+            printf("(bsize: %llu)(%d)\n", llu(v->u.datafile.b_size), val.size);
+            break;
+
+        case PVFS_TYPE_DIRDATA:
+            printf("(count: %llu)(%d)\n", llu(v->u.dirdata.count), val.size);
+            break;
+
+        default:
+            printf("(%d)\n", val.size);
+            break;
+    }
+
     return;
 }
 
