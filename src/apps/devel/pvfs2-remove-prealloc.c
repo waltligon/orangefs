@@ -47,12 +47,15 @@ typedef struct
 /* globals */
 static options_t opts;
 
-int open_db( DB **db_p, char *path, int type, int flags);
+int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags);
 void close_db( DB *db_p );
 int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval);
 void remove_preallocated_handles(DB *db_p_keyval, PVFS_handle pool_handle);
 void print_help(char *progname);
 int process_args(int argc, char ** argv);
+int PINT_trove_dbpf_keyval_compare(DB * dbp, const DBT * a, const DBT * b);
+
+#define TROVE_db_cache_size_bytes 1610612736
 
 int main( int argc, char **argv )
 {
@@ -60,7 +63,7 @@ int main( int argc, char **argv )
     DB_ENV dbe;
     DB_ENV *dbe_p = &dbe;
     char *path = NULL;
-    u_int32_t db_flags = 0,
+    u_int32_t db_flags = DB_THREAD,
               env_flags = DB_INIT_MPOOL,
               type = DB_UNKNOWN;
     int ret, path_len; 
@@ -101,7 +104,7 @@ int main( int argc, char **argv )
     /* Open collection attribute database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, COLLECTION_ATTR_FILE );
-    ret = open_db( &db_p_coll_attr, path, type, db_flags);
+    ret = open_db( &db_p_coll_attr, path, type, 0, db_flags);
     if (ret != 0)
     {
         printf("Unable to open collection attributes database: %s\n",
@@ -112,7 +115,7 @@ int main( int argc, char **argv )
     /* Open keyval database */
     memset(path, path_len, sizeof(char));
     sprintf(path, "%s/%s/%s", opts.dbpath, opts.hexdir, KEYVAL_FILE );
-    ret = open_db( &db_p_keyval, path, type, db_flags);
+    ret = open_db( &db_p_keyval, path, type, 1, db_flags);
     if (ret != 0)
     {
         printf("Unable to open keyval database: %s\n", db_strerror(ret));
@@ -131,7 +134,7 @@ int main( int argc, char **argv )
     return 0;
 }
 
-int open_db( DB **db_p, char *path, int type, int flags)
+int open_db( DB **db_p, char *path, int type, int set_keyval_compare, int flags)
 {
     int ret = 0;
 
@@ -141,6 +144,11 @@ int open_db( DB **db_p, char *path, int type, int flags)
         close_db( *db_p );
         printf("Couldn't create db_p for %s: %s\n", path, db_strerror(ret));
         return ret;
+    }
+
+    if (set_keyval_compare)
+    {
+        (*db_p)->set_bt_compare((*db_p), PINT_trove_dbpf_keyval_compare);
     }
 
     ret = (*db_p)->open(*db_p, NULL, path, NULL, type, flags, 0 );
@@ -171,7 +179,7 @@ void close_db( DB *db_p )
 int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
 {
     int ret = 0;
-    DBC *dbc_p_coll_attr = NULL;
+    DBC *dbc_p = NULL;
     int i;
     char type_string[11] = { 0 }; /* 32 bit type only needs 10 digits */
     PVFS_ds_type type;
@@ -180,7 +188,7 @@ int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
     char *key_string = NULL;
     PVFS_handle pool_handle = PVFS_HANDLE_NULL;
 
-    ret = db_p_coll_attr->cursor(db_p_coll_attr, NULL, &dbc_p_coll_attr, 0);
+    ret = db_p_coll_attr->cursor(db_p_coll_attr, NULL, &dbc_p, 0);
     if( ret != 0 )
     {
         printf("Unable to open cursor: %s\n", db_strerror(ret));
@@ -211,7 +219,7 @@ int find_pool_keys(DB *db_p_coll_attr, DB *db_p_keyval)
         val.ulen = sizeof(pool_handle);
         val.flags = DB_DBT_USERMEM;
 
-        ret = dbc_p_coll_attr->c_get(dbc_p_coll_attr, &key, &val, DB_SET);
+        ret = dbc_p->c_get(dbc_p, &key, &val, DB_SET);
         if (ret != 0)
         {
             printf("Unable to retrieve pool handle: %s\n", db_strerror(ret));
@@ -466,6 +474,38 @@ void print_help(char *progname)
                     "\t--host<name>\t\thost whose preallocated "
                     "handles should be removed\n");
     return;
+}
+
+#define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
+    (_size - sizeof(TROVE_handle))
+
+int PINT_trove_dbpf_keyval_compare(
+    DB * dbp, const DBT * a, const DBT * b)
+{
+    struct dbpf_keyval_db_entry db_entry_a;
+    struct dbpf_keyval_db_entry db_entry_b;
+
+    memcpy(&db_entry_a, a->data, sizeof(struct dbpf_keyval_db_entry));
+    memcpy(&db_entry_b, b->data, sizeof(struct dbpf_keyval_db_entry));
+
+    if(db_entry_a.handle != db_entry_b.handle)
+    {
+        return (db_entry_a.handle < db_entry_b.handle) ? -1 : 1;
+    }
+
+    if(a->size > b->size)
+    {
+        return 1;
+    }
+
+    if(a->size < b->size)
+    {
+        return -1;
+    }
+
+    /* must be equal */
+    return (memcmp(db_entry_a.key, db_entry_b.key,
+                    DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(a->size)));
 }
 
 /*
