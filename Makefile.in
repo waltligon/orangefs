@@ -907,9 +907,9 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 
 # rule for building development tools and its objects. don't know why db isn't
 # already in libs.
-$(DEVELTOOLS): $(DEVELOBJS) $(LIBRARIES)
-	$(Q) "  LD 		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(DEVELOBJS) $(LIBS) -ldb $(call modldflags,$<)
+$(DEVELTOOLS): %: %.o
+	$(Q) "  LD              $@"
+	$(E)$(LD) -o $@ $< $(LDFLAGS) $(LIBS) -ldb
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)

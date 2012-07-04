@@ -204,9 +204,11 @@ void close_db( DB *db_p )
 void iterate_database(DB *db_p, void (*print)(DBT key, DBT val) )
 {
     int ret = 0;
-    DBC *dbc_p = NULL;
+    DBC dbc;
+    DBC *dbc_p = &dbc;
     DBT key, val;
 
+    memset(&dbc, 0, sizeof(dbc));
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if( ret != 0 )
     {
