@@ -218,7 +218,7 @@ int PVFS_hint_add(
     int length,
     void *value)
 {
-    int ret;
+    int ret; 
     const struct PINT_hint_info *info;
     PINT_hint *new_hint;
 

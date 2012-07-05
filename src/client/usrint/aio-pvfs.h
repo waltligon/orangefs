@@ -26,6 +26,8 @@ int pvfs_aio_write(struct aiocb *aiocbp);
 int pvfs_lio_listio(int mode, struct aiocb * const list[], int nent,
 		    struct sigevent *sig);
 
+int pvfs_aio_open(const char *path, int flags, ...);
+
 /*
  * Local variables:
  *  c-indent-level: 4

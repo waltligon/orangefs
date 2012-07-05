@@ -35,6 +35,9 @@ enum
     CREATE_RETRY = 170
 };
 
+/* this allows the aio open sm to call a nested create sm */
+#define OPEN_CREATE_FILE 930
+
 /* completion function prototypes */
 static int create_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -48,7 +51,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
 
-machine pvfs2_client_create_sm
+nested machine pvfs2_client_create_sm
 {
     state init
     {
@@ -121,6 +124,21 @@ machine pvfs2_client_create_sm
     {
         run create_cleanup;
         CREATE_RETRY => init;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_create_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_create_sm;
+        default => create_terminate;
+    }
+
+    state create_terminate
+    {
+        run create_terminate;   
         default => terminate;
     }
 }
@@ -348,7 +366,8 @@ static PINT_sm_action create_init(
 
 
     assert((js_p->error_code == 0) ||
-           (js_p->error_code == CREATE_RETRY));
+           (js_p->error_code == CREATE_RETRY) ||
+           (js_p->error_code == OPEN_CREATE_FILE));
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
@@ -663,9 +682,7 @@ static PINT_sm_action create_cleanup(
     }
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
+    return SM_ACTION_COMPLETE;
 }
 
 /** looks at the attributes of the parent directory and decides if it impacts
@@ -1042,6 +1059,14 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action create_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* terminate the sm */
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

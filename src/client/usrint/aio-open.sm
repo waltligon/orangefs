@@ -4,9 +4,19 @@
  * See COPYING in top-level directory.
  */
 
+#include "pvfs2-aio.h"
+#include "client-state-machine.h"
+#include "str-utils.h"
+#include "openfile-util.h"
+#include "pvfs2-internal.h"
+#include "pvfs2-dist-simple-stripe.h"
+#include "usrint.h"
+
+extern job_context_id pint_client_sm_context;
+
 enum
 {
-    OPEN_PDIR_GIVEN = 924;
+    OPEN_PDIR_GIVEN = 924,
     OPEN_PDIR_NULL,
     OPEN_PDIR_RESOLVE_FAIL,
     OPEN_RUN_LOOKUP_SM,
@@ -23,14 +33,14 @@ static int initialize_context(
     char *pathname,
     PVFS_object_ref ctx_starting_refn);
 
-static void finalize_context(
-    PINT_client_lookup_sm_ctx *ctx);
-
 static PVFS_error split_path(
     const char *path,
     int dirflag,
     char **directory,
     char **filename);
+
+static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
+
 %%
 
 machine pvfs2_client_aio_open_sm
@@ -91,7 +101,7 @@ machine pvfs2_client_aio_open_sm
     {
         run open_resolve_fail_file_lookup_abs;
         OPEN_RUN_LOOKUP_SM => resolve_fail_file_lookup;
-        default => file_found;
+        default => file_lookup_inspect;
     }
 
     state resolve_fail_file_lookup
@@ -103,14 +113,14 @@ machine pvfs2_client_aio_open_sm
     state resolve_fail_file_lookup_inspect
     {
         run open_resolve_fail_file_lookup_inspect;
-        default => file_found;
+        default => file_lookup_inspect;
     }
 
     state file_lookup_setup
     {
         run open_file_lookup_setup;
         OPEN_RUN_LOOKUP_SM => file_lookup;
-        default => file_found;
+        default => file_lookup_inspect;
     }
 
     state file_lookup
@@ -123,10 +133,10 @@ machine pvfs2_client_aio_open_sm
     {
         run open_file_lookup_setup_next;
         OPEN_RUN_LOOKUP_SM => file_lookup;
-        default => file_found;
+        default => file_lookup_inspect;
     }
 
-    state file_found
+    state file_lookup_inspect
     {
         run open_file_ref_lookup_inspect;
         OPEN_CREATE_FILE => create_file;
@@ -158,10 +168,10 @@ machine pvfs2_client_aio_open_sm
     state fildes_getattr
     {
         jump pvfs2_client_getattr_sm;
-        default => getattr_sm_inspect;
+        default => fildes_getattr_inspect;
     }
 
-    state getattr_sm_inspect
+    state fildes_getattr_inspect
     {
         run open_getattr_inspect;
 	OPEN_TRUNCATE_FILE => file_truncate;
@@ -183,7 +193,7 @@ machine pvfs2_client_aio_open_sm
 
     state file_append_getattr
     {
-        jump pvfs2_client_getatrr_sm;
+        jump pvfs2_client_getattr_sm;
         default => file_append_getattr_inspect;
     }
 
@@ -479,36 +489,6 @@ static int initialize_context(
     return ret;
 }
 
-static void finalize_context(
-    PINT_client_lookup_sm_ctx *ctx)
-{
-    int i = 0;
-    PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    for(i = 0; i < MAX_LOOKUP_SEGMENTS; i++)
-    {
-        cur_seg = &ctx->segments[i];
-        assert(cur_seg);
-
-        if (cur_seg->seg_name)
-        {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Freeing segment %s\n",
-                         cur_seg->seg_name);
-            free(cur_seg->seg_name);
-            cur_seg->seg_name = NULL;
-        }
-
-        if (cur_seg->seg_remaining)
-        {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Freeing remaining "
-                         "segment %s\n", cur_seg->seg_remaining);
-            free(cur_seg->seg_remaining);
-            cur_seg->seg_remaining = NULL;
-        }
-        PINT_free_object_attr(&(cur_seg->seg_attr));
-    }
-}
-
 static PVFS_error split_path(
     const char *path,
     int dirflag,
@@ -594,6 +574,81 @@ static PVFS_error split_path(
     return 0;
 }
 
+/**
+ * Returns the default distribution, or NULL if the distribution could not
+ * be created.  The default distribution is read from the server
+ * configuration if possible.  If the server config does not specify a
+ * default distribution, simple_stripe will be used.
+ */
+static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
+{
+    server_configuration_s* server_config = NULL;
+    PINT_dist* dist = NULL;
+
+    /* Retrieve the server configuration (with mutex) */
+    server_config = PINT_get_server_config_struct(fs_id);
+
+    /* If a default dist is specified in the config, use that
+       else just create a simple_stripe distribution */
+    if (NULL != server_config &&
+        NULL != server_config->default_dist_config.name)
+    {
+        dist = PINT_dist_create(server_config->default_dist_config.name);
+
+        if (dist)
+        {
+            PINT_llist_p iter = server_config->default_dist_config.param_list;
+
+            /* Set supplied the distribution parameters */
+            while (iter)
+            {
+                int rc;
+                distribution_param_configuration* param =PINT_llist_head(iter);
+
+                /* If we are at the list end, break
+                   else, set the distribution parameter to the given value */
+                if (NULL == param)
+                {
+                    break;
+                }
+                else
+                {
+                    rc = dist->methods->set_param(dist->dist_name,
+                                                  dist->params,
+                                                  param->name,
+                                                  &param->value);
+
+                    if (0 != rc)
+                    {
+                        gossip_err("Error setting distribution parameter\n"
+                                   "  dist: %s\n"
+                                   "  param name: %s\n"
+                                   "  param value: %lld\n",
+                                   dist->dist_name, param->name,
+                                   lld(param->value));
+                    }
+                }
+                iter = PINT_llist_next(iter);
+            }
+        }
+        else
+        {
+            gossip_err("Error creating default distribution: %s\n",
+                       server_config->default_dist_config.name);
+        }
+    }
+    else
+    {
+        dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
+    }
+
+    /* Release the server config mutex */
+    PINT_put_server_config_struct(server_config);
+
+    return dist;
+}
+
+
 /****************************************************************/
 
 PVFS_error PVFS_iaio_open(
@@ -622,15 +677,13 @@ PVFS_error PVFS_iaio_open(
         return ret;
     }
 
-    pvfs_sys_init();
- 
     ret = split_path(path, 0, &directory, &filename);
     if (ret < 0)
     {
         return ret;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_CLIENT_AIO_OPEN,
+    PINT_smcb_alloc(&smcb, PVFS_AIO_OPEN,
              sizeof(struct PINT_client_sm),
              client_op_state_get_machine,
              client_state_machine_terminate,
@@ -650,14 +703,13 @@ PVFS_error PVFS_iaio_open(
     sm_p->u.aio_open.file_creation_param = file_creation_param;
     sm_p->u.aio_open.mode = mode;
     sm_p->u.aio_open.pd = fildes;
-    memset(sm_p->u.aio_open.parent_ref, 0, sizeof(PVFS_object_ref));
 
     return PINT_client_state_machine_post(
         smcb, op_id, user_ptr);
 }
 
 PVFS_error PVFS_aio_open(
-    pvfs_descriptor **fildes
+    pvfs_descriptor **fildes,
     const char *path,
     int flags, 
     PVFS_hint file_creation_param,
@@ -699,12 +751,12 @@ static PINT_sm_action open_init(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: init\n");
 
     memset(&sm_p->u.aio_open.file_ref, 0, sizeof(PVFS_object_ref));
-    memset(&sm_p->u.aio_open.parent_ref, 0, sizeof(PVFS_object_ref));
+    memset(&sm_p->u.aio_open.parent_ref, 0, sizeof(PVFS_object_ref)); 
+    sm_p->u.aio_open.current_seg_path = NULL;
 
     /* Check the flags to determine if links are followed */
     if (sm_p->u.aio_open.flags & O_NOFOLLOW)
@@ -737,6 +789,8 @@ static PINT_sm_action open_pdir_lookup(
     PVFS_fs_id lookup_fs_id;
     char pvfs_path[PVFS_PATH_MAX];
     PVFS_object_ref parent;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: pdir_lookup\n");
 
     ret = PVFS_util_resolve(sm_p->u.aio_open.directory, &lookup_fs_id,
                             pvfs_path, PVFS_PATH_MAX);
@@ -777,6 +831,7 @@ static PINT_sm_action open_pdir_lookup(
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
+        memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
@@ -793,7 +848,7 @@ static PINT_sm_action open_pdir_lookup(
                     &(parent.handle));
 
         ret = initialize_context(&lookup_frame->u.lookup, path,
-                                 sm_p->u.aio_open.parent_ref);
+                                 parent);
         if (ret != 0)
         {
             gossip_err("aio-open: failed to init context (path = %s)\n", path);
@@ -813,6 +868,10 @@ static PINT_sm_action open_pdir_lookup(
         {
             js_p->error_code = OPEN_RUN_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         path, llu(parent.handle));
+
         }
     }
 
@@ -824,6 +883,8 @@ static PINT_sm_action open_pdir_lookup_given(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: pdir_given\n");
 
     if (sm_p->u.aio_open.directory)
     {
@@ -841,7 +902,7 @@ static PINT_sm_action open_pdir_lookup_given(
             /* there must be at least one */
             /* so n either case increment it first */
             for(sm_p->u.aio_open.cur++;
-                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/')
+                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/');
                  sm_p->u.aio_open.cur++);
             if (sm_p->u.aio_open.cur - sm_p->u.aio_open.start > PVFS_NAME_MAX-1)
             {
@@ -874,8 +935,10 @@ static PINT_sm_action open_pdir_lookup_given(
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;;
         }
+        memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
         PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_open.pdir->s->pvfs_ref.fs_id);
+
         PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
         lookup_frame->u.lookup.orig_pathname = current_seg_path;
         lookup_frame->u.lookup.starting_refn = sm_p->u.aio_open.pdir->s->pvfs_ref;
@@ -908,6 +971,11 @@ static PINT_sm_action open_pdir_lookup_given(
         {
             js_p->error_code = OPEN_RUN_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         current_seg_path,
+                         llu(sm_p->u.aio_open.pdir->s->pvfs_ref.handle));
+
         }
     }    
     else
@@ -926,10 +994,13 @@ static PINT_sm_action open_pdir_ref_lookup_rel_setup_next(
     int ret = 0;
     int frame_id, frames_remaining;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: pdir_ref_lookup_rel_setup_next\n");
+
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = lookup_frame->error_code;
     if (js_p->error_code)
     {
         free(lookup_frame);
@@ -948,7 +1019,7 @@ static PINT_sm_action open_pdir_ref_lookup_rel_setup_next(
             /* there must be at least one */
             /* so n either case increment it first */
             for(sm_p->u.aio_open.cur++;
-                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/')
+                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/');
                  sm_p->u.aio_open.cur++);
             if (sm_p->u.aio_open.cur - sm_p->u.aio_open.start > PVFS_NAME_MAX-1)
             {
@@ -999,11 +1070,15 @@ static PINT_sm_action open_pdir_ref_lookup_rel_setup_next(
         {
             js_p->error_code = OPEN_RUN_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         current_seg_path,
+                         llu(sm_p->u.aio_open.lookup_resp.ref.handle));
         }
     }
     else
     {
-        sm_p->u.aio_open.parent_ref = lookup_frame.u.lookup.lookup_resp.ref;
+        sm_p->u.aio_open.parent_ref = lookup_frame->u.lookup.lookup_resp->ref;
         free(lookup_frame);
         js_p->error_code = OPEN_FIND_FILE;
     }
@@ -1015,13 +1090,15 @@ static PINT_sm_action open_pdir_ref_lookup_abs_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: pdir_ref_lookup_abs_inspect\n");
 
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = lookup_frame->error_code;
     if (js_p->error_code < 0)
     {
         free(lookup_frame);
@@ -1042,6 +1119,8 @@ static PINT_sm_action open_resolve_fail_file_lookup_abs(
     PVFS_fs_id lookup_fs_id;
     char pvfs_path[PVFS_PATH_MAX];
     PVFS_object_ref file;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: resolve_fail_file_lookup_setup\n");
 
     ret = PVFS_util_resolve(sm_p->u.aio_open.path, &lookup_fs_id,
                             pvfs_path, PVFS_PATH_MAX);
@@ -1068,12 +1147,14 @@ static PINT_sm_action open_resolve_fail_file_lookup_abs(
         js_p->error_code = 0;
     }
     else
+    {
         PINT_client_sm *lookup_frame = malloc(sizeof(PINT_client_sm));
         if (lookup_frame == NULL)
         {
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
+        memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
         char *path = ((pvfs_path[0] == '/') ? &pvfs_path[1] : pvfs_path);
 
@@ -1090,7 +1171,7 @@ static PINT_sm_action open_resolve_fail_file_lookup_abs(
                     &(file.handle));
 
         ret = initialize_context(&lookup_frame->u.lookup, path,
-                                 sm_p->u.aio_open.file_ref);
+                                 file);
         if (ret != 0)
         {
             gossip_err("aio-open: failed to init context (path = %s)\n", path);
@@ -1110,7 +1191,11 @@ static PINT_sm_action open_resolve_fail_file_lookup_abs(
         {
             js_p->error_code = OPEN_RUN_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         path, llu(file.handle));
         }
+    }
 
     return SM_ACTION_COMPLETE;
 }
@@ -1119,13 +1204,15 @@ static PINT_sm_action open_resolve_fail_file_lookup_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: resolve_fail_file_lookup_inspect\n");
 
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = lookup_frame->error_code;
     if (!js_p->error_code)
     {
         sm_p->u.aio_open.file_ref = sm_p->u.aio_open.lookup_resp.ref;
@@ -1142,6 +1229,8 @@ static PINT_sm_action open_file_lookup_setup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = 0;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_lookup_setup\n");
+
     sm_p->u.aio_open.cur = sm_p->u.aio_open.filename;
     sm_p->u.aio_open.last = sm_p->u.aio_open.filename;
     sm_p->u.aio_open.start = sm_p->u.aio_open.filename;
@@ -1156,7 +1245,7 @@ static PINT_sm_action open_file_lookup_setup(
         /* there must be at least one */
         /* so n either case increment it first */
         for(sm_p->u.aio_open.cur++;
-            (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/')
+            (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/');
             sm_p->u.aio_open.cur++);
         if (sm_p->u.aio_open.cur - sm_p->u.aio_open.start > PVFS_NAME_MAX-1)
         {
@@ -1176,10 +1265,15 @@ static PINT_sm_action open_file_lookup_setup(
         }
     }
 
-    char current_seg_path[PVFS_NAME_MAX];
-    memset(current_seg_path, 0, PVFS_NAME_MAX);
-    strncpy(current_seg_path, sm_p->u.aio_open.start,
-            sm_p->u.aio_open.cur - sm_p->u.aio_open.start + 1);
+    sm_p->u.aio_open.current_seg_path = (char *)malloc(PVFS_NAME_MAX);
+    if (sm_p->u.aio_open.current_seg_path == NULL)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+    memset(sm_p->u.aio_open.current_seg_path, 0, PVFS_NAME_MAX);
+    strncpy(sm_p->u.aio_open.current_seg_path, sm_p->u.aio_open.start,
+            sm_p->u.aio_open.cur - sm_p->u.aio_open.start + 2);;
     sm_p->u.aio_open.start = sm_p->u.aio_open.cur;
     sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
 
@@ -1189,10 +1283,11 @@ static PINT_sm_action open_file_lookup_setup(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(lookup_frame, 0, sizeof(PINT_client_sm));
 
-    PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_open.pdir->s->pvfs_ref.fs_id);
+    PINT_init_msgarray_params(lookup_frame, sm_p->u.aio_open.parent_ref.fs_id);
     PINT_init_sysint_credential(lookup_frame->cred_p, sm_p->cred_p);
-    lookup_frame->u.lookup.orig_pathname = current_seg_path;
+    lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_open.current_seg_path;
     lookup_frame->u.lookup.starting_refn = sm_p->u.aio_open.parent_ref;
     lookup_frame->u.lookup.lookup_resp = &(sm_p->u.aio_open.lookup_resp);
     lookup_frame->u.lookup.follow_link = sm_p->u.aio_open.follow_link;
@@ -1202,11 +1297,13 @@ static PINT_sm_action open_file_lookup_setup(
                   sizeof(PVFS_handle),
                   &(sm_p->u.aio_open.parent_ref.handle));
 
-    ret = initialize_context(&lookup_frame->u.lookup, current_seg_path,
-                                 sm_p->u.aio_open.parent_ref);
+    ret = initialize_context(&lookup_frame->u.lookup,
+                             sm_p->u.aio_open.current_seg_path,
+                             sm_p->u.aio_open.parent_ref);
     if (ret != 0)
     {
-        gossip_err("aio-open: failed to init context (path = %s)\n", current_seg_path);
+        gossip_err("aio-open: failed to init context (path = %s)\n",
+                   sm_p->u.aio_open.current_seg_path);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -1223,6 +1320,10 @@ static PINT_sm_action open_file_lookup_setup(
     {
         js_p->error_code = OPEN_RUN_LOOKUP_SM;
         PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                     sm_p->u.aio_open.current_seg_path,
+                     llu(sm_p->u.aio_open.parent_ref.handle));
     }
   
     return SM_ACTION_COMPLETE;
@@ -1235,10 +1336,13 @@ static PINT_sm_action open_file_lookup_setup_next(
     int ret = 0;
     int frame_id, frames_remaining;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_lookup_setup_next\n");
+
     struct PINT_client_sm *lookup_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = lookup_frame->error_code;
     if (js_p->error_code)
     {
         free(lookup_frame);
@@ -1257,7 +1361,7 @@ static PINT_sm_action open_file_lookup_setup_next(
             /* there must be at least one */
             /* so n either case increment it first */
             for(sm_p->u.aio_open.cur++;
-                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/')
+                (*sm_p->u.aio_open.cur && *sm_p->u.aio_open.cur != '/');
                  sm_p->u.aio_open.cur++);
             if (sm_p->u.aio_open.cur - sm_p->u.aio_open.start > PVFS_NAME_MAX-1)
             {
@@ -1276,23 +1380,25 @@ static PINT_sm_action open_file_lookup_setup_next(
                 sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
             }
         }
-        char current_seg_path[PVFS_NAME_MAX];
-        memset(current_seg_path, 0, PVFS_NAME_MAX);
-        strncpy(current_seg_path, sm_p->u.aio_open.start,
+
+        memset(sm_p->u.aio_open.current_seg_path, 0, PVFS_NAME_MAX);
+        strncpy(sm_p->u.aio_open.current_seg_path, sm_p->u.aio_open.start,
                 sm_p->u.aio_open.cur - sm_p->u.aio_open.start + 1);
         sm_p->u.aio_open.start = sm_p->u.aio_open.cur;
         sm_p->u.aio_open.last = sm_p->u.aio_open.cur;
 
-        lookup_frame->u.lookup.orig_pathname = current_seg_path;
+        lookup_frame->u.lookup.orig_pathname = sm_p->u.aio_open.current_seg_path;
         lookup_frame->u.lookup.starting_refn = sm_p->u.aio_open.lookup_resp.ref;
         lookup_frame->u.lookup.follow_link = sm_p->u.aio_open.follow_link;
         lookup_frame->u.lookup.current_context = 0;
 
-        ret = initialize_context(&lookup_frame->u.lookup, current_seg_path,
+        ret = initialize_context(&lookup_frame->u.lookup,
+                                 sm_p->u.aio_open.current_seg_path,
                                  sm_p->u.aio_open.lookup_resp.ref);
         if (ret != 0)
         {
-            gossip_err("aio-open: failed to init context (path = %s)\n", current_seg_path);
+            gossip_err("aio-open: failed to init context (path = %s)\n",
+                       sm_p->u.aio_open.current_seg_path);
             js_p->error_code = ret;
             return SM_ACTION_COMPLETE;
         }
@@ -1309,11 +1415,15 @@ static PINT_sm_action open_file_lookup_setup_next(
         {
             js_p->error_code = OPEN_RUN_LOOKUP_SM;
             PINT_sm_push_frame(smcb, 0, (void *)lookup_frame);
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                         sm_p->u.aio_open.current_seg_path,
+                         llu(sm_p->u.aio_open.lookup_resp.ref.handle));
         }
     }
     else
     {
-        sm_p->u.aio_open.file_ref = lookup_frame.u.lookup.lookup_resp.ref;
+        sm_p->u.aio_open.file_ref = lookup_frame->u.lookup.lookup_resp->ref;
         free(lookup_frame);
         js_p->error_code = OPEN_FILE_FOUND;
     }
@@ -1325,7 +1435,11 @@ static PINT_sm_action open_file_ref_lookup_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_lookup_inspect\n");
+
+    if (sm_p->u.aio_open.current_seg_path)
+        free(sm_p->u.aio_open.current_seg_path);
 
     /* file found, but EXCLUSIVE so fail */
     if ((js_p->error_code >= 0) && (sm_p->u.aio_open.flags & O_EXCL) &&
@@ -1338,7 +1452,8 @@ static PINT_sm_action open_file_ref_lookup_inspect(
     /* examine file ref lookup error to see if we can work around it */
     if (js_p->error_code < 0)
     {
-        if ((js_p->error_code != -PVFS_ENOENT) || !(flags & O_CREAT))
+        if ((js_p->error_code != -PVFS_ENOENT) ||
+            !(sm_p->u.aio_open.flags & O_CREAT))
         {
             return SM_ACTION_COMPLETE;
         }
@@ -1401,7 +1516,7 @@ static PINT_sm_action open_file_ref_lookup_inspect(
              (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
         {
             gossip_err("Error: invalid number of datafiles (%d) specified "
-                       "in PVFS_sys_create().\n", (int)attr.dfile_count);
+                       "for create sm.\n", (int)attr.dfile_count);
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
         }
@@ -1433,10 +1548,10 @@ static PINT_sm_action open_file_ref_lookup_inspect(
         }
 
         PINT_init_msgarray_params(create_frame, sm_p->u.aio_open.parent_ref.fs_id);
-        PINT_init_sysint_credential(create_frame->cred_p, sm_p->credential);
+        PINT_init_sysint_credential(create_frame->cred_p, sm_p->cred_p);
         create_frame->u.create.object_name = sm_p->u.aio_open.filename;
-        create_frame->u.create.create_resp = sm_p->u.aio_open.create_resp;
-        PINT_CONVERT_ATTR(&lookup_frame->u.create.attr, &attr, PVFS_ATTR_META_ALL);
+        create_frame->u.create.create_resp = &sm_p->u.aio_open.create_resp;
+        PINT_CONVERT_ATTR(&create_frame->u.create.attr, &attr, PVFS_ATTR_META_ALL);
 
         /* save the original attribute passed in. since create does it's own
          * retries we need the original attribute available on retries */
@@ -1456,7 +1571,7 @@ static PINT_sm_action open_file_ref_lookup_inspect(
 
         create_frame->u.create.layout.algorithm = PVFS_SYS_LAYOUT_ROUND_ROBIN;
         create_frame->object_ref = sm_p->u.aio_open.parent_ref;
-        create_frame->u..create.dist = get_default_distribution(create_frame->parent_ref.fs_id);
+        create_frame->u.create.dist = get_default_distribution(create_frame->parent_ref.fs_id);
         if (!create_frame->u.create.dist)
         {
             js_p->error_code = -PVFS_ENOMEM;
@@ -1484,13 +1599,15 @@ static PINT_sm_action open_create_file_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: create_file_inspect\n");
 
     struct PINT_client_sm *create_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
-
+    
+    js_p->error_code = create_frame->error_code;
     free(create_frame);
     if (js_p->error_code < 0)
     {
@@ -1513,21 +1630,23 @@ static PINT_sm_action open_setup_fildes(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
+    pvfs_descriptor *fildes_out;
 
-    sm_p->u.aio_open->pd = pvfs_alloc_descriptor(&pvfs_ops, -1,
-				    &(sm_p->u.aio_open.file_ref), 0);
-    if (!(sm_p->u.aio_open->pd))
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: setup_fildes\n");
+
+    fildes_out = pvfs_alloc_descriptor(&pvfs_ops, -1,
+                 &(sm_p->u.aio_open.file_ref), 0);
+    if (!fildes_out)
     {
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
-    sm_p->u.aio_open->pd->s->flags = sm_p->u.aio_open.flags;
-    sm_p->u.aio_open->pd->is_in_use = PVFS_FS;
+    fildes_out->s->flags = sm_p->u.aio_open.flags;
+    fildes_out->is_in_use = PVFS_FS;
 
-    if ((sm_p->u.aio_open->pd->s->pvfs_ref.handle == PVFS_HANDLE_NULL) ||
-        (sm_p->u.aio_open->pd->s->pvfs_ref.fs_id == PVFS_FS_ID_NULL))
-    {
+    if ((fildes_out->s->pvfs_ref.handle == PVFS_HANDLE_NULL) ||
+        (fildes_out->s->pvfs_ref.fs_id == PVFS_FS_ID_NULL))
+    {   
         js_p->error_code = -PVFS_EINVAL; 
         return SM_ACTION_COMPLETE;
     }
@@ -1539,24 +1658,27 @@ static PINT_sm_action open_setup_fildes(
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    memset(getattr_frame, 0, sizeof(PINT_client_sm));
 
-    PINT_init_msgarray_params(getattr_frame, sm_p->u.aio_open->pd->s->pvfs_ref.fs_id);
+    PINT_init_msgarray_params(getattr_frame, fildes_out->s->pvfs_ref.fs_id);
     PINT_init_sysint_credential(getattr_frame->cred_p, sm_p->cred_p);
     getattr_frame->error_code = 0;
-    getattr_frame->object_ref = sm_p->u.aio_open->pd->s->pvfs_ref;
+    getattr_frame->object_ref = fildes_out->s->pvfs_ref;
     getattr_frame->u.getattr.getattr_resp_p = &(sm_p->u.aio_open.getattr_resp);
     PVFS_hint_copy(sm_p->hints, &(getattr_frame->hints));
     PVFS_hint_add(&(getattr_frame->hints), PVFS_HINT_HANDLE_NAME,
-                  sizeof(PVFS_handle), &(sm_p->u.aio_open->pd->s->pvfs_ref.handle));
+                  sizeof(PVFS_handle), &(fildes_out->s->pvfs_ref.handle));
 
     PINT_SM_GETATTR_STATE_FILL(
         getattr_frame->getattr,
-        sm_p->u.aio_open->pd->s->pvfs_ref,
+        fildes_out->s->pvfs_ref,
         PVFS_util_sys_to_object_attr_mask(PVFS_ATTR_SYS_ALL_NOHINT),
         PVFS_TYPE_NONE,
         0);
 
     PINT_sm_push_frame(smcb, 0, (void *)getattr_frame);
+
+    *(sm_p->u.aio_open.pd) = fildes_out;
 
     return SM_ACTION_COMPLETE;
 }
@@ -1565,46 +1687,50 @@ static PINT_sm_action open_getattr_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+    pvfs_descriptor *fildes_out = *(sm_p->u.aio_open.pd);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: fildes_getattr_inspect\n");
 
     struct PINT_client_sm *getattr_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = getattr_frame->error_code;
     free(getattr_frame);
     if (js_p->error_code < 0)
     {
         return SM_ACTION_COMPLETE;
     }
 
-    sm_p->u.aio_open->pd->s->mode = sm_p->u.aio_open.getattr_resp.attr.perms;
+    fildes_out->s->mode = sm_p->u.aio_open.getattr_resp.attr.perms;
 
     if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_METAFILE)
     {
-        sm_p->u.aio_open->pd->s->mode |= S_IFREG;
+        fildes_out->s->mode |= S_IFREG;
     }
     if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
-        sm_p->u.aio_open->pd->s->mode |= S_IFDIR;
+        fildes_out->s->mode |= S_IFDIR;
         if (sm_p->u.aio_open.pdir)
         {
-            sm_p->u.aio_open->pd->s->dpath = (char *)malloc(strlen(sm_p->u.aio_open.pdir->s->dpath) + strlen(sm_p->u.aio_open.path) + 2);
-            strcpy(sm_p->u.aio_open->pd->s->dpath, sm_p->u.aio_open.pdir->s->dpath);
-            strcat(sm_p->u.aio_open->pd->s->dpath, "/");
-            strcat(sm_p->u.aio_open->pd->s->dpath, sm_p->u.aio_open.path);
+            fildes_out->s->dpath = (char *)malloc(strlen(sm_p->u.aio_open.pdir->s->dpath) + strlen(sm_p->u.aio_open.path) + 2);
+            strcpy(fildes_out->s->dpath, sm_p->u.aio_open.pdir->s->dpath);
+            strcat(fildes_out->s->dpath, "/");
+            strcat(fildes_out->s->dpath, sm_p->u.aio_open.path);
         }
         else
         {
-            sm_p->u.aio_open->pd->s->dpath = (char *)malloc(strlen(sm_p->u.aio_open.path) + 1);
-            strcpy(sm_p->u.aio_open->pd->s->dpath, sm_p->u.aio_open.path);
+            fildes_out->s->dpath = (char *)malloc(strlen(sm_p->u.aio_open.path) + 1);
+            strcpy(fildes_out->s->dpath, sm_p->u.aio_open.path);
+        }
     }
-    if (sm_p->u.aio_open.getattr_resp.attr.objtype = PVFS_TYPE_SYMLINK)
+    if (sm_p->u.aio_open.getattr_resp.attr.objtype == PVFS_TYPE_SYMLINK)
     {
-        sm_p->u.aio_open->pd->s->mode |= S_IFLNK;
+        fildes_out->s->mode |= S_IFLNK;
     }
-    gen_mutex_unlock(&sm_p->u.aio_open->pd->s->lock);
-    gen_mutex_unlock(&sm_p->u.aio_open->pd->lock);
+    gen_mutex_unlock(&fildes_out->s->lock);
+    gen_mutex_unlock(&fildes_out->lock);
 
     if (sm_p->u.aio_open.flags & O_TRUNC)
     {
@@ -1632,6 +1758,12 @@ static PINT_sm_action open_getattr_inspect(
 
         js_p->error_code = OPEN_TRUNCATE_FILE;
         PINT_sm_push_frame(smcb, 0, (void *)trunc_frame);
+
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "Truncating file %s under %llu, %d\n",
+            sm_p->u.aio_open.filename, llu(sm_p->u.aio_open.parent_ref.handle),
+            sm_p->u.aio_open.parent_ref.fs_id);
+
         return SM_ACTION_COMPLETE;
     }
     
@@ -1642,7 +1774,9 @@ static PINT_sm_action open_file_append_check(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
+    pvfs_descriptor *fildes_out = *(sm_p->u.aio_open.pd);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_append_check\n");
 
     if (sm_p->u.aio_open.flags & O_TRUNC)
     {
@@ -1652,6 +1786,7 @@ static PINT_sm_action open_file_append_check(
                                               smcb, &frame_id,
                                               &js_p->error_code, &frames_remaining);
         
+        js_p->error_code = trunc_frame->error_code;
         free(trunc_frame);
         if (js_p->error_code < 0)
         {
@@ -1663,16 +1798,16 @@ static PINT_sm_action open_file_append_check(
     {
         /* append to the file */
 
-        if (!(sm_p->u.aio_open->pd) || sm_p->u.aio_open->pd->is_in_use != PVFS_FS)
+        if (!(fildes_out) || fildes_out->is_in_use != PVFS_FS)
         {
             js_p->error_code = -PVFS_EBADF;
             return SM_ACTION_COMPLETE;
         }
-        gen_mutex_lock(&(sm_p->u.aio_open->pd->s->lock));
-        memset(&(sm_p->u.aio_open.getattr_resp), 0, sizeof(PVFS_sysres_getattr));
+        gen_mutex_lock(&(fildes_out->s->lock));
+        memset(&(sm_p->u.aio_open.getattr_resp), 0, sizeof(PVFS_sysresp_getattr));
         
-        if (sm_p->u.aio_open->pd->s->pvfs_ref.handle == PVFS_HANDLE_NULL ||
-            sm_p->u.aio_open->pd->s->pvfs_ref.fs_id == PVFS_FS_ID_NULL)
+        if (fildes_out->s->pvfs_ref.handle == PVFS_HANDLE_NULL ||
+            fildes_out->s->pvfs_ref.fs_id == PVFS_FS_ID_NULL)
         {
             js_p->error_code = -PVFS_EINVAL;
             return SM_ACTION_COMPLETE;
@@ -1683,24 +1818,24 @@ static PINT_sm_action open_file_append_check(
         if (getattr_frame == NULL)
         {
             js_p->error_code = -PVFS_ENOMEM;
-            gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock));
+            gen_mutex_unlock(&(fildes_out->s->lock));
             return SM_ACTION_COMPLETE;
         }
+        memset(getattr_frame, 0, sizeof(PINT_client_sm));
 
-        PINT_init_msgarray_params(getattr_frame,
-            sm_p->u.aio_open->pd->s->pvfs_ref.fs_id);
-        PINT_init_sysint_credentials(getattr_frame->cred_p, sm_p->cred_p);
+        PINT_init_msgarray_params(getattr_frame, fildes_out->s->pvfs_ref.fs_id);
+        PINT_init_sysint_credential(getattr_frame->cred_p, sm_p->cred_p);
         getattr_frame->error_code = 0;
-        getattr_frame->object_ref = sm_p->u.aio_open->pd->s->pvfs_ref;
+        getattr_frame->object_ref = fildes_out->s->pvfs_ref;
         getattr_frame->u.getattr.getattr_resp_p = &(sm_p->u.aio_open.getattr_resp);
         PVFS_hint_copy(sm_p->hints, &getattr_frame->hints);
         PVFS_hint_add(&getattr_frame->hints, PVFS_HINT_HANDLE_NAME,
                       sizeof(PVFS_handle), 
-                      &(sm_p->u.aio_open->pd->s->pvfs_ref.handle));
+                      &(fildes_out->s->pvfs_ref.handle));
 
         PINT_SM_GETATTR_STATE_FILL(
             getattr_frame->getattr,
-            sm_p->u.aio_open->pd->s->pvfs_ref,
+            fildes_out->s->pvfs_ref,
             PVFS_util_sys_to_object_attr_mask(
                 PVFS_ATTR_SYS_SIZE),
             PVFS_TYPE_NONE,
@@ -1717,30 +1852,33 @@ static PINT_sm_action open_file_append_getattr_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+    pvfs_descriptor *fildes_out = *(sm_p->u.aio_open.pd);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_append_getattr_inspect\n");
 
     struct PINT_client_sm *getattr_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = getattr_frame->error_code;
     free(getattr_frame);
     if (js_p->error_code < 0)
     {
-        gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock));
+        gen_mutex_unlock(&(fildes_out->s->lock));
         return SM_ACTION_COMPLETE;
     }
 
-    sm_p->u.aio_open->pd->s->file_pointer = sm_p->u.aio_open.getattr_resp.attr.size;
+    fildes_out->s->file_pointer = sm_p->u.aio_open.getattr_resp.attr.size;
 
-    if (S_ISDIR(sm_p->u.aio_open->pd->s->mode))
+    if (S_ISDIR(fildes_out->s->mode))
     {
         int dirent_no;
 
         memset(&(sm_p->u.aio_open.readdir_resp), 0, sizeof(PVFS_sysresp_readdir));
-        dirent_no = sm_p->u.aio_open->pd->s->file_pointer / sizeof(PVFS_dirent);
-        sm_p->u.aio_open->pd->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
-        sm_p->u.aio_open->pd->s->token = PVFS_READDIR_START;
+        dirent_no = fildes_out->s->file_pointer / sizeof(PVFS_dirent);
+        fildes_out->s->file_pointer = dirent_no * sizeof(PVFS_dirent);
+        fildes_out->s->token = PVFS_READDIR_START;
 
         if (dirent_no)
         {        
@@ -1749,7 +1887,7 @@ static PINT_sm_action open_file_append_getattr_inspect(
                 gossip_lerr("PVFS readdir sm unable to handle request "
                             "for %d entries.\n", dirent_no);
                 js_p->error_code = -PVFS_EINVAL;
-                gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock)):
+                gen_mutex_unlock(&(fildes_out->s->lock));
                 return SM_ACTION_COMPLETE;
             }
 
@@ -1758,34 +1896,34 @@ static PINT_sm_action open_file_append_getattr_inspect(
             if (readdir_frame == NULL)
             {
                 js_p->error_code = -PVFS_ENOMEM;
-                gen_mutex_unlock(&sm_p->u.aio_open->pd->s->lock);
+                gen_mutex_unlock(&fildes_out->s->lock);
                 return SM_ACTION_COMPLETE;
             }
+            memset(readdir_frame, 0, sizeof(PINT_client_sm));
 
-            PINT_init_msgarray_parms(readdir_frame,
-                sm_p->u.aio_open->pd->s->pvfs_ref.fs_id);
-            PINT_init_sysint_credentials(readdir_frame->cred_p, sm_p->cred_p);
+            PINT_init_msgarray_params(readdir_frame,fildes_out->s->pvfs_ref.fs_id);
+            PINT_init_sysint_credential(readdir_frame->cred_p, sm_p->cred_p);
             readdir_frame->u.readdir.readdir_resp = &sm_p->u.aio_open.readdir_resp;
-            readdir_frame->object_ref = sm_p->u.aio_open->pd->s->pvfs_ref;
+            readdir_frame->object_ref = fildes_out->s->pvfs_ref;
             PVFS_hint_copy(sm_p->hints, &readdir_frame->hints);
             PVFS_hint_add(&readdir_frame->hints, PVFS_HINT_HANDLE_NAME,
-                sizeof(PVFS_handle), &sm_p->u.aio_open->pd->s->pvfs_ref.handle);
+                sizeof(PVFS_handle), &fildes_out->s->pvfs_ref.handle);
 
             /* point the sm dirent array and outcount to the readdir response */
-            readdir_frame->readdir.dirent_array = &(sm_p->u.aio_open.readdir_resp->dirent_array);
-            readdir_frame->readdir.dirent_outcount = &(sm_p->u.aio_open.readdir_resp->pvfs_dirent_outcount);
-            readdir_frame->readdir.token = &(sm_p->u.aio_open.readdir_resp->token);
-            readdir_frame->readdir.directory_version = &(sm_p->u.aio_open.readdir_resp->directory_version);
+            readdir_frame->readdir.dirent_array = &(sm_p->u.aio_open.readdir_resp.dirent_array);
+            readdir_frame->readdir.dirent_outcount = &(sm_p->u.aio_open.readdir_resp.pvfs_dirent_outcount);
+            readdir_frame->readdir.token = &(sm_p->u.aio_open.readdir_resp.token);
+            readdir_frame->readdir.directory_version = &(sm_p->u.aio_open.readdir_resp.directory_version);
 
-            readdir_frame->readdir.pos_token = sm_p->u.aio_open->pd->s->token;
-            readdir_frame->u.readdir.pos_token = sm_p->u.aio_open->pd->s->token;
+            readdir_frame->readdir.pos_token = fildes_out->s->token;
+            readdir_frame->u.readdir.pos_token = fildes_out->s->token;
             readdir_frame->readdir.dirent_limit = dirent_no;
             readdir_frame->u.readdir.dirent_limit = dirent_no;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing readdir on handle "
                          "%llu on fs %d\n",
-                         llu(sm_p->u.aio_open->pd->s->pvfs_ref.handle)
-                         sm_p->u.aio_open->pd->s->pvfs_ref.fs_id);
+                         llu(fildes_out->s->pvfs_ref.handle),
+                         fildes_out->s->pvfs_ref.fs_id);
 
             js_p->error_code = OPEN_FILE_APPEND;
             PINT_sm_push_frame(smcb, 0, (void *)readdir_frame);
@@ -1793,7 +1931,7 @@ static PINT_sm_action open_file_append_getattr_inspect(
         }
     }
 
-    gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock));
+    gen_mutex_unlock(&(fildes_out->s->lock));
 
     return SM_ACTION_COMPLETE;
 }
@@ -1802,23 +1940,26 @@ static PINT_sm_action open_file_append_readdir_inspect(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
     int frame_id, frames_remaining;
+    pvfs_descriptor *fildes_out = *(sm_p->u.aio_open.pd);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: file_append_readdir_inspect\n");
 
     struct PINT_client_sm *readdir_frame = (PINT_client_sm *)PINT_sm_pop_frame(
                                  smcb, &frame_id,
                                  &js_p->error_code, &frames_remaining);
 
+    js_p->error_code = readdir_frame->error_code;
     free(readdir_frame);
     if (js_p->error_code < 0)
     {
-        gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock));
+        gen_mutex_unlock(&(fildes_out->s->lock));
         return SM_ACTION_COMPLETE;
     }
 
-    sm_p->u.aio_open->pd->s->token = sm_p->u.aio_open.readdir_resp.token;
+    fildes_out->s->token = sm_p->u.aio_open.readdir_resp.token;
     free(sm_p->u.aio_open.readdir_resp.dirent_array);
-    gen_mutex_unlock(&(sm_p->u.aio_open->pd->s->lock));
+    gen_mutex_unlock(&(fildes_out->s->lock));
 
     return SM_ACTION_COMPLETE;
 }
@@ -1827,15 +1968,17 @@ static PINT_sm_action open_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = 0;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: cleanup\n");
+
+    sm_p->error_code = js_p->error_code;
     if (js_p->error_code < 0)
     {
-        sm_p->u.aio_open->pd = NULL;
+        *(sm_p->u.aio_open.pd) = NULL;
     }
 
     PINT_SET_OP_COMPLETE;
-    RETURN SM_ACTION_TERMINATE;
+    return SM_ACTION_TERMINATE;
 }
 
 /*

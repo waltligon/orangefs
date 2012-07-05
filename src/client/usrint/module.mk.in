@@ -31,7 +31,7 @@ CLIENT_SMCGEN := \
 SMCGEN += $(CLIENT_SMCGEN)
 
 # list of all .c files (generated or otherwise) that belong in library
-LIBSRC += $(SRC)
+LIBSRC += $(SRC) $(CLIENT_SMCGEN)
 ULIBSRC += $(USRC)
 
 endif # BUILD_USRINT

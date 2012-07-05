@@ -33,6 +33,9 @@
 #include "pint-event.h"
 #include "pint-util.h"
 #include "security-util.h"
+#include "pvfs2-usrint.h"
+#include "posix-ops.h"
+
 
 /* TODO: orange-security
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
@@ -586,6 +589,7 @@ struct PINT_client_aio_open_sm
 
     /* fields needed for relative lookups */
     char *cur, *last, *start;
+    char *current_seg_path;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
     PVFS_sysresp_create create_resp;
@@ -778,6 +782,9 @@ enum
 #define PVFS_OP_SYS_MAXVAL 69
 #define PVFS_OP_MGMT_MAXVALID 82
 #define PVFS_OP_MGMT_MAXVAL 199
+#define PVFS_OP_AIO_MINVAL 500
+#define PVFS_OP_AIO_MAXVAL 600
+#define PVFS_OP_AIO_MAXVALID 500
 
 int PINT_client_io_cancel(job_id_t id);
 
@@ -838,9 +845,11 @@ struct PINT_client_op_entry_s
 
 extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
 extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
+extern struct PINT_client_op_entry_s PINT_client_sm_aio_table[];
 
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
@@ -854,8 +863,10 @@ extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdirplus_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_sysdev_unexp_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;

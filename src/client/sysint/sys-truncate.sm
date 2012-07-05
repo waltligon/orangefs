@@ -41,7 +41,7 @@ static int unstuff_comp_fn(
 
 %% 
 
-machine pvfs2_client_truncate_sm
+nested machine pvfs2_client_truncate_sm
 {
     state truncate_getattr
     {
@@ -95,6 +95,21 @@ machine pvfs2_client_truncate_sm
     state cleanup
     {
         run truncate_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_truncate_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_truncate_sm;
+        default => truncate_terminate;
+    }
+
+    state truncate_terminate
+    {
+        run truncate_terminate;
         default => terminate;
     }
 }
@@ -305,8 +320,7 @@ static PINT_sm_action truncate_cleanup(
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
+    return SM_ACTION_COMPLETE;
 }
 
 static PINT_sm_action truncate_inspect_attr(
@@ -328,6 +342,14 @@ static PINT_sm_action truncate_inspect_attr(
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action truncate_terminate(
+    struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* terminate the sm */
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_TERMINATE;
 }
 
 /* unstuff_needed()

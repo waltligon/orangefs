@@ -345,16 +345,16 @@ static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
 {
     {&pvfs2_client_remove_sm},
-    {&pvfs2_client_create_sm},
+    {&pvfs2_client_sysint_create_sm},
     {&pvfs2_client_mkdir_sm},
     {&pvfs2_client_symlink_sm},
     {&pvfs2_client_sysint_getattr_sm},
     {&pvfs2_client_io_sm},
     {&pvfs2_client_flush_sm},
-    {&pvfs2_client_truncate_sm},
+    {&pvfs2_client_sysint_truncate_sm},
     {&pvfs2_client_sysint_readdir_sm},
     {&pvfs2_client_setattr_sm},
-    {&pvfs2_client_lookup_sm},
+    {&pvfs2_client_sysint_lookup_sm},
     {&pvfs2_client_rename_sm},
     {&pvfs2_client_get_eattr_sm},
     {&pvfs2_client_set_eattr_sm},
@@ -364,6 +364,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
+    {&pvfs2_client_aio_open_sm},
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -382,6 +383,10 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_get_uid_list_sm}
 };
 
+struct PINT_client_op_entry_s PINT_client_sm_aio_table[] =
+{
+    {&pvfs2_client_aio_open_sm},
+};
 
 /* This function allows the generic state-machine-fns.c locate function
  * to access the appropriate sm struct based on the client operation index
@@ -418,10 +423,14 @@ struct PINT_state_machine_s *client_op_state_get_machine(int op)
         }
         else
         {
-            /* now checjk range for mgmt functions */
+            /* now check range for mgmt functions */
             if (op <= PVFS_OP_MGMT_MAXVAL)
             {
                 return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+            }
+            else if (op <= PVFS_OP_AIO_MAXVAL)
+            {
+                return PINT_client_sm_aio_table[op-PVFS_OP_AIO_MINVAL].sm;
             }
             else
             {

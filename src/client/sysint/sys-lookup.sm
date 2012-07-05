@@ -62,7 +62,7 @@ static void finalize_context(
 
 %%
 
-machine pvfs2_client_lookup_sm
+nested machine pvfs2_client_lookup_sm
 {
     state lookup_segment_start
     {
@@ -160,6 +160,21 @@ machine pvfs2_client_lookup_sm
     state lookup_cleanup
     {
         run lookup_cleanup;
+        default => return;
+    }
+}
+
+machine pvfs2_client_sysint_lookup_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_lookup_sm;
+        default => lookup_terminate;
+    }
+
+    state lookup_terminate
+    {
+        run lookup_terminate;
         default => terminate;
     }
 }
@@ -1163,6 +1178,12 @@ static PINT_sm_action lookup_cleanup(
                      llu(sm_p->u.lookup.lookup_resp->ref.handle));
     }
 
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action lookup_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
     /* mark operation as complete */
     PINT_SET_OP_COMPLETE;
     return SM_ACTION_TERMINATE;
@@ -1223,6 +1244,8 @@ static int lookup_segment_lookup_comp_fn(
 
     return 0;
 }
+
+
 
 /*
  * Local variables:

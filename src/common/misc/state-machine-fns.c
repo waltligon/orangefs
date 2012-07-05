@@ -447,9 +447,17 @@ static int PINT_smcb_misc_op(struct PINT_smcb *smcb)
         || smcb->op == PVFS_DEV_UNEXPECTED;
 }
 
+static int PINT_smcb_aio_op(struct PINT_smcb *smcb)
+{
+    if (smcb->op >= PVFS_OP_AIO_MINVAL && smcb->op <= PVFS_OP_AIO_MAXVALID)
+        return 1;
+    return 0;
+}
+
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb)
 {
-    if (!PINT_smcb_sys_op(smcb) && !PINT_smcb_mgmt_op(smcb) && !PINT_smcb_misc_op(smcb))
+    if (!PINT_smcb_sys_op(smcb) && !PINT_smcb_mgmt_op(smcb) && 
+        !PINT_smcb_misc_op(smcb) && !PINT_smcb_aio_op(smcb))
         return 1;
     return 0;
 }

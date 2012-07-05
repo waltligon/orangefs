@@ -3,9 +3,9 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include "aio-pvfs.h"
 #include "aiocommon.h"
+#include "pvfs2-aio.h"
 
 /* TODO: Implement this 
 int pvfs_aio_cancel(int fd, struct aiocb *aiocbp)
@@ -130,6 +130,73 @@ int pvfs_lio_listio(int mode, struct aiocb * const list[], int nent,
    return aiocommon_lio_listio(pvfs_list, nent);
 }
 
+int pvfs_aio_open(const char *path, int flags, ...)
+{
+    va_list ap;
+    int mode;
+    PVFS_hint hints;
+    char *newpath;
+    pvfs_descriptor *pd;
+    PVFS_credential *credential;
+    int rc;
+    int orig_errno = errno;
+
+    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_aio_open: called with %s\n", path);
+
+    if (!path)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    va_start(ap, flags);
+    if (flags & O_CREAT)
+        mode = va_arg(ap, int);
+    else
+        mode = 0777;
+    if (flags & O_HINTS)
+        hints = va_arg(ap, PVFS_hint);
+    else    
+        hints = PVFS_HINT_NULL;
+    va_end(ap);
+
+    /* fully qualify pathname */
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return -1;
+    }
+    
+    rc = iocommon_cred(&credential);
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    /* make async open call */
+    rc = PVFS_aio_open(&pd,
+                       newpath,
+                       flags,
+                       hints,
+                       mode,
+                       NULL,
+                       credential,
+                       PVFS_HINT_NULL);
+   IOCOMMON_CHECK_ERR(rc); 
+
+errorout:
+    if (newpath != path)
+    {
+        free(newpath);
+    }
+    if (rc < 0)
+    {
+        return -1;
+    }
+    else
+    {
+        return pd->fd;
+    }
+}
 
 /*
  * Local variables:
