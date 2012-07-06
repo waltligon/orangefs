@@ -1,0 +1,39 @@
+
+%%
+
+attribute meta (Y, N);
+attribute data (Y, N);
+attribute metamedia (disk, ssd, tape);
+attribute datamedia (disk, ssd, tape);
+attribute tier (primary, secondary, archive);
+attribute rack 0-255;
+attribute space 0-100;
+attribute load 0-100;
+
+policy create_file_meta_1(int num_servers, int copies) for create_file_meta
+{
+    meta == Y;
+    tier == primary;
+    sets num_servers spread rack
+    {
+        select 1 where
+            (metamedia == ssd && datamedia == disk || space >= 75);
+        select others where
+            (metamedia == disk);
+    }
+}
+
+policy create_file_data(int num_servers, int copies) for create_file_data
+{
+    data == Y;
+    tier == primary;
+    sets num_servers spread rack
+    {
+        select 1 where
+            (metamedia == ssd && datamedia == disk || space >= 75);
+        select others where
+            (metamedia == disk);
+    }
+}
+
+%%
