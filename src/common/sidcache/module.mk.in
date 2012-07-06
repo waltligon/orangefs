@@ -1,0 +1,3 @@
+DIR := src/common/sidcache
+LIBSRC += $(DIR)/policyeval.c
+SERVERSRC += $(DIR)/policyeval.c
