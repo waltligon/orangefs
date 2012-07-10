@@ -668,6 +668,7 @@ PVFS_error PVFS_iaio_open(
     PINT_client_sm *sm_p = NULL;
     char *directory = NULL;
     char *filename = NULL;
+    char *newpath = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_iaio_open entered\n");
 
@@ -675,6 +676,21 @@ PVFS_error PVFS_iaio_open(
     {
         gossip_err("invalid (NULL) required arguments\n");
         return ret;
+    }
+
+    newpath = pvfs_qualify_path(path);
+    if (!newpath)
+    {
+        return ret;
+    }
+    if (newpath == path)
+    {
+        newpath = malloc(strlen(path) + 1);
+        if (!newpath)
+        {
+            return -PVFS_ENOMEM;
+        }
+        strcpy(newpath, path);
     }
 
     ret = split_path(path, 0, &directory, &filename);
@@ -695,7 +711,7 @@ PVFS_error PVFS_iaio_open(
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_init_sysint_credential(sm_p->cred_p, credential);
-    sm_p->u.aio_open.path = path;
+    sm_p->u.aio_open.path = newpath;
     sm_p->u.aio_open.directory = directory;
     sm_p->u.aio_open.filename = filename;
     sm_p->u.aio_open.flags = flags;
@@ -1970,6 +1986,12 @@ static PINT_sm_action open_cleanup(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: cleanup\n");
+
+    free(sm_p->u.aio_open.path);
+    if (sm_p->u.aio_open.directory)
+        free(sm_p->u.aio_open.directory);
+    if (sm_p->u.aio_open.filename)
+        free(sm_p->u.aio_open.filename);
 
     sm_p->error_code = js_p->error_code;
     if (js_p->error_code < 0)

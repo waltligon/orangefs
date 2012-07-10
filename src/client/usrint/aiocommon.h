@@ -25,7 +25,26 @@
 
 #define PVFS_AIO_DEFAULT_TIMEOUT_MS 10
 
-struct pvfs_aiocb
+#define AIO_SET_ERR(rc)                             \
+do {                                                \
+    if (IS_PVFS_NON_ERRNO_ERROR(-(rc)))             \
+    {                                               \
+        pvfs_errno = -rc;                           \
+        errno = EIO;                                \
+    }                                               \
+    else if (IS_PVFS_ERROR(-(rc)))                  \
+    {                                               \
+        errno = PINT_errno_mapping[(-(rc)) & 0x7f]; \
+    }                                               \
+} while (0)         
+
+typedef enum
+{
+    PVFS_AIO_IO_OP = 1,
+    PVFS_AIO_OPEN_OP,
+} PVFS_aio_op_code;
+
+/*struct pvfs_aiocb
 {
     PVFS_sys_op_id op_id;
     PVFS_sysresp_io io_resp;
@@ -34,12 +53,52 @@ struct pvfs_aiocb
 
     struct aiocb *a_cb;
     struct qlist_head link;
-};
+};*/
+
+struct PINT_aio_io_cb
+{
+
+}
+
+struct PINT_aio_open_cb
+{
+    char *path;     /* in */
+    int flags;      /* in */
+    PVFS_hint file_creation_param;  /* in */
+    int mode;       /* in */
+    int *fd;                /* in/out */
+    pvfs_descriptor *pd;    /* in/out */
+}
+
+/* a pvfs async control block, used for keeping track of async
+ * operations outstanding in the filesystem
+ */
+struct pvfs_aiocb
+{
+    PVFS_sys_op_id op_id; 
+    PVFS_credential *cred_p;
+    PVFS_hint hints;
+
+    PVFS_aio_op_code op_code;
+    PVFS_error error_code;
+    struct qlist_head link;
+
+    struct aiocb *a_cb; /* acb if present ???? */
+
+    int (*call_back_fn)(void *c_dat, int status);
+    void *c_dat;
+
+    union
+    {
+        struct PINT_aio_io_cb io;
+        struct PINT_aio_open_cb open;
+    } u;
+}
+
 
 int aiocommon_init(void);
 
-int aiocommon_lio_listio(struct pvfs_aiocb *list[],
-                         int nent);
+int aiocommon_lio_listio(struct pvfs_aiocb *list[], int nent);
 
 void aiocommon_remove_cb(struct pvfs_aiocb *p_cb);
 
