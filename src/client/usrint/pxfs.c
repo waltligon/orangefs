@@ -59,12 +59,10 @@ extern int pxfs_open(const char *path, int flags, int *fd,
     open_acb->u.open.flags = flags;
     open_acb->u.open.fd = fd;
 
-    rc = aiocommon_submit_op(open_acb);
-    if (rc < 0)
-    {
-        AIO_SET_ERR(-(open_acb->error_code));
-    }
-    return rc;
+/* TODO: CB */
+
+    aiocommon_submit_op(open_acb);
+    return 0;
 }
 
 /*
