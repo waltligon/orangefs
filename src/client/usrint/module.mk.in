@@ -10,7 +10,7 @@ SRC := \
  	$(DIR)/ucache.c \
  	$(DIR)/mmap.c \
 	$(DIR)/aiocommon.c \
-	$(DIR)/aio-pvfs.c
+	$(DIR)/pxfs.c
 
 #   these routines don't need pvfs implementation and will
 #   probably be removed

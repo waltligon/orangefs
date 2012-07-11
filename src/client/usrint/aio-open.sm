@@ -1987,7 +1987,7 @@ static PINT_sm_action open_cleanup(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "aio_open state: cleanup\n");
 
-    free(sm_p->u.aio_open.path);
+    free((char *)sm_p->u.aio_open.path);
     if (sm_p->u.aio_open.directory)
         free(sm_p->u.aio_open.directory);
     if (sm_p->u.aio_open.filename)

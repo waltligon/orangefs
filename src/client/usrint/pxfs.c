@@ -10,13 +10,12 @@
  *  PXFS user interface routines
  */
 
+#include "pxfs.h"
+
 extern int pxfs_open(const char *path, int flags, int *fd,
                      pxfs_cb cb, void *cdat, ...)
 {
     va_list ap;
-    int mode;
-    PVFS_hint hints;
-    PVFS_credential *credential;
     int rc;
     struct pvfs_aiocb *open_acb;
 
@@ -58,10 +57,11 @@ extern int pxfs_open(const char *path, int flags, int *fd,
     open_acb->u.open.path = path;
     open_acb->u.open.flags = flags;
     open_acb->u.open.fd = fd;
-
-/* TODO: CB */
+    open_acb->call_back_fn = cb;
+    open_acb->call_back_dat = cdat;
 
     aiocommon_submit_op(open_acb);
+
     return 0;
 }
 
