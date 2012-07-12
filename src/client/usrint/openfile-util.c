@@ -1071,6 +1071,9 @@ int is_pvfs_path(const char *path)
  * A slash at the end of the path is interpreted as no filename
  * and is an error.  To parse the last dir in a path, remove this
  * trailing slash.  No filename with no directory is OK.
+ *
+ * dirflag is set when creating or removing a directory in which
+ * case we remove trailing /'s and .'s
  */
 int split_pathname( const char *path,
                     int dirflag,
@@ -1078,7 +1081,7 @@ int split_pathname( const char *path,
                     char **filename)
 {
     int i, fnlen, slashes = 0;
-    int length = strlen("pvfs2");
+    int length = strlen("pvfs2:");/* shouldn't this have a colon? */
 
     if (!path || !directory || !filename)
     {
@@ -1100,8 +1103,9 @@ int split_pathname( const char *path,
     i = length - 1;
     if (dirflag)
     {
-        /* skip any trailing slashes */
-        for(; i >= 0 && path[i] == '/'; i--)
+        /* skip any trailing slashes or single dots */
+        for(; i >= 0 && (path[i] == '/' || 
+                        (path[i] == '.' && (i == 0 || path[i-1] == '/'))); i--)
         {
             slashes++;
         }
@@ -1110,6 +1114,7 @@ int split_pathname( const char *path,
     {
         if (path[i] == '/')
         {
+            int j;
             /* parse the directory */
             *directory = malloc(i + 1);
             if (!*directory)
@@ -1118,6 +1123,13 @@ int split_pathname( const char *path,
             }
             strncpy(*directory, path, i);
             (*directory)[i] = '\0';
+            /* remove any trailing slashes or single dots */
+            for (j = i - 1; j >= 0 && ((*directory)[j] == '/' ||
+                                      ((*directory)[j] == '.' && (j == 0 ||
+                                              (*directory)[j-1] == '/'))); j--)
+            {
+                (*directory)[j] = '\0';
+            }
             break;
         }
     }
@@ -1154,8 +1166,8 @@ int split_pathname( const char *path,
         *filename = NULL;
         return -1;
     }
-    strncpy(*filename, path + i, length - i);
-    (*filename)[length - i] = '\0';
+    strncpy(*filename, path + i, fnlen);
+    (*filename)[fnlen] = '\0';
     return 0;
 }
 

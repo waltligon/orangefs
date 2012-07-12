@@ -116,8 +116,6 @@ int iocommon_lookup_absolute(const char *abs_path,
     /* set up buffer to return partially looked up path */
     /* in failure.  This is most likely a non-PVFS path */
 
-    /* Set up error path
-       TODO: orange-security 
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -129,7 +127,6 @@ int iocommon_lookup_absolute(const char *abs_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
-    */
 
     errno = 0;
     rc = PVFS_sys_lookup(lookup_fs_id, pvfs_path,
@@ -174,8 +171,6 @@ int iocommon_lookup_relative(const char *rel_path,
     /* Set credentials */
     iocommon_cred(&credentials);
 
-    /* Set up error path
-       TODO: orange-security 
     if (error_path)
     {
         memset(error_path, 0, error_path_size);
@@ -187,7 +182,6 @@ int iocommon_lookup_relative(const char *rel_path,
         resp_lookup.error_path = NULL;
         resp_lookup.error_path_size = 0;
     }
-    */
 
     current_seg_ref = parent_ref;
     cur = (char *)rel_path;
@@ -511,7 +505,8 @@ pvfs_descriptor *iocommon_open(const char *path,
 {
     int rc = 0;
     int orig_errno = errno;
-    int follow_link;
+    int follow_link = 0;
+    int open_dir = 0;
     char *directory = NULL;
     char *filename = NULL;
     char error_path[256];
@@ -531,7 +526,14 @@ pvfs_descriptor *iocommon_open(const char *path,
     iocommon_cred(&credentials);
 
     /* Split the path into a directory and file */
-    rc = split_pathname(path, 0, &directory, &filename);
+    rc = split_pathname(path, 1, &directory, &filename);
+    if (rc < 0 && errno == EISDIR)
+    {
+        /* clear error */
+        rc = 0;
+        errno = 0;
+        open_dir = 1; /* we are opening a direcotry filename is null */
+    }
     IOCOMMON_RETURN_ERR(rc);
 
     /* Check the flags to determine if links are followed */
@@ -554,10 +556,19 @@ pvfs_descriptor *iocommon_open(const char *path,
             if (errno == ESTALE)
             {
                 /* special case we are opening the root dir of PVFS */
+                /* which had better exist or we have a problem */
+                char *fullpath;
+
+                fullpath = (char *)malloc(strlen(directory) +
+                                          strlen(filename) + 1);
+                strcpy(fullpath, directory);
+                strcat(fullpath, "/");
+                strcat(fullpath, filename);
                 errno = 0;
-                rc = iocommon_lookup_absolute(path, &file_ref, NULL, 0);
+                rc = iocommon_lookup_absolute(fullpath, &file_ref, NULL, 0);
                 /* in this case we don't need to look up anything else */
                 /* jump right to found the file code */
+                free(fullpath);
                 goto foundfile;
             }
             IOCOMMON_RETURN_ERR(rc);
@@ -584,14 +595,23 @@ pvfs_descriptor *iocommon_open(const char *path,
 
     /* An open procedure safe for multiprocessing */
 
-    /* Attempt to find file */
-    errno = 0;
-    rc = iocommon_lookup_relative(filename,
-                                  parent_ref,
-                                  follow_link,
-                                  &file_ref,
-                                  error_path,
-                                  sizeof(error_path));
+    if (!open_dir)
+    {
+        /* Attempt to find file */
+        errno = 0;
+        rc = iocommon_lookup_relative(filename,
+                                      parent_ref,
+                                      follow_link,
+                                      &file_ref,
+                                      error_path,
+                                      sizeof(error_path));
+    }
+    else
+    {
+        /* the parent is the file */
+        file_ref = parent_ref;
+    }
+
 foundfile:
     if ((rc == 0) && (flags & O_EXCL) && (flags & O_CREAT))
     {
