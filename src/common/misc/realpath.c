@@ -43,12 +43,6 @@
 
 #define MAX_READLINKS 32
 
-extern int PVFS_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max);
-
 #ifdef WIN32
 /* PINT_realpath()
  *
