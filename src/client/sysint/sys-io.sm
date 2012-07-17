@@ -333,6 +333,7 @@ PVFS_error PVFS_isys_io(
         gossip_ldebug(GOSSIP_IO_DEBUG, "Warning: 0 byte I/O operation "
                       "attempted.\n");
         resp_p->total_completed = 0;
+        *op_id = -1;
         return 1; 
     }
 

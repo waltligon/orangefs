@@ -30,24 +30,24 @@ static PVFS_sys_op_id aio_running_ops[PVFS_AIO_MAX_RUNNING] = {0};
 /* Initialization of PVFS AIO system */
 int aiocommon_init(void)
 {
-   /* initialize waiting, running, and finished lists for aio implementation */
-   aio_waiting_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
-   if (aio_waiting_list == NULL)
-   {
-      return -1;
-   }
-   INIT_QLIST_HEAD(aio_waiting_list);
+    /* initialize waiting, running, and finished lists for aio implementation */
+    aio_waiting_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
+    if (aio_waiting_list == NULL)
+    {
+        return -1;
+    }
+    INIT_QLIST_HEAD(aio_waiting_list);
 
-   aio_running_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
-   if (aio_running_list == NULL)
-   {
-      return -1;
-   }
-   INIT_QLIST_HEAD(aio_running_list);
+    aio_running_list = (struct qlist_head *)malloc(sizeof(struct qlist_head));
+    if (aio_running_list == NULL)
+    {
+        return -1;
+    }
+    INIT_QLIST_HEAD(aio_running_list);
 
-   gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
+    gossip_debug(GOSSIP_USRINT_DEBUG, "Successfully initalized PVFS AIO inteface\n");
 
-   return 0;
+    return 0;
 }
 
 void aiocommon_submit_op(struct pvfs_aiocb *p_cb)
@@ -76,6 +76,7 @@ static void aiocommon_run_waiting_ops(void)
         if (aio_num_ops_running == PVFS_AIO_MAX_RUNNING ||
             qlist_empty(aio_waiting_list))
         {
+            gen_mutex_unlock(&aio_wait_list_mutex);
             break;
         }
 
@@ -98,16 +99,27 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
     switch(p_cb->op_code)
     {
         case PVFS_AIO_IO_OP:
+            rc = PVFS_isys_io(p_cb->u.io.pd->s->pvfs_ref,
+                              p_cb->u.io.file_req,
+                              p_cb->u.io.offset,
+                              p_cb->u.io.buf,
+                              p_cb->u.io.mem_req,
+                              p_cb->cred_p,
+                              &(p_cb->u.io.io_resp),
+                              p_cb->u.io.which,
+                              &(p_cb->op_id),
+                              p_cb->hints,
+                              (void *)p_cb);        
             break;
         case PVFS_AIO_OPEN_OP:
-            rc = PVFS_iaio_open(&p_cb->u.open.pd,
+            rc = PVFS_iaio_open(&(p_cb->u.open.pd),
                                 p_cb->u.open.path,
                                 p_cb->u.open.flags, 
                                 p_cb->u.open.file_creation_param,
                                 p_cb->u.open.mode,
                                 NULL,
                                 p_cb->cred_p,
-                                &p_cb->op_id,
+                                &(p_cb->op_id),
                                 p_cb->hints,
                                 (void *)p_cb);
             break;
@@ -116,9 +128,14 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
             break;
     }
 
-    if (rc < 0 || (rc == 0 && p_cb->op_id == -1))
+    if (rc < 0)
     {
         p_cb->error_code = rc;
+        aiocommon_finish_op(p_cb);
+    }
+    else if(rc >= 0 && p_cb->op_id == -1)
+    {
+        p_cb->error_code = 0;   
         aiocommon_finish_op(p_cb);
     }
     else
@@ -139,6 +156,16 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
     switch (p_cb->op_code)
     {
         case PVFS_AIO_IO_OP:
+            if (p_cb->error_code < 0)
+            {
+                *(p_cb->u.io.bcnt) = -1;
+            }
+            else
+            {
+                *(p_cb->u.io.bcnt) = p_cb->u.io.io_resp.total_completed;
+            }
+            PVFS_Request_free(&(p_cb->u.io.mem_req));
+            PVFS_Request_free(&(p_cb->u.io.file_req));
             break;
         case PVFS_AIO_OPEN_OP:
             if (p_cb->error_code < 0)
@@ -172,9 +199,6 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
         (*p_cb->call_back_fn)(p_cb->call_back_dat, status);
     }
 
-    /* TODO: free stuff */
-    free(p_cb);
-
     return;
 }
 
@@ -188,12 +212,28 @@ static void *aiocommon_progress(void *ptr)
     int err_code_array[PVFS_AIO_MAX_RUNNING] = {0};
     struct pvfs_aiocb *pcb_array[PVFS_AIO_MAX_RUNNING] = {NULL};
 
+    pvfs_sys_init();
     gossip_debug(GOSSIP_USRINT_DEBUG, "AIO progress thread starting up\n");
 
     /* progress thread */
     while (1)
     {
+        /* run any queued async io operations */
         aiocommon_run_waiting_ops();      
+
+        /* check to see if the progress thread should exit
+         * (no more waiting or running operations)
+         */
+        gen_mutex_lock(&aio_wait_list_mutex);
+        if (!aio_num_ops_running && qlist_empty(aio_waiting_list))
+        {
+            gossip_debug(GOSSIP_USRINT_DEBUG,
+                         "No AIO requests waiting, progress thread exiting\n");
+            aio_progress_status = PVFS_AIO_PROGRESS_IDLE;
+            gen_mutex_unlock(&aio_wait_list_mutex);
+            pthread_exit(NULL);
+        }
+        gen_mutex_unlock(&aio_wait_list_mutex);
 
         /* call PVFS_sys_testsome() to force progress on "running" operations
          * in the system.
@@ -232,6 +272,7 @@ static void *aiocommon_progress(void *ptr)
             {
                 if (aio_running_ops[j] == pcb_array[i]->op_id)
                 {
+                    free(pcb_array[i]);
                     /* remove it from the running op_ids array */
                     if (j > 0)
                         memcpy(temp_running_ops, aio_running_ops,
@@ -246,16 +287,6 @@ static void *aiocommon_progress(void *ptr)
             }
 
             aio_num_ops_running--;
-            gen_mutex_lock(&aio_wait_list_mutex);
-            if (!aio_num_ops_running && qlist_empty(aio_waiting_list))
-            {
-                gossip_debug(GOSSIP_USRINT_DEBUG,
-                             "No AIO requests waiting, progress thread exiting\n");
-                aio_progress_status = PVFS_AIO_PROGRESS_IDLE;
-                gen_mutex_unlock(&aio_wait_list_mutex);
-                pthread_exit(NULL);
-            }
-            gen_mutex_unlock(&aio_wait_list_mutex);
         }
     }
 }

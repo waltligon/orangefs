@@ -35,21 +35,28 @@ typedef enum
     PVFS_AIO_OPEN_OP,
 } PVFS_aio_op_code;
 
+
+/* the following structures contain operation dependent data for aio calls */
 struct PINT_aio_io_cb
 {
-    PVFS_Request mem_req;
-    PVFS_Request file_req;
-    PVFS_sysresp_io io_resp;
+    pvfs_descriptor *pd;        /* in */
+    enum PVFS_io_type which;    /* in */
+    off64_t offset;             /* in */
+    void *buf;                  /* in */
+    PVFS_Request mem_req;       /* in */
+    PVFS_Request file_req;      /* in */
+    PVFS_sysresp_io io_resp;    /* in */
+    ssize_t *bcnt;              /* in/out */
 };
 
 struct PINT_aio_open_cb
 {
-    const char *path;   /* in */
-    int flags;          /* in */
+    const char *path;               /* in */
+    int flags;                      /* in */
     PVFS_hint file_creation_param;  /* in */
-    int mode;       /* in */
-    int *fd;                /* in/out */
-    pvfs_descriptor *pd;    /* out */
+    int mode;                       /* in */
+    int *fd;                        /* in/out */
+    pvfs_descriptor *pd;            /* out */
 };
 
 /* a pvfs async control block, used for keeping track of async
