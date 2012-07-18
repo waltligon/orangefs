@@ -13,7 +13,7 @@ typedef int BMI_addr;
 extern DB     *SID_db;
 
 /* Global variable for the database environement */
-extern DB_ENV *envp;
+extern DB_ENV *SID_envp;
 
 /* main SID transaction */
 extern DB_TXN *SID_txn;
@@ -29,7 +29,7 @@ typedef uuid_t SID;
 
 
 /* <===================== GLOBAL DATABASE DEFINES =====================> */
-/* Used to set the in cache memory size */
+/* Used to set the in cache memory size for DB environment*/
 #define CACHE_SIZE_GB (0)
 #define CACHE_SIZE_MB (500)
 
@@ -44,6 +44,7 @@ typedef uuid_t SID;
 
 /* Minimum size of bulk retrieve in bytes */
 #define BULK_MIN_SIZE (KILOBYTE * 8)
+
 
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*
