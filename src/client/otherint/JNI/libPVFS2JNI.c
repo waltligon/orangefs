@@ -105,7 +105,7 @@ Java_PVFS2JNI_pvfsOpen(
 JNIEXPORT int JNICALL
 Java_PVFS2JNI_pvfsOpen64 (JNIEnv *env, jobject obj, jstring path, int flags)
 {
-	printf("pvfsOpen64\n");
+    printf("pvfsOpen64\n");
     fflush(stdout);
     int rc = 0;
     char cpath[PVFS_PATH_MAX];
@@ -125,7 +125,7 @@ Java_PVFS2JNI_pvfsOpen64 (JNIEnv *env, jobject obj, jstring path, int flags)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsOpenat (JNIEnv *env, jobject obj, int dirfd, jstring path, int flags)
 {
-	printf("pvfsOpenat\n");
+    printf("pvfsOpenat\n");
     fflush(stdout);
     int rc = 0;
     char cpath[PVFS_PATH_MAX];
@@ -144,7 +144,7 @@ Java_PVFS2JNI_pvfsOpenat (JNIEnv *env, jobject obj, int dirfd, jstring path, int
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsOpenat64 (JNIEnv *env, jobject obj, int dirfd, jstring path, int flags)
 {
-	printf("pvfsOpenat64\n");
+    printf("pvfsOpenat64\n");
     fflush(stdout);
     int rc = 0;
     char cpath[PVFS_PATH_MAX];
@@ -226,7 +226,7 @@ Java_PVFS2JNI_pvfsUnlink(JNIEnv *env, jobject obj, jstring path)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsUnlinkat (JNIEnv *env, jobject obj, int dirfd, jstring path, int flags)
 {
- 	printf("pvfsUnlinkat\n");
+    printf("pvfsUnlinkat\n");
     fflush(stdout);
     int rc = 0;
     char cpath[PVFS_PATH_MAX];
@@ -326,9 +326,9 @@ Java_PVFS2JNI_pvfsClose(JNIEnv *env, jobject obj, int fd)
 JNIEXPORT int JNICALL
 Java_PVFS2JNI_pvfsFlush(JNIEnv *env, jobject obj, int fd)
 {
-	printf("pvfsFlush\n");
-	fflush(stdout);
-	int rc = 0;
+    printf("pvfsFlush\n");
+    fflush(stdout);
+    int rc = 0;
     rc = pvfs_flush(fd);
     if(rc < 0)
     {
@@ -353,7 +353,7 @@ Java_PVFS2JNI_pvfsPrdwr64 (JNIEnv *env, jobject obj, int fd, jlong buf, jlong co
     rc=pvfs_prdwr64(fd, bufc, countc, offsetc, which);
     if(rc < 0)
     {
-    	perror("pvfs_prdwr64 error");
+        perror("pvfs_prdwr64 error");
         fflush(stdout);
         return -1;
     }
@@ -377,7 +377,7 @@ Java_PVFS2JNI_pvfsLseek (JNIEnv *env, jobject obj, int fd, jlong offset, int whe
     jlong op=(jlong)rc;
     if(op < 0)
     {
-    	perror("pvfs_lseek error");
+        perror("pvfs_lseek error");
         fflush(stdout);
         return -1;
     }
@@ -389,13 +389,13 @@ Java_PVFS2JNI_pvfsLseek (JNIEnv *env, jobject obj, int fd, jlong offset, int whe
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsLseek64 (JNIEnv *env, jobject obj, int fd, jlong offset, int whence)
 {
-	printf("pvfsLseek64\n");
-	fflush(stdout);
-	off_t offsetc=(off_t) offset;
-	off_t rc = pvfs_lseek(fd, offsetc, whence);
-	if(rc < 0)
+    printf("pvfsLseek64\n");
+    fflush(stdout);
+    off_t offsetc=(off_t) offset;
+    off_t rc = pvfs_lseek(fd, offsetc, whence);
+    if(rc < 0)
     {
-    	perror("pvfs_lseek64 error");
+        perror("pvfs_lseek64 error");
         fflush(stdout);
         return -1;
     }
@@ -407,9 +407,9 @@ Java_PVFS2JNI_pvfsLseek64 (JNIEnv *env, jobject obj, int fd, jlong offset, int w
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsTruncate (JNIEnv *env, jobject obj, jstring path, jlong length)
 {
-	printf("pvfsTruncate\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsTruncate\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     off_t clength = (off_t) length;
@@ -417,7 +417,7 @@ Java_PVFS2JNI_pvfsTruncate (JNIEnv *env, jobject obj, jstring path, jlong length
     rc=pvfs_truncate(cpath, clength);
     if(rc < 0)
     {
-    	perror("pvfs_truncate error");
+        perror("pvfs_truncate error");
         fflush(stdout);
         return -1;
     }
@@ -430,9 +430,9 @@ Java_PVFS2JNI_pvfsTruncate (JNIEnv *env, jobject obj, jstring path, jlong length
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsTruncate64 (JNIEnv *env, jobject obj, jstring path, jlong length)
 {
-	printf("pvfsTruncate64\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsTruncate64\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     off64_t clength = (off64_t) length;
@@ -440,7 +440,7 @@ Java_PVFS2JNI_pvfsTruncate64 (JNIEnv *env, jobject obj, jstring path, jlong leng
     rc=pvfs_truncate64(cpath, clength);
     if(rc < 0)
     {
-    	perror("pvfs_truncate64 error");
+        perror("pvfs_truncate64 error");
         fflush(stdout);
         return -1;
     }
@@ -451,15 +451,15 @@ Java_PVFS2JNI_pvfsTruncate64 (JNIEnv *env, jobject obj, jstring path, jlong leng
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFallocate (JNIEnv *env, jobject obj, int fd, jlong offset, jlong length)
 {
-	printf("pvfsFallocate\n");
-	fflush(stdout);
-	off_t coffset = (off_t) offset;
-	off_t clength = (off_t) length;
-	int rc=0;
-	rc=pvfs_fallocate(fd, coffset, clength);
-	if(rc < 0)
-	{
-		perror("pvfs_fallocate error");
+    printf("pvfsFallocate\n");
+    fflush(stdout);
+    off_t coffset = (off_t) offset;
+    off_t clength = (off_t) length;
+    int rc=0;
+    rc=pvfs_fallocate(fd, coffset, clength);
+    if(rc < 0)
+    {
+        perror("pvfs_fallocate error");
         fflush(stdout);
         return -1;
     }
@@ -470,14 +470,14 @@ Java_PVFS2JNI_pvfsFallocate (JNIEnv *env, jobject obj, int fd, jlong offset, jlo
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFtruncate (JNIEnv *env, jobject obj, int fd, jlong length)
 {
-	printf("pvfsFtruncate\n");
-	fflush(stdout);
-	off_t clength = (off_t) length;
-	int rc=0;
-	rc=pvfs_ftruncate(fd, clength);
-	if(rc < 0)
-	{
-		perror("pvfs_ftruncate error");
+    printf("pvfsFtruncate\n");
+    fflush(stdout);
+    off_t clength = (off_t) length;
+    int rc=0;
+    rc=pvfs_ftruncate(fd, clength);
+    if(rc < 0)
+    {
+        perror("pvfs_ftruncate error");
         fflush(stdout);
         return -1;
     }
@@ -489,14 +489,14 @@ Java_PVFS2JNI_pvfsFtruncate (JNIEnv *env, jobject obj, int fd, jlong length)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFtruncate64 (JNIEnv *env, jobject obj, int fd, jlong length)
 {
-	printf("pvfsFtruncate64\n");
-	fflush(stdout);
-	off64_t clength = (off64_t) length;
-	int rc=0;
-	rc=pvfs_ftruncate(fd, clength);
-	if(rc < 0)
-	{
-		perror("pvfs_ftruncate64 error");
+    printf("pvfsFtruncate64\n");
+    fflush(stdout);
+    off64_t clength = (off64_t) length;
+    int rc=0;
+    rc=pvfs_ftruncate(fd, clength);
+    if(rc < 0)
+    {
+        perror("pvfs_ftruncate64 error");
         fflush(stdout);
         return -1;
     }
@@ -507,13 +507,13 @@ Java_PVFS2JNI_pvfsFtruncate64 (JNIEnv *env, jobject obj, int fd, jlong length)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsDup (JNIEnv *env, jobject obj, int oldfd)
 {
-	printf("pvfsDup\n");
-	fflush(stdout);
+    printf("pvfsDup\n");
+    fflush(stdout);
     int rc=0;
-	rc=pvfs_dup(oldfd);
-	if(rc < 0)
-	{
-		perror("pvfs_dup error");
+    rc=pvfs_dup(oldfd);
+    if(rc < 0)
+    {
+        perror("pvfs_dup error");
         fflush(stdout);
         return -1;
     }
@@ -524,13 +524,13 @@ Java_PVFS2JNI_pvfsDup (JNIEnv *env, jobject obj, int oldfd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsDup2 (JNIEnv *env, jobject obj, int oldfd, int newfd)
 {
-	printf("pvfsDup2\n");
-	fflush(stdout);
+    printf("pvfsDup2\n");
+    fflush(stdout);
     int rc=0;
-	rc=pvfs_dup_descriptor(oldfd, newfd);
-	if(rc < 0)
-	{
-		perror("pvfs_dup2 error");
+    rc=pvfs_dup_descriptor(oldfd, newfd);
+    if(rc < 0)
+    {
+        perror("pvfs_dup2 error");
         fflush(stdout);
         return -1;
     }
@@ -541,17 +541,17 @@ Java_PVFS2JNI_pvfsDup2 (JNIEnv *env, jobject obj, int oldfd, int newfd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsChown (JNIEnv *env, jobject obj, jstring path, jlong owner, jlong group)
 {
-	printf("pvfsChown\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsChown\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     uid_t cowner = (uid_t) owner;
     gid_t cgroup = (gid_t) group;
     int rc = pvfs_chown(cpath, cowner, cgroup);
     if(rc < 0)
-	{
-		perror("pvfs_chown error");
+    {
+        perror("pvfs_chown error");
         fflush(stdout);
         return -1;
     }
@@ -562,14 +562,14 @@ Java_PVFS2JNI_pvfsChown (JNIEnv *env, jobject obj, jstring path, jlong owner, jl
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFchown (JNIEnv *env, jobject obj, int fd, jlong owner, jlong group)
 {
-	printf("pvfsFchown\n");
-	fflush(stdout);
-	uid_t cowner = (uid_t) owner;
+    printf("pvfsFchown\n");
+    fflush(stdout);
+    uid_t cowner = (uid_t) owner;
     gid_t cgroup = (gid_t) group;
     int rc = pvfs_fchown(fd, cowner, cgroup);
     if(rc < 0)
-	{
-		perror("pvfs_fchown error");
+    {
+        perror("pvfs_fchown error");
         fflush(stdout);
         return -1;
     }
@@ -580,17 +580,17 @@ Java_PVFS2JNI_pvfsFchown (JNIEnv *env, jobject obj, int fd, jlong owner, jlong g
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFchownat (JNIEnv *env, jobject obj, int fd, jstring path, jlong owner, jlong group, int flag)
 {
-	printf("pvfsFchownat\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsFchownat\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     uid_t cowner = (uid_t) owner;
     gid_t cgroup = (gid_t) group;
     int rc = pvfs_fchownat(fd,cpath, cowner, cgroup,flag);
     if(rc < 0)
-	{
-		perror("pvfs_fchownat error");
+    {
+        perror("pvfs_fchownat error");
         fflush(stdout);
         return -1;
     }
@@ -601,16 +601,16 @@ Java_PVFS2JNI_pvfsFchownat (JNIEnv *env, jobject obj, int fd, jstring path, jlon
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsChmod (JNIEnv *env, jobject obj, jstring path, int mode)
 {
-	printf("pvfsChmod\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsChmod\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     mode_t cmode = (mode_t) mode;
     int rc = pvfs_chmod(cpath, cmode);
     if(rc < 0)
-	{
-		perror("pvfs_chmod error");
+    {
+        perror("pvfs_chmod error");
         fflush(stdout);
         return -1;
     }
@@ -621,13 +621,13 @@ Java_PVFS2JNI_pvfsChmod (JNIEnv *env, jobject obj, jstring path, int mode)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFchmod (JNIEnv *env, jobject obj, int fd, int mode)
 {
-	printf("pvfsFchmod\n");
-	fflush(stdout);
-	mode_t cmode = (mode_t) mode;
+    printf("pvfsFchmod\n");
+    fflush(stdout);
+    mode_t cmode = (mode_t) mode;
     int rc = pvfs_fchmod(fd, cmode);
     if(rc < 0)
-	{
-		perror("pvfs_fchmod error");
+    {
+        perror("pvfs_fchmod error");
         fflush(stdout);
         return -1;
     }
@@ -638,16 +638,16 @@ Java_PVFS2JNI_pvfsFchmod (JNIEnv *env, jobject obj, int fd, int mode)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFchmodat (JNIEnv *env, jobject obj, int fd, jstring path, int mode, int flag)
 {
-	printf("pvfsFchmodat\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsFchmodat\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     mode_t cmode = (mode_t) mode;
     int rc = pvfs_fchmodat(fd,cpath,cmode,flag);
     if(rc < 0)
-	{
-		perror("pvfs_fchmodat error");
+    {
+        perror("pvfs_fchmodat error");
         fflush(stdout);
         return -1;
     }
@@ -659,17 +659,17 @@ Java_PVFS2JNI_pvfsFchmodat (JNIEnv *env, jobject obj, int fd, jstring path, int 
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsMkdir (JNIEnv *env, jobject obj, jstring path, jint mode)
 {
-	printf("pvfsMkdir\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsMkdir\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     int rc=0;
     mode_t cmode=(mode_t) mode;
     rc=pvfs_mkdir(cpath, cmode);
     if(rc < 0)
-	{
-		perror("pvfs_mkdir error");
+    {
+        perror("pvfs_mkdir error");
         fflush(stdout);
         return -1;
     }
@@ -680,17 +680,17 @@ Java_PVFS2JNI_pvfsMkdir (JNIEnv *env, jobject obj, jstring path, jint mode)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsMkdirat (JNIEnv *env, jobject obj, int dirfd, jstring path, jint mode)
 {
-	printf("pvfsMkdirat\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsMkdirat\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     int rc=0;
     mode_t cmode=(mode_t) mode;
     rc=pvfs_mkdirat(dirfd, cpath, cmode);
     if(rc < 0)
-	{
-		perror("pvfs_mkdirat error");
+    {
+        perror("pvfs_mkdirat error");
         fflush(stdout);
         return -1;
     }
@@ -701,16 +701,16 @@ Java_PVFS2JNI_pvfsMkdirat (JNIEnv *env, jobject obj, int dirfd, jstring path, ji
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsRmdir (JNIEnv *env, jobject obj, jstring path)
 {
-	printf("pvfsRmdir\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsRmdir\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     int rc=0;
     rc=pvfs_rmdir(cpath);
     if(rc < 0)
-	{
-		perror("pvfs_rmdir error");
+    {
+        perror("pvfs_rmdir error");
         fflush(stdout);
         return -1;
     }
@@ -721,9 +721,9 @@ Java_PVFS2JNI_pvfsRmdir (JNIEnv *env, jobject obj, jstring path)
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsReadlink (JNIEnv *env, jobject obj, jstring path, jstring buf, jlong bufsiz)
 {
-	printf("pvfsReadlink\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsReadlink\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     long cbufsiz=(long) bufsiz;
@@ -733,8 +733,8 @@ Java_PVFS2JNI_pvfsReadlink (JNIEnv *env, jobject obj, jstring path, jstring buf,
     size_t bufsize = (size_t) bufsiz;
     ssize_t rc = pvfs_readlink(cpath, cbuf, bufsize);
     if(rc < 0)
-	{
-		perror("pvfs_readlink error");
+    {
+        perror("pvfs_readlink error");
         fflush(stdout);
         return -1;
     }
@@ -746,9 +746,9 @@ Java_PVFS2JNI_pvfsReadlink (JNIEnv *env, jobject obj, jstring path, jstring buf,
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsReadlinkat (JNIEnv *env, jobject obj, int fd, jstring path, jstring buf, jlong bufsiz)
 {
-	printf("pvfsReadlinkat\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsReadlinkat\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     long cbufsiz=(long) bufsiz;
@@ -758,8 +758,8 @@ Java_PVFS2JNI_pvfsReadlinkat (JNIEnv *env, jobject obj, int fd, jstring path, js
     size_t bufsize = (size_t) bufsiz;
     ssize_t rc = pvfs_readlinkat(fd, cpath, cbuf, bufsize);
     if(rc < 0)
-	{
-		perror("pvfs_readlinkat error");
+    {
+        perror("pvfs_readlinkat error");
         fflush(stdout);
         return -1;
     }
@@ -880,9 +880,9 @@ JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsAccess (JNIEnv *env, jobject obj, jstring path, int mode)
 {
 
-	printf("pvfsAccess\n");
+    printf("pvfsAccess\n");
     fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     int rc= pvfs_access(cpath, mode);
@@ -900,9 +900,9 @@ Java_PVFS2JNI_pvfsAccess (JNIEnv *env, jobject obj, jstring path, int mode)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFaccessat (JNIEnv *env, jobject obj, int fd, jstring path, int mode, int flags)
 {
-	printf("pvfsAccess\n");
+    printf("pvfsAccess\n");
     fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     int rc= pvfs_faccessat(fd, cpath, mode, flags);
@@ -919,7 +919,7 @@ Java_PVFS2JNI_pvfsFaccessat (JNIEnv *env, jobject obj, int fd, jstring path, int
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFlock (JNIEnv *env, jobject obj, int fd, int op)
 {
-	printf("pvfsFlock\n");
+    printf("pvfsFlock\n");
     fflush(stdout);
     int rc=pvfs_flock(fd, op);
     if(rc < 0)
@@ -951,7 +951,7 @@ Java_PVFS2JNI_pvfsFcntl  (JNIEnv *env, jobject obj, int fd, int cmd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFsync  (JNIEnv *env, jobject obj, int fd)
 {
-	printf("pvfsFsync\n");
+    printf("pvfsFsync\n");
     fflush(stdout);
     int rc=pvfs_fsync(fd);
     if(rc < 0)
@@ -967,7 +967,7 @@ Java_PVFS2JNI_pvfsFsync  (JNIEnv *env, jobject obj, int fd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFdatasync  (JNIEnv *env, jobject obj, int fd)
 {
-	printf("pvfsFdatasync\n");
+    printf("pvfsFdatasync\n");
     fflush(stdout);
     int rc=pvfs_fdatasync(fd);
     if(rc < 0)
@@ -983,7 +983,7 @@ Java_PVFS2JNI_pvfsFdatasync  (JNIEnv *env, jobject obj, int fd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFadvise  (JNIEnv *env, jobject obj, int fd, jlong offset, jlong len, int advice)
 {
-	printf("pvfsFadvise\n");
+    printf("pvfsFadvise\n");
     fflush(stdout);
     off_t coffset = (off_t) offset;
     off_t clen= (off_t) clen;
@@ -1001,7 +1001,7 @@ Java_PVFS2JNI_pvfsFadvise  (JNIEnv *env, jobject obj, int fd, jlong offset, jlon
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFadvise64  (JNIEnv *env, jobject obj, int fd, jlong offset, jlong len, int advice)
 {
-	printf("pvfsFadvise64\n");
+    printf("pvfsFadvise64\n");
     fflush(stdout);
     off_t coffset = (off64_t) offset;
     off_t clen= (off64_t) clen;
@@ -1019,9 +1019,9 @@ Java_PVFS2JNI_pvfsFadvise64  (JNIEnv *env, jobject obj, int fd, jlong offset, jl
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsMknod  (JNIEnv *env, jobject obj, jstring path, int mode, int dev)
 {
-	printf("pvfsMknod\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsMknod\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     mode_t cmode = (mode_t) mode;
@@ -1040,9 +1040,9 @@ Java_PVFS2JNI_pvfsMknod  (JNIEnv *env, jobject obj, jstring path, int mode, int 
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsMknodat (JNIEnv *env, jobject obj, int dirfd, jstring path, int mode, int dev)
 {
-	printf("pvfsMknodat\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsMknodat\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
     mode_t cmode = (mode_t) mode;
@@ -1061,12 +1061,12 @@ Java_PVFS2JNI_pvfsMknodat (JNIEnv *env, jobject obj, int dirfd, jstring path, in
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsChdir  (JNIEnv *env, jobject obj, jstring path)
 {
-	printf("pvfsChdir\n");
-	fflush(stdout);
-	char cpath[PVFS_PATH_MAX];
+    printf("pvfsChdir\n");
+    fflush(stdout);
+    char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
     (*env)->GetStringUTFRegion(env, path, 0, cpath_len, cpath);
-	int rc= pvfs_chdir(cpath);
+    int rc= pvfs_chdir(cpath);
     if(rc < 0)
     {
         perror("pvfs_chdir error");
@@ -1080,9 +1080,9 @@ Java_PVFS2JNI_pvfsChdir  (JNIEnv *env, jobject obj, jstring path)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsFchdir  (JNIEnv *env, jobject obj, int fd)
 {
-	printf("pvfsFchdir\n");
-	fflush(stdout);
-	int rc= pvfs_fchdir(fd);
+    printf("pvfsFchdir\n");
+    fflush(stdout);
+    int rc= pvfs_fchdir(fd);
     if(rc < 0)
     {
         perror("pvfs_fchdir error");
@@ -1096,10 +1096,10 @@ Java_PVFS2JNI_pvfsFchdir  (JNIEnv *env, jobject obj, int fd)
 JNIEXPORT jint JNICALL
 Java_PVFS2JNI_pvfsUmask  (JNIEnv *env, jobject obj, int mask)
 {
-	printf("pvfsUmask\n");
-	fflush(stdout);
-	mode_t cmask= (mode_t) mask;
-	mode_t rc= pvfs_umask(mask);
+    printf("pvfsUmask\n");
+    fflush(stdout);
+    mode_t cmask= (mode_t) mask;
+    mode_t rc= pvfs_umask(mask);
     if(rc < 0)
     {
         perror("pvfs_umask error");
@@ -1113,197 +1113,197 @@ Java_PVFS2JNI_pvfsUmask  (JNIEnv *env, jobject obj, int mask)
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsRead(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsRead\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_read(fd, (void *) buffer, (size_t) count);
-	if(rc < 0)
-	{
-		perror("jni pvfs_read");
-	}
-	if(rc > 0)
-	{
-		printf("\tread %lld bytes\n", (long long int) rc);
-	}
-	/* copy back and free the buffer using 0 */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsRead\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_read(fd, (void *) buffer, (size_t) count);
+    if(rc < 0)
+    {
+        perror("jni pvfs_read");
+    }
+    if(rc > 0)
+    {
+        printf("\tread %lld bytes\n", (long long int) rc);
+    }
+    /* copy back and free the buffer using 0 */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsPread(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count, jlong offset)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsPread\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	printf("\toffset = %lu\n", (uint64_t) offset);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_pread(fd, (void *) buffer, (size_t) count, (off_t) offset);
-	if(rc < 0)
-	{
-		perror("jni pvfs_pread");
-	}
-	if(rc > 0)
-	{
-		printf("\tread %lld bytes\n", (long long int) rc);
-	}
-	/* copy back and free the buffer using 0 */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsPread\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    printf("\toffset = %lu\n", (uint64_t) offset);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_pread(fd, (void *) buffer, (size_t) count, (off_t) offset);
+    if(rc < 0)
+    {
+        perror("jni pvfs_pread");
+    }
+    if(rc > 0)
+    {
+        printf("\tread %lld bytes\n", (long long int) rc);
+    }
+    /* copy back and free the buffer using 0 */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsPread64(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count, jlong offset)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsPread64\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	printf("\toffset = %lu\n", (uint64_t) offset);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_pread64(fd, (void *) buffer, (size_t) count, (off64_t) offset);
-	if(rc < 0)
-	{
-		perror("jni pvfs_pread64");
-	}
-	if(rc > 0)
-	{
-		printf("\tread %lld bytes\n", (long long int) rc);
-	}
-	/* copy back and free the buffer using 0 */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsPread64\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    printf("\toffset = %lu\n", (uint64_t) offset);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_pread64(fd, (void *) buffer, (size_t) count, (off64_t) offset);
+    if(rc < 0)
+    {
+        perror("jni pvfs_pread64");
+    }
+    if(rc > 0)
+    {
+        printf("\tread %lld bytes\n", (long long int) rc);
+    }
+    /* copy back and free the buffer using 0 */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, 0);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsWrite(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsWrite\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_write(fd, (void *) buffer, (size_t) count);
-	if(rc < 0)
-	{
-		perror("jni pvfs_write");
-	}
-	if(rc > 0)
-	{
-		printf("\twrote %lld bytes\n", (long long int) rc);
-	}
-	/* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsWrite\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_write(fd, (void *) buffer, (size_t) count);
+    if(rc < 0)
+    {
+        perror("jni pvfs_write");
+    }
+    if(rc > 0)
+    {
+        printf("\twrote %lld bytes\n", (long long int) rc);
+    }
+    /* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsPwrite(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count, jlong offset)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsPwrite\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	printf("\toffset = %lu\n", (uint64_t) offset);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_pwrite(fd, (void *) buffer, (size_t) count, (off_t) offset);
-	if(rc < 0)
-	{
-		perror("jni pvfs_pwrite");
-	}
-	if(rc > 0)
-	{
-		printf("\twrote %lld bytes\n", (long long int) rc);
-	}
-	/* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsPwrite\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    printf("\toffset = %lu\n", (uint64_t) offset);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_pwrite(fd, (void *) buffer, (size_t) count, (off_t) offset);
+    if(rc < 0)
+    {
+        perror("jni pvfs_pwrite");
+    }
+    if(rc > 0)
+    {
+        printf("\twrote %lld bytes\n", (long long int) rc);
+    }
+    /* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 JNIEXPORT jlong JNICALL
 Java_PVFS2JNI_pvfsPwrite64(JNIEnv *env, jobject obj, int fd, jbyteArray buf, jlong count, jlong offset)
 {
-	ssize_t rc = 0;
-	jboolean is_copy;
-	jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
-	printf("pvfsPwrite64\n");
-	printf("\tfd = %d\n", fd);
-	printf("\tcount = %lu\n", (uint64_t) count);
-	printf("\toffset = %lu\n", (uint64_t) offset);
-	is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
-	if(!buffer)
-	{
-		perror("GetByteArrayElements");
-		errno = EFAULT;
-		return -1;
-	}
-	rc = pvfs_pwrite64(fd, (void *) buffer, (size_t) count, (off_t) offset);
-	if(rc < 0)
-	{
-		perror("jni pvfs_pwrite64");
-	}
-	if(rc > 0)
-	{
-		printf("\twrote %lld bytes\n", (long long int) rc);
-	}
-	/* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
-	(*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
-	fflush(stdout);
-	fflush(stderr);
-	return (jlong) rc;
+    ssize_t rc = 0;
+    jboolean is_copy;
+    jbyte * buffer = (*env)->GetByteArrayElements(env, buf, &is_copy);
+    printf("pvfsPwrite64\n");
+    printf("\tfd = %d\n", fd);
+    printf("\tcount = %lu\n", (uint64_t) count);
+    printf("\toffset = %lu\n", (uint64_t) offset);
+    is_copy == JNI_TRUE ? printf("\tbuf is_copy\n") : printf("\tbuf !is_copy\n");
+    if(!buffer)
+    {
+        perror("GetByteArrayElements");
+        errno = EFAULT;
+        return -1;
+    }
+    rc = pvfs_pwrite64(fd, (void *) buffer, (size_t) count, (off_t) offset);
+    if(rc < 0)
+    {
+        perror("jni pvfs_pwrite64");
+    }
+    if(rc > 0)
+    {
+        printf("\twrote %lld bytes\n", (long long int) rc);
+    }
+    /* free the buffer without copying back the possible changes in buffer using JNI_ABORT */
+    (*env)->ReleaseByteArrayElements(env, buf, buffer, JNI_ABORT);
+    fflush(stdout);
+    fflush(stderr);
+    return (jlong) rc;
 }
 
 /*
@@ -1324,8 +1324,8 @@ Java_PVFS2JNI_pvfsWritev(JNIEnv *env, jobject obj, int fd, jObject vector, jlong
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStat  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsStat\n");
-	struct stat *arg;
+    printf("pvfsStat\n");
+    struct stat *arg;
     arg = (struct stat *)jarg;
     
        
@@ -1347,7 +1347,7 @@ Java_PVFS2JNI_pvfsStat  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStatMask  (JNIEnv *env, jobject obj, jlong jarg, jstring path, jlong mask)
 {
-	printf("pvfsStatMask\n");
+    printf("pvfsStatMask\n");
     
     struct stat *arg;
     arg = (struct stat *)jarg;
@@ -1371,7 +1371,7 @@ Java_PVFS2JNI_pvfsStatMask  (JNIEnv *env, jobject obj, jlong jarg, jstring path,
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstat  (JNIEnv *env, jobject obj, jlong jarg, int fd)
 {
-	printf("pvfsFstat\n");
+    printf("pvfsFstat\n");
     
     struct stat *arg;
     arg = (struct stat *)jarg;
@@ -1391,7 +1391,7 @@ Java_PVFS2JNI_pvfsFstat  (JNIEnv *env, jobject obj, jlong jarg, int fd)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatMask  (JNIEnv *env, jobject obj, jlong jarg, int fd, jlong mask)
 {
-	printf("pvfsFstatMask\n");
+    printf("pvfsFstatMask\n");
     
     struct stat *arg;
     arg = (struct stat *)jarg;
@@ -1413,7 +1413,7 @@ Java_PVFS2JNI_pvfsFstatMask  (JNIEnv *env, jobject obj, jlong jarg, int fd, jlon
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatat  (JNIEnv *env, jobject obj, jlong jarg, int fd, jstring path, int flag)
 {
-	    
+        
     printf("pvfFstatat\n");
     struct stat *arg;
     arg = (struct stat *)jarg;
@@ -1438,7 +1438,7 @@ Java_PVFS2JNI_pvfsFstatat  (JNIEnv *env, jobject obj, jlong jarg, int fd, jstrin
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsLstat  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsLstat\n");
+    printf("pvfsLstat\n");
     struct stat *arg;
     arg = (struct stat *)jarg;
    
@@ -1455,13 +1455,13 @@ Java_PVFS2JNI_pvfsLstat  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
     return rc; 
     
 }
-     	
-		
+        
+        
 //pvfs_lstat_mask
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsLstatMask  (JNIEnv *env, jobject obj, jlong jarg, jstring path, jlong mask)
 {
-	printf("pvfsLstatMask\n");
+    printf("pvfsLstatMask\n");
     struct stat *arg;
     arg = (struct stat *)jarg;
    
@@ -1478,13 +1478,13 @@ Java_PVFS2JNI_pvfsLstatMask  (JNIEnv *env, jobject obj, jlong jarg, jstring path
     }
     return rc; 
     
-}	
+}   
 
 //pvfs_stat64
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsStat64\n");
+    printf("pvfsStat64\n");
     
     struct stat64 *arg;
     arg = (struct stat64 *)jarg;
@@ -1508,7 +1508,7 @@ Java_PVFS2JNI_pvfsStat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstat64  (JNIEnv *env, jobject obj, jlong jarg, int fd)
 {
-	printf("pvfsFstat64\n");
+    printf("pvfsFstat64\n");
     
     struct stat64 *arg;
     arg = (struct stat64 *)jarg;
@@ -1530,7 +1530,7 @@ Java_PVFS2JNI_pvfsFstat64  (JNIEnv *env, jobject obj, jlong jarg, int fd)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatat64  (JNIEnv *env, jobject obj, jlong jarg,int fd, jstring path, int flag)
 {
-	printf("pvfsFstatat64\n");
+    printf("pvfsFstatat64\n");
     
     struct stat64 *arg;
     arg = (struct stat64 *)jarg;
@@ -1554,7 +1554,7 @@ Java_PVFS2JNI_pvfsFstatat64  (JNIEnv *env, jobject obj, jlong jarg,int fd, jstri
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsLstat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsLstat64\n");
+    printf("pvfsLstat64\n");
     
     struct stat64 *arg;
     arg = (struct stat64 *)jarg;
@@ -1576,10 +1576,10 @@ Java_PVFS2JNI_pvfsLstat64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillStat64  (JNIEnv *env, jobject obj, jobject x)
 {
-	printf("FillStat64\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
+    printf("FillStat64\n");
+    fflush(stdout);
+    
+     jfieldID fid1;        
      jfieldID fid2;
      jfieldID fid3;
      jfieldID fid4;
@@ -1594,109 +1594,102 @@ Java_PVFS2JNI_FillStat64  (JNIEnv *env, jobject obj, jobject x)
      jfieldID fid13;
      
      
-     	jlong st_dev;
-		jlong st_ino;
-		jint st_mode;
-		jint st_nlink;
-		jlong st_uid;
-		jlong st_gid;
-		jlong st_rdev;
-		jlong st_size;
-		jint st_blksize;
-		jlong st_blocks;
-		jlong st_atim;
-		jlong st_mtim;
-		jlong st_ctim;
-		
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Stat64");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "st_dev", "J");
-     if (fid1 == NULL) {
-         return; 
-     }
+    jlong st_dev;
+    jlong st_ino;
+    jint st_mode;
+    jint st_nlink;
+    jlong st_uid;
+    jlong st_gid;
+    jlong st_rdev;
+    jlong st_size;
+    jint st_blksize;
+    jlong st_blocks;
+    jlong st_atim;
+    jlong st_mtim;
+    jlong st_ctim;
+        
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Stat64");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "st_dev", "J");
+    if (fid1 == NULL) {
+        return; 
+    }
      
     fid2 = (*env)->GetFieldID(env, cls1, "st_ino", "J");
-     if (fid2 == NULL) {
-         return; 
-     }
+    if (fid2 == NULL) {
+        return; 
+    }
     
     fid3 = (*env)->GetFieldID(env, cls1, "st_mode", "I");
-     if (fid3 == NULL) {
-         return; 
-     }
+    if (fid3 == NULL) {
+        return; 
+    }
      
     fid4 = (*env)->GetFieldID(env, cls1, "st_nlink", "I");
-     if (fid4 == NULL) {
-         return; 
-     } 
+    if (fid4 == NULL) {
+        return; 
+    } 
      
     fid5 = (*env)->GetFieldID(env, cls1, "st_uid", "J");
-     if (fid5 == NULL) {
-         return; 
-     }
+    if (fid5 == NULL) {
+        return; 
+    }
      
     fid6 = (*env)->GetFieldID(env, cls1, "st_gid", "J");
-     if (fid6 == NULL) {
-         return; 
-     }
+    if (fid6 == NULL) {
+        return; 
+    }
     
     fid7 = (*env)->GetFieldID(env, cls1, "st_rdev", "J");
-     if (fid7 == NULL) {
-         return; 
-     } 
+    if (fid7 == NULL) {
+        return; 
+    } 
     
     
     fid8 = (*env)->GetFieldID(env, cls1, "st_size", "J");
-     if (fid8 == NULL) {
-         return; 
-     } 
+    if (fid8 == NULL) {
+        return; 
+    } 
      
     
     fid9 = (*env)->GetFieldID(env, cls1, "st_blksize", "I");
-     if (fid9 == NULL) {
-         return; 
-     } 
+    if (fid9 == NULL) {
+        return; 
+    } 
      
      
     fid10 = (*env)->GetFieldID(env, cls1, "st_blocks", "J");
-     if (fid10 == NULL) {
-         return; 
-     } 
+    if (fid10 == NULL) {
+        return; 
+    } 
      
      
     fid11 = (*env)->GetFieldID(env, cls1, "st_atime", "J");
-     if (fid11 == NULL) {
-         return; 
-     } 
+    if (fid11 == NULL) {
+        return; 
+    } 
      
      
     fid12 = (*env)->GetFieldID(env, cls1, "st_mtime", "J");
-     if (fid12 == NULL) {
-         return; 
-     } 
+    if (fid12 == NULL) {
+        return; 
+    } 
      
      
     fid13 = (*env)->GetFieldID(env, cls1, "st_ctime", "J");
-     if (fid13 == NULL) {
-         return; 
-     } 
-    
+    if (fid13 == NULL) {
+        return; 
+    } 
    
-    struct stat64 *cstat64 = (struct stat64 *)malloc(sizeof(struct stat64));
+    struct stat64 *cstat64 = (struct stat64 *) malloc(sizeof(struct stat64));
     
-    
-    
-   
-	
-	st_dev = (*env)->GetLongField(env,x,fid1);
+    st_dev = (*env)->GetLongField(env,x,fid1);
     dev_t cst_dev = (dev_t) st_dev;
     cstat64->st_dev = cst_dev;
-      
     
     st_ino = (*env)->GetLongField(env,x,fid2);
     ino64_t cst_ino = (ino64_t) st_ino;
     cstat64->st_ino = cst_ino;
-    
         
     st_mode = (*env)->GetIntField(env,x,fid3);
     mode_t cst_mode = (mode_t) st_mode;
@@ -1705,50 +1698,46 @@ Java_PVFS2JNI_FillStat64  (JNIEnv *env, jobject obj, jobject x)
     st_nlink = (*env)->GetIntField(env,x,fid4);
     nlink_t cst_nlink = (nlink_t) st_nlink;
     cstat64->st_nlink = cst_nlink;
-    
+
     st_uid = (*env)->GetLongField(env,x,fid5);
     uid_t cst_uid = (uid_t) st_uid;
     cstat64->st_uid = cst_uid;
-    
+
     st_gid = (*env)->GetLongField(env,x,fid6);
     gid_t cst_gid = (gid_t) st_gid;
     cstat64->st_gid = cst_gid;
-    
+
     st_rdev = (*env)->GetLongField(env,x,fid7);
     dev_t cst_rdev = (dev_t) st_rdev;
     cstat64->st_rdev = cst_rdev;
-    
+
     st_size = (*env)->GetLongField(env,x,fid8);
     off64_t cst_size = (off64_t) st_size;
     cstat64->st_size = cst_size;
-    
+
     st_blksize = (*env)->GetIntField(env,x,fid9);
     blksize_t cst_blksize = (blksize_t) st_blksize;
     cstat64->st_blksize = cst_blksize;
-    
+
     st_blocks = (*env)->GetLongField(env,x,fid10);
     blkcnt64_t cst_blocks = (blkcnt64_t) st_blocks;
     cstat64->st_blocks = cst_blocks;
-    
+
     st_atim = (*env)->GetLongField(env,x,fid11);
     time_t cst_atime = (time_t) st_atim;
     cstat64->st_atime = cst_atime;
-    
+
     st_mtim = (*env)->GetLongField(env,x,fid12);
     time_t cst_mtime = (time_t) st_mtim;
     cstat64->st_mtime = cst_mtime;
-    
+
     st_ctim = (*env)->GetLongField(env,x,fid13);
     time_t cst_ctime = (time_t) st_ctim;
     cstat64->st_ctime = cst_ctime;
-    
-    
-    
-    
+
     long lp = (long)cstat64;
-    return lp;
-    
     free(cstat64);
+    return lp; 
 }
 
 
@@ -1756,288 +1745,263 @@ Java_PVFS2JNI_FillStat64  (JNIEnv *env, jobject obj, jobject x)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillStat  (JNIEnv *env, jobject obj, jobject x)
 {
-	printf("FillStat\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
-     jfieldID fid2;
-     jfieldID fid3;
-     jfieldID fid4;
-     jfieldID fid5;
-     jfieldID fid6;
-     jfieldID fid7;
-     jfieldID fid8;
-     jfieldID fid9;
-     jfieldID fid10;
-     jfieldID fid11;
-     jfieldID fid12;
-     jfieldID fid13;
-     
-     
-     	jlong st_dev;
-		jlong st_ino;
-		jint st_mode;
-		jint st_nlink;
-		jlong st_uid;
-		jlong st_gid;
-		jlong st_rdev;
-		jlong st_size;
-		jint st_blksize;
-		jlong st_blocks;
-		jlong st_atim;
-		jlong st_mtim;
-		jlong st_ctim;
-		
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Stat");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "st_dev", "J");
-     if (fid1 == NULL) {
-         return; 
-     }
+    printf("FillStat\n");
+    fflush(stdout);
+
+    jfieldID fid1;        
+    jfieldID fid2;
+    jfieldID fid3;
+    jfieldID fid4;
+    jfieldID fid5;
+    jfieldID fid6;
+    jfieldID fid7;
+    jfieldID fid8;
+    jfieldID fid9;
+    jfieldID fid10;
+    jfieldID fid11;
+    jfieldID fid12;
+    jfieldID fid13;
+
+    jlong st_dev;
+    jlong st_ino;
+    jint st_mode;
+    jint st_nlink;
+    jlong st_uid;
+    jlong st_gid;
+    jlong st_rdev;
+    jlong st_size;
+    jint st_blksize;
+    jlong st_blocks;
+    jlong st_atim;
+    jlong st_mtim;
+    jlong st_ctim;
+        
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Stat");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "st_dev", "J");
+    if (fid1 == NULL) {
+        return; 
+    }
      
     fid2 = (*env)->GetFieldID(env, cls1, "st_ino", "J");
-     if (fid2 == NULL) {
-         return; 
-     }
+    if (fid2 == NULL) {
+        return; 
+    }
     
     fid3 = (*env)->GetFieldID(env, cls1, "st_mode", "I");
-     if (fid3 == NULL) {
-         return; 
-     }
+    if (fid3 == NULL) {
+        return; 
+    }
      
     fid4 = (*env)->GetFieldID(env, cls1, "st_nlink", "I");
-     if (fid4 == NULL) {
-         return; 
-     } 
+    if (fid4 == NULL) {
+        return; 
+    } 
      
     fid5 = (*env)->GetFieldID(env, cls1, "st_uid", "J");
-     if (fid5 == NULL) {
-         return; 
-     }
+    if (fid5 == NULL) {
+        return; 
+    }
      
     fid6 = (*env)->GetFieldID(env, cls1, "st_gid", "J");
-     if (fid6 == NULL) {
-         return; 
-     }
+    if (fid6 == NULL) {
+        return; 
+    }
     
     fid7 = (*env)->GetFieldID(env, cls1, "st_rdev", "J");
-     if (fid7 == NULL) {
-         return; 
-     } 
+    if (fid7 == NULL) {
+        return; 
+    } 
     
     
     fid8 = (*env)->GetFieldID(env, cls1, "st_size", "J");
-     if (fid8 == NULL) {
-         return; 
-     } 
+    if (fid8 == NULL) {
+        return; 
+    } 
      
     
     fid9 = (*env)->GetFieldID(env, cls1, "st_blksize", "I");
-     if (fid9 == NULL) {
-         return; 
-     } 
+    if (fid9 == NULL) {
+        return; 
+    } 
      
      
     fid10 = (*env)->GetFieldID(env, cls1, "st_blocks", "J");
-     if (fid10 == NULL) {
-         return; 
-     } 
+    if (fid10 == NULL) {
+        return; 
+    } 
      
      
     fid11 = (*env)->GetFieldID(env, cls1, "st_atime", "J");
-     if (fid11 == NULL) {
-         return; 
-     } 
+    if (fid11 == NULL) {
+        return; 
+    } 
      
      
     fid12 = (*env)->GetFieldID(env, cls1, "st_mtime", "J");
-     if (fid12 == NULL) {
-         return; 
-     } 
+    if (fid12 == NULL) {
+        return; 
+    } 
      
      
     fid13 = (*env)->GetFieldID(env, cls1, "st_ctime", "J");
-     if (fid13 == NULL) {
-         return; 
-     } 
-    
-   
+    if (fid13 == NULL) {
+        return; 
+    } 
+
     struct stat *cstat = (struct stat *)malloc(sizeof(struct stat));
-    
-    
-    
-   
-	
-	st_dev = (*env)->GetLongField(env,x,fid1);
+
+    st_dev = (*env)->GetLongField(env,x,fid1);
     dev_t cst_dev = (dev_t) st_dev;
     cstat->st_dev = cst_dev;
-      
-    
+
     st_ino = (*env)->GetLongField(env,x,fid2);
     ino64_t cst_ino = (ino64_t) st_ino;
     cstat->st_ino = cst_ino;
-    
-        
+
     st_mode = (*env)->GetIntField(env,x,fid3);
     mode_t cst_mode = (mode_t) st_mode;
     cstat->st_mode = cst_mode;
-    
+
     st_nlink = (*env)->GetIntField(env,x,fid4);
     nlink_t cst_nlink = (nlink_t) st_nlink;
     cstat->st_nlink = cst_nlink;
-    
+
     st_uid = (*env)->GetLongField(env,x,fid5);
     uid_t cst_uid = (uid_t) st_uid;
     cstat->st_uid = cst_uid;
-    
+
     st_gid = (*env)->GetLongField(env,x,fid6);
     gid_t cst_gid = (gid_t) st_gid;
     cstat->st_gid = cst_gid;
-    
+
     st_rdev = (*env)->GetLongField(env,x,fid7);
     dev_t cst_rdev = (dev_t) st_rdev;
     cstat->st_rdev = cst_rdev;
-    
+
     st_size = (*env)->GetLongField(env,x,fid8);
     off64_t cst_size = (off64_t) st_size;
     cstat->st_size = cst_size;
-    
+
     st_blksize = (*env)->GetIntField(env,x,fid9);
     blksize_t cst_blksize = (blksize_t) st_blksize;
     cstat->st_blksize = cst_blksize;
-    
+
     st_blocks = (*env)->GetLongField(env,x,fid10);
     blkcnt64_t cst_blocks = (blkcnt64_t) st_blocks;
     cstat->st_blocks = cst_blocks;
-    
+
     st_atim = (*env)->GetLongField(env,x,fid11);
     time_t cst_atime = (time_t) st_atim;
     cstat->st_atime = cst_atime;
-    
+
     st_mtim = (*env)->GetLongField(env,x,fid12);
     time_t cst_mtime = (time_t) st_mtim;
     cstat->st_mtime = cst_mtime;
-    
+
     st_ctim = (*env)->GetLongField(env,x,fid13);
     time_t cst_ctime = (time_t) st_ctim;
     cstat->st_ctime = cst_ctime;
-    
-    
-    
-    
+
     long lp = (long)cstat;
-    return lp;
     free(cstat);
-    
+    return lp;
 }
 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseStat64  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct stat64 *arg;
+    struct stat64 *arg;
     arg = (struct stat64 *)jarg;
     disp64(arg);
-	//printf("=======DISPLAY========\n");
-	//printf("The st_dev is: %ld\n", arg->st_dev);
+    //printf("=======DISPLAY========\n");
+    //printf("The st_dev is: %ld\n", arg->st_dev);
 }
 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseStat  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct stat xyz;
-	struct stat *arg;
+    struct stat xyz;
+    struct stat *arg;
     arg = (struct stat *)jarg;
     disp(arg);
-	//printf("=======DISPLAY========\n");
-	//printf("The st_dev is: %ld\n", arg->st_dev);
-}	
+    //printf("=======DISPLAY========\n");
+    //printf("The st_dev is: %ld\n", arg->st_dev);
+}   
 
-	
+    
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillDirent  (JNIEnv *env, jobject obj, jobject x)
 {
-	printf("FillDirent\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
-     jfieldID fid2;
-     jfieldID fid3;
-     jfieldID fid4;
-     jfieldID fid5;
-     
-     
-     
-     	jlong d_ino;
-		jlong d_off;
-		jint d_reclen;
-		jstring d_type;
-		jstring d_name;
-		
-		
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Dirent");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "d_ino", "J");
-     if (fid1 == NULL) {
-         return; 
-     }
-     
+    printf("FillDirent\n");
+    fflush(stdout);
+    
+    jfieldID fid1;        
+    jfieldID fid2;
+    jfieldID fid3;
+    jfieldID fid4;
+    jfieldID fid5;
+
+    jlong d_ino;
+    jlong d_off;
+    jint d_reclen;
+    jstring d_type;
+    jstring d_name;
+
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Dirent");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "d_ino", "J");
+    if (fid1 == NULL) {
+        return; 
+    }
+
     fid2 = (*env)->GetFieldID(env, cls1, "d_off", "J");
-     if (fid2 == NULL) {
-         return; 
-     }
-    
+    if (fid2 == NULL) {
+        return; 
+    }
+
     fid3 = (*env)->GetFieldID(env, cls1, "d_reclen", "I");
-     if (fid3 == NULL) {
-         return; 
-     }
-    
-    
+    if (fid3 == NULL) {
+        return; 
+    }
+
     fid4 = (*env)->GetFieldID(env, cls1, "d_type", "Ljava/lang/String;");
-    
-     if (fid4 == NULL) {
-         return; 
-     } 
-     
+    if (fid4 == NULL) {
+        return; 
+    } 
+
     fid5 = (*env)->GetFieldID(env, cls1, "d_name", "Ljava/lang/String;");
-     if (fid5 == NULL) {
-         return; 
-     }
-     
-    
-    
+    if (fid5 == NULL) {
+        return; 
+    }
+
     const char* strdtype;
     const char* strdname;
-    
+
     struct dirent *cdirent = (struct dirent *)malloc(sizeof(struct dirent));
-    
-    
-    
-   
-	
-	d_ino = (*env)->GetLongField(env,x,fid1);
+
+    d_ino = (*env)->GetLongField(env,x,fid1);
     __ino_t cd_ino = (__ino_t) d_ino;
     cdirent->d_ino = cd_ino;
-      
+
     d_off = (*env)->GetLongField(env,x,fid2);
     __off_t cd_off = (__off_t) d_off;
     cdirent->d_off = cd_off;
-    
+ 
     d_reclen = (*env)->GetIntField(env,x,fid3);
     unsigned short int cd_reclen = (unsigned short int) d_reclen;
     cdirent->d_reclen = cd_reclen;
-    
-    
-	d_type = (*env)->GetObjectField(env, x, fid4);
+
+    d_type = (*env)->GetObjectField(env, x, fid4);
     strdtype = (*env)->GetStringUTFChars(env, d_type, NULL);
-     if (strdtype == NULL) {
-         return; /* out of memory */
-     }
+    if (strdtype == NULL) {
+        return; /* out of memory */
+    }
     if((strlen(strdtype))!=1)
     {
-    	perror("d_type is of type char, hence length cannot exceed 1\n");
-    	fflush(stdout);
-    	return;
-    	
+        perror("d_type is of type char, hence length cannot exceed 1\n");
+        fflush(stdout);
+        return;
     } 
     else
     {
@@ -2048,155 +2012,129 @@ Java_PVFS2JNI_FillDirent  (JNIEnv *env, jobject obj, jobject x)
        //fflush(stdout);
        cdirent->d_type=cd_type;
     }
-    
-    
+
     //char cstrdtype = &(strdtype);
     //printf("The d_type is: %s \n", chartest);
-    
-    
+
     (*env)->ReleaseStringUTFChars(env, d_type, strdtype);
-    
+
     d_name = (*env)->GetObjectField(env, x, fid5);
     strdname = (*env)->GetStringUTFChars(env, d_name, NULL);
-     if (strdname == NULL) {
-         return; /* out of memory */
-     }
-     if((strlen(strdname))>256)
+    if (strdname == NULL) {
+        return; /* out of memory */
+    }
+    if((strlen(strdname))>256)
     {
-    	perror("Length of strdname cannot exceed 250\n");
-    	fflush(stdout);
-    	return;
-    	
-    	
+        perror("Length of strdname cannot exceed 250\n");
+        fflush(stdout);
+        return;
     } 
     else
     {
-    	char cd_name[256];
-    	strcpy(cd_name, strdname);
-    	strcpy(cdirent->d_name,cd_name);
-    	
-        
+        char cd_name[256];
+        strcpy(cd_name, strdname);
+        strcpy(cdirent->d_name,cd_name);
     }
-    (*env)->ReleaseStringUTFChars(env, d_name, strdname); 
-    
-    
-    
-    long lp = (long)cdirent;
-    return lp;
-   free(cdirent);
+    (*env)->ReleaseStringUTFChars(env, d_name, strdname);
 
+    long lp = (long)cdirent;
+    free(cdirent);
+    return lp;
 }
 void dispdirent(struct dirent *abc)
 {
-	printf("=======DISPLAY========\n");
-	
-	printf("The d_ino is: %d\n", (int) abc->d_ino);
-	printf("The d_off is: %d\n", (int) abc->d_off);
-	printf("The d_reclen is: %d\n", abc->d_reclen);
-	printf("The d_type is: %c \n", abc->d_type);
-	printf("The d_name is: %s \n", abc->d_name);
-	
-	
-	fflush(stdout);
-	
+    printf("=======DISPLAY========\n");
+    printf("The d_ino is: %d\n", (int) abc->d_ino);
+    printf("The d_off is: %d\n", (int) abc->d_off);
+    printf("The d_reclen is: %d\n", abc->d_reclen);
+    printf("The d_type is: %c \n", abc->d_type);
+    printf("The d_name is: %s \n", abc->d_name);
+    fflush(stdout);
 }
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseDirent  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct dirent xyz;
-	struct dirent *arg;
+    struct dirent xyz;
+    struct dirent *arg;
     arg = (struct dirent *)jarg;
     dispdirent(arg);
-	//printf("=======DISPLAY========\n");
-	//printf("The st_dev is: %ld\n", arg->st_dev);
+    //printf("=======DISPLAY========\n");
+    //printf("The st_dev is: %ld\n", arg->st_dev);
 }
 
 //FILL DIRENT
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillDirent64(JNIEnv *env, jobject obj, jobject x)
 {
-	printf("FillDirent64\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
-     jfieldID fid2;
-     jfieldID fid3;
-     jfieldID fid4;
-     jfieldID fid5;
-     
-     
-     
-     	jlong d_ino;
-		jlong d_off;
-		jint d_reclen;
-		jstring d_type;
-		jstring d_name;
-		
-		
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Dirent64");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "d_ino", "J");
-     if (fid1 == NULL) {
-         return; 
-     }
-     
+    printf("FillDirent64\n");
+    fflush(stdout);
+    
+    jfieldID fid1;        
+    jfieldID fid2;
+    jfieldID fid3;
+    jfieldID fid4;
+    jfieldID fid5;
+
+    jlong d_ino;
+    jlong d_off;
+    jint d_reclen;
+    jstring d_type;
+    jstring d_name;
+
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Dirent64");
+
+    fid1 = (*env)->GetFieldID(env, cls1, "d_ino", "J");
+    if (fid1 == NULL) {
+        return; 
+    }
+
     fid2 = (*env)->GetFieldID(env, cls1, "d_off", "J");
-     if (fid2 == NULL) {
-         return; 
-     }
-    
+    if (fid2 == NULL) {
+        return; 
+    }
+
     fid3 = (*env)->GetFieldID(env, cls1, "d_reclen", "I");
-     if (fid3 == NULL) {
-         return; 
-     }
-    
-    
+    if (fid3 == NULL) {
+        return; 
+    }
+ 
     fid4 = (*env)->GetFieldID(env, cls1, "d_type", "Ljava/lang/String;");
-    
-     if (fid4 == NULL) {
-         return; 
-     } 
-     
+    if (fid4 == NULL) {
+        return; 
+    }
+ 
     fid5 = (*env)->GetFieldID(env, cls1, "d_name", "Ljava/lang/String;");
-     if (fid5 == NULL) {
-         return; 
-     }
-     
-    
-    
+    if (fid5 == NULL) {
+        return; 
+    }
+
     const char* strdtype;
     const char* strdname;
-    
+
     struct dirent64 *cdirent64 = (struct dirent64 *)malloc(sizeof(struct dirent64));
-    
-    
-    
-   
-	
-	d_ino = (*env)->GetLongField(env,x,fid1);
+
+    d_ino = (*env)->GetLongField(env,x,fid1);
     __ino64_t cd_ino = (__ino64_t) d_ino;
     cdirent64->d_ino = cd_ino;
-      
+
     d_off = (*env)->GetLongField(env,x,fid2);
     __off64_t cd_off = (__off64_t) d_off;
     cdirent64->d_off = cd_off;
-    
+
     d_reclen = (*env)->GetIntField(env,x,fid3);
     unsigned short int cd_reclen = (unsigned short int) d_reclen;
     cdirent64->d_reclen = cd_reclen;
-    
-    
-	d_type = (*env)->GetObjectField(env, x, fid4);
+
+    d_type = (*env)->GetObjectField(env, x, fid4);
     strdtype = (*env)->GetStringUTFChars(env, d_type, NULL);
-     if (strdtype == NULL) {
-         return; /* out of memory */
-     }
+    if (strdtype == NULL) {
+        return; /* out of memory */
+    }
     if((strlen(strdtype))!=1)
     {
-    	perror("d_type is of type char, hence length cannot exceed 1\n");
-    	fflush(stdout);
-    	return;
-    	
+        perror("d_type is of type char, hence length cannot exceed 1\n");
+        fflush(stdout);
+        return;
     } 
     else
     {
@@ -2207,68 +2145,57 @@ Java_PVFS2JNI_FillDirent64(JNIEnv *env, jobject obj, jobject x)
        //fflush(stdout);
        cdirent64->d_type=cd_type;
     }
-    
-    
+
     //char cstrdtype = &(strdtype);
     //printf("The d_type is: %s \n", chartest);
-    
-    
+
     (*env)->ReleaseStringUTFChars(env, d_type, strdtype);
-    
+
     d_name = (*env)->GetObjectField(env, x, fid5);
     strdname = (*env)->GetStringUTFChars(env, d_name, NULL);
-     if (strdname == NULL) {
-         return; /* out of memory */
-     }
-     if((strlen(strdname))>257)
+    if (strdname == NULL) {
+        return; /* out of memory */
+    }
+    if((strlen(strdname))>257)
     {
-    	perror("Length of strdname cannot exceed 250\n");
-    	fflush(stdout);
-    	return;
-    	
-    	
+        perror("Length of strdname cannot exceed 250\n");
+        fflush(stdout);
+        return;
+        
+        
     } 
     else
     {
-    	char cd_name[256];
-    	strcpy(cd_name, strdname);
-    	strcpy(cdirent64->d_name,cd_name);
-    	
-        
+        char cd_name[256];
+        strcpy(cd_name, strdname);
+        strcpy(cdirent64->d_name,cd_name);
     }
-    (*env)->ReleaseStringUTFChars(env, d_name, strdname); 
-    
-    
-    
-    long lp = (long)cdirent64;
-    return lp;
-    free(cdirent64);
+    (*env)->ReleaseStringUTFChars(env, d_name, strdname);
 
+    long lp = (long)cdirent64;
+    free(cdirent64);
+    return lp;
 }
 
 void dispdirent64(struct dirent64 *abc)
 {
-	printf("=======DISPLAY========\n");
-	
-	printf("The d_ino is: %d\n", (int) abc->d_ino);
-	printf("The d_off is: %d\n", (int) abc->d_off);
-	printf("The d_reclen is: %d\n", abc->d_reclen);
-	printf("The d_type is: %c \n", abc->d_type);
-	printf("The d_name is: %s \n", abc->d_name);
-	
-	
-	fflush(stdout);
-	
+    printf("=======DISPLAY========\n");
+    printf("The d_ino is: %d\n", (int) abc->d_ino);
+    printf("The d_off is: %d\n", (int) abc->d_off);
+    printf("The d_reclen is: %d\n", abc->d_reclen);
+    printf("The d_type is: %c \n", abc->d_type);
+    printf("The d_name is: %s \n", abc->d_name);
+    fflush(stdout);
 }
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseDirent64  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct dirent64 xyz;
-	struct dirent64 *arg;
+    struct dirent64 xyz;
+    struct dirent64 *arg;
     arg = (struct dirent64 *)jarg;
-    dispdirent64(arg);	
-	//printf("=======DISPLAY========\n");
-	//printf("The st_dev is: %ld\n", arg->st_dev);
+    dispdirent64(arg);  
+    //printf("=======DISPLAY========\n");
+    //printf("The st_dev is: %ld\n", arg->st_dev);
 }
 
 
@@ -2276,10 +2203,10 @@ Java_PVFS2JNI_UseDirent64  (JNIEnv *env, jobject obj, jlong jarg)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillStatfs  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
 {
-	printf("FillStatfs\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
+    printf("FillStatfs\n");
+    fflush(stdout);
+    
+     jfieldID fid1;        
      jfieldID fid2;
      jfieldID fid3;
      jfieldID fid4;
@@ -2294,23 +2221,23 @@ Java_PVFS2JNI_FillStatfs  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
      
      
      
-     	jlong f_type;
-		jlong f_bsize;
-		jlong f_blocks;
-		jlong f_bfree;
-		jlong f_bavail;
-		jlong f_files;
-		jlong f_ffree;
-		jlong f_fsid;
-		jlong f_namelen;
-		jlong f_frsize;
-		jlong f_flags;
-		
-		
-				
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statfs");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "f_type", "J");
+        jlong f_type;
+        jlong f_bsize;
+        jlong f_blocks;
+        jlong f_bfree;
+        jlong f_bavail;
+        jlong f_files;
+        jlong f_ffree;
+        jlong f_fsid;
+        jlong f_namelen;
+        jlong f_frsize;
+        jlong f_flags;
+        
+        
+                
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statfs");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "f_type", "J");
      if (fid1 == NULL) {
          return; 
      }
@@ -2382,8 +2309,8 @@ Java_PVFS2JNI_FillStatfs  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
     printf("f_spare[4]=%d\n",cstatfs->f_spare[4]);
     */
    
-	
-	f_type = (*env)->GetLongField(env,x,fid1);
+    
+    f_type = (*env)->GetLongField(env,x,fid1);
     __SWORD_TYPE cf_type = (__SWORD_TYPE) f_type;
     cstatfs->f_type = cf_type;
       
@@ -2439,12 +2366,12 @@ Java_PVFS2JNI_FillStatfs  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
     int jval;
     for(ival=0;ival<=4;ival++)
     {
-    	cbuf[ival]=buf[ival];
+        cbuf[ival]=buf[ival];
     }
     //printf("cbuf=%ld",cbuf[4]);
     for(jval=0;jval<=4;jval++)
     {
-    	cstatfs->f_spare[jval] = cbuf[jval];
+        cstatfs->f_spare[jval] = cbuf[jval];
     }
     //cstatfs->f_spare[4] = 10;
     
@@ -2466,58 +2393,58 @@ Java_PVFS2JNI_FillStatfs  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
 
 void dispstatfs(struct statfs *abc)
 {
-	printf("=======DISPLAY========\n");
-	
-	printf("The f_type is: %ld\n", abc->f_type);
-	printf("The f_bsize is: %ld\n", abc->f_bsize);
-	printf("The f_blocks is: %lu\n", (long unsigned int) abc->f_blocks);
-	printf("The f_bfree is: %lu \n", (long unsigned int) abc->f_bfree);
-	printf("The f_bavail is: %lu \n", (long unsigned int) abc->f_bavail);
-	printf("The f_files is: %lu \n", (long unsigned int) abc->f_files);
-	printf("The f_ffree is: %lu \n", (long unsigned int) abc->f_ffree);
-	//printf("The f_fsid is: %d \n", abc->f_fsid);
-	printf("The f_namelen is: %ld \n", abc->f_namelen);
-	printf("The f_frsize is: %ld \n", abc->f_frsize);
-	printf("The f_flags is: %ld \n", abc->f_flags);
-	int i;
-	
-	for(i=0;i<=4;i++)
+    printf("=======DISPLAY========\n");
+    
+    printf("The f_type is: %ld\n", abc->f_type);
+    printf("The f_bsize is: %ld\n", abc->f_bsize);
+    printf("The f_blocks is: %lu\n", (long unsigned int) abc->f_blocks);
+    printf("The f_bfree is: %lu \n", (long unsigned int) abc->f_bfree);
+    printf("The f_bavail is: %lu \n", (long unsigned int) abc->f_bavail);
+    printf("The f_files is: %lu \n", (long unsigned int) abc->f_files);
+    printf("The f_ffree is: %lu \n", (long unsigned int) abc->f_ffree);
+    //printf("The f_fsid is: %d \n", abc->f_fsid);
+    printf("The f_namelen is: %ld \n", abc->f_namelen);
+    printf("The f_frsize is: %ld \n", abc->f_frsize);
+    printf("The f_flags is: %ld \n", abc->f_flags);
+    int i;
+    
+    for(i=0;i<=4;i++)
     {
-    	printf("F_SPARE %d = %ld\n",i,abc->f_spare[i]);
+        printf("F_SPARE %d = %ld\n",i,abc->f_spare[i]);
     }
-	
-	for(i=0;i<=1;i++)
+    
+    for(i=0;i<=1;i++)
     {
-    	printf("F_FSID %d = %d\n",i,abc->f_fsid.__val[i]);
+        printf("F_FSID %d = %d\n",i,abc->f_fsid.__val[i]);
     }
-	printf("=======DISPLAY========\n");
-	
-	
-	fflush(stdout);
-	free(abc);
+    printf("=======DISPLAY========\n");
+    
+    
+    fflush(stdout);
+    free(abc);
 }
 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseStatfs  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct statfs xyz;
-	struct statfs *arg;
+    struct statfs xyz;
+    struct statfs *arg;
     arg = (struct statfs *)jarg;
-    dispstatfs(arg);	
-	
+    dispstatfs(arg);    
+    
 }
 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillFsid  (JNIEnv *env, jobject obj, jobject x)
 {
-	
-	printf("FillFsid\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;
-	 jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Fsid");
-	 
-	 fid1 = (*env)->GetFieldID(env, cls1, "val", "[I");
+    
+    printf("FillFsid\n");
+    fflush(stdout);
+    
+     jfieldID fid1;
+     jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Fsid");
+     
+     fid1 = (*env)->GetFieldID(env, cls1, "val", "[I");
      if (fid1 == NULL) {
          return; 
      } 
@@ -2535,16 +2462,16 @@ Java_PVFS2JNI_FillFsid  (JNIEnv *env, jobject obj, jobject x)
     int jval;
     for(ival=0;ival<=1;ival++)
     {
-    	cbuf[ival]=buf[ival];
+        cbuf[ival]=buf[ival];
     }
     //printf("cbuf=%ld",cbuf[4]);
     for(jval=0;jval<=1;jval++)
     {
-    	cfsid_t->__val[jval] = cbuf[jval];
+        cfsid_t->__val[jval] = cbuf[jval];
     }
     for(jval=0;jval<=1;jval++)
     {
-    	printf("arr[%d]=%d\n",jval,cfsid_t->__val[jval]);
+        printf("arr[%d]=%d\n",jval,cfsid_t->__val[jval]);
     }
      long lp = (long)cfsid_t;
     return lp;
@@ -2552,47 +2479,47 @@ Java_PVFS2JNI_FillFsid  (JNIEnv *env, jobject obj, jobject x)
 
 void dispfsid(fsid_t *abc)
 {
-	printf("=======DISPLAY========\n");
-	int i;
-	for(i=0;i<=1;i++)
+    printf("=======DISPLAY========\n");
+    int i;
+    for(i=0;i<=1;i++)
     {
-    	printf("Array element %d = %d\n",i,abc->__val[i]);
+        printf("Array element %d = %d\n",i,abc->__val[i]);
     }
-	
-	printf("=======DISPLAY========\n");
-	
-	
-	fflush(stdout);
-	
+    
+    printf("=======DISPLAY========\n");
+    
+    
+    fflush(stdout);
+    
 } 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseFsid  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	fsid_t xyz;
-	fsid_t *arg;
+    fsid_t xyz;
+    fsid_t *arg;
     arg = (fsid_t *)jarg;
-    dispfsid(arg);	
-	
+    dispfsid(arg);  
+    
 }
  
  JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillUtimbuf  (JNIEnv *env, jobject obj, jobject x)
 {
-	
-	printf("FillUtimbuf\n");
-	fflush(stdout); 
-	
-	jfieldID fid1;        
+    
+    printf("FillUtimbuf\n");
+    fflush(stdout); 
+    
+    jfieldID fid1;        
     jfieldID fid2;
      
     jlong actime;
-	jlong modtime;
-		
-		
-				
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Utimbuf");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "actime", "J");
+    jlong modtime;
+        
+        
+                
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Utimbuf");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "actime", "J");
      if (fid1 == NULL) {
          return; 
      }
@@ -2622,46 +2549,46 @@ Java_PVFS2JNI_FillUtimbuf  (JNIEnv *env, jobject obj, jobject x)
 
 void disputimbuf(struct utimbuf *abc)
 {
-	printf("=======DISPLAY========\n");
-	
-	printf("ACTIME=:%ld\n", abc->actime);
+    printf("=======DISPLAY========\n");
+    
+    printf("ACTIME=:%ld\n", abc->actime);
     printf("MODTIME=:%ld\n", abc->modtime);
-		
-	printf("=======DISPLAY========\n");
-	
-	
-	fflush(stdout);
-	free(abc);
+        
+    printf("=======DISPLAY========\n");
+    
+    
+    fflush(stdout);
+    free(abc);
 }  
      
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseUtimbuf  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct utimbuf xyz;
-	struct utimbuf *arg;
+    struct utimbuf xyz;
+    struct utimbuf *arg;
     arg = (struct utimbuf *)jarg;
-    disputimbuf(arg);	
-	
+    disputimbuf(arg);   
+    
 } 
 
  JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillTimeval  (JNIEnv *env, jobject obj, jobject x)
 {
-	
-	printf("FillTimeval\n");
-	fflush(stdout); 
-	
-	jfieldID fid1;        
+    
+    printf("FillTimeval\n");
+    fflush(stdout); 
+    
+    jfieldID fid1;        
     jfieldID fid2;
      
     jlong tv_sec;
-	jlong tv_usec;
-		
-		
-				
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Timeval");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "tv_sec", "J");
+    jlong tv_usec;
+        
+        
+                
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Timeval");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "tv_sec", "J");
      if (fid1 == NULL) {
          return; 
      }
@@ -2691,32 +2618,32 @@ Java_PVFS2JNI_FillTimeval  (JNIEnv *env, jobject obj, jobject x)
 
 void disptimeval(struct timeval abc[2])
 {
-	printf("=======DISPLAY========\n");
-	
-	printf("++STRUCT  1++\n");	
+    printf("=======DISPLAY========\n");
+    
+    printf("++STRUCT  1++\n");  
     printf("ACTIME=:%ld\n", abc[0].tv_sec);
     printf("MODTIME=:%ld\n", abc[0].tv_usec);
     
-    printf("++STRUCT  2++\n");	
+    printf("++STRUCT  2++\n");  
     printf("ACTIME=:%ld\n", abc[1].tv_sec);
     printf("MODTIME=:%ld\n", abc[1].tv_usec);
     
-	printf("=======DISPLAY========\n");
-	
-	
-	
-	fflush(stdout);
-	//free(abc);
+    printf("=======DISPLAY========\n");
+    
+    
+    
+    fflush(stdout);
+    //free(abc);
 }  
      
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseTimeval  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2)
 {
-	
-	struct timeval *arg1;
-	struct timeval *arg2;
-	
-	
+    
+    struct timeval *arg1;
+    struct timeval *arg2;
+    
+    
     arg1 = (struct timeval *)jarg1;
     arg2 = (struct timeval *)jarg2;
     
@@ -2729,11 +2656,11 @@ Java_PVFS2JNI_UseTimeval  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2)
     abc[1].tv_usec=arg2->tv_usec;
     
     disptimeval(abc);
-    /*printf("++STRUCT  1++\n");	
+    /*printf("++STRUCT  1++\n");    
     printf("ACTIME=:%ld\n", abc[0].tv_sec);
     printf("MODTIME=:%ld\n", abc[0].tv_usec);
     printf("++STRUCT  2++\n");
-	printf("ACTIME=:%ld\n", abc[1].tv_sec);
+    printf("ACTIME=:%ld\n", abc[1].tv_sec);
     printf("MODTIME=:%ld\n", abc[1].tv_usec);*/
     
 }     
@@ -2742,7 +2669,7 @@ Java_PVFS2JNI_UseTimeval  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsReaddir  (JNIEnv *env, jobject obj, jlong jarg, int fd, int count)
 {
-	printf("pvfsReaddir\n");
+    printf("pvfsReaddir\n");
     
     struct dirent *arg;
     arg = (struct dirent *)jarg;
@@ -2766,7 +2693,7 @@ Java_PVFS2JNI_pvfsReaddir  (JNIEnv *env, jobject obj, jlong jarg, int fd, int co
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsGetdents  (JNIEnv *env, jobject obj, jlong jarg, int fd, int size)
 {
-	printf("pvfsGetdents\n");
+    printf("pvfsGetdents\n");
     
     struct dirent *arg;
     arg = (struct dirent *)jarg;
@@ -2789,7 +2716,7 @@ Java_PVFS2JNI_pvfsGetdents  (JNIEnv *env, jobject obj, jlong jarg, int fd, int s
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsGetdents64  (JNIEnv *env, jobject obj, jlong jarg, int fd, int size)
 {
-	printf("pvfsGetdents64\n");
+    printf("pvfsGetdents64\n");
     
     struct dirent64 *arg;
     arg = (struct dirent64 *)jarg;
@@ -2812,11 +2739,11 @@ Java_PVFS2JNI_pvfsGetdents64  (JNIEnv *env, jobject obj, jlong jarg, int fd, int
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_Futimesat  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, int dirfd, jstring path)
 {
-	
-	struct timeval *arg1;
-	struct timeval *arg2;
-	
-	
+    
+    struct timeval *arg1;
+    struct timeval *arg2;
+    
+    
     arg1 = (struct timeval *)jarg1;
     arg2 = (struct timeval *)jarg2;
     
@@ -2848,11 +2775,11 @@ Java_PVFS2JNI_Futimesat  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, in
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_Utimes  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, jstring path)
 {
-	
-	struct timeval *arg1;
-	struct timeval *arg2;
-	
-	
+    
+    struct timeval *arg1;
+    struct timeval *arg2;
+    
+    
     arg1 = (struct timeval *)jarg1;
     arg2 = (struct timeval *)jarg2;
     
@@ -2884,11 +2811,11 @@ Java_PVFS2JNI_Utimes  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, jstri
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_Futimes  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, int fd)
 {
-	
-	struct timeval *arg1;
-	struct timeval *arg2;
-	
-	
+    
+    struct timeval *arg1;
+    struct timeval *arg2;
+    
+    
     arg1 = (struct timeval *)jarg1;
     arg2 = (struct timeval *)jarg2;
     
@@ -2917,7 +2844,7 @@ Java_PVFS2JNI_Futimes  (JNIEnv *env, jobject obj, jlong jarg1, jlong jarg2, int 
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsUtime  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsUtime\n");
+    printf("pvfsUtime\n");
     
     struct utimbuf *arg;
     arg = (struct utimbuf *)jarg;
@@ -2941,7 +2868,7 @@ Java_PVFS2JNI_pvfsUtime  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_pvfsListxattr (JNIEnv *env, jobject obj, jstring path, jstring list, jlong size)
 {
-	printf("pvfsListxattr\n");
+    printf("pvfsListxattr\n");
     
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
@@ -2969,7 +2896,7 @@ Java_PVFS2JNI_pvfsListxattr (JNIEnv *env, jobject obj, jstring path, jstring lis
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_pvfsLlistxattr (JNIEnv *env, jobject obj, jstring path, jstring list, jlong size)
 {
-	printf("pvfsLlistxattr\n");
+    printf("pvfsLlistxattr\n");
     
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
@@ -2997,7 +2924,7 @@ Java_PVFS2JNI_pvfsLlistxattr (JNIEnv *env, jobject obj, jstring path, jstring li
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_pvfsFlistxattr (JNIEnv *env, jobject obj, int fd, jstring list, jlong size)
 {
-	printf("pvfsFlistxattr\n");
+    printf("pvfsFlistxattr\n");
     
     char clist[PVFS_MAX_XATTR_LISTLEN];
     int clist_len = (*env)->GetStringLength(env, list);
@@ -3021,7 +2948,7 @@ Java_PVFS2JNI_pvfsFlistxattr (JNIEnv *env, jobject obj, int fd, jstring list, jl
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsRemovexattr(JNIEnv *env, jobject obj, jstring path, jstring name)
 {
-	printf("pvfsRemovexattr\n");
+    printf("pvfsRemovexattr\n");
     
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
@@ -3048,7 +2975,7 @@ Java_PVFS2JNI_pvfsRemovexattr(JNIEnv *env, jobject obj, jstring path, jstring na
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsLremovexattr(JNIEnv *env, jobject obj, jstring path, jstring name)
 {
-	printf("pvfsLremovexattr\n");
+    printf("pvfsLremovexattr\n");
     
     char cpath[PVFS_PATH_MAX];
     int cpath_len = (*env)->GetStringLength(env, path);
@@ -3075,7 +3002,7 @@ Java_PVFS2JNI_pvfsLremovexattr(JNIEnv *env, jobject obj, jstring path, jstring n
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFremovexattr(JNIEnv *env, jobject obj, int fd, jstring name)
 {
-	printf("pvfsFremovexattr\n");
+    printf("pvfsFremovexattr\n");
     
      
     char cname[PVFS_NAME_MAX];
@@ -3099,7 +3026,7 @@ Java_PVFS2JNI_pvfsFremovexattr(JNIEnv *env, jobject obj, int fd, jstring name)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_pvfsGetumask(JNIEnv *env, jobject obj)
 {
-	printf("pvfsGetumask\n");
+    printf("pvfsGetumask\n");
     
     mode_t rc= pvfs_getumask();
     long ret = (long) rc;
@@ -3112,7 +3039,7 @@ Java_PVFS2JNI_pvfsGetumask(JNIEnv *env, jobject obj)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsGetdtablesize(JNIEnv *env, jobject obj)
 {
-	printf("pvfsGetdtablesize\n");
+    printf("pvfsGetdtablesize\n");
     
     int rc= pvfs_getdtablesize();
     return rc; 
@@ -3123,7 +3050,7 @@ Java_PVFS2JNI_pvfsGetdtablesize(JNIEnv *env, jobject obj)
 JNIEXPORT void JNICALL 
 Java_PVFS2JNI_pvfsSync(JNIEnv *env, jobject obj)
 {
-	printf("pvfsSync\n");
+    printf("pvfsSync\n");
     
     pvfs_sync();
     return; 
@@ -3134,10 +3061,10 @@ Java_PVFS2JNI_pvfsSync(JNIEnv *env, jobject obj)
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillStatfs64  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
 {
-	printf("FillStatfs64\n");
-	fflush(stdout);
-	
-	 jfieldID fid1;        
+    printf("FillStatfs64\n");
+    fflush(stdout);
+    
+     jfieldID fid1;        
      jfieldID fid2;
      jfieldID fid3;
      jfieldID fid4;
@@ -3152,23 +3079,23 @@ Java_PVFS2JNI_FillStatfs64  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
      
      
      
-     	jlong f_type;
-		jlong f_bsize;
-		jlong f_blocks;
-		jlong f_bfree;
-		jlong f_bavail;
-		jlong f_files;
-		jlong f_ffree;
-		jlong f_fsid;
-		jlong f_namelen;
-		jlong f_frsize;
-		jlong f_flags;
-		
-		
-				
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statfs64");
-	
-	fid1 = (*env)->GetFieldID(env, cls1, "f_type", "J");
+        jlong f_type;
+        jlong f_bsize;
+        jlong f_blocks;
+        jlong f_bfree;
+        jlong f_bavail;
+        jlong f_files;
+        jlong f_ffree;
+        jlong f_fsid;
+        jlong f_namelen;
+        jlong f_frsize;
+        jlong f_flags;
+        
+        
+                
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statfs64");
+    
+    fid1 = (*env)->GetFieldID(env, cls1, "f_type", "J");
      if (fid1 == NULL) {
          return; 
      }
@@ -3240,8 +3167,8 @@ Java_PVFS2JNI_FillStatfs64  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
     printf("f_spare[4]=%d\n",cstatfs->f_spare[4]);
     */
    
-	
-	f_type = (*env)->GetLongField(env,x,fid1);
+    
+    f_type = (*env)->GetLongField(env,x,fid1);
     __SWORD_TYPE cf_type = (__SWORD_TYPE) f_type;
     cstatfs64->f_type = cf_type;
       
@@ -3297,12 +3224,12 @@ Java_PVFS2JNI_FillStatfs64  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
     int jval;
     for(ival=0;ival<=4;ival++)
     {
-    	cbuf[ival]=buf[ival];
+        cbuf[ival]=buf[ival];
     }
     //printf("cbuf=%ld",cbuf[4]);
     for(jval=0;jval<=4;jval++)
     {
-    	cstatfs64->f_spare[jval] = cbuf[jval];
+        cstatfs64->f_spare[jval] = cbuf[jval];
     }
     //cstatfs->f_spare[4] = 10;
     
@@ -3325,56 +3252,56 @@ Java_PVFS2JNI_FillStatfs64  (JNIEnv *env, jobject obj, jobject x, jlong jarg)
 //DISPSTATFS64
 void dispstatfs64(struct statfs64 *abc)
 {
-	printf("=======DISPLAY========\n");
-	printf("The f_type is: %ld\n", (long int) abc->f_type);
-	printf("The f_bsize is: %ld\n", (long int) abc->f_bsize);
-	printf("The f_blocks is: %lu\n", abc->f_blocks);
-	printf("The f_bfree is: %lu\n", abc->f_bfree);
-	printf("The f_bavail is: %lu\n", abc->f_bavail);
-	printf("The f_files is: %lu\n", abc->f_files);
-	printf("The f_ffree is: %lu\n", abc->f_ffree);
-	//printf("The f_fsid is: %lu\n", abc->f_fsid);
-	printf("The f_namelen is: %lu\n", abc->f_namelen);
-	printf("The f_frsize is: %lu\n", abc->f_frsize);
-	printf("The f_flags is: %ld \n", abc->f_flags);
-	
-	int i;
-	
-	for(i=0;i<=4;i++)
+    printf("=======DISPLAY========\n");
+    printf("The f_type is: %ld\n", (long int) abc->f_type);
+    printf("The f_bsize is: %ld\n", (long int) abc->f_bsize);
+    printf("The f_blocks is: %lu\n", abc->f_blocks);
+    printf("The f_bfree is: %lu\n", abc->f_bfree);
+    printf("The f_bavail is: %lu\n", abc->f_bavail);
+    printf("The f_files is: %lu\n", abc->f_files);
+    printf("The f_ffree is: %lu\n", abc->f_ffree);
+    //printf("The f_fsid is: %lu\n", abc->f_fsid);
+    printf("The f_namelen is: %lu\n", abc->f_namelen);
+    printf("The f_frsize is: %lu\n", abc->f_frsize);
+    printf("The f_flags is: %ld \n", abc->f_flags);
+    
+    int i;
+    
+    for(i=0;i<=4;i++)
     {
-    	printf("F_SPARE %d = %ld\n",i,abc->f_spare[i]);
+        printf("F_SPARE %d = %ld\n",i,abc->f_spare[i]);
     }
-	
-	for(i=0;i<=1;i++)
+    
+    for(i=0;i<=1;i++)
     {
-    	printf("F_FSID %d = %d\n",i,abc->f_fsid.__val[i]);
+        printf("F_FSID %d = %d\n",i,abc->f_fsid.__val[i]);
     }
-	printf("=======DISPLAY========\n");
-	
-	
-	fflush(stdout);
-	free(abc);
+    printf("=======DISPLAY========\n");
+    
+    
+    fflush(stdout);
+    free(abc);
 }
 
 //UseStatfs64
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseStatfs64  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	struct statfs64 xyz;
-	struct statfs64 *arg;
+    struct statfs64 xyz;
+    struct statfs64 *arg;
     arg = (struct statfs64 *)jarg;
-    dispstatfs64(arg);	
-	
+    dispstatfs64(arg);  
+    
 }
 
 //FILL STATVFS
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_FillStatvfs  (JNIEnv *env, jobject obj, jobject x)
 {
-	printf("FillStatvfs\n");
-	fflush(stdout);
-	
-	         
+    printf("FillStatvfs\n");
+    fflush(stdout);
+    
+             
      jfieldID fid2;
      jfieldID fid3;
      jfieldID fid4;
@@ -3390,25 +3317,25 @@ Java_PVFS2JNI_FillStatvfs  (JNIEnv *env, jobject obj, jobject x)
      
      
      
-     	
-		jlong f_bsize;
-		jlong f_frsize;
-		jlong f_blocks;
-		jlong f_bfree;
-		jlong f_bavail;
-		jlong f_files;
-		jlong f_ffree;
-		jlong f_favail;
-		jlong f_fsid;
-		jlong f_flag;
-		jlong f_namemax;
-		
-		
-		
-				
-	jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statvfs");
-	
-	     
+        
+        jlong f_bsize;
+        jlong f_frsize;
+        jlong f_blocks;
+        jlong f_bfree;
+        jlong f_bavail;
+        jlong f_files;
+        jlong f_ffree;
+        jlong f_favail;
+        jlong f_fsid;
+        jlong f_flag;
+        jlong f_namemax;
+        
+        
+        
+                
+    jclass cls1 = (*env)->FindClass(env,"PVFS2JNI$Statvfs");
+    
+         
     fid2 = (*env)->GetFieldID(env, cls1, "f_bsize", "J");
      if (fid2 == NULL) {
          return; 
@@ -3482,8 +3409,8 @@ Java_PVFS2JNI_FillStatvfs  (JNIEnv *env, jobject obj, jobject x)
     printf("f_spare[4]=%d\n",cstatfs->f_spare[4]);
     */
    
-	
-	
+    
+    
     f_bsize = (*env)->GetLongField(env,x,fid2);
     unsigned long cf_bsize = (unsigned long) f_bsize;
     cstatvfs->f_bsize = cf_bsize;
@@ -3539,39 +3466,39 @@ Java_PVFS2JNI_FillStatvfs  (JNIEnv *env, jobject obj, jobject x)
 
 void dispstatvfs(struct statvfs *abc)
 {
-	printf("=======DISPLAY========\n");
-	printf("The f_bsize is: %lu\n", abc->f_bsize);
-	printf("The f_blocks is: %lu\n", abc->f_blocks);
-	printf("The f_bfree is: %lu\n", abc->f_bfree);
-	printf("The f_bavail is: %lu\n", abc->f_bavail);
-	printf("The f_files is: %lu\n", abc->f_files);
-	printf("The f_ffree is: %lu\n", abc->f_ffree);
-	printf("The f_fsid is: %lu\n", abc->f_fsid);
-	printf("The f_namemax is: %lu\n", abc->f_namemax);
-	printf("The f_frsize is: %lu\n", abc->f_frsize);
-	printf("The f_flag is: %lu\n", abc->f_flag);
-	printf("The f_favail is: %lu\n", abc->f_favail);
-	printf("=======DISPLAY========\n");
-	fflush(stdout);
-	free(abc);
+    printf("=======DISPLAY========\n");
+    printf("The f_bsize is: %lu\n", abc->f_bsize);
+    printf("The f_blocks is: %lu\n", abc->f_blocks);
+    printf("The f_bfree is: %lu\n", abc->f_bfree);
+    printf("The f_bavail is: %lu\n", abc->f_bavail);
+    printf("The f_files is: %lu\n", abc->f_files);
+    printf("The f_ffree is: %lu\n", abc->f_ffree);
+    printf("The f_fsid is: %lu\n", abc->f_fsid);
+    printf("The f_namemax is: %lu\n", abc->f_namemax);
+    printf("The f_frsize is: %lu\n", abc->f_frsize);
+    printf("The f_flag is: %lu\n", abc->f_flag);
+    printf("The f_favail is: %lu\n", abc->f_favail);
+    printf("=======DISPLAY========\n");
+    fflush(stdout);
+    free(abc);
 }
 
 JNIEXPORT jlong JNICALL 
 Java_PVFS2JNI_UseStatvfs  (JNIEnv *env, jobject obj, jlong jarg)
 {
-	
-	struct statvfs *arg;
+    
+    struct statvfs *arg;
     arg = (struct statvfs *)jarg;
-    dispstatvfs(arg);	
-	
+    dispstatvfs(arg);   
+    
 }
 
 //pvfs_statfs
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStatfs  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsStatfs\n");
-	struct statfs *arg;
+    printf("pvfsStatfs\n");
+    struct statfs *arg;
     arg = (struct statfs *)jarg;
     
        
@@ -3593,7 +3520,7 @@ Java_PVFS2JNI_pvfsStatfs  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatfs(JNIEnv *env, jobject obj, jlong jarg, int fd)
 {
-	printf("pvfsFstatfs\n");
+    printf("pvfsFstatfs\n");
     
     struct statfs *arg;
     arg = (struct statfs *)jarg;
@@ -3612,8 +3539,8 @@ Java_PVFS2JNI_pvfsFstatfs(JNIEnv *env, jobject obj, jlong jarg, int fd)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStatfs64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsStatfs64\n");
-	struct statfs64 *arg;
+    printf("pvfsStatfs64\n");
+    struct statfs64 *arg;
     arg = (struct statfs64 *)jarg;
     
        
@@ -3635,7 +3562,7 @@ Java_PVFS2JNI_pvfsStatfs64  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatfs64(JNIEnv *env, jobject obj, jlong jarg, int fd)
 {
-	printf("pvfsFstatfs64\n");
+    printf("pvfsFstatfs64\n");
     
     struct statfs64 *arg;
     arg = (struct statfs64 *)jarg;
@@ -3654,8 +3581,8 @@ Java_PVFS2JNI_pvfsFstatfs64(JNIEnv *env, jobject obj, jlong jarg, int fd)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsStatvfs  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 {
-	printf("pvfsStatvfs\n");
-	struct statvfs *arg;
+    printf("pvfsStatvfs\n");
+    struct statvfs *arg;
     arg = (struct statvfs *)jarg;
     
        
@@ -3677,7 +3604,7 @@ Java_PVFS2JNI_pvfsStatvfs  (JNIEnv *env, jobject obj, jlong jarg, jstring path)
 JNIEXPORT jint JNICALL 
 Java_PVFS2JNI_pvfsFstatvfs(JNIEnv *env, jobject obj, jlong jarg, int fd)
 {
-	printf("pvfsFstatvfs\n");
+    printf("pvfsFstatvfs\n");
     
     struct statvfs *arg;
     arg = (struct statvfs *)jarg;

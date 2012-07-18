@@ -43,7 +43,7 @@ Step 3:
 ===============================================================================
 Step 4:
 
-  Compile your Java code that depends upond the JNI layer. 
+  Compile your Java code that depends upon the JNI layer. 
   Note: The class path of the JNI code must be specified.
 
   ex: 
