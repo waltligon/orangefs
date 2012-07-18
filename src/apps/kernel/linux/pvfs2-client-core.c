@@ -3809,7 +3809,7 @@ int main(int argc, char **argv)
         return(ret);
     }
 
-    PINT_acache_enable_perf_counter(acache_pc, static_acache_pc);
+    PINT_acache_enable_perf_counter(acache_pc);
 
     /* start performance counters for ncache */
     ncache_pc = PINT_perf_initialize(ncache_keys);

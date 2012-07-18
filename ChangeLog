@@ -1,7 +1,50 @@
 -----------------------
 OrangeFS Release ChangeLog
 -----------------------
-* Bug fix:  Corrected a long time bug: if the number of unexpected requests
+SVN changes can be seen at
+http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
+
+Trunk
+
+* New Feature: users can now specify at configure time how they want the
+* kernel module to handle the file pointer when an error occurs.  The
+* default behavior is to leave the file pointer alone, i.e., the file
+* pointer will always represent the position of the last byte written,
+* even though the user's entire request is not totally satisfied. In 
+* this case, a the actual number of bytes written is returned to the user.
+* The new feature will change this default behavior such that the file pointer
+* is repositioned to the byte just prior to the user's write request, a
+* -1 is returned to the user's call, and errno is appropriately set.  To
+* enable this feature, add --enable-reset-file-pos on the configure
+* command line when your OrangeFS system is configured.
+
+* Bug fix:  modified pvfs2_readdir, which is executed by the kernel module
+* on behalf of an "ls", to properly retry or quit when pvfs2-client-core
+* aborts/restarts or when pvfs2-client terminates.  Prior to these
+* changes, pvfs2_readdir could possibly corrupt another process's "ls"
+* command by releasing access to a shared memory buffer index that may
+* be legitimately in use.
+
+* Bug fix:  modified the kernel code to re-post data to the shared memory
+* system (for I/O requests) whenever pvfs2-client-core aborts.  Because the 
+* data was not re-posted prior to these changes, the resulting file contained 
+* corrupted data.
+
+* New Feature: added hint support to pvfs_open() to allow user to
+* provide various things like the number of servers to use, the
+* distribution to use, the layout to use, as well as tags that can be
+* used to trace requests.
+
+* New Feature: added new layout LOCAL which puts a file on the server on
+* the same node as the client, if there is one.  Otherwise defaults to
+* ROUND_ROBIN
+
+* Bug Fix: repaired a bug in the layout processing
+
+* Bug Fix: fixed some problems with void pointers and replaced a missing
+* function prototype
+
+* Bug Fix: Corrected a long time bug: if the number of unexpected requests
 defined in the config file is greater than 64, then the code inadvertently
 used invalid job_status_s addresses when calling
 server_post_unexpected_recv(). If a failure occurs, the error code in the

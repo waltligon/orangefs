@@ -650,6 +650,8 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "PINT_client_io_cancel id %lld\n",lld(id));
+    gossip_debug(GOSSIP_CANCEL_DEBUG,
+            "PINT_client_io_cancel id %lld\n",lld(id));
 
     smcb = PINT_id_gen_safe_lookup(id);
     if (!smcb)
