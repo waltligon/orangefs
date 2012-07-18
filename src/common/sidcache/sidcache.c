@@ -15,6 +15,11 @@ static int attrs_in_file;
 static int valid_attrs_in_file;
 
 
+/* <==================================== STATIC FUNCTIONS ======================================> */
+static int SID_initialize_secondary_dbs(DB *secondary_dbs[]);
+static int SID_initialize_database_cursors(DBC *db_cursors[]);
+static int SID_parse_input_file_header(FILE *inpfile, int *records_in_file);
+
 /* <================================ INITIALIZATION FUNCTIONS ==================================> */
 
 /* 

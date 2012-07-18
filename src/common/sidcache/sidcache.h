@@ -48,41 +48,12 @@ typedef uuid_t SID;
 
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*
- * This function intializes the secondary attribute database array to NULL
- *
- * On success 0 is returned, otherwise the index that is not equal to NULL
- * is returned unless the index is 0, then -1 is returned
-*/
-int SID_intialize_secondary_dbs(DB *secondary_dbs[]);
-
-/*
- * This function intializes SID_attr_cursor array to NULL
- * 
- * On success 0 is returned, otherwise the index that is not equal to NULL
- * is returned unless the index is 0, then -1 is returned
-*/
-int SID_initialize_database_cursors(DBC *db_cursors[]);
-
-/*
  * This function initializes a SID_cachevale_t struct to default values
 */
 void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
 
 
 /* <======================= SID CACHE FUNCTIONS =======================> */
-/*
- * This function parses the first two lines in the input file and gets
- * the number of attributes per sid, number of sids, and the string representations
- * of the int attributes for the sids. It gets the attributes that each sid has
- * parsing the strings representations of the attributes.
- * This function also sets the attr_positions array to make sure sets up that
- * the attributes in the input file go into their correct positions in the
- * SID_cacheval_t attrs array
- *
- * Returns 0 on success, otherwise returns an error code
-*/
-int SID_parse_input_file_header(FILE *inpfile, int *records_in_file);
-
 /*
  * This function loads the contents of the sid cache from an input file. The
  * number of sids in the file is returned though the parameter db_records
