@@ -2,6 +2,7 @@
 
 /* Used for error checking */
 #define ERR_CHK
+#define UUID_STR_LEN (37)
 
 DBT bulk_next_key;
 
