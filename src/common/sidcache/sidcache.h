@@ -45,6 +45,8 @@ typedef uuid_t SID;
 /* Minimum size of bulk retrieve in bytes */
 #define BULK_MIN_SIZE (KILOBYTE * 8)
 
+/* Size of string representation of UUID */
+#define UUID_STR_LEN (37)
 
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*

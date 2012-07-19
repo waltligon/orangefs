@@ -1457,7 +1457,7 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
     /* Closing the array of secondary attribute databases */ 
     for(i = 0; i < SID_NUM_ATTR; i++)
     {
-        if(SID_attr_indices[i] != NULL)
+        if(secondary_dbs[i] != NULL)
         {
 
             ret = secondary_dbs[i]->close(secondary_dbs[i], /* Secondary database pointer */
