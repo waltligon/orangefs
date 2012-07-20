@@ -101,7 +101,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -124,7 +124,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
-      <AdditionalIncludeDirectories>..\..\..\include\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -159,10 +159,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\common\gen-locks\gen-win-locks.c" />
+    <ClCompile Include="..\..\..\..\src\common\gen-locks\gen-win-locks.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\common\gen-locks\gen-locks.h" />
+    <ClInclude Include="..\..\..\..\src\common\gen-locks\gen-locks.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

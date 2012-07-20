@@ -66,7 +66,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\;..\..\..\include;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\gossip;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -79,7 +79,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\;..\..\..\include;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\gossip;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -94,7 +94,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\;..\..\..\include;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\gossip;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -111,7 +111,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\;..\..\..\include;..\..\..\src\io\bmi;..\..\..\src\common\gossip;..\..\..\src\common\windows</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\io\bmi;..\..\..\..\src\common\gossip;..\..\..\..\src\common\windows</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -123,10 +123,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\test\io\bmi\test-bmi.h" />
+    <ClInclude Include="..\..\..\..\test\io\bmi\test-bmi.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\test\io\bmi\pingpong.c" />
+    <ClCompile Include="..\..\..\..\test\io\bmi\pingpong.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

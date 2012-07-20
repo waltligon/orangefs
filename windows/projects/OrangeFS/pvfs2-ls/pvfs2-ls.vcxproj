@@ -41,7 +41,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -56,7 +56,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\src\io\job;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\src\io\job;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -68,7 +68,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\apps\admin\pvfs2-ls.c" />
+    <ClCompile Include="..\..\..\..\src\apps\admin\pvfs2-ls.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

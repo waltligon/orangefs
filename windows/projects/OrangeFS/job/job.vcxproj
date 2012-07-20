@@ -90,7 +90,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -101,7 +101,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
@@ -114,7 +114,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -125,7 +125,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -138,7 +138,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -153,7 +153,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\include\windows;..\..\..\src\common\misc;..\..\..\src\common\gen-locks;..\..\..\src\io\bmi;..\..\..\src\io\trove;..\..\..\src\common\gossip;..\..\..\src\common\id-generator;..\..\..\src\common\windows;..\..\..\src\common\quicklist;..\..\..\src\common\quickhash;..\..\..\src\io\description;..\..\..\src\proto;..\..\..\src\io\dev;..\..\..\include;..\..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..\src\common\misc;..\..\..\..\src\common\gen-locks;..\..\..\..\src\io\bmi;..\..\..\..\src\io\trove;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\windows;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\io\description;..\..\..\..\src\proto;..\..\..\..\src\io\dev;..\..\..\..\include;..\..\..\..</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -163,16 +163,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\..\src\io\job\job-desc-queue.c" />
-    <ClCompile Include="..\..\..\src\io\job\job-time-mgr.c" />
-    <ClCompile Include="..\..\..\src\io\job\job.c" />
-    <ClCompile Include="..\..\..\src\io\job\thread-mgr.c" />
+    <ClCompile Include="..\..\..\..\src\io\job\job-desc-queue.c" />
+    <ClCompile Include="..\..\..\..\src\io\job\job-time-mgr.c" />
+    <ClCompile Include="..\..\..\..\src\io\job\job.c" />
+    <ClCompile Include="..\..\..\..\src\io\job\thread-mgr.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\..\src\io\job\job-desc-queue.h" />
-    <ClInclude Include="..\..\..\src\io\job\job-time-mgr.h" />
-    <ClInclude Include="..\..\..\src\io\job\job.h" />
-    <ClInclude Include="..\..\..\src\io\job\thread-mgr.h" />
+    <ClInclude Include="..\..\..\..\src\io\job\job-desc-queue.h" />
+    <ClInclude Include="..\..\..\..\src\io\job\job-time-mgr.h" />
+    <ClInclude Include="..\..\..\..\src\io\job\job.h" />
+    <ClInclude Include="..\..\..\..\src\io\job\thread-mgr.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
