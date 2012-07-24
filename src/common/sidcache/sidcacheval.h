@@ -12,9 +12,6 @@
 
 typedef int BMI_addr;
 
-/* This is temporarly put here for now for testing */
-#define SID_NUM_ATTR (8)
-
 typedef struct SID_cacheval_s
 {
     int attr[SID_NUM_ATTR];
