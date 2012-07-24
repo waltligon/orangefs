@@ -1,6 +1,19 @@
+/*
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+*/
 
-#include <sidcache.h>
+#ifndef SIDCACHEVAL_H
+#define SIDCACHEVAL_H
+
+//#include <sidcache.h>
 #include <policy.h>
+
+typedef int BMI_addr;
+
+/* This is temporarly put here for now for testing */
+#define SID_NUM_ATTR (8)
 
 typedef struct SID_cacheval_s
 {
@@ -9,6 +22,7 @@ typedef struct SID_cacheval_s
     char url[0];
 } SID_cacheval_t;
 
+#endif
 /*
  * Local variables:
  *  c-indent-level: 4

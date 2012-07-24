@@ -1,7 +1,11 @@
+/*
+ * (C) 2012 Clemson University
+ *
+ * See COPYING in top-level directory.
+*/
+
 #include "sidcache.h"
 
-/* Used for error checking */
-#define ERR_CHK
 #define UUID_STR_LEN (37)
 
 DBT bulk_next_key;
@@ -14,6 +18,15 @@ static int *attr_positions;
    reflect only the valid attributes */
 static int attrs_in_file;
 static int valid_attrs_in_file;
+
+
+/* Global database variables */
+DB *SID_db;                         /* Primary database (sid cache) */
+DB_ENV *SID_envp;                   /* Environment for sid cache and secondary dbs */
+DB *SID_attr_index[SID_NUM_ATTR];   /* Array of secondary databases */
+DBC *SID_attr_cursor[SID_NUM_ATTR]; /* Array of secondary database cursors */
+DB_TXN *SID_txn;                    /* Main transaction variable (transactions are currently not used
+                                       with the sid cache) */
 
 
 /* <==================================== STATIC FUNCTIONS ======================================> */
@@ -129,9 +142,7 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
        load_sid_cache_from_file should have opened the file */
     if(!inpfile)
     {
-        #ifdef ERR_CHK
-        printf("File is not opened. Exiting load_sid_cache_from_file\n");
-        #endif
+        gossip_err("File is not opened. Exiting load_sid_cache_from_file\n");
         return(-1);
     }
     
@@ -140,10 +151,8 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
     fscanf(inpfile, "%d", &attrs_in_file);
     if(attrs_in_file > SID_NUM_ATTR || attrs_in_file < 1)
     {
-        #ifdef ERR_CHK
-        printf("The number of attributes in the input file was not within the proper range\n");
-        printf("The contents of the database will not be read from the inputfile\n");
-        #endif
+        gossip_err("The number of attributes in the input file was not within the proper range\n");
+        gossip_err("The contents of the database will not be read from the inputfile\n");
         valid_attrs_in_file = 0;
         return(-1);
     }
@@ -159,9 +168,7 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
         entry in the input file */
     if(*records_in_file == 0)
     {
-        #ifdef ERR_CHK
-        printf("There are no sids in the input file\n");
-        #endif
+        gossip_err("There are no sids in the input file\n");
         return(-1);
     }
     
@@ -199,9 +206,7 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
            not added to the sid cache */
         if(j == SID_NUM_ATTR)
         {
-            #ifdef ERR_CHK
-            printf("Attribute: %s is an invalid attribute, and it will not be added\n", attrs_strings[i]);
-            #endif
+            gossip_err("Attribute: %s is an invalid attribute, and it will not be added\n", attrs_strings[i]);
             attr_positions[i] = -1;
             valid_attrs_in_file--;
         }
@@ -243,9 +248,7 @@ int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name,
     inpfile = fopen(file_name, "r");
     if(!inpfile)
     {
-        #ifdef ERR_CHK
-        printf("Could not open the file %s\n", file_name);
-        #endif
+        gossip_err("Could not open the file %s\n", file_name);
         return(-1);
     }
 
@@ -294,9 +297,7 @@ int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name,
         ret = uuid_parse(tmp_sid_str, current_sid);
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error parsing uuid in load function\n");
-            #endif
+            gossip_err("Error parsing uuid in load function\n");
         }
 
         ret = SID_create_SID_cacheval_t(&current_sid_cacheval, sid_attributes, tmp_bmi, tmp_url);
@@ -335,9 +336,7 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
     if(uuid_is_null(sid_server))
     {
-        #ifdef ERR_CHK
-        printf("Error: uuid_t in store function is currently NULL\n");
-        #endif
+        gossip_err("Error: uuid_t in store function is currently NULL\n");
         return(-1);
     }
 
@@ -358,9 +357,7 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error inserting sid into the sid cache : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error inserting sid into the sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -401,9 +398,7 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t **c
                       0);    /* get flags */
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error getting sid from sid cache : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error getting sid from sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -433,7 +428,7 @@ int SID_bmi_lookup_from_sid_cache(DB **dbp, SID search_sid, char **bmi_addr)
 
     if (ret)
     {
-        printf("Error retrieving from sid cache\n");
+        gossip_err("Error retrieving from sid cache\n");
         return ret;
     }
 
@@ -493,9 +488,7 @@ int SID_update_sid_in_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *new_at
    
     if(new_attrs == NULL)
     {
-        #ifdef ERR_CHK
-        printf("The new attributes passed to SID_update_sid_in_sid_cache is NULL\n");
-        #endif
+        gossip_err("The new attributes passed to SID_update_sid_in_sid_cache is NULL\n");
         return(-1);
     }
  
@@ -676,9 +669,7 @@ int SID_update_url_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t **current_si
 
     if(!new_url)
     {
-        #ifdef ERR_CHK
-        printf("The url passed into url update function is currently NULL\n");
-        #endif
+        gossip_err("The url passed into url update function is currently NULL\n");
         return(-1);
     }
 
@@ -791,10 +782,8 @@ int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records)
                       0);   /* Delete flag */
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error deleting record from sid cache : %s\n", db_strerror(ret));
+        gossip_err("Error deleting record from sid cache : %s\n", db_strerror(ret));
         return(ret);
-        #endif
     }
   
     if(db_records != NULL)
@@ -818,9 +807,7 @@ int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t, int sid_attributes[],
 {
     if(!sid_url)
     {
-        #ifdef ERR_CHK
-        printf("The url passed to SID_create_SID_cacheval_t is NULL\n");
-        #endif
+        gossip_err("The url passed to SID_create_SID_cacheval_t is NULL\n");
         *cacheval_t = NULL;
         return(-1);
     }
@@ -873,9 +860,7 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
     outpfile = fopen(file_name, "w");
     if(!outpfile)
     {
-        #ifdef ERR_CHK
-        printf("Error opening dump file\n");
-        #endif
+        gossip_err("Error opening dump file\n");
         return(-1);
     }
 
@@ -888,9 +873,7 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
 
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error occured when trying to create cursor : %s", db_strerror(ret));
-        #endif
+        gossip_err("Error occured when trying to create cursor : %s", db_strerror(ret));
         return(ret);
     }
 
@@ -999,9 +982,7 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
     ret = cursorp->close(cursorp);
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error occurred when closing cursor : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error occurred when closing cursor : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1017,8 +998,8 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
  *
  * The minimum amount that can be retrieved is 8 KB of entries.
  * 
- * You can specify a larger size by putting an amount into the two size parameters
- * that will be in addition to the 8KB min.
+ * You must specify a size larger than 8 KB by putting an amount into the two size
+ * parameters.
  *
  * The output DBT is malloc'ed so take care to make sure it is freed, either by
  * using it in a bulk_insert or by manually freeing.
@@ -1031,20 +1012,27 @@ int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrie
     int ret = 0, size;
     DBT key = bulk_next_key;
 
+    /* If the input size of the retrieve is smaller than the minimum size then exit function with error */
+    if (BULK_MIN_SIZE > (size_of_retrieve_kb * KILOBYTE) + (size_of_retrieve_mb * MEGABYTE))
+    {
+        gossip_err("Size of bulk retrieve buffer must be greater than 8 KB\n");
+        return (-1);
+    }
+
     /* If cursor is open, close it so we can reopen it as a bulk cursor */
     if (*dbcursorp != NULL)
     {
         (*dbcursorp)->close(*dbcursorp);
     }
 
-    /* Calculate size of buffer as size of kb + size of mb + minimum size*/
-    size = (size_of_retrieve_kb * KILOBYTE) + (size_of_retrieve_mb * MEGABYTE) + BULK_MIN_SIZE;
+    /* Calculate size of buffer as size of kb + size of mb */
+    size = (size_of_retrieve_kb * KILOBYTE) + (size_of_retrieve_mb * MEGABYTE);
 
     /* Malloc buffer DBT */
     output->data = malloc(size);
     if (output->data == NULL)
     {
-        printf("Error sizing buffer\n");
+        gossip_err("Error sizing buffer\n");
         return (-1);
     }
 
@@ -1054,7 +1042,7 @@ int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrie
     /* Open bulk cursor */
     if ((ret = dbp->cursor(dbp, NULL, dbcursorp, DB_CURSOR_BULK)) != 0) {
         free(output->data);
-        printf("Error creating bulk cursor\n");
+        gossip_err("Error creating bulk cursor\n");
         return (ret);
     }
 
@@ -1115,7 +1103,7 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
         DB_MULTIPLE_KEY_WRITE_NEXT(opaque_p, &output, retkey, retklen, retdata, retdlen);
         if (opaque_p == NULL)
         {
-            printf("Error cannot fit into write buffer\n");
+            gossip_err("Error cannot fit into write buffer\n");
             break;
         }
     }
@@ -1172,8 +1160,6 @@ int SID_create_open_environment(DB_ENV **envp)
     /* Setting the opening environement flags */
     u_int32_t flags =
         DB_CREATE     | /* Creating environment if it does not exist */
-        DB_INIT_LOCK  | /* Initializing the locking subsystem */
-        DB_INIT_LOG   | /* Initializing the logging subsystem */
         DB_INIT_MPOOL | /* Initializing the memory pool (in-memory cache) */
         DB_PRIVATE;     /* Region files are not backed up by the file system
                            instead they are backed up by heap memory */
@@ -1182,11 +1168,12 @@ int SID_create_open_environment(DB_ENV **envp)
     ret = db_env_create(envp, /* Globacl environment pointer */
                         0);    /* Environment create flag (Must be set to 0) */
 
+    /* Enabling stderr for gossip */
+    gossip_enable_stderr();
+
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error creating environment handle : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error creating environment handle : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1198,9 +1185,7 @@ int SID_create_open_environment(DB_ENV **envp)
 
     if(ret)
     {
-        #ifdef ERR_CHK
-		printf("Error setting in cache memory size for environment : %s\n", db_strerror(ret));
-        #endif
+		gossip_err("Error setting in cache memory size for environment : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1212,9 +1197,7 @@ int SID_create_open_environment(DB_ENV **envp)
 
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error openeing environment database handle : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error openeing environment database handle : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1241,9 +1224,7 @@ int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp)
                     0);    /* Create flags (Must be set to 0 or DB_XA_CREATE) */
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error creating handle for database :  %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error creating handle for database :  %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1256,9 +1237,7 @@ int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp)
                        0);      /* File mode. Default is 0 */
    if(ret)
    {
-        #ifdef ERR_CHK
-        printf("Error opening handle for database :  %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error opening handle for database :  %s\n", db_strerror(ret));
         return(ret);
    }
 
@@ -1286,9 +1265,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
     ret = SID_initialize_secondary_dbs(secondary_dbs);
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Could not initialize secondary atttribute db array\n");
-        #endif
+        gossip_err("Could not initialize secondary atttribute db array\n");
         return(ret);
     }
 
@@ -1300,9 +1277,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
                         0);      /* Create flags (Must be set to 0 or DB_XA_CREATE) */
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error creating handle for database :  %s\n", db_strerror(ret));
-            #endif
+            gossip_err("Error creating handle for database :  %s\n", db_strerror(ret));
             return(ret);
         }
 
@@ -1313,9 +1288,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
         ret = tmp_db->set_flags(tmp_db, DB_DUPSORT);
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error setting duplicate flag for database : %s\n", db_strerror(ret));
-            #endif
+            gossip_err("Error setting duplicate flag for database : %s\n", db_strerror(ret));
             return(ret);
         }
 
@@ -1330,9 +1303,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
 
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error opening handle for database :  %s\n", db_strerror(ret));
-            #endif
+            gossip_err("Error opening handle for database :  %s\n", db_strerror(ret));
             return(ret);
         }
 
@@ -1345,9 +1316,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
 
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error associating the two databases %s\n", db_strerror(ret));
-            #endif
+            gossip_err("Error associating the two databases %s\n", db_strerror(ret));
             return(ret);
         }
 
@@ -1376,9 +1345,7 @@ int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[])
     ret = SID_initialize_database_cursors(db_cursors);
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error initializing cursor array :  %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error initializing cursor array :  %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1394,9 +1361,7 @@ int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[])
         /* Checking to make sure the cursor was created */
         if(ret)
         {
-            #ifdef ERR_CHK
-            printf("Error creating cursor :  %s\n", db_strerror(ret));
-            #endif
+            gossip_err("Error creating cursor :  %s\n", db_strerror(ret));
             return(ret);
         }
         /* If the cursor was successfully created it is added to the
@@ -1430,9 +1395,7 @@ int SID_close_dbcs(DBC *db_cursors[])
             ret = db_cursors[i]->close(db_cursors[i]);
             if(ret)
             {
-                #ifdef ERR_CHK
-                printf("Error closing cursor :  %s\n", db_strerror(ret));
-                #endif
+                gossip_err("Error closing cursor :  %s\n", db_strerror(ret));
                 return(ret);
             }
         }
@@ -1466,9 +1429,7 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
             /* Checking to make sure the secondary database has been closed */
             if(ret)
             {
-                #ifdef ERR_CHK
-                printf("Error closing attribute database : %s\n", db_strerror(ret));
-                #endif
+                gossip_err("Error closing attribute database : %s\n", db_strerror(ret));
                 return(ret);
             }
         }
@@ -1484,9 +1445,7 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
 
      if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error closing primary database : %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error closing primary database : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1500,9 +1459,7 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
 
     if(ret)
     {
-        #ifdef ERR_CHK
-        printf("Error closing environment :  %s\n", db_strerror(ret));
-        #endif
+        gossip_err("Error closing environment :  %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1515,3 +1472,12 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
 
     return(ret);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */
