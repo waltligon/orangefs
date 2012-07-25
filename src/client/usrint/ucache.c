@@ -25,7 +25,7 @@ FILE *out;                   /* For Logging Purposes */
 /* static uint32_t ucache_blk_cnt = 0; */
 
 /* Global pointers to data in shared mem. Pointers set in ucache_initialize */
-union user_cache_u *ucache = 0;
+union ucache_u *ucache = 0;
 struct ucache_aux_s *ucache_aux = 0; /* All locks and stats stored here */
 
 /* ucache_aux is a pointer to the actual data summarized by the following 
@@ -177,7 +177,7 @@ int ucache_initialize(void)
         //    "ucache_initialize - ucache shmget: errno = %d\n", errno);
         return -1;
     }
-    ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
+    ucache = (union ucache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1) 
     {
         //gossip_debug(GOSSIP_UCACHE_DEBUG,        
@@ -541,7 +541,7 @@ int wipe_ucache(void)
         perror("wipe_ucache - ucache shmget");
         return -1;
     }
-    ucache = (union user_cache_u *)shmat(ucache_shmid, NULL, 0);
+    ucache = (union ucache_u *)shmat(ucache_shmid, NULL, 0);
     if((long int)ucache == -1)
     {
         perror("wipe ucache - ucache shmat");
