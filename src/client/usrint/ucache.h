@@ -92,7 +92,7 @@
 /* Globals */
 extern FILE * out;
 extern int ucache_enabled;
-extern union user_cache_u *ucache;
+extern union ucache_u *ucache;
 extern struct ucache_aux_s *ucache_aux;
 extern ucache_lock_t *ucache_locks;
 extern ucache_lock_t *ucache_lock;
@@ -196,7 +196,7 @@ struct file_table_s
 /** The whole system wide cache
  *
  */
-union user_cache_u
+union ucache_u
 {
     struct file_table_s ftbl;
     union cache_block_u b[0]; /* actual size of this varies */
@@ -204,12 +204,12 @@ union user_cache_u
 
 struct ucache_ref_s
 {
-    union user_cache_u *ucache;     /* pointer to ucache shmem */
+    union ucache_u *ucache;     /* pointer to ucache shmem */
     ucache_lock_t *ucache_locks;    /* pointer to ucache locks */
 };
 
 /* externally visible API */
-union user_cache_u *get_ucache(void);
+union ucache_u *get_ucache(void);
 int ucache_initialize(void);
 int ucache_open_file(PVFS_fs_id *fs_id,
                      PVFS_handle *handle, 
