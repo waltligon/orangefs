@@ -91,8 +91,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -102,8 +102,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -114,8 +114,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -125,8 +125,8 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_MEMLEAKS;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ForcedIncludeFiles>memleaks.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
@@ -139,8 +139,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -154,8 +154,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..\..\..\..\include\windows;..\..\..\..;..\..\..\..\include;..\..\..\..\src\common\misc;..\..\..\..\src\common\windows;..\..\..\..\src\common\gossip;..\..\..\..\src\common\id-generator;..\..\..\..\src\common\quicklist;..\..\..\..\src\common\quickhash;..\..\..\..\src\common\security</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_MBCS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;_CRT_SECURE_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
