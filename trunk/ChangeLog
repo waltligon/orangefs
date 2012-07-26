@@ -1,0 +1,162 @@
+-----------------------
+OrangeFS Release ChangeLog
+-----------------------
+SVN changes can be seen at
+http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
+
+Trunk
+
+* New Feature: users can now specify at configure time how they want the
+* kernel module to handle the file pointer when an error occurs.  The
+* default behavior is to leave the file pointer alone, i.e., the file
+* pointer will always represent the position of the last byte written,
+* even though the user's entire request is not totally satisfied. In 
+* this case, a the actual number of bytes written is returned to the user.
+* The new feature will change this default behavior such that the file pointer
+* is repositioned to the byte just prior to the user's write request, a
+* -1 is returned to the user's call, and errno is appropriately set.  To
+* enable this feature, add --enable-reset-file-pos on the configure
+* command line when your OrangeFS system is configured.
+
+* Bug fix:  modified pvfs2_readdir, which is executed by the kernel module
+* on behalf of an "ls", to properly retry or quit when pvfs2-client-core
+* aborts/restarts or when pvfs2-client terminates.  Prior to these
+* changes, pvfs2_readdir could possibly corrupt another process's "ls"
+* command by releasing access to a shared memory buffer index that may
+* be legitimately in use.
+
+* Bug fix:  modified the kernel code to re-post data to the shared memory
+* system (for I/O requests) whenever pvfs2-client-core aborts.  Because the 
+* data was not re-posted prior to these changes, the resulting file contained 
+* corrupted data.
+
+* New Feature: added hint support to pvfs_open() to allow user to
+* provide various things like the number of servers to use, the
+* distribution to use, the layout to use, as well as tags that can be
+* used to trace requests.
+
+* New Feature: added new layout LOCAL which puts a file on the server on
+* the same node as the client, if there is one.  Otherwise defaults to
+* ROUND_ROBIN
+
+* Bug Fix: repaired a bug in the layout processing
+
+* Bug Fix: fixed some problems with void pointers and replaced a missing
+* function prototype
+
+* Bug Fix: Corrected a long time bug: if the number of unexpected requests
+defined in the config file is greater than 64, then the code inadvertently
+used invalid job_status_s addresses when calling
+server_post_unexpected_recv(). If a failure occurs, the error code in the
+status structure is updated with the error value. In this case, the code would
+NOT segfault, because the address is actually within valid address space on
+the heap; however, the code would be overwriting other global structures, like
+the known_method_table, etc. To correct this problem, I use a local
+job_status_s structure inside the server_post_unexpected_recv(). Please read
+the comments in that function to understand why this works.
+	SVN Changeset 9273
+
+* Enhancement: Incremented display of handles from 16 to 20 bytes in pvfs2-ls.
+
+* Bug fix: Fix invalid argument errors on chmod though pvfs2fuse
+
+* Bug fix: uninitialized variable could cause seg fault when file system 
+* cannot be initialized.
+
+orangefs-2.8.4
+* Change verisioning to no longer include dates, just increment the sub version for every release
+
+orangefs-2.8.3-20110323
+* Bug fix: resolve assert in dbpf_open_cache_remove() when using tree code for file remove
+        CVS: Orange-Branch:bligon:20110322141529
+
+* Bug fix: PINT_dist_encode() segfault in pvfs2-server caused by the client create state machine not sending dist information on create retries.
+        CVS: Orange-Branch:mtmoore:20110322014656 
+        CVS: Orange-Branch:mtmoore:20110322031703
+        CVS: Orange-Branch:mtmoore:20110322040628
+        CVS: Orange-Branch:mtmoore:20110322114637
+        CVS: Orange-Branch:mtmoore:20110322121208 
+
+* Bug fix: fix incorrect attribute output using sys attrs
+        CVS: Orange-Branch:mtmoore:20110301023749
+
+* Bug fix: fix segfault in pvfs2-server if client provides too large of buffer in the list-eattr state machine. Includes additional sanity checks on extended attribute operations
+        CVS: Orange-Branch:mtmoore:20110225222047
+
+* Bug fix: merge dir.c fix from main branch
+        CVS: Orange-Branch:bligon:20110126215228 
+
+* Bug fix: resolve data corruption caused by ki_pos not being updated during synchronous I/O through asynchronous path (relevant to newer kernels).
+        CVS: Orange-Branch:mtmoore:20110123143300
+
+* Bug fix: fix resolving symbolic links from pvfs2-* utilities
+        CVS: Orange-Branch:mtmoore:20110114215452 
+
+* Bug fix: Fix ncache entry update when moving files by David Metheny
+        CVS: Orange-Branch:mtmoore:20110111154332 
+
+* Bug fix: PVFS_hint_add fix by Julian Kunkel and refinement of patch
+        CVS: Orange-Branch:mtmoore:20110105051448 
+	CVS: Orange-Branch:bligon:20110224203131
+
+* Bug fix: change where unlocks occur w.r.t __PVFS_JOB_THREADED__ to prevent deadlock
+        CVS: Orange-Branch:mtmoore:20101221163004
+
+* Bug fix: change incorrect use of union members in tree-communicate
+        CVS: Orange-Branch:mtmoore:20101214182035 
+
+* Bug fix: initialize values in trove-migrate to resolve segfault
+        CVS: Orange-Branch:bligon:20101213175120 
+
+* Bug fix: pvfs2-mkspace not set collection-only properly
+        CVS: Orange-Branch:bligon:20101213174458
+
+* Bug fix: update iteration in quickhash to use safe variant
+        CVS: Orange-Branch:mtmoore:20101207004159 
+
+* Bug fix: null handle/fs_id sent to getattr in client create state machine
+        CVS: Orange-Branch:bligon:20101201170021
+
+* Added support for newer (> 2.6.18) kernels up through 2.6.34.
+        CVS: Orange-Branch:mtmoore:20101216185529 
+        CVS: Orange-Branch:mtmoore:20101221153412 
+        CVS: Orange-Branch:mtmoore:20101221153514
+        CVS: Orange-Branch:mtmoore:20101221153709
+        CVS: Orange-Branch:mtmoore:20101221153806 
+        CVS: Orange-Branch:mtmoore:20101221154012 
+        CVS: Orange-Branch:mtmoore:20101221154240 
+        CVS: Orange-Branch:mtmoore:20101221160327
+        CVS: Orange-Branch:mtmoore:20110123143015 
+        CVS: Orange-Branch:mtmoore:20110124130323
+        CVS: Orange-Branch:mtmoore:20110203182026
+
+* Added beginning of new user interface
+        CVS: Orange-Branch:walt:20110208213934
+
+* Cleanup: change PINT_dist_finalize to unregister and free distributions cleanly
+        CVS: Orange-Branch:mtmoore:20101221163224 
+
+* Cleanup: delete items from timer queue list when element is freed
+        CVS: Orange-Branch:mtmoore:20101221163041
+
+-------------------------------------------------------------------------------
+
+
+orangefs-2.8.2-20100920
+* Changed unstuff state machine to handle writing to files with read-only
+permissions on create 
+	CVS: Orange-Branch:bligon:20100920181650
+
+* Bug fix for kernel panics from list corruption
+	CVS: Orange-Branch:mtmoore:20100915132022 
+
+* Trove version increase to 0.1.5 to support precreate pools of multiple types
+	CVS: Orange-Branch:mtmoore:20100908153740
+
+* PJMP memory leak fix
+	CVS: Orange-Branch:bligon:20100906203050
+
+* BMI memory leak fix
+	CVS: Orange-Branch:bligon:20100831190531,
+	     Orange-Branch:bligon:20100831190748,
+	     Orange-Branch:bligon:20100902155433

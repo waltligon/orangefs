@@ -1,0 +1,3 @@
+#!/bin/sh
+
+sh ${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/kernel/linux-2.6/pvfs2-shell-test.sh ${PVFS2_MOUNTPOINT} 2>&1

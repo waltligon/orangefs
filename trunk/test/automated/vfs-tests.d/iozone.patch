@@ -1,0 +1,1058 @@
+diff -Naur patch/benchmarks/iozone3_239/src/current/fileop.c src/benchmarks/iozone3_239/src/current/fileop.c
+--- patch/benchmarks/iozone3_239/src/current/fileop.c	2005-04-22 17:09:54.000000000 -0400
++++ src/benchmarks/iozone3_239/src/current/fileop.c	2010-07-26 17:25:19.000000000 -0400
+@@ -184,8 +184,6 @@
+ file_stat(int x)
+ {
+ 	int i,j,k,y;
+-	int fd;
+-	int ret;
+ 	char buf[100];
+ 	struct stat mystat;
+ 	for(i=0;i<x;i++)
+@@ -216,10 +214,7 @@
+ file_access(int x)
+ {
+ 	int i,j,k,y;
+-	int fd;
+-	int ret;
+ 	char buf[100];
+-	struct stat mystat;
+ 	for(i=0;i<x;i++)
+ 	{
+ 	  sprintf(buf,"iozone_L1_%d",i);
+@@ -247,12 +242,8 @@
+ void 
+ file_readdir(int x)
+ {
+-	int i,j,k,ret1;
+-	int fd;
+-	int ret;
++	int i,j,ret1;
+ 	char buf[100];
+-	char buf1[100];
+-	struct stat mystat;
+ 	DIR *dirbuf;
+ 	struct dirent *y;
+ 	for(i=0;i<x;i++)
+@@ -290,11 +281,8 @@
+ file_link(int x)
+ {
+ 	int i,j,k,y;
+-	int fd;
+-	int ret;
+ 	char buf[100];
+ 	char bufn[100];
+-	struct stat mystat;
+ 	for(i=0;i<x;i++)
+ 	{
+ 	  sprintf(buf,"iozone_L1_%d",i);
+@@ -323,11 +311,8 @@
+ file_unlink(int x)
+ {
+ 	int i,j,k,y;
+-	int fd;
+-	int ret;
+ 	char buf[100];
+ 	char bufn[100];
+-	struct stat mystat;
+ 	for(i=0;i<x;i++)
+ 	{
+ 	  sprintf(buf,"iozone_L1_%d",i);
+diff -Naur patch/benchmarks/iozone3_239/src/current/iozone.c src/benchmarks/iozone3_239/src/current/iozone.c
+--- patch/benchmarks/iozone3_239/src/current/iozone.c	2005-04-22 17:09:54.000000000 -0400
++++ src/benchmarks/iozone3_239/src/current/iozone.c	2010-07-26 15:26:59.000000000 -0400
+@@ -1458,6 +1458,7 @@
+ 	int num_child1;
+ 	int cret;
+ 	int anwser,bind_cpu;
++        long long int x=0;
+ 
+ 	anwser=bind_cpu=0;
+ 	/* Used to make fread/fwrite do something better than their defaults */
+@@ -1665,7 +1666,8 @@
+ #ifdef NO_PRINT_LLD
+ 			sscanf(optarg,"%ld",&kilobytes64);
+ #else
+-			sscanf(optarg,"%lld",&kilobytes64);
++			x = (long long int)kilobytes64;
++			sscanf(optarg,"%lld",&x);
+ #endif
+ 			if(optarg[strlen(optarg)-1]=='k' ||
+ 				optarg[strlen(optarg)-1]=='K'){
+@@ -1689,7 +1691,8 @@
+ #ifdef NO_PRINT_LLD
+ 	    		sprintf(splash[splash_line++],"\tFile size set to %ld KB\n",kilobytes64);
+ #else
+-	    		sprintf(splash[splash_line++],"\tFile size set to %lld KB\n",kilobytes64);
++			x = (long long int)kilobytes64;
++	    		sprintf(splash[splash_line++],"\tFile size set to %lld KB\n",x);
+ #endif
+ 			sflag++;
+ 			break;
+@@ -2038,7 +2041,8 @@
+ #ifdef NO_PRINT_LLD
+ 			sprintf(splash[splash_line++],"\tUsing minimum file size of %ld kilobytes.\n",minimum_file_size);
+ #else
+-			sprintf(splash[splash_line++],"\tUsing minimum file size of %lld kilobytes.\n",minimum_file_size);
++			x = (long long int)minimum_file_size;
++			sprintf(splash[splash_line++],"\tUsing minimum file size of %lld kilobytes.\n",x);
+ #endif
+ 			break;
+ 		case 'g':	/* Set maximum file size for auto mode */
+@@ -2061,7 +2065,8 @@
+ #ifdef NO_PRINT_LLD
+ 			sprintf(splash[splash_line++],"\tUsing maximum file size of %ld kilobytes.\n",maximum_file_size);
+ #else
+-			sprintf(splash[splash_line++],"\tUsing maximum file size of %lld kilobytes.\n",maximum_file_size);
++                        x = (long long int)maximum_file_size;
++			sprintf(splash[splash_line++],"\tUsing maximum file size of %lld kilobytes.\n",x);
+ #endif
+ 			break;
+ 		case 'z':	/* Set no cross over */
+@@ -2624,8 +2629,9 @@
+             printf("Error: record length %ld is greater than filesize %ld KB\n ",
+                                 reclen,kilobytes64);
+ #else
++            x = (long long int)kilobytes64;
+             printf("Error: record length %lld is greater than filesize %lld KB\n ",
+-                                reclen,kilobytes64);
++                                reclen,x);
+ #endif
+                 exit(23);
+         }
+@@ -2738,6 +2744,7 @@
+ 	long long num_tests,test_num,i,j;
+ 	long long data1[MAXTESTS], data2[MAXTESTS];
+ 	num_tests = sizeof(func)/sizeof(char *);
++        long long int x = 0;
+ #if defined(HAVE_PREAD) 
+ 	if(!Eflag)
+ 	{
+@@ -2790,7 +2797,11 @@
+ 		if(!silent) printf("%8ld",reclen/1024);
+ 	}
+ #else
+-	if(!silent) printf("%16lld",kilobytes64);
++	if(!silent) 
++        {
++	   x = (long long int)kilobytes64;
++           printf("%16lld",x);
++        }
+ 	if(r_traj_flag || w_traj_flag)
+ 	{
+ 		if(!silent) printf("%8lld",(long long )0);
+@@ -2848,7 +2859,8 @@
+ 	    	printf("\n\tiozone %ld %ld ", kilobytes64,  goodrecl);
+ 	    	printf("\t(i.e. record size = %ld bytes)\n",  goodrecl);
+ #else
+-	    	printf("\n\tiozone %lld %lld ", kilobytes64,  goodrecl);
++		x = (long long int)kilobytes64;
++	    	printf("\n\tiozone %lld %lld ", x,  goodrecl);
+ 	    	printf("\t(i.e. record size = %lld bytes)\n",  goodrecl);
+ #endif
+ 	   }
+@@ -3079,6 +3091,7 @@
+ 	double max_throughput = 0;
+ 	double avg_throughput = 0;
+ 	double min_xfer = 0; 
++	long long int x = 0;
+ 
+ 
+ 	toutputindex=0;
+@@ -3138,21 +3151,28 @@
+ 	if(w_traj_flag)
+ 	{
+ #ifdef NO_PRINT_LLD
+-	if(!silent) printf("\tEach %s writes a %ld Kbyte file in telemetry controlled records\n",
++	   if(!silent) printf("\tEach %s writes a %ld Kbyte file in telemetry controlled records\n",
+ 		port,kilobytes64);
+ #else
+-	if(!silent) printf("\tEach %s writes a %lld Kbyte file in telemetry controlled records\n",
+-		port,kilobytes64);
++	   if(!silent) 
++	   {   
++               x = (long long int)kilobytes64;
++	       printf("\tEach %s writes a %lld Kbyte file in telemetry controlled records\n",port,x);
++           }  
+ #endif
+ 	}
+ 	else
+ 	{
+ #ifdef NO_PRINT_LLD
+-	if(!silent) printf("\tEach %s writes a %ld Kbyte file in %ld Kbyte records\n",
++	   if(!silent) printf("\tEach %s writes a %ld Kbyte file in %ld Kbyte records\n",
+ 		port,kilobytes64,reclen/1024);
+ #else
+-	if(!silent) printf("\tEach %s writes a %lld Kbyte file in %lld Kbyte records\n",
+-		port,kilobytes64,reclen/1024);
++	   if(!silent) 
++	   {   
++                x = (long long int)kilobytes64;
++		printf("\tEach %s writes a %lld Kbyte file in %lld Kbyte records\n",
++		port,x,reclen/1024);
++	   }
+ #endif
+ 	}
+ 
+@@ -5878,6 +5898,7 @@
+ 	unsigned long long c= 0x01010101;
+ 	unsigned long long d = 0x01010101;
+ 	unsigned long long pattern_buf;
++	long long int tmp = 0;
+ 
+ 	value = (a<<32) | b;
+ 	value1 = (c<<32) | d;
+@@ -5930,8 +5951,10 @@
+ 	printf("where %8.8llx loop %ld\n",where,i);
+ #else
+ 	printf("Error in file: Found ?%llx? Expecting ?%llx? addr %lx\n",*where, (long long)((pattern_buf<<32)|pattern_buf),((long)where));
+-	printf("Error in file: Position %lld \n",file_position);
+-	printf("Record # %lld Record size %lld kb \n",recnum,recsize/1024);
++        tmp = (long long int)file_position;
++	printf("Error in file: Position %lld \n",tmp);
++	tmp = (long long int)recnum;
++	printf("Record # %lld Record size %lld kb \n",tmp,recsize/1024);
+ 	printf("where %8.8lx loop %lld\n",(long)where,(long long)i);
+ #endif
+ 		   return(1);
+@@ -5974,9 +5997,12 @@
+ 	printf("Error in file: Position %ld \n",file_position);
+ 	printf("Record # %ld Record size %ld kb \n",recnum,recsize/1024);
+ #else
+-	printf("Error in file: Position %lld %lld %lld \n",i,j,k);
+-	printf("Error in file: Position %lld \n",file_position);
+-	printf("Record # %lld Record size %lld kb \n",recnum,recsize/1024);
++        tmp = (long long int)i;
++	printf("Error in file: Position %lld %lld %lld \n",tmp,j,k);
++	tmp = (long long int)file_position;
++	printf("Error in file: Position %lld \n",tmp);
++        tmp = (long long int)recnum;
++	printf("Record # %lld Record size %lld kb \n",tmp,recsize/1024);
+ #endif
+ 	printf("Found pattern: Char >>%c<< Expecting >>%c<<\n", *where2,*pattern_ptr);
+ 		   return(1);
+@@ -6142,6 +6168,7 @@
+ long long *data2;
+ #endif
+ {
++	long long int tmp;
+ 	double starttime1;
+ 	double writetime[2];
+ 	double walltime[2], cputime[2];
+@@ -6458,9 +6485,15 @@
+ 				else
+ 				fprintf(rwqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((qtime_stop-qtime_start-time_res))*1000000,reclen);
+ #else
+-				fprintf(wqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((qtime_stop-qtime_start-time_res))*1000000,reclen);
++				{
++  				 tmp = (long long int)traj_offset;
++				 fprintf(wqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((qtime_stop-qtime_start-time_res))*1000000,reclen);
++				}
+ 				else
+-				fprintf(rwqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((qtime_stop-qtime_start-time_res))*1000000,reclen);
++				{
++				 tmp = (long long int)traj_offset;
++				 fprintf(rwqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((qtime_stop-qtime_start-time_res))*1000000,reclen);
++				}
+ #endif
+ 			}
+ 			w_traj_ops_completed++;
+@@ -6883,7 +6916,7 @@
+ 				printf("\nError freading block %ld %x\n", i,
+ 					(unsigned long long)buffer);
+ #else
+-				printf("\nError freading block %ld %x\n", i,
++				printf("\nError freading block %ld %llx\n", i,
+ 					(unsigned long long)buffer);
+ #endif
+ #else
+@@ -6997,6 +7030,7 @@
+ long long *data1,*data2;
+ #endif
+ {
++	long long int tmp = 0;
+ 	double starttime2;
+ 	double compute_val = (double)0;
+ 	double readtime[2];
+@@ -7137,7 +7171,7 @@
+ 		if(read(fd, (void *)nbuff, (size_t) page_size) != page_size)
+ 		{
+ #ifdef _64BIT_ARCH_
+-			printf("\nError reading block %d %x\n", 0,
++			printf("\nError reading block %d %llx\n", 0,
+ 				(unsigned long long)nbuff);
+ #else
+ 			printf("\nError reading block %d %lx\n", 0,
+@@ -7226,7 +7260,8 @@
+ 				printf("\nError reading block %ld %lx\n", i,
+ 					(unsigned long long)nbuff);
+ #else
+-				printf("\nError reading block %lld %llx\n", i,
++				tmp = (long long int)i;
++				printf("\nError reading block %lld %llx\n", tmp,
+ 					(unsigned long long)nbuff);
+ #endif
+ #else
+@@ -7269,9 +7304,15 @@
+ 				else
+ 				fprintf(rrqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,(qtime_stop-qtime_start-time_res)*1000000,reclen);
+ #else
+-				fprintf(rqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,(qtime_stop-qtime_start-time_res)*1000000,reclen);
++				{
++				  tmp = (long long int)traj_offset;
++				  fprintf(rqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,(qtime_stop-qtime_start-time_res)*1000000,reclen);
++				}
+ 				else
+-				fprintf(rrqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,(qtime_stop-qtime_start-time_res)*1000000,reclen);
++				{
++				  tmp = (long long int)traj_offset;
++				  fprintf(rrqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,(qtime_stop-qtime_start-time_res)*1000000,reclen);
++				}
+ #endif
+ 			}
+ 			r_traj_ops_completed++;
+@@ -7418,6 +7459,7 @@
+ long long *data1, *data2;
+ #endif
+ {
++	long long int tmp = 0;
+ 	double randreadtime[2];
+ 	double starttime2;
+ 	double walltime[2], cputime[2];
+@@ -7593,8 +7635,9 @@
+ 				 printf("\nError reading block at %ld\n",
+ 					 offset64); 
+ #else
++				 tmp = (long long int)offset64;
+ 				 printf("\nError reading block at %lld\n",
+-					 offset64); 
++					 tmp); 
+ #endif
+ 				 perror("read");
+ 				 exit(70);
+@@ -7711,8 +7754,9 @@
+ 						printf("\nError writing block at %ld\n",
+ 							offset64); 
+ #else
++						tmp = (long long int)offset64;
+ 						printf("\nError writing block at %lld\n",
+-							offset64); 
++							tmp); 
+ #endif
+ 						if(wval==-1)
+ 							perror("write");
+@@ -7828,6 +7872,7 @@
+ long long *data1,*data2;
+ #endif
+ {
++	long long int tmp = 0;
+ 	double revreadtime[2];
+ 	double starttime2;
+ 	double walltime[2], cputime[2];
+@@ -7969,7 +8014,8 @@
+ #ifdef NO_PRINT_LLD
+ 					printf("\nError reading block %ld\n", i); 
+ #else
+-					printf("\nError reading block %lld\n", i); 
++					tmp = (long long int)i;
++					printf("\nError reading block %lld\n", tmp); 
+ #endif
+ 					perror("read");
+ 					exit(79);
+@@ -8365,6 +8411,7 @@
+ long long *data1, *data2;
+ #endif
+ {
++	long long int tmp = 0;
+ 	double strideintime;
+ 	double starttime1;
+ 	double compute_val = (double)0;
+@@ -8501,8 +8548,10 @@
+ 		    		printf("\nError reading block %ld, fd= %d Filename %s Read returned %ld\n", i, fd,filename,uu);
+ 		    		printf("\nSeeked to %ld Reclen = %ld\n", savepos64,reclen);
+ #else
+-		    		printf("\nError reading block %lld, fd= %d Filename %s Read returned %lld\n", i, fd,filename,uu);
+-		    		printf("\nSeeked to %lld Reclen = %lld\n", savepos64,reclen);
++				tmp = (long long int)i;
++		    		printf("\nError reading block %lld, fd= %d Filename %s Read returned %lld\n", tmp, fd,filename,uu);
++				tmp = (long long int)savepos64;
++		    		printf("\nSeeked to %lld Reclen = %lld\n",tmp,reclen);
+ #endif
+ 				perror("read");
+ 		    		exit(88);
+@@ -9919,6 +9968,7 @@
+ long long who;
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long i;
+ 	off64_t current_file_size;
+ 	off64_t rec_size;
+@@ -9943,7 +9993,11 @@
+ #ifdef NO_PRINT_LLD
+ 		if(!silent) printf("  %c%ld%c",042,rec_size/1024,042);
+ #else
+-		if(!silent) printf("  %c%lld%c",042,rec_size/1024,042);
++		if(!silent) 
++		{
++		   tmp = (long long int)rec_size;
++		   printf("  %c%lld%c",042,tmp/1024,042);
++		}
+ #endif
+ 	}
+ 	if(!silent) printf("\n");
+@@ -9961,7 +10015,11 @@
+ #ifdef NO_PRINT_LLD
+ 	if(!silent) printf("%c%ld%c  ",042,current_file_size,042);
+ #else
+-	if(!silent) printf("%c%lld%c  ",042,current_file_size,042);
++	if(!silent) 
++	{
++	   tmp = (long long int)current_file_size;
++	   printf("%c%lld%c  ",042,tmp,042);
++	}
+ #endif
+ 	for(i=0;i<=max_y;i++){
+ 		if(report_array[0][i] != current_file_size){
+@@ -9976,7 +10034,11 @@
+ #ifdef NO_PRINT_LLD
+ 			if(!silent) printf("%c%ld%c  ",042,current_file_size,042);
+ #else
+-			if(!silent) printf("%c%lld%c  ",042,current_file_size,042);
++			if(!silent) 
++			{
++			   tmp = (long long int)current_file_size;
++			   printf("%c%lld%c  ",042,tmp,042);
++			}
+ #endif
+ 		}
+ 		if(bif_flag)
+@@ -9984,7 +10046,11 @@
+ #ifdef NO_PRINT_LLD
+ 		if(!silent) printf(" %ld ",report_array[who][i]);
+ #else
+-		if(!silent) printf(" %lld ",report_array[who][i]);
++		if(!silent) 
++		{
++		  tmp = (long long int)report_array[who][i];
++		  printf(" %lld ",tmp);
++		}
+ #endif
+ 	}
+ 	if(bif_flag)
+@@ -10156,6 +10222,7 @@
+ long long who;
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long i;
+ 	off64_t current_file_size;
+ 	off64_t rec_size;
+@@ -10173,7 +10240,11 @@
+ #ifdef NO_PRINT_LLD
+ 		if(!silent) printf("  %c%ld%c",042,rec_size/1024,042);
+ #else
+-		if(!silent) printf("  %c%lld%c",042,rec_size/1024,042);
++		if(!silent) 
++		{
++		   tmp = (long long int)rec_size;
++		   printf("  %c%lld%c",042,tmp/1024,042);
++		}
+ #endif
+ 	}
+ 	if(!silent) printf("\n");
+@@ -10191,7 +10262,11 @@
+ #ifdef NO_PRINT_LLD
+ 	if(!silent) printf("%c%ld%c  ",042,current_file_size,042);
+ #else
+-	if(!silent) printf("%c%lld%c  ",042,current_file_size,042);
++	if(!silent) 
++	{
++	   tmp = (long long int)current_file_size;
++	   printf("%c%lld%c  ",042,tmp,042);
++	}
+ #endif
+ 	for (i = 0; i <= max_y; i++) {
+ 		if (report_array[0][i] != current_file_size) {
+@@ -10206,7 +10281,11 @@
+ #ifdef NO_PRINT_LLD
+ 			if(!silent) printf("%c%ld%c  ",042,current_file_size,042);
+ #else
+-			if(!silent) printf("%c%lld%c  ",042,current_file_size,042);
++			if(!silent) 
++			{
++			   tmp = (long long int)current_file_size;
++			   printf("%c%lld%c  ",042,tmp,042);
++			}
+ #endif
+ 		}
+ 		if (bif_flag)
+@@ -10416,7 +10495,7 @@
+ #ifdef NO_PRINT_LLD
+                 printf("shmid = %d, size = %ld, size1 = %d, Error %d\n",shmid,size,(size_t)size1,errno);
+ #else
+-                printf("shmid = %d, size = %lld, size1 = %d, Error %d\n",shmid,size,(size_t)size1,errno);
++                printf("shmid = %d, size = %lld, size1 = %lx, Error %d\n",shmid,size,(size_t)size1,errno);
+ #endif
+                 exit(119);
+         }
+@@ -10628,6 +10707,7 @@
+ #endif
+ {
+ 
++	long long int tmp = 0;
+ 	struct child_stats *child_stat;
+ 	double starttime1 = 0;
+ 	double temp_time;
+@@ -11029,7 +11109,8 @@
+ #ifdef NO_PRINT_LLD
+ 			fprintf(thread_wqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-			fprintf(thread_wqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++			fprintf(thread_wqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+ 		}
+ 		w_traj_ops_completed++;
+@@ -11186,6 +11267,7 @@
+ #endif
+ {
+ 
++	long long int tmp = 0;
+ 	struct child_stats *child_stat;
+ 	double starttime1 = 0;
+ 	double temp_time;
+@@ -11588,7 +11670,8 @@
+ #ifdef NO_PRINT_LLD
+ 			fprintf(thread_wqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-			fprintf(thread_wqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++			fprintf(thread_wqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+ 		}
+ 		w_traj_ops_completed++;
+@@ -11739,6 +11822,7 @@
+ thread_rwrite_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	/************************/
+ 	/* Children only here 	*/
+ 	/************************/
+@@ -12071,7 +12155,8 @@
+ #ifdef NO_PRINT_LLD
+ 			fprintf(thread_rwqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-			fprintf(thread_rwqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++			fprintf(thread_rwqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+ 		}
+ 		if(rlocking)
+@@ -12205,6 +12290,7 @@
+ thread_read_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	struct child_stats *child_stat;
+ 	double walltime, cputime;
+@@ -12478,7 +12564,8 @@
+ 		    		printf("\nError reading block %ld, fd= %d\n", i,
+ 					 fd);
+ #else
+-		    		printf("\nError reading block %lld, fd= %d\n", i,
++				tmp = (long long int)i;
++		    		printf("\nError reading block %lld, fd= %d\n", tmp,
+ 					 fd);
+ #endif
+ 				perror("read");
+@@ -12525,7 +12612,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_rqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_rqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_rqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 
+@@ -12658,6 +12746,7 @@
+ thread_pread_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	struct child_stats *child_stat;
+ 	double walltime, cputime;
+@@ -12931,7 +13020,8 @@
+ 		    		printf("\nError preading block %ld, fd= %d\n", i,
+ 					 fd);
+ #else
+-		    		printf("\nError preading block %lld, fd= %d\n", i,
++				tmp = (long long int)i;
++		    		printf("\nError preading block %lld, fd= %d\n", tmp,
+ 					 fd);
+ #endif
+ 				perror("pread");
+@@ -12978,7 +13068,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_rqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_rqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_rqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 
+@@ -13112,6 +13203,7 @@
+ thread_rread_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	char *nbuff;
+ 	struct child_stats *child_stat;
+@@ -13384,7 +13476,8 @@
+ 		    		printf("\nError writing block %ld, fd= %d\n", i,
+ 					 fd);
+ #else
+-		    		printf("\nError writing block %lld, fd= %d\n", i,
++				tmp = (long long int)i;
++		    		printf("\nError writing block %lld, fd= %d\n", tmp,
+ 					 fd);
+ #endif
+ 				perror("read");
+@@ -13431,7 +13524,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_rrqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_rrqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_rrqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 
+@@ -13562,6 +13656,7 @@
+ thread_reverse_read_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	char *nbuff;
+ 	struct child_stats *child_stat;
+@@ -13818,7 +13913,8 @@
+ #ifdef NO_PRINT_LLD
+ 				printf("\nError reading block %ld\n", i); 
+ #else
+-				printf("\nError reading block %lld\n", i); 
++				tmp = (long long int)i;
++				printf("\nError reading block %lld\n", tmp); 
+ #endif
+ 				perror("read");
+ 				if (!no_unlink)
+@@ -13873,7 +13969,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_revqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_revqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_revqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 	}
+@@ -13990,6 +14087,7 @@
+ thread_stride_read_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	char *nbuff=0;
+ 	struct child_stats *child_stat;
+@@ -14239,7 +14337,8 @@
+ #ifdef NO_PRINT_LLD
+ 		    		printf("\nError reading block %ld, fd= %d\n", i, fd);
+ #else
+-		    		printf("\nError reading block %lld, fd= %d\n", i, fd);
++				tmp = (long long int)i;
++		    		printf("\nError reading block %lld, fd= %d\n", tmp, fd);
+ #endif
+ 				perror("read");
+ 				if (!no_unlink)
+@@ -14323,7 +14422,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_strqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_strqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_strqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 	}
+@@ -14509,6 +14609,7 @@
+ thread_ranread_test(x)
+ #endif
+ {
++	long long int tmp = 0;
+ 	long long xx,xx2;
+ 	struct child_stats *child_stat;
+ 	double walltime, cputime;
+@@ -14795,8 +14896,9 @@
+ 				printf("\nError reading block at %ld\n",
+ 					 offset); 
+ #else
++				tmp = (long long int)offset;
+ 				printf("\nError reading block at %lld\n",
+-					 offset); 
++					 tmp); 
+ #endif
+ 				perror("ranread");
+ 				if (!no_unlink)
+@@ -14846,7 +14948,8 @@
+ #ifdef NO_PRINT_LLD
+                         fprintf(thread_randrfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-                        fprintf(thread_randrfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++                        fprintf(thread_randrfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+                 }
+ 	}
+@@ -14968,6 +15071,7 @@
+ #endif
+ {
+ 
++	long long int tmp = 0;
+ 	struct child_stats *child_stat;
+ 	double starttime1 = 0;
+ 	double temp_time;
+@@ -15375,7 +15479,8 @@
+ #ifdef NO_PRINT_LLD
+ 			fprintf(thread_randwqfd,"%10.1ld %10.0f %10.1ld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #else
+-			fprintf(thread_randwqfd,"%10.1lld %10.0f %10.1lld\n",(traj_offset)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
++			tmp = (long long int)traj_offset;
++			fprintf(thread_randwqfd,"%10.1lld %10.0f %10.1lld\n",(tmp)/1024,((thread_qtime_stop-thread_qtime_start-time_res))*1000000,reclen);
+ #endif
+ 		}
+ 		w_traj_ops_completed++;
+@@ -15629,7 +15734,7 @@
+ 	if(debug1 )
+ 	{
+ 		printf("\nthread created has an id of %lx\n",ts);
+-		printf("meme %ld\n",meme);
++		printf("meme %lld\n",meme);
+ 	}
+ 	return((long long)meme);
+ }
+@@ -17473,8 +17578,8 @@
+ 	bzero(&outbuf,sizeof(struct client_neutral_command));
+ 	if(mdebug)
+ 	{
+-		printf("Master_neutral_command size = %d\n",sizeof(struct master_neutral_command));
+-		printf("Client_neutral_command size = %d\n",sizeof(struct client_neutral_command));
++		printf("Master_neutral_command size = %lx\n",sizeof(struct master_neutral_command));
++		printf("Client_neutral_command size = %lx\n",sizeof(struct client_neutral_command));
+ 	}
+ 	/* 
+ 	 * Convert internal commands to string format for neutral format/portability
+@@ -17807,6 +17912,7 @@
+ #endif
+ {
+ 	int me,ns;
++        socklen_t me2;
+ 	struct sockaddr_in *addr;
+ 	if(flag)
+ 	{
+@@ -17827,6 +17933,7 @@
+ 		}
+ 	}
+ 	me=sizeof(struct sockaddr_in);
++        me2 = (socklen_t)me;
+ 	if(cdebug)
+ 	{
+ 		printf("Child %d enters listen\n",(int)chid);
+@@ -17838,7 +17945,7 @@
+ 		printf("Child %d enters accept\n",(int)chid);
+ 		fflush(stdout);
+ 	}
+-	ns=accept(s,(void *)addr,&me);
++	ns=accept(s,(void *)addr,&me2);
+ 	if(cdebug)
+ 	{
+ 		printf("Child %d attached for receive. Sock %d  %d\n",(int)chid, ns,errno);
+@@ -19807,6 +19914,7 @@
+ {
+ 	int tsize;
+ 	int s,ns,me;
++        socklen_t me2;
+ 	int rc;
+ 	int xx;
+ 	int tmp_port;
+@@ -19815,6 +19923,7 @@
+ 	int recv_buf_size=65536;
+ 	xx = 0;
+ 	me=sizeof(struct sockaddr_in);
++        me2 = (socklen_t)me;
+ 	tsize=size_of_message; /* Number of messages to receive */
+         s = socket(AF_INET, SOCK_STREAM, 0);
+         if (s < 0)
+@@ -19863,7 +19972,7 @@
+ 		printf("Child enters accept\n");
+ 		fflush(stdout);
+ 	}
+-	ns=accept(s,(void *)addr,&me);
++	ns=accept(s,(void *)addr,&me2);
+ 	if(cdebug)
+ 	{
+ 		printf("Child attached for receive. Sock %d  %d\n", ns,errno);
+@@ -20028,6 +20137,7 @@
+ {
+ 	int tsize;
+ 	int s,ns,me;
++	socklen_t me2;
+ 	int rc;
+ 	int xx;
+ 	int tmp_port;
+@@ -20036,6 +20146,7 @@
+ 	int recv_buf_size=65536;
+ 	xx = 0;
+ 	me=sizeof(struct sockaddr_in);
++        me2 = (socklen_t)me;
+ 	tsize=sp_size_of_message; /* Number of messages to receive */
+         s = socket(AF_INET, SOCK_STREAM, 0);
+         if (s < 0)
+@@ -20084,7 +20195,7 @@
+ 		printf("Master enters accept\n");
+ 		fflush(stdout);
+ 	}
+-	ns=accept(s,(void *)addr,&me);
++	ns=accept(s,(void *)addr,&me2);
+ 	if(mdebug)
+ 	{
+ 		printf("Master attached for receive. Sock %d  %d\n", ns,errno);
+diff -Naur patch/benchmarks/iozone3_239/src/current/libasync.c src/benchmarks/iozone3_239/src/current/libasync.c
+--- patch/benchmarks/iozone3_239/src/current/libasync.c	2005-04-22 17:09:54.000000000 -0400
++++ src/benchmarks/iozone3_239/src/current/libasync.c	2010-07-26 16:28:31.000000000 -0400
+@@ -301,6 +301,7 @@
+ off64_t max;
+ long long depth;
+ {
++	long long int tmp = 0;
+ 	off64_t a_offset,r_offset;
+ 	long long a_size;
+ 	struct cache_ent *ce,*first_ce=0;
+@@ -331,7 +332,7 @@
+ 		}
+ 		if(ret)
+ 		{
+-			printf("aio_error 1: ret %d %d\n",ret,errno);
++			printf("aio_error 1: ret %zd %d\n",ret,errno);
+ 		}
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+@@ -369,10 +370,10 @@
+ 		if(retval < ce->myaiocb.aio_nbytes)
+ #endif
+ 		{
+-			printf("aio_return error1: ret %d %d\n",retval,errno);
++			printf("aio_return error1: ret %zd %d\n",retval,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-			printf("aio_return error1: fd %d offset %ld buffer %lx size %d Opcode %d\n",
++			printf("aio_return error1: fd %d offset %ld buffer %lx size %zd Opcode %d\n",
+ 				ce->myaiocb.aio_fildes,
+ 				ce->myaiocb.aio_offset,
+ 				(long)(ce->myaiocb.aio_buf),
+@@ -421,7 +422,7 @@
+ 			if(errno==EAGAIN)
+ 				goto again;
+ 			else
+-				printf("error returned from aio_read(). Ret %d errno %d\n",ret,errno);
++				printf("error returned from aio_read(). Ret %zd errno %d\n",ret,errno);
+ 		}
+ 	}
+ 	if(stride==0)	 /* User does not want read-ahead */
+@@ -477,7 +478,7 @@
+ 			;
+ 		}
+ 		if(ret)
+-			printf("aio_error 2: ret %d %d\n",ret,errno);
++			printf("aio_error 2: ret %zd %d\n",ret,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+ 		retval=aio_return(&first_ce->myaiocb);
+@@ -497,12 +498,13 @@
+ 		if(retval < first_ce->myaiocb.aio_nbytes)
+ #endif
+ 		{
+-			printf("aio_return error2: ret %d %d\n",retval,errno);
++			printf("aio_return error2: ret %zd %d\n",retval,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-			printf("aio_return error2: fd %d offset %lld buffer %lx size %d Opcode %d\n",
++			tmp = (long long int)first_ce->myaiocb.aio_offset;
++			printf("aio_return error2: fd %d offset %lld buffer %lx size %zd Opcode %d\n",
+ 				first_ce->myaiocb.aio_fildes,
+-				first_ce->myaiocb.aio_offset,
++				tmp,
+ 				(long)(first_ce->myaiocb.aio_buf),
+ 				first_ce->myaiocb.aio_nbytes,
+ 				first_ce->myaiocb.aio_lio_opcode
+@@ -806,6 +808,7 @@
+ off64_t max;
+ long long depth;
+ {
++	long long int tmp = 0;
+ 	off64_t a_offset,r_offset;
+ 	long long a_size;
+ 	struct cache_ent *ce,*first_ce=0;
+@@ -835,7 +838,7 @@
+ 			;
+ 		}
+ 		if(ret)
+-			printf("aio_error 3: ret %d %d\n",ret,errno);
++			printf("aio_error 3: ret %zd %d\n",ret,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+ 		if(ce->oldbuf != ce->myaiocb.aio_buf ||
+@@ -885,12 +888,13 @@
+ 		if(retval < ce->myaiocb.aio_nbytes)
+ #endif
+ 		{
+-			printf("aio_return error4: ret %d %d\n",retval,errno);
++			printf("aio_return error4: ret %zd %d\n",retval,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-			printf("aio_return error4: fd %d offset %lld buffer %lx size %d Opcode %d\n",
++			tmp = (long long int)ce->myaiocb.aio_offset;
++			printf("aio_return error4: fd %d offset %lld buffer %lx size %zd Opcode %d\n",
+ 				ce->myaiocb.aio_fildes,
+-				ce->myaiocb.aio_offset,
++				tmp,
+ 				(long)(ce->myaiocb.aio_buf),
+ 				ce->myaiocb.aio_nbytes,
+ 				ce->myaiocb.aio_lio_opcode
+@@ -903,9 +907,10 @@
+ 				ce->myaiocb64.aio_lio_opcode
+ #endif
+ #else
+-			printf("aio_return error4: fd %d offset %d buffer %lx size %d Opcode %d\n",
++			tmp = (long long int)ce->myaiocb.aio_offset;
++			printf("aio_return error4: fd %d offset %d buffer %lx size %zd Opcode %d\n",
+ 				ce->myaiocb.aio_fildes,
+-				ce->myaiocb.aio_offset,
++				tmp,
+ 				(long)(ce->myaiocb.aio_buf),
+ 				ce->myaiocb.aio_nbytes,
+ 				ce->myaiocb.aio_lio_opcode
+@@ -948,7 +953,7 @@
+ 			if(errno==EAGAIN)
+ 				goto again;
+ 			else
+-				printf("error returned from aio_read(). Ret %d errno %d\n",ret,errno);
++				printf("error returned from aio_read(). Ret %zd errno %d\n",ret,errno);
+ 		}
+ 	}
+ 	if(stride==0)	 /* User does not want read-ahead */
+@@ -1013,7 +1018,7 @@
+ 			;
+ 		}
+ 		if(ret)
+-			printf("aio_error 4: ret %d %d\n",ret,errno);
++			printf("aio_error 4: ret %zd %d\n",ret,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+ 		if(first_ce->oldbuf != first_ce->myaiocb.aio_buf ||
+@@ -1045,12 +1050,13 @@
+ 		if(retval < first_ce->myaiocb.aio_nbytes)
+ #endif
+ 		{
+-			printf("aio_return error5: ret %d %d\n",retval,errno);
++			printf("aio_return error5: ret %zd %d\n",retval,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-			printf("aio_return error5: fd %d offset %lld buffer %lx size %d Opcode %d\n",
++			tmp = (long long int)first_ce->myaiocb.aio_offset;
++			printf("aio_return error5: fd %d offset %lld buffer %lx size %zd Opcode %d\n",
+ 				first_ce->myaiocb.aio_fildes,
+-				first_ce->myaiocb.aio_offset,
++				tmp,
+ 				(long)(first_ce->myaiocb.aio_buf),
+ 				first_ce->myaiocb.aio_nbytes,
+ 				first_ce->myaiocb.aio_lio_opcode
+@@ -1063,9 +1069,10 @@
+ 				first_ce->myaiocb64.aio_lio_opcode
+ #endif
+ #else
+-			printf("aio_return error5: fd %d offset %ld buffer %lx size %d Opcode %d\n",
++			tmp = (long long int)first_ce->myaiocb.aio_offset;
++			printf("aio_return error5: fd %d offset %ld buffer %lx size %zd Opcode %d\n",
+ 				first_ce->myaiocb.aio_fildes,
+-				first_ce->myaiocb.aio_offset,
++				tmp,
+ 				(long)(first_ce->myaiocb.aio_buf),
+ 				first_ce->myaiocb.aio_nbytes,
+ 				first_ce->myaiocb.aio_lio_opcode
+@@ -1204,7 +1211,7 @@
+ 		}
+ 		else
+ 		{
+-			printf("Error in aio_write: ret %d errno %d count %lld\n",ret,errno,gc->w_count);
++			printf("Error in aio_write: ret %zd errno %d count %lld\n",ret,errno,gc->w_count);
+ 			/*
+ 			printf("aio_write_no_copy: fd %d buffer %x offset %lld size %d\n",
+ 				ce->myaiocb64.aio_fildes,
+@@ -1367,6 +1374,7 @@
+ async_wait_for_write(gc)
+ struct cache *gc;
+ {
++	long long int tmp = 0;
+ 	struct cache_ent *ce;
+ 	size_t ret,retval;
+ 	if(gc->w_head==0)
+@@ -1397,12 +1405,13 @@
+ 	}
+ 	if(ret)
+ 	{
+-		printf("aio_error 5: ret %d %d\n",ret,errno);
++		printf("aio_error 5: ret %zd %d\n",ret,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-		printf("fd %d offset %lld size %d\n",
++		tmp = (long long int)ce->myaiocb64.aio_offset;
++		printf("fd %d offset %lld size %zd\n",
+ 			ce->myaiocb.aio_fildes,
+-			ce->myaiocb.aio_offset,
++			tmp,
+ 			ce->myaiocb.aio_nbytes);
+ #else
+ 		printf("fd %d offset %lld size %d\n",
+@@ -1466,6 +1475,7 @@
+ long long depth;
+ char *free_addr;
+ {
++	long long int tmp = 0;
+ 	struct cache_ent *ce;
+ 	size_t ret;
+ 	long long direct = 1;
+@@ -1503,13 +1513,14 @@
+ 		}
+ 		else
+ 		{
+-			printf("Error in aio_write: ret %d errno %d\n",ret,errno);
++			printf("Error in aio_write: ret %zd errno %d\n",ret,errno);
+ #ifdef _LARGEFILE64_SOURCE 
+ #ifdef __LP64__
+-			printf("aio_write_no_copy: fd %d buffer %lx offset %lld size %d\n",
++			tmp = (long long int)ce->myaiocb.aio_offset;
++			printf("aio_write_no_copy: fd %d buffer %lx offset %lld size %zd\n",
+ 				ce->myaiocb.aio_fildes,
+ 				(long)(ce->myaiocb.aio_buf),
+-				ce->myaiocb.aio_offset,
++				tmp,
+ 				ce->myaiocb.aio_nbytes);
+ #else
+ 			printf("aio_write_no_copy: fd %d buffer %lx offset %lld size %d\n",

@@ -1,0 +1,75 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2TAB 5 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2tab \- information about pvfs2 volumes
+.SH DESCRIPTION
+Any program that uses PVFS2 will consult a 
+.B pvfs2tab
+file for information about how to convert a path name into information like
+which servers to contact and what files to request.
+
+Programs will look for a 
+.B pvfs2tab
+file in several places
+
+.I /etc/pvfs2tab
+.RS
+The default location of the file
+.RE
+.I pvfs2tab
+.RS
+If there is no 
+.I /etc/pvfs2tab 
+file, then a program will look in the current directory for a file called 
+.I pvfs2tab
+.RE
+.I PVFS2TAB_FILE environment variable
+.RS
+This environment variable overrides any system-wide or local files.  Programs
+will look for a file located at the value of the environment variable.
+.RE
+
+.SH FORMAT
+The file format is similar but not identical to 
+.B fstab
+(5), and looks like
+"<bmi_address>/<fs_name> <mountpoint> pvfs2 <options> 0 0"  .
+
+.I bmi address
+.RS
+Takes the form <protocol>://<hostspec>
+.I <protocol>
+is the name of the communications protocol used by bmi ("gm", "tcp", "ib").
+.I <hostspec> 
+is the name of any metadata server.  This format is method-dependent.  For
+example, a <hostspec> for the "tcp" method would look like "foo.bar.com:2344".
+Other methods may express hosts in different ways.
+.RE
+.I <fs_name> 
+.RS
+is the name of a PVFS file system on that server.
+.RE
+.I <mountpoint>
+.RS
+is the virtual mountpoint used by pvfs2 clients.
+.RE
+.I <options>
+.RS
+will generally be "default" for a standard set of options.  Two other options
+are currently available.  The option "flowproto=<flow_method>" can be used to
+specify an alternate flow protocol method.  The option "encoding=<encoding>"
+can be used to select a per-file system wire encoding mechanism, one of
+"direct", "le_bfield", or "xdr".
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

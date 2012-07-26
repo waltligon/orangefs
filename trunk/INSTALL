@@ -1,0 +1,8 @@
+Please see the quickstart guide which can be generated with
+`make docs` and found in:
+
+doc/pvfs2-quickstart.pdf
+doc/pvfs2-quickstart.ps
+
+Also available at:
+http://www.orangefs.org/documentation/releases/current/doc/pvfs2-quickstart.pdf

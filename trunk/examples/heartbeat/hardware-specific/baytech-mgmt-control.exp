@@ -1,0 +1,119 @@
+#!/usr/bin/expect -f
+
+# expect script to login to a baytech management module and control power
+# to one of its outlets
+
+# gather command line arguments into variables
+set host [lrange $argv 0 0]   
+set user [lrange $argv 1 1] 
+set password [lrange $argv 2 2] 
+set strip [lrange $argv 3 3]
+set outlet [lrange $argv 4 4]
+set command [lrange $argv 5 5]
+
+# complain if we don't get exactly 5 arguments
+if {$argc!=6} {
+	send_user "Usage: baytech.exp <host> <user> <password> <strip> <outlet> <cmd>\n"
+	send_user "   NOTE: <cmd> may be \"on\" \"off\" or \"reboot\"\n"
+	exit 1
+}
+
+set bay_command ""
+
+if { [string compare $command "on"] == 0 } {
+	set bay_command "On"
+}
+if { [string compare $command "off"] == 0 } {
+	set bay_command "Off"
+}
+if { [string compare $command "reboot"] == 0 } {
+	set bay_command "Reboot"
+}
+
+if { [string compare $bay_command ""] == 0 } {
+	send_error "Error: <cmd> must be one of on|off|reboot.\n"
+	exit 1
+}
+
+# use a 15 second timeout
+set timeout 15
+
+# this disables showing interaction on stdout.  It should be commented
+# if you are trying to debug this script and want to see what it is doing
+log_user 0
+
+# delete old log file and start a new one
+#system rm -f /tmp/expect.log
+#log_file -a /tmp/expect.log
+
+# open ssh connection.  Turn off strict host checking so ssh doesn't ask us 
+# if it is ok to connect to this hostname
+spawn ssh "-oStrictHostKeyChecking no" $user@$host 
+
+# Look for passwod prompt
+expect {
+	"*?assword:*" {}
+	default {
+		# password prompt never showed up
+		send_user "failed to ssh to host $host\n"
+		exit 1
+	}
+}
+
+# Send password aka $password 
+send -- "$password\r"
+# look for top level prompt
+expect {
+	"*Enter Request*" {}
+	default {
+		# our user name and password did not work
+		send_user "Error: host $host failed to accept username and password\n"
+		exit 1
+	}
+}
+
+# send strip name, wait, and then send an extra carriage return
+# (for some reason the Baytech will not always continue to the next screen on
+# its own)
+send -- "$strip\r"
+sleep 5
+send -- "\r"
+
+# wait for prompt for particular strip, then send command to power on 
+expect {
+	"*RPC-28A>*" {}
+	default {
+		send_user "Error: failed to select strip $strip\n"
+		exit 1
+	}
+}
+send -- "$bay_command $outlet\r"
+
+# wait for the Y/N confirmation and send a Y
+expect {
+	"*Y/N*" {}
+	default {
+		send_user "Error: failed to issue command for outlet $outlet\n"
+		exit 1
+	}
+}
+
+send -- "Y\r"
+
+# wait for command to complete 
+expect {
+	"*RPC-28A>*" {}
+	default {
+		send_user "Error: failed to confirm command for outlet $outlet\n"
+		exit 1
+	}
+}
+
+# Ordinarily we would now send some sort of "logout" command and then expect 
+# eof.  For some reason the Baytech devices will not let us logout gracefully 
+# however, so we instead just close the connection and return after waiting
+# for the result
+
+close
+wait
+

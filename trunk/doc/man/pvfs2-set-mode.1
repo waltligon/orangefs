@@ -1,0 +1,39 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH PVFS2-SET-MODE 1 "SEPTEMBER 2003"  PVFS2 "PVFS2 Manuals"
+.SH NAME
+pvfs2-set-mode \- Change the mode of a PVFS2 volume
+.SH SYNOPSIS
+.B pvfs2-set-mode
+.I -m mount_point <MODE>
+
+.SH DESCRIPTION
+Changes the operating mode of a PVFS2 volume. 
+
+.SH OPTIONS
+.IP -m
+send a mode-change message to all servers responsible for 
+.I mount_point
+.IP <MODE>
+can as of this writing only be "normal" and "admin".  In "admin" mode, the
+PVFS2 volume becomes read-only.  Typically, this is used before running
+.B pvfs2-fsck
+on the volume.
+
+.SH ENVIRONMENT
+.IP PVFS2TAB_FILE
+If set, the full pathname for an alternate 
+.IR pvfs2tab
+file
+
+.SH BUGS
+Please report all bugs to the pvfs2 bugzilla (http://bugzilla.mcs.anl.gov/pvfs/)
+.SH AUTHOR
+The PVFS2 development team (pvfs2-developers@beowulf-underground.org)
+.SH "SEE ALSO"
+.BR pvfs2-server (1),
+.BR pvfs2-statfs (1)
+.BR pvfs2-ping (1)
+.BR pvfs2-cp (1)
+.BR pvfs2-genconfig (1)

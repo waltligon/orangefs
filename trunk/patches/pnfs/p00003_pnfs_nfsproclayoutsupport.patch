@@ -1,0 +1,240 @@
+
+Modify the NFS exported PVFS2 client to support the pNFS file-based layout
+driver. The generated file-based layout is derived from the data servers
+listed in the proc file system.
+pNFS support is achieved by implementing the pNFS export operations
+that manage the pNFS data layout information.
+
+
+The goal of this patch is to generate a pNFS file layout based on the
+I/O servers (data servers) listed in a proc file system variable.  Using
+a proc variable allows a sysadmin to select which nodes the pNFS client will
+use for I/O.  The data servers listed must be exported PVFS2 clients.
+
+When a pNFS client requests a file-based data layout for a file, the exported
+PVFS2 client module retrieves the ordered listed of I/O servers from the
+/proc system variable.
+The PVFS2 client then uses the I/O servers to create a file-based layout and
+returns the layout to the nfs server.
+
+To use this patch and generate a file-based layout based on the existing PVFS2
+I/O servers, the layouttype proc variable must be set to 5.
+
+This patch compiles against a version of the 2.6.18.3 linux kernel.
+
+
+---
+
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c         |  109 +++++++++-
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h |    3 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c    |    1 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h   |    1 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c   |    3 
+ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c        |    4 
+ 6 files changed, 120 insertions(+), 1 deletion(-)
+
+diff -puN src/kernel/linux-2.6/pvfs2-kernel.h~nfsproclayoutsupport src/kernel/linux-2.6/pvfs2-kernel.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-kernel.h~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-kernel.h	2008-01-05 17:53:58.000000000 -0800
+@@ -171,6 +171,8 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall
+ #define MSECS_TO_JIFFIES(ms) (((ms)*HZ+999)/1000)
+ #endif
+ 
++#define PNFS_DATASERVER_LEN 128
++
+ /************************************
+  * valid pvfs2 kernel operation states
+  *
+@@ -995,6 +997,7 @@ int service_operation(pvfs2_kernel_op_t*
+ 
+ extern int layouttype;
+ extern int layout_stripesize;
++extern char layout_dsnames[];
+ 
+ /** handles two possible error cases, depending on context.
+  *
+diff -puN src/kernel/linux-2.6/pvfs2-mod.c~nfsproclayoutsupport src/kernel/linux-2.6/pvfs2-mod.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-mod.c~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-mod.c	2008-01-05 17:53:58.000000000 -0800
+@@ -31,6 +31,7 @@ int op_timeout_secs = PVFS2_DEFAULT_OP_T
+ 
+ int layouttype = LAYOUT_PVFS2;
+ int layout_stripesize = 65536;
++char layout_dsnames[PNFS_DATASERVER_LEN]; /* comma separated list of file data servers */
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("PVFS2 Development Team");
+diff -puN src/kernel/linux-2.6/pvfs2-proc.c~nfsproclayoutsupport src/kernel/linux-2.6/pvfs2-proc.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-proc.c~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-proc.c	2008-01-05 17:53:58.000000000 -0800
+@@ -336,6 +336,9 @@ static ctl_table pvfs2_table[] = {
+     {9, "layout_stripesize", &layout_stripesize, sizeof(int), 0644, NULL,
+         &proc_dointvec_minmax, &sysctl_intvec,
+         NULL, &min_stripesize, &max_stripesize},
++    {10, "layout_ds", &layout_dsnames, PNFS_DATASERVER_LEN, 0644, NULL,
++         &proc_dostring, &sysctl_string,
++     NULL, },
+     {0}
+ };
+ static ctl_table fs_table[] = {
+diff -puN src/kernel/linux-2.6/pnfs.c~nfsproclayoutsupport src/kernel/linux-2.6/pnfs.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pnfs.c~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pnfs.c	2008-01-05 17:53:58.000000000 -0800
+@@ -36,9 +36,19 @@ spinlock_t pvfs2_layout_lock = SPIN_LOCK
+ static int
+ pvfs2_layout_type(void)
+ {
+-    return layouttype;
++    int lt;
++
++    /* 5 is a special file layout type that retrieves the
++     * list of data servers from the /proc fs */
++    if (layouttype == 5)
++	lt = LAYOUT_NFSV4_FILES;
++    else
++	lt = layouttype;
++    return lt;
+ }
+ 
++static unsigned int nfsmanual_num_devices;
++
+ /****** PVFS2 Layout Functions ******/
+ 
+ /* Set pvfs2 layout information for return to nfsd.
+@@ -456,6 +466,96 @@ nfs_getdevicelist(struct super_block *sb
+     return ret;
+ }
+ 
++/* Retrieves pvfs2 data layout information about the specified file.
++ * return- positive 0
++ * negative -ENOSYS or pvfs2_inode_getattr error
++ */
++static int
++nfsmanual_layout_get(struct inode * inode, void* buf)
++{
++    int ret;
++    struct nfsd4_pnfs_layoutget *layout_request = (struct nfsd4_pnfs_layoutget*)buf;
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: off:%Lu ex:%Lu macc:%d iomode:%d\n", __FUNCTION__,
++		 layout_request->lg_seg.offset,
++		 layout_request->lg_seg.length,
++		 layout_request->lg_mxcnt,
++		 layout_request->lg_seg.iomode);
++    ret = nfs_build_layout(layout_request, nfsmanual_num_devices);
++    if (ret)
++	gossip_err("%s: Error!  Could not copy attributes (%d)\n",__FUNCTION__,ret);
++
++    return ret;
++}
++
++/* Generate nfs file device list from devices specified in the /proc fs */
++static int
++nfsmanual_getdevicelist(struct super_block *sb, void *buf)
++{
++    int i=0;
++    struct nfsd4_pnfs_getdevlist *gdevl = (struct nfsd4_pnfs_getdevlist*)buf;
++    struct nfsd4_pnfs_devlist* devlist;
++    struct pnfs_filelayout_devaddr *fdev;
++    char netid[] = "tcp";
++    char nfsport[] = ".8.1";
++    char* t1, *t2;
++    char devs[PNFS_DATASERVER_LEN];
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Start\n", __FUNCTION__);
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: layout_ds string %s\n", __FUNCTION__, layout_dsnames);
++
++    /* Use at most 8 (number of iota machines) data servers */
++    devlist = (struct nfsd4_pnfs_devlist*)kmalloc(8 * sizeof(struct nfsd4_pnfs_devlist), PVFS2_GFP_FLAGS);
++
++    /* copy devices from proc variable to ensure we don't modify
++     * (which seemed to be happened via strsep)
++     */
++    memcpy(devs, layout_dsnames, PNFS_DATASERVER_LEN);
++    t2 = devs;
++
++    /* todo: ensure space alocated */
++    while ((t1 = strsep(&t2, ","))) {
++	if (!*t1)
++	    continue;
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: Adding device %s\n", __FUNCTION__, t1);
++	devlist[i].dev_id = i;
++
++	fdev = (struct pnfs_filelayout_devaddr*)kmalloc(
++	    sizeof(struct pnfs_filelayout_devaddr), PVFS2_GFP_FLAGS);
++	/* todo ensure space allocated */
++	fdev->r_netid.len = 3;
++	fdev->r_netid.data = (char*)kmalloc(3, PVFS2_GFP_FLAGS);
++	memcpy(fdev->r_netid.data, netid, 3);
++
++	fdev->r_addr.len = strlen(t1);
++	fdev->r_addr.data = (char*)kmalloc(fdev->r_addr.len + 4, PVFS2_GFP_FLAGS);
++	memcpy(fdev->r_addr.data, t1, fdev->r_addr.len);
++
++	/* add port */
++	memcpy(fdev->r_addr.data + fdev->r_addr.len, nfsport, 4);
++	/* Increase by 4 to add the nfs port 2049 */
++	fdev->r_addr.len += 4;
++
++	gossip_debug(GOSSIP_PNFS_DEBUG,"%s: raddrlen: %d raddr: %s\n",
++		    __FUNCTION__, fdev->r_addr.len, fdev->r_addr.data);
++	devlist[i].dev_addr = (void*)fdev;
++	i++;
++    }
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: End\n", __FUNCTION__);
++
++    gdevl->gd_devlist = devlist;
++    gdevl->gd_devlist_len = i;
++
++    /* Set number of devices for layoutget.  This is
++     * ok since a client must always retrieve a list of
++     * devices before it retrieves the layout */
++    nfsmanual_num_devices = i;
++
++    gossip_debug(GOSSIP_PNFS_DEBUG,"%s: End (len: %d)\n", __FUNCTION__, gdevl->gd_devlist_len);
++
++    return 0;
++}
++
+ /* export ops for each layout type */
+ struct export_operations pvfs2layout_export_ops =
+ {
+@@ -472,6 +572,13 @@ struct export_operations nfslayout_expor
+     .get_devicelist = nfs_getdevicelist,
+ };
+ 
++struct export_operations nfsmanuallayout_export_ops =
++{
++    .layout_type    = pvfs2_layout_type,
++    .layout_get     = nfsmanual_layout_get,
++    .get_devicelist = nfsmanual_getdevicelist,
++};
++
+ /*
+  * Local variables:
+  *  c-indent-level: 4
+diff -puN src/kernel/linux-2.6/pvfs2-pnfs.h~nfsproclayoutsupport src/kernel/linux-2.6/pvfs2-pnfs.h
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/pvfs2-pnfs.h~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/pvfs2-pnfs.h	2008-01-05 17:53:58.000000000 -0800
+@@ -26,6 +26,7 @@ struct pvfs2_layout {
+ 
+ extern struct export_operations pvfs2layout_export_ops;
+ extern struct export_operations nfslayout_export_ops;
++extern struct export_operations nfsmanuallayout_export_ops;
+ 
+ /* Structs need to be defined just to compile kernel module since they
+  * are used in include/linux/nfs4_pnfs.h.
+diff -puN src/kernel/linux-2.6/super.c~nfsproclayoutsupport src/kernel/linux-2.6/super.c
+--- pvfs-2.6.3-pnfsfilelayout/src/kernel/linux-2.6/super.c~nfsproclayoutsupport	2008-01-05 17:53:58.000000000 -0800
++++ pvfs-2.6.3-pnfsfilelayout-dhildeb/src/kernel/linux-2.6/super.c	2008-01-05 17:53:58.000000000 -0800
+@@ -1108,6 +1108,10 @@ int pvfs2_fill_sb(
+ 	    gossip_debug(GOSSIP_PNFS_DEBUG,"Setting nfs layout export ops\n");
+ 	    sb->s_export_op = &nfslayout_export_ops;
+ 	    break;
++        case 5: /* proc version of files */
++	    gossip_debug(GOSSIP_PNFS_DEBUG,"Setting nfs manual layout export ops\n");
++	    sb->s_export_op = &nfsmanuallayout_export_ops;
++	    break;
+         default:
+ 	    gossip_err("Invalid layouttype, no export ops to set! (%d)\n", layouttype);
+     }
+_

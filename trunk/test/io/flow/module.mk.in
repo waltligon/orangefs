@@ -1,0 +1,35 @@
+DIR := io/flow
+
+TEST_IO_FLOW_DIR_SRC := \
+	$(DIR)/test-harness-server-trove.c \
+	$(DIR)/test-harness-client.c 	\
+	$(DIR)/test-bmi-cache-server.c  \
+	$(DIR)/test-bmi-cache-client.c  \
+	$(DIR)/test1-client.c  \
+	$(DIR)/test1-server.c
+
+TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
+
+$(DIR)/test-harness-server-trove: $(DIR)/test-harness-server-trove.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
+
+$(DIR)/test-harness-client: $(DIR)/test-harness-client.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@
+
+$(DIR)/test-bmi-cache-server: $(DIR)/test-bmi-cache-server.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
+
+$(DIR)/test-bmi-cache-client: $(DIR)/test-bmi-cache-client.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@
+
+$(DIR)/test1-server: $(DIR)/test1-server.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
+
+$(DIR)/test1-client: $(DIR)/test1-client.o
+	$(Q) "  LD		$@"
+	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@

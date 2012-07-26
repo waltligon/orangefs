@@ -1,0 +1,70 @@
+#
+# $Date: 2010-04-30 20:00:56 $
+#
+# A brief description of the contents of the test/automated directory
+
+
+From time to time we (pvfs2 developers) make an effort to thouroughly
+test pvfs2.  We really do think it's important... it just ends up taking
+a back seat to lots of other important items.   
+
+CURRENT APPROACH:
+
+  It would be hard to describe this as "minimally invasive".  We want to
+  test the VFS interface in addition to the libpvfs and mpi-io
+  interfaces, so we need significant modifications to the host machine.
+  At MCS, we have 'gil' and 'lain', two "red" machines (machines on
+  which we have root acces and no support from our system
+  adminitrators).  
+
+  The scripts require occaional root access, so it's best to set up sudo
+  with a NOPASSWD entry (i.e. a line like "robl    ALL=NOPASSWD: ALL" in
+  /etc/sudoers).  
+
+  The main driver is 'testscrpt.sh' (name subject to change).  It
+  builds pvfs2, starts up the servers, loads the kernel module, and
+  starts pvfs2-client and pvfs2-client-core.   The script needs a few
+  variables set:
+
+    PVFS2_DEST:       staging location for checking out, building, logging
+    PVFS2_MOUNTPOINT: where we mount pvfs2
+    EXTRA_TESTS:      directory where more sophisticated benchmarks (like
+                      bonnie, iozone, ior, etc) live
+
+  Then it proceeds to run every executable file in 'sysint-tests.d',
+  'vfs-tests.d' and 'mpiio-tests.d' These files are simple little shell
+  scripts that do something to exercise pvfs2.  
+
+  Sam set up a tinderbox on lain.mcs.anl.gov, and wrote
+  tinder-pvfs2-status to make it easy for scripts to lob bits at it.   A
+  couple things that tripped me up when I first started using it:
+
+  - The states are enumerated in 'BuildStatus.pm' in the tinderbox
+    directory.  
+  - there seems to be a 6 minute interval where if you start a new run
+    you'll overwrite the old run
+
+On a Cluster:
+  The common way to deploy PVFS2 on a cluster is through our pav
+  scripts.  Thus, we need a pav config file, specified by the PAV_CONFIG
+  variable.  We also want to run the usual battery of tests
+
+OLDER APPROACHES:
+
+These files aren't used anymore but might provide someone with some
+useful ideas on how to script up a benchmark and interact with PBS.  If
+anybody wants to document them, feel free to elaborate on this section.
+
+  bonnie++.sh
+  CONFIG.template
+  kmod_ctrl.sh
+  PAVCONFIG.template
+  pvfs2tests.py
+  run-cron-adenine.sh
+  run-cron-heroin.sh
+  run-test-adenine.sh
+  simple.sh
+  single-node-kernel-test.sh
+  SUBMIT.pbs.template
+
+# vim: tw=72

@@ -1,0 +1,532 @@
+//===========================================================================
+//
+//  File Name:    Setup.rul
+//
+//  Description:  Blank setup main script file
+//
+//  Comments:     Blank setup is an empty setup project. If you want to
+//				  create a new project via. step-by step instructions use the
+//				  Project Assistant.
+//
+//===========================================================================
+
+// Included header files ----------------------------------------------------
+#include "ifx.h" 
+#include "MountPointUserModeDialog.Rul" 
+#include "ListMapDialog.Rul" 
+#include "CertMapDialog.Rul"
+#include "LDAPMapDialog.Rul"
+
+// Note: In order to have your InstallScript function executed as a custom
+// action by the Windows Installer, it must be prototyped as an 
+// entry-point function.
+
+// The keyword export identifies MyFunction() as an entry-point function.
+// The argument it accepts must be a handle to the Installer database.
+    
+/* export prototype MyFunction(HWND); */
+
+prototype InstallServices(); 
+prototype InstallDriver(); 
+prototype WriteOrangeFSTab(STRING);
+prototype InitConfigFile(BYREF NUMBER, STRING);
+prototype WriteListMapConfig(NUMBER, STRING, STRING, STRING);
+prototype WriteCertMapConfig(NUMBER, STRING);
+prototype WriteLDAPMapConfig(NUMBER, STRING, STRING, STRING, STRING,
+                             NUMBER, STRING, STRING, STRING, STRING);
+prototype CloseConfigFile(NUMBER);
+
+// global variables
+/*
+#define USERMAP_LIST     1
+#define USERMAP_CERT     2
+#define USERMAP_LDAP     3
+*/
+
+// 64-bit flag
+BOOL bIs64Bit;
+// Program Files and System directories for appropriate architecture
+STRING szProgramFilesDir, szSystemDir;
+
+//---------------------------------------------------------------------------
+// OnBegin
+//
+// The OnBegin event is called directly by the framework after the setup
+// initializes.
+//---------------------------------------------------------------------------
+function OnBegin()
+begin
+    // Set directory locations based on architecture (32/64-bit)
+    bIs64Bit = SYSINFO.bIsWow64;
+    if (bIs64Bit) then
+        szProgramFilesDir = PROGRAMFILES64;
+        szSystemDir = WINSYSDIR64;
+    else
+        szProgramFilesDir = PROGRAMFILES;
+        szSystemDir = WINSYSDIR;
+    endif;
+end;
+//---------------------------------------------------------------------------
+// OnFirstUIBefore
+//
+// The OnFirstUIBefore event is called by the framework when the setup is
+// running in first install mode. By default this event displays UI allowing
+// the end user to specify installation parameters.
+//---------------------------------------------------------------------------
+function OnFirstUIBefore()
+    NUMBER nResult, nSetupType, nvSize, nUser;
+    STRING szTitle, szMsg, szQuestion, svName, svCompany, szFile;
+    STRING szLicenseFile;
+	BOOL bCustom, bIgnore1, bIgnore2;
+begin	
+    // TO DO: if you want to enable background, window title, and caption bar title                                                                   
+    // SetTitle( @PRODUCT_NAME, 24, WHITE );                                        
+    // SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION ); 	                  
+    // Enable( FULLWINDOWMODE );						   
+    // Enable( BACKGROUND );							  
+    // SetColor(BACKGROUND,RGB (0, 128, 128));					   
+
+    // Added in InstallShield 15 - Show an appropriate error message if
+    // -removeonly is specified and the product is not installed.
+    if( REMOVEONLY ) then
+        Disable( DIALOGCACHE );
+		szMsg = SdLoadString( IDS_IFX_ERROR_PRODUCT_NOT_INSTALLED_UNINST );
+   		SdSubstituteProductInfo( szMsg );
+		MessageBox( szMsg, SEVERE );
+		abort;
+    endif;
+    
+	nSetupType = TYPICAL;	
+
+Dlg_SdWelcome:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SdWelcome(szTitle, szMsg);
+    if (nResult = BACK) goto Dlg_SdWelcome;
+	
+	szTitle   = "";
+	svName    = "";
+    svCompany = "";
+/*
+Dlg_SdRegisterUser:
+    szMsg = "";
+    szTitle = "";
+    nResult = SdRegisterUser( szTitle, szMsg, svName, svCompany );
+    if (nResult = BACK) goto Dlg_SdWelcome;
+
+Dlg_SetupType:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SetupType2(szTitle, szMsg, "", nSetupType, 0);
+    if (nResult = BACK) then
+        goto Dlg_SdWelcome;
+    else
+	    nSetupType = nResult;
+        if (nSetupType != CUSTOM) then
+	        nvSize = 0;
+	        FeatureCompareSizeRequired(MEDIA, INSTALLDIR, nvSize);
+	        if (nvSize != 0) then      
+            	MessageBox(szSdStr_NotEnoughSpace, WARNING);
+	            goto Dlg_SetupType;
+            endif;
+			bCustom = FALSE;
+			goto Dlg_SdStartCopy;
+		else
+			bCustom = TRUE;
+        endif;
+    endif;    
+*/
+
+Dlg_SdAskDestPath:    	
+    nResult = SdAskDestPath(szTitle, szMsg, INSTALLDIR, 0);
+    if (nResult = BACK) goto Dlg_SdWelcome;
+/*
+Dlg_SdFeatureTree: 
+    szTitle    = "";
+    szMsg      = "";
+    if (nSetupType = CUSTOM) then
+		nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+		if (nResult = BACK) goto Dlg_SdAskDestPath;  
+    endif;
+*/
+Dlg_SdStartCopy:
+    szTitle = "";
+    szMsg   = "";
+    nResult = SdStartCopy2( szTitle, szMsg );			
+	
+    if (nResult = BACK) goto Dlg_SdAskDestPath;
+
+    // Added in IS 2009 - Set appropriate StatusEx static text.
+    SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_FIRSTUI ) );
+
+    // setup default status
+    Enable(STATUSEX);
+ 
+    return 0;
+end;                    
+            
+// Output the file "orangefstab" with the file system location URI in it
+function WriteOrangeFSTab(szFSURI)
+    NUMBER nFileHandle;
+begin
+    OpenFileMode(FILE_MODE_APPEND);
+    
+    if (CreateFile(nFileHandle, INSTALLDIR, "orangefstab") < 0) then
+        MessageBox("File " + INSTALLDIR + "\\orangefstab could not be created. " +
+                   "You must add this file manually (see documentation).", SEVERE);
+    else
+        WriteLine(nFileHandle, szFSURI + " /mnt/pvfs2 pvfs2 defaults,noauto 0 0"); 
+        
+        CloseFile(nFileHandle);
+    endif;
+end;
+
+function InitConfigFile(nvFileHandle, szMountPoint)
+begin                       
+    // create the config file
+    OpenFileMode(FILE_MODE_APPEND);
+    
+    if (CreateFile(nvFileHandle, INSTALLDIR, "orangefs.cfg") < 0) then
+        MessageBox("File " + INSTALLDIR + "\\orangefs.cfg could not be created. " +
+                   "You must add this file manually (see documentation).", SEVERE);
+        return -1;
+    endif;
+    
+    // write the mount point 
+    if (szMountPoint != "Auto") then
+        WriteLine(nvFileHandle, "mount " + szMountPoint);    
+    endif;
+    
+    return 0;
+end;
+
+function WriteListMapConfig(nFileHandle, szUserID, szUID, szGID)
+begin
+    // write list map mode setting and one user
+    WriteLine(nFileHandle, "user-mode list");
+    
+    if (szUserID != "" && szUID != "" && szGID != "") then
+        WriteLine(nFileHandle, "user " + szUserID + " " + szUID + ":" + szGID);
+    endif;
+    
+end;
+
+function WriteCertMapConfig(nFileHandle, szCertDirPrefix)
+begin          
+    // write cert map mode settings
+    WriteLine(nFileHandle, "user-mode certificate");
+    
+    if (szCertDirPrefix != "") then
+       WriteLine(nFileHandle, "cert-dir-prefix " + szCertDirPrefix);
+    endif; 
+end;
+
+function WriteLDAPMapConfig(nFileHandle, szHost, szUserDN, szPassword, szRoot,
+                            nScope, szClass, szNamingAttr, szUIDAttr, szGIDAttr)
+begin
+    // write LDAP map options
+    WriteLine(nFileHandle, "user-mode ldap");
+    
+    if (szHost != "") then
+        WriteLine(nFileHandle, "ldap-host " + szHost);
+    endif;
+    
+    if (szUserDN != "") then
+        WriteLine(nFileHandle, "ldap-bind-dn " + szUserDN);
+    endif;
+    
+    if (szPassword != "") then
+        WriteLine(nFileHandle, "ldap-password " + szPassword);
+    endif;
+    
+    if (szRoot != "") then
+        WriteLine(nFileHandle, "ldap-search-root " + szRoot);
+    endif;
+    
+    if (nScope = LDAPSCOPE_SUBTREE) then
+        WriteLine(nFileHandle, "ldap-search-scope subtree");
+    else
+        WriteLine(nFileHandle, "ldap-search-scope onelevel");
+    endif;
+    
+    if (szClass != "") then
+        WriteLine(nFileHandle, "ldap-search-class " + szClass);
+    endif;
+    
+    if (szNamingAttr != "") then
+        WriteLine(nFileHandle, "ldap-naming-attr " + szNamingAttr);
+    endif;
+    
+    if (szUIDAttr != "") then
+        WriteLine(nFileHandle, "ldap-uid-attr " + szUIDAttr);
+    endif;
+    
+    if (szGIDAttr != "") then
+        WriteLine(nFileHandle, "ldap-gid-attr " + szGIDAttr);
+    endif;
+        
+end;
+
+function CloseConfigFile(nFileHandle)
+begin
+    CloseFile(nFileHandle);
+end;
+
+
+function InstallDriver()
+    STRING svExePath;
+begin                                                 
+    svExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
+    
+    LaunchAppAndWait(svExePath, "/i d", LAAW_OPTION_WAIT);
+end;    
+
+function InstallServices()
+    NUMBER rc, line, error;
+    STRING file, errText;
+begin
+    if (!ServiceExistsService("DokanMounter")) then
+        rc = ServiceAddService("DokanMounter",
+                               "DokanMounter",
+                               "OrangeFS/Dokan driver interface service",
+                               szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\mounter.exe",
+                               TRUE,
+                               "");
+        if (rc < ISERR_SUCCESS) then
+            GetExtendedErrInfo(file, line, error);
+            Sprintf(errText, " (%d)", error);
+            MessageBox("DokanMounter service installation failed:\n" +
+                        FormatMessage(error) + errText + " " +
+                        szProgramFilesDir + "\\Dokan\\DokanLibrary\\mounter.exe", SEVERE);
+        endif;
+    endif;
+    if (!ServiceExistsService("orangefs-client")) then
+        rc = ServiceAddService("orangefs-client",
+                               "OrangeFS Client",
+                               "Allows transparent access to Orange file systems.",
+                               INSTALLDIR ^ "\\orangefs-client -service",
+                               FALSE,
+                               "");
+        if (rc < ISERR_SUCCESS) then
+            GetExtendedErrInfo(file, line, error);
+            Sprintf(errText, " (%d)", error);
+            MessageBox("OrangeFS Client service installation failed:\n" +
+                        FormatMessage(error) + errText + " " +
+                        INSTALLDIR + "\\orangefs-client -service", SEVERE);
+        endif;
+    endif;
+end;
+                        
+//---------------------------------------------------------------------------
+// OnFirstUIAfter
+//
+// The OnFirstUIAfter event called by the framework after the file transfer
+// of the setup when the setup is running in first install mode. By default
+// this event displays UI that informs the end user that the setup has been
+// completed successfully.
+//---------------------------------------------------------------------------
+function OnFirstUIAfter()
+    STRING szTitle, szMsg1, szMsg2, szOpt1, szOpt2, szTemp;
+    STRING szFSURI, szMountPoint, szUserMapMode;
+    STRING szUserID, szUID, szGID;
+    STRING szCertPrefixDir;
+    NUMBER bOpt1, bOpt2, nUserMapMode, nRC;    
+    NUMBER nCertMapMode;
+    BOOL bLDAP_AD, bLDAP_eDir, bLDAP_Custom;
+    NUMBER nLDAPMapDefault;
+    STRING szHost, szUserDN, szPassword, szRoot, szClass, 
+           szNamingAttr, szUIDAttr, szGIDAttr;
+    NUMBER nScope;
+    NUMBER nFileHandle;
+begin
+	Disable(STATUSEX);
+
+	bOpt1   = FALSE;
+    bOpt2   = FALSE;  
+          
+    // in silent mode, a preconfigured orangefstab and orangefs.cfg
+    // are installed
+    if (MODE = SILENTMODE) goto Label_DlgSkip;
+    
+Dlg_MountPointUserMap:
+    // prompt for file system location, mount point and user mapping mode
+    Disable(BACKBUTTON);
+    nUserMapMode = 0;
+    nRC = MountPointUserModeDialog(szFSURI, szMountPoint, nUserMapMode);
+    
+Dlg_UserMap:
+    // prompt for user mapping settings
+    Enable(BACKBUTTON);
+    switch(nUserMapMode)
+        case USERMAP_LIST:
+            nRC = ListMapDialog(szUserID, szUID, szGID); 
+        case USERMAP_CERT:
+            nRC = CertMapDialog(nUserMapMode, szCertPrefixDir);
+        case USERMAP_LDAP:
+            bLDAP_AD = TRUE;
+            bLDAP_eDir = FALSE;
+            bLDAP_Custom = FALSE;
+            AskOptions(EXCLUSIVE, "Select LDAP Default Values", "Microsoft Active Directory", bLDAP_AD, 
+                       "Novell eDirectory", bLDAP_eDir, "Custom (no defaults)", bLDAP_Custom);
+            if (bLDAP_AD) then
+                nLDAPMapDefault = LDAPMAP_AD;
+            elseif (bLDAP_eDir) then
+                nLDAPMapDefault = LDAPMAP_EDIR;
+            else
+                nLDAPMapDefault = LDAPMAP_CUSTOM;
+            endif;
+            nRC = LDAPMapDialog(nLDAPMapDefault, szHost, szUserDN, szPassword, szRoot, nScope,
+                                szClass, szNamingAttr, szUIDAttr, szGIDAttr);
+    endswitch;
+    
+    if (nRC = BUTTON_BACK) then
+        goto Dlg_MountPointUserMap;
+    endif;
+        
+    WriteOrangeFSTab(szFSURI);
+    
+    InitConfigFile(nFileHandle, szMountPoint);
+    switch (nUserMapMode)
+       case USERMAP_LIST:
+           WriteListMapConfig(nFileHandle, szUserID, szUID, szGID);
+       case USERMAP_CERT:
+           WriteCertMapConfig(nFileHandle, szCertPrefixDir);
+       case USERMAP_LDAP:
+           WriteLDAPMapConfig(nFileHandle, szHost, szUserDN, szPassword, szRoot, nScope,
+                              szClass, szNamingAttr, szUIDAttr, szGIDAttr);
+    endswitch;
+    CloseConfigFile(nFileHandle);
+
+Label_DlgSkip:
+        
+    InstallServices();
+    
+    InstallDriver();    
+
+    if ( BATCH_INSTALL ) then
+    	SdFinishReboot ( szTitle , szMsg1 , SYS_BOOTMACHINE , szMsg2 , 0 );
+    else
+        szOpt1 = "Start the OrangeFS services";
+        bOpt1 = TRUE;
+	    SdFinish ( szTitle , szMsg1 , szMsg2 , szOpt1 , szOpt2 , bOpt1 , bOpt2 );
+	    
+        if (bOpt1) then
+            ServiceStartService("DokanMounter", "");
+            ServiceStartService("orangefs-client", "");
+        endif;
+	endif;
+end;
+//---------------------------------------------------------------------------
+// OnMaintUIBefore
+//
+// The OnMaintUIBefore event is called by the framework when the setup is
+// running in maintenance mode. By default this event displays UI that
+// allows the end user to add or remove features, repair currently
+// installed features or uninstall the application.
+//---------------------------------------------------------------------------
+function OnMaintUIBefore()
+	NUMBER nResult, nType;
+	STRING szTitle, szMsg, svDir, svResult, szCaption, szExePath;
+begin
+	// TO DO: if you want to enable background, window title, and caption bar title   								
+	// SetTitle( @PRODUCT_NAME, 24, WHITE );					
+	// SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION );  			
+	// SetColor(BACKGROUND,RGB (0, 128, 128));					
+	// Enable( FULLWINDOWMODE );						
+	// Enable( BACKGROUND );							
+	                       
+	// prompt to remove program
+	svResult = SdLoadString(IFX_MAINTUI_MSG);
+	szCaption = SdLoadString(IFX_ONMAINTUI_CAPTION);
+	nResult = SprintfBox(MB_OKCANCEL, szCaption, "%s", svResult);
+	if (nResult = IDOK) then
+	    // Stop and remove the services
+	    ServiceStopService("orangefs-client");
+	    ServiceRemoveService("orangefs-client");
+	    ServiceStopService("DokanMounter");
+	    ServiceRemoveService("DokanMounter");
+	    
+	    // uninstall driver
+        szExePath = szProgramFilesDir ^ "\\Dokan\\DokanLibrary\\dokanctl.exe";
+    
+        LaunchAppAndWait(szExePath, "/r d", LAAW_OPTION_WAIT);
+                                       
+        // remove files etc.
+        FeatureRemoveAll();
+        
+        // setup default status
+        SetStatusWindow(0, "");
+        Enable(STATUSEX);
+        StatusUpdate(ON, 100);
+    endif;                                       
+	
+/*	
+Dlg_Start:
+
+    // Added in Version 9.5 - Support for REMOVEONLY option.
+    if( !REMOVEONLY ) then
+		// In standard mode show maintenance dialog
+		Disable(BACKBUTTON);
+		nType = SdWelcomeMaint(szTitle, szMsg, MODIFY);
+		Enable(BACKBUTTON);
+	else
+        // Hide the initial progress dialog as otherwise the user can
+        // click on it, and hide the MessageBox.
+        Disable( DIALOGCACHE );
+
+        // In RemoveOnly mode, set to remove.
+        nType = REMOVEALL;
+    endif;
+	
+	// Show Uninstall Confirmation Dialog
+    if ( nType = REMOVEALL ) then
+		nResult = MessageBox( SdLoadString( IFX_MAINTUI_MSG ), MB_YESNO );
+		if (nResult != IDYES ) then
+            
+            if( REMOVEONLY ) then
+                // In REMOVEONLY mode, abort the setup.
+                abort;
+            else
+                // In non-REMOVEONLY mode, redisplay the previous dialog.
+			    goto Dlg_Start;
+            endif;
+
+		endif;
+	endif;
+
+	nResult = NEXT;
+
+Dlg_SdFeatureTree:
+	if (nType = MODIFY) then
+		szTitle = "";
+		szMsg = "";
+		nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+		if (nResult = BACK) goto Dlg_Start;
+	endif;
+
+	switch(nType)
+        case REMOVEALL: 
+        
+            ComponentRemoveAll();
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_REMOVEALL ) );
+
+        case REPAIR:
+        
+            ComponentReinstall();
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_REPAIR ) );
+
+
+        case MODIFY:
+
+            // Added in IS 2009 - Set appropriate StatusEx static text.
+            SetStatusExStaticText( SdLoadString( IDS_IFX_STATUSEX_STATICTEXT_MAINTUI_MODIFY ) );
+
+    endswitch;
+    
+	Enable(STATUSEX);
+*/
+end;

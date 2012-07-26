@@ -1,0 +1,117 @@
+#!/bin/sh
+#
+#
+#
+#set -x
+
+if [ $# -lt 1 ]; then
+   echo "Usage: $0 <tagnames>"
+   echo "        e.g. $0 HEAD Orange-Branch"
+   exit 0
+fi
+
+# CVS tags to check out and test
+#CVSTAGS="HEAD Orange-Branch"
+#CVSTAGS="Orange-Branch"
+CVSTAGS=$*
+echo "Testing tags $CVSTAGS"
+
+export CVSROOT=cvs.parl.clemson.edu:/projects/cvsroot
+export CVS_RSH=/usr/bin/ssh
+
+# directory paths
+PATH_SUFFIX=$(cd `dirname $0`; pwd)
+thedate=`date +%Y%m%d`
+base_dir=/tmp/$USER/pvfs2-nightly/$thedate
+#auto_dir=/usr/local/pvfs2-nightly/test/automated
+auto_dir=${PATH_SUFFIX}/automated
+orange_tests_dir=/usr/local/pvfs2-nightly/orange-tests.d
+
+# diff files we want to be emailed 
+email_diffs=""
+email="${USER}@clemson.edu"
+
+
+# cleans up previous runs and makes new run directory
+initial_setup () {
+  # remove any previous run
+  if [ ! -d /tmp/$USER/pvfs2-nightly ]; then
+	mkdir -p /tmp/$USER/pvfs2-nightly
+  fi
+  if [ -d $base_dir ]; then
+        new_name=$base_dir.`ls -ld --time-style=long-iso $base_dir | cut -d ' ' -f 7`
+        echo "Renaming existing test directory $base_dir to $new_name."
+        mv $base_dir $new_name
+  fi
+  rm -fr $base_dir 2>&1 > /dev/null
+  mkdir -p $base_dir
+}
+
+
+
+# show differences between CVS tags
+diff_pvfs_tags () {
+  diffs_exist=0
+  cd $base_dir
+  # do a cvs rdiff on each branch tag
+  for tag1 in $CVSTAGS
+  do
+    for tag2 in $CVSTAGS
+    do
+      if [ "$tag1" != "$tag2" ]; then
+        diffs_exist=1
+        cvs -Q rdiff -R -s -r $tag1 -r $tag2 pvfs2 >  ${tag1}_vs_${tag2}.diff 
+      fi
+    done
+  done
+  # email any requested diffs
+  if [ "$diffs_exists" = "1" ]; then
+    cd $base_dir
+    for file1 in `ls *.diff`
+    do
+      for file2 in $email_diffs
+      do
+        if [ "$file1" = "$file2" ]; then
+          mailx -s "orange nightly: $file2" $email < $base_dir/$file2
+        fi
+      done
+    done
+  fi
+}
+
+
+# Runs the standard PVFS build tests and also runs
+# the orange performance tests
+run_pvfs_tests () {
+  tag=$1
+  mkdir -p $base_dir/$tag
+  mkdir -p $base_dir/$tag/mount
+  cd $auto_dir
+  # generate the test config file 
+  cat > /tmp/$USER/nightly-tests.cfg << EOF
+export CVS_TAG="$tag"
+export PVFS2_DEST=$base_dir/$tag
+#export PVFS2_MOUNTPOINT=/scratch/pvfs2-nightly
+export PVFS2_MOUNTPOINT=$base_dir/$tag/mount
+EOF
+  # Run the standard PVFS tests
+  ./testscrpt.sh
+
+  # now run the orange performance tests
+#  cd $orange_tests_dir
+#  for i in `ls *.pbs` 
+#  do
+#    cd $base_dir/$tag
+#    ssh -t user001 qsub -v CVS_TAG=$tag,PVFS2_DEST=$base_dir/$tag -o $base_dir/$tag/${i}-${tag}.stdout -e $base_dir/$tag/${i}-${tag}.stderr $orange_tests_dir/$i
+#  done
+}
+
+
+### Main program
+initial_setup
+diff_pvfs_tags
+
+for tag in $CVSTAGS
+do
+  run_pvfs_tests $tag
+done

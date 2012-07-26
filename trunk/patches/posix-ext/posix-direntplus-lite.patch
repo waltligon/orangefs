@@ -1,0 +1,441 @@
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/arch/i386/kernel/syscall_table.S vanilla-new/arch/i386/kernel/syscall_table.S
+--- vanilla/arch/i386/kernel/syscall_table.S	2006-08-29 17:56:17.000000000 -0500
++++ vanilla-new/arch/i386/kernel/syscall_table.S	2006-09-04 05:03:44.000000000 -0500
+@@ -322,3 +322,5 @@
+ 	.long sys_getdents64_plus /* 320 */
+ 	.long sys_readx
+ 	.long sys_writex
++	.long sys_getdents_plus_lite
++	.long sys_getdents64_plus_lite
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/readdir.c vanilla-new/fs/readdir.c
+--- vanilla/fs/readdir.c	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/fs/readdir.c	2006-09-04 04:49:14.000000000 -0500
+@@ -69,6 +69,33 @@
+ 
+ EXPORT_SYMBOL_GPL(vfs_readdirplus);
+ 
++int vfs_readdirplus_lite(struct file *file, unsigned long lite_mask,
++		filldirpluslite_t fillerpluslite, void *buf)
++{
++	struct inode *inode = file->f_dentry->d_inode;
++	int res = -ENOTDIR;
++	if (!file->f_op || !file->f_op->readdirplus_lite)
++		goto out;
++
++	res = security_file_permission(file, MAY_READ);
++	if (res)
++		goto out;
++
++	mutex_lock(&inode->i_mutex);
++	res = -ENOENT;
++	if (!IS_DEADDIR(inode)) {
++		res = file->f_op->readdirplus_lite(file, lite_mask, buf, fillerpluslite);
++		file_accessed(file);
++	}
++	mutex_unlock(&inode->i_mutex);
++out:
++	if (file->f_op && file->f_op->readdir && !file->f_op->readdirplus_lite)
++		res = -EOPNOTSUPP;
++	return res;
++}
++
++EXPORT_SYMBOL_GPL(vfs_readdirplus_lite);
++
+ /*
+  * Traditional linux readdir() handling..
+  *
+@@ -343,6 +370,112 @@
+ 	return error;
+ }
+ 
++/* getdents_plus_lite implementation */
++#define DIRENT_OFFSET(de) ((unsigned long) &((de)->dp_dirent) - (unsigned long) (char __user *) (de))
++
++struct linux_dirent_plus_lite {
++	struct stat_lite     dp_stat_lite;
++	int                  dp_stat_lite_err;
++	struct linux_dirent  dp_dirent;
++};
++
++struct getdentspluslite_callback {
++	struct linux_dirent_plus_lite __user * current_dir;
++	struct linux_dirent_plus_lite __user * previous;
++	int count;
++	int error;
++};
++
++static int filldirpluslite(void * __buf, const char * name, int namlen, loff_t offset,
++		   ino_t ino, unsigned int d_type, struct kstat_lite *statp)
++{
++	struct linux_dirent __user *de;
++	struct linux_dirent_plus_lite __user * dirent;
++	struct getdentspluslite_callback * buf = (struct getdentspluslite_callback *) __buf;
++	int err, reclen = ROUND_UP(NAME_OFFSET(de) + namlen + DIRENT_OFFSET(dirent) + 2);
++
++	buf->error = -EINVAL;	/* only used if we fail.. */
++	if (reclen > buf->count)
++		return -EINVAL;
++	dirent = buf->previous;
++	if (dirent) {
++		if (__put_user(offset, &dirent->dp_dirent.d_off))
++			goto efault;
++	}
++	dirent = buf->current_dir;
++	err = 0;
++	if (IS_ERR(statp)) {
++		err = PTR_ERR(statp);
++		if (__put_user(err, &dirent->dp_stat_lite_err))
++			goto efault;
++	}
++	else {
++		if (__put_user(err, &dirent->dp_stat_lite_err))
++			goto efault;
++		if (cp_new_statlite(statp, &dirent->dp_stat_lite))
++			goto efault;
++	}
++	if (__put_user(ino, &dirent->dp_dirent.d_ino))
++		goto efault;
++	if (__put_user(reclen, &dirent->dp_dirent.d_reclen))
++		goto efault;
++	if (copy_to_user(dirent->dp_dirent.d_name, name, namlen))
++		goto efault;
++	if (__put_user(0, dirent->dp_dirent.d_name + namlen))
++		goto efault;
++	if (__put_user(d_type, (char __user *) dirent + reclen - 1))
++		goto efault;
++	buf->previous = dirent;
++	dirent = (void __user *)dirent + reclen;
++	buf->current_dir = dirent;
++	buf->count -= reclen;
++	return 0;
++efault:
++	buf->error = -EFAULT;
++	return -EFAULT;
++}
++
++asmlinkage long sys_getdents_plus_lite(unsigned int fd, unsigned long lite_mask, 
++		struct linux_dirent_plus_lite __user * dirent, unsigned int count)
++{
++	struct file * file;
++	struct linux_dirent_plus_lite __user * lastdirent;
++	struct getdentspluslite_callback buf;
++	int error;
++
++	error = -EFAULT;
++	if (!access_ok(VERIFY_WRITE, dirent, count))
++		goto out;
++
++	error = -EBADF;
++	file = fget(fd);
++	if (!file)
++		goto out;
++
++	buf.current_dir = dirent;
++	buf.previous = NULL;
++	buf.count = count;
++	buf.error = 0;
++
++	error = vfs_readdirplus_lite(file, lite_mask, filldirpluslite, &buf);
++	if (error < 0)
++		goto out_putf;
++	error = buf.error;
++	lastdirent = buf.previous;
++	if (lastdirent) {
++		typeof(lastdirent->dp_dirent.d_off) d_off = file->f_pos;
++		error = -EFAULT;
++		if (__put_user(d_off, &lastdirent->dp_dirent.d_off))
++			goto out_putf;
++		error = count - buf.count;
++	}
++
++out_putf:
++	fput(file);
++out:
++	return error;
++}
++
+ #define ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
+ 
+ struct getdents_callback64 {
+@@ -531,3 +664,106 @@
+ out:
+ 	return error;
+ }
++
++struct getdentspluslite_callback64 {
++	struct linux_dirent64_plus_lite __user * current_dir;
++	struct linux_dirent64_plus_lite __user * previous;
++	int count;
++	int error;
++};
++
++static int filldir64_plus_lite(void * __buf, const char * name, int namlen, loff_t offset,
++		     ino_t ino, unsigned int d_type, struct kstat_lite *statp)
++{
++	struct linux_dirent64 __user *de;
++	struct linux_dirent64_plus_lite __user *dirent;
++	struct getdentspluslite_callback64 * buf = (struct getdentspluslite_callback64 *) __buf;
++	int err, reclen = ROUND_UP64(NAME_OFFSET(de) + namlen + 1 + DIRENT_OFFSET(dirent));
++
++	buf->error = -EINVAL;	/* only used if we fail.. */
++	if (reclen > buf->count)
++		return -EINVAL;
++	dirent = buf->previous;
++	if (dirent) {
++		if (__put_user(offset, &dirent->dp_dirent.d_off))
++			goto efault;
++	}
++	dirent = buf->current_dir;
++	err = 0;
++	if (IS_ERR(statp)) {
++		err = PTR_ERR(statp);
++		if (__put_user(err, &dirent->dp_stat_lite_err))
++			goto efault;
++	}
++	else {
++		if (__put_user(err, &dirent->dp_stat_lite_err))
++			goto efault;
++#ifdef __ARCH_WANT_STAT64
++		if (cp_new_stat64_lite(statp, &dirent->dp_stat_lite))
++#else
++		if (cp_new_statlite(statp, &dirent->dp_stat_lite))
++#endif
++			goto efault;
++	}
++	if (__put_user(ino, &dirent->dp_dirent.d_ino))
++		goto efault;
++	if (__put_user(0, &dirent->dp_dirent.d_off))
++		goto efault;
++	if (__put_user(reclen, &dirent->dp_dirent.d_reclen))
++		goto efault;
++	if (__put_user(d_type, &dirent->dp_dirent.d_type))
++		goto efault;
++	if (copy_to_user(dirent->dp_dirent.d_name, name, namlen))
++		goto efault;
++	if (__put_user(0, dirent->dp_dirent.d_name + namlen))
++		goto efault;
++	buf->previous = dirent;
++	dirent = (void __user *)dirent + reclen;
++	buf->current_dir = dirent;
++	buf->count -= reclen;
++	return 0;
++efault:
++	buf->error = -EFAULT;
++	return -EFAULT;
++}
++
++asmlinkage long sys_getdents64_plus_lite(unsigned int fd, unsigned long lite_mask, 
++		struct linux_dirent64_plus_lite __user * dirent, unsigned int count)
++{
++	struct file * file;
++	struct linux_dirent64_plus_lite __user * lastdirent;
++	struct getdentspluslite_callback64 buf;
++	int error;
++
++	error = -EFAULT;
++	if (!access_ok(VERIFY_WRITE, dirent, count))
++		goto out;
++
++	error = -EBADF;
++	file = fget(fd);
++	if (!file)
++		goto out;
++
++	buf.current_dir = dirent;
++	buf.previous = NULL;
++	buf.count = count;
++	buf.error = 0;
++
++	error = vfs_readdirplus_lite(file, lite_mask, filldir64_plus_lite, &buf);
++	if (error < 0)
++		goto out_putf;
++	error = buf.error;
++	lastdirent = buf.previous;
++	if (lastdirent) {
++		typeof(lastdirent->dp_dirent.d_off) d_off = file->f_pos;
++		error = -EFAULT;
++		if (__put_user(d_off, &lastdirent->dp_dirent.d_off))
++			goto out_putf;
++		error = count - buf.count;
++	}
++
++out_putf:
++	fput(file);
++out:
++	return error;
++}
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/dirent.h vanilla-new/include/asm-i386/dirent.h
+--- vanilla/include/asm-i386/dirent.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-i386/dirent.h	2006-09-04 04:59:36.000000000 -0500
+@@ -9,12 +9,24 @@
+ 	struct dirent dp_dirent;
+ };
+ 
++struct dirent_plus_lite {
++	struct stat_lite dp_stat_lite;
++	int              dp_stat_lite_err;
++	struct dirent    dp_dirent;
++};
++
+ struct dirent64_plus {
+ 	struct stat64   dp_stat;
+ 	int             dp_stat_err;
+ 	struct dirent64 dp_dirent;
+ };
+ 
++struct dirent64_plus_lite {
++	struct stat64_lite   dp_stat_lite;
++	int                  dp_stat_lite_err;
++	struct dirent64 	   dp_dirent;
++};
++
+ #ifdef __KERNEL__
+ 
+ struct linux_dirent64_plus {
+@@ -23,6 +35,12 @@
+ 	struct linux_dirent64 dp_dirent;
+ };
+ 
++struct linux_dirent64_plus_lite {
++	struct stat64_lite    dp_stat_lite;
++	int                   dp_stat_lite_err;
++	struct linux_dirent64 dp_dirent;
++};
++
+ #endif
+ 
+ #endif
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/unistd.h vanilla-new/include/asm-i386/unistd.h
+--- vanilla/include/asm-i386/unistd.h	2006-08-29 17:56:17.000000000 -0500
++++ vanilla-new/include/asm-i386/unistd.h	2006-09-04 05:04:09.000000000 -0500
+@@ -328,8 +328,10 @@
+ #define __NR_getdents64_plus 320
+ #define __NR_readx      321
+ #define __NR_writex     322
++#define __NR_getdents_plus_lite 323
++#define __NR_getdents64_plus_lite 324
+ 
+-#define NR_syscalls 323
++#define NR_syscalls 325
+ 
+ /*
+  * user-visible error numbers are in the range -1 - -128: see
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/dirent.h vanilla-new/include/asm-x86_64/dirent.h
+--- vanilla/include/asm-x86_64/dirent.h	2006-05-24 16:19:07.000000000 -0500
++++ vanilla-new/include/asm-x86_64/dirent.h	2006-09-04 04:57:56.000000000 -0500
+@@ -9,12 +9,24 @@
+ 	struct dirent dp_dirent;
+ };
+ 
++struct dirent_plus_lite {
++	struct stat_lite dp_stat_lite;
++	int              dp_stat_lite_err;
++	struct dirent    dp_dirent;
++};
++
+ struct dirent64_plus {
+ 	struct stat     dp_stat;
+ 	int             dp_stat_err;
+ 	struct dirent64 dp_dirent;
+ };
+ 
++struct dirent64_plus_lite {
++	struct stat_lite dp_stat_lite;
++	int              dp_stat_lite_err;
++	struct dirent64  dp_dirent;
++};
++
+ #ifdef __KERNEL__
+ 
+ struct linux_dirent64_plus {
+@@ -23,6 +35,12 @@
+ 	struct linux_dirent64 dp_dirent;
+ };
+ 
++struct linux_dirent64_plus_lite {
++	struct stat_lite      dp_stat_lite;
++	int                   dp_stat_lite_err;
++	struct linux_dirent64 dp_dirent;
++};
++
+ #endif
+ 
+ #endif
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/unistd.h vanilla-new/include/asm-x86_64/unistd.h
+--- vanilla/include/asm-x86_64/unistd.h	2006-08-29 17:56:17.000000000 -0500
++++ vanilla-new/include/asm-x86_64/unistd.h	2006-09-04 05:04:44.000000000 -0500
+@@ -623,8 +623,12 @@
+ __SYSCALL(__NR_readx, sys_readx)
+ #define __NR_writex 281
+ __SYSCALL(__NR_writex, sys_writex)
++#define __NR_getdents_plus_lite 282
++__SYSCALL(__NR_getdents_plus_lite, sys_getdents_plus_lite)
++#define __NR_getdents64_plus_lite 283
++__SYSCALL(__NR_getdents64_plus_lite, sys_getdents64_plus_lite)
+ 
+-#define __NR_syscall_max __NR_writex
++#define __NR_syscall_max __NR_getdents64_plus_lite
+ 
+ #ifndef __NO_STUBS
+ 
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/fs.h vanilla-new/include/linux/fs.h
+--- vanilla/include/linux/fs.h	2006-08-29 17:56:17.000000000 -0500
++++ vanilla-new/include/linux/fs.h	2006-09-04 04:55:48.000000000 -0500
+@@ -957,6 +957,13 @@
+  */
+ typedef int (*filldirplus_t)(void *, const char *, int, loff_t, ino_t, unsigned, struct kstat *);
+ 
++/* 
++ * This is the "filldirplus_lite function type, used by readdirplus_lite() to let
++ * the kernel specify the kind of dirent layout and the stat_lite information
++ * all in one shot
++ */
++typedef int (*filldirpluslite_t)(void *, const char *, int, loff_t, ino_t, unsigned, struct kstat_lite *);
++
+ struct block_device_operations {
+ 	int (*open) (struct inode *, struct file *);
+ 	int (*release) (struct inode *, struct file *);
+@@ -1032,6 +1039,7 @@
+ 	ssize_t (*aio_write) (struct kiocb *, const char __user *, size_t, loff_t);
+ 	int (*readdir) (struct file *, void *, filldir_t);
+ 	int (*readdirplus) (struct file *, void *, filldirplus_t);
++	int (*readdirplus_lite) (struct file *, unsigned long, void *, filldirpluslite_t);
+ 	unsigned int (*poll) (struct file *, struct poll_table_struct *);
+ 	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
+ 	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+@@ -1728,6 +1736,7 @@
+ 
+ extern int vfs_readdir(struct file *, filldir_t, void *);
+ extern int vfs_readdirplus(struct file *, filldirplus_t, void *);
++extern int vfs_readdirplus_lite(struct file *file, unsigned long, filldirpluslite_t fillerpluslite, void *buf);
+ extern int cp_new_stat(struct kstat *stat, struct stat __user *statbuf);
+ extern int cp_new_statlite(struct kstat_lite *stat_lite, struct stat_lite __user *statlitebuf);
+ #ifdef __ARCH_WANT_STAT64
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/syscalls.h vanilla-new/include/linux/syscalls.h
+--- vanilla/include/linux/syscalls.h	2006-08-29 17:56:17.000000000 -0500
++++ vanilla-new/include/linux/syscalls.h	2006-09-04 05:00:20.000000000 -0500
+@@ -25,6 +25,8 @@
+ struct linux_dirent64;
+ struct linux_dirent_plus;
+ struct linux_dirent64_plus;
++struct linux_dirent_plus_lite;
++struct linux_dirent64_plus_lite;
+ struct list_head;
+ struct msgbuf;
+ struct msghdr;
+@@ -434,9 +436,15 @@
+ asmlinkage long sys_getdents_plus(unsigned int fd,
+ 				struct linux_dirent_plus __user *dirent,
+ 				unsigned int count);
++asmlinkage long sys_getdents_plus_lite(unsigned int fd, unsigned long lite_mask,
++				struct linux_dirent_plus_lite __user *dirent,
++				unsigned int count);
+ asmlinkage long sys_getdents64_plus(unsigned int fd,
+ 				struct linux_dirent64_plus __user *dirent,
+ 				unsigned int count);
++asmlinkage long sys_getdents64_plus_lite(unsigned int fd, unsigned long lite_mask,
++				struct linux_dirent64_plus_lite __user *dirent,
++				unsigned int count);
+ 
+ asmlinkage long sys_setsockopt(int fd, int level, int optname,
+ 				char __user *optval, int optlen);

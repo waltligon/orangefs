@@ -1,0 +1,60 @@
+#
+# Makefile stub for bmi_ib.
+#
+# Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
+#
+# See COPYING in top-level directory.
+#
+
+# only do any of this if configure decided to use IB on OpenIB
+ifneq (,$(BUILD_IB)$(BUILD_OPENIB))
+
+#
+# Local definitions.
+#
+DIR := src/io/bmi/bmi_ib
+cfiles := ib.c util.c mem.c
+apis :=
+
+ifdef BUILD_IB
+cfiles += vapi.c
+apis += -DVAPI
+endif
+ifdef BUILD_OPENIB
+cfiles += openib.c
+apis += -DOPENIB
+endif
+
+#
+# Export these to the top Makefile to tell it what to build.
+#
+src := $(patsubst %,$(DIR)/%,$(cfiles))
+LIBSRC    += $(src)
+SERVERSRC += $(src)
+LIBBMISRC += $(src)
+
+#
+# Add extra include paths and warnings just for this directory.
+#
+cflags :=
+ifdef GNUC
+cflags += -W -Wcast-qual -Wshadow -Wwrite-strings
+endif
+
+#
+# Extra cflags for files in this directory.
+#
+MODCFLAGS_$(DIR) := $(cflags)
+
+#
+# Each particular IB API needs its headers.
+#
+MODCFLAGS_$(DIR)/vapi.c := -I@IB_INCDIR@
+MODCFLAGS_$(DIR)/openib.c := -I@OPENIB_INCDIR@
+
+#
+# Tell the main driver about the APIs that are available.
+#
+MODCFLAGS_$(DIR)/ib.c := $(apis)
+
+endif  # BUILD_IB or BUILD_OPENIB

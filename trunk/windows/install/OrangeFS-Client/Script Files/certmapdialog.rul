@@ -1,0 +1,76 @@
+#include "Ifx.h"
+
+// Control Constants
+#define BUTTON_NEXT      1
+#define BUTTON_BACK     12
+#define BUTTON_CANCEL2   9  
+#define RB_PROFILE    1323
+#define RB_PREFIX     1324
+#define EDIT_PREFIX   1326
+                          
+#define CERTMAP_PROFILE  1
+#define CERTMAP_PREFIX   2
+
+prototype EnableItem(STRING, NUMBER, BOOL);
+prototype CertMapDialog(BYREF NUMBER, BYREF STRING);
+
+// Enable/disable dialog control
+function EnableItem(sDialogName, nControlID, bEnabled)
+    HWND hDialog, hInstance;
+begin                       
+    hDialog = CmdGetHwndDlg(sDialogName);
+    hInstance = GetDlgItem(hDialog, nControlID);
+    
+    EnableWindow(hInstance, bEnabled);
+end;
+
+function CertMapDialog(nvCertMapMode, svCertPrefixDir)
+    NUMBER nControl, nResult;
+    BOOL bDone;
+begin
+    EzDefineDialog("CertMapDialog",
+                   ISUSER,
+                   "CertMapDialog",
+                   0);
+    
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("CertMapDialog");
+        switch (nControl)
+            case DLG_INIT:
+                // select profile button
+                CtrlSetState("CertMapDialog", RB_PROFILE, BUTTON_CHECKED);
+            case RB_PROFILE:
+                // disable prefix edit
+                if (CtrlGetState("CertMapDialog", RB_PROFILE) = BUTTON_CHECKED) then
+                    EnableItem("CertMapDialog", EDIT_PREFIX, FALSE);
+                endif;
+            case RB_PREFIX:
+                // enable prefix edit
+                if (CtrlGetState("CertMapDialog", RB_PREFIX) = BUTTON_CHECKED) then
+                    EnableItem("CertMapDialog", EDIT_PREFIX, TRUE);
+                endif;
+            case BUTTON_NEXT:
+                // get map mode
+                if (CtrlGetState("CertMapDialog", RB_PROFILE) = BUTTON_CHECKED) then
+                    nvCertMapMode = CERTMAP_PROFILE;
+                else
+                    nvCertMapMode = CERTMAP_PREFIX;
+                endif; 
+                // get prefix dir
+                CtrlGetText("CertMapDialog", EDIT_PREFIX, svCertPrefixDir);
+                bDone = TRUE;
+                nResult = BUTTON_NEXT;
+            case BUTTON_BACK:
+                bDone = TRUE;
+                nResult = BUTTON_BACK;
+            case BUTTON_CANCEL2:
+                Do(EXIT);
+        endswitch;
+    endwhile;
+    
+    EndDialog("CertMapDialog");
+    ReleaseDialog("CertMapDialog");
+    
+    return nResult;
+end;

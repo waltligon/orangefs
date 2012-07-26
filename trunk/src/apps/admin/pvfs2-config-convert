@@ -1,0 +1,153 @@
+#!/usr/bin/perl -w
+#
+#  (C) 2001 Clemson University and The University of Chicago
+#
+#  See COPYING in top-level directory.
+#
+# convert old format pvfs2 config files to the new single config format.
+#
+use Term::ReadLine;
+use Getopt::Long;
+
+# turn on strictness
+use strict 'vars';
+
+my $opt_servers = '';
+my $show_help = '';
+
+sub usage
+{
+
+    print STDERR <<"THIS";    
+Usage: pvfs2-config-convert [OPTIONS] <old-fs.conf> <old-server.conf> <new-fs.conf>
+
+  The pvfs2-config-convert utility converts old fs.conf and server.conf config
+  files to the new format, where only a single fs.conf is used.  Each of the
+  options in the server.conf files will be added to the new fs.conf.  Note that
+  this script does not support server.conf files generated for configurations where
+  multiple servers are run on the same node.
+
+  This script requires the following argument:
+
+       --servers   <STRING>   hostnames of all servers.  Can be
+                                <prefix>{#-#,#,#-#,...}
+
+The rest of the arguments are optional:
+
+       --help                 This message
+
+THIS
+
+}
+
+GetOptions('servers=s' => \$opt_servers,
+           'help'      => \$show_help) 
+    or die "Could not parse arguments.  See -h for help\n";
+
+if($show_help)
+{
+    usage();
+    exit;
+}
+
+if($opt_servers eq '')
+{
+    die "Bad arguments. See -h for help.\n";
+}
+
+if(@ARGV != 3)
+{
+    die "Bad arguments. See -h for help.\n";
+}
+
+my @servers = parse_hostlist($opt_servers);
+
+open(NEWFSCONF, ">", $ARGV[2]) or die "Failed to create new fs.conf: $ARGV[2]: $!\n";
+open(OLDFSCONF, "<", $ARGV[0]) or die "Failed to open old fs.conf: $ARGV[0]: $!\n";
+
+my $line = undef;
+
+while(defined($line = <OLDFSCONF>))
+{
+    print NEWFSCONF $line;
+}
+
+close(OLDFSCONF);
+
+foreach my $s (@servers)
+{
+    open(OLDSCONF, "<", $ARGV[1] . "-$s") or die "Failed to open old server.conf: $ARGV[1]-$s: $!\n";
+
+    print NEWFSCONF "<ServerOptions>\n\tServer $s\n";
+    while(defined($line = <OLDSCONF>))
+    {
+        if($line !~ /HostID/)
+        {
+            print NEWFSCONF "\t" . $line;
+        }
+    }
+
+    print NEWFSCONF "</ServerOptions>\n";
+    close(OLDSCONF);
+}
+
+close(NEWFSCONF);
+
+sub parse_hostlist
+{
+    my $inputline = shift;
+    my @components = ();
+    my @hosts = ();
+
+    # we want to split the string into components seperated by comma
+    # but we don't want split components that have curly brackets.  For example,
+    # we need to be sure that "hosta{1-4,8-12},hostb,hostc{1,2,3}" splits to
+    # hosta{1-4,8-12}
+    # hostb
+    # hostc{1,2,3}
+    #
+    @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?))/g;
+    foreach my $comp (@components)
+    {
+        # if we've got a component that has {..}, then expand.
+        # match the prefix (hostname) and curly brackets
+        if($comp =~ /([^{]+){([^}]+)}/)
+        {
+            my $prefix = $1;
+            my $ranges = $2;
+
+            # split the ranges string on the commas
+            foreach my $r (split(/,/, $ranges))
+            {
+                if($r !~ /-/)
+                {
+                    # only one number, just push it on
+                }
+                else
+                {
+                    # min and max in this range.  Add each of the indexes
+                    my ($s, $f) = $r =~ /([0-9]+)-([0-9]+)/; 
+                    for(my $i = $s; $i <= $f; ++$i)
+                    {
+                        push @hosts, "$prefix$i";
+                    }
+                }
+            }
+        }
+        else {
+            push @hosts, $comp;
+        }
+    }
+    return @hosts;
+}
+
+
+
+# Local variables:
+#  c-indent-level: 4
+#  c-basic-offset: 4
+# End:
+#  
+# vim: ts=8 sts=4 sw=4 expandtab
+
+
