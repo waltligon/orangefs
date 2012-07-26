@@ -156,6 +156,8 @@ static int PINT_subreq(PVFS_offset offset,
     (*newreq)->num_nested_req = oldreq->num_nested_req + 1;
     (*newreq)->committed = 0;
     (*newreq)->refcount = 0;
+//    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS Request setup: req = %p, ereq"
+//                 " = %p\n", *newreq, oldreq);
     (*newreq)->ereq = oldreq;
     PINT_REQUEST_REFINC(oldreq);
     return PVFS_SUCCESS;

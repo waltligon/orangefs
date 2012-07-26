@@ -39,14 +39,15 @@ typedef enum
 /* the following structures contain operation dependent data for aio calls */
 struct PINT_aio_io_cb
 {
+    struct iovec vector;        /* in */
     pvfs_descriptor *pd;        /* in */
     enum PVFS_io_type which;    /* in */
     off64_t offset;             /* in */
-    void *buf;                  /* in */
-    PVFS_Request mem_req;       /* in */
-    PVFS_Request file_req;      /* in */
-    PVFS_sysresp_io io_resp;    /* in */
-    ssize_t *bcnt;              /* in/out */
+    void *sys_buf;              
+    PVFS_Request mem_req;       
+    PVFS_Request file_req;      
+    PVFS_sysresp_io io_resp;    
+    ssize_t *bcnt;              /* out */
 };
 
 struct PINT_aio_open_cb
@@ -55,6 +56,7 @@ struct PINT_aio_open_cb
     int flags;                      /* in */
     PVFS_hint file_creation_param;  /* in */
     int mode;                       /* in */
+    pvfs_descriptor *pdir;          /* in */
     int *fd;                        /* in/out */
     pvfs_descriptor *pd;            /* out */
 };
@@ -65,14 +67,11 @@ struct PINT_aio_open_cb
 struct pvfs_aiocb
 {
     PVFS_sys_op_id op_id; 
-    PVFS_credential *cred_p;
     PVFS_hint hints;
 
     PVFS_aio_op_code op_code;
     PVFS_error error_code;
     struct qlist_head link;
-
-    struct aiocb *a_cb; /* acb if present ???? */
 
     int (*call_back_fn)(void *c_dat, int status);
     void *call_back_dat;

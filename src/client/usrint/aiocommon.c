@@ -85,8 +85,8 @@ static void aiocommon_run_waiting_ops(void)
         gossip_debug(GOSSIP_USRINT_DEBUG, "Adding AIO CB %p to running list\n",
                      p_cb);
 
-        aiocommon_run_op(p_cb);
         gen_mutex_unlock(&aio_wait_list_mutex);
+        aiocommon_run_op(p_cb);
     }
 
     return;
@@ -95,21 +95,40 @@ static void aiocommon_run_waiting_ops(void)
 static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
 {
     int rc = 0;
+    PVFS_credential *cred;
 
+    rc = iocommon_cred(&cred);
+   
     switch(p_cb->op_code)
     {
         case PVFS_AIO_IO_OP:
+            
+            rc = PVFS_Request_contiguous(p_cb->u.io.vector.iov_len, PVFS_BYTE,
+                                         &(p_cb->u.io.file_req));
+            if (rc < 0)
+            {
+                rc = -PVFS_ENOMEM;
+                break;
+            }
+            rc = pvfs_convert_iovec(&(p_cb->u.io.vector), 1, &(p_cb->u.io.mem_req),
+                                    &(p_cb->u.io.sys_buf));
+            if (rc < 0)
+            {
+                rc = -PVFS_ENOMEM;
+                break;
+            }
+
             rc = PVFS_isys_io(p_cb->u.io.pd->s->pvfs_ref,
                               p_cb->u.io.file_req,
                               p_cb->u.io.offset,
-                              p_cb->u.io.buf,
+                              p_cb->u.io.sys_buf,
                               p_cb->u.io.mem_req,
-                              p_cb->cred_p,
+                              cred,
                               &(p_cb->u.io.io_resp),
                               p_cb->u.io.which,
                               &(p_cb->op_id),
                               p_cb->hints,
-                              (void *)p_cb);        
+                              (void *)p_cb);
             break;
         case PVFS_AIO_OPEN_OP:
             rc = PVFS_iaio_open(&(p_cb->u.open.pd),
@@ -117,8 +136,8 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                                 p_cb->u.open.flags, 
                                 p_cb->u.open.file_creation_param,
                                 p_cb->u.open.mode,
-                                NULL,
-                                p_cb->cred_p,
+                                p_cb->u.open.pdir,
+                                cred,
                                 &(p_cb->op_id),
                                 p_cb->hints,
                                 (void *)p_cb);

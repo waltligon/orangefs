@@ -870,6 +870,10 @@ PINT_Request *PINT_do_request_commit(PINT_Request *region, PINT_Request *node,
 		region[node->committed].ereq = NULL;
 	}
 
+/*    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS Request reg setup: req = %p, ereq = "
+                 "%p at depth %d \n", region[node->committed],
+                 region[node->committed].ereq, depth);
+*/
 	/* Update sreq so that the relative positions are maintained */
 	if (node->sreq)
 	{

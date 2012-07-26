@@ -26,7 +26,7 @@ int pvfs_aio_write(struct aiocb *aiocbp);
 int pvfs_lio_listio(int mode, struct aiocb * const list[], int nent,
 		    struct sigevent *sig);
 
-int pvfs_aio_open(const char *path, int flags, ...);
+int pvfs_aio_lio_callback(void *cdat, int status);
 
 /*
  * Local variables:

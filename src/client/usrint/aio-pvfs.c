@@ -16,8 +16,7 @@ int pvfs_aio_cancel(int fd, struct aiocb *aiocbp)
 
 int pvfs_aio_error(const struct aiocb *aiocbp)
 {
-   /* verify aiocbp and make sure the pvfs aiocb still exists (stored at __next_prio) */
-   if (!aiocbp || !aiocbp->__next_prio)
+   if (!aiocbp)
    {
       errno = EINVAL;
       return -1;
@@ -33,7 +32,7 @@ int pvfs_aio_read(struct aiocb *aiocbp)
 {
    if (!aiocbp)
    {
-      errno = EFAULT;
+      errno = EINVAL;
       return -1;
    }
    aiocbp->aio_lio_opcode = LIO_READ;
@@ -44,19 +43,11 @@ int pvfs_aio_read(struct aiocb *aiocbp)
 ssize_t pvfs_aio_return(struct aiocb *aiocbp)
 {
    /* if the aiocbp is invalid or the cb is still in progress, return an error */
-   if (!aiocbp || !aiocbp->__next_prio || (aiocbp->__error_code == EINPROGRESS))
+   if (!aiocbp || (aiocbp->__error_code == EINPROGRESS))
    {
       errno = EINVAL;
       return -1;
    }
-
-   /* remove the pvfs aiocb from internal structures (this will make future calls
-    * to return() or error() fail) */
-   aiocommon_remove_cb((struct pvfs_aiocb *)aiocbp->__next_prio);
-   free((struct pvfs_aiocb *)aiocbp->__next_prio);
-   aiocbp->__next_prio = NULL;
-
-   gossip_debug(GOSSIP_USRINT_DEBUG, "AIO CB %p removed\n", aiocbp);
 
    /* return the aio return value */
    return aiocbp->__return_value;
@@ -69,7 +60,7 @@ int pvfs_aio_write(struct aiocb *aiocbp)
 {
    if (!aiocbp)
    {
-      errno = EFAULT;
+      errno = EINVAL;
       return -1;
    }
    aiocbp->aio_lio_opcode = LIO_WRITE;
@@ -80,122 +71,102 @@ int pvfs_aio_write(struct aiocb *aiocbp)
 int pvfs_lio_listio(int mode, struct aiocb * const list[], int nent,
                     struct sigevent *sig)
 {
-   int i;
-   struct pvfs_aiocb **pvfs_list;   
+    int i;
+    pvfs_descriptor *pd = NULL;
+    struct pvfs_aiocb **pvfs_list;
  
-   /* TODO: HANDLE sig */
-   /* TODO: handle the mode argument, i.e. implement a wait function and call */
+    /* TODO: HANDLE sig */
+    /* TODO: handle the mode argument, i.e. implement a wait function and call */
 
-   if (nent > PVFS_AIO_LISTIO_MAX || (mode != LIO_WAIT && mode != LIO_NOWAIT))
-   {
-      errno = EINVAL;
-      return -1;
-   } 
-   
-   if (list == NULL)
-   {
-      errno = EFAULT;
-      return -1;
-   }
-
-   pvfs_list = (struct pvfs_aiocb **)malloc(nent * sizeof(struct pvfs_aiocb *));
-   if (pvfs_list == NULL)
-   {
-      errno = ENOMEM;
-      return -1;
-   }
-
-   for (i = 0; i < nent; i++)
-   {
-      /* if the control block is a NULL pointer, then ignore it */
-      if (list[i] == NULL)
-      {
-         nent--;
-         i--;
-         continue;
-      }
-
-      pvfs_list[i] = (struct pvfs_aiocb *)malloc(sizeof(struct pvfs_aiocb));
-      if (pvfs_list[i] == NULL)
-      {
-         errno = ENOMEM;
-         return -1;
-      }
-
-      /* make the aiocb and pvfscb point to each other */
-      pvfs_list[i]->a_cb = list[i];
-      list[i]->__next_prio = (void *)pvfs_list[i];
-   }
-
-   return aiocommon_lio_listio(pvfs_list, nent);
-}
-
-int pvfs_aio_open(const char *path, int flags, ...)
-{
-    va_list ap;
-    int mode;
-    PVFS_hint hints;
-    char *newpath;
-    pvfs_descriptor *pd;
-    PVFS_credential *credential;
-    int rc;
-    int orig_errno = errno;
-
-    gossip_debug(GOSSIP_USRINT_DEBUG, "pvfs_aio_open: called with %s\n", path);
-
-    if (!path)
+    if (nent > PVFS_AIO_LISTIO_MAX || (mode != LIO_WAIT && mode != LIO_NOWAIT) ||
+        !list)
     {
         errno = EINVAL;
         return -1;
-    }
-    va_start(ap, flags);
-    if (flags & O_CREAT)
-        mode = va_arg(ap, int);
-    else
-        mode = 0777;
-    if (flags & O_HINTS)
-        hints = va_arg(ap, PVFS_hint);
-    else    
-        hints = PVFS_HINT_NULL;
-    va_end(ap);
-
-    /* fully qualify pathname */
-    newpath = pvfs_qualify_path(path);
-    if (!newpath)
+    } 
+   
+    pvfs_list = malloc(nent * sizeof(struct pvfs_aiocb *));
+    if (pvfs_list == NULL)
     {
-        return -1;
-    }
-    
-    rc = iocommon_cred(&credential);
-    if (rc < 0)
-    {
+        errno = ENOMEM;
         return -1;
     }
 
-    /* make async open call */
-    rc = PVFS_aio_open(&pd,
-                       newpath,
-                       flags,
-                       hints,
-                       mode,
-                       NULL,
-                       credential,
-                       PVFS_HINT_NULL);
-   IOCOMMON_CHECK_ERR(rc); 
+    for (i = 0; i < nent; i++)
+    {
+        /* if the control block is a NULL pointer, then ignore it */
+        if (list[i] == NULL)
+        {
+            nent--;
+            i--;
+            continue;
+        }
 
-errorout:
-    if (newpath != path)
-    {
-        free(newpath);
+        pvfs_list[i] = malloc(sizeof(struct pvfs_aiocb));
+        if (pvfs_list[i] == NULL)
+        {
+            errno = ENOMEM;
+            return -1;
+        }
+        memset(pvfs_list[i], 0, sizeof(struct pvfs_aiocb));
+
+        if (list[i]->aio_fildes < 0)
+        {
+            list[i]->__error_code = EBADF;
+            list[i]->__return_value = -1;
+        }
+        
+        if (!(list[i]->aio_buf))
+        {
+            list[i]->__error_code = EINVAL;
+            list[i]->__return_value = -1;
+        }
+
+        pd = pvfs_find_descriptor(list[i]->aio_fildes);
+        if (!pd)
+        {
+            list[i]->__error_code = EBADF;
+            list[i]->__error_code = -1;
+        }
+
+        list[i]->__error_code = EINPROGRESS;
+        pvfs_list[i]->hints = PVFS_HINT_NULL;
+        pvfs_list[i]->op_code = PVFS_AIO_IO_OP;
+        pvfs_list[i]->u.io.vector.iov_len = list[i]->aio_nbytes;
+        pvfs_list[i]->u.io.vector.iov_base = (void *)list[i]->aio_buf;
+        pvfs_list[i]->u.io.pd = pd;
+        pvfs_list[i]->u.io.offset = list[i]->aio_offset;
+        pvfs_list[i]->u.io.bcnt = &(list[i]->__return_value);
+        pvfs_list[i]->call_back_fn = &pvfs_aio_lio_callback;
+        pvfs_list[i]->call_back_dat = list[i];
+        switch (list[i]->aio_lio_opcode)
+        {
+            case LIO_READ:
+                pvfs_list[i]->u.io.which = PVFS_IO_READ;
+                aiocommon_submit_op(pvfs_list[i]);
+                break;
+            case LIO_WRITE:
+                pvfs_list[i]->u.io.which = PVFS_IO_WRITE;
+                aiocommon_submit_op(pvfs_list[i]);
+                break;
+            case LIO_NOP:
+                list[i]->__error_code = 0;
+                list[i]->__return_value = 0;
+                break;
+        }
     }
-    if (rc < 0)
-    {
-        return -1;
-    }
-    else
-    {
-        return pd->fd;
-    }
+
+    return 0;
+}
+
+/* call back function for aio lio operation */
+int pvfs_aio_lio_callback(void *cdat, int status)
+{
+    struct aiocb *finished_cb = (struct aiocb *)cdat;
+
+    finished_cb->__error_code = status;
+
+    return 1;
 }
 
 /*

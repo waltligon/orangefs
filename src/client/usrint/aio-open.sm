@@ -719,6 +719,7 @@ PVFS_error PVFS_iaio_open(
     sm_p->u.aio_open.file_creation_param = file_creation_param;
     sm_p->u.aio_open.mode = mode;
     sm_p->u.aio_open.pd = fildes;
+    PVFS_hint_copy(hints, &sm_p->hints);
 
     return PINT_client_state_machine_post(
         smcb, op_id, user_ptr);

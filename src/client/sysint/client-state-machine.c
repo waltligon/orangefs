@@ -298,7 +298,8 @@ static PVFS_error completion_list_retrieve_some_completed(
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
            (MAX_RETURNED_JOBS * sizeof(struct PINT_smcb *)));
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s has %d items left on completed list\n", __func__, new_list_index);    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s returning %d completed items\n",
+                 __func__, *out_count);    
     /* return only the op_ids that were found in the input list */
     memcpy(op_id_array, out_ops, (out_op_count * sizeof(PVFS_sys_op_id)));
 
