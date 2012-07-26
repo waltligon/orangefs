@@ -29,7 +29,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-mkdir.c \
 	$(DIR)/sys-remove.c \
 	$(DIR)/sys-flush.c \
-	$(DIR)/sys-symlink.c \
+	$(DIR)/sys-link.c \
 	$(DIR)/sys-readdir.c \
 	$(DIR)/sys-readdirplus.c \
 	$(DIR)/sys-rename.c \

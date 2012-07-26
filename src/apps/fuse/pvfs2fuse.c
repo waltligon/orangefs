@@ -105,16 +105,16 @@ static int pvfs_fuse_gen_credential(
    memset(new_cred, 0, sizeof(PVFS_credential));
 
    /* generate credential -- this process must be running as root */
-   ret = PVFS_util_gen_credential(uid, 
-                                  gid, 
-                                  PVFS2_DEFAULT_CREDENTIAL_TIMEOUT, 
+   ret = PVFS_util_gen_credential(uid,
+                                  gid,
+                                  PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
                                   NULL,
                                   new_cred);
 
    if (ret == 0)
    {
        /* copy credential to provided buffer */
-       ret = PINT_copy_credential(new_cred, credential);      
+       ret = PINT_copy_credential(new_cred, credential);
    }
 
    /* free generated credential */
@@ -124,7 +124,7 @@ static int pvfs_fuse_gen_credential(
    return ret;
 }
 
-static int lookup( const char *path, pvfs_fuse_handle_t *pfh, 
+static int lookup( const char *path, pvfs_fuse_handle_t *pfh,
 				   int32_t follow_link )
 {
    PVFS_sysresp_lookup lk_response;
@@ -141,10 +141,10 @@ static int lookup( const char *path, pvfs_fuse_handle_t *pfh,
    }
 
    memset(&lk_response, 0, sizeof(lk_response));
-   ret = PVFS_sys_lookup(pvfs2fuse.fs_id, 
+   ret = PVFS_sys_lookup(pvfs2fuse.fs_id,
 						 (char *)path,
-						 &pfh->cred, 
-						 &lk_response, 
+						 &pfh->cred,
+						 &lk_response,
 						 follow_link);
    if ( ret < 0 ) {
       pvfs_fuse_cleanup_credential(&pfh->cred);
@@ -165,14 +165,14 @@ static int pvfs_fuse_getattr_pfhp(pvfs_fuse_handle_t *pfhp, struct stat *stbuf)
    int			perm_mode = 0;
 
    memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
-    
-   ret = PVFS_sys_getattr(pfhp->ref, 
+
+   ret = PVFS_sys_getattr(pfhp->ref,
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          (PVFS_credential *) &pfhp->cred, 
+                          (PVFS_credential *) &pfhp->cred,
                           &getattr_response);
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   
+
    memset(stbuf, 0, sizeof(struct stat));
 
    /* Code copied from kernel/linux-2.x/pvfs2-utils.c */
@@ -191,7 +191,7 @@ static int pvfs_fuse_getattr_pfhp(pvfs_fuse_handle_t *pfhp, struct stat *stbuf)
    */
 
    attrs = &getattr_response.attr;
-   
+
    if (attrs->objtype == PVFS_TYPE_METAFILE)
    {
 	  if (attrs->mask & PVFS_ATTR_SYS_SIZE)
@@ -268,7 +268,7 @@ static int pvfs_fuse_getattr_pfhp(pvfs_fuse_handle_t *pfhp, struct stat *stbuf)
 		 break;
 	  case PVFS_TYPE_DIRECTORY:
 		 stbuf->st_mode |= S_IFDIR;
-		 /* NOTE: we have no good way to keep nlink consistent for 
+		 /* NOTE: we have no good way to keep nlink consistent for
 		  * directories across clients; keep constant at 1.  Why 1?  If
 		  * we go with 2, then find(1) gets confused and won't work
 		  * properly withouth the -noleaf option */
@@ -288,7 +288,7 @@ static int pvfs_fuse_getattr_pfhp(pvfs_fuse_handle_t *pfhp, struct stat *stbuf)
    stbuf->st_blksize = 4096;
 
    PVFS_util_release_sys_attr(attrs);
-    
+
    return 0;
 }
 
@@ -329,9 +329,9 @@ static int pvfs_fuse_readlink(const char *path, char *buf, size_t size)
       return PVFS_ERROR_TO_ERRNO_N( ret );
    }
 
-   ret = PVFS_sys_getattr(pfh.ref, 
+   ret = PVFS_sys_getattr(pfh.ref,
 						  PVFS_ATTR_SYS_ALL_NOHINT,
-						  (PVFS_credential *) &pfh.cred, 
+						  (PVFS_credential *) &pfh.cred,
 						  &getattr_response);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
@@ -457,7 +457,7 @@ static int pvfs_fuse_symlink(const char *from, const char *to)
    PVFS_sys_attr        attr;
    PVFS_sysresp_lookup  resp_lookup;
    PVFS_object_ref      parent_ref;
-   PVFS_sysresp_symlink resp_sym;
+   PVFS_sysresp_link resp_sym;
    PVFS_credential      credential;
    pvfs_fuse_handle_t	dir_pfh;
    char *tofile, *todir, *cp;
@@ -473,7 +473,7 @@ static int pvfs_fuse_symlink(const char *from, const char *to)
    /* Set the attributes for the new directory */
    attr.owner = credential.userid;
    attr.group = credential.group_array[0];
-   attr.perms = 0777;              
+   attr.perms = 0777;
    attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
 
    todir = strdup( to );
@@ -507,11 +507,11 @@ static int pvfs_fuse_symlink(const char *from, const char *to)
 	  return(-1);
    }
 
-   ret = PVFS_sys_symlink(tofile, 
-						  dir_pfh.ref, 
+   ret = PVFS_sys_symlink(tofile,
+						  dir_pfh.ref,
 						  (char *) from,
-						  attr, 
-						  &credential, 
+						  attr,
+						  &credential,
 						  &resp_sym);
 
    pvfs_fuse_cleanup_credential(&credential);
@@ -526,7 +526,7 @@ static int pvfs_fuse_symlink(const char *from, const char *to)
    {
 	  ret = 0;
    }
-    
+
    free( tofile );
    free( todir );
    return(ret);
@@ -585,23 +585,23 @@ static int pvfs_fuse_chmod(const char *path, mode_t mode)
 {
    int			ret;
    PVFS_sys_attr	new_attr;
- 
+
    pvfs_fuse_handle_t	pfh;
 
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW );
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   /* FUSE passes in 5 octets in 'mode'. However, the the first 
+   /* FUSE passes in 5 octets in 'mode'. However, the the first
     * octet is not related to permissions, hence checking only
     *  the lower 4 octets */
    new_attr.perms = mode & 07777;
    new_attr.mask = PVFS_ATTR_SYS_PERM;
- 
+
    ret = PVFS_sys_setattr(pfh.ref,new_attr,&pfh.cred);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
-   if (ret < 0) 
+   if (ret < 0)
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
 
    return 0;
@@ -611,22 +611,22 @@ static int pvfs_fuse_chown(const char *path, uid_t uid, gid_t gid)
 {
    int			ret;
    PVFS_sys_attr	new_attr;
- 
+
    pvfs_fuse_handle_t	pfh;
 
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW );
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   
+
    new_attr.owner = uid;
    new_attr.group = gid;
    new_attr.mask = PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID;
- 
+
    ret = PVFS_sys_setattr(pfh.ref,new_attr,&pfh.cred);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
-   if (ret < 0) 
+   if (ret < 0)
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
 
    return 0;
@@ -640,12 +640,12 @@ static int pvfs_fuse_truncate(const char *path, off_t size)
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW );
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   
+
    ret = PVFS_sys_truncate(pfh.ref,size,&pfh.cred);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
-   if (ret < 0) 
+   if (ret < 0)
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
 
    return 0;
@@ -655,22 +655,22 @@ static int pvfs_fuse_utime(const char *path, struct utimbuf *timbuf)
 {
    int			ret;
    PVFS_sys_attr	new_attr;
- 
+
    pvfs_fuse_handle_t	pfh;
 
    ret = lookup( path, &pfh, PVFS2_LOOKUP_LINK_FOLLOW );
    if ( ret < 0 )
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
-   
+
    new_attr.atime = (PVFS_time)timbuf->actime;
    new_attr.mtime = (PVFS_time)timbuf->modtime;
    new_attr.mask = PVFS_ATTR_SYS_ATIME | PVFS_ATTR_SYS_MTIME;
- 
+
    ret = PVFS_sys_setattr(pfh.ref,new_attr,&pfh.cred);
 
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
-   if (ret < 0) 
+   if (ret < 0)
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
 
    return 0;
@@ -705,7 +705,7 @@ static int pvfs_fuse_read(const char *path, char *buf, size_t size, off_t offset
    PVFS_sysresp_io	resp_io;
    int			ret;
    pvfs_fuse_handle_t	*pfh = GET_FUSE_HANDLE( fi );
-  
+
    file_req = PVFS_BYTE;
    ret = PVFS_Request_contiguous(size, PVFS_BYTE, &mem_req);
    if (ret < 0)
@@ -714,7 +714,7 @@ static int pvfs_fuse_read(const char *path, char *buf, size_t size, off_t offset
    ret = PVFS_sys_read(pfh->ref, file_req, offset, buf,
 					   mem_req, &pfh->cred, &resp_io);
 
-   if (ret == 0) 
+   if (ret == 0)
    {
 	  PVFS_Request_free(&mem_req);
 	  return(resp_io.total_completed);
@@ -730,7 +730,7 @@ static int pvfs_fuse_write(const char *path, const char *buf, size_t size,
    PVFS_sysresp_io	resp_io;
    int			ret;
    pvfs_fuse_handle_t	*pfh = GET_FUSE_HANDLE( fi );
-  
+
    file_req = PVFS_BYTE;
    ret = PVFS_Request_contiguous(size, PVFS_BYTE, &mem_req);
    if (ret < 0)
@@ -738,7 +738,7 @@ static int pvfs_fuse_write(const char *path, const char *buf, size_t size,
 
    ret = PVFS_sys_write(pfh->ref, file_req, offset, (char*)buf,
 						mem_req, &pfh->cred, &resp_io);
-   if (ret == 0) 
+   if (ret == 0)
    {
 	  PVFS_Request_free(&mem_req);
 	  return(resp_io.total_completed);
@@ -771,7 +771,7 @@ static int pvfs_fuse_statfs(const char *path, struct statvfs *stbuf)
 		 return PVFS_ERROR_TO_ERRNO_N( ret );
    }
 
-   memcpy(&stbuf->f_fsid, &resp_statfs.statfs_buf.fs_id, 
+   memcpy(&stbuf->f_fsid, &resp_statfs.statfs_buf.fs_id,
 		  sizeof(resp_statfs.statfs_buf.fs_id));
    /* FIXME is this bsize right? */
 
@@ -794,7 +794,7 @@ static int pvfs_fuse_statfs(const char *path, struct statvfs *stbuf)
 static int pvfs_fuse_release(const char *path, struct fuse_file_info *fi)
 {
    pvfs_fuse_handle_t *pfh = GET_FUSE_HANDLE( fi );
-  
+
    if ( pfh != NULL ) {
       pvfs_fuse_cleanup_credential(&pfh->cred);
       free( pfh );
@@ -893,9 +893,9 @@ static int pvfs_fuse_access(const char *path, int mask)
    if ( mask == F_OK )
 	  return 0;
 
-   ret = PVFS_sys_getattr(pfh.ref, 
+   ret = PVFS_sys_getattr(pfh.ref,
                           PVFS_ATTR_SYS_ALL_NOHINT,
-                          (PVFS_credential *) &pfh.cred, 
+                          (PVFS_credential *) &pfh.cred,
                           &getattr_response);
 
    /* copy uid and gid so credential can be freed */
@@ -904,7 +904,7 @@ static int pvfs_fuse_access(const char *path, int mask)
    pvfs_fuse_cleanup_credential(&pfh.cred);
 
    if ( ret < 0 )
-   {            
+   {
 	  return PVFS_ERROR_TO_ERRNO_N( ret );
    }
 
@@ -944,7 +944,7 @@ static int pvfs_fuse_access(const char *path, int mask)
 	  return(0);
    }
 
-   /* see if gid matches object group 
+   /* see if gid matches object group
       TODO: check all groups */
    if(attrs->group == gid)
    {
@@ -987,7 +987,7 @@ static int pvfs_fuse_access(const char *path, int mask)
 		 return(0);
 	  }
    }
-  
+
    /* default case: access denied */
    return -EACCES;
 }
@@ -1044,7 +1044,7 @@ static int pvfs_fuse_create(const char *path, mode_t mode,
        * just passed up in prelude_check_acls (server/prelude.c).  I'm
        * not sure that's the right thing to do.
        */
-	  if ( rc == -PVFS_ENOENT ) 
+	  if ( rc == -PVFS_ENOENT )
 	  {
 		 return -EACCES;
 	  }
@@ -1278,7 +1278,7 @@ int main(int argc, char *argv[])
 		 last_slash = rindex(tok, '/');
 		 *last_slash = '\0';
 
-		 /* config server and fs name are a special case, take one 
+		 /* config server and fs name are a special case, take one
 		  * string and split it in half on "/" delimiter
 		  */
 		 me->pvfs_config_servers[cur_server] = strdup(tok);
@@ -1301,7 +1301,7 @@ int main(int argc, char *argv[])
 		 }
 		 ++cur_server;
 	  }
-	
+
 	  /* FIXME flowproto should be an option */
 	  me->flowproto = FLOWPROTO_DEFAULT;
 
@@ -1331,7 +1331,7 @@ int main(int argc, char *argv[])
    if ( getpid() == 0 )
 	  fuse_opt_insert_arg( &args, 1, "-oallow_other" );
    fuse_opt_insert_arg( &args, 1, "-s" );
-    
+
    {
 	  /* set the fsname and volname */
 	  char name[200];
@@ -1347,7 +1347,7 @@ int main(int argc, char *argv[])
 	  fuse_opt_insert_arg( &args, 1, name );
 #endif
    }
-    
+
 #if (__FreeBSD__ >= 10)
    {
 	  /* MacFUSE has a bug where cached attributes

@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     char str_buf[256] = {0};
     char *filename = (char *)0;
     PVFS_fs_id cur_fs;
-    PVFS_sysresp_symlink resp_sym;
+    PVFS_sysresp_link resp_sym;
     char* entry_name = NULL;
     char *target = NULL;
     PVFS_object_ref parent_refn;
@@ -61,7 +61,7 @@ int main(int argc, char **argv)
     }
     printf("Link to be created is %s\n",str_buf);
 
-    memset(&resp_sym, 0, sizeof(PVFS_sysresp_symlink));
+    memset(&resp_sym, 0, sizeof(resp_sym));
     PVFS_util_gen_credential_defaults(&credentials);
 
     entry_name = str_buf;
@@ -71,7 +71,7 @@ int main(int argc, char **argv)
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-    ret = PINT_lookup_parent(filename, cur_fs, &credentials, 
+    ret = PINT_lookup_parent(filename, cur_fs, &credentials,
                              &parent_refn.handle);
     if(ret < 0)
     {
@@ -87,8 +87,8 @@ int main(int argc, char **argv)
         printf("symlink failed with errcode = %d\n", ret);
         return(-1);
     }
-	
-    printf("--symlink--\n"); 
+
+    printf("--symlink--\n");
     printf("Handle: %lld\n", lld(resp_sym.ref.handle));
 
     ret = PVFS_sys_finalize();

@@ -239,7 +239,7 @@ sys-setattr.sm
  changes
 
 --------------
-sys-symlink.sm
+sys-link.sm
 --------------
 -PVFS_EINVAL
  credentials, parent_ref object, entry_name, target, or resp arguments

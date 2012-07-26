@@ -68,7 +68,7 @@ typedef struct PINT_client_mirror_ctx
   /*the server_nr for the primary datahandle*/
   uint32_t original_server_nr;
 
-  /*do we retry the primary or use a mirrored handle?*/ 
+  /*do we retry the primary or use a mirrored handle?*/
   PVFS_boolean retry_original;
 
   /*did the current message for this handle complete without any errors?*/
@@ -76,7 +76,7 @@ typedef struct PINT_client_mirror_ctx
 
 } PINT_client_small_io_ctx;
 
-/* this structure is used to handle mirrored retries when 
+/* this structure is used to handle mirrored retries when
  * pvfs2_client_datafile_getattr_sizes_sm is called.
 */
 typedef struct PINT_client_mirror_ctx PINT_client_getattr_mirror_ctx;
@@ -92,7 +92,7 @@ typedef struct PINT_sm_getattr_state
      * PVFS_ATTR_SYS_*
      */
     uint32_t req_attrmask;
-    
+
     /*
       Either from the acache or full getattr op, this is the resuling
       attribute that can be used by calling state machines
@@ -112,7 +112,7 @@ typedef struct PINT_sm_getattr_state
     PVFS_size size;
 
     int flags;
-    
+
 } PINT_sm_getattr_state;
 
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
@@ -202,16 +202,16 @@ struct PINT_client_mkdir_sm
     PINT_sm_getattr_state metafile_getattr;
 };
 
-struct PINT_client_symlink_sm
+struct PINT_client_link_sm
 {
     char *link_name;                /* input parameter */
     char *link_target;              /* input parameter */
-    PVFS_sysresp_symlink *sym_resp; /* in/out parameter*/
+    PVFS_sysresp_link *link_resp; /* in/out parameter*/
     PVFS_sys_attr sys_attr;         /* input parameter */
 
     int retry_count;
     int stored_error_code;
-    PVFS_handle symlink_handle;
+    PVFS_handle link_handle;        /* handle of target metadata */
 };
 
 struct PINT_client_getattr_sm
@@ -354,7 +354,7 @@ struct PINT_client_readdirplus_sm
     int attrmask;                       /* input parameter */
     PVFS_sysresp_readdirplus *readdirplus_resp; /* in/out parameter*/
     /* scratch variables */
-    int nhandles;  
+    int nhandles;
     int svr_count;
     PVFS_size        **size_array;
     PVFS_object_attr *obj_attr_array;
@@ -364,7 +364,7 @@ struct PINT_client_readdirplus_sm
     PVFS_handle     **handles;
 };
 
-/* 
+/*
  * A segment is part of a path - namely each part of the
  * path delimited by / characters.  As each segment is
  * looked up we record the PVFS_object_ref for the
@@ -381,7 +381,7 @@ typedef struct
 } PINT_client_lookup_sm_segment;
 
 #define PVFS2_MAX_LOOKUP_CONTEXTS    256
-/* 
+/*
  * A context is a group of segments that have been looked up
  * on a server.  A server can resolve more than one segment
  * in a single request, and these groupings are maintained
@@ -424,7 +424,7 @@ struct PINT_client_rename_sm
     PVFS_handle old_dirent_handle;
 };
 
-struct PINT_client_mgmt_setparam_list_sm 
+struct PINT_client_mgmt_setparam_list_sm
 {
     PVFS_fs_id fs_id;
     enum PVFS_server_param param;
@@ -439,7 +439,7 @@ struct PINT_client_mgmt_statfs_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_server_stat *stat_array;
-    int count; 
+    int count;
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
     PVFS_sysresp_statfs* resp; /* ignored by mgmt functions */
@@ -450,9 +450,9 @@ struct PINT_client_mgmt_perf_mon_list_sm
     PVFS_fs_id fs_id;
     int64_t **perf_matrix;
     uint64_t *end_time_ms_array;
-    int server_count; 
-    int *key_count; 
-    int history_count; 
+    int server_count;
+    int *key_count;
+    int history_count;
     PVFS_id_gen_t *addr_array;
     uint32_t *next_id_array;
     PVFS_error_details *details;
@@ -462,8 +462,8 @@ struct PINT_client_mgmt_event_mon_list_sm
 {
     PVFS_fs_id fs_id;
     struct PVFS_mgmt_event **event_matrix;
-    int server_count; 
-    int event_count; 
+    int server_count;
+    int event_count;
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
 };
@@ -471,7 +471,7 @@ struct PINT_client_mgmt_event_mon_list_sm
 struct PINT_client_mgmt_iterate_handles_list_sm
 {
     PVFS_fs_id fs_id;
-    int server_count; 
+    int server_count;
     PVFS_id_gen_t *addr_array;
     PVFS_handle **handle_matrix;
     int *handle_count_array;
@@ -568,7 +568,7 @@ struct PINT_client_mgmt_get_uid_list_sm
     uint32_t *uid_count;               /* out */
 };
 
-typedef struct 
+typedef struct
 {
     PVFS_dirent **dirent_array;
     uint32_t      *dirent_outcount;
@@ -618,7 +618,7 @@ typedef struct PINT_client_sm
         struct PINT_client_remove_sm remove;
         struct PINT_client_create_sm create;
         struct PINT_client_mkdir_sm mkdir;
-        struct PINT_client_symlink_sm sym;
+        struct PINT_client_link_sm link;
         struct PINT_client_getattr_sm getattr;
         struct PINT_client_setattr_sm setattr;
         struct PINT_client_io_sm io;
@@ -713,23 +713,24 @@ enum
     PVFS_SYS_REMOVE                = 1,
     PVFS_SYS_CREATE                = 2,
     PVFS_SYS_MKDIR                 = 3,
-    PVFS_SYS_SYMLINK               = 4,
-    PVFS_SYS_GETATTR               = 5,
-    PVFS_SYS_IO                    = 6,
-    PVFS_SYS_FLUSH                 = 7,
-    PVFS_SYS_TRUNCATE              = 8,
-    PVFS_SYS_READDIR               = 9,
-    PVFS_SYS_SETATTR               = 10,
-    PVFS_SYS_LOOKUP                = 11,
-    PVFS_SYS_RENAME                = 12,
-    PVFS_SYS_GETEATTR              = 13,
-    PVFS_SYS_SETEATTR              = 14,
-    PVFS_SYS_DELEATTR              = 15,
-    PVFS_SYS_LISTEATTR             = 16,
-    PVFS_SYS_SMALL_IO              = 17,
-    PVFS_SYS_STATFS                = 18,
-    PVFS_SYS_FS_ADD                = 19,
-    PVFS_SYS_READDIRPLUS           = 20,
+    PVFS_SYS_HARDLINK              = 4,
+    PVFS_SYS_SYMLINK               = 5,
+    PVFS_SYS_GETATTR               = 6,
+    PVFS_SYS_IO                    = 7,
+    PVFS_SYS_FLUSH                 = 8,
+    PVFS_SYS_TRUNCATE              = 9,
+    PVFS_SYS_READDIR               = 10,
+    PVFS_SYS_SETATTR               = 11,
+    PVFS_SYS_LOOKUP                = 12,
+    PVFS_SYS_RENAME                = 13,
+    PVFS_SYS_GETEATTR              = 14,
+    PVFS_SYS_SETEATTR              = 15,
+    PVFS_SYS_DELEATTR              = 16,
+    PVFS_SYS_LISTEATTR             = 17,
+    PVFS_SYS_SMALL_IO              = 18,
+    PVFS_SYS_STATFS                = 19,
+    PVFS_SYS_FS_ADD                = 20,
+    PVFS_SYS_READDIRPLUS           = 21,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -741,7 +742,7 @@ enum
     PVFS_MGMT_REMOVE_DIRENT        = 78,
     PVFS_MGMT_CREATE_DIRENT        = 79,
     PVFS_MGMT_GET_DIRDATA_HANDLE   = 80,
-    PVFS_MGMT_GET_UID_LIST         = 81, 
+    PVFS_MGMT_GET_UID_LIST         = 81,
     PVFS_SERVER_GET_CONFIG         = 200,
     PVFS_CLIENT_JOB_TIMER          = 300,
     PVFS_CLIENT_PERF_COUNT_TIMER   = 301,
@@ -817,6 +818,7 @@ extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_hardlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;

@@ -132,12 +132,12 @@ typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 /* rename */
 /* no data returned in rename response */
 
-/** Holds results of a symlink operation (reference to new symlink). */
-struct PVFS_sysresp_symlink_s
+/** Holds results of a link operation (reference to new link). */
+struct PVFS_sysresp_link_s
 {
     PVFS_object_ref ref;
 };
-typedef struct PVFS_sysresp_symlink_s PVFS_sysresp_symlink;
+typedef struct PVFS_sysresp_link_s PVFS_sysresp_link;
 
 /** Holds results of a readlink operation (string name of target). */
 struct PVFS_sysresp_readlink_s
@@ -175,7 +175,7 @@ struct PVFS_sysresp_readdirplus_s
     PVFS_dirent   *dirent_array;
     uint32_t        pvfs_dirent_outcount; /**< uint32_t for portable, fixed size structure */
     uint64_t       directory_version;
-    PVFS_error    *stat_err_array; 
+    PVFS_error    *stat_err_array;
     PVFS_sys_attr *attr_array;
 };
 typedef struct PVFS_sysresp_readdirplus_s PVFS_sysresp_readdirplus;
@@ -424,13 +424,14 @@ PVFS_error PVFS_sys_rename(
     const PVFS_credential *credential,
     PVFS_hint hints);
 
-PVFS_error PVFS_isys_symlink(
+PVFS_error PVFS_isys_link(
     char *entry_name,
     PVFS_object_ref parent_ref,
-    char *target,
+    void *target,
+    int link_type,
     PVFS_sys_attr attr,
     const PVFS_credential *credential,
-    PVFS_sysresp_symlink *resp,
+    PVFS_sysresp_link *resp,
     PVFS_sys_op_id *op_id,
     PVFS_hint hints,
     void *user_ptr);
@@ -441,7 +442,16 @@ PVFS_error PVFS_sys_symlink(
     char *target,
     PVFS_sys_attr attr,
     const PVFS_credential *credential,
-    PVFS_sysresp_symlink *resp,
+    PVFS_sysresp_link *resp,
+    PVFS_hint hints);
+
+PVFS_error PVFS_sys_hardlink(
+    char *entry_name,
+    PVFS_object_ref parent_ref,
+    PVFS_handle target,
+    PVFS_sys_attr attr,
+    const PVFS_credentials *credentials,
+    PVFS_sysresp_link *resp,
     PVFS_hint hints);
 
 PVFS_error PVFS_isys_io(
