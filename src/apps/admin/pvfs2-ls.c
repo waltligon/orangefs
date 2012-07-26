@@ -388,7 +388,7 @@ void print_entry_attr(
         group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
     }
 
-    snprintf(entry_buffer,ENTRY_MAX,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+    snprintf(entry_buffer,ENTRY_MAX,"%s %c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%s %s",
              inode,
              f_type,
