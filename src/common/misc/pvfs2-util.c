@@ -108,11 +108,10 @@ static int parse_encoding_string(
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
 
-int PVFS_util_resolve_absolute(
-    const char* local_path,
-    PVFS_fs_id* out_fs_id,
-    char* out_fs_path,
-    int out_fs_path_max);
+#ifndef ENABLE_SECURITY
+static int PINT_gen_unsigned_credential(const char *user, const char *group,
+                                        unsigned int timeout, PVFS_credential *cred);
+#endif
 
 struct PVFS_sys_mntent* PVFS_util_gen_mntent(
     char* config_server,
@@ -355,8 +354,8 @@ int PVFS_util_gen_credential(const char *user, const char *group,
  * Generate unsigned credential in-process instead of calling pvfs2_gencred. 
  * For use when robust security is disabled.
  */
-int PINT_gen_unsigned_credential(const char *user, const char *group,
-                                 unsigned int timeout, PVFS_credential *cred)
+static int PINT_gen_unsigned_credential(const char *user, const char *group,
+                                        unsigned int timeout, PVFS_credential *cred)
 {
     unsigned long uid, gid, bufsize;
     char *endptr;
