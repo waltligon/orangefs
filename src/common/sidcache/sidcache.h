@@ -87,7 +87,7 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
 /*
  * This function searches for a sid in the sid cache. The sid (uuid_t) value
- * of the SID_sid_t struct must be initialized before this function is
+ * (sid_server parameter) must be initialized before this function is
  * used. The SID_cacheval_t will malloced and set to the values of the attibutes
  * in the database for the sid if it is found in the database
  *

@@ -355,7 +355,7 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
     /* Placing the data into the database */
     ret = (*dbp)->put(*dbp,            /* Primary database pointer */
                       NULL,            /* Transaction pointer */
-                      &key,            /* SID_sid_t sid (uuid_t) */
+                      &key,            /* SID (uuid_t) */
                       &data,           /* Data is marshalled SID_cacheval_t struct */
                       DB_NOOVERWRITE); /* Do not allow for overwrites because this is the primary database */
 
@@ -379,8 +379,8 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
 /*
  * This function searches for a sid in the sid cache. The sid (uuid_t) value
- * of the SID_sid_t struct must be initialized before this function is
- * used. The SID_cacheval_t will malloced and set to the values of the attibutes
+ * (sid_server parameter) must be initialized before this function is used.
+ * The SID_cacheval_t will malloced and set to the values of the attibutes
  * in the database for the sid if it is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
@@ -477,8 +477,8 @@ void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data)
 
 /*
  * This function updates the sid in the sid cache to any new values 
- * (attributes or bmi address) that are in the SID_sid_t struct parameter
- * to this function if a sid with a matching uuid_t as the SID_sid_t struct
+ * (attributes, bmi address, or url) that are in the SID_cacheval_t struct parameter
+ * to this function if a sid with a matching uuid_t as the sid_server parameter
  * is found in the sid cache
  *
  * Returns 0 on success, otherwise returns error code
@@ -859,7 +859,7 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
     char *ATTRS = "ATTRS: ";        /* Tag for the number of attributes on the first line of dump file */
     char *SIDS = "SIDS: ";          /* Tag for the number of sids on the first line of the dump file */
     char tmp_sid_str[UUID_STR_LEN]; /* Temporary string to hold the string representation of the sids */
-    SID tmp_sid;                    /* Temporary SID_sid_t struct to hold contents of the database */
+    SID tmp_sid;                    /* Temporary SID (uuid_t) to hold contents of the database */
     SID_cacheval_t *tmp_sid_attrs;  /* Temporary SID_cacheval_t struct to hold contents of database */
 
     /* Opening the file to dump the contents of the database to */
