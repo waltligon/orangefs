@@ -1174,9 +1174,6 @@ int SID_create_open_environment(DB_ENV **envp)
     ret = db_env_create(envp, /* Globacl environment pointer */
                         0);    /* Environment create flag (Must be set to 0) */
 
-    /* Enabling stderr for gossip */
-    gossip_enable_stderr();
-
     if(ret)
     {
         gossip_err("Error creating environment handle : %s\n", db_strerror(ret));
