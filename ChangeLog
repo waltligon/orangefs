@@ -6,6 +6,13 @@ http://www.orangefs.org/fisheye/orangefs/changelog/orangefs/branches/trunk
 
 Trunk
 
+* New Feature: added human readable times to pvfs2-db-display.  Rev 9366.
+
+* New Feature:  when setting the mode (admin or normal) of a filesystem 
+* using pvfs2-set-mode, you can now do so for individual servers.  Prior
+* to this change, the mode was set for all the servers within a particular 
+* filesystem.
+
 * New Feature: users can now specify at configure time how they want the
 * kernel module to handle the file pointer when an error occurs.  The
 * default behavior is to leave the file pointer alone, i.e., the file
