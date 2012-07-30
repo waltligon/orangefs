@@ -4,10 +4,11 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef SIDCACHE_H
-#define SIDCACHE_H 1
+#ifndef POLICYEVAL_H
+#define POLICYEVAL_H 1
 
 #include <db.h>
+#include "sidcache.h"
 
 #define SID_OTHERS -1
 

@@ -219,6 +219,17 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input);
 */
 void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey);
 
+
+/*************************************************************************************
+* The following is the order in which the functions should be called to              *
+* the open the sidcache:                                                             *
+* 1. SID_create_open_environment (If an environment is not needed then this function *
+*                                 can be skipped and the environment variable can be *
+*                                 passed as NULL to rest of the database functions)  *
+* 2. SID_create_open_sid_cache                                                       *
+* 3. SID_create_open_assoc_sec_dbs                                                   *
+* 4. SID_create_open_dbcs                                                            *
+*************************************************************************************/
 /*
  * This function creates and opens the environement handle
  *
@@ -232,7 +243,7 @@ int SID_create_open_environment(DB_ENV **envp);
  *
  * Returns 0 on success, otherwise returns an error code 
 */
-int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp);
+int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp);
 
 /*
  * This function creates, opens, and associates the secondary attribute
@@ -243,9 +254,8 @@ int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp);
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
-        int (* secdbs_callback_functions[])(DB *pri, const DBT *pkey, 
-        const DBT *pdata, DBT *skey));
+int SID_create_open_assoc_sec_dbs(DB_ENV *envp, DB *dbp, DB *secondary_dbs[], 
+        int (* secdbs_callback_functions[])(DB *pri, const DBT *pkey, const DBT *pdata, DBT *skey));
 
 /*
  * This function creates and opens the database cursors set to the secondary
@@ -255,6 +265,13 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[],
 */
 int SID_create_open_dbcs(DB *secondary_dbs[], DBC *db_cursors[]);
 
+
+/************************************************************************
+* The following is the order in which the functions should be called to *
+* the close the sidcache:                                               *
+* 1. SID_close_dbcs                                                     *
+* 2. SID_close_dbs_env                                                  *
+************************************************************************/
 /*
  * This function closes the database cursors in the cursors pointer array
  * 
@@ -268,7 +285,7 @@ int SID_close_dbcs(DBC *db_cursors[]);
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[]);
+int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[]);
 
 #endif /* SIDCACHE_H */
 

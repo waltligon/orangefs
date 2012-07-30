@@ -1215,7 +1215,7 @@ int SID_create_open_environment(DB_ENV **envp)
  *
  * Returns 0 on success. Otherwise returns error code.
 */
-int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp)
+int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp)
 {
     int ret = 0;
 
@@ -1223,7 +1223,7 @@ int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp)
                                     it does not already exist */
 
     ret = db_create(dbp,   /* Primary database pointer */
-                    *envp, /* Environment pointer */
+                    envp,  /* Environment pointer */
                     0);    /* Create flags (Must be set to 0 or DB_XA_CREATE) */
     if(ret)
     {
@@ -1258,7 +1258,7 @@ int SID_create_open_sid_cache(DB_ENV **envp, DB **dbp)
  *
  * Returns 0 on success, otherwise returns an error code
 */
-int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[], 
+int SID_create_open_assoc_sec_dbs(DB_ENV *envp, DB *dbp, DB *secondary_dbs[], 
                                   int (* secdbs_callback_functions[])(DB *pri, const DBT *pkey, const DBT *pdata, DBT *skey))
 {
     int ret = 0;
@@ -1277,7 +1277,7 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[],
     {
         /* Creating temp database */
         ret = db_create(&tmp_db, /* Database pointer */
-                        *envp,   /* Environment pointer */
+                        envp,    /* Environment pointer */
                         0);      /* Create flags (Must be set to 0 or DB_XA_CREATE) */
         if(ret)
         {
@@ -1312,11 +1312,11 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[],
         }
 
         /* Associating the primary database to the secondary. Returns 0 on success */
-        ret = (*dbp)->associate(*dbp,                         /* Primary database pointer */
-                                NULL,                         /* TXN id */
-                                tmp_db,                       /* Secondary database pointer */
-                                secdbs_callback_functions[i], /* Secondary database callback function */
-                                0);                           /* Associate flags */
+        ret = dbp->associate(dbp,                          /* Primary database pointer */
+                             NULL,                         /* TXN id */
+                             tmp_db,                       /* Secondary database pointer */
+                             secdbs_callback_functions[i], /* Secondary database callback function */
+                             0);                           /* Associate flags */
 
         if(ret)
         {
@@ -1416,7 +1416,7 @@ int SID_close_dbcs(DBC *db_cursors[])
  *
  * Returns 0 on success, otherwisre returns an error code
 */
-int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
+int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
 {
     int ret = 0;
     int i = 0;
@@ -1440,11 +1440,11 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
     }
 
     /* Checking to make sure that database handle has been opened */
-    if(*dbp != NULL)
+    if(dbp != NULL)
     {
         /* Closing the primary database. Returns 0 on success */
-        ret = (*dbp)->close(*dbp, /* Primary database pointer */
-                            0);   /* Database close flags */
+        ret = dbp->close(dbp, /* Primary database pointer */
+                         0);  /* Database close flags */
     }
 
      if(ret)
@@ -1455,10 +1455,10 @@ int SID_close_dbs_env(DB_ENV **envp, DB **dbp, DB *secondary_dbs[])
 
 
     /* Checking to make sure the environment handle is open */
-    if(*envp != NULL)
+    if(envp != NULL)
     {
-        ret  = (*envp)->close(*envp, /* Environment pointer */
-                              0);    /* Environment close flags */
+        ret  = envp->close(envp, /* Environment pointer */
+                           0);   /* Environment close flags */
     }
 
     if(ret)
