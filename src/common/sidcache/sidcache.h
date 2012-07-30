@@ -62,7 +62,7 @@ typedef uuid_t SID;
 
 /* <==================== INITIALIZATION FUNCTIONS =====================> */
 /*
- * This function initializes a SID_cachevale_t struct to default values
+ * This function initializes a SID_cacheval_t struct to default values
 */
 void SID_initialize_SID_cacheval_t(SID_cacheval_t **cacheval_t);
 
@@ -88,8 +88,8 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 /*
  * This function searches for a sid in the sid cache. The sid (uuid_t) value
  * of the SID_sid_t struct must be initialized before this function is
- * used. The SID_sid_t will be set to the values in the database for the
- * sid if it is found in the database
+ * used. The SID_cacheval_t will malloced and set to the values of the attibutes
+ * in the database for the sid if it is found in the database
  *
  * Returns 0 on success, otherwise returns an error code
 */
@@ -103,14 +103,15 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t **c
 int SID_bmi_lookup_from_sid_cache(DB **dbp, SID search_sid, char **bmi_addr);
 
 /*
- * This function packs up the data fOR THE SID_cacheval_t to store in the
+ * This function packs up the data for the SID_cacheval_t to store in the
  * sid cache
 */
 void SID_pack_SID_cacheval_data(SID_cacheval_t *the_sids_attrs, DBT *data);
 
 /*
- * This function unpacks the data recieved from the database and sets
- * the values inside of the SID_cacheval_t struct
+ * This function unpacks the data recieved from the database, mallocs the 
+ * SID_cacheval_t struct, and sets the values inside of the SID_cacheval_t 
+ * struct with the data retrieved from the database
 */
 void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data);
 
@@ -125,32 +126,35 @@ void SID_unpack_SID_cacheval_data(SID_cacheval_t **the_sids_attrs, DBT *data);
 int SID_update_sid_in_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *new_attrs);
 
 /*
- * This function updates the attributes in a SID_cacheval_t struct to the
- * attribute values in the parameter new_attrs
+ * This function updates the attributes for a sid in the database if a sid
+ * with a matching uuid (sid_server parameter) is found in the database
+ *
+ * Returns 0 on success, otherwise returns an error code
 */
 int SID_update_attributes_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t *current_sid_attrs, 
         int new_attr[]);
 
 /*
- * This function updates the bmi address in a SID_cacheval_t struct to the
- * bmi address in the parameter new_bmi_addr
+ * This function updates the bmi address for a sid in the database if a sid
+ * with a matching uuid (sid_server parameter) is found in the database
+ *
+ * Returns 0 on success, otherwise returns an error code
 */
 int SID_update_bmi_address_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t *current_sid_attrs, 
        BMI_addr new_bmi_addr);
 
 /*
- * This function updates the url address for the SID_cache_t struct to the
- * url in the parameter new_url
+ * This function updates the url address for a sid in the database if a sid
+ * with a matching uuid (sid_server parameter) is found in the database
  *
- * If the url is updated then all other attributes are updated as well and this
- * function will return 0, otherwise the function returns 1
+ * Returns 0 on success, otherwise returns an error code
 */
 int SID_update_url_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t **current_sid_attrs, 
         char *new_url);
 
 /*
  * This function deletes a record from the sid cache if a sid with a matching
- * uuid_t as the one in the SID_sid_t struct is found in the sid cache
+ * uuid (sid_server parameter) is found in the database
  *
  * Returns 0 on success, otherwise returns an error code 
 */
@@ -158,7 +162,7 @@ int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records);
 
 /*
  * This function creates a SID_cacheval_t struct with the attributes that are passed to
- * this function by dynamically creating the SID_cacheval_t. If url attribute cannot
+ * this function by dynamically creating the SID_cacheval_t. The url attribute cannot
  * be null otherwise the SID_cacheval_t is not dynamically created
  *
  * Returns 0 on success, otherwise -1 is returned
@@ -168,7 +172,7 @@ int SID_create_SID_cacheval_t(SID_cacheval_t **cacheval_t, int sid_attributes[],
 
 /*
  * This function clean up a SID_cacheval_t struct by freeing the dynamically
- * created bmi address.
+ * created SID_cacheval_t struct
 */
 void SID_clean_up_SID_cacheval_t(SID_cacheval_t **cacheval_t);
 
@@ -244,8 +248,8 @@ int SID_create_open_assoc_sec_dbs(DB_ENV **envp, DB **dbp, DB *secondary_dbs[],
         const DBT *pdata, DBT *skey));
 
 /*
- * This function creates and opens the database cursors set to the primary
- * database in the database cursor pointer array
+ * This function creates and opens the database cursors set to the secondary
+ * attribute databases in the database cursor pointer array
  *
  * Returns 0 on success, otherwise returns an error code
 */
