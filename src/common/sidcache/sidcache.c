@@ -5,6 +5,8 @@
 */
 
 #include "sidcache.h"
+#include "gossip.h"
+#include "pvfs2-debug.h"
 
 /* Length of string representation of uuid_t */
 #define UUID_STR_LEN (37)

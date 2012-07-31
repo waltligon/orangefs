@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <policy.h>
 #include "sidcacheval.h"
-#include "gossip.h"
 
 /* these are defines just to temporarily allow compile */
 //typedef int BMI_addr;
