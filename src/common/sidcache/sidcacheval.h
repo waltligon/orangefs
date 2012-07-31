@@ -5,9 +5,8 @@
 */
 
 #ifndef SIDCACHEVAL_H
-#define SIDCACHEVAL_H
+#define SIDCACHEVAL_H 1
 
-//#include <sidcache.h>
 #include <policy.h>
 
 typedef int BMI_addr;

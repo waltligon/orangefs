@@ -5,7 +5,7 @@
 */
 
 #ifndef SIDCACHE_H
-#define SIDCACHE_H
+#define SIDCACHE_H 1
 
 #include <db.h>
 #include <uuid/uuid.h>
