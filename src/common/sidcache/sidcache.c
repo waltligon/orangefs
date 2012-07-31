@@ -5,8 +5,8 @@
 */
 
 #include "sidcache.h"
-#include "gossip.h"
 #include "pvfs2-debug.h"
+#include "gossip.h"
 
 /* Length of string representation of uuid_t */
 #define UUID_STR_LEN (37)
@@ -212,7 +212,8 @@ int SID_parse_input_file_header(FILE *inpfile, int *records_in_file)
            not added to the sid cache */
         if(j == SID_NUM_ATTR)
         {
-            gossip_err("Attribute: %s is an invalid attribute, and it will not be added\n", attrs_strings[i]);
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Attribute: %s is an invalid attribute, \
+                         and it will not be added\n", attrs_strings[i]);
             attr_positions[i] = -1;
             valid_attrs_in_file--;
         }
@@ -299,11 +300,12 @@ int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name,
 
         /* Getting the sid's uuid string representation from the input file */
         fscanf(inpfile, "%s", tmp_sid_str);
-        //uuid_clear(current_sid);
+
         ret = uuid_parse(tmp_sid_str, current_sid);
         if(ret)
         {
-            gossip_err("Error parsing uuid in SID_load_cache_from_file function\n");
+            /* Skips adding sid to sid cache */
+            goto bad_sid;
         }
 
         ret = SID_create_SID_cacheval_t(&current_sid_cacheval, sid_attributes, tmp_bmi, tmp_url);
@@ -322,6 +324,9 @@ int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name,
         }
 
         SID_clean_up_SID_cacheval_t(&current_sid_cacheval);
+
+        bad_sid:
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error parsing uuid in SID_load_cache_from_file function\n");
     }
    
     fclose(inpfile);
@@ -404,7 +409,7 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t **c
                       0);    /* get flags */
     if(ret)
     {
-        gossip_err("Error getting sid from sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error getting sid from sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -434,7 +439,7 @@ int SID_bmi_lookup_from_sid_cache(DB **dbp, SID search_sid, char **bmi_addr)
 
     if (ret)
     {
-        gossip_err("Error retrieving from sid cache\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error retrieving from sid cache\n");
         return ret;
     }
 
@@ -493,7 +498,7 @@ int SID_update_sid_in_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *new_at
    
     if(new_attrs == NULL)
     {
-        gossip_err("The new attributes passed to SID_update_sid_in_sid_cache is NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The new attributes passed to SID_update_sid_in_sid_cache is NULL\n");
         return(-1);
     }
  
@@ -677,7 +682,7 @@ int SID_update_url_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t **current_si
 
     if(!new_url)
     {
-        gossip_err("The url passed into SID_update_url_in_sid function is currently NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The url passed into SID_update_url_in_sid function is currently NULL\n");
         return(-1);
     }
 
@@ -790,7 +795,7 @@ int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records)
                       0);   /* Delete flag */
     if(ret)
     {
-        gossip_err("Error deleting record from sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error deleting record from sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
   
@@ -990,7 +995,7 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
     ret = cursorp->close(cursorp);
     if(ret)
     {
-        gossip_err("Error occurred when closing cursor in SID_dump_sid_cache function: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error occurred when closing cursor in SID_dump_sid_cache function: %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1023,7 +1028,7 @@ int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrie
     /* If the input size of the retrieve is smaller than the minimum size then exit function with error */
     if (BULK_MIN_SIZE > (size_of_retrieve_kb * KILOBYTE) + (size_of_retrieve_mb * MEGABYTE))
     {
-        gossip_err("Size of bulk retrieve buffer must be greater than 8 KB\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Size of bulk retrieve buffer must be greater than 8 KB\n");
         return (-1);
     }
 
@@ -1040,7 +1045,7 @@ int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrie
     output->data = malloc(size);
     if (output->data == NULL)
     {
-        gossip_err("Error sizing buffer\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error sizing buffer\n");
         return (-1);
     }
 
@@ -1050,7 +1055,7 @@ int SID_bulk_retrieve_from_sid_cache(int size_of_retrieve_kb, int size_of_retrie
     /* Open bulk cursor */
     if ((ret = dbp->cursor(dbp, NULL, dbcursorp, DB_CURSOR_BULK)) != 0) {
         free(output->data);
-        gossip_err("Error creating bulk cursor\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error creating bulk cursor\n");
         return (ret);
     }
 
@@ -1111,7 +1116,7 @@ int SID_bulk_insert_into_sid_cache(DB *dbp, DBT *input)
         DB_MULTIPLE_KEY_WRITE_NEXT(opaque_p, &output, retkey, retklen, retdata, retdlen);
         if (opaque_p == NULL)
         {
-            gossip_err("Error cannot fit into write buffer\n");
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error cannot fit into write buffer\n");
             break;
         }
     }
@@ -1161,9 +1166,6 @@ void SID_zero_dbt(DBT *key, DBT *data, DBT *pkey)
 int SID_create_open_environment(DB_ENV **envp)
 {
     int ret = 0;
-
-    /* Setting the global bulk next key to zero */
-    SID_zero_dbt(&bulk_next_key, NULL, NULL);
 
     /* Setting the opening environement flags */
     u_int32_t flags =
@@ -1223,6 +1225,9 @@ int SID_create_open_sid_cache(DB_ENV *envp, DB **dbp)
 
     u_int32_t flags = DB_CREATE; /* Database open flags. Creates the database if
                                     it does not already exist */
+
+    /* Setting the global bulk next key to zero */
+    SID_zero_dbt(&bulk_next_key, NULL, NULL);
 
     ret = db_create(dbp,   /* Primary database pointer */
                     envp,  /* Environment pointer */
@@ -1401,7 +1406,7 @@ int SID_close_dbcs(DBC *db_cursors[])
             ret = db_cursors[i]->close(db_cursors[i]);
             if(ret)
             {
-                gossip_err("Error closing cursor :  %s\n", db_strerror(ret));
+                gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error closing cursor :  %s\n", db_strerror(ret));
                 return(ret);
             }
         }
@@ -1435,7 +1440,7 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
             /* Checking to make sure the secondary database has been closed */
             if(ret)
             {
-                gossip_err("Error closing attribute database : %s\n", db_strerror(ret));
+                gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error closing attribute database : %s\n", db_strerror(ret));
                 return(ret);
             }
         }
@@ -1451,7 +1456,7 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
 
      if(ret)
     {
-        gossip_err("Error closing primary database : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error closing primary database : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -1465,7 +1470,7 @@ int SID_close_dbs_env(DB_ENV *envp, DB *dbp, DB *secondary_dbs[])
 
     if(ret)
     {
-        gossip_err("Error closing environment :  %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error closing environment :  %s\n", db_strerror(ret));
         return(ret);
     }
 
