@@ -326,7 +326,8 @@ int SID_load_sid_cache_from_file(DB **dbp, FILE *inpfile, const char *file_name,
         SID_clean_up_SID_cacheval_t(&current_sid_cacheval);
 
         bad_sid:
-            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error parsing uuid in SID_load_cache_from_file function\n");
+            gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error parsing uuid in \
+                         SID_load_cache_from_file function\n");
     }
    
     fclose(inpfile);
@@ -347,7 +348,8 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
     if(uuid_is_null(sid_server))
     {
-        gossip_err("Error: uuid_t in SID_store_sid_into sid_cache function is currently NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error: uuid_t in SID_store_sid_into \
+                     sid_cache function is currently NULL\n");
         return(-1);
     }
 
@@ -368,7 +370,8 @@ int SID_store_sid_into_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *cache
 
     if(ret)
     {
-        gossip_err("Error inserting sid into the sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error inserting sid into the \
+                     sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -409,7 +412,8 @@ int SID_retrieve_sid_from_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t **c
                       0);    /* get flags */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error getting sid from sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error getting sid from \
+                     sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
 
@@ -498,7 +502,8 @@ int SID_update_sid_in_sid_cache(DB **dbp, SID sid_server, SID_cacheval_t *new_at
    
     if(new_attrs == NULL)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The new attributes passed to SID_update_sid_in_sid_cache is NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The new attributes passed to \
+                     SID_update_sid_in_sid_cache is NULL\n");
         return(-1);
     }
  
@@ -682,7 +687,8 @@ int SID_update_url_in_sid(DB **dbp, SID *sid_server, SID_cacheval_t **current_si
 
     if(!new_url)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The url passed into SID_update_url_in_sid function is currently NULL\n");
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "The url passed into SID_update_url_in_sid \
+                     function is currently NULL\n");
         return(-1);
     }
 
@@ -795,7 +801,8 @@ int SID_delete_sid_from_sid_cache(DB **dbp, SID sid_server, int *db_records)
                       0);   /* Delete flag */
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error deleting record from sid cache : %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error deleting record from \
+                     sid cache : %s\n", db_strerror(ret));
         return(ret);
     }
   
@@ -886,7 +893,8 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
 
     if(ret)
     {
-        gossip_err("Error occured when trying to create cursor in SID_dump_sid_cache function: %s", db_strerror(ret));
+        gossip_err("Error occured when trying to create cursor in \
+                    SID_dump_sid_cache function: %s", db_strerror(ret));
         return(ret);
     }
 
@@ -995,7 +1003,8 @@ int SID_dump_sid_cache(DB **dbp, const char *file_name, FILE *outpfile, int db_r
     ret = cursorp->close(cursorp);
     if(ret)
     {
-        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error occurred when closing cursor in SID_dump_sid_cache function: %s\n", db_strerror(ret));
+        gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Error occurred when closing cursor \
+                     in SID_dump_sid_cache function: %s\n", db_strerror(ret));
         return(ret);
     }
 
