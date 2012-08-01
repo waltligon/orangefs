@@ -190,24 +190,36 @@ extern int pxfs_openat64(int dirfd, const char *path, int flags, int *fd,
     return pxfs_openat(dirfd, path, flags, fd, cb, cdat, mode);
 }
 
-/*
 extern int pxfs_creat(const char *path, mode_t mode, int *fd,
-                      pxfs_cb cb, void *cdat, ...);
+                      pxfs_cb cb, void *cdat, ...)
+{
+    return pxfs_open(path, O_RDWR | O_CREAT | O_EXCL, fd, cb, cdat, mode);
+}
 
 extern int pxfs_creat64(const char *path, mode_t mode, int *fd,
-                        pxfs_cb cb, void *cdat, ...);
+                        pxfs_cb cb, void *cdat, ...)
+{
+    return pxfs_open64(path, O_RDWR | O_CREAT | O_EXCL, fd, cb, cdat, mode);
+}
 
+/*
 extern int pxfs_unlink (const char *path, pxfs_cb cb, void *cdat);
 
 extern int pxfs_unlinkat (int dirfd, const char *path, int flags,
                           pxfs_cb cb, void *cdat);
+*/
 
 extern int pxfs_rename(const char *oldpath, const char *newpath,
-                       pxfs_cb cb, void *cdat);
+                       pxfs_cb cb, void *cdat)
+{
+    return 0;
+}
 
 extern int pxfs_renameat(int olddirfd, const char *oldpath, int newdirfd,
-                         const char *newpath, pxfs_cb cb, void *cdat);
-*/
+                         const char *newpath, pxfs_cb cb, void *cdat)
+{
+    return 0;
+}
 
 extern int pxfs_read(int fd, void *buf, size_t count, ssize_t *bcnt,
                      pxfs_cb cb, void *cdat)

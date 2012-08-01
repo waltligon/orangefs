@@ -50,7 +50,7 @@ static int rename_chdirent_comp_fn(
 
 %%
 
-machine pvfs2_client_rename_sm
+nested machine pvfs2_client_rename_sm
 {
     state init
     {
@@ -239,6 +239,21 @@ machine pvfs2_client_rename_sm
     state cleanup
     {
         run rename_cleanup;
+        default => terminate;
+    }
+}
+
+machine pvfs2_client_sysint_rename_sm
+{
+    state dowork
+    {
+        jump pvfs2_client_rename_sm;
+        default => rename_terminate;
+    }
+
+    state rename_terminate
+    {
+        run rename_terminate;
         default => terminate;
     }
 }
@@ -997,9 +1012,16 @@ static PINT_sm_action rename_cleanup(
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
-    PINT_SET_OP_COMPLETE;
-    return SM_ACTION_TERMINATE;
+    return SM_ACTION_COMPLETE;
 }
+
+static PINT_sm_action rename_terminate(
+        struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    /* terminate the sm */
+    PINT_SET_OP_COMPLETE;
+    return SM_ACTION_COMPLETE;
+}    
 
 static PINT_sm_action rename_generic_timer(
         struct PINT_smcb *smcb, job_status_s *js_p)

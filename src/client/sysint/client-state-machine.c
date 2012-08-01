@@ -356,7 +356,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_sysint_readdir_sm},
     {&pvfs2_client_setattr_sm},
     {&pvfs2_client_sysint_lookup_sm},
-    {&pvfs2_client_rename_sm},
+    {&pvfs2_client_sysint_rename_sm},
     {&pvfs2_client_get_eattr_sm},
     {&pvfs2_client_set_eattr_sm},
     {&pvfs2_client_del_eattr_sm},
@@ -365,7 +365,6 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_statfs_sm},
     {&pvfs2_fs_add_sm},
     {&pvfs2_client_readdirplus_sm},
-    {&pvfs2_client_aio_open_sm},
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -387,6 +386,7 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
 struct PINT_client_op_entry_s PINT_client_sm_aio_table[] =
 {
     {&pvfs2_client_aio_open_sm},
+    {&pvfs2_client_aio_rename_sm},
 };
 
 /* This function allows the generic state-machine-fns.c locate function
@@ -1233,6 +1233,7 @@ const char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_FS_ADD, "PVFS_SYS_FS_ADD" },
         { PVFS_SYS_STATFS, "PVFS_SYS_STATFS" },
         { PVFS_AIO_OPEN, "PVFS_AIO_OPEN" },
+        { PVFS_AIO_RENAME, "PVFS_AIO_RENAME" },
         { 0, "UNKNOWN" }
     };
 

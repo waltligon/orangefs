@@ -33,6 +33,7 @@ typedef enum
 {
     PVFS_AIO_IO_OP = 1,
     PVFS_AIO_OPEN_OP,
+    PVFS_AIO_RENAME_OP,
 } PVFS_aio_op_code;
 
 
