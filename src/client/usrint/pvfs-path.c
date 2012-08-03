@@ -600,14 +600,10 @@ int is_pvfs_path(const char **path)
  * and is an error.  To parse the last dir in a path, remove this
  * trailing slash.  No filename with no directory is OK.
  *
- * dirflag is set when creating or removing a directory in which
- * case we remove trailing /'s and .'s
- *
  * WBL - New design we should never have trailing or extra slashes
  * dots or double dots so no special code to deal with them.
  */
 int split_pathname( const char *path,
-                    int dirflag,
                     char **directory,
                     char **filename)
 {
@@ -647,13 +643,33 @@ int split_pathname( const char *path,
         /* found no '/' path is all filename */
         *directory = NULL;
     }
-    i++;
+    else if (i == 0)
+    {
+        /* special case, this is an item in the true root dir */
+        /* the true root cannot be a PVFS mount point and we */
+        /* would not be here if this hadn't resolved at some */
+        /* point so it must be a dir, the PVFS mount point */
+        /* easiest thing is put it all in the dir output and */
+        /* set the EISDIR so iocommon_open will know it is */
+        /* everything */
+        free(*directory);
+        *directory = malloc(length + 1);
+        if (!*directory)
+        {
+            return -1;
+        }
+        strncpy(*directory, path, length);
+        *filename = NULL;
+        errno = EISDIR;
+        return -1;
+    }
     /* copy the filename */
-    fnlen = length - i/* - slashes*/;
+    i++;
+    fnlen = length - i /* - slashes*/;
     if (fnlen == 0)
     {
         filename = NULL;
-        if (!directory)
+        if (*directory)
         {
             errno = EISDIR;
         }
