@@ -19,6 +19,9 @@
 #include "iocommon.h"
 #include "aiocommon.h"
 
+#define PVFS_ATTR_DEFAULT_MASK \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | PVFS_ATTR_SYS_BLKSIZE)
+
 typedef int (*pxfs_cb)(void *cdat, int status);
 
 /* define FD flags unique to PXFS here */
@@ -70,16 +73,16 @@ extern int pxfs_rename(const char *oldpath, const char *newpath,
 extern int pxfs_renameat(int olddirfd, const char *oldpath, int newdirfd,
                          const char *newpath, pxfs_cb cb, void *cdat);
 
-extern int pxfs_read(int fd, void *buf, size_t count, ssize_t *bcnt,
+extern int pxfs_read(int fd, const void *buf, size_t count, ssize_t *bcnt,
                      pxfs_cb cb, void *cdat);
 
-extern int pxfs_pread(int fd, void *buf, size_t count, off_t offset,
+extern int pxfs_pread(int fd, const void *buf, size_t count, off_t offset,
                       ssize_t *bcnt, pxfs_cb cb, void *cdat);
 
 extern int pxfs_readv(int fd, const struct iovec *vector, int count,
                       ssize_t *bcnt, pxfs_cb cb, void *cdat);
 
-extern int pxfs_pread64(int fd, void *buf, size_t count, off64_t offset,
+extern int pxfs_pread64(int fd, const void *buf, size_t count, off64_t offset,
                         ssize_t *bcnt, pxfs_cb cb, void *cdat);
 
 extern int pxfs_write(int fd, const void *buf, size_t count,

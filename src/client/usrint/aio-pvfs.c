@@ -129,11 +129,18 @@ int pvfs_lio_listio(int mode, struct aiocb * const list[], int nent,
             list[i]->__error_code = -1;
         }
 
+        pvfs_list[i]->u.io.vector = malloc(sizeof(struct iovec));
+        if (!(pvfs_list[i]))
+        {
+            errno = ENOMEM;
+            return -1;
+        }
+
         list[i]->__error_code = EINPROGRESS;
         pvfs_list[i]->hints = PVFS_HINT_NULL;
         pvfs_list[i]->op_code = PVFS_AIO_IO_OP;
-        pvfs_list[i]->u.io.vector.iov_len = list[i]->aio_nbytes;
-        pvfs_list[i]->u.io.vector.iov_base = (void *)list[i]->aio_buf;
+        pvfs_list[i]->u.io.vector->iov_len = list[i]->aio_nbytes;
+        pvfs_list[i]->u.io.vector->iov_base = (void *)list[i]->aio_buf;
         pvfs_list[i]->u.io.pd = pd;
         pvfs_list[i]->u.io.offset = list[i]->aio_offset;
         pvfs_list[i]->u.io.bcnt = &(list[i]->__return_value);

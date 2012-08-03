@@ -32,18 +32,23 @@ enum
 typedef enum
 {
     PVFS_AIO_IO_OP = 1,
+    PVFS_AIO_IOV_OP,
     PVFS_AIO_OPEN_OP,
     PVFS_AIO_RENAME_OP,
+    PVFS_AIO_STAT_OP,
+    PVFS_AIO_STAT64_OP,
 } PVFS_aio_op_code;
 
 
 /* the following structures contain operation dependent data for aio calls */
 struct PINT_aio_io_cb
 {
-    struct iovec vector;        /* in */
+    struct iovec *vector;       /* in */
+    int count;                  /* in (readv writev )*/
     pvfs_descriptor *pd;        /* in */
     enum PVFS_io_type which;    /* in */
     off64_t offset;             /* in */
+    int advance_fp;             /* in */
     void *sys_buf;              
     PVFS_Request mem_req;       
     PVFS_Request file_req;      
@@ -60,6 +65,24 @@ struct PINT_aio_open_cb
     pvfs_descriptor *pdir;          /* in */
     int *fd;                        /* in/out */
     pvfs_descriptor *pd;            /* out */
+};
+
+struct PINT_aio_rename_cb
+{
+    PVFS_object_ref *oldpdir;   /* in */
+    char *olddir;               /* in */
+    char *oldname;              /* in */
+    PVFS_object_ref *newpdir;   /* in */
+    char *newdir;               /* in */
+    char *newname;              /* in */
+};
+
+struct PINT_aio_stat_cb
+{
+    pvfs_descriptor *pd;        /* in */
+    uint32_t mask;              /* in */
+    PVFS_sysresp_getattr getattr_resp;
+    void  *buf;           /* out */
 };
 
 /* a pvfs async control block, used for keeping track of async
@@ -81,6 +104,8 @@ struct pvfs_aiocb
     {
         struct PINT_aio_io_cb io;
         struct PINT_aio_open_cb open;
+        struct PINT_aio_rename_cb rename;
+        struct PINT_aio_stat_cb stat;
     } u;
 };
 

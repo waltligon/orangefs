@@ -102,15 +102,16 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
     switch(p_cb->op_code)
     {
         case PVFS_AIO_IO_OP:
-            
-            rc = PVFS_Request_contiguous(p_cb->u.io.vector.iov_len, PVFS_BYTE,
+        {
+            rc = PVFS_Request_contiguous(p_cb->u.io.vector->iov_len, PVFS_BYTE,
                                          &(p_cb->u.io.file_req));
             if (rc < 0)
             {
                 rc = -PVFS_ENOMEM;
                 break;
             }
-            rc = pvfs_convert_iovec(&(p_cb->u.io.vector), 1, &(p_cb->u.io.mem_req),
+            rc = pvfs_convert_iovec(p_cb->u.io.vector, 1,
+                                    &(p_cb->u.io.mem_req),
                                     &(p_cb->u.io.sys_buf));
             if (rc < 0)
             {
@@ -130,7 +131,43 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                               p_cb->hints,
                               (void *)p_cb);
             break;
+        }
+        case PVFS_AIO_IOV_OP:
+        {
+            int i, size = 0;
+            for (i = 0; i < p_cb->u.io.count; i++)
+            {
+                size += p_cb->u.io.vector[i].iov_len;
+            }
+            rc = PVFS_Request_contiguous(size, PVFS_BYTE, &(p_cb->u.io.file_req));
+            if (rc < 0)
+            {
+                rc = -PVFS_ENOMEM;
+                break;
+            }
+            rc = pvfs_convert_iovec(p_cb->u.io.vector, p_cb->u.io.count, 
+                                    &(p_cb->u.io.mem_req), &(p_cb->u.io.sys_buf));
+            if (rc < 0)
+            {
+                rc = -PVFS_ENOMEM;
+                break;
+            }
+
+            rc = PVFS_isys_io(p_cb->u.io.pd->s->pvfs_ref,
+                              p_cb->u.io.file_req,
+                              p_cb->u.io.offset,
+                              p_cb->u.io.sys_buf,
+                              p_cb->u.io.mem_req,
+                              cred,
+                              &(p_cb->u.io.io_resp),
+                              p_cb->u.io.which,
+                              &(p_cb->op_id),
+                              p_cb->hints,
+                              (void *)p_cb);
+            break;
+        }
         case PVFS_AIO_OPEN_OP:
+        {
             rc = PVFS_iaio_open(&(p_cb->u.open.pd),
                                 p_cb->u.open.path,
                                 p_cb->u.open.flags, 
@@ -142,9 +179,48 @@ static void aiocommon_run_op(struct pvfs_aiocb *p_cb)
                                 p_cb->hints,
                                 (void *)p_cb);
             break;
+        }
+        case PVFS_AIO_RENAME_OP:
+        { 
+            rc = PVFS_iaio_rename(p_cb->u.rename.oldpdir,
+                                  p_cb->u.rename.olddir,
+                                  p_cb->u.rename.oldname,
+                                  p_cb->u.rename.newpdir,
+                                  p_cb->u.rename.newdir,
+                                  p_cb->u.rename.newname,
+                                  cred,
+                                  &(p_cb->op_id),
+                                  p_cb->hints,
+                                  (void *)p_cb);
+            break;
+        }
+        case PVFS_AIO_STAT_OP:
+        {   
+            rc = PVFS_isys_getattr(p_cb->u.stat.pd->s->pvfs_ref,
+                                   p_cb->u.stat.mask,
+                                   cred,
+                                   &(p_cb->u.stat.getattr_resp),
+                                   &(p_cb->op_id),
+                                   p_cb->hints,
+                                   (void *)p_cb);
+            break;
+        }
+        case PVFS_AIO_STAT64_OP:
+        {
+            rc = PVFS_isys_getattr(p_cb->u.stat.pd->s->pvfs_ref,
+                                   p_cb->u.stat.mask,
+                                   cred,
+                                   &(p_cb->u.stat.getattr_resp),
+                                   &(p_cb->op_id),
+                                   p_cb->hints,
+                                   (void *)p_cb);
+            break;
+        }
         default:
+        {
             rc = -PVFS_EINVAL;
             break;
+        }
     }
 
     if (rc < 0)
@@ -175,6 +251,7 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
     switch (p_cb->op_code)
     {
         case PVFS_AIO_IO_OP:
+        {
             if (p_cb->error_code < 0)
             {
                 *(p_cb->u.io.bcnt) = -1;
@@ -182,11 +259,37 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
             else
             {
                 *(p_cb->u.io.bcnt) = p_cb->u.io.io_resp.total_completed;
+                if (p_cb->u.io.advance_fp)
+                {
+                    gen_mutex_lock(&(p_cb->u.io.pd->s->lock));
+                    p_cb->u.io.pd->s->file_pointer += *(p_cb->u.io.bcnt);
+                    gen_mutex_unlock(&(p_cb->u.io.pd->s->lock));
+                }
+            }
+            free(p_cb->u.io.vector);
+            PVFS_Request_free(&(p_cb->u.io.mem_req));
+            PVFS_Request_free(&(p_cb->u.io.file_req));
+            break;
+        }
+        case PVFS_AIO_IOV_OP:
+        {
+            if (p_cb->error_code < 0)
+            {
+                *(p_cb->u.io.bcnt) = -1;
+            }
+            else
+            {
+                *(p_cb->u.io.bcnt) = p_cb->u.io.io_resp.total_completed;
+                gen_mutex_lock(&(p_cb->u.io.pd->s->lock));
+                p_cb->u.io.pd->s->file_pointer += *(p_cb->u.io.bcnt);
+                gen_mutex_unlock(&(p_cb->u.io.pd->s->lock));
             }
             PVFS_Request_free(&(p_cb->u.io.mem_req));
             PVFS_Request_free(&(p_cb->u.io.file_req));
             break;
+        }
         case PVFS_AIO_OPEN_OP:
+        {
             if (p_cb->error_code < 0)
             {
                 *(p_cb->u.open.fd) = -1;
@@ -196,8 +299,89 @@ static void aiocommon_finish_op(struct pvfs_aiocb *p_cb)
                 *(p_cb->u.open.fd) = p_cb->u.open.pd->fd;
             }
             break;
-        default:
+        }
+        case PVFS_AIO_RENAME_OP:
+        {
+            free(p_cb->u.rename.olddir);
+            free(p_cb->u.rename.oldname);
+            free(p_cb->u.rename.newdir);
+            free(p_cb->u.rename.newname);
             break;
+        }
+        case PVFS_AIO_STAT_OP:
+        {
+            PVFS_sys_attr attr = p_cb->u.stat.getattr_resp.attr;
+            struct stat *buf = (struct stat *)p_cb->u.stat.buf;
+
+            buf->st_dev = p_cb->u.stat.pd->s->pvfs_ref.fs_id;
+            buf->st_ino = p_cb->u.stat.pd->s->pvfs_ref.handle;
+            buf->st_mode = attr.perms;
+            if (attr.objtype == PVFS_TYPE_METAFILE)
+            {
+                buf->st_mode |= S_IFREG;
+            }
+            if (attr.objtype == PVFS_TYPE_DIRECTORY)
+            {
+                buf->st_mode |= S_IFDIR;
+            }
+            if (attr.objtype == PVFS_TYPE_SYMLINK)
+            {
+                buf->st_mode |= S_IFLNK;
+            }
+            buf->st_nlink = 1; /* PVFS does not allow hard links */
+            buf->st_uid = attr.owner;
+            buf->st_gid = attr.group;
+            buf->st_rdev = 0; /* no dev special files */
+            buf->st_size = attr.size;
+            buf->st_blksize = attr.blksize;
+            if (attr.blksize)
+            {
+                buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
+            }
+            buf->st_atime = attr.atime;
+            buf->st_mtime = attr.mtime;
+            buf->st_ctime = attr.ctime;
+            break;
+        }
+        case PVFS_AIO_STAT64_OP:
+        {
+            PVFS_sys_attr attr = p_cb->u.stat.getattr_resp.attr;
+            struct stat64 *buf = (struct stat64 *)p_cb->u.stat.buf;
+
+            buf->st_dev = p_cb->u.stat.pd->s->pvfs_ref.fs_id;
+            buf->st_ino = p_cb->u.stat.pd->s->pvfs_ref.handle;
+            buf->st_mode = attr.perms;
+            if (attr.objtype == PVFS_TYPE_METAFILE)
+            {
+                buf->st_mode |= S_IFREG;
+            }
+            if (attr.objtype == PVFS_TYPE_DIRECTORY)
+            {
+                buf->st_mode |= S_IFDIR;
+            }
+            if (attr.objtype == PVFS_TYPE_SYMLINK)
+            {
+                buf->st_mode |= S_IFLNK;
+            }
+            buf->st_nlink = 1; /* PVFS does not allow hard links */
+            buf->st_uid = attr.owner;
+            buf->st_gid = attr.group;
+            buf->st_rdev = 0; /* no dev special files */
+            buf->st_size = attr.size;
+            buf->st_blksize = attr.blksize;
+            if (attr.blksize)
+            {
+                buf->st_blocks = (attr.size + (attr.blksize - 1)) / attr.blksize;
+            }
+            buf->st_atime = attr.atime;
+            buf->st_mtime = attr.mtime;
+            buf->st_ctime = attr.ctime;
+            break;
+        }
+        default:
+        {
+            break;
+        }
     }
 
     /* set the status with the error number, if an error occured */

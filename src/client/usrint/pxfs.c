@@ -12,6 +12,30 @@
 
 #include "pxfs.h"
 
+/* actual implementations of the read/write functions */
+
+static int pxfs_rdwr64(int fd,
+                       void *buf,
+                       size_t size,
+                       off64_t offset,
+                       ssize_t *bcnt,
+                       pxfs_cb cb,
+                       void *cdat,
+                       int which,
+                       int advance_fp);
+
+static int pxfs_rdwrv(int fd,
+                      const struct iovec *vector,
+                      int count,
+                      ssize_t *bcnt,
+                      pxfs_cb  cb,
+                      void *cdat,
+                      int which);
+
+/**
+ *
+ **/
+
 extern int pxfs_open(const char *path, int flags, int *fd,
                      pxfs_cb cb, void *cdat, ...)
 {
@@ -157,6 +181,7 @@ extern int pxfs_openat(int dirfd, const char *path, int flags, int *fd,
     return rc;
 }
 
+/* TODO: TEST */
 extern int pxfs_openat64(int dirfd, const char *path, int flags, int *fd,
                          pxfs_cb cb, void *cdat, ...)
 {
@@ -209,23 +234,88 @@ extern int pxfs_unlinkat (int dirfd, const char *path, int flags,
                           pxfs_cb cb, void *cdat);
 */
 
+/**
+ * pxfs_rename
+ */
 extern int pxfs_rename(const char *oldpath, const char *newpath,
                        pxfs_cb cb, void *cdat)
 {
+    int rc;
+    char *abs_oldpath, *abs_newpath;
+    struct pvfs_aiocb *rename_acb = NULL;
+
+    if (!oldpath | !newpath)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    rename_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!rename_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(rename_acb, 0, sizeof(struct pvfs_aiocb));
+    
+    abs_oldpath = pvfs_qualify_path(oldpath);
+    if (!abs_oldpath)
+    {
+        return -1;
+    }
+
+    abs_newpath = pvfs_qualify_path(newpath);
+    if (!abs_newpath)
+    {
+        return -1;
+    }
+
+    rc = split_pathname(abs_oldpath, 0, &(rename_acb->u.rename.olddir),
+                        &(rename_acb->u.rename.oldname));
+    if (rc < 0)
+    {
+        return -1;
+    }
+    
+    rc = split_pathname(abs_newpath, 0, &(rename_acb->u.rename.newdir),
+                        &(rename_acb->u.rename.newname));
+    if (rc < 0)
+    {
+        return -1;
+    }
+
+    rename_acb->hints = PVFS_HINT_NULL;
+    rename_acb->op_code = PVFS_AIO_RENAME_OP;
+    rename_acb->u.rename.oldpdir = NULL;
+    rename_acb->u.rename.newpdir = NULL;
+    rename_acb->call_back_fn = cb;
+    rename_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(rename_acb);
+
+    if (abs_oldpath != oldpath)
+    {
+        free(abs_oldpath);
+    }
+    if (abs_newpath != newpath)
+    {
+        free(abs_newpath);
+    }
+
     return 0;
 }
 
+/*
 extern int pxfs_renameat(int olddirfd, const char *oldpath, int newdirfd,
                          const char *newpath, pxfs_cb cb, void *cdat)
 {
-    return 0;
 }
+*/
 
-extern int pxfs_read(int fd, void *buf, size_t count, ssize_t *bcnt,
+extern int pxfs_read(int fd, const void *buf, size_t count, ssize_t *bcnt,
                      pxfs_cb cb, void *cdat)
 {
     pvfs_descriptor *pd = NULL;
-    struct pvfs_aiocb *read_acb = NULL;
 
     if (fd < 0)
     {
@@ -233,59 +323,100 @@ extern int pxfs_read(int fd, void *buf, size_t count, ssize_t *bcnt,
         return -1;
     }
 
-    if (!buf || !bcnt)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-
-    read_acb = malloc(sizeof(struct pvfs_aiocb));
-    if (!read_acb)
-    {
-        errno = ENOMEM;
-        return -1;
-    }
-    memset(read_acb, 0, sizeof(struct pvfs_aiocb));
-
     pd = pvfs_find_descriptor(fd);
     if (!pd)
     {
-        free(read_acb);
+        errno = EBADF;
         return -1;
     }    
 
-    read_acb->hints = PVFS_HINT_NULL;
-    read_acb->op_code = PVFS_AIO_IO_OP;
-    read_acb->u.io.vector.iov_len = count;
-    read_acb->u.io.vector.iov_base = (void *)buf;
-    read_acb->u.io.pd = pd;
-    read_acb->u.io.which = PVFS_IO_READ;
-    read_acb->u.io.offset = pd->s->file_pointer;
-    read_acb->u.io.bcnt = bcnt;
-    read_acb->call_back_fn = cb;
-    read_acb->call_back_dat = cdat;
-
-    aiocommon_submit_op(read_acb);
-
-    return 0;
+    return pxfs_rdwr64(fd, (void *)buf, count, pd->s->file_pointer, bcnt,
+                        cb, cdat, PVFS_IO_READ, 1);
 }
 
-/*
-extern int pxfs_pread(int fd, void *buf, size_t count, off_t offset,
-                      ssize_t *bcnt, pxfs_cb cb, void *cdat);
+extern int pxfs_pread(int fd, const void *buf, size_t count, off_t offset,
+                      ssize_t *bcnt, pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwr64(fd, (void *)buf, count, (off64_t)offset, bcnt,
+                        cb, cdat, PVFS_IO_READ, 0);
+}
 
 extern int pxfs_readv(int fd, const struct iovec *vector, int count,
-                      ssize_t *bcnt, pxfs_cb cb, void *cdat);
+                      ssize_t *bcnt, pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwrv(fd, vector, count, bcnt, cb, cdat, PVFS_IO_READ);
+}
 
-extern int pxfs_pread64(int fd, void *buf, size_t count, off64_t offset,
-                        ssize_t *bcnt, pxfs_cb cb, void *cdat);
-*/
+extern int pxfs_pread64(int fd, const void *buf, size_t count, off64_t offset,
+                        ssize_t *bcnt, pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwr64(fd, (void *)buf, count, offset, bcnt, cb,
+                       cdat, PVFS_IO_READ, 0);
+}
 
 extern int pxfs_write(int fd, const void *buf, size_t count, ssize_t *bcnt,
                       pxfs_cb cb, void *cdat)
 {
     pvfs_descriptor *pd = NULL;
-    struct pvfs_aiocb *write_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    /* check for append mode */
+    if (pd->s->flags & O_APPEND)
+    {
+        /* WHAT */
+        return 0;
+    }
+    else
+    {
+        return pxfs_rdwr64(fd, (void *)buf, count, pd->s->file_pointer, bcnt,
+                           cb, cdat, PVFS_IO_WRITE, 0);
+    }
+}
+
+extern int pxfs_pwrite(int fd, const void *buf, size_t count, off_t offset,
+                       ssize_t *bcnt, pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwr64(fd, (void *)buf, count, (off64_t)offset, bcnt,
+                        cb, cdat, PVFS_IO_WRITE, 0);
+}
+
+extern int pxfs_writev(int fd, const struct iovec *vector, int count,
+                       ssize_t *bcnt , pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwrv(fd, vector, count, bcnt, cb, cdat, PVFS_IO_WRITE);
+}
+
+extern int pxfs_pwrite64(int fd, const void *buf, size_t count,
+                         off64_t offset, ssize_t *bcnt,
+                         pxfs_cb cb, void *cdat)
+{
+    return pxfs_rdwr64(fd, (void *)buf, count, offset, bcnt, cb,
+                       cdat, PVFS_IO_WRITE, 0);
+}
+
+static int pxfs_rdwr64(int fd,
+                       void *buf,
+                       size_t size,
+                       off64_t offset,
+                       ssize_t *bcnt,
+                       pxfs_cb cb, 
+                       void *cdat,
+                       int which,
+                       int advance_fp)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *io_acb = NULL;
 
     if (fd < 0)
     {
@@ -299,50 +430,271 @@ extern int pxfs_write(int fd, const void *buf, size_t count, ssize_t *bcnt,
         return -1;
     }
 
-    write_acb = malloc(sizeof(struct pvfs_aiocb));
-    if (!write_acb)
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    /* Ensure descriptor is used for the correct type of access */
+    if ((which == PVFS_IO_READ &&
+            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which == PVFS_IO_WRITE &&
+            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    io_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!io_acb)
     {
         errno = ENOMEM;
         return -1;
     }
-    memset(write_acb, 0, sizeof(struct pvfs_aiocb));
+    memset(io_acb, 0, sizeof(struct pvfs_aiocb));
 
-    pd = pvfs_find_descriptor(fd);
-    if (!pd)
+    io_acb->u.io.vector = malloc(sizeof(struct iovec));
+    if(!(io_acb->u.io.vector))
     {
-        free(write_acb);
+        errno = -ENOMEM;
         return -1;
     }
 
-    write_acb->hints = PVFS_HINT_NULL;
-    write_acb->op_code = PVFS_AIO_IO_OP;
-    write_acb->u.io.vector.iov_len = count;
-    write_acb->u.io.vector.iov_base = (void *)buf;
-    write_acb->u.io.pd = pd;
-    write_acb->u.io.which = PVFS_IO_WRITE;
-    write_acb->u.io.offset = pd->s->file_pointer;
-    write_acb->u.io.bcnt = bcnt;
-    write_acb->call_back_fn = cb;
-    write_acb->call_back_dat = cdat;
+    io_acb->hints = PVFS_HINT_NULL;
+    io_acb->op_code = PVFS_AIO_IO_OP;
+    io_acb->u.io.vector->iov_len = size;
+    io_acb->u.io.vector->iov_base = (void *)buf;
+    io_acb->u.io.pd = pd;
+    io_acb->u.io.which = which;
+    io_acb->u.io.advance_fp = advance_fp;
+    io_acb->u.io.offset = offset;
+    io_acb->u.io.bcnt = bcnt;
+    io_acb->call_back_fn = cb;
+    io_acb->call_back_dat = cdat;
 
-    aiocommon_submit_op(write_acb);
+    aiocommon_submit_op(io_acb);
+
+    return 0;
+}
+
+static int pxfs_rdwrv(int fd,
+                      const struct iovec *vector,
+                      int count,
+                      ssize_t *bcnt,
+                      pxfs_cb  cb,
+                      void *cdat,
+                      int which)
+
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *io_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    if (!vector || !bcnt)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+
+    /* find the descriptor */
+    pd = pvfs_find_descriptor(fd);
+    if (!pd)
+    {
+        errno = EBADF;
+        return -1;
+    }    
+
+    /* Ensure descriptor is used for the correct type of access */
+    if ((which == PVFS_IO_READ &&
+            (O_WRONLY == (pd->s->flags & O_ACCMODE))) ||
+        (which == PVFS_IO_WRITE &&
+            (O_RDONLY == (pd->s->flags & O_ACCMODE))))
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    io_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!io_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(io_acb, 0, sizeof(struct pvfs_aiocb));
+
+    io_acb->hints = PVFS_HINT_NULL;
+    io_acb->op_code = PVFS_AIO_IOV_OP;
+    io_acb->u.io.vector = (struct iovec *)vector;
+    io_acb->u.io.count = count;
+    io_acb->u.io.pd = pd;
+    io_acb->u.io.which = which;
+    io_acb->u.io.offset = pd->s->file_pointer;
+    io_acb->u.io.bcnt = bcnt;
+    io_acb->call_back_fn = cb;
+    io_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(io_acb);
+
+    return 0;
+}
+/*
+extern int pxfs_truncate(const char *path, off_t length,
+                         pxfs_cb cb, void *cdat);
+
+extern int pxfs_truncate64 (const char *path, off64_t length,
+                            pxfs_cb cb, void *cdat);
+
+extern int pxfs_fallocate(int fd, off_t offset, off_t length,
+                          pxfs_cb cb, void *cdat);
+*/
+
+//extern int pxfs_ftruncate (int fd, off_t length, pxfs_cb cb, void *cdat);
+
+//extern int pxfs_ftruncate64 (int fd, off64_t length, pxfs_cb cb, void *cdat);
+
+/*
+extern int pxfs_close( int fd , pxfs_cb cb, void *cdat);
+
+extern int pxfs_flush(int fd, pxfs_cb cb, void *cdat);
+
+extern int pxfs_stat(const char *path, struct stat *buf,
+                     pxfs_cb cb, void *cdat);
+
+extern int pxfs_stat64(const char *path, struct stat64 *buf,
+                       pxfs_cb cb, void *cdat);
+
+extern int pxfs_stat_mask(const char *path, struct stat *buf,
+                          uint32_t mask, pxfs_cb cb, void *cdat);
+*/
+
+/**
+ * pxfs_fstat
+ */
+extern int pxfs_fstat(int fd, struct stat *buf, pxfs_cb cb, void *cdat)
+{
+    return pxfs_fstat_mask(fd, buf, PVFS_ATTR_DEFAULT_MASK, cb, cdat);
+}
+
+/**
+ * pxfs_fstat64
+ */
+extern int pxfs_fstat64(int fd, struct stat64 *buf, pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;    
+    struct pvfs_aiocb *stat_acb = NULL;
+
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (!buf)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
+
+    stat_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!stat_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(stat_acb, 0, sizeof(struct pvfs_aiocb));
+
+    stat_acb->hints = PVFS_HINT_NULL;
+    stat_acb->op_code = PVFS_AIO_STAT64_OP;
+    stat_acb->u.stat.pd = pd;
+    stat_acb->u.stat.buf = (void *)buf;
+    stat_acb->u.stat.mask = PVFS_ATTR_DEFAULT_MASK;
+    stat_acb->call_back_fn = cb;
+    stat_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(stat_acb);
 
     return 0;
 }
 
 /*
-extern int pxfs_pwrite(int fd, const void *buf, size_t count, off_t offset,
-                       ssize_t *bcnt, pxfs_cb cb, void *cdat);
+extern int pxfs_fstatat(int fd, const char *path, struct stat *buf,
+                        int flag, pxfs_cb cb, void *cdat);
 
-extern int pxfs_writev(int fd, const struct iovec *vector, int count,
-                       ssize_t *bcnt , pxfs_cb cb, void *cdat);
-
-extern int pxfs_pwrite64(int fd, const void *buf, size_t count,
-                         off64_t offset, ssize_t *bcnt,
-                         pxfs_cb cb, void *cdat);
+extern int pxfs_fstatat64(int fd, const char *path, struct stat64 *buf,
+                          int flag, pxfs_cb cb, void *cdat);
 */
 
+/**
+ * pxfs_fstat_mask
+ */
+extern int pxfs_fstat_mask(int fd, struct stat *buf, uint32_t mask,
+                           pxfs_cb cb, void *cdat)
+{
+    pvfs_descriptor *pd;
+    struct pvfs_aiocb *stat_acb = NULL;
+    
+    if (fd < 0)
+    {
+        errno = EBADF;
+        return -1;
+    }
+    if (!buf)
+    {
+        errno = EINVAL;
+        return -1;
+    }
+    pd = pvfs_find_descriptor(fd);
+    if (!pd || pd->is_in_use != PVFS_FS)
+    {
+        errno = EBADF;
+        return -1;
+    }
 
+    mask &= PVFS_ATTR_DEFAULT_MASK;
+
+    stat_acb = malloc(sizeof(struct pvfs_aiocb));
+    if (!stat_acb)
+    {
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(stat_acb, 0, sizeof(struct pvfs_aiocb));
+
+    stat_acb->hints = PVFS_HINT_NULL;
+    stat_acb->op_code = PVFS_AIO_STAT_OP;
+    stat_acb->u.stat.pd = pd;
+    stat_acb->u.stat.buf = (void *)buf;
+    stat_acb->u.stat.mask = mask;
+    stat_acb->call_back_fn = cb;
+    stat_acb->call_back_dat = cdat;
+
+    aiocommon_submit_op(stat_acb);
+
+    return 0;    
+}
+
+/*
+extern int pxfs_lstat(const char *path, struct stat *buf,
+                      pxfs_cb cb, void *cdat);
+
+extern int pxfs_lstat64(const char *path, struct stat64 *buf,
+                        pxfs_cb cb, void *cdat);
+
+extern int pxfs_lstat_mask(const char *path, struct stat *buf, uint32_t mask,
+                           pxfs_cb cb, void *cdat);
+*/
 
 /*
  * Local variables:

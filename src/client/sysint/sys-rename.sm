@@ -239,7 +239,7 @@ nested machine pvfs2_client_rename_sm
     state cleanup
     {
         run rename_cleanup;
-        default => terminate;
+        default => return;
     }
 }
 
