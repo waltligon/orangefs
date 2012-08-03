@@ -238,7 +238,7 @@ extern int pvfs_chdir(const char *path);
 
 extern int pvfs_fchdir(int fd);
 
-extern int pvfs_cwd_init(const char *buf, size_t size);
+extern int pvfs_cwd_init(void);
 
 extern char *pvfs_getcwd(char *buf, size_t size);
 

@@ -309,11 +309,13 @@ struct PINT_client_readdirplus_sm
 typedef struct
 {
     char *seg_name;
-    char *seg_remaining;
+    char *path_remaining;
     PVFS_object_attr seg_attr;
     PVFS_object_ref seg_starting_refn;
     PVFS_object_ref seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
+
+#define PVFS2_MAX_LOOKUP_CONTEXTS 256
 
 /*
  * A context is a group of segments that have been looked up

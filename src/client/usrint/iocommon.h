@@ -68,6 +68,7 @@ extern int iocommon_fsync(pvfs_descriptor *pvfs_info);
  * assumes an absoluate path
  */
 extern int iocommon_lookup_absolute(const char *abs_path,
+                             int follow_flag,
                              PVFS_object_ref *ref,
                              char *error_path,
                              int error_path_size);

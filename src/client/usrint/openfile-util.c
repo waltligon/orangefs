@@ -17,7 +17,9 @@
 #endif
 #include "posix-ops.h"
 #include "openfile-util.h"
+#include "iocommon.h"
 #include "posix-pvfs.h"
+#include "pvfs-path.h"
 #ifdef PVFS_AIO_ENABLE
 #include "aiocommon.h"
 #endif
@@ -196,10 +198,13 @@ static int my_glibc_readdir(u_int fd, struct dirent *dirp, u_int count)
     return syscall(SYS_readdir, fd, dirp, count);
 }
 
+/* moved the need for this to posix-pvfs.c */
+#if 0
 static int my_glibc_getcwd(char *buf, unsigned long size)
 {
     return syscall(SYS_getcwd, buf, size);
 }
+#endif
 
 void load_glibc(void)
 { 
@@ -474,7 +479,6 @@ int pvfs_sys_init(void)
 void pvfs_sys_init_doit(void) {
     struct rlimit rl; 
 	int rc;
-    char curdir[PVFS_PATH_MAX];
 
     /* this allows system calls to run */
     load_glibc();
@@ -484,14 +488,7 @@ void pvfs_sys_init_doit(void) {
     atexit(usrint_cleanup);
 
     /* set up current working dir */
-    memset(curdir, 0, sizeof(curdir));
-    rc = my_glibc_getcwd(curdir, PVFS_PATH_MAX);
-    if (rc < 0)
-    {
-        perror("failed to get CWD");
-        exit(-1);
-    }
-    pvfs_cwd_init(curdir, PVFS_PATH_MAX);
+    pvfs_cwd_init();
 
 	rc = getrlimit(RLIMIT_NOFILE, &rl); 
 	/* need to check for "INFINITY" */
@@ -541,6 +538,10 @@ void pvfs_sys_init_doit(void) {
     }
 
     /* call other initialization routines */
+
+    /* lib calls should never print user error messages */
+    /* user can do that with return codes */
+    PVFS_perror_gossip_silent();
 
 #if PVFS_UCACHE_ENABLE
     //gossip_enable_file(UCACHE_LOG_FILE, "a");
@@ -904,271 +905,6 @@ int pvfs_free_descriptor(int fd)
 
     debug("pvfs_free_descriptor returns %d\n", 0);
 	return 0;
-}
-
-/* 
- * takes a path that is relative to the working dir and
- * expands it all the way to the root
- */
-char *pvfs_qualify_path(const char *path)
-{
-    int cdsz, psz, msz;
-    char *rc;
-    char *newpath = NULL;
-    char curdir[PVFS_PATH_MAX];
-
-    if(path[0] != '/')
-    {
-        memset(curdir, 0, PVFS_PATH_MAX);
-        rc = getcwd(curdir, PVFS_PATH_MAX);
-        if (curdir == NULL)
-        {
-            /* ERANGE if need a larger buffer */
-            /* error, bail out */
-            return NULL;
-        }
-        cdsz = strlen(curdir);
-        psz = strlen(path);
-        msz = cdsz + psz + 2;
-        if (msz < 2)
-        {
-            errno = EINVAL;
-            return NULL;
-        }
-        /* allocate buffer for whole path and copy */
-        newpath = (char *)malloc(msz);
-        if (!newpath)
-        {
-            return NULL;
-        }
-        memset(newpath, 0, msz);
-        if (cdsz >= 0) /* zero size copy is bad */
-        {
-            strncpy(newpath, curdir, cdsz);
-        }
-        /* free(curdir); */
-        strncat(newpath, "/", 1);
-        if (psz >= 0) /* zero size copy is bad */
-        {
-            strncat(newpath, path, psz);
-        }
-    }
-    else
-    {
-        newpath = (char *)path;
-    }
-    return newpath;
-}
-
-/**
- * Determines if a path is part of a PVFS Filesystem 
- *
- * returns 1 if PVFS 0 otherwise
- */
-
-int is_pvfs_path(const char *path)
-{
-    int rc = 0;
-    char *newpath = NULL ;
-#if PVFS_USRINT_KMOUNT
-    int npsize;
-    struct stat sbuf;
-    struct statfs fsbuf;
-#else
-    PVFS_fs_id fs_id;
-    char pvfs_path[PVFS_PATH_MAX];
-#endif
-    
-    if(pvfs_sys_init())
-    {
-        return 0;
-    }
-
-    if (!path)
-    {
-        errno = EINVAL;
-        return 0; /* let glibc sort out the error */
-    }
-#if PVFS_USRINT_KMOUNT
-    memset(&sbuf, 0, sizeof(sbuf));
-    memset(&fsbuf, 0, sizeof(fsbuf));
-    npsize = strnlen(path, PVFS_PATH_MAX) + 1;
-    newpath = (char *)malloc(npsize);
-    if (!newpath)
-    {
-        return 0; /* let glibc sort out the error */
-    }
-    strncpy(newpath, path, npsize);
-    
-    /* first try to stat the path */
-    /* this must call standard glibc stat */
-    rc = glibc_ops.stat(newpath, &sbuf);
-    if (rc < 0)
-    {
-        int count;
-        /* path doesn't exist, try removing last segment */
-        for(count = strlen(newpath) - 2; count > 0; count--)
-        {
-            if(newpath[count] == '/')
-            {
-                newpath[count] = '\0';
-                break;
-            }
-        }
-        /* this must call standard glibc stat */
-        rc = glibc_ops.stat(newpath, &sbuf);
-        if (rc < 0)
-        {
-            /* can't find the path must be an error */
-            free(newpath);
-            return 0; /* let glibc sort out the error */
-        }
-    }
-    /* this must call standard glibc statfs */
-    rc = glibc_ops.statfs(newpath, &fsbuf);
-    free(newpath);
-    if(fsbuf.f_type == PVFS_FS)
-    {
-        return 1; /* PVFS */
-    }
-    else
-    {
-        return 0; /* not PVFS assume the kernel can handle it */
-    }
-/***************************************************************/
-#else /* PVFS_USRINT_KMOUNT */
-/***************************************************************/
-    /* we might not be able to stat the file direcly
-     * so we will use our resolver to look up the path
-     * prefix in the mount tab files
-     */
-    memset(pvfs_path, 0 , PVFS_PATH_MAX);
-    newpath = pvfs_qualify_path(path);
-    rc = PVFS_util_resolve(newpath, &fs_id, pvfs_path, PVFS_PATH_MAX);
-    if (newpath != path)
-    {
-        free(newpath);
-    }
-    if (rc < 0)
-    {
-        if (rc == -PVFS_ENOENT)
-        {
-            return 0; /* not a PVFS path */
-        }
-        errno = rc;
-        return 0; /* an error returned - let glibc deal with it */
-        // return -1; /* an error returned */
-    }
-    return 1; /* a PVFS path */
-#endif /* PVFS_USRINT_KMOUNT */
-}
-
-/**
- * Split a pathname into a directory and a filename.
- * If non-null is passed as the directory or filename,
- * the field will be allocated and filled with the correct value
- *
- * A slash at the end of the path is interpreted as no filename
- * and is an error.  To parse the last dir in a path, remove this
- * trailing slash.  No filename with no directory is OK.
- *
- * dirflag is set when creating or removing a directory in which
- * case we remove trailing /'s and .'s
- */
-int split_pathname( const char *path,
-                    int dirflag,
-                    char **directory,
-                    char **filename)
-{
-    int i, fnlen, slashes = 0;
-    int length = strlen("pvfs2:");/* shouldn't this have a colon? */
-
-    if (!path || !directory || !filename)
-    {
-        errno = EINVAL;
-        return -1;
-    }
-	/* chop off pvfs2 prefix */
-	if (strncmp(path, "pvfs2:", length) == 0)
-    {
-		path = &path[length];
-    }
-    /* Split path into a directory and filename */
-    length = strnlen(path, PVFS_PATH_MAX);
-    if (length == PVFS_PATH_MAX)
-    {
-        errno = ENAMETOOLONG;
-        return -1;
-    }
-    i = length - 1;
-    if (dirflag)
-    {
-        /* skip any trailing slashes or single dots */
-        for(; i >= 0 && (path[i] == '/' || 
-                        (path[i] == '.' && (i == 0 || path[i-1] == '/'))); i--)
-        {
-            slashes++;
-        }
-    }
-    for (; i >= 0; i--)
-    {
-        if (path[i] == '/')
-        {
-            int j;
-            /* parse the directory */
-            *directory = malloc(i + 1);
-            if (!*directory)
-            {
-                return -1;
-            }
-            strncpy(*directory, path, i);
-            (*directory)[i] = '\0';
-            /* remove any trailing slashes or single dots */
-            for (j = i - 1; j >= 0 && ((*directory)[j] == '/' ||
-                                      ((*directory)[j] == '.' && (j == 0 ||
-                                              (*directory)[j-1] == '/'))); j--)
-            {
-                (*directory)[j] = '\0';
-            }
-            break;
-        }
-    }
-    if (i == -1)
-    {
-        /* found no '/' path is all filename */
-        *directory = NULL;
-    }
-    i++;
-    /* copy the filename */
-    fnlen = length - i - slashes;
-    if (fnlen == 0)
-    {
-        filename = NULL;
-        if (!directory)
-        {
-            errno = EISDIR;
-        }
-        else
-        {
-            errno = ENOENT;
-        }
-        return -1;
-    }
-    /* check flag to see if there are slashes to skip */
-    *filename = malloc(fnlen + 1);
-    if (!*filename)
-    {
-        if (*directory)
-        {
-            free(*directory);
-        }
-        *directory = NULL;
-        *filename = NULL;
-        return -1;
-    }
-    strncpy(*filename, path + i, fnlen);
-    (*filename)[fnlen] = '\0';
-    return 0;
 }
 
 void PINT_initrand(void)
